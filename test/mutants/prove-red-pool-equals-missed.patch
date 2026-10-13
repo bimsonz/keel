@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-project
+# why: `--project=unit` is not read as naming a project, so `--project=unit --project pool:keel` counts as a pool command and its unit tests run under one seed.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..0062f097 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -38,7 +38,7 @@ export const SEEDS = [42, 1337, 20_261_014] as const;
+  * seed, so each seed is another run of them.
+  */
+ export function poolAlone(command: string): boolean {
+-  const named = [...command.matchAll(/--project(?:=|\s+)(?:'([^']*)'|"([^"]*)"|(\S+))/g)].map(
++  const named = [...command.matchAll(/--project\s+(?:'([^']*)'|"([^"]*)"|(\S+))/g)].map(
+     ([, single, double, bare]) => single ?? double ?? bare ?? "",
+   );
+   return named.length > 0 && named.every((project) => project.startsWith("pool:"));

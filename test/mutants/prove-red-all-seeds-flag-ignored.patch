@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: --all-seeds is read and dropped, so a lane that asks for every seed on its pool patches gets one run of each.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..f28dbb84 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -363,7 +363,7 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+     const arg = argv[at] ?? "";
+     if (arg === "--") continue;
+     if (arg === "--baseline-only") baselineOnly = true;
+-    else if (arg === "--all-seeds") allSeeds = true;
++    else if (arg === "--all-seeds") allSeeds = false;
+     else if (arg === "--unseeded") {
+       at += 1;
+       unseeded = Number(argv[at] ?? "none");

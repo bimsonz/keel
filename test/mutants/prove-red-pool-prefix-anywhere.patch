@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-project
+# why: a project counts as a pool one when `pool:` stands anywhere in its name, so `--project '!pool:keel'`, which is every project but that one, is proved on one seed.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..2106adea 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -41,7 +41,7 @@ export function poolAlone(command: string): boolean {
+   const named = [...command.matchAll(/--project(?:=|\s+)(?:'([^']*)'|"([^"]*)"|(\S+))/g)].map(
+     ([, single, double, bare]) => single ?? double ?? bare ?? "",
+   );
+-  return named.length > 0 && named.every((project) => project.startsWith("pool:"));
++  return named.length > 0 && named.every((project) => project.includes("pool:"));
+ }
+ 
+ /** One run the prover asks for, in the tree as it stands. */

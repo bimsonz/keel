@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-once-keeps-seeds, prove-red.pool-project
+# why: a command that names no project passes `every project is a pool one` with nothing to check, so a mutant of any test run without --project is proved on one seed.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..adc9015c 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -41,7 +41,7 @@ export function poolAlone(command: string): boolean {
+   const named = [...command.matchAll(/--project(?:=|\s+)(?:'([^']*)'|"([^"]*)"|(\S+))/g)].map(
+     ([, single, double, bare]) => single ?? double ?? bare ?? "",
+   );
+-  return named.length > 0 && named.every((project) => project.startsWith("pool:"));
++  return named.every((project) => project.startsWith("pool:"));
+ }
+ 
+ /** One run the prover asks for, in the tree as it stands. */

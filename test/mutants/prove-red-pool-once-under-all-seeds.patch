@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-once
+# why: the prover does not read --all-seeds, so a pool mutant that was asked to take every seed is still proved on one.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..5fb8d914 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -215,7 +215,7 @@ export function prover(given: {
+     const filtered = filteredToClaims(command, kills);
+     const fault = baselineFault(baseline(filtered, true), kills);
+     if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
+-    const once = !allSeeds && mutant.allSeeds !== true && poolAlone(command);
++    const once = mutant.allSeeds !== true && poolAlone(command);
+     return mutated(() => {
+       let note = "no tests";
+       const every = [

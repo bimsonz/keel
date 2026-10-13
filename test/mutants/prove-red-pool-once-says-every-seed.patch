@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-once
+# why: a pool mutant run once is reported as failing under three seeds and the unseeded runs it never took, so a push report claims a proof that did not happen.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..ca0f8449 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -257,7 +257,7 @@ export function prover(given: {
+         verdict: "red",
+         note,
+         detail: once
+-          ? `${bracketed(kills)} failed under seed ${SEEDS[0]}, run once (a pool project)`
++          ? `${bracketed(kills)} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`
+           : `${bracketed(kills)} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
+       };
+     });

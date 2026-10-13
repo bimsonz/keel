@@ -2,18 +2,19 @@
 # kills: prove-red.arguments
 # why: --baseline-only takes the argument after it as a value, so `--baseline-only domain-` sweeps every patch and not the domain's.
 diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
-index b86e653..fca4e2a 100644
+index 16ff0749..abe188d5 100644
 --- a/packages/tooling/src/prove-red.ts
 +++ b/packages/tooling/src/prove-red.ts
-@@ -326,7 +326,10 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+@@ -362,8 +362,10 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
    for (let at = 0; at < argv.length; at += 1) {
      const arg = argv[at] ?? "";
      if (arg === "--") continue;
 -    if (arg === "--baseline-only") baselineOnly = true;
+-    else if (arg === "--all-seeds") allSeeds = true;
 +    if (arg === "--baseline-only") {
 +      baselineOnly = true;
 +      at += 1;
-+    }
++    } else if (arg === "--all-seeds") allSeeds = true;
      else if (arg === "--unseeded") {
        at += 1;
        unseeded = Number(argv[at] ?? "none");

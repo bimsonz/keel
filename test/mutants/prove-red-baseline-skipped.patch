@@ -2,15 +2,15 @@
 # kills: prove-red.baseline
 # why: no baseline is read for a tagged mutant, so a test that already fails with no patch applied reads as killed in every run: the hole the console's [console.no-credential] fell through.
 diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
-index 660b8c4..9fb85ce 100644
+index 16ff0749..64bd486e 100644
 --- a/packages/tooling/src/prove-red.ts
 +++ b/packages/tooling/src/prove-red.ts
-@@ -159,7 +159,7 @@ export function prover(given: {
-   /** Red only if every claimed tag fails in every run: each fixed seed, then the unseeded runs. */
-   const tagged = ({ command, kills, mutated }: Mutant): Proof => {
+@@ -213,7 +213,7 @@ export function prover(given: {
+   const tagged = (mutant: Mutant): Proof => {
+     const { command, kills, mutated } = mutant;
      const filtered = filteredToClaims(command, kills);
 -    const fault = baselineFault(baseline(filtered, true), kills);
 +    const fault: string | null = null;
      if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
+     const once = !allSeeds && mutant.allSeeds !== true && poolAlone(command);
      return mutated(() => {
-       let note = "no tests";

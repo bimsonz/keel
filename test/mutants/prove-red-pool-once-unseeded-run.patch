@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-once
+# why: the one run a pool mutant takes is the last of its runs, an unseeded one, so a pool test that draws is proved on a seed nobody can repeat.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..5515ebcd 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -225,7 +225,7 @@ export function prover(given: {
+           seed: undefined,
+         })),
+       ];
+-      for (const { label, seed } of once ? every.slice(0, 1) : every) {
++      for (const { label, seed } of once ? every.slice(-1) : every) {
+         const ran = run({ command: filtered, seed, reported: true });
+         if (ran.report === undefined)
+           return {

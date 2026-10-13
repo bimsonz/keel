@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: every seed is the default again, so each pool patch takes five runs unless a lane remembers a flag: the cost that was to be cut for every lane.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..75100dfb 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -358,7 +358,7 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+   let unseeded = 2;
+   let dir: string | undefined;
+   let baselineOnly = false;
+-  let allSeeds = false;
++  let allSeeds = true;
+   for (let at = 0; at < argv.length; at += 1) {
+     const arg = argv[at] ?? "";
+     if (arg === "--") continue;

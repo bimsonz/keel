@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: --all-seeds takes the argument after it as a value, so `--all-seeds domain-` proves every patch and not the domain's.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..c4a46ecb 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -363,8 +363,10 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+     const arg = argv[at] ?? "";
+     if (arg === "--") continue;
+     if (arg === "--baseline-only") baselineOnly = true;
+-    else if (arg === "--all-seeds") allSeeds = true;
+-    else if (arg === "--unseeded") {
++    else if (arg === "--all-seeds") {
++      allSeeds = true;
++      at += 1;
++    } else if (arg === "--unseeded") {
+       at += 1;
+       unseeded = Number(argv[at] ?? "none");
+       if (!Number.isInteger(unseeded) || unseeded < 0)

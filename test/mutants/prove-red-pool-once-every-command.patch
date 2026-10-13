@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.pool-once-keeps-seeds
+# why: every tagged mutant takes one run whatever project it names, so a property test's mutant is proved on seed 42 alone and a mutant that survives another seed is never seen.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 16ff0749..411fa45e 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -215,7 +215,7 @@ export function prover(given: {
+     const filtered = filteredToClaims(command, kills);
+     const fault = baselineFault(baseline(filtered, true), kills);
+     if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
+-    const once = !allSeeds && mutant.allSeeds !== true && poolAlone(command);
++    const once = !allSeeds && mutant.allSeeds !== true;
+     return mutated(() => {
+       let note = "no tests";
+       const every = [
