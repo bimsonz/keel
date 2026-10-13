@@ -67,17 +67,18 @@ describe("the feed read by project", () => {
   it(
     "[t3.feed-project] a project's page is the whole feed after the cursor, kept to that project and cut to the limit; its cursor is the last one returned when cut and the head otherwise; read to the end, every event of the project comes exactly once",
     () => {
-      let cuts = 0;
-      let caughtUp = 0;
       fc.assert(
         fc.property(
-          fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 60 }),
-          fc.integer({ min: 0, max: 64 }),
+          // Feeds of every length up to sixty: by default fast-check keeps arrays short.
+          fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 60, size: "max" }),
+          fc.nat({ max: 200 }),
           fc.integer({ min: 1, max: 8 }),
           fc.integer({ min: 0, max: 2 }),
-          (arrivals, after, limit, which) => {
+          (arrivals, anywhere, limit, which) => {
             const store = makeEntityStoreMemory().service;
             const events = arrivals.map((p, index) => arrival(index + 1, PROJECTS[p]));
+            // A cursor anywhere in the feed, or a little past its head.
+            const after = anywhere % (events.length + 4);
             for (const event of events) store.transaction(() => recordFeed(store, event));
             const project = PROJECTS[which];
             if (project === undefined) throw new Error("three projects");
@@ -88,8 +89,6 @@ describe("the feed read by project", () => {
               index + 1 > after && event.project === project ? [{ event, at: index + 1 }] : [],
             );
             const cut = mine.length > limit;
-            if (cut) cuts += 1;
-            else caughtUp += 1;
             const expected = {
               ids: mine.slice(0, limit).map((each) => each.event.eventId),
               cursor: position(cut ? (mine[limit - 1]?.at ?? 0) : Math.max(head, after)),
@@ -113,14 +112,12 @@ describe("the feed read by project", () => {
           },
         ),
       );
-      // The generator reaches both ends of the cursor rule.
-      expect(cuts).toBeGreaterThan(0);
-      expect(caughtUp).toBeGreaterThan(0);
     },
     PROPERTY_TIMEOUT,
   );
 
-  it("[t3.feed-project] by hand: interleaved projects, a page cut and a page caught up", () => {
+  // Both ends of the cursor rule as fixed examples: what a property draws is never what a case asserts.
+  it("[t3.feed-project] by hand: interleaved projects, a page cut by its limit and a page caught up", () => {
     const store = makeEntityStoreMemory().service;
     const [a, b] = PROJECTS;
     const events = [a, b, a, undefined, b, a, b].map((project, index) =>
