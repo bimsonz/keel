@@ -410,7 +410,7 @@ describe("the Lane DO", () => {
     await drainOutbox(stub);
   });
 
-  it("[lane.do.instance-failed] the platform's report of an errored instance, through the Lanes adapter, fails its batch on the infrastructure and frees the lane for the next change; a report of an instance still running changes nothing", async () => {
+  it("[lane.do.instance-failed] the platform's report of an errored instance, through the Lanes adapter, fails its batch on the infrastructure and frees the lane for the next change; a report of an instance still running, or of another instance, changes nothing", async () => {
     const { stub, laneId, verification } = await lane();
     await stub.receive([queued(laneId, 1), queued(laneId, 2)]);
     await runDurableObjectAlarm(stub);
@@ -421,6 +421,13 @@ describe("the Lane DO", () => {
     await Effect.runPromise(ended.pipe(Effect.provide(LanesRpc(env.LANE))));
     expect(await batchState(stub, job.fence.batchId)).toBe("verifying");
     verification.end(instanceId, { _tag: "Failed", status: "errored", error: "not a job" });
+    // A report that names another instance, an earlier batch's, is not this batch's: nothing is read for it.
+    const stray = Effect.flatMap(Lanes, (lanes) =>
+      lanes.verificationEnded(laneId, `${instanceId}-earlier`),
+    );
+    await Effect.runPromise(stray.pipe(Effect.provide(LanesRpc(env.LANE))));
+    expect(verification.looked).toEqual([instanceId]);
+    expect(await batchState(stub, job.fence.batchId)).toBe("verifying");
     await Effect.runPromise(ended.pipe(Effect.provide(LanesRpc(env.LANE))));
     expect(await batchState(stub, job.fence.batchId)).toBe("red");
     // The lane is free: the change behind gets a batch and an instance of its own.
