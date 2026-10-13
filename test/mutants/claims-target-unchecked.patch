@@ -2,10 +2,10 @@
 # kills: token.target
 # why: a token request's project is never checked to be a project id, so a token is asked for with whatever text the request sends
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index ee77446..b14aabd 100644
+index d21f06d..2b2eb89 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
-@@ -68,7 +68,6 @@ export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunC
+@@ -76,7 +76,6 @@ export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunC
    if (runKey !== undefined && agent.keys?.some((key) => key.jkt === runKey))
      return Result.fail(new RunKeyRefused());
    const project = request.project === undefined ? undefined : asProject(request.project);

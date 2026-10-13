@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/changes.test.ts
+# kills: run.changes-port
+# why: the doorway's adapter sends a declare without the token's run, so a change declared by a lane is held by no run on the real objects
+diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+index 0997151..fe0a350 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+@@ -85,7 +85,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+           const command = encodeDeclare({
+             changeId,
+             agentId: principal.agentId,
+-            ...(principal.run === undefined ? {} : { run: principal.run }),
+             projectId: principal.projectId,
+             origin: "agent",
+             ...intent,

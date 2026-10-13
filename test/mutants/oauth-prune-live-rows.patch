@@ -2,10 +2,10 @@
 # kills: oauth.rows
 # why: a token request deletes every signed request's id, live ones too, so a captured request is good again as soon as anyone asks for a token
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index c7c4bfd..5dddf08 100644
+index 409ba6d..7b49ec6 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -205,7 +205,7 @@ export async function agentClaims(
+@@ -207,7 +207,7 @@ export async function agentClaims(
  export async function forgetSpentIds(db: D1Database, now: Date = new Date()): Promise<void> {
    const at = now.toISOString();
    await db.batch([

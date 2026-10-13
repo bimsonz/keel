@@ -2,10 +2,10 @@
 # kills: token.key-only
 # why: the directory answers every agent's keys for any agent, so a request signed by one agent's key gets another agent's token
 diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-index 17a8ec3..3c3a6db 100644
+index a7ad46a..6f78313 100644
 --- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
 +++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-@@ -85,7 +85,7 @@ export function AgentDirectoryD1(db: D1Database) {
+@@ -86,7 +86,7 @@ export function AgentDirectoryD1(db: D1Database) {
              db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId),
              db
                .prepare(

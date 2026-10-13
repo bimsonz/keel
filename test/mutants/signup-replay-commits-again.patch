@@ -2,10 +2,10 @@
 # kills: agent.sign-up
 # why: the same key signing up again commits AgentSignedUp a second time, so every retry of a sign-up is another event in the log and on the feed
 diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
-index aa8eff2..439dcb5 100644
+index 68c39af..659c6a4 100644
 --- a/packages/core/src/domain/identity/agent-machine.ts
 +++ b/packages/core/src/domain/identity/agent-machine.ts
-@@ -105,7 +105,9 @@ export const decideAgent = (
+@@ -129,7 +129,9 @@ export const decideAgent = (
      case "SignUp":
        // The same key again is the same account, so nothing is committed. Another key never joins this way.
        return agent.state !== "revoked" && agent.keys?.some((key) => key.jkt === command.key.jkt)

@@ -2,10 +2,10 @@
 # kills: signup.directory
 # why: writing an account leaves its old keys in place, so a key the agent removed still gets its tokens
 diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-index 17a8ec3..473a06a 100644
+index a7ad46a..7f6e557 100644
 --- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
 +++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-@@ -192,12 +192,11 @@ export function AgentDirectoryD1(db: D1Database) {
+@@ -233,12 +233,11 @@ export function AgentDirectoryD1(db: D1Database) {
                  agent.revocationEpoch,
                  agent.createdAt,
                ),

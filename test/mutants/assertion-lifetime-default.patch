@@ -2,10 +2,10 @@
 # kills: token.assertion
 # why: a signed token request may say it is good for the provider's default five minutes, so one that leaks unused is good five times as long
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index c7c4bfd..07e09c8 100644
+index 409ba6d..aca363d 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -251,7 +251,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
+@@ -253,7 +253,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
      // The provider links a resource to a stored client row, and an agent has none: Keel has one resource.
      enforcePerClientResources: false,
      m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,

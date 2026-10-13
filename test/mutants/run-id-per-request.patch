@@ -2,10 +2,10 @@
 # kills: token.run
 # why: a run's id follows the key that asks, so a lane that restarts with a new key is a new run and its work is split in two
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index ee77446..bd16077 100644
+index d21f06d..763e728 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
-@@ -17,7 +17,7 @@ export type RunName =
+@@ -25,7 +25,7 @@ export type RunName =
   * different names.
   */
  export function runIdOf(agentId: AgentId, name: RunName): RunId {

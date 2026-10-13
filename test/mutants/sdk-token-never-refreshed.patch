@@ -2,7 +2,7 @@
 # kills: sdk.key-token
 # why: a key client keeps its first token for ever, so five minutes in every call is refused once, and each of them pays for a second token
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index ff295d6..ac65b3e 100644
+index 4320047..370bcf0 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -171,7 +171,7 @@ export class KeelClient {

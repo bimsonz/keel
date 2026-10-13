@@ -2,10 +2,10 @@
 # kills: token.run
 # why: a run's id is made from its label alone, so two agents that both call a run `main` share one run
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index ee77446..ab4e448 100644
+index d21f06d..87f9314 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
-@@ -18,7 +18,7 @@ export type RunName =
+@@ -26,7 +26,7 @@ export type RunName =
   */
  export function runIdOf(agentId: AgentId, name: RunName): RunId {
    const named = name.label === undefined ? `key\n${name.runKey}` : `label\n${name.label}`;

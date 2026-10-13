@@ -2,7 +2,7 @@
 # kills: dpop.token
 # why: a token whose signature does not verify is read anyway, so anyone writes their own and is any agent they name
 diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-index e70ff90..a5979a7 100644
+index 90bba1a..7c5b4e5 100644
 --- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 @@ -83,7 +83,8 @@ export async function verifyAgentToken(

@@ -2,7 +2,7 @@
 # kills: dpop.bound-token
 # why: a token's key binding is never checked, so a token copied from a log or the wire works for whoever holds it
 diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-index e70ff90..02d7519 100644
+index 90bba1a..cb991e4 100644
 --- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 @@ -87,7 +87,7 @@ export async function verifyAgentToken(

@@ -2,10 +2,10 @@
 # kills: token.shape
 # why: an agent's token lasts the provider's default hour, so a token copied from a log is good twelve times as long
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index c7c4bfd..b154082 100644
+index 409ba6d..bd1f9cf 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -250,7 +250,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
+@@ -252,7 +252,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
      resources: [config.origin],
      // The provider links a resource to a stored client row, and an agent has none: Keel has one resource.
      enforcePerClientResources: false,

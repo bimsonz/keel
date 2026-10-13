@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/events-feed.test.ts
+# kills: run.published
+# why: the feed publishes an event without its run, so the console and every reader see one agent where several runs worked
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index e9f0e1a..46fa672 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -91,14 +91,6 @@ function eventRecord(entry: EventFeedEntry) {
+     seq: entry.seq,
+     at: new Date(entry.at).toISOString(),
+     ...(entry.actor === undefined ? {} : { actor: entry.actor }),
+-    ...(entry.run === undefined
+-      ? {}
+-      : {
+-          run: {
+-            id: entry.run.id,
+-            ...(entry.run.label === undefined ? {} : { label: entry.run.label }),
+-          },
+-        }),
+     ...(entry.project === undefined ? {} : { project: entry.project }),
+     ...(entry.label === undefined ? {} : { label: entry.label }),
+     payload,

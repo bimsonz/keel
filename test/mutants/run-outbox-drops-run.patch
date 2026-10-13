@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: run.envelope
+# why: the outbox stamps the actor on an event and leaves the run off, so every event of an agent with several runs reads as the whole agent's
+diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
+index 022dee2..9150d30 100644
+--- a/packages/core/src/application/ports/event-outbox.ts
++++ b/packages/core/src/application/ports/event-outbox.ts
+@@ -278,7 +278,6 @@ export function envelopesFor(
+       dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
+       ...(spec.causation === undefined ? {} : { causation: spec.causation }),
+       ...(spec.actor === undefined ? {} : { actor: spec.actor }),
+-      ...(spec.run === undefined ? {} : { run: spec.run }),
+       ...(spec.project === undefined ? {} : { project: spec.project }),
+       affected: draft.affected ?? [],
+       notified: subscribers(type, { entity, affected: draft.affected ?? [] }),

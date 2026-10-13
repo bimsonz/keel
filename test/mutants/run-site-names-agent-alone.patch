@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/run-commit-sites.test.ts
+# kills: run.commit-sites
+# why: a use-case names the agent as its commit's actor itself, so the next one written the same way drops the run and nothing notices
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index c360c49..724db69 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -209,7 +209,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+       cause: command.idempotencyKey,
+       fingerprint,
+       project: at.projectId,
+-      ...byAgent(command.agentId, command.run),
++      actor: `agent:${command.agentId}` as const,
+     },
+     conflictMove(conflictId, escalate),
+   ).pipe(

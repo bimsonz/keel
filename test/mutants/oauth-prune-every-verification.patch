@@ -2,10 +2,10 @@
 # kills: oauth.rows
 # why: the pruning deletes every expired verification row, not a proof's id alone, so it reaches into rows other parts of sign-in own
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index c7c4bfd..c7cd77e 100644
+index 409ba6d..51938cc 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -208,7 +208,7 @@ export async function forgetSpentIds(db: D1Database, now: Date = new Date()): Pr
+@@ -210,7 +210,7 @@ export async function forgetSpentIds(db: D1Database, now: Date = new Date()): Pr
      db.prepare(`DELETE FROM "oauthClientAssertion" WHERE "expiresAt" < ?`).bind(at),
      db
        .prepare(
