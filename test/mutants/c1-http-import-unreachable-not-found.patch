@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/operator.test.ts
+# kills: a11b.start-refused
+# why: An upstream that did not answer is told as a repository that is not there, so the caller gives up on a create that would work shortly
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 8ca67339..58ffc9d2 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -202,7 +202,7 @@ const IMPORT_REFUSALS: Record<
+     next: "Name a branch the repository holds, or leave `ref` out to take its default",
+   },
+   unreachable: {
+-    status: 503,
++    status: 404,
+     detail: "The repository's host did not answer.",
+     next: "Create the project again shortly, with the same Idempotency-Key",
+   },

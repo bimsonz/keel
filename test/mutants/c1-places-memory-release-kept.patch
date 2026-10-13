@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-release
+# why: The memory adapter keeps a released place, so a test of a refused start passes on an adapter that gives nothing back
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 296e5c76..f897bb19 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -203,7 +203,7 @@ export function makeProjectNamespacesMemory() {
+             places.set(place.projectId, { ...place, name });
+             return Effect.void;
+           }),
+-        release: (projectId) => Effect.sync(() => void places.delete(projectId)),
++        release: () => Effect.void,
+         byId: (projectId) => Effect.sync(() => Option.fromNullishOr(places.get(projectId))),
+         byName: (namespace, name) =>
+           Effect.sync(() => Option.fromNullishOr(byName(namespace, name))),

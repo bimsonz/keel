@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/project.test.ts
+# kills: project.do.start-refused
+# why: The port answers the wire's shape of ImportTooLarge, not its own error, so a caller matching the port's class misses it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+index 4115c4a1..fc65698a 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+@@ -54,7 +54,6 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+             Effect.catchTags({
+               RepoNotFound: (missing) => Effect.fail(new RepoNotFound({ repo: missing.repo })),
+               ImportRefused: (refused) => Effect.fail(new ImportRefused(refused)),
+-              ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
+             }),
+           );
+         }),

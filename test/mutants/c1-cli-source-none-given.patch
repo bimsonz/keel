@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/cli/test/cli.test.ts
+# kills: cli.project-source-usage
+# why: A create that names no start is sent as an empty project, which nobody asked for
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index c6d22bc5..b0d50f20 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -93,7 +93,7 @@ function sourceOf(values: {
+     values.fork !== undefined,
+     values.template !== undefined,
+   ].filter(Boolean).length;
+-  if (given !== 1)
++  if (given > 1)
+     throw new UsageError("give exactly one of --empty, --import, --fork and --template");
+   if (values.ref !== undefined && values.import === undefined)
+     throw new UsageError("--ref names a branch of the repository --import takes");

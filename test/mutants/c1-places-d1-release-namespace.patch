@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-release
+# why: Releasing one project's place empties its whole namespace
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index 017be66e..2f5bba31 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -55,7 +55,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+         }),
+       release: (projectId) =>
+         Effect.promise(() =>
+-          db.prepare("DELETE FROM projects WHERE id = ?").bind(projectId).run(),
++          db.prepare("DELETE FROM projects WHERE namespace_id = (SELECT namespace_id FROM projects WHERE id = ?)").bind(projectId).run(),
+         ).pipe(Effect.asVoid),
+       byId,
+       byName: (namespace, name) =>

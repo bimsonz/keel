@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.start-empty
+# why: A retry asks for the first commit again though main is there, so the writer is reached for a trunk that already has its start
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..f597feae 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -140,7 +140,6 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+       yield* host.create(repos.trunk).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+     const main = branchOf(yield* Effect.orDie(host.branches(repos.trunk)), MAIN);
+     const head =
+-      main?.commit ??
+       (yield* (yield* Trunks).seed(projectId, command.name, yield* startedAt(projectId, entity)));
+     const empty: TrunkOrigin = { kind: "empty" };
+     return { head, origin: empty };

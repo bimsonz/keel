@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.import-over-quota
+# why: An import its namespace has no room for stays in the code host, held by a project that was never made
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..093ab2f6 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -208,7 +208,6 @@ export const createProject: (
+   yield* trunks.initialize(projectId, head, command.by, origin).pipe(
+     Effect.catchTag("PromotionStateRefused", Effect.die),
+     // The history is no project's: its repo goes, so the namespace holds nothing it was refused.
+-    Effect.tapError(() => host.delete(repos.trunk)),
+   );
+   if (!(yield* exists(repos.staging)))
+     yield* host

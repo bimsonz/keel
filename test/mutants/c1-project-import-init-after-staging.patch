@@ -1,0 +1,33 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.import-over-quota
+# why: Staging and the mirror are made before the import is admitted, so a refused import leaves two repos behind
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..bb607d73 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -203,6 +203,12 @@ export const createProject: (
+   const repos = projectRepos(projectId);
+   const host = yield* CodeHost;
+   const { head, origin } = yield* startTrunk(command, entity);
++  if (!(yield* exists(repos.staging)))
++    yield* host
++      .fork(repos.trunk, repos.staging)
++      .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
++  if (!(yield* exists(repos.mirror)))
++    yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+   const trunks = yield* Trunks;
+   // A retry names the same head (trunk was made once), so only a trunk moved by someone else refuses.
+   yield* trunks.initialize(projectId, head, command.by, origin).pipe(
+@@ -210,12 +216,6 @@ export const createProject: (
+     // The history is no project's: its repo goes, so the namespace holds nothing it was refused.
+     Effect.tapError(() => host.delete(repos.trunk)),
+   );
+-  if (!(yield* exists(repos.staging)))
+-    yield* host
+-      .fork(repos.trunk, repos.staging)
+-      .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
+-  if (!(yield* exists(repos.mirror)))
+-    yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+   yield* trunks.sync(projectId);
+   yield* (yield* WorkspacePool).configure(projectId, { source: repos.mirror, target: poolTarget });
+ 

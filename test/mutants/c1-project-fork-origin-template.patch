@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.start-fork, b11.bootstrap-order
+# why: A fork is recorded as a template and a template as a fork, so a trunk's origin names the wrong kind of start
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..78c0f4a0 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -130,9 +130,9 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+       yield* host.fork(from, repos.trunk).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+     const head = yield* Effect.orDie(host.head(repos.trunk, MAIN));
+     const forked: TrunkOrigin =
+-      source._tag === "Template"
+-        ? { kind: "template", name: source.repo, commit: head }
+-        : { kind: "forked", project: source.projectId, commit: head };
++      source._tag !== "Template"
++        ? { kind: "template", name: projectRepos(projectId).trunk.name, commit: head }
++        : { kind: "forked", project: projectId, commit: head };
+     return { head, origin: forked };
+   }
+   if (source._tag === "Empty") {

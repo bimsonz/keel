@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/operator.test.ts
+# kills: a11b.start-refused
+# why: A create refused by the quota drops what the quota said to do next
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 8ca67339..84b1436a 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -273,12 +273,6 @@ export function createProjectError(
+         body: problem(403, "quota.exceeded", caller.requestId, {
+           detail: `The repository's history is ${error.requested} bytes, and the namespace has ${Math.max(0, error.limit - error.used)} of its ${error.limit} left (${error.kind}). Nothing was kept, and no project was made.`,
+           nextActions: [
+-            ...error.nextActions.map(({ kind, title, operationId, args }) => ({
+-              kind,
+-              title,
+-              ...(operationId === undefined ? {} : { operationId }),
+-              ...(args === undefined ? {} : { args }),
+-            })),
+             again("Import a smaller repository, or create the project in a namespace with room"),
+           ],
+         }),

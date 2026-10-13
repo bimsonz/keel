@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.import-not-main, project.start-import
+# why: An import that came under another branch is given no main, so trunk has no branch Keel lands on
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..206eef41 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -155,7 +155,6 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+   const came = branches.find((branch) => branch.ref !== MAIN) ?? main;
+   if (came === undefined)
+     return yield* Effect.die(new Error(`project ${projectId}: its imported trunk holds no branch`));
+-  if (main === undefined) yield* (yield* Trunks).adopt(projectId, came.commit);
+   const imported: TrunkOrigin = {
+     kind: "imported",
+     url: source.url,

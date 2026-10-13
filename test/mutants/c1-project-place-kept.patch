@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/project-place.test.ts
+# kills: project.place-released
+# why: A refused start keeps its place, so the name is held by a project that was never made
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+index 2da55a30..0c9ede1e 100644
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -71,11 +71,7 @@ export const createProject: (
+   yield* places.assign({ projectId, namespace, name });
+   return yield* (yield* Projects)
+     .create(actor, { projectId, name, source: input.source, idempotencyKey })
+-    .pipe(
+-      Effect.tapError((refused) =>
+-        refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),
+-      ),
+-    );
++;
+ });
+ 
+ /** The project's settings, as its Project DO holds them. */

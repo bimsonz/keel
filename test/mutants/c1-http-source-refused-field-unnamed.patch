@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/operator.test.ts
+# kills: a11b.source-refused
+# why: A refused import does not say which field to fix
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 8ca67339..7d247175 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -342,7 +342,7 @@ export function sourceRefused(
+     status: 400,
+     body: problem(400, "request.invalid", caller.requestId, {
+       detail: `The import's ${refused.field} ${URL_REFUSALS[refused.why]} (${refused.why}).`,
+-      issues: [{ path: ["body", "source", refused.field], message: URL_REFUSALS[refused.why] }],
++      issues: [{ path: ["body", "source"], message: URL_REFUSALS[refused.why] }],
+       nextActions: [again(`Correct the import's ${refused.field}, then create the project again`)],
+     }),
+   };

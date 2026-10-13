@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.import-not-main, project.start-import
+# why: An import's origin says main came, whatever branch the upstream gave
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..2c540130 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -159,7 +159,7 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+   const imported: TrunkOrigin = {
+     kind: "imported",
+     url: source.url,
+-    ref: came.ref,
++    ref: MAIN,
+     commit: came.commit,
+   };
+   return { head: came.commit, origin: imported };

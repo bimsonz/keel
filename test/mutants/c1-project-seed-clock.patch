@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: project.seed-time
+# why: Each try takes its own time for the first commit, so a retry writes another commit than the one a lost push may have landed
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6177185e..b4d3c75b 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -89,8 +89,7 @@ const alreadyMade = () => Effect.void;
+  */
+ const startedAt = (projectId: ProjectId, entity: EntityRef) =>
+   commit({ entity, cause: `start:${projectId}`, project: projectId }, (tx) => {
+-    if (tx.store.get(PROJECT_START, projectId) === undefined)
+-      tx.store.put(PROJECT_START, projectId, { at: tx.at });
++    tx.store.put(PROJECT_START, projectId, { at: tx.at });
+     return Result.succeed({ value: undefined, drafts: [] });
+   }).pipe(
+     Effect.andThen(EntityStore),
