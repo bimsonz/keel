@@ -426,14 +426,16 @@ describe("a deps build", () => {
           HOME: "/root",
           KEEL_BUNDLE_URL: `https://bundles.keel.internal/${X}/${"b".repeat(64)}?exp=1900000000&sig=${"A".repeat(86)}`,
           KEEL_INSTALL: "5555555555555555555555555555555555555555555555555555555555555555",
-          KEEL_INSTALL_INPUTS:
+          // One line of base64, written by another hand than the box's.
+          KEEL_INSTALL_INPUTS_B64: btoa(
             "keel.install/1\n" +
-            "6666666666666666666666666666666666666666666666666666666666666666  .npmrc\n" +
-            "7777777777777777777777777777777777777777777777777777777777777777  package.json\n" +
-            "8888888888888888888888888888888888888888888888888888888888888888  packages/cli/bin/cli.js\n" +
-            "9999999999999999999999999999999999999999999999999999999999999999  packages/cli/package.json\n" +
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  pnpm-lock.yaml\n" +
-            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  pnpm-workspace.yaml\n",
+              "6666666666666666666666666666666666666666666666666666666666666666  .npmrc\n" +
+              "7777777777777777777777777777777777777777777777777777777777777777  package.json\n" +
+              "8888888888888888888888888888888888888888888888888888888888888888  packages/cli/bin/cli.js\n" +
+              "9999999999999999999999999999999999999999999999999999999999999999  packages/cli/package.json\n" +
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  pnpm-lock.yaml\n" +
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  pnpm-workspace.yaml\n",
+          ),
           KEEL_DEPS_UPLOAD: "http://deps.keel.internal",
         },
       },
@@ -444,7 +446,7 @@ describe("a deps build", () => {
       "KEEL_BUNDLE_URL",
       "KEEL_DEPS_UPLOAD",
       "KEEL_INSTALL",
-      "KEEL_INSTALL_INPUTS",
+      "KEEL_INSTALL_INPUTS_B64",
     ]);
   });
 
@@ -919,8 +921,8 @@ describe("keel-verify's buildDeps", () => {
       parts: [secondPart],
     });
     expect([first.started(), second.started()]).toMatchObject([
-      [{ env: { KEEL_INSTALL: A, KEEL_INSTALL_INPUTS: one } }],
-      [{ env: { KEEL_INSTALL: B, KEEL_INSTALL_INPUTS: other } }],
+      [{ env: { KEEL_INSTALL: A, KEEL_INSTALL_INPUTS_B64: btoa(one) } }],
+      [{ env: { KEEL_INSTALL: B, KEEL_INSTALL_INPUTS_B64: btoa(other) } }],
     ]);
     // Two pointers side by side: the second build wrote nothing over the first.
     expect([await pointerAt(X, A), await pointerAt(X, B)]).toMatchObject([

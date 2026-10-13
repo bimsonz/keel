@@ -15,7 +15,13 @@ import {
   pointerServes,
 } from "@keeltown/core/application/verification";
 import type { NamespaceId } from "@keeltown/core/kernel";
-import { BUNDLE_HOST, DEPS_BUILD_COMMAND, DEPS_HOST, sha256Hex } from "@keeltown/runner-protocol";
+import {
+  BUNDLE_HOST,
+  DEPS_BUILD_COMMAND,
+  DEPS_HOST,
+  depsInputsEncoded,
+  sha256Hex,
+} from "@keeltown/runner-protocol";
 import { Exit, Option, Schema } from "effect";
 import {
   type DepsBoxRpc,
@@ -50,7 +56,8 @@ export interface DepsInstallEnv {
   readonly HOME: string;
   readonly KEEL_BUNDLE_URL: string;
   readonly KEEL_INSTALL: string;
-  readonly KEEL_INSTALL_INPUTS: string;
+  /** The inputs on one line (`depsInputsEncoded`): a session's exec does not hand over a value of several lines whole. */
+  readonly KEEL_INSTALL_INPUTS_B64: string;
   readonly KEEL_DEPS_UPLOAD: string;
 }
 
@@ -383,7 +390,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
         HOME: "/root",
         KEEL_BUNDLE_URL: request.bundleUrl,
         KEEL_INSTALL: need.install,
-        KEEL_INSTALL_INPUTS: need.inputs,
+        KEEL_INSTALL_INPUTS_B64: depsInputsEncoded(need.inputs),
         KEEL_DEPS_UPLOAD: `http://${DEPS_HOST}`,
       });
     } catch (error) {

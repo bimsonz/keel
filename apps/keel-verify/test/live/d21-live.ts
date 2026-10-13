@@ -13,7 +13,7 @@
 //           to a `bounce` verdict under its own plan's hash, ChangeBounced, and
 //           no landing. This is the arm that can fail.
 // Each case is judged from the project's event feed. KeelVerify's instance is
-// `keel-verify-<BatchFormed eventId>`, read back with wrangler. What is
+// `keel-verify-<projectId>-<laneName>-<BatchFormed eventId>`, read back with wrangler. What is
 // deployed to keel-verify is read before and after the run, and must be the
 // same. Every change the run leaves open is abandoned at the end. KEEL_URL
 // overrides keel.town.
@@ -53,6 +53,9 @@ function operatorClient(): KeelClient {
 type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
 const tagOf = (e: EventRecord): string => e.payload._tag;
 const field = (e: EventRecord, key: string): unknown => Reflect.get(e.payload, key);
+/** KeelVerify's instance for a batch, as its lane names it: `keel-verify-<projectId>-<laneName>-<BatchFormed eventId>`. */
+const verifyInstanceOf = (formed: EventRecord): string =>
+  `keel-verify-${String(field(formed, "projectId"))}-${String(field(formed, "laneId")).split(":").at(-1) ?? ""}-${formed.eventId}`;
 
 async function feedHead(reader: KeelClient): Promise<string> {
   let page = await reader.events({ limit: 500 });
@@ -283,7 +286,7 @@ try {
     const planHash = compiled === undefined ? undefined : field(compiled, "planHash");
     console.log(`     settled in ${settledMs} ms; plan ${String(planHash)}`);
     if (formed !== undefined) {
-      const instance = `keel-verify-${formed.eventId}`;
+      const instance = verifyInstanceOf(formed);
       const described = describeVerify(instance);
       console.log(`     ${instance}: ${described.status}, steps ${described.steps.join(" → ")}`);
       console.log(`     verdict step: ${JSON.stringify(described.verdict).slice(0, 600)}`);

@@ -330,8 +330,8 @@ const path = (name: string, value: string): string => {
  * Its environment: `KEEL_BUNDLE_URL`, the candidate bundle's signed URL,
  * fetched with its scheme rewritten to `http://` (the box has no HTTPS, and
  * the signature does not cover the scheme); `KEEL_INSTALL`, the install digest
- * the build is for, and `KEEL_INSTALL_INPUTS`, the inputs it is the sha256
- * of; `KEEL_DEPS_UPLOAD`, the base URL each part is PUT under, by
+ * the build is for, and `KEEL_INSTALL_INPUTS_B64`, the inputs it is the sha256
+ * of, as `depsInputsEncoded` writes them; `KEEL_DEPS_UPLOAD`, the base URL each part is PUT under, by
  * its sha256; and `KEEL_REGISTRY` (the public registry over plain HTTP when
  * unset).
  *
@@ -379,7 +379,7 @@ export const depsBuildCommand = (
   const partBytes = count("partBytes", terms.partBytes);
   const maxBytes = count("maxBytes", terms.maxBytes);
   const installSeconds = count("installSeconds", terms.installSeconds);
-  return [
+  const build = [
     "set -u",
     VERIFY_BUNDLE_SH,
     DEPS_PACK_SH,
@@ -426,6 +426,26 @@ export const depsBuildCommand = (
     'done <"$K/packed"',
     'echo "KEEL_FILES $files"; echo "KEEL_INSTALL_MS $ms"; echo "KEEL_PARTS $list"; echo "KEEL_BUILD ok"; echo KEEL_END',
   ].join("\n");
+  // A sandbox session runs a command in its own long-lived shell, so the build is a subshell: `refuse`'s exit
+  // ends it alone. A session hands over a value of several lines with every line after the first indented, so
+  // the inputs come as one line of base64 (`depsInputsEncoded`) and are read back here, their last newline kept.
+  return [
+    "(",
+    'KEEL_INSTALL_INPUTS=$(printf %s "${KEEL_INSTALL_INPUTS_B64:-}" | base64 -d 2>/dev/null; printf x)',
+    "KEEL_INSTALL_INPUTS=${KEEL_INSTALL_INPUTS%x}",
+    build,
+    ")",
+  ].join("\n");
+};
+
+/**
+ * The install inputs as the box hands them to its command, in
+ * `KEEL_INSTALL_INPUTS_B64`: the base64 of their UTF-8 bytes, on one line.
+ */
+export const depsInputsEncoded = (inputs: string): string => {
+  let bytes = "";
+  for (const byte of new TextEncoder().encode(inputs)) bytes += String.fromCharCode(byte);
+  return btoa(bytes);
 };
 
 /** The deps box's command as keel-verify runs it: core's terms, in the image's own paths. */

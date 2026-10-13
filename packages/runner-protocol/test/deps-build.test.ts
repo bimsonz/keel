@@ -27,6 +27,7 @@ import {
   type DepsBuildTerms,
   DepsRefused,
   depsBuildCommand,
+  depsInputsEncoded,
   sha256Hex,
   writeBundle,
 } from "../src/index.ts";
@@ -477,10 +478,12 @@ const box = (over: (root: string) => Partial<DepsBoxPaths> = () => ({})) => {
     paths,
     calls: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : []),
     /** Runs the deps box's command, as keel-verify's object does, with this environment. */
-    build: (terms: DepsBuildTerms, env: NodeJS.ProcessEnv) =>
+    build: (terms: DepsBuildTerms, env: NodeJS.ProcessEnv, session = false) =>
       new Promise<{ status: number | null; stdout: string; stderr: string; lines: string[] }>(
         (done, failed) => {
-          const child = spawn("sh", ["-c", depsBuildCommand(terms, paths)], {
+          const command = depsBuildCommand(terms, paths);
+          // A session's shell reads the command as its own input and lives on: a line of its own follows.
+          const child = spawn("sh", session ? ["-s"] : ["-c", command], {
             env: {
               ...process.env,
               NO_PROXY: "127.0.0.1",
@@ -496,7 +499,8 @@ const box = (over: (root: string) => Partial<DepsBoxPaths> = () => ({})) => {
           child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
           child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
           child.stdin.on("error", () => undefined);
-          child.stdin.end();
+          if (session) child.stdin.end(`${command}\necho KEEL_SESSION_ALIVE\n`);
+          else child.stdin.end();
           child.on("error", failed);
           child.on("close", (status) => {
             const stdout = Buffer.concat(out).toString("utf8");
@@ -524,7 +528,7 @@ const environment = (
 ) => ({
   KEEL_BUNDLE_URL: `https://${origin}/${NAMESPACE}/${built.address}?exp=1800000000&sig=${SIGNATURE}`,
   KEEL_INSTALL: built.install,
-  KEEL_INSTALL_INPUTS: built.inputs,
+  KEEL_INSTALL_INPUTS_B64: depsInputsEncoded(built.inputs),
   KEEL_DEPS_UPLOAD: `http://${origin}`,
 });
 
@@ -541,6 +545,8 @@ const refusal = async (
     /** The hash the bundle's URL names, when it is not the candidate's own. */
     readonly address?: string;
     readonly paths?: (root: string) => Partial<DepsBoxPaths>;
+    /** Run on a shell's standard input, as a sandbox session's exec runs a command. */
+    readonly session?: boolean;
   } = {},
 ) => {
   const built = await candidate(over.lock ?? LOCK, over.inputs);
@@ -549,10 +555,14 @@ const refusal = async (
     over.uploads,
   );
   const deps = box(over.paths);
-  const ran = await deps.build(over.terms ?? TERMS, {
-    ...environment(host.origin, { ...built, address: over.address ?? built.address }),
-    ...(typeof over.env === "function" ? over.env(deps.paths) : over.env),
-  });
+  const ran = await deps.build(
+    over.terms ?? TERMS,
+    {
+      ...environment(host.origin, { ...built, address: over.address ?? built.address }),
+      ...(typeof over.env === "function" ? over.env(deps.paths) : over.env),
+    },
+    over.session,
+  );
   return {
     status: ran.status,
     read: parseDepsBuild(ran.stdout),
@@ -827,6 +837,23 @@ describe("the deps box's command", () => {
     expect(unmade).toMatchObject({ ...refused("no-workspace"), installs: 0, puts: 0 });
   });
 
+  it("[deps.build.session] refuses without ending the shell that runs it: a sandbox session runs the command in its own long-lived shell, which is left to read the report and run what comes next", async () => {
+    // The command on a shell's standard input, as a session's exec runs one, and a line of the shell's own after it.
+    const unmade = await refusal({
+      session: true,
+      paths: (root) => ({ workspace: join(root, "toolchain/workspace") }),
+    });
+    expect(unmade.lines).toEqual([...refused("no-workspace").lines, "KEEL_SESSION_ALIVE"]);
+  });
+
+  it("[deps.inputs.encoded] hands the inputs over as one line of base64, of their UTF-8 bytes: a session's exec indents every line of a value after its first", () => {
+    const inputs =
+      "keel.install/1\n" + `${"6".repeat(64)}  caf${String.fromCodePoint(233)}/package.json\n`;
+    expect(depsInputsEncoded(inputs)).toBe(
+      "a2VlbC5pbnN0YWxsLzEKNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NiAgY2Fmw6kvcGFja2FnZS5qc29uCg==",
+    );
+  });
+
   it("[deps.build.bundle] refuses a bundle it cannot fetch, one that is not what its URL names, and one whose tree does not verify", async () => {
     const unfetched = await refusal({ served: () => new Map() });
     expect(unfetched).toMatchObject({ ...refused("bundle-unfetched"), installs: 0, puts: 0 });
@@ -866,10 +893,10 @@ describe("the deps box's command", () => {
       await refusal({ env: { KEEL_INSTALL: sha256("another candidate's inputs\n") } }),
     ).toMatchObject(mismatch);
     expect(await refusal({ env: { KEEL_INSTALL: "" } })).toMatchObject(mismatch);
-    expect(await refusal({ env: { KEEL_INSTALL_INPUTS: "" } })).toMatchObject(mismatch);
+    expect(await refusal({ env: { KEEL_INSTALL_INPUTS_B64: "" } })).toMatchObject(mismatch);
     // Handed neither, as a box is that was started for no digest at all.
     expect(
-      await refusal({ env: { KEEL_INSTALL: undefined, KEEL_INSTALL_INPUTS: undefined } }),
+      await refusal({ env: { KEEL_INSTALL: undefined, KEEL_INSTALL_INPUTS_B64: undefined } }),
     ).toMatchObject(mismatch);
   });
 

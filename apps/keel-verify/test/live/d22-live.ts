@@ -179,6 +179,9 @@ const archiveBucket = (): string => {
   return found;
 };
 
+/** KeelVerify's instance for a batch, as its lane names it: `keel-verify-<projectId>-<laneName>-<BatchFormed eventId>`. */
+const verifyInstanceOf = (formed: EventRecord): string =>
+  `keel-verify-${String(field(formed, "projectId"))}-${String(field(formed, "laneId")).split(":").at(-1) ?? ""}-${formed.eventId}`;
 const stepsOf = (e: EventRecord | undefined) => (e === undefined ? undefined : field(e, "steps"));
 
 /** The role cache's effect, as B's code makes it: freshness is per-session on the permission check. */
@@ -606,10 +609,10 @@ try {
     return tagOf(e) === "BatchFormed" && Array.isArray(members) && members.includes(C);
   });
   if (formed !== undefined) {
-    const verify = describe("keel-verify-batch", `keel-verify-${formed.eventId}`);
+    const verify = describe("keel-verify-batch", verifyInstanceOf(formed));
     if (verify !== undefined) {
       console.log(
-        `     keel-verify-${formed.eventId}: ${verify.status}, steps ${verify.steps.map((s) => s.name).join(" → ")}`,
+        `     ${verifyInstanceOf(formed)}: ${verify.status}, steps ${verify.steps.map((s) => s.name).join(" → ")}`,
       );
       for (const s of verify.steps.filter((x) => x.name.includes("guard")))
         console.log(`     ${s.name}: ${brief(s.output, 700)}`);
