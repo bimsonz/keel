@@ -10,11 +10,11 @@
 //       ref name, and trunk's first head, which stock git finds on that branch
 //       of the upstream with the same history behind it;
 //   (b) a change lands on the imported history: an agent's workspace holds the
-//       origin's commit, its new file lands as one commit above trunk's head,
-//       and stock git verifies that commit against the signers file Keel
-//       publishes and refuses it against a file that names another key. The
-//       imported commits are as the upstream wrote them: Keel signs only what
-//       it composes;
+//       origin's commit, its new file lands as one commit of Keel's above the
+//       head it started from, and stock git verifies that commit against the
+//       signers file Keel publishes and refuses it against a file that names
+//       another key. The imported commits are as the upstream wrote them:
+//       Keel signs only what it composes;
 //   (c) an empty project: `c6b-empty` starts with one commit of Keel's own, a
 //       README that names the project, with no parent, written and committed
 //       by Keel at this host, which stock git verifies against the published
@@ -98,10 +98,10 @@ async function initialized(reader: KeelClient, projectId: string) {
 }
 
 const dirs: string[] = [];
-try {
-  const operator = new KeelClient({ baseUrl: keelUrl, session });
+const operator = new KeelClient({ baseUrl: keelUrl, session });
 
-  // (a) the import, and its origin on record.
+/** (a) and (b): the import with its origin on record, and a change landed on it. */
+async function importAndLand(): Promise<void> {
   const upstream = mkdtempSync(join(tmpdir(), "keel-c6b-"));
   dirs.push(upstream);
   git(upstream, ["init", "-q"]);
@@ -201,36 +201,51 @@ try {
   const bounce = tagged(events, "ChangeBounced", declared.change.id)[0]?.payload;
   if (bounce !== undefined)
     console.log(`     bounced: ${JSON.stringify(Reflect.get(bounce, "reasons"))}`);
-  check(
-    tagged(events, "ChangeLanded", declared.change.id).length === 1,
-    "(b) the change lands on the imported trunk",
-  );
-  const [landed = "", below = ""] = (await agent.commits(imported.id, { limit: 2 })).items.map(
-    (c) => c.sha,
-  );
-  check(
-    landed !== trunkAtStart && below === trunkAtStart,
-    "(b) trunk's head is one new commit above the head the change started from",
-  );
-  // A workspace granted now is forked from trunk, so its clone holds what landed; it is abandoned once read.
+  const landedIt = tagged(events, "ChangeLanded", declared.change.id).length === 1;
+  check(landedIt, "(b) the change lands on the imported trunk");
+  console.log("\n     chain of the import's change:");
+  for (const e of events) console.log(`     ${line(e)}`);
+  // Nothing landed: trunk's head is still the import's, and there is no commit of Keel's to read.
+  if (!landedIt) return;
+  // What the change landed as, by its own ChangeLanded: another change may land around it.
+  const landed =
+    events.flatMap((e) =>
+      e.payload._tag === "ChangeLanded" && e.payload.changeId === declared.change.id
+        ? [e.payload.commitSha]
+        : [],
+    )[0] ?? "";
+  // A workspace granted now is a fork of trunk. One forked before the landing is brought to
+  // trunk's head as an agent would bring it. It is abandoned once read.
   const reader = await declareWhenPooled(
     agent,
     { goal: `6b ${run}: read trunk`, footprint: [{ path: file, op: "edit" }] },
     key(`${run}:${IMPORTED}:reader`),
   );
   if (reader.workspace.token === undefined) throw new Error("declare answered no workspace token");
-  const dirR = cloneWorkspace(reader.workspace.remote, reader.workspace.token);
+  const tokenR = reader.workspace.token;
+  const dirR = cloneWorkspace(reader.workspace.remote, tokenR);
   dirs.push(dirR);
+  if (!holdsCommit(dirR, landed)) {
+    await agent.rebase(reader.change.id, {
+      lease: reader.lease.id,
+      idempotencyKey: key(`${run}:${IMPORTED}:reader:rebase`),
+    });
+    git(dirR, ["fetch", "-q", "origin", "keel/trunk"], tokenR);
+    console.log("     the reader's workspace was forked before the landing: trunk fetched into it");
+  }
   const signers = await keelSigners(dirR, agent, keelUrl);
   check(
-    holdsCommit(dirR, landed) && reaches(dirR, origin.commit, landed),
-    "(b) a workspace forked after it holds the landed commit, with the origin's commit behind it",
+    holdsCommit(dirR, landed) &&
+      reaches(dirR, trunkAtStart, landed) &&
+      reaches(dirR, origin.commit, landed),
+    "(b) the landed commit is on trunk above the head the change started from, with the origin's commit behind it",
   );
   if (holdsCommit(dirR, landed)) {
     console.log(`     ${signers.show(landed, "%h %G? signed by %GS, committed by %cn <%ce> %cI")}`);
     check(
-      git(dirR, ["show", `${landed}:${file}`]) === text.trim(),
-      "(b) the landed commit holds the agent's file",
+      git(dirR, ["diff-tree", "--no-commit-id", "--name-only", "-r", landed]) === file &&
+        git(dirR, ["show", `${landed}:${file}`]) === text.trim(),
+      "(b) the landed commit adds the agent's file and nothing else",
     );
   }
   check(
@@ -250,8 +265,10 @@ try {
     {},
     { lease: reader.lease.id, idempotencyKey: key(`${run}:${IMPORTED}:reader:abandon`) },
   );
+}
 
-  // (c) an empty project starts with Keel's own signed commit.
+/** (c): an empty project starts with Keel's own signed commit. */
+async function startEmpty(): Promise<void> {
   const empty = await operator.createProject(
     { namespace: NAMESPACE, name: EMPTY, source: { kind: "empty" } },
     { idempotencyKey: key(`project:${EMPTY}`) },
@@ -308,17 +325,20 @@ try {
     {},
     { lease: look.lease.id, idempotencyKey: key(`${run}:${EMPTY}:reader:abandon`) },
   );
-
-  console.log("\n     chain of the import's change:");
-  for (const e of events) console.log(`     ${line(e)}`);
-} catch (error) {
-  if (error instanceof KeelProblem) {
-    console.log(`FAIL ${error.message}`);
-    for (const next of error.nextActions) console.log(`       next: ${next.title}`);
-  } else console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
-  failures += 1;
-} finally {
-  for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 }
+
+// Each part by itself: what stops one says nothing of the other.
+for (const part of [importAndLand, startEmpty]) {
+  try {
+    await part();
+  } catch (error) {
+    if (error instanceof KeelProblem) {
+      console.log(`FAIL ${error.message}`);
+      for (const next of error.nextActions) console.log(`       next: ${next.title}`);
+    } else console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+    failures += 1;
+  }
+}
+for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 console.log(failures === 0 ? "\nall 6b checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
