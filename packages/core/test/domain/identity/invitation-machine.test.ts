@@ -7,6 +7,7 @@ import {
   evolveInvitation,
   type Invitation,
   type InvitationCommand,
+  type InvitationFacts,
   type InvitationScopes,
   INVITED_SCOPES,
   type NamespaceAgentEvent,
@@ -24,7 +25,10 @@ import {
   userActor,
   type UserId,
 } from "../../../src/domain/kernel/index.ts";
+import { invitationChart } from "../../charts/charts.ts";
+import { ABSENT, foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { type Machine, tour } from "../../support/machine.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const ORG: NamespaceId = makeId("org", ulid(1));
@@ -72,6 +76,18 @@ const decodes = (scopes: unknown) =>
     scopes,
   })._tag === "Some";
 const end = (by: Actor): InvitationCommand => ({ _tag: "End", by });
+
+const START = 1_760_000_000_000;
+const machine: Machine<Invitation, InvitationCommand, NamespaceAgentEvent, InvitationFacts> = {
+  decide: decideInvitation,
+  evolve: evolveInvitation,
+};
+
+// The chart checks the machine; it never drives it.
+const invitationView: View<Invitation, NamespaceAgentEvent> = {
+  from: (f) => f.before?.state ?? ABSENT,
+  to: (f) => f.after.state,
+};
 
 describe("the invitation machine", () => {
   it("[link.invite-machine] a member invites, the agent accepts, and only then does anyone answer for it, on what the invitation gives", () => {
@@ -270,5 +286,32 @@ describe("the invitation machine", () => {
         expect(replayInvitation(log)).toEqual(state);
       }),
     );
+  });
+
+  it("[link.invite-chart] every state change a run makes is an edge of the Invitation chart, and a tour of the machine takes every edge", () => {
+    fc.assert(
+      fc.property(fc.array(commandArb, { size: "max", maxLength: 40 }), (commands) => {
+        let state: Invitation | undefined;
+        for (const [index, command] of commands.entries()) {
+          const decided = decideInvitation(state, command, FACTS);
+          const folds = foldsOf(machine, state, [decided], Instant(START + index));
+          expect(offChart(invitationChart, folds, invitationView)).toEqual([]);
+          state = folds.at(-1)?.after ?? state;
+        }
+      }),
+    );
+    // Every command from every state, with no seed: the agent's own end and a person's.
+    const walked = tour(machine, {
+      start: Instant(START),
+      facts: () => FACTS,
+      moves: () =>
+        [invite(ANN), accept, end(agentActor(BOT)), end(userActor(ANN))].map((command) => ({
+          command,
+          dt: 1,
+        })),
+      signature: (invitation) => invitation?.state ?? ABSENT,
+    });
+    expect(offChart(invitationChart, walked, invitationView)).toEqual([]);
+    expect(uncovered(invitationChart, walked, invitationView)).toEqual([]);
   });
 });

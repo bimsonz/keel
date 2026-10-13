@@ -272,6 +272,20 @@ export const agentChart: Chart = {
   },
 };
 
+// Invitation: an agent's place in one namespace. Ended is where a run may rest, and no end: the agent may be invited again.
+const i = to("invitation");
+
+export const invitationChart: Chart = {
+  id: "invitation",
+  initial: "invited",
+  meta: { createdBy: "AgentInvited", section: "Invitation" },
+  states: {
+    invited: { on: { AgentJoinedNamespace: i("joined"), AgentLeftNamespace: i("ended") } },
+    joined: { on: { AgentLeftNamespace: i("ended") } },
+    ended: { tags: ["terminal"], on: { AgentInvited: i("invited") } },
+  },
+};
+
 // Conflict
 const f = to("conflict");
 /** Out of an open conflict: proof, a ruling or a non-discriminating probe, or escalation when it is unprovable. */
@@ -389,6 +403,7 @@ export const charts: readonly Chart[] = [
   workspaceChart,
   sketchChart,
   agentChart,
+  invitationChart,
   conflictChart,
   probeChart,
   escalationChart,

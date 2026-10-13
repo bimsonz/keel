@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-chart
+# why: an end leaves the agent where it was, invited or joined, where the chart says it is Ended
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..e8c9c6bc 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -165,7 +165,7 @@ export const evolveInvitation = (
+         ? { ...state, state: "joined", joinedAt: committed.at }
+         : illegal(state, event);
+     case "AgentLeftNamespace":
+-      return standing(state) ? { ...state, state: "ended" } : illegal(state, event);
++      return standing(state) ? { ...state } : illegal(state, event);
+     default: {
+       const unreachable: never = event;
+       return unreachable;

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-chart
+# why: the chart draws AgentInvited on a joined agent, an edge the machine never takes: one member answers for it until its invitation ends
+diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
+index db48566b..5c06c4f5 100644
+--- a/packages/core/test/charts/charts.ts
++++ b/packages/core/test/charts/charts.ts
+@@ -281,7 +281,7 @@ export const invitationChart: Chart = {
+   meta: { createdBy: "AgentInvited", section: "Invitation" },
+   states: {
+     invited: { on: { AgentJoinedNamespace: i("joined"), AgentLeftNamespace: i("ended") } },
+-    joined: { on: { AgentLeftNamespace: i("ended") } },
++    joined: { on: { AgentLeftNamespace: i("ended"), AgentInvited: i("invited") } },
+     ended: { tags: ["terminal"], on: { AgentInvited: i("invited") } },
+   },
+ };

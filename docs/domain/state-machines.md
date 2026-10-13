@@ -521,6 +521,18 @@ stateDiagram-v2
 
 Owner: the namespace's own object (`ns:<id>`), one row an agent, on the namespace's entity `org:<namespaceId>`. An agent is invited into an org by a member and stands there once it accepts (`read` and `work`, never more). A person's own namespace and an agent's own take no invitation: the policy asks it of an org alone.
 
+<!-- chart:invitation — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
+```mermaid
+stateDiagram-v2
+  [*] --> Invited: AgentInvited
+  Invited --> Joined: AgentJoinedNamespace
+  Invited --> Ended: AgentLeftNamespace
+  Joined --> Ended: AgentLeftNamespace
+  Ended --> Invited: AgentInvited
+  Ended --> [*]
+```
+<!-- /chart:invitation -->
+
 | From | Command | Event | To |
 |---|---|---|---|
 | none, Ended | `Invite {by, scopes}` | `AgentInvited` | Invited |
