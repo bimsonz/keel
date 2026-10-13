@@ -3,6 +3,7 @@ import { D1_AWAY, isD1Unavailable } from "../../src/adapters/driven/d1/unavailab
 
 /** The sentences Cloudflare lists as the ones a retry is for, written out here so one leaving the list is seen. */
 const TRANSIENT = [
+  "D1 DB reset because its code was updated.",
   "Network connection lost.",
   "Replica disconnected from primary.",
   "Internal error in D1 DB storage caused object to be reset.",
@@ -21,7 +22,7 @@ const under = (wrappers: number, error: unknown): unknown =>
   wrappers === 0 ? error : new Error("a wrapper", { cause: under(wrappers - 1, error) });
 
 describe("what D1 says when it is away", () => {
-  it("[d1.unavailable-list] each of the eleven sentences reads as away: plain, as D1 prefixes it, and as a cause two deep", () => {
+  it("[d1.unavailable-list] each sentence of the list reads as away: plain, as D1 prefixes it, and as a cause two deep", () => {
     expect([...D1_AWAY]).toEqual(TRANSIENT);
     for (const sentence of TRANSIENT) {
       expect([

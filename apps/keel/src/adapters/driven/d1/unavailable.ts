@@ -5,6 +5,7 @@
  * Keel's own defect and has no place here.
  */
 export const D1_AWAY = [
+  "D1 DB reset because its code was updated.",
   "Network connection lost.",
   "Replica disconnected from primary.",
   "Internal error in D1 DB storage caused object to be reset.",
