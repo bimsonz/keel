@@ -15736,7 +15736,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "A commit on trunk. Each change Keel lands is one commit, which keeps its\nsubmitted author, names Keel as committer (so `committer.at` is when it\nlanded), and names the change in a `Change-Id` trailer."
+        "description": "A commit on trunk. Each change Keel lands is one commit, signed by Keel as\ncommitter (so `committer.at` is when it landed; the keys are published at\n`/.well-known/keel/allowed-signers`). Its author is the agent whose change\nit is, under Keel's own `agents.` domain, at the date of the commit the\nagent pushed. Its trailers name the change (`Change-Id`), the agent\n(`Keel-Agent`), its run once it has one (`Keel-Run`), and what the pushed\ncommit said of its own author (`Declared-Author`)."
       },
       "RepoCommitDiff": {
         "type": "object",

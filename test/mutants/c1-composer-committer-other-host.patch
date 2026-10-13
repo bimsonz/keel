@@ -2,7 +2,7 @@
 # kills: composer.deterministic, composer.keeps-author, signers.decode
 # why: Keel commits under a fixed address instead of keel@<its host>, so the committer is not the principal its signers file names
 diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
-index 6da24da..4c09b9e 100644
+index 7532946..39cfcd2 100644
 --- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
 @@ -39,7 +39,7 @@ const Signers = Schema.Array(
@@ -12,5 +12,5 @@ index 6da24da..4c09b9e 100644
 -export const keelPrincipal = (host: string) => `keel@${host}`;
 +export const keelPrincipal = (_host: string) => "keel@keel.invalid";
  
- /** Keel as the committer of what it composes at `at` (milliseconds). */
- export const keelCommitter = (host: string, at: number): Signature => ({
+ /**
+  * An agent as the author of what it landed: its given handle (its id while it

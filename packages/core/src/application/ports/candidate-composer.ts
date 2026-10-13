@@ -1,7 +1,23 @@
 import { Context, type Effect } from "effect";
 import type { CompositionRefused } from "../../domain/integration/index.ts";
-import type { CandidateId, ChangeId, CommitSha, Instant, Tier } from "../../domain/kernel/index.ts";
+import type {
+  AgentId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  Instant,
+  Tier,
+} from "../../domain/kernel/index.ts";
 import type { RepoRef } from "./code-host.ts";
+
+/** The agent a change belongs to, as the gate authenticated it: who Keel names as the author of what it lands. */
+export interface MemberAgent {
+  readonly id: AgentId;
+  /** Its given handle, made from its key. An agent enrolled before handles has none and is written by its id. */
+  readonly handle?: string | undefined;
+  /** The run the change was made in, once runs exist. */
+  readonly run?: string | undefined;
+}
 
 /** One queued change: where its commits live, the trunk commit it was made on, and what it lands as. */
 export interface CandidateMember {
@@ -13,6 +29,12 @@ export interface CandidateMember {
   readonly head: CommitSha;
   /** The intent's title: its commit's message. */
   readonly title: string;
+  /**
+   * The change's agent, which Keel writes as its commit's author; what the
+   * submitted commit said of its own author is kept as a trailer. Absent only
+   * for a probe's world, which never lands and keeps its submitted authors.
+   */
+  readonly agent?: MemberAgent | undefined;
 }
 
 export interface CandidateRequest {
@@ -49,8 +71,11 @@ export interface ComposedCandidate {
 
 /**
  * Restacks queued changes onto trunk: one commit per member, chained in batch
- * order, each with its `Change-Id` trailer, its submitted commit's author and
- * Keel as committer at the batch's time, refusing whenever unsure. Composing a
+ * order, each signed by Keel as committer at the batch's time, authored by the
+ * member's agent at the submitted commit's date, and carrying `Change-Id`,
+ * `Keel-Agent`, `Keel-Run` (once runs exist) and `Declared-Author` (the
+ * submitted commit's own author text) as trailers; a member with no agent
+ * keeps its submitted author. It refuses whenever unsure. Composing a
  * candidate again gives the same commits and leaves its ref as it was.
  */
 export class CandidateComposer extends Context.Service<

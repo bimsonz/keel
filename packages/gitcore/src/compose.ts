@@ -20,14 +20,24 @@ import {
 } from "./objects.ts";
 import { objectsBetween } from "./transfer.ts";
 
+/** The trailer that holds what a submitted commit said of its own author, when the composer names another. */
+export const DECLARED_AUTHOR = "Declared-Author";
+
 /** One change in a batch: its own base and head, and the commit it becomes. */
 export interface RestackMember {
   /** The commit the change was made on (its workspace's head when granted). */
   readonly base: string;
-  /** The submitted commit, whose author the restacked commit keeps. */
+  /** The submitted commit: the restacked commit keeps its author date, and its author unless one is given. */
   readonly head: string;
   readonly message: string;
   readonly trailers: ReadonlyArray<readonly [string, string]>;
+  /**
+   * Who the restacked commit's author line names, in place of the submitted
+   * commit's own author: a submitted commit says whatever its writer typed.
+   * The date and offset stay the submitted commit's, and its own author text
+   * is kept as the last trailer, `Declared-Author`, labelled as what it is.
+   */
+  readonly author?: { readonly name: string; readonly email: string } | undefined;
 }
 
 export interface Restacked {
@@ -88,7 +98,8 @@ export class FallbackReader implements ObjectReader {
  * Folds each member onto `base` in order, merging its change against its own
  * base (`mergeTrees(tree(m.base), acc, tree(m.head))`), and commits each step
  * on top of the one before, by `committer` and with the submitted head's own
- * author (name, email, date and offset), as `git rebase` keeps it. With
+ * author (name, email, date and offset), as `git rebase` keeps it, or with the
+ * member's given author at the submitted date. With
  * `options.sign` each commit is signed and its id is that of the signed
  * commit. Throws `MemberRefused` at the first member GitCore will not merge,
  * and `MissingObject` for an object no reader holds.
@@ -118,10 +129,13 @@ export async function restack(
     const spec: CommitSpec = {
       tree: merged.tree,
       parents: [parent],
-      author: to.author,
+      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
       committer,
       message: m.message,
-      trailers: m.trailers,
+      trailers:
+        m.author === undefined
+          ? m.trailers
+          : [...m.trailers, [DECLARED_AUTHOR, `${to.author.name} <${to.author.email}>`]],
     };
     const unsigned = encodeCommit(spec);
     const body =

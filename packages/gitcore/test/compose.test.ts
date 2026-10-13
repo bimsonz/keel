@@ -253,6 +253,65 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
     }
   });
 
+  it("[restack.author-given] a member's given author is written at the submitted commit's date, with the submitted author kept as the Declared-Author trailer", async () => {
+    const ada = "Ada Lovelace <ada@example.com> 1712345678 +0200";
+    const { base, heads } = seed([
+      { ...edit(2, (t) => t.set("src/a.ts", file("export const a = 12;\n"))), author: ada },
+      edit(3, (t) => t.set("lib/f.ts", file("export const f = 6;\n"))),
+    ]);
+    const [first = "", second = ""] = heads;
+    const staging = stagingWith(trunkOf(BASE));
+    try {
+      const out = await restack(
+        new FallbackReader([staging.reader, wsReader]),
+        base,
+        [
+          {
+            ...memberOf(0, base, first),
+            trailers: [
+              ["Change-Id", "chg_0"],
+              ["Keel-Agent", "agt_7"],
+            ],
+            author: { name: "k7f3-agent", email: "agt_7@agents.keel.test" },
+          },
+          memberOf(1, base, second),
+        ],
+        KEEL,
+      );
+      const tip = out.commits.at(-1)?.oid ?? "";
+      expect(await pushTo(staging.dir, CAND, tip, out.objects)).toEqual({ kind: "applied" });
+      // What git itself reads back: the identities, and the trailers by git's own trailer parser.
+      const read = out.commits.map((c) =>
+        git(staging.dir, [
+          "show",
+          "-s",
+          "--format=%an <%ae> %at %ad%n%cn <%ce> %ct%n%(trailers:only,unfold)",
+          "--date=format:%z",
+          c.oid,
+        ])
+          .trim()
+          .split("\n"),
+      );
+      expect(read).toEqual([
+        [
+          "k7f3-agent <agt_7@agents.keel.test> 1712345678 +0200",
+          `Keel <keel@keel.invalid> ${KEEL.time}`,
+          "Change-Id: chg_0",
+          "Keel-Agent: agt_7",
+          "Declared-Author: Ada Lovelace <ada@example.com>",
+        ],
+        // No author given: the submitted commit's own stands, and nothing is declared.
+        [
+          "t <t@example.com> 1700000000 +0000",
+          `Keel <keel@keel.invalid> ${KEEL.time}`,
+          "Change-Id: chg_1",
+        ],
+      ]);
+    } finally {
+      staging.cleanup();
+    }
+  });
+
   it("[restack.deterministic] restacks one batch to the same commits and objects every time", async () => {
     const { base, heads } = seed([
       edit(2, (t) => t.set("src/b.ts", file("export const b = 22;\n"))),

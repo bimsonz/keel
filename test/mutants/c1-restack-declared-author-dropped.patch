@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/compose.test.ts apps/keel/test/unit/candidate-composer.test.ts
+# kills: restack.author-given, composer.agent-author
+# why: What the pushed commit said of its own author is thrown away when Keel names the author
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index edfe72f..36fef9d 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -132,10 +132,7 @@ export async function restack(
+       author: m.author === undefined ? to.author : { ...to.author, ...m.author },
+       committer,
+       message: m.message,
+-      trailers:
+-        m.author === undefined
+-          ? m.trailers
+-          : [...m.trailers, [DECLARED_AUTHOR, `${to.author.name} <${to.author.email}>`]],
++      trailers: m.trailers,
+     };
+     const unsigned = encodeCommit(spec);
+     const body =

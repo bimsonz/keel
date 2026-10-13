@@ -36,6 +36,7 @@ const BASE = {
 };
 const ulid = (n: number) => `01JA0000000000000000000${String(n).padStart(3, "0")}`;
 const changeId = (n: number) => makeId("chg", ulid(n));
+const agentId = (n: number) => makeId("agt", ulid(n));
 const candidateId = (n: number) => makeId("cnd", ulid(n));
 
 const run = <A, E>(program: Effect.Effect<A, E, CodeHost | CodeHostFixture | CandidateComposer>) =>
@@ -56,6 +57,9 @@ async function readBack(repo: RepoRef, sha: string) {
       author: `${c.author.name} <${c.author.email}> ${c.authoredAt}`,
       committer: `${c.committer.name} <${c.committer.email}> ${c.committedAt}`,
       changeId: /^Change-Id: (.+)$/m.exec(c.message)?.[1],
+      agent: /^Keel-Agent: (.+)$/m.exec(c.message)?.[1],
+      declared: /^Declared-Author: (.+)$/m.exec(c.message)?.[1],
+      authoredAt: c.authoredAt,
       title: c.message.split("\n")[0],
     };
   } finally {
@@ -98,6 +102,10 @@ it("[composer.live] composes a three-change candidate through the binding and pu
         repo: workspaceAt(i),
         base,
         head: heads[i] ?? base,
+        // The first two are landings by an agent, one with a handle; the third keeps its submitted author.
+        ...(i < 2
+          ? { agent: { id: agentId(i), ...(i === 0 ? { handle: "k7f3-live" } : {}) } }
+          : {}),
         title: `change ${i}`,
       });
       const request = {
@@ -123,7 +131,8 @@ it("[composer.live] composes a three-change candidate through the binding and pu
     }),
   );
   const chain = await Promise.all(report.composed.commits.map((c) => readBack(staging, c.sha)));
-  // What each agent pushed: the restacked commit keeps its author, as git rebase does.
+  // What each agent pushed: a landing is authored by its agent at the pushed commit's date, and
+  // declares the pushed author; a member with no agent keeps its author, as git rebase does.
   const submitted = await Promise.all(
     [0, 1, 2].map((i) => readBack(workspaceAt(i), report.heads[i] ?? report.base)),
   );
@@ -140,14 +149,22 @@ it("[composer.live] composes a three-change candidate through the binding and pu
     [report.composed.commits[1]?.sha],
   ]);
   const seconds = AT / 1000;
-  // The pushed commits are not the agents' identities, so a composer stamping the agent fails here.
-  expect(submitted.filter((c) => c.author.includes("@agents.keel.invalid"))).toEqual([]);
+  // The pushed commits are not the agents' identities, so a composer keeping them fails here.
+  expect(submitted.filter((c) => c.author.includes("@agents.keel.test"))).toEqual([]);
+  const authors = [
+    `k7f3-live <${agentId(0)}@agents.keel.test> ${submitted[0]?.authoredAt}`,
+    `${agentId(1)} <${agentId(1)}@agents.keel.test> ${submitted[1]?.authoredAt}`,
+    submitted[2]?.author,
+  ];
   expect(chain).toEqual(
     [0, 1, 2].map((i) => ({
       parents: expect.any(Array),
-      author: submitted[i]?.author,
+      author: authors[i],
+      authoredAt: submitted[i]?.authoredAt,
       committer: `Keel <keel@keel.test> ${seconds}`,
       changeId: changeId(i),
+      agent: i < 2 ? agentId(i) : undefined,
+      declared: i < 2 ? submitted[i]?.author.replace(/ \S+$/, "") : undefined,
       title: `change ${i}`,
     })),
   );

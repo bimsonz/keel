@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/compose.test.ts apps/keel/test/unit/candidate-composer.test.ts
+# kills: restack.author-given, composer.agent-author
+# why: A given author is written at the committer's time, so the date the work was authored is lost
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index edfe72f..6397bed 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -129,7 +129,7 @@ export async function restack(
+     const spec: CommitSpec = {
+       tree: merged.tree,
+       parents: [parent],
+-      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
++      author: m.author === undefined ? to.author : { ...committer, ...m.author },
+       committer,
+       message: m.message,
+       trailers:

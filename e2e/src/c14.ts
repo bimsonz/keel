@@ -26,7 +26,9 @@
 //   (i) Keel signs what it lands: one more workspace, taken only to read trunk,
 //       holds the run's landed commits, and stock git verifies each against
 //       the signers file Keel publishes, and none against a file that names
-//       another key. Each names Keel at this host as its committer.
+//       another key. Each names Keel at this host as its committer, and as
+//       its author the agent whose change it is, under Keel's agents domain,
+//       with what the pushed commit said of its author kept as a trailer.
 // It ends with each promotion's wall time by trunk's own clock. No remote URL
 // or credential is printed.
 import { execFileSync } from "node:child_process";
@@ -510,6 +512,41 @@ try {
       (sha) => git(dirR, ["log", "-1", "--format=%cn <%ce>", sha]) === `Keel <${principal}>`,
     ),
     `(i) each names Keel <${principal}> as its committer`,
+  );
+  // Who landed what: each change's agent, as Keel authenticated it, never what its commit says.
+  const [firstId = "", secondId = ""] = await Promise.all(
+    [first, second].map(async (client) => (await client.whoami()).result.agent.id),
+  );
+  const agentOf = new Map([
+    [a.change.id, firstId],
+    [b.change.id, secondId],
+    ...declaredHunks.map((d, i): [string, string] => [d.change.id, i === 0 ? firstId : secondId]),
+  ]);
+  const trailer = (sha: string, name: string) =>
+    git(dirR, ["log", "-1", `--format=%(trailers:key=${name},valueonly)`, sha]).trim();
+  const agentsHost = `agents.${new URL(keelUrl).host}`;
+  for (const sha of held)
+    console.log(
+      `     ${git(dirR, ["log", "-1", "--format=%h author %an <%ae>", sha])}; declared ${trailer(sha, "Declared-Author")}`,
+    );
+  check(
+    held.every((sha) => {
+      const agent = agentOf.get(trailer(sha, "Change-Id"));
+      return (
+        agent !== undefined &&
+        trailer(sha, "Keel-Agent") === agent &&
+        git(dirR, ["log", "-1", "--format=%ae", sha]) === `${agent}@${agentsHost}`
+      );
+    }),
+    `(i) each is authored by the agent whose change it is, at ${agentsHost}, and names it in Keel-Agent`,
+  );
+  check(
+    held.every((sha) =>
+      /^c14-(first|second) <c14-(first|second)@agents\.keel\.invalid>$/.test(
+        trailer(sha, "Declared-Author"),
+      ),
+    ),
+    "(i) each keeps what its pushed commit said of its author, as Declared-Author",
   );
   await first.abandon(
     reader.change.id,

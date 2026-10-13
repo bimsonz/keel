@@ -20,6 +20,7 @@ import {
 } from "@keeltown/gitcore";
 import { Effect, Layer, Schema } from "effect";
 import {
+  agentAuthor,
   type CommitSigner,
   type CommitSigningConfig,
   commitSigner,
@@ -41,10 +42,11 @@ export type OpenObjects = (repo: RepoRef) => Promise<ObjectReader & Disposable>;
 
 /**
  * What gitcore restacks for a request: Keel at `host` as committer at
- * BatchFormed's time, the intent's title as the message and the change's
- * `Change-Id` trailer. Each commit keeps its submitted commit's author, which
- * gitcore reads from the head. Everything comes from the request and its
- * commits, so a recompose gives the same SHAs.
+ * BatchFormed's time, the intent's title as the message, and as author the
+ * member's agent, named by the trailers `Keel-Agent` and (once it has one)
+ * `Keel-Run` after `Change-Id`. A member with no agent, a probe's, keeps its
+ * submitted commit's author, which gitcore reads from the head. Everything
+ * comes from the request and its commits, so a recompose gives the same SHAs.
  */
 export function restackSpec(
   request: CandidateRequest,
@@ -61,7 +63,12 @@ export function restackSpec(
       base: m.base,
       head: m.head,
       message: m.title,
-      trailers: [["Change-Id", m.changeId]],
+      trailers: [
+        ["Change-Id", m.changeId],
+        ...(m.agent === undefined ? [] : [["Keel-Agent", m.agent.id] as const]),
+        ...(m.agent?.run === undefined ? [] : [["Keel-Run", m.agent.run] as const]),
+      ],
+      author: m.agent === undefined ? undefined : agentAuthor(m.agent, host),
     })),
   };
 }

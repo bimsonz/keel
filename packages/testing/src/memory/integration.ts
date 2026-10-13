@@ -16,6 +16,7 @@ import {
   BundleRefused,
   CandidateBundles,
   CandidateComposer,
+  type CandidateRequest,
   Lanes,
   PackTooLarge,
   type RepoRef,
@@ -42,12 +43,16 @@ const sha1 = async (text: string): Promise<CommitSha> => {
  * when unsure.
  */
 export function makeCandidateComposerMemory(options: { readonly refuse?: readonly string[] } = {}) {
+  /** Every request composed or refused, in order: what a lane named for each member. */
+  const requests: CandidateRequest[] = [];
   return {
+    requests,
     layer: Layer.succeed(
       CandidateComposer,
       CandidateComposer.of({
         compose: (request) =>
           Effect.gen(function* () {
+            requests.push(request);
             const refused = request.members.filter((m) => options.refuse?.includes(m.changeId));
             if (refused.length > 0)
               return yield* new CompositionRefused({ reason: "overlap", paths: [] });

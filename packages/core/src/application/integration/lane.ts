@@ -651,6 +651,8 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
         base: workspace.baseSha,
         head: change.commitSha,
         title: change.intent.goal,
+        // The agent the change belongs to, as the gate authenticated it: never what its commit says.
+        agent: { id: change.agentId },
       } satisfies CandidateMember;
     }).pipe(Effect.orDie),
   );

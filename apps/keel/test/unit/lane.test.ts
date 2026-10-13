@@ -161,7 +161,8 @@ function world(options: WorldOptions = {}) {
       });
     }),
   ).pipe(Layer.provide(Layer.merge(verification.layer, outbox.layer)));
-  const composer = makeCandidateComposerMemory({ refuse: options.refuseCompose ?? [] }).layer;
+  const composing = makeCandidateComposerMemory({ refuse: options.refuseCompose ?? [] });
+  const composer = composing.layer;
   const layer = Layer.mergeAll(
     outbox.layer,
     clock.layer,
@@ -187,7 +188,20 @@ function world(options: WorldOptions = {}) {
     yield* (yield* CodeHost).create(STAGING);
     return yield* code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
   });
-  return { code, clock, verification, bundles, staging, changes, startedIn, hooks, layer, seeded };
+  return {
+    code,
+    clock,
+    verification,
+    bundles,
+    staging,
+    changes,
+    startedIn,
+    hooks,
+    layer,
+    seeded,
+    /** Every compose the lane asked for, as it asked. */
+    composed: composing.requests,
+  };
 }
 type World = ReturnType<typeof world>;
 
@@ -521,6 +535,28 @@ describe("the Lane", () => {
         yield* laneStep(LANE);
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([]);
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(1)]]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.member-author] names each member's agent to the composer as the change records it: not its lease's holder, and nothing its commit says",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const queued = w.changes.get(change(1));
+        if (queued === undefined) throw new Error("the change was not queued");
+        // Another agent holds the lease: the author is the change's own agent all the same.
+        w.changes.set(change(1), {
+          ...queued,
+          lease: { ...queued.lease, agentId: makeId("agt", "01J9BBBBBBBBBBBBBBBBBBBBBB") },
+        });
+        yield* toVerifying(w);
+        expect(w.composed.map((request) => request.members.map((m) => m.agent))).toEqual([
+          [{ id: AGENT }],
+        ]);
       }).pipe(Effect.provide(w.layer));
     },
   );

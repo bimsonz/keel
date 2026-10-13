@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.member-author
+# why: The Lane names no agent for a member, so a landing keeps whatever author its pushed commit typed
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 488d418..06ba439 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -652,7 +652,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+         head: change.commitSha,
+         title: change.intent.goal,
+         // The agent the change belongs to, as the gate authenticated it: never what its commit says.
+-        agent: { id: change.agentId },
+       } satisfies CandidateMember;
+     }).pipe(Effect.orDie),
+   );

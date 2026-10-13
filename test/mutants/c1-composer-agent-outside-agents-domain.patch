@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.agent-author
+# why: An agent's author address is under Keel's host itself, where a person's address could one day be
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 7532946..83f068b 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -51,7 +51,7 @@ export const agentAuthor = (
+   host: string,
+ ): { readonly name: string; readonly email: string } => ({
+   name: agent.handle ?? agent.id,
+-  email: `${agent.id}@agents.${host}`,
++  email: `${agent.id}@${host}`,
+ });
+ 
+ /** Keel as the committer of what it composes at `at` (milliseconds). */

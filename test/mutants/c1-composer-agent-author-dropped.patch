@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.agent-author
+# why: The composer names the agent in trailers and still leaves the pushed commit's author on the author line
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index cba379e..9e59059 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -68,7 +68,6 @@ export function restackSpec(
+         ...(m.agent === undefined ? [] : [["Keel-Agent", m.agent.id] as const]),
+         ...(m.agent?.run === undefined ? [] : [["Keel-Run", m.agent.run] as const]),
+       ],
+-      author: m.agent === undefined ? undefined : agentAuthor(m.agent, host),
+     })),
+   };
+ }

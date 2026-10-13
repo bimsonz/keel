@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/compose.test.ts apps/keel/test/unit/candidate-composer.test.ts
+# kills: restack.author-given, composer.agent-author
+# why: A member's given author is ignored, so the landed commit's author line is still whatever the pushed commit said
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index edfe72f..0f38db4 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -129,7 +129,7 @@ export async function restack(
+     const spec: CommitSpec = {
+       tree: merged.tree,
+       parents: [parent],
+-      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
++      author: to.author,
+       committer,
+       message: m.message,
+       trailers:

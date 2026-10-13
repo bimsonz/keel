@@ -7,6 +7,7 @@ import {
   CandidateComposer,
   type CandidateRequest,
   CodeHost,
+  type MemberAgent,
   type RepoRef,
 } from "@keeltown/core/ports";
 import {
@@ -98,7 +99,7 @@ const ADA: Signature = { name: "Ada Lovelace", email: "ada@example.com", time: 1
  * repo by a composer holding `signing`: the compose's Exit, how many pushes
  * staging was sent, and the commit an unsigned restack would give.
  */
-async function composedBy(signing: CommitSigningConfig) {
+async function composedBy(signing: CommitSigningConfig, agent?: MemberAgent) {
   const code = makeCodeHostMemory();
   const staging: RepoRef = { namespace: "memory", name: "prj-staging" };
   const workspace: RepoRef = { namespace: "memory", name: "prj-ws-1" };
@@ -151,7 +152,7 @@ async function composedBy(signing: CommitSigningConfig) {
         ...REQUEST,
         staging,
         base: at.base,
-        members: [{ ...member, repo: workspace, base: at.base, head: at.head }],
+        members: [{ ...member, repo: workspace, base: at.base, head: at.head, agent }],
       });
       const exit = yield* Effect.exit(compose);
       const unsigned = encodeCommit({
@@ -199,7 +200,7 @@ describe("the GitCore composer's restack", () => {
     });
   });
 
-  it("[composer.keeps-author] the composed commit keeps the submitted commit's author, with Keel at its host as committer", async () => {
+  it("[composer.keeps-author] a member with no agent, a probe's, keeps the submitted commit's author, with Keel at its host as committer", async () => {
     const keys = await makeCommitSigningKeys();
     const { base, head, exit, unsigned } = await composedBy({ host: HOST, ...keys });
     expect(head).not.toBe(base);
@@ -219,6 +220,52 @@ describe("the GitCore composer's restack", () => {
     if (!Exit.isSuccess(exit)) throw new Error(defectOf(exit));
     expect(exit.value.commitSha).toBe(expected);
     expect(exit.value.commits).toEqual([{ changeId: CHANGE, sha: expected }]);
+  });
+
+  it("[composer.agent-author] a member's agent is the commit's author under Keel's agents domain, named in trailers, with the submitted author declared", async () => {
+    const keys = await makeCommitSigningKeys();
+    const key = await importSshSigningKey(keys.signingKey);
+    const AGENT = makeId("agt", "01J9AAAAAAAAAAAAAAAAAAAAAA");
+    const cases = [
+      {
+        agent: { id: AGENT, handle: "k7f3-quiet-otter", run: "run_01J9RRRRRRRRRRRRRRRRRRRRRR" },
+        author: { name: "k7f3-quiet-otter", email: `${AGENT}@agents.keel.test` },
+        trailers: [
+          ["Change-Id", CHANGE],
+          ["Keel-Agent", AGENT],
+          ["Keel-Run", "run_01J9RRRRRRRRRRRRRRRRRRRRRR"],
+          ["Declared-Author", "Ada Lovelace <ada@example.com>"],
+        ],
+      },
+      {
+        // An agent from before handles is written by its id, and one with no run names none.
+        agent: { id: AGENT },
+        author: { name: AGENT, email: `${AGENT}@agents.keel.test` },
+        trailers: [
+          ["Change-Id", CHANGE],
+          ["Keel-Agent", AGENT],
+          ["Declared-Author", "Ada Lovelace <ada@example.com>"],
+        ],
+      },
+    ] as const;
+    for (const { agent, author, trailers } of cases) {
+      const { base, tree, exit } = await composedBy({ host: HOST, ...keys }, agent);
+      const spec = {
+        tree,
+        parents: [base],
+        // The date and offset stay the submitted commit's.
+        author: { ...ADA, ...author },
+        committer: KEEL,
+        message: "Retry the webhook on 503",
+        trailers,
+      };
+      const expected = await hashObject(
+        "commit",
+        encodeCommit({ ...spec, gpgsig: await sshSignature(key, encodeCommit(spec)) }),
+      );
+      if (!Exit.isSuccess(exit)) throw new Error(defectOf(exit));
+      expect(exit.value.commitSha).toBe(expected);
+    }
   });
 
   it("[composer.signs] every composed commit is the deployment's key's signature over its unsigned form, the same on a recompose", async () => {

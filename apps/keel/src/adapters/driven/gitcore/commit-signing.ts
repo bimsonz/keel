@@ -41,6 +41,19 @@ const Signers = Schema.Array(
 /** Who signs Keel's commits, as a commit's committer line and the signers file both name it. */
 export const keelPrincipal = (host: string) => `keel@${host}`;
 
+/**
+ * An agent as the author of what it landed: its given handle (its id while it
+ * has none), at an address under Keel's own `agents.` domain, which no person
+ * can hold and no submitted commit can claim.
+ */
+export const agentAuthor = (
+  agent: { readonly id: string; readonly handle?: string | undefined },
+  host: string,
+): { readonly name: string; readonly email: string } => ({
+  name: agent.handle ?? agent.id,
+  email: `${agent.id}@agents.${host}`,
+});
+
 /** Keel as the committer of what it composes at `at` (milliseconds). */
 export const keelCommitter = (host: string, at: number): Signature => ({
   name: "Keel",

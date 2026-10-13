@@ -74,9 +74,13 @@ model RepoIdentity {
 }
 
 /**
- * A commit on trunk. Each change Keel lands is one commit, which keeps its
- * submitted author, names Keel as committer (so `committer.at` is when it
- * landed), and names the change in a `Change-Id` trailer.
+ * A commit on trunk. Each change Keel lands is one commit, signed by Keel as
+ * committer (so `committer.at` is when it landed; the keys are published at
+ * `/.well-known/keel/allowed-signers`). Its author is the agent whose change
+ * it is, under Keel's own `agents.` domain, at the date of the commit the
+ * agent pushed. Its trailers name the change (`Change-Id`), the agent
+ * (`Keel-Agent`), its run once it has one (`Keel-Run`), and what the pushed
+ * commit said of its own author (`Declared-Author`).
  */
 model RepoCommit {
   sha: CommitSha;
