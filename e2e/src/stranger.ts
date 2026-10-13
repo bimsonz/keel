@@ -11,6 +11,15 @@
 //   (2) an agent that holds nothing but a key signs itself up and asks for a
 //       sponsor, and the stranger stands behind it. That names them as its
 //       sponsor and gives it no way into their project;
+//   (2 a) the stranger makes an org, `walk-<run>-o`, and a private project in
+//       it, and invites two more agents that hold nothing but a key and have
+//       no sponsor. Invited they read nothing; once they accept they read
+//       that project, and the agent the stranger sponsors and never invited
+//       still reads nothing;
+//   (2 b) one of the two lands a change in that project, and the two then
+//       make changes that disagree. The conflict is proven, or Keel cannot
+//       prove it either way; it is put to the stranger, who invited them, and
+//       to nobody beside them, and the stranger rules on it;
 //   (3) the neighbour and a visitor with no account cannot list, find or
 //       read that project, nor can git clone it; once the stranger makes it
 //       public they can, and once it is private again they cannot;
@@ -19,8 +28,8 @@
 //       credential: stock git then clones their private project with nothing
 //       pasted, and is refused once they sign out;
 //   (4) the stranger's namespace holds ten projects and is refused an
-//       eleventh, with the way on: the same project, asked for in an org the
-//       stranger makes, `walk-<run>-o`, is made;
+//       eleventh, with the way on: the same project, asked for in the org
+//       the stranger made, is made;
 //   (end) the stranger's account owns a project, so it is not deleted; the
 //       neighbour's owns nothing, so it is, and its handle is never given out
 //       again.
@@ -29,11 +38,15 @@
 //
 // Each run needs a run of its own, since a handle is taken for good. It
 // leaves behind the stranger's account with ten private projects, their org
-// with one, the agent, whose key is gone with the run, and the neighbour's
-// handle. No session, passkey, code, secret or key is printed. Step (3b) keeps
-// the terminal's sign-in in this machine's key store, under a profile of the
-// run's own, until it signs out; git's config for it is a file of the run's.
+// with two and the two agents invited into it, the agent they sponsor, and the
+// neighbour's handle; each agent's key is gone with the run. A change of step
+// (2 b) that is still open at its end is withdrawn, unless it is parked or on
+// its way to trunk. No session, passkey, code, secret or key is printed. Step
+// (3b) keeps the terminal's sign-in in this machine's key store, under a
+// profile of the run's own, until it signs out; git's config for it is a file
+// of the run's.
 import { spawn } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,7 +54,17 @@ import { fileURLToPath } from "node:url";
 import { generateAgentKey, KeelClient, KeelProblem, signUp as signUpByKey } from "@keeltown/sdk";
 import { type Account, AccountRefused, signIn, signUp } from "../../scripts/lib/account.ts";
 import { git } from "./lib/git.ts";
-import { FIXTURE } from "./lib/s1.ts";
+import {
+  applyPatch,
+  declareS1,
+  declareWhenPooled,
+  feedOf,
+  field,
+  FIXTURE,
+  pushAndSubmit,
+  scenarioPatch,
+  tagOf,
+} from "./lib/s1.ts";
 
 const [run] = process.argv.slice(2);
 if (run === undefined || !/^[a-z0-9]{1,12}$/.test(run))
@@ -54,6 +77,13 @@ const ORG = `walk-${run}-o`;
 /** How many projects a namespace holds, as the instance's default has it. */
 const ROOM = 10;
 const PROJECT = "walk";
+/** The org's project, where the invited agents work. */
+const WORK = "work";
+/** How long a new project's pool, or a change on its way to trunk, is waited for. */
+const SETTLE_MS = 10 * 60_000;
+/** The Probe's budget, from the parties' submissions to the conflict's end. */
+const PROOF_MS = 10 * 60_000;
+const STEP_MS = 2 * 60_000;
 const key = (what: string) => `stranger:${run}:${what}`;
 /** The CLI as it is in this repository, and the profile the run's sign-in is kept under. */
 const CLI = fileURLToPath(new URL("../../packages/cli/src/bin.ts", import.meta.url));
@@ -79,6 +109,31 @@ async function signedUp(handle: string): Promise<Person> {
   };
 }
 
+/** An agent that signed itself up with a key: a client for its own account, and one whose tokens name a project. */
+interface KeyAgent {
+  readonly agentId: string;
+  readonly handle: string;
+  /** The name it signed up under, which the run's keys tell its moves apart by. */
+  readonly name: string;
+  readonly own: KeelClient;
+  readonly in: (project: string) => KeelClient;
+}
+
+async function keyAgent(name: string): Promise<KeyAgent> {
+  const { signer } = await generateAgentKey();
+  const account = await signUpByKey({ baseUrl: keelUrl, signer, name });
+  console.log(`     agent ${account.handle} signed up by key: ${account.agentId}`);
+  const client = (project?: string) =>
+    new KeelClient({
+      baseUrl: keelUrl,
+      agentId: account.agentId,
+      key: signer,
+      run: "walk",
+      ...(project === undefined ? {} : { project }),
+    });
+  return { agentId: account.agentId, handle: account.handle, name, own: client(), in: client };
+}
+
 /** What a read answers: 200, or the status Keel refused it with, at the API or where a token is asked for. */
 async function statusOf(read: Promise<unknown>): Promise<number> {
   try {
@@ -90,6 +145,17 @@ async function statusOf(read: Promise<unknown>): Promise<number> {
     throw error;
   }
 }
+
+/** What an agent's token for a project reads of it: its commits and its changes. */
+async function readsOf(agent: KeyAgent, project: string): Promise<string> {
+  const there = agent.in(project);
+  return [
+    await statusOf(there.commits(project, { limit: 1 })),
+    await statusOf(there.changes({ project, limit: 1 })),
+  ].join(" ");
+}
+
+const seconds = (from: number) => Math.round((Date.now() - from) / 1000);
 
 /** Whether `reader`'s list of projects names `projectId`, read to its last page. */
 async function lists(reader: KeelClient, projectId: string): Promise<boolean> {
@@ -210,6 +276,11 @@ const visitor = new KeelClient({ baseUrl: keelUrl });
 let stranger: Person | undefined;
 let neighbour: Person | undefined;
 let projectId: string | undefined;
+/** The agent the stranger sponsors and never invites: the "cannot" beside the invited agents' every "can". */
+let sponsoredAgent: KeyAgent | undefined;
+/** The two agents the stranger invites into their org, and that org's project. */
+let invited: { readonly work: KeyAgent; readonly pair: KeyAgent } | undefined;
+let orgProjectId: string | undefined;
 
 /** (1) a person signs up, has a namespace of their own and creates a project in it. */
 async function arrives(): Promise<void> {
@@ -258,15 +329,9 @@ async function standsBehind(): Promise<void> {
   if (stranger === undefined || neighbour === undefined || projectId === undefined)
     throw new Error("(2) needs both people and the stranger's project");
   const { userId } = stranger.account.session;
-  const { signer } = await generateAgentKey();
-  const account = await signUpByKey({ baseUrl: keelUrl, signer, name: `walk-${run}` });
-  console.log(`     agent ${account.handle} signed up by key: ${account.agentId}`);
-  const agent = new KeelClient({
-    baseUrl: keelUrl,
-    agentId: account.agentId,
-    key: signer,
-    run: "walk",
-  });
+  const account = await keyAgent(`walk-${run}`);
+  sponsoredAgent = account;
+  const agent = account.own;
   const sponsored = async (person: Person) =>
     (await person.client.sponsoredAgents()).items.some((item) => item.id === account.agentId);
   check(
@@ -290,13 +355,7 @@ async function standsBehind(): Promise<void> {
     card.id === account.agentId && !JSON.stringify(card).includes(userId),
     "(2) what anyone reads of the agent does not name its sponsor",
   );
-  const forProject = new KeelClient({
-    baseUrl: keelUrl,
-    agentId: account.agentId,
-    key: signer,
-    project: projectId,
-    run: "walk",
-  });
+  const forProject = account.in(projectId);
   const read = {
     address: await statusOf(agent.project(STRANGER, PROJECT)),
     commits: await statusOf(agent.commits(projectId, { limit: 1 })),
@@ -306,6 +365,332 @@ async function standsBehind(): Promise<void> {
     read.address === 404 && read.commits === 404 && read.withAProjectToken !== 200,
     `(2) sponsoring gives it no way into the stranger's private project: ${JSON.stringify(read)}`,
   );
+}
+
+/** (2 a) the stranger makes an org and a project in it, and invites agents that hold nothing but a key. */
+async function invites(): Promise<void> {
+  if (stranger === undefined || neighbour === undefined || sponsoredAgent === undefined)
+    throw new Error("(2 a) needs both people and the agent the stranger sponsors");
+  const { userId } = stranger.account.session;
+  const person = stranger.client;
+  const outsider = neighbour.client;
+  const uninvited = sponsoredAgent;
+  const org = await asks("/organization/create", stranger.account.session.token, {
+    name: ORG,
+    slug: ORG,
+  });
+  check(org.status === 200, `(2 a) the stranger makes an org, ${ORG}: ${org.status}`);
+  const asked = Date.now();
+  const project = await person.createProject(
+    { namespace: ORG, name: WORK, source: { kind: "template", name: FIXTURE } },
+    { idempotencyKey: key("org-project") },
+  );
+  orgProjectId = project.id;
+  console.log(`     project ${ORG}/${WORK}: ${project.id}, in ${Date.now() - asked} ms`);
+  check(
+    project.namespace.handle === ORG &&
+      project.namespace.kind === "org" &&
+      project.visibility === "private",
+    "(2 a) the project they create there is the org's, and private",
+  );
+
+  const work = await keyAgent(`walk-${run}-work`);
+  const pair = await keyAgent(`walk-${run}-pair`);
+  /** What each of the two the stranger invites answers, in turn. */
+  const both = async <A>(ask: (agent: KeyAgent) => Promise<A>) => [
+    await ask(work),
+    await ask(pair),
+  ];
+  const each = async <A>(ask: (agent: KeyAgent) => Promise<A>, wanted: A) =>
+    (await both(ask)).every((answer) => answer === wanted);
+  const reads = (agent: KeyAgent) => readsOf(agent, project.id);
+  /** The org in an agent's own list of the namespaces that asked it: the state it stands in there, or nothing. */
+  const askedBy = async (agent: KeyAgent) =>
+    (await agent.own.invitations()).items
+      .filter((item) => item.namespace.handle === ORG)
+      .map((item) => item.state)
+      .join(" ");
+  /** How `reader` sees an agent among the org's agents: its state and who invited it, or nothing. */
+  const listed = (reader: KeelClient) => async (agent: KeyAgent) => {
+    const row = (await reader.namespaceAgents(ORG)).items.find((item) => item.id === agent.agentId);
+    return row === undefined ? "absent" : `${row.state} by ${row.invitedBy ?? "nobody named"}`;
+  };
+
+  check(
+    await each(async (agent) => (await agent.own.whoami()).result.agent.sponsor, undefined),
+    "(2 a) two more agents signed themselves up, and neither has a sponsor",
+  );
+  check(
+    (await each(reads, "404 404")) && (await reads(uninvited)) === "404 404",
+    "(2 a) before any invitation none of the three agents reads the org's project",
+  );
+  const own = await statusOf(
+    person.inviteAgent(STRANGER, work.handle, { idempotencyKey: key("invite:own") }),
+  );
+  check(own === 404, `(2 a) the stranger's own namespace takes no invitation: ${own}`);
+  const foreign = await statusOf(
+    outsider.inviteAgent(ORG, work.handle, { idempotencyKey: key("invite:neighbour") }),
+  );
+  check(
+    foreign === 403 && (await each(askedBy, "")),
+    `(2 a) the neighbour, no member of the org, is refused the invitation, and neither agent is asked: ${foreign}`,
+  );
+
+  const asking = await both((agent) =>
+    person.inviteAgent(ORG, agent.handle, { idempotencyKey: key(`invite:${agent.name}`) }),
+  );
+  check(
+    asking.every((row) => row.state === "invited" && row.invitedBy === userId),
+    `(2 a) the stranger invites both by their handles: ${asking.map((row) => row.state).join(", ")}`,
+  );
+  check(await each(reads, "404 404"), "(2 a) invited and not yet joined, they read nothing");
+  check(await each(askedBy, "invited"), "(2 a) each one's own list names the org as asking");
+  check(
+    (await each(listed(person), `invited by ${userId}`)) &&
+      (await each(listed(outsider), "absent")) &&
+      (await each(listed(visitor), "absent")),
+    "(2 a) the stranger sees the invitations and that they made them; the neighbour and a visitor see none",
+  );
+
+  const joined = await both((agent) =>
+    agent.own.acceptInvitation(ORG, { idempotencyKey: key(`accept:${agent.name}`) }),
+  );
+  check(
+    joined.every((row) => row.state === "joined"),
+    `(2 a) they accept: ${joined.map((row) => row.state).join(", ")}`,
+  );
+  check(
+    (await each(reads, "200 200")) && (await reads(uninvited)) === "404 404",
+    "(2 a) their tokens for the org's project read it, and the agent the stranger sponsors and did not invite reads nothing",
+  );
+  check(
+    (await each(listed(person), `joined by ${userId}`)) &&
+      (await each(listed(outsider), "joined by nobody named")) &&
+      (await each(listed(visitor), "joined by nobody named")),
+    "(2 a) anyone sees them among the org's agents, and only its member sees who invited them",
+  );
+  const cards = await both((agent) => visitor.agent(agent.agentId));
+  check(
+    cards.every(
+      (card) =>
+        JSON.stringify(card.orgs) === JSON.stringify([{ handle: ORG, kind: "org" }]) &&
+        !JSON.stringify(card).includes(userId),
+    ),
+    "(2 a) what anyone reads of each names the org it joined, and nobody who invited it",
+  );
+  invited = { work, pair };
+}
+
+/** (2 b) an invited agent lands a change in the org's project, and a conflict there is put to the stranger. */
+async function landsAndAsks(): Promise<void> {
+  if (
+    stranger === undefined ||
+    neighbour === undefined ||
+    sponsoredAgent === undefined ||
+    invited === undefined ||
+    orgProjectId === undefined
+  )
+    throw new Error("(2 b) needs the org's project and the agents invited into it");
+  const project = orgProjectId;
+  const person = stranger.client;
+  const outsider = neighbour.client;
+  const [work, pair] = [invited.work.in(project), invited.pair.in(project)];
+  const authors = { work: invited.work.handle, pair: invited.pair.handle };
+  const base = (await work.commits(project, { limit: 1 })).items[0]?.sha;
+  if (base === undefined) throw new Error("the org's project has no commit on trunk");
+  const { cursor } = await person.snapshot({ project });
+  // The stranger's own read of the project: a member's, so it holds what only members are told.
+  const feed = feedOf(person, { project, cursor });
+  const of = (tag: string, id: string) =>
+    feed.seen.filter(
+      (e) =>
+        tagOf(e) === tag &&
+        (e.entity.id === id ||
+          ["changeId", "conflictId", "escalationId"].some((k) => field(e, k) === id)),
+    );
+  const open: string[] = [];
+  try {
+    const path = `notes/walk-${run}.md`;
+    const note = {
+      goal: "Leave a note from the walk",
+      footprint: [{ path, op: "create" as const }],
+      premises: [],
+    };
+    const refused = await statusOf(
+      sponsoredAgent.in(project).declare(note, { idempotencyKey: key("declare:uninvited") }),
+    );
+    check(
+      refused === 404,
+      `(2 b) the agent the stranger sponsors and did not invite is refused a change there: ${refused}`,
+    );
+    const declaredAt = Date.now();
+    const first = await declareWhenPooled(work, note, key("land"), SETTLE_MS);
+    const landing = first.result.change.id;
+    open.push(landing);
+    await pushAndSubmit(
+      work,
+      first,
+      {
+        author: authors.work,
+        message: `The walk ${run}: a note`,
+        idempotencyKey: key("land:submit"),
+      },
+      (dir) => {
+        mkdirSync(join(dir, "notes"), { recursive: true });
+        writeFileSync(join(dir, path), `Left by the walk's run ${run}.\n`);
+      },
+    );
+    const moved = await feed.until(
+      () => of("ChangeLanded", landing).length + of("ChangeBounced", landing).length > 0,
+      SETTLE_MS,
+    );
+    check(
+      moved && of("ChangeLanded", landing).length === 1,
+      `(2 b) an invited agent's change lands in the org's project, ${seconds(declaredAt)} s after it was declared`,
+    );
+    const head = (await person.commits(project, { limit: 1 })).items[0]?.sha;
+    check(
+      (await person.change(landing)).state === "landed" && head !== undefined && head !== base,
+      "(2 b) the stranger reads it as landed, and trunk's newest commit is no longer the one it began with",
+    );
+
+    const { a, b } = await declareS1(
+      { a: work, b: pair },
+      base,
+      (party) => key(`s1:${party}`),
+      SETTLE_MS,
+      (changeId) => open.push(changeId),
+    );
+    const [A, B] = [a.result.change.id, b.result.change.id];
+    console.log(`     A ${A}; B ${B}`);
+    const suspected = () =>
+      feed.seen.find((e) => {
+        const parties = field(e, "parties");
+        return (
+          tagOf(e) === "ConflictSuspected" &&
+          Array.isArray(parties) &&
+          parties.includes(A) &&
+          parties.includes(B)
+        );
+      });
+    await feed.until(() => suspected() !== undefined, STEP_MS);
+    const conflict = suspected();
+    check(
+      conflict !== undefined,
+      "(2 b) the two then declare changes that disagree, and Keel suspects the conflict",
+    );
+    if (conflict === undefined) return;
+    const conflictId = String(field(conflict, "conflictId"));
+    console.log(`     conflict ${conflictId}`);
+
+    const submittedAt = Date.now();
+    await pushAndSubmit(
+      work,
+      a,
+      { author: authors.work, message: `The walk ${run}: A`, idempotencyKey: key("s1:a:submit") },
+      applyPatch(scenarioPatch("a").file),
+    );
+    await pushAndSubmit(
+      pair,
+      b,
+      { author: authors.pair, message: `The walk ${run}: B`, idempotencyKey: key("s1:b:submit") },
+      applyPatch(scenarioPatch("b").file),
+    );
+    // What ends the Probe's part: a proof, or the conflict escalated or dismissed without one.
+    const ENDS = ["ConflictProven", "ConflictEscalated", "ConflictDismissed"];
+    await feed.until(
+      () => [...ENDS, "ProbeDiscarded"].some((tag) => of(tag, conflictId).length > 0),
+      PROOF_MS,
+    );
+    // A discarded probe is not the end: Keel then escalates the conflict itself, a moment later.
+    await feed.until(() => ENDS.some((tag) => of(tag, conflictId).length > 0), STEP_MS);
+    const proven = of("ConflictProven", conflictId).length > 0;
+    if (proven) {
+      // Proven, a conflict is its parties' to settle or to put to a person: B puts it.
+      await pair.resolve(
+        conflictId,
+        {
+          move: "escalate",
+          changeId: B,
+          note: "The cache keeps a revoked collaborator's role for the session. Which should give way?",
+        },
+        { lease: b.result.lease.id, idempotencyKey: key("escalate") },
+      );
+      await feed.until(() => of("ConflictEscalated", conflictId).length > 0, STEP_MS);
+    }
+    const reason = proven ? "human-class" : "unprovable";
+    const said = of("ConflictEscalated", conflictId)[0];
+    const escalationId = said === undefined ? "" : String(field(said, "escalationId"));
+    check(
+      said !== undefined && field(said, "reason") === reason,
+      `(2 b) the conflict ${
+        proven
+          ? "is proven, and a party puts it to a person"
+          : "cannot be proven either way, and Keel puts it to a person"
+      }, ${seconds(submittedAt)} s after the changes were submitted: ${said === undefined ? "not escalated" : String(field(said, "reason"))}`,
+    );
+    if (said === undefined) return;
+    console.log(`     escalation ${escalationId}`);
+    await feed.until(() => of("EscalationRaised", escalationId).length > 0, STEP_MS);
+    check(
+      of("EscalationRaised", escalationId).length === 1,
+      "(2 b) the stranger's feed of the project says the escalation was raised",
+    );
+    const openOf = async (reader: KeelClient) =>
+      (await reader.escalations({ state: "open" })).items.find((item) => item.id === escalationId);
+    const question = await openOf(person);
+    check(
+      question !== undefined && (await openOf(outsider)) === undefined,
+      "(2 b) it is among the open escalations of the stranger, who invited agents that have no sponsor, and not among the neighbour's",
+    );
+    const unasked = await statusOf(visitor.escalations({ state: "open" }));
+    check(unasked === 401, `(2 b) a visitor is told of none: ${unasked}`);
+    if (question === undefined) return;
+    console.log(`     ${question.label} in ${question.project.name}: ${question.question}`);
+    for (const option of question.options)
+      console.log(
+        `       ${option.id}${option.id === question.default ? " (the default)" : ""}: ${option.label}`,
+      );
+    const ruled = await person
+      .giveRuling(
+        escalationId,
+        {
+          option: "premise-holds",
+          rationale:
+            "A revocation takes effect at once: a cache may stay only if a revoke evicts it.",
+        },
+        { idempotencyKey: key("ruling") },
+      )
+      .then(
+        (ruling) => ruling.state,
+        (error: unknown) => {
+          if (!(error instanceof KeelProblem)) throw error;
+          return `${error.status} ${error.code} (request ${error.requestId})`;
+        },
+      );
+    check(ruled === "ruled", `(2 b) the stranger rules that the premise holds: ${ruled}`);
+    check(
+      (await openOf(person)) === undefined,
+      "(2 b) and it is no longer among their open escalations",
+    );
+  } finally {
+    // A landed change is done, a parked one awaits a ruling, and one that is integrating
+    // has left the queue for trunk: each is left as it is. Anything else is withdrawn.
+    const LEFT = new Set(["landed", "withdrawn", "superseded", "bounced", "parked", "integrating"]);
+    for (const changeId of open) {
+      const state = (await person.change(changeId)).state;
+      if (LEFT.has(state)) {
+        if (state !== "landed") console.log(`     ${changeId} is left ${state}`);
+        continue;
+      }
+      await person.abandon(
+        changeId,
+        { reason: `The walk's run ${run} is over` },
+        { idempotencyKey: key(`abandon:${changeId}`) },
+      );
+      console.log(`     ${changeId} withdrawn (it was ${state})`);
+    }
+  }
 }
 
 /** (3) the project is the stranger's alone until they make it public, and again after. */
@@ -510,15 +895,10 @@ async function fills(): Promise<void> {
     "(4) nothing was made, and its name holds no place",
   );
 
-  const org = await asks("/organization/create", stranger.account.session.token, {
-    name: ORG,
-    slug: ORG,
-  });
-  check(org.status === 200, `(4) the stranger makes an org, ${ORG}: ${org.status}`);
   const there = await empty(ORG, over, "project-in-org");
   check(
     there.namespace.handle === ORG && there.namespace.kind === "org",
-    "(4) the same project, asked for in that org, is made",
+    `(4) the same project, asked for in the org the stranger made, ${ORG}, is made`,
   );
 }
 
@@ -561,7 +941,16 @@ async function leaves(): Promise<void> {
 }
 
 // Each part by itself, and the leaving always: a part that stops must not leave the neighbour behind.
-for (const part of [arrives, standsBehind, keepsAndShows, clonesFromATerminal, fills, leaves]) {
+for (const part of [
+  arrives,
+  standsBehind,
+  invites,
+  landsAndAsks,
+  keepsAndShows,
+  clonesFromATerminal,
+  fills,
+  leaves,
+]) {
   try {
     await part();
   } catch (error) {
