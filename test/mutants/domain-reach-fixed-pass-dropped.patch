@@ -1,0 +1,13 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/support/reach.test.ts
+# kills: reach.floor
+# why: the property is asserted once, under the run's seed alone, so a count has no floor at all.
+diff --git a/packages/core/test/support/reach.ts b/packages/core/test/support/reach.ts
+index b9ebb616..6bbf0f81 100644
+--- a/packages/core/test/support/reach.ts
++++ b/packages/core/test/support/reach.ts
+@@ -17,5 +17,4 @@ const REACH_DRAWS = 300;
+ 
+ export const assertReaching = <Ts>(property: fc.IProperty<Ts>): void => {
+   fc.assert(property);
+-  fc.assert(property, { seed: REACH_SEED, numRuns: REACH_DRAWS });
+ };
