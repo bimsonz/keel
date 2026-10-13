@@ -43,9 +43,11 @@ const Position = Schema.String.check(Schema.isPattern(/^\d{12}$/));
  * Read the feed after `cursor` (from its start when absent): at most `limit`
  * (1–500, default 100) events, waiting up to `waitMs` (0–30,000) for one.
  * With `project`, only that project's events, sought through its index.
+ * The cursor `end` is the feed's head in the turn that reads: no events and
+ * the head's position, or with a wait the next arrival.
  */
 export const ProjectorRead = Schema.Struct({
-  cursor: Schema.optional(Position),
+  cursor: Schema.optional(Schema.Union([Position, Schema.Literal("end")])),
   limit: Schema.optional(Schema.Int),
   waitMs: Schema.optional(Schema.Int),
   project: Schema.optional(ProjectId),

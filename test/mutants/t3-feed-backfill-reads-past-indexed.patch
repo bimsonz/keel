@@ -2,7 +2,7 @@
 # kills: t3.feed-index-backfill
 # why: a read while the index is behind answers the head as its cursor, so the project's events between what is indexed and the head are skipped for good
 diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
-index b3954509..83c2d375 100644
+index 3344e231..c28bc188 100644
 --- a/packages/core/src/application/memory/feed.ts
 +++ b/packages/core/src/application/memory/feed.ts
 @@ -225,7 +225,10 @@ function readProject(store: Store, project: ProjectId, after: number, max: numbe
@@ -16,4 +16,4 @@ index b3954509..83c2d375 100644
 +  };
  }
  
- /**
+ /** The cursor that names the feed's head, wherever it is when the read is taken. */

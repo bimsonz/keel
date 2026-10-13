@@ -6,6 +6,7 @@ import {
   listEscalations,
   listConflicts,
   probeConflict,
+  FEED_END,
   readFeed,
   recordFeed,
   viewSnapshot,
@@ -81,14 +82,19 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     const waiters = this.waiters;
     const program = Schema.decodeUnknownEffect(ProjectorRead)(request).pipe(
       Effect.orDie,
-      Effect.flatMap(({ cursor, limit, waitMs, project }) =>
+      Effect.flatMap(({ cursor, limit, waitMs, project }) => {
         // A read by project waits for that project's next event: another's arrival re-reads and finds none.
-        waiters.until(
-          waitMs ?? 0,
-          readFeed(cursor, limit, project),
-          (page) => page.events.length > 0,
-        ),
-      ),
+        const from = (after: string | undefined) =>
+          waiters.until(
+            waitMs ?? 0,
+            readFeed(after, limit, project),
+            (page) => page.events.length > 0,
+          );
+        // `end` is where the feed is now: found once, and a read that waits reads on from there.
+        return cursor === FEED_END && (waitMs ?? 0) > 0
+          ? readFeed(FEED_END, limit, project).pipe(Effect.flatMap((end) => from(end.cursor)))
+          : from(cursor);
+      }),
     );
     return this.answer(ProjectorCodecs.read, program);
   }

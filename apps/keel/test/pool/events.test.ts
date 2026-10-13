@@ -198,6 +198,34 @@ describe("GET /v1/events", () => {
     expect(beyond.body.items).toEqual([]);
   });
 
+  it("[feed.end-waits] `cursor=end` answers no events and the head, and with a wait the next event to arrive and nothing from before, for a member and for an agent's own project", async () => {
+    const { projectA, projectB, member } = await tenancy();
+    const agent = await tokenFor(await seedAgent({ projectId: projectA }, ["agent:read"]));
+    const before = await arrive(projectA);
+    const at = await head(member);
+    const end = await events(member, "?cursor=end");
+    expect([end.status, end.body.items, end.body.nextCursor]).toEqual([200, [], at]);
+    const mine = await events(agent, "?cursor=end");
+    expect([mine.status, mine.body.items, mine.body.nextCursor]).toEqual([200, [], at]);
+
+    const started = Date.now();
+    const waiting = events(member, "?cursor=end&wait=8");
+    const waitingMine = events(agent, "?cursor=end&wait=8");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await arrive(projectB);
+    const arrived = await arrive(projectA);
+    const page = await waiting;
+    expect(page.body.items.map((e) => e.eventId)).not.toContain(before.eventId);
+    expect(page.body.items.length).toBeGreaterThan(0);
+    // The agent's read is answered by its own project's arrival alone.
+    expect((await waitingMine).body.items.map((e) => e.eventId)).toEqual([arrived.eventId]);
+    expect(Date.now() - started).toBeLessThan(6_000);
+    // Reading on from the cursor `end` gave: both arrivals, and nothing from before it.
+    const on = await events(member, `?cursor=${end.body.nextCursor}`);
+    expect(on.body.items.map((e) => e.eventId)).toContain(arrived.eventId);
+    expect(on.body.items.map((e) => e.eventId)).not.toContain(before.eventId);
+  });
+
   it("[a11.events-cursor] refuses a cursor that is not a feed position, naming it", async () => {
     const { member } = await tenancy();
     const page = await events(member, "?cursor=not-a-cursor");

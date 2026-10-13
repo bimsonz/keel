@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/feed-project.test.ts -t feed.end
+# kills: feed.end
+# why: a project's `end` is the feed's head while its index is behind, so reading on from it skips every event of the project the index had yet to reach
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index 3344e231..5771ba33 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -253,7 +253,7 @@ export const readFeed: (
+ ) {
+   const store = yield* EntityStore;
+   if (cursor === FEED_END) {
+-    const end = project === undefined ? headOf(store) : store.transaction(() => indexFeed(store));
++    const end = headOf(store);
+     return { events: [], cursor: position(end) };
+   }
+   const after = cursor === undefined ? 0 : Number(cursor);

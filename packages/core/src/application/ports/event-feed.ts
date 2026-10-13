@@ -17,7 +17,11 @@ export interface EventFeedPage {
 }
 
 export interface EventFeedRead {
-  /** Twelve digits; absent reads from the feed's start. */
+  /**
+   * Twelve digits, or `end` for the feed's head as the read finds it (no
+   * events, and the cursor to read on from; with a wait, the next arrival).
+   * Absent reads from the feed's start.
+   */
   readonly cursor?: string;
   /** 1–500; absent is 100. */
   readonly limit?: number;

@@ -104,6 +104,59 @@ export function describeEventFeedContract(adapter: string, make: () => EventFeed
       },
     );
 
+    it.live(
+      "[feed.end] a read from `end` answers no events and the head, and reading on from that cursor answers what arrives after it and nothing from before, for the whole feed and for one project",
+      () => {
+        const harness = make();
+        const [a, b] = [freshProject(), freshProject()];
+        return Effect.gen(function* () {
+          const feed = yield* EventFeed;
+          const earlier = [event(1, a), event(2, b), event(3)];
+          for (const e of earlier) yield* harness.arrive(e);
+          const at = yield* head;
+          const whole = yield* feed.read({ cursor: "end", waitSeconds: 0 });
+          const mine = yield* feed.read({ cursor: "end", waitSeconds: 0, project: a });
+          expect(whole).toEqual({ events: [], cursor: at });
+          expect(mine).toEqual({ events: [], cursor: at });
+
+          const later = [event(4, b), event(5, a), event(6), event(7, a)];
+          for (const e of later) yield* harness.arrive(e);
+          const on = yield* feed.read({ cursor: whole.cursor, waitSeconds: 0 });
+          expect(idsOf(on)).toEqual(idsOf({ events: later }));
+          const onMine = yield* feed.read({ cursor: mine.cursor, waitSeconds: 0, project: a });
+          expect(idsOf(onMine)).toEqual([later[1]?.eventId, later[3]?.eventId]);
+          // `end` moves with the feed.
+          const again = yield* feed.read({ cursor: "end", waitSeconds: 0, limit: 1 });
+          expect(again).toEqual({ events: [], cursor: yield* head });
+          expect(again.cursor > whole.cursor).toBe(true);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[feed.end-waits] a waiting read from `end` is answered by the next arrival, and by nothing that was there before",
+      () => {
+        const harness = make();
+        const a = freshProject();
+        return Effect.gen(function* () {
+          const feed = yield* EventFeed;
+          const before = [event(1, a), event(2)];
+          for (const e of before) yield* harness.arrive(e);
+          const started = Date.now();
+          const waiting = yield* Effect.forkChild(feed.read({ cursor: "end", waitSeconds: 8 }));
+          const mine = yield* Effect.forkChild(
+            feed.read({ cursor: "end", waitSeconds: 8, project: a }),
+          );
+          yield* Effect.sleep("200 millis");
+          const arrived = event(3, a);
+          yield* harness.arrive(arrived);
+          expect(idsOf(yield* Fiber.join(waiting))).toEqual([arrived.eventId]);
+          expect(idsOf(yield* Fiber.join(mine))).toEqual([arrived.eventId]);
+          expect(Date.now() - started).toBeLessThan(6_000);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
     it.live("[feed.wait] answers a waiting read as soon as an event arrives", () => {
       const harness = make();
       return Effect.gen(function* () {

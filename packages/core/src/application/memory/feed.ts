@@ -228,10 +228,19 @@ function readProject(store: Store, project: ProjectId, after: number, max: numbe
   return { events, cursor: position(n <= count ? last : Math.max(indexed, after)) };
 }
 
+/** The cursor that names the feed's head, wherever it is when the read is taken. */
+export const FEED_END = "end";
+
 /**
  * The events after `cursor`, oldest first, at most `limit` (1–500). Positions
  * are dense, so each is read by key. With `project`, only that project's
  * events, sought through its index (`readProject`).
+ *
+ * The cursor `end` answers no events and the position to read on from: the
+ * feed's head, or for a read by project the position its index is complete to
+ * (after a step of it), never past it, so reading on from there skips nothing
+ * of the project's that the index has yet to reach. A read that waits from
+ * `end` takes this answer once and waits on from its cursor.
  */
 export const readFeed: (
   cursor: string | undefined,
@@ -243,6 +252,10 @@ export const readFeed: (
   project?: ProjectId,
 ) {
   const store = yield* EntityStore;
+  if (cursor === FEED_END) {
+    const end = project === undefined ? headOf(store) : store.transaction(() => indexFeed(store));
+    return { events: [], cursor: position(end) };
+  }
   const after = cursor === undefined ? 0 : Number(cursor);
   const max = Math.min(Math.max(limit, 1), FEED_PAGE_MAX);
   if (project !== undefined) return readProject(store, project, after, max);

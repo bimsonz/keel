@@ -2,11 +2,11 @@
 # kills: t3.feed-project
 # why: a read that names a project walks the whole feed as before, so its page holds other projects' events and costs the instance's size
 diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
-index b3954509..2f9672ed 100644
+index 3344e231..69099fd4 100644
 --- a/packages/core/src/application/memory/feed.ts
 +++ b/packages/core/src/application/memory/feed.ts
-@@ -245,7 +245,6 @@ export const readFeed: (
-   const store = yield* EntityStore;
+@@ -258,7 +258,6 @@ export const readFeed: (
+   }
    const after = cursor === undefined ? 0 : Number(cursor);
    const max = Math.min(Math.max(limit, 1), FEED_PAGE_MAX);
 -  if (project !== undefined) return readProject(store, project, after, max);

@@ -2,7 +2,7 @@
 # kills: t3.feed-project
 # why: a page that has all of a project's events answers the last one returned as its cursor, not the head, so a reader never moves past other projects' events
 diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
-index b3954509..61607be9 100644
+index 3344e231..b7442ccb 100644
 --- a/packages/core/src/application/memory/feed.ts
 +++ b/packages/core/src/application/memory/feed.ts
 @@ -225,7 +225,7 @@ function readProject(store: Store, project: ProjectId, after: number, max: numbe
@@ -13,4 +13,4 @@ index b3954509..61607be9 100644
 +  return { events, cursor: position(indexed < 0 ? indexed : last) };
  }
  
- /**
+ /** The cursor that names the feed's head, wherever it is when the read is taken. */

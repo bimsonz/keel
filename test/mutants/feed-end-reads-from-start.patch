@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/feed-project.test.ts -t feed.end
+# kills: feed.end
+# why: a read from `end` is a read from the feed's start, so a console that asks where the feed is now is sent its whole history
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index 3344e231..93e8bfe0 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -252,11 +252,7 @@ export const readFeed: (
+   project?: ProjectId,
+ ) {
+   const store = yield* EntityStore;
+-  if (cursor === FEED_END) {
+-    const end = project === undefined ? headOf(store) : store.transaction(() => indexFeed(store));
+-    return { events: [], cursor: position(end) };
+-  }
+-  const after = cursor === undefined ? 0 : Number(cursor);
++  const after = cursor === undefined || cursor === FEED_END ? 0 : Number(cursor);
+   const max = Math.min(Math.max(limit, 1), FEED_PAGE_MAX);
+   if (project !== undefined) return readProject(store, project, after, max);
+   const last = Math.min(headOf(store), after + max);

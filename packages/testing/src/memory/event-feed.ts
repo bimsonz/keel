@@ -51,7 +51,9 @@ export function makeEventFeedMemory() {
       EventFeed.of({
         read: ({ cursor, limit = 100, waitSeconds, project }) =>
           Effect.gen(function* () {
-            const after = cursor === undefined ? 0 : Number(cursor);
+            // `end` is the head as this read finds it: resolved once, before the read first looks.
+            const after =
+              cursor === undefined ? 0 : cursor === "end" ? entries.length : Number(cursor);
             const deadline = (yield* EffectClock.currentTimeMillis) + waitSeconds * 1000;
             // An arrival the read does not hold (another project's) leaves it waiting for the next.
             while (page(after, limit, project).events.length === 0) {

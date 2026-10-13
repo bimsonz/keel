@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.end-waits
+# kills: feed.end-waits
+# why: a waiting read from `end` finds the end again after every arrival, so it never sees one and answers nothing when its wait runs out
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 17ee0caa..21bdf266 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -92,7 +92,7 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+           );
+         // `end` is where the feed is now: found once, and a read that waits reads on from there.
+         return cursor === FEED_END && (waitMs ?? 0) > 0
+-          ? readFeed(FEED_END, limit, project).pipe(Effect.flatMap((end) => from(end.cursor)))
++          ? from(FEED_END)
+           : from(cursor);
+       }),
+     );

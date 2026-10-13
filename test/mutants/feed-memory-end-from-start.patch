@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing -t feed.end
+# kills: feed.end
+# why: the in-memory feed reads `end` as its start, so a test over it is handed history the real feed would never send
+diff --git a/packages/testing/src/memory/event-feed.ts b/packages/testing/src/memory/event-feed.ts
+index 8f427cc5..6d56a4ea 100644
+--- a/packages/testing/src/memory/event-feed.ts
++++ b/packages/testing/src/memory/event-feed.ts
+@@ -53,7 +53,7 @@ export function makeEventFeedMemory() {
+           Effect.gen(function* () {
+             // `end` is the head as this read finds it: resolved once, before the read first looks.
+             const after =
+-              cursor === undefined ? 0 : cursor === "end" ? entries.length : Number(cursor);
++              cursor === undefined || cursor === "end" ? 0 : Number(cursor);
+             const deadline = (yield* EffectClock.currentTimeMillis) + waitSeconds * 1000;
+             // An arrival the read does not hold (another project's) leaves it waiting for the next.
+             while (page(after, limit, project).events.length === 0) {

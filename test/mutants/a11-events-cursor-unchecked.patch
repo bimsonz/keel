@@ -2,15 +2,20 @@
 # kills: a11.events-cursor
 # why: a cursor that is not a position reaches the Projector's decode and answers 500
 diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
-index be92cd7..7ae5831 100644
+index e68086c4..8d33e141 100644
 --- a/apps/keel/src/adapters/driving/http/events.ts
 +++ b/apps/keel/src/adapters/driving/http/events.ts
-@@ -53,7 +53,7 @@ export interface EventsInput {
+@@ -58,7 +58,12 @@ export interface EventsInput {
  
- /** The query, with a cursor that is not a feed position refused as a 400 naming it. */
+ /** The query, with a cursor that is neither a feed position nor `end` refused as a 400 naming it. */
  export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<EventsInput, Issues> {
--  if (input.cursor !== undefined && !POSITION.test(input.cursor)) {
-+  if (input.cursor !== undefined && !POSITION.test(input.cursor) && input.cursor.length < 0) {
+-  if (input.cursor !== undefined && input.cursor !== FEED_END && !POSITION.test(input.cursor)) {
++  if (
++    input.cursor !== undefined &&
++    input.cursor !== FEED_END &&
++    !POSITION.test(input.cursor) &&
++    input.cursor.length < 0
++  ) {
      return Result.fail([
-       { path: ["cursor"], message: "Expected a cursor from an earlier page: twelve digits" },
-     ]);
+       {
+         path: ["cursor"],

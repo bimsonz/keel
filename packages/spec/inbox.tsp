@@ -80,7 +80,10 @@ interface Inbox {
 
   /**
    * The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the
-   * same bound with a token or without. `project` keeps one project's events: an agent reads its own
+   * same bound with a token or without. `cursor=end` reads from the log's head as it is found: no
+   * events and the cursor to read on from, or with `wait` the next event to arrive; for one project,
+   * the head is as far as that project's index has reached.
+   * `project` keeps one project's events: an agent reads its own
    * (the default) or a public one; an observer reads any, and the whole log without it.
    * Without a token, `project` names a public project (otherwise 404, as for one that does not exist)
    * and only its public events are served: escalations, rulings, sessions, settings and operator

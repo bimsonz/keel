@@ -1,3 +1,4 @@
+import { FEED_END } from "@keeltown/core/application/memory";
 import { CoordinationEvent } from "@keeltown/core/domain/coordination";
 import { DeliveryEvent } from "@keeltown/core/domain/delivery";
 import { IdentityEvent } from "@keeltown/core/domain/identity";
@@ -55,11 +56,14 @@ export interface EventsInput {
   readonly project?: ProjectId;
 }
 
-/** The query, with a cursor that is not a feed position refused as a 400 naming it. */
+/** The query, with a cursor that is neither a feed position nor `end` refused as a 400 naming it. */
 export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<EventsInput, Issues> {
-  if (input.cursor !== undefined && !POSITION.test(input.cursor)) {
+  if (input.cursor !== undefined && input.cursor !== FEED_END && !POSITION.test(input.cursor)) {
     return Result.fail([
-      { path: ["cursor"], message: "Expected a cursor from an earlier page: twelve digits" },
+      {
+        path: ["cursor"],
+        message: "Expected a cursor from an earlier page (twelve digits), or `end` for the head",
+      },
     ]);
   }
   return Result.succeed({

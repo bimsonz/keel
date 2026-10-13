@@ -63,6 +63,101 @@ function readOut(store: Store, project: ProjectId, limit: number) {
   return { ids, cursors };
 }
 
+/** Every event after `from`, of `project` when given, read page by page until a page comes back empty. */
+function readOn(store: Store, from: string, limit: number, project?: ProjectId) {
+  const ids: string[] = [];
+  let cursor = from;
+  for (let pages = 0; pages < 10_000; pages += 1) {
+    const page = read(store, cursor, limit, project);
+    if (page.events.length === 0) break;
+    ids.push(...idsOf(page));
+    cursor = page.cursor;
+  }
+  return ids;
+}
+
+describe("the feed read from its end", () => {
+  it(
+    "[feed.end] a read from `end` answers no events and a cursor from which each later arrival is read once, in order, and nothing from before, for the whole feed and for one project",
+    () => {
+      fc.assert(
+        fc.property(
+          fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 40, size: "max" }),
+          fc.array(fc.integer({ min: 0, max: 3 }), { maxLength: 12, size: "max" }),
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 0, max: 2 }),
+          (before, after, limit, which) => {
+            const store = makeEntityStoreMemory().service;
+            const project = PROJECTS[which];
+            if (project === undefined) throw new Error("three projects");
+            const earlier = before.map((p, index) => arrival(index + 1, PROJECTS[p]));
+            for (const event of earlier) store.transaction(() => recordFeed(store, event));
+            const head = position(earlier.length);
+            const whole = read(store, "end", limit);
+            const mine = read(store, "end", limit, project);
+            expect([whole, mine]).toEqual([
+              { events: [], cursor: head },
+              { events: [], cursor: head },
+            ]);
+
+            const later = after.map((p, index) => arrival(earlier.length + index + 1, PROJECTS[p]));
+            for (const event of later) store.transaction(() => recordFeed(store, event));
+            expect(readOn(store, whole.cursor, limit)).toEqual(later.map((e) => e.eventId));
+            expect(readOn(store, mine.cursor, limit, project)).toEqual(
+              later.filter((e) => e.project === project).map((e) => e.eventId),
+            );
+            expect(read(store, "end", limit).cursor).toBe(position(earlier.length + later.length));
+          },
+        ),
+      );
+    },
+    PROPERTY_TIMEOUT,
+  );
+
+  // Both sides of the rule as fixed examples: an empty feed, a feed with history, and what arrives after.
+  it("[feed.end] by hand: `end` of an empty feed is its start, and of a feed with history its head, by project too", () => {
+    const store = makeEntityStoreMemory().service;
+    const [a, b] = PROJECTS;
+    if (a === undefined || b === undefined) throw new Error("two projects");
+    expect(read(store, "end", 5)).toEqual({ events: [], cursor: position(0) });
+    expect(read(store, "end", 5, a)).toEqual({ events: [], cursor: position(0) });
+    const events = [a, b, undefined, a].map((project, index) => arrival(index + 1, project));
+    for (const event of events) store.transaction(() => recordFeed(store, event));
+    expect(read(store, "end", 5)).toEqual({ events: [], cursor: position(4) });
+    expect(read(store, "end", 5, b)).toEqual({ events: [], cursor: position(4) });
+    const late = [arrival(5, b), arrival(6, a)];
+    for (const event of late) store.transaction(() => recordFeed(store, event));
+    expect(readOn(store, position(4), 5)).toEqual(late.map((e) => e.eventId));
+    expect(readOn(store, position(4), 5, b)).toEqual([late[0]?.eventId]);
+  });
+
+  it("[feed.end] while a project's index is behind, its `end` is as far as the index has reached and never the head, so reading on skips nothing of the project's", () => {
+    const store = makeEntityStoreMemory().service;
+    const [a, b] = PROJECTS;
+    if (a === undefined || b === undefined) throw new Error("two projects");
+    const total = FEED_INDEX_STEP + 40;
+    const unindexed: string[] = [];
+    // As the feed was recorded before it kept an index: the entries and the head.
+    for (let n = 1; n <= total; n += 1) {
+      const project: ProjectId = n % 10 === 0 ? a : b;
+      const event = arrival(n, project);
+      store.put(FEED.kind, position(n), asStored(event));
+      if (project === a && n > FEED_INDEX_STEP) unindexed.push(event.eventId);
+    }
+    store.put(FEED.head.kind, FEED.head.id, total);
+    expect(unindexed).toHaveLength(4);
+
+    const mine = read(store, "end", 500, a);
+    expect(mine).toEqual({ events: [], cursor: position(FEED_INDEX_STEP) });
+    // The whole feed's end is its head: it needs no index.
+    expect(read(store, "end", 500)).toEqual({ events: [], cursor: position(total) });
+    // What the index had yet to reach is read on from the project's cursor, with what arrives after.
+    const late = arrival(total + 1, a);
+    store.transaction(() => recordFeed(store, late));
+    expect(readOn(store, mine.cursor, 500, a)).toEqual([...unindexed, late.eventId]);
+  });
+});
+
 describe("the feed read by project", () => {
   it(
     "[t3.feed-project] a project's page is the whole feed after the cursor, kept to that project and cut to the limit; its cursor is the last one returned when cut and the head otherwise; read to the end, every event of the project comes exactly once",

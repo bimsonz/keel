@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.end-waits
+# kills: feed.end-waits
+# why: the doorway refuses `end` as no cursor, so nobody can ask for the feed's head
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index e68086c4..286b60dd 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -58,7 +58,7 @@ export interface EventsInput {
+ 
+ /** The query, with a cursor that is neither a feed position nor `end` refused as a 400 naming it. */
+ export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<EventsInput, Issues> {
+-  if (input.cursor !== undefined && input.cursor !== FEED_END && !POSITION.test(input.cursor)) {
++  if (input.cursor !== undefined && !POSITION.test(input.cursor)) {
+     return Result.fail([
+       {
+         path: ["cursor"],
