@@ -2,7 +2,7 @@
 # kills: run.pool-header
 # why: the isolate leaves a client's own run header on an upgrade whose token names no run, so a plain token reads as any lane it names
 diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index 058f4b99..f9381cb7 100644
+index 2de00515..4887d99e 100644
 --- a/apps/keel/src/composition/isolate.ts
 +++ b/apps/keel/src/composition/isolate.ts
 @@ -204,8 +204,7 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {

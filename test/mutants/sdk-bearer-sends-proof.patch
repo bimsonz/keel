@@ -2,7 +2,7 @@
 # kills: sdk.key-bearer
 # why: a client asked for a plain token asks for a bound one, so the token it hands a tool that cannot sign is refused wherever the tool presents it
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index d2d9c292..052c017b 100644
+index 7fc90509..a0609d78 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -130,7 +130,7 @@ export class KeelClient {

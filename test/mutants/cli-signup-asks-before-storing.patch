@@ -2,10 +2,10 @@
 # kills: cli.signup
 # why: the key reaches the key store only after Keel has answered, so a crash between the two leaves an account whose key is gone for good
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index d67193a5..b49403dc 100644
+index 74a3f8f8..8ce07e04 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -337,7 +337,6 @@ async function signUpCommand(
+@@ -371,7 +371,6 @@ async function signUpCommand(
        return 2;
      }
      const { signer, privateJwk } = await generateAgentKey();

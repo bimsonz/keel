@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: dpop.unbound-proof
+# why: a plain bearer is admitted beside a DPoP header that nothing looks at, so a client that believes its token is bound is never told it is not
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e26234f7..9710e66a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -128,7 +128,6 @@ export async function verifyAgentToken(
+   const scopes = asScopes(claims.value.scope.split(" ").filter(Boolean));
+   if (scopes._tag === "None") return NOT_A_TOKEN;
+   const { sub, epoch, prj, handle, run, run_label: label, cnf } = claims.value;
+-  if (cnf === undefined && presented.proof !== undefined) return NO_KEY_TO_PROVE;
+   return {
+     agentId: sub,
+     ...(prj === undefined ? {} : { projectId: prj }),

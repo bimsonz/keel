@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: run.own-project
+# why: an agent the policy lets create in its own namespace is answered that the operation has not landed
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 868426af..d50af9fa 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -943,6 +943,8 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+         // import's URL and branch by Keel's own rules, and a project to fork, which is a second resource
+         // named in the body, decided as a fork.
+         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
++          if (caller.principal._tag !== "User")
++            return Promise.resolve(notImplemented(caller.requestId));
+           const source = projectSource(input.source);
+           if (source._tag === "Unknown") return Promise.resolve(sourceNotFound(caller, input));
+           if (source._tag === "Refused") return Promise.resolve(sourceRefused(caller, source));

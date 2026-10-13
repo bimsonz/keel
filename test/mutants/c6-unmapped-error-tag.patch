@@ -1,10 +1,10 @@
 # expect-red: pnpm --filter @keeltown/keel typecheck
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index 6623b3cd..97561de1 100644
+index f8146fd6..1b3808fe 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
 @@ -37,7 +37,11 @@ import {
- /** Who the caller is: its admitted agent, with its org and sponsor, and the current session of the run its token names. */
+ /** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, and that run's current session. */
  export const whoami: (
    principal: AgentClaims,
 -) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =

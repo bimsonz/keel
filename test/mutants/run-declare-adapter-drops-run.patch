@@ -2,10 +2,10 @@
 # kills: run.changes-port
 # why: the doorway's adapter sends a declare without the token's run, so a change declared by a lane is held by no run on the real objects
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 09971517..fe0a3501 100644
+index 2759aeb7..ab2e75d6 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -85,7 +85,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+@@ -86,7 +86,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
            const command = encodeDeclare({
              changeId,
              agentId: principal.agentId,

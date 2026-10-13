@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: run.own-project
+# why: the adapter leaves the run out of the command it sends the project's object
+diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+index 316f0d93..f0bf273b 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+@@ -42,7 +42,6 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+             source: input.source,
+             by: actorId(actor),
+             actor: eventActorOf(actor),
+-            ...(input.run === undefined ? {} : { run: input.run }),
+             idempotencyKey: input.idempotencyKey,
+             fingerprint,
+           });

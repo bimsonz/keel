@@ -2,10 +2,10 @@
 # kills: run.namespace-read
 # why: an approval's profile is made from the object's answer alone, so the person who just became a sponsor is shown no namespace for the agent
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index c514ab46..bde6592f 100644
+index 868426af..3d6ed89a 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -530,7 +530,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -540,7 +540,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                      }),
                    ),
                  ),

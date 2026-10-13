@@ -2,10 +2,10 @@
 # kills: ba.device
 # why: any client id may start a device grant, so another tool can pose as keeltown on the approval page
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 732b4f0e..96e6dabc 100644
+index 5a0a0bed..810b5129 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -424,7 +424,7 @@ export function authOptions(config: AuthConfig) {
+@@ -464,7 +464,7 @@ export function authOptions(config: AuthConfig) {
        }),
        deviceAuthorization({
          verificationUri: `${origin}/device`,

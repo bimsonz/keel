@@ -2,15 +2,15 @@
 # kills: b11.bootstrap-order, project.create-heals
 # why: a project's creation is recorded as done by operator:<id>, the name events gave a person before users existed, so the event's actor is no user and the project's history does not show the person who made it
 diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
-index 700da77..a1440a8 100644
+index 45cd1bbb..f475cb63 100644
 --- a/packages/core/src/application/integration/create-project.ts
 +++ b/packages/core/src/application/integration/create-project.ts
-@@ -130,7 +130,7 @@ export const createProject: (
+@@ -228,7 +228,7 @@ export const createProject: (
        entity,
        cause: command.idempotencyKey,
        fingerprint: command.fingerprint,
--      actor: userActor(command.by),
+-      actor: command.actor,
 +      actor: `operator:${command.by}`,
+       ...(command.run === undefined ? {} : { run: command.run }),
        project: projectId,
      },
-     (tx) => {

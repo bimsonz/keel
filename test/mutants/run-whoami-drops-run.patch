@@ -2,7 +2,7 @@
 # kills: run.pool-whoami
 # why: `whoami` asks for the agent's session whatever run its token names, so a lane is answered no session, or another's
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index 6623b3cd..0668cad6 100644
+index f8146fd6..a048e1dd 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
 @@ -40,7 +40,7 @@ export const whoami: (
@@ -11,6 +11,6 @@ index 6623b3cd..0668cad6 100644
      const agent = yield* admit(principal);
 -    const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
 +    const current = yield* (yield* Sessions).current(agent.id);
-     return { agent, session: current === null ? null : { id: current.id } };
-   });
- 
+     return {
+       agent,
+       ...(principal.run === undefined ? {} : { run: principal.run }),

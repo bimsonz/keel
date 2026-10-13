@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: token.unchecked
+# why: a failed read of the signing keys reads as a token Keel did not issue, so an agent is told to throw a good token away
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e26234f7..fd8ae12a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -101,7 +101,7 @@ export async function verifyAgentToken(
+       },
+     });
+   } catch {
+-    return keysUnread === undefined ? NOT_A_TOKEN : unchecked("the signing keys", keysUnread.fault);
++    return NOT_A_TOKEN;
+   }
+   try {
+     const { internalAdapter } = await auth.$context;

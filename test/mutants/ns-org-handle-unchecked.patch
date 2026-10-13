@@ -2,10 +2,10 @@
 # kills: ns.reserved, ba.names
 # why: an org's name is not checked before it is made, so someone can create an org named settings or api and take a path keel.town serves itself
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index d061e011..c18a2b6b 100644
+index 5a0a0bed..04c851f4 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -352,10 +352,6 @@ export function authOptions(config: AuthConfig) {
+@@ -395,10 +395,6 @@ export function authOptions(config: AuthConfig) {
              code: "HANDLE_REQUIRED",
              message: "Choose a handle first: it is your namespace, where your projects live",
            });

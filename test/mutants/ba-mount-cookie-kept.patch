@@ -2,7 +2,7 @@
 # kills: ba.one-credential, ba.one-credential-fresh
 # why: a bearer's request reaches Better Auth with another session's cookie beside it, and its handlers act for the cookie while Keel's answer names the bearer
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index af681a40..a7264a4d 100644
+index cb536a8b..605b2a24 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
 @@ -103,6 +103,6 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {

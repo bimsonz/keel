@@ -2,14 +2,14 @@
 # kills: dpop.token
 # why: a token whose signature does not verify is read anyway, so anyone writes their own and is any agent they name
 diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-index cc561cb0..494846b0 100644
+index e26234f7..0f6cdc74 100644
 --- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-@@ -73,7 +73,8 @@ export async function verifyAgentToken(
+@@ -101,7 +101,8 @@ export async function verifyAgentToken(
        },
      });
    } catch {
--    return NOT_A_TOKEN;
+-    return keysUnread === undefined ? NOT_A_TOKEN : unchecked("the signing keys", keysUnread.fault);
 +    const [, body = ""] = presented.token.split(".");
 +    payload = JSON.parse(atob(body.replaceAll("-", "+").replaceAll("_", "/")));
    }

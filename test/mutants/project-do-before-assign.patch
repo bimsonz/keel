@@ -2,10 +2,10 @@
 # kills: project.create-heals
 # why: the Project DO is made before the project's place is taken, so trunk is initialized with no place and a taken name is found only once a second project exists
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index 2da55a30..7d97ccab 100644
+index c7b4a4de..7980b361 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
-@@ -68,14 +68,14 @@ export const createProject: (
+@@ -70,20 +70,15 @@ export const createProject: (
    const placed = yield* places.byId(projectId);
    if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
      return yield* new IdempotencyConflict({ idempotencyKey });
@@ -13,11 +13,18 @@ index 2da55a30..7d97ccab 100644
 +    projectId,
 +    name,
 +    source: input.source,
++    ...(input.run === undefined ? {} : { run: input.run }),
 +    idempotencyKey,
 +  });
    yield* places.assign({ projectId, namespace, name });
 -  return yield* (yield* Projects)
--    .create(actor, { projectId, name, source: input.source, idempotencyKey })
+-    .create(actor, {
+-      projectId,
+-      name,
+-      source: input.source,
+-      ...(input.run === undefined ? {} : { run: input.run }),
+-      idempotencyKey,
+-    })
 -    .pipe(
 -      Effect.tapError((refused) =>
 -        refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),

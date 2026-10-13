@@ -2,10 +2,10 @@
 # kills: gate.claims
 # why: a suspended agent that signed itself up is admitted as active, so a sponsor's pause stops nothing it does with its own token
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 93010ae3..da31e8d5 100644
+index be3dab27..a3207520 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -200,7 +200,7 @@ export const principalOf: (
+@@ -209,7 +209,7 @@ export const principalOf: (
            namespace: org,
            ...(projectId === undefined ? {} : { projectId }),
            scopes: claims.scopes,

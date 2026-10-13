@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: token.unchecked
+# why: a failed write of a proof's id reads as a bad proof, so a good bound token is answered 401 while the store is down
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e26234f7..0839cac0 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -116,9 +116,8 @@ export async function verifyAgentToken(
+       signingAlgorithms: KEY_ALGORITHMS,
+     });
+   } catch (error) {
+-    if (!isDpopBindingError(error)) return unchecked("the proof's id", error);
+     return {
+-      refused: error.code,
++      refused: isDpopBindingError(error) ? error.code : "invalid_dpop_proof",
+       detail:
+         "A token bound to a key needs `Authorization: DPoP <token>` and a DPoP proof made by that key for this method and URL, naming the token, used once.",
+     };

@@ -2,13 +2,13 @@
 # kills: authz.mcp
 # why: a bearer the gate refuses is served over MCP as an anonymous caller instead of a 401
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 4e86121c..a73e44c1 100644
+index 0b221b80..20ca3bb6 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -77,12 +77,9 @@ export function makeMcpEndpoint(
-     if (presented === null)
-       return unauthenticated(deps.challenge("mcp"), "A bearer token is required");
+@@ -79,12 +79,9 @@ export function makeMcpEndpoint(
      const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
+     // A token that could not be checked is the gate's own 503: a 401 here would tell a client its good token is bad.
+     if (gated instanceof Response && gated.status === 503) return gated;
 -    if (gated instanceof Response)
 -      return unauthenticated(
 -        gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),
@@ -21,7 +21,7 @@ index 4e86121c..a73e44c1 100644
      const authInfo: AuthInfo = {
        token: presented.token,
        clientId:
-@@ -94,7 +91,7 @@ export function makeMcpEndpoint(
+@@ -96,7 +93,7 @@ export function makeMcpEndpoint(
        scopes: principal._tag === "Agent" ? [...principal.scopes] : [],
        // Keel's own expiry is enforced by the gate; the SDK requires a value.
        expiresAt: Math.floor(Date.now() / 1000) + 60,

@@ -2,11 +2,11 @@
 # kills: project.place-released
 # why: A key reused for another body gives back the place of the project the key already made
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index 2da55a30..4bbe7ddc 100644
+index c7b4a4de..06f3b11c 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
-@@ -73,7 +73,7 @@ export const createProject: (
-     .create(actor, { projectId, name, source: input.source, idempotencyKey })
+@@ -81,7 +81,7 @@ export const createProject: (
+     })
      .pipe(
        Effect.tapError((refused) =>
 -        refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),

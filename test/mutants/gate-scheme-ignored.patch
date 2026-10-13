@@ -2,10 +2,10 @@
 # kills: dpop.unbound
 # why: the scheme a request presents its token under is ignored, so a plain token passes under the scheme that promises a key and its holder is never told it has none
 diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-index cc561cb0..2ce00d9f 100644
+index e26234f7..0ba057e6 100644
 --- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-@@ -79,7 +79,10 @@ export async function verifyAgentToken(
+@@ -107,7 +107,10 @@ export async function verifyAgentToken(
      const { internalAdapter } = await auth.$context;
      await enforceDpopBinding({
        payload,

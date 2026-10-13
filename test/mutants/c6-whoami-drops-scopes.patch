@@ -1,9 +1,9 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/whoami.test.ts
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index d826dbdb..0ab4c8c1 100644
+index f584f090..2429d2b5 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -36,7 +36,7 @@ export function agentProfile(agent: Agent) {
+@@ -37,7 +37,7 @@ export function agentProfile(agent: Agent) {
      ...(agent.handle === undefined ? {} : { handle: agent.handle }),
      name: agent.name,
      ...(agent.kind === undefined ? {} : { kind: agent.kind }),

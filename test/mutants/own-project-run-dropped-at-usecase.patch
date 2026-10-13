@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: run.own-project
+# why: the creation does not hand the run to the Projects port, so the project's object is never told it
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+index c7b4a4de..eb5b8283 100644
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -76,7 +76,6 @@ export const createProject: (
+       projectId,
+       name,
+       source: input.source,
+-      ...(input.run === undefined ? {} : { run: input.run }),
+       idempotencyKey,
+     })
+     .pipe(

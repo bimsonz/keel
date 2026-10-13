@@ -2,7 +2,7 @@
 # kills: token.rate-limit
 # why: an agent's token requests are counted against the sign-in limit, so a few runs asking every five minutes lock out the people signing in from the same address
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index af681a40..94c31513 100644
+index cb536a8b..997c6adc 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
 @@ -89,7 +89,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {

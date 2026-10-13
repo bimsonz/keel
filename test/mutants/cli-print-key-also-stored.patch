@@ -2,10 +2,10 @@
 # kills: cli.signup-no-store
 # why: a key made for a secret manager is also written over the key this machine holds, so the machine's own agent loses its key
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index d67193a5..5dd945f1 100644
+index 74a3f8f8..ef3e96bc 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -322,6 +322,7 @@ async function signUpCommand(
+@@ -356,6 +356,7 @@ async function signUpCommand(
      // A key for somewhere else to keep: printed once, before Keel is asked, and written nowhere.
      const { signer, privateJwk } = await generateAgentKey();
      io.stdout(JSON.stringify(privateJwk));

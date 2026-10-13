@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-views
+# why: whoami's summary line, which is what a model reads first, never says which run the token is
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index f584f090..58110263 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -73,7 +73,7 @@ export const runView = (run: RunRef) => ({
+ 
+ export function whoamiOk(identity: Identity): WhoamiResult {
+   const { agent, run } = identity;
+-  const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
++  const inRun = "";
+   return {
+     status: 200,
+     body: {

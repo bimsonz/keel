@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/create-project.test.ts
+# kills: run.own-project
+# why: the commit makes its actor from the creator's id as a user's, whoever the command says the actor is
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 45cd1bbb..b6e007ef 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -228,7 +228,7 @@ export const createProject: (
+       entity,
+       cause: command.idempotencyKey,
+       fingerprint: command.fingerprint,
+-      actor: command.actor,
++      actor: `user:${command.by}`,
+       ...(command.run === undefined ? {} : { run: command.run }),
+       project: projectId,
+     },

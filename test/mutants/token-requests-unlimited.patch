@@ -2,7 +2,7 @@
 # kills: token.rate-limit
 # why: a token request is admitted whatever its limiter answers, so one address guesses at signed requests without end
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index af681a40..abe847a7 100644
+index cb536a8b..21847bc1 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
 @@ -91,7 +91,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {

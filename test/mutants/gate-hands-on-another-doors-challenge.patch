@@ -2,10 +2,10 @@
 # kills: gate.challenge-none
 # why: the gate hands on the MCP door's challenge whichever door the request came in by, so a 401 at the API names the metadata of another resource
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 86baabc6..980fed00 100644
+index 22076ce2..d8dd8f1a 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -245,6 +245,6 @@ export async function gate(
+@@ -266,6 +266,6 @@ export async function gate(
    return {
      admitted: answer.admitted,
      timing: `gate;dur=${Date.now() - started}, session;dur=${sessionMs}`,

@@ -2,10 +2,10 @@
 # kills: cli.key-work
 # why: a work command's token names no project and no run whatever the command line and the environment say, so every lane's work is of no run
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index d67193a5..5fac2832 100644
+index 74a3f8f8..337b0b16 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -417,7 +417,6 @@ async function clientFor(
+@@ -451,7 +451,6 @@ async function clientFor(
      baseUrl,
      agentId: held.agentId,
      key: held.signer,

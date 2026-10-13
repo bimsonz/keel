@@ -2,7 +2,7 @@
 # kills: run.pool-stream
 # why: the isolate's stream loop reads the Inbox port with no run, whatever the handler passed
 diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index 058f4b99..bf1a4f4b 100644
+index 2de00515..3dc8cf2e 100644
 --- a/apps/keel/src/composition/isolate.ts
 +++ b/apps/keel/src/composition/isolate.ts
 @@ -199,7 +199,7 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {

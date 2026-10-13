@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: token.unchecked
+# why: the gate answers a token it could not check as an invalid credential: 401 with a challenge, where nothing says the token is bad
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 22076ce2..604f87bb 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -226,7 +226,7 @@ export async function gate(
+         },
+         door,
+       );
+-      if ("unchecked" in answer) return notChecked(requestId);
++      if ("unchecked" in answer) return refused({ refused: "invalid" });
+       if ("refused" in answer)
+         return challenged(
+           problemResponse(401, "auth.invalid_token", requestId, {

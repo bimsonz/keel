@@ -2,10 +2,10 @@
 # kills: oauth.surface
 # why: every answer to a signed-in person carries their session as a signed token in a header, a second credential nothing in Keel accounts for
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index d061e011..52186746 100644
+index 5a0a0bed..bab8ca76 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -427,7 +427,6 @@ export function authOptions(config: AuthConfig) {
+@@ -472,7 +472,6 @@ export function authOptions(config: AuthConfig) {
        // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
        // is never turned into a token: no answer carries one in a header.
        jwt({

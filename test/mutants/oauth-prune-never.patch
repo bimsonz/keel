@@ -2,10 +2,10 @@
 # kills: oauth.rows
 # why: the one-time ids are never deleted, so every token request an agent ever made leaves a row, every five minutes for every run
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index d061e011..a22b3645 100644
+index 5a0a0bed..0927cc37 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -359,7 +359,6 @@ export function authOptions(config: AuthConfig) {
+@@ -402,7 +402,6 @@ export function authOptions(config: AuthConfig) {
          return beforeOrg(ctx);
        }),
        after: createAuthMiddleware(async (ctx) => {

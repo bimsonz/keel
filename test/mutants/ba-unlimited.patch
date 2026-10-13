@@ -2,7 +2,7 @@
 # kills: ba.rate-limit
 # why: the mount never asks the limiter, so one address can send codes and attempts without end
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index af681a40..d71910c2 100644
+index cb536a8b..84c3c676 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
 @@ -98,7 +98,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {

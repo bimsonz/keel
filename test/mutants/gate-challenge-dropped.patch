@@ -2,10 +2,10 @@
 # kills: gate.challenge
 # why: a 401 carries no WWW-Authenticate, so a client holding no good token is never told where the server that issues one is
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 86baabc6..78d1b6b4 100644
+index 22076ce2..2dc0129a 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -105,7 +105,6 @@ function only(headers: Headers, name: "authorization" | "cookie"): Headers {
+@@ -106,7 +106,6 @@ function only(headers: Headers, name: "authorization" | "cookie"): Headers {
  
  /** A 401 with the door's challenge, so a client that holds no good token learns where to get one. */
  function challenged(response: Response, challenge: string): Response {

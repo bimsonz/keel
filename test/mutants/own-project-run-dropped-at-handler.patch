@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: run.own-project
+# why: the handler does not hand on the token's run, so an agent's project is created in no run
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 868426af..497e5029 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -970,7 +970,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 namespace: target.namespace,
+                 name: input.name,
+                 source,
+-                ...(inRun === undefined ? {} : { run: inRun }),
+                 idempotencyKey: input["idempotency-key"],
+               }).pipe(
+                 Effect.map((project) =>

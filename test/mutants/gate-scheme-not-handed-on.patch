@@ -2,10 +2,10 @@
 # kills: gate.agent-token
 # why: every agent token is handed on as presented under the DPoP scheme, so the check cannot refuse a key-bound token sent as a plain bearer
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 86baabc6..1f6c94c2 100644
+index 22076ce2..dcc1df6e 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -198,7 +198,7 @@ export async function gate(
+@@ -218,7 +218,7 @@ export async function gate(
        const answer = await deps.agentToken(
          {
            token,

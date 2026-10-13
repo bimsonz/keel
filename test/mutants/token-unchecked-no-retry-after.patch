@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: token.unchecked
+# why: the 503 for a token that could not be checked carries no Retry-After, so a client is not told when to send again
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 22076ce2..ae4fd707 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -123,7 +123,6 @@ function notChecked(requestId: string): Response {
+     retryAfterMs: RECHECK_SECONDS * 1000,
+     nextActions: [{ kind: "wait", title: "Send the request again after retryAfterMs" }],
+   });
+-  response.headers.set("retry-after", String(RECHECK_SECONDS));
+   return response;
+ }
+ 

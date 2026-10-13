@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-views
+# why: a run is shown by its id alone, without the label the agent gave it
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index f584f090..cbedbdd4 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -68,7 +68,6 @@ export function latticesOk(): Lattices_listLatticesResult {
+ /** A run as a view names it: its id, and its label when the agent gave one. */
+ export const runView = (run: RunRef) => ({
+   id: run.id,
+-  ...(run.label === undefined ? {} : { label: run.label }),
+ });
+ 
+ export function whoamiOk(identity: Identity): WhoamiResult {

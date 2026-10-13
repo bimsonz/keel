@@ -2,10 +2,10 @@
 # kills: cli.agent-show
 # why: `agent show` prints the stored key with the rest, so asking who the agent is puts its private key on the screen
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index d67193a5..52b3f747 100644
+index 74a3f8f8..56cfcd8c 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -375,6 +375,7 @@ async function keyCommand(
+@@ -409,6 +409,7 @@ async function keyCommand(
        ...(held.handle === undefined ? {} : { handle: held.handle }),
        thumbprint: await thumbprint(held.signer.publicJwk),
        key: held.where,

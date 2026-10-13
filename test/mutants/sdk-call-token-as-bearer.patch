@@ -2,7 +2,7 @@
 # kills: sdk.key-call
 # why: a bound token is presented as a plain bearer with no proof, which Keel refuses: a token bound to a key needs the key shown
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index d2d9c292..e57b7076 100644
+index 7fc90509..285a1c36 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -232,7 +232,7 @@ export class KeelClient {
