@@ -39,6 +39,7 @@ import {
   type ProjectId,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const ORG_1 = makeId("org", ulid(1));
@@ -1217,6 +1218,30 @@ describe("authorize", () => {
     expect(operationIds.length).toBeGreaterThan(40);
     expect(Object.keys(SPEC_ACTIONS).toSorted()).toEqual(operationIds.toSorted());
     expect(Object.keys(NON_SPEC_ACTIONS).filter((a) => operationIds.includes(a))).toEqual([]);
+  });
+
+  it("[authz.unauthenticated-next] whoever has no credential is told to sign up, then to sign in, and each names an operation anyone may call", () => {
+    let unauthenticated = 0;
+    assertReaching(
+      fc.property(requestArb, ({ action, resource }) => {
+        const result = decide(ANON, action, resource);
+        if (Result.isSuccess(result) || result.failure._tag !== "AuthenticationRequired")
+          return true;
+        unauthenticated += 1;
+        const offered = result.failure.nextActions.map((next) => next.operationId);
+        return (
+          offered.join() === "Auth_registerClient,Auth_exchangeToken" &&
+          // An offer to someone with no credential is one they can take with none.
+          offered.every(
+            (operation) =>
+              operation !== undefined &&
+              isAction(operation) &&
+              outcome(decide(ANON, operation, { _tag: "Instance" })) === "ok:",
+          )
+        );
+      }),
+    );
+    expect(unauthenticated).toBeGreaterThan(0);
   });
 
   it("[authz.refusal-shape] every 401 and 403 names a next action; a 404 says nothing", () => {

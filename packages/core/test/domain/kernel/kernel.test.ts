@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   Actor,
   agentActor,
+  byAgent,
   canBlock,
   canonicalJson,
   contentHashOf,
@@ -14,6 +15,7 @@ import {
   type Json,
   makeId,
   matchesGlob,
+  RunRef,
   sha256Hex,
   userActor,
   weakest,
@@ -237,16 +239,74 @@ describe("an event's actor", () => {
 
     fc.assert(
       fc.property(ulidArb, ulidArb, (a, u) => {
-        const byAgent = agentActor(makeId("agt", a));
-        const byUser = userActor(makeId("usr", u));
+        const anAgent = agentActor(makeId("agt", a));
+        const aUser = userActor(makeId("usr", u));
         return (
-          isActor(byAgent) &&
-          isActor(byUser) &&
-          byAgent !== byUser &&
-          actorThroughTheWire(byAgent) === byAgent &&
-          actorThroughTheWire(byUser) === byUser
+          isActor(anAgent) &&
+          isActor(aUser) &&
+          anAgent !== aUser &&
+          actorThroughTheWire(anAgent) === anAgent &&
+          actorThroughTheWire(aUser) === aUser
         );
       }),
     );
+  });
+});
+
+/** Whether an envelope naming `run` decodes, and the run it then carries, once sent as JSON. */
+const runThroughTheWire = (run: unknown): { readonly decoded: boolean; readonly run?: unknown } => {
+  const sent = {
+    eventId: makeId("evt", ulid(4)),
+    type: "IntentDeclared",
+    entity: { kind: "change", id: makeId("chg", ulid(3)) },
+    seq: 1,
+    at: 1_760_000_000_000,
+    dedupeKey: "declare#1",
+    actor: agentActor(makeId("agt", ulid(1))),
+    ...(run === undefined ? {} : { run }),
+    affected: [],
+    notified: [],
+    payload: {},
+  };
+  const read = Schema.decodeUnknownResult(EventEnvelope)(JSON.parse(JSON.stringify(sent)));
+  if (read._tag === "Failure") return { decoded: false };
+  const again = Schema.decodeUnknownSync(EventEnvelope)(
+    JSON.parse(JSON.stringify(Schema.encodeSync(EventEnvelope)(read.success))),
+  );
+  return { decoded: true, ...(again.run === undefined ? {} : { run: again.run }) };
+};
+
+describe("an event's run", () => {
+  it("[kernel.envelope-run] an envelope names a run only by its id with an optional label, the run survives the wire, and byAgent names it exactly when it is given one", () => {
+    const agent = makeId("agt", ulid(1));
+    const id = makeId("run", ulid(7));
+    const bare = { id };
+    const labelled = { id, label: "nightly.build-2" };
+    expect(runThroughTheWire(undefined)).toEqual({ decoded: true });
+    expect(runThroughTheWire(bare)).toEqual({ decoded: true, run: bare });
+    expect(runThroughTheWire(labelled)).toEqual({ decoded: true, run: labelled });
+
+    const unlawful: readonly unknown[] = [
+      id,
+      "nightly.build-2",
+      7,
+      [],
+      {},
+      { label: "nightly.build-2" },
+      { id: "nightly" },
+      { id: agent },
+      { id, label: "" },
+      { id, label: "Nightly Build" },
+      { id, label: "-nightly" },
+      { id, label: "n".repeat(65) },
+    ];
+    expect(unlawful.filter((run) => runThroughTheWire(run).decoded)).toEqual([]);
+
+    const run = Schema.decodeUnknownSync(RunRef)(labelled);
+    expect(byAgent(agent, run)).toEqual({ actor: `agent:${agent}`, run: labelled });
+    const alone = byAgent(agent, undefined);
+    expect(alone).toEqual({ actor: `agent:${agent}` });
+    // No key at all for a token that named no run: an absent run is absent, never a run of `undefined`.
+    expect(Object.keys(alone)).toEqual(["actor"]);
   });
 });

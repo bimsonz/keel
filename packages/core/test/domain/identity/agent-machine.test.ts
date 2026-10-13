@@ -309,6 +309,8 @@ interface Folded {
 /** The fold's from-table (state-machines.md § Agent), typed apart from `evolveAgent`. */
 const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" => {
   if (from === undefined) {
+    // An agent begins one of two ways: a person enrols it, or it signs itself up with a key.
+    if (event._tag === "AgentSignedUp") return { state: "active", epoch: 0 };
     if (event._tag !== "AgentEnrolled") return "illegal";
     return event.sponsor === undefined
       ? { state: "active", epoch: 0 }
@@ -381,8 +383,9 @@ const REACHED: readonly { readonly by: readonly Kind[]; readonly is: Folded | un
 
 /**
  * Every event in each form the fold could tell apart: this agent's or
- * another's, with or without a sponsor at enrolment, the held sponsor or
- * another, and the epoch before, at and after the next.
+ * another's, with or without a sponsor at enrolment, a sign-up with and
+ * without a name, the held sponsor or another, and the epoch before, at and
+ * after the next.
  */
 const eventForms = (epoch: number): readonly AgentEvent[] =>
   [AGENT, ELSEWHERE].flatMap((agentId): AgentEvent[] => [
@@ -403,6 +406,8 @@ const eventForms = (epoch: number): readonly AgentEvent[] =>
       scopes: ["agent:work"],
       sponsor: OTHER,
     },
+    { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY },
+    { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY, name: "builder" },
     { _tag: "AgentSuspended", agentId, reason: "runaway retries", by: "operator:zb" },
     { _tag: "AgentReinstated", agentId, by: "operator:zb" },
     ...[epoch, epoch + 1, epoch + 2].map((revocationEpoch): AgentEvent => ({
@@ -738,8 +743,8 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
       });
     });
     expect(cases.map((c) => c.folded)).toEqual(cases.map((c) => c.table));
-    // Seven states by twenty-two events, a good share of them on each side of the table.
-    expect(cases).toHaveLength(154);
+    // Seven states by twenty-six events, a good share of them on each side of the table.
+    expect(cases).toHaveLength(182);
     expect(cases.filter((c) => c.table.endsWith(": illegal")).length).toBeGreaterThan(100);
     expect(cases.filter((c) => !c.table.endsWith(": illegal")).length).toBeGreaterThan(15);
 
