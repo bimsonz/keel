@@ -2,18 +2,18 @@
 # kills: authz.agent-never-governs-a-person
 # why: an agent that governs a namespace a person also owns loses its read and its work there, not only its governing
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 4a5aca00..5d3440b0 100644
+index a673edda..4559220f 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -256,7 +256,10 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+@@ -295,7 +295,10 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
    if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
-   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
-   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+   if (resource._tag !== "Project" && resource._tag !== "Namespace") return NONE;
+   if (resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended) return NONE;
 -  const standing = standingOn(agent, resource);
 +  const standing =
 +    resource.personOwned && agent.standing._tag === "Governs"
 +      ? "None"
 +      : standingOn(agent, resource);
    const rights = new Set<Right>();
-   if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+   if (resource._tag === "Namespace" || resource.visibility === "public") rights.add("read");
    if (standing !== "None") rights.add("read");

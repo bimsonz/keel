@@ -2,14 +2,15 @@
 # kills: authz.agent-never-governs-a-person
 # why: an agent said to govern keeps member, maintain and own where a person owns: the rule rests on the gate filling the standing truthfully
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..6cc87feb 100644
+index a673edda..e69fa637 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -245,7 +245,6 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
-   if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+@@ -304,7 +304,7 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+     for (const right of GOVERNING) rights.add(right);
    if (!agent.scopes.includes("agent:read")) rights.delete("read");
    if (!agent.scopes.includes("agent:work")) rights.delete("work");
 -  if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
++
    return rights;
  };
  

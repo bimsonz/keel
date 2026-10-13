@@ -2,7 +2,7 @@
 # kills: authz.person-owns
 # why: an agent's own namespace is counted as owned by a person, so the agent that governs it is refused there and nobody can configure it
 diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
-index 6000065..1f5f43a 100644
+index fba18b27..a5d480d2 100644
 --- a/packages/core/src/domain/identity/tenancy.ts
 +++ b/packages/core/src/domain/identity/tenancy.ts
 @@ -153,7 +153,7 @@ export interface SelfResource {
@@ -13,4 +13,4 @@ index 6000065..1f5f43a 100644
 +export const personOwns = (_kind: NamespaceKind): boolean => true;
  
  /**
-  * A namespace: a person's own, an agent's own, or an org (`kind`). Only an org
+  * A namespace: a person's own, an agent's own, or an org. Its id says which

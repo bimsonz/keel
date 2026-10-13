@@ -2,15 +2,15 @@
 # kills: authz.private-is-missing
 # why: a non-member is told 403 for a private project, so it can tell a private project from a missing one
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 91a2965..4c06841 100644
+index a673edda..ff946f53 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -343,7 +343,8 @@ const notSeen = (
-   const inside = insideOrg(principal, resource.org);
-   const suspended = resource._tag === "Org" ? resource.suspended : resource.orgSuspended;
-   if (suspended) return inside ? refused("org-suspended") : hidden();
--  if (resource._tag === "Project" && resource.visibility === "private" && !inside) return hidden();
-+  if (resource._tag === "Project" && resource.visibility === "private" && !inside)
+@@ -454,7 +454,8 @@ const notSeen = (
+   const suspended =
+     resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended;
+   if (suspended) return within ? refused("org-suspended") : hidden();
+-  if (resource._tag === "Project" && resource.visibility === "private" && !within) return hidden();
++  if (resource._tag === "Project" && resource.visibility === "private" && !within)
 +    return refused("foreign-project");
    return undefined;
  };

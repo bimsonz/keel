@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.org-rows
+# why: deleting an org is asked of any namespace, so a person's own is deleted apart from its account.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..5fae10fc 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -151,7 +151,7 @@ export const NON_SPEC_ACTIONS = {
+   ManageMembers: rule("Org", "maintain"),
+   /** Make or unmake an owner. */
+   ManageOwners: rule("Org", "own"),
+-  DeleteOrg: rule("Org", "own"),
++  DeleteOrg: rule("Namespace", "own"),
+   /** Set, clear or list a project's deploy targets. */
+   ManageDeployTargets: rule("Project", "own"),
+   /** Store, replace or delete a credential in the org's store; none is ever read back. */

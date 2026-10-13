@@ -2,14 +2,15 @@
 # kills: authz.agent-governs-its-own, authz.outsider-public-only
 # why: an agent that governs one namespace governs every org no person owns
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..0e3099e2 100644
+index a673edda..4714711e 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -215,7 +215,6 @@ const standingOn = (
-   resource: ProjectResource | OrgResource,
+@@ -262,7 +262,7 @@ const standingOn = (
+   resource: ProjectResource | NamespaceResource,
  ): AgentStanding["_tag"] => {
    const { standing } = agent;
--  if (resource.org !== agent.org) return "None";
+-  if (resource.namespace !== agent.namespace) return "None";
++
    if (resource._tag === "Project" && resource.projectId !== agent.projectId) return "None";
    return standing._tag === "Invited" && !answers(standing.by) ? "None" : standing._tag;
  };

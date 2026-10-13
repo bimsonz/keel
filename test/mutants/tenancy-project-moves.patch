@@ -2,10 +2,10 @@
 # kills: ports.project-namespaces-taken
 # why: assigning a placed project another place answers success, so the caller believes it moved while D1 kept the old place
 diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
-index 017be66e..253839ac 100644
+index 8a1f849e..dab695a5 100644
 --- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
 +++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
-@@ -48,9 +48,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+@@ -112,9 +112,7 @@ export function ProjectNamespacesD1(db: D1Database) {
            if (inserted.meta.changes === 1) return;
            const held = yield* byId(place.projectId);
            const repeated =
@@ -13,6 +13,6 @@ index 017be66e..253839ac 100644
 -            held.value.namespace === place.namespace &&
 -            held.value.name === name;
 +            Option.isSome(held);
-           if (!repeated) yield* new ProjectNameTaken({ org: place.namespace, name });
+           if (!repeated) yield* new ProjectNameTaken({ namespace: place.namespace, name });
          }),
        release: (projectId) =>

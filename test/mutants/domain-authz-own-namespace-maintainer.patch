@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.own-namespace
+# why: a person is a maintainer of their own namespace, where they are its owner.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..5d89d6c8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -218,7 +218,7 @@ const roleIn = (memberships: readonly Membership[], org: NamespaceId): Role | un
+  * whatever a membership says, since only an org has members.
+  */
+ export const roleOf = (user: UserPrincipal, namespace: NamespaceId): Role | undefined => {
+-  if (namespace === user.userId) return "owner";
++  if (namespace === user.userId) return "maintainer";
+   return namespaceKind(namespace) === "org" ? roleIn(user.memberships, namespace) : undefined;
+ };
+ 

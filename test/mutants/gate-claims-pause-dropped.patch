@@ -6,7 +6,7 @@ index 93010ae3..da31e8d5 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
 @@ -200,7 +200,7 @@ export const principalOf: (
-           org,
+           namespace: org,
            ...(projectId === undefined ? {} : { projectId }),
            scopes: claims.scopes,
 -          paused: agent.state === "suspended",

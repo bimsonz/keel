@@ -2,14 +2,15 @@
 # kills: authz.agent-invited-read-work, authz.agent-governs-its-own
 # why: an agent keeps its rights in a suspended org
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 4a5aca00..2ebbaf48 100644
+index a673edda..1b129bc1 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -255,7 +255,6 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+@@ -294,7 +294,7 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
    if (agent.paused) return NONE;
    if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
-   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
--  if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+   if (resource._tag !== "Project" && resource._tag !== "Namespace") return NONE;
+-  if (resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended) return NONE;
++
    const standing = standingOn(agent, resource);
    const rights = new Set<Right>();
-   if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+   if (resource._tag === "Namespace" || resource.visibility === "public") rights.add("read");

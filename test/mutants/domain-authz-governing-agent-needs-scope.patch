@@ -2,16 +2,15 @@
 # kills: authz.agent-governs-its-own
 # why: governing asks a scope of the token beyond the agent's standing
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..873c2ca1 100644
+index a673edda..7806d750 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -242,7 +242,8 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
-   if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+@@ -300,7 +300,7 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (resource._tag === "Namespace" || resource.visibility === "public") rights.add("read");
    if (standing !== "None") rights.add("read");
    if (standing !== "None" && resource._tag === "Project") rights.add("work");
--  if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
-+  if (standing === "Governs" && agent.scopes.includes("agent:work"))
-+    for (const right of GOVERNING) rights.add(right);
+-  if (standing === "Governs" && mayGovern(agent, resource))
++  if (standing === "Governs" && mayGovern(agent, resource) && agent.scopes.includes("agent:work"))
+     for (const right of GOVERNING) rights.add(right);
    if (!agent.scopes.includes("agent:read")) rights.delete("read");
    if (!agent.scopes.includes("agent:work")) rights.delete("work");
-   if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);

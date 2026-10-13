@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.no-member-right-off-org
+# why: an agent said to govern counts in any agent's namespace, where it counts only in its own.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..569b1e95 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -273,7 +273,7 @@ const standingOn = (
+  * agent's, whatever the standing says.
+  */
+ const mayGovern = (agent: AgentPrincipal, resource: ProjectResource | NamespaceResource): boolean =>
+-  kindOf(resource) === "org" || resource.namespace === agent.agentId;
++  kindOf(resource) !== "user" || resource.namespace === agent.agentId;
+ 
+ /** The rights of whoever governs. Where a person owns, they are people's alone. */
+ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];

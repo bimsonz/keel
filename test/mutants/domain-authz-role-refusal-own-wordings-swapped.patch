@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.role-refusal-by-kind
+# why: a person's own namespace is called an agent's, and an agent's a person's.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..d53b78bb 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -407,8 +407,8 @@ const ROLE_NAMES: Readonly<Record<"member" | "maintain" | "own", string>> = {
+ 
+ /** A person's or an agent's own namespace has nobody to ask: only its owner does what needs a role there. */
+ const OWN_NAMESPACE: Readonly<Record<Exclude<NamespaceKind, "org">, string>> = {
+-  user: "a person's own",
+-  agent: "an agent's own",
++  user: "an agent's own",
++  agent: "a person's own",
+ };
+ 
+ /** The refusal of a role the caller lacks, worded by the namespace's kind: only an org has members to ask. */

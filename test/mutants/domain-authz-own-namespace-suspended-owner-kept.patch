@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.own-namespace
+# why: a suspended person keeps their rights in their own namespace.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..6082dae6 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -312,7 +312,11 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<Right> => {
+   switch (principal._tag) {
+     case "User": {
+-      if (principal.suspended || principal.handle === undefined) return NONE;
++      if (
++        (principal.suspended && namespaceOf(resource) !== principal.userId) ||
++        principal.handle === undefined
++      )
++        return NONE;
+       const namespace = namespaceOf(resource);
+       return rightsByRole(
+         namespace === undefined ? undefined : roleOf(principal, namespace),

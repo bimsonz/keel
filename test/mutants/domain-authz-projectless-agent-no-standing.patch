@@ -2,15 +2,15 @@
 # kills: authz.agent-governs-its-own
 # why: an agent whose token names no project has no standing in its own namespace, so it can never make its first project
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..b3fc5ea3 100644
+index a673edda..bd3eb9ca 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -215,7 +215,7 @@ const standingOn = (
-   resource: ProjectResource | OrgResource,
+@@ -262,7 +262,7 @@ const standingOn = (
+   resource: ProjectResource | NamespaceResource,
  ): AgentStanding["_tag"] => {
    const { standing } = agent;
--  if (resource.org !== agent.org) return "None";
-+  if (resource.org !== agent.org || agent.projectId === undefined) return "None";
+-  if (resource.namespace !== agent.namespace) return "None";
++  if (resource.namespace !== agent.namespace || agent.projectId === undefined) return "None";
    if (resource._tag === "Project" && resource.projectId !== agent.projectId) return "None";
    return standing._tag === "Invited" && !answers(standing.by) ? "None" : standing._tag;
  };

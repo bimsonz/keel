@@ -2,13 +2,13 @@
 # kills: authz.agent-governs-its-own
 # why: an agent asking to govern a sibling project of its own namespace is told only a person may, when a token for that project would do
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..204b776c 100644
+index a673edda..1adbf999 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -472,7 +472,7 @@ const whyNoRule = (
-   resource: ProjectResource | OrgResource,
- ): Exclude<RefusalReason, "role"> =>
-   agent.standing._tag === "Governs" && resource.org === agent.org && !resource.personOwned
+@@ -564,7 +564,7 @@ const whyNoRule = (
+   resource.namespace === agent.namespace &&
+   !resource.personOwned &&
+   mayGovern(agent, resource)
 -    ? "foreign-project"
 +    ? "users-only"
      : "users-only";

@@ -2,19 +2,20 @@
 # kills: authz.spec-covered
 # why: rebase, an operation in the spec, is listed as a non-spec action
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 8018c88..6df27f6 100644
+index a673edda..a5cf7e75 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -92,7 +92,6 @@ export const SPEC_ACTIONS = {
+@@ -118,7 +118,7 @@ export const SPEC_ACTIONS = {
    declare: rule("Project", "work"),
    adopt: rule("Project", "work"),
    rely: rule("Project", "work"),
 -  rebase: rule("Project", "work"),
++
    revise: rule("Project", "work"),
    submit: rule("Project", "work"),
    sketch: rule("Project", "work"),
-@@ -130,6 +129,7 @@ export const NON_SPEC_ACTIONS = {
-   ManageCredentials: rule("Org", "own"),
+@@ -158,6 +158,7 @@ export const NON_SPEC_ACTIONS = {
+   ManageCredentials: rule("Namespace", "own"),
    DeleteProject: rule("Project", "own"),
    CloneRepo: rule("Project", "read"),
 +  rebase: rule("Project", "work"),

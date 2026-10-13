@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.org-rows
+# why: managing members is asked of any namespace, so a person's own takes it from its owner.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..754663ba 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -148,7 +148,7 @@ export const NON_SPEC_ACTIONS = {
+   SetHandle: rule("Self", "handle"),
+   CreateOrg: rule("Instance", "account"),
+   /** Invite, remove, or move a member between member and maintainer. */
+-  ManageMembers: rule("Org", "maintain"),
++  ManageMembers: rule("Namespace", "maintain"),
+   /** Make or unmake an owner. */
+   ManageOwners: rule("Org", "own"),
+   DeleteOrg: rule("Org", "own"),

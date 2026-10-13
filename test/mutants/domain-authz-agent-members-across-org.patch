@@ -11,7 +11,7 @@ index 3f965345..0020d97e 100644
    const asMember =
 -    rights.has("member") ||
 -    (resource._tag === "Project" && standingOn(principal, resource) !== "None");
-+    rights.has("member") || resource.org === principal.org;
++    rights.has("member") || resource.namespace === principal.namespace;
    switch (need) {
      case "read":
        if (rights.has("read")) return granted(asMember ? "members" : "public");

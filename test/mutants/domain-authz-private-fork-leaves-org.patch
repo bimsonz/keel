@@ -2,14 +2,14 @@
 # kills: authz.fork
 # why: a private project forks into another org of the caller's, where it would outlive the member's removal
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 91a2965..92891ee 100644
+index a673edda..6f8833f9 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -363,7 +363,7 @@ const fork = (user: UserPrincipal, resource: ForkResource): Decision => {
+@@ -475,7 +475,7 @@ const fork = (user: UserPrincipal, resource: ForkResource): Decision => {
    if (
      project._tag === "Project" &&
      project.visibility === "private" &&
--    project.org !== resource.target.org
+-    project.namespace !== resource.target.namespace
 +    false
    )
      return refused("private-source");

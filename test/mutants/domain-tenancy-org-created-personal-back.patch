@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/tenancy.test.ts
+# kills: tenancy.org-created-reads-old
+# why: an org's creation needs `personal` again, so an event written without it no longer reads.
+diff --git a/packages/core/src/domain/identity/events.ts b/packages/core/src/domain/identity/events.ts
+index d61e5af4..c1a81cf0 100644
+--- a/packages/core/src/domain/identity/events.ts
++++ b/packages/core/src/domain/identity/events.ts
+@@ -73,6 +73,7 @@ export const UserSignedUp = Schema.TaggedStruct("UserSignedUp", {
+ export const OrgCreated = Schema.TaggedStruct("OrgCreated", {
+   orgId: OrgId,
+   name: Handle,
++  personal: Schema.Boolean,
+   by: UserId,
+ });
+ /**

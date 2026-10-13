@@ -9,7 +9,7 @@ index 3f965345..31c4ce6b 100644
    const rights = rightsOf(principal, resource);
    const asMember =
      rights.has("member") ||
-+    resource._tag === "Org" ||
++    resource._tag === "Namespace" ||
      (resource._tag === "Project" && standingOn(principal, resource) !== "None");
    switch (need) {
      case "read":

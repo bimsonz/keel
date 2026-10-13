@@ -2,23 +2,23 @@
 # kills: authz.suspended
 # why: a suspended org still admits its members, so its agents keep working
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 91a2965..91e9956 100644
+index a673edda..d528cced 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -186,7 +186,6 @@ const roleIn = (memberships: readonly Membership[], org: string): Role | undefin
+@@ -226,7 +226,6 @@ export const roleOf = (user: UserPrincipal, namespace: NamespaceId): Role | unde
  const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {
    switch (resource._tag) {
      case "Project":
--      if (resource.orgSuspended) return NONE;
+-      if (resource.namespaceSuspended) return NONE;
        if (role !== undefined) return new Set(ROLE_RIGHTS[role]);
        return resource.visibility === "public" ? READ : NONE;
-     case "Org":
-@@ -342,7 +341,7 @@ const notSeen = (
-   if (resource._tag === "Missing") return hidden();
-   const inside = insideOrg(principal, resource.org);
-   const suspended = resource._tag === "Org" ? resource.suspended : resource.orgSuspended;
--  if (suspended) return inside ? refused("org-suspended") : hidden();
-+  if (suspended && !inside) return hidden();
-   if (resource._tag === "Project" && resource.visibility === "private" && !inside) return hidden();
+     case "Namespace":
+@@ -453,7 +452,7 @@ const notSeen = (
+   const within = inside(principal, resource.namespace);
+   const suspended =
+     resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended;
+-  if (suspended) return within ? refused("org-suspended") : hidden();
++  if (suspended && !within) return hidden();
+   if (resource._tag === "Project" && resource.visibility === "private" && !within) return hidden();
    return undefined;
  };

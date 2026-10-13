@@ -2,15 +2,15 @@
 # kills: authz.agent-resource
 # why: an agent reads another agent's account without the read scope its token was cut to
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 4a5aca00..4de08c04 100644
+index a673edda..8cd328d2 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -253,7 +253,7 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
+@@ -292,7 +292,7 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
   */
  const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
    if (agent.paused) return NONE;
 -  if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
 +  if (resource._tag === "Agent") return READ;
-   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
-   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+   if (resource._tag !== "Project" && resource._tag !== "Namespace") return NONE;
+   if (resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended) return NONE;
    const standing = standingOn(agent, resource);

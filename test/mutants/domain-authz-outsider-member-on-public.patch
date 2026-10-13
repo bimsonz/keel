@@ -2,15 +2,15 @@
 # kills: authz.outsider-public-only
 # why: a non-member holds a member's rights on a public project, so any signed-in user reads it with the members' audience and enrols an agent in it
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 8018c881..74919e84 100644
+index a673edda..88ece3b5 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -179,7 +179,7 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
+@@ -228,7 +228,7 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
      case "Project":
-       if (resource.orgSuspended) return NONE;
+       if (resource.namespaceSuspended) return NONE;
        if (role !== undefined) return new Set(ROLE_RIGHTS[role]);
 -      return resource.visibility === "public" ? READ : NONE;
 +      return resource.visibility === "public" ? new Set<Right>(["read", "member"]) : NONE;
-     case "Org":
+     case "Namespace":
        if (resource.suspended) return NONE;
        return role === undefined ? READ : new Set(ROLE_RIGHTS[role]);

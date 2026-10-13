@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.role-refusal-by-kind
+# why: whoever lacks a role is told to ask a member in every namespace, a person's own among them, which has none.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..f65e0c6f 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -420,7 +420,7 @@ const lacksRole = (need: "member" | "maintain" | "own", kind: NamespaceKind): De
+         {
+           kind: "escalate",
+           title:
+-            kind === "org"
++            kind === "org" || kind === "user" || kind === "agent"
+               ? `Ask ${ROLE_NAMES[need]}: this needs that role`
+               : `This is ${OWN_NAMESPACE[kind]} namespace and has no members: only its owner does this. Use your own namespace, or an org you are a member of`,
+         },

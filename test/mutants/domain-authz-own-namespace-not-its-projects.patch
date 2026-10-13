@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.own-namespace
+# why: a person owns their namespace by identity and its projects only by a membership.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index a673edda..f151790d 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -315,7 +315,11 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
+       if (principal.suspended || principal.handle === undefined) return NONE;
+       const namespace = namespaceOf(resource);
+       return rightsByRole(
+-        namespace === undefined ? undefined : roleOf(principal, namespace),
++        namespace === undefined
++          ? undefined
++          : resource._tag === "Project"
++            ? roleIn(principal.memberships, namespace)
++            : roleOf(principal, namespace),
+         resource,
+       );
+     }

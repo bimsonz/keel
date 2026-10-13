@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.no-member-right-off-org
+# why: a membership's role counts in any namespace it names, where only an org has members.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 09bde052..c81ea3b1 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -221,7 +221,7 @@ const roleIn = (memberships: readonly Membership[], org: NamespaceId): Role | un
+  */
+ export const roleOf = (user: UserPrincipal, namespace: NamespaceId): Role | undefined => {
+   if (namespace === user.userId) return "owner";
+-  return namespaceKind(namespace) === "org" ? roleIn(user.memberships, namespace) : undefined;
++  return roleIn(user.memberships, namespace);
+ };
+ 
+ /**

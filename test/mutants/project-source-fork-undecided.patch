@@ -2,11 +2,11 @@
 # kills: project.source-private
 # why: a project named as the source is forked without the policy being asked, so anyone who knows a private project's id copies its trunk into an org of their own
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index cc42607..1cc469b 100644
+index 12688f86..5237a9ed 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -732,17 +732,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
-               const target = caller.resource?._tag === "Org" ? caller.resource : undefined;
+@@ -861,17 +861,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+               const target = caller.resource?._tag === "Namespace" ? caller.resource : undefined;
                if (target === undefined)
                  return yield* Effect.die(new Error("createProject ran without its namespace"));
 -              if (source._tag === "Project") {
@@ -20,6 +20,7 @@ index cc42607..1cc469b 100644
 -                    decided.failure,
 -                  );
 -              }
++
                return yield* createProject(actor, {
-                 namespace: target.org,
+                 namespace: target.namespace,
                  name: input.name,
