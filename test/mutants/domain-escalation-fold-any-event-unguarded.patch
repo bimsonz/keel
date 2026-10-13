@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.fold-table
+# why: the fold no longer refuses an event when `event.escalationId !== escalation.id`.
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b88..69f6cd54 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -207,7 +207,7 @@ export const evolveEscalation = (
+       : illegal(state, event);
+   }
+   const escalation = state;
+-  if (event.escalationId !== escalation.id) return illegal(escalation, event);
++  
+   switch (event._tag) {
+     case "EscalationRaised":
+       return illegal(escalation, event);

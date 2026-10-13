@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.fold-table
+# why: the fold takes EscalationWithdrawn with its guard gone: `escalation.state === "open"`.
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b88..3fc318f4 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -224,9 +224,7 @@ export const evolveEscalation = (
+           }
+         : illegal(escalation, event);
+     case "EscalationWithdrawn":
+-      return escalation.state === "open"
+-        ? { ...escalation, state: "withdrawn", withdrawnReason: event.reason }
+-        : illegal(escalation, event);
++      return { ...escalation, state: "withdrawn", withdrawnReason: event.reason };
+     default: {
+       const unreachable: never = event;
+       return unreachable;

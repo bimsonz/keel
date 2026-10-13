@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: the fold no longer refuses an event when `event.workspaceId !== workspace.id`.
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af24..1437da86 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -147,7 +147,7 @@ export const evolveWorkspace = (
+       : illegal(state, event);
+   }
+   const workspace = state;
+-  if (event.workspaceId !== workspace.id) return illegal(workspace, event);
++  
+   switch (event._tag) {
+     case "WorkspaceForked":
+       return illegal(workspace, event);

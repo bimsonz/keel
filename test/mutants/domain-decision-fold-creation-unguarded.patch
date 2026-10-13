@@ -1,0 +1,27 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: the fold makes a decision from any event, where only DecisionRecorded may create one.
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..e1ffd4a9 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -154,8 +154,7 @@ export const evolveDecision = (
+ ): Decision => {
+   const event = committed.payload;
+   if (state === undefined) {
+-    return event._tag === "DecisionRecorded"
+-      ? {
++    return {
+           id: event.decisionId,
+           escalationId: event.escalationId,
+           option: event.option,
+@@ -165,8 +164,7 @@ export const evolveDecision = (
+           alternatives: event.alternatives,
+           decidedAt: committed.at,
+           state: "active",
+-        }
+-      : illegal(state, event);
++        };
+   }
+   const decision = state;
+   if (event.decisionId !== decision.id) return illegal(decision, event);

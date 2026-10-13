@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.fold-table
+# why: the fold takes TenetSuperseded with its guard gone: `tenet.state === "established"`.
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 72d411ea..469b5e94 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -240,9 +240,7 @@ export const evolveTenet = (state: Tenet | undefined, committed: Committed<Tenet
+           }
+         : illegal(tenet, event);
+     case "TenetSuperseded":
+-      return tenet.state === "established"
+-        ? { ...tenet, state: "superseded", endedBy: event.by }
+-        : illegal(tenet, event);
++      return { ...tenet, state: "superseded", endedBy: event.by };
+     default: {
+       const unreachable: never = event;
+       return unreachable;

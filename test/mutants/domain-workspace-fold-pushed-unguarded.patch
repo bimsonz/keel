@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: the fold takes WorkspacePushed with its guard gone: `workspace.state === "granted"`.
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af24..9ac6798e 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -166,7 +166,7 @@ export const evolveWorkspace = (
+         ? { ...workspace, holder: event.changeId }
+         : illegal(workspace, event);
+     case "WorkspacePushed":
+-      return workspace.state === "granted" ? workspace : illegal(workspace, event);
++      return workspace;
+     case "WorkspaceCollected":
+       return workspace.state === "ready" || workspace.state === "granted"
+         ? { ...workspace, state: "collected" }

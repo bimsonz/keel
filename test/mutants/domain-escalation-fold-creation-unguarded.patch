@@ -1,0 +1,27 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.fold-table
+# why: the fold makes an escalation from any event, where only EscalationRaised may create one.
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b88..8a59ae7b 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -191,8 +191,7 @@ export const evolveEscalation = (
+ ): Escalation => {
+   const event = committed.payload;
+   if (state === undefined) {
+-    return event._tag === "EscalationRaised"
+-      ? {
++    return {
+           id: event.escalationId,
+           state: "open",
+           question: event.question,
+@@ -203,8 +202,7 @@ export const evolveEscalation = (
+           precedents: event.precedents,
+           default: event.default,
+           raisedAt: committed.at,
+-        }
+-      : illegal(state, event);
++        };
+   }
+   const escalation = state;
+   if (event.escalationId !== escalation.id) return illegal(escalation, event);

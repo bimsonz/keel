@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: the fold takes WorkspaceReassigned without the check `workspace.state === "granted"`.
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af24..9f3a938d 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -162,8 +162,7 @@ export const evolveWorkspace = (
+           }
+         : illegal(workspace, event);
+     case "WorkspaceReassigned":
+-      return workspace.state === "granted" && workspace.holder === event.sketchId
+-        ? { ...workspace, holder: event.changeId }
++      return workspace.holder === event.sketchId ? { ...workspace, holder: event.changeId }
+         : illegal(workspace, event);
+     case "WorkspacePushed":
+       return workspace.state === "granted" ? workspace : illegal(workspace, event);

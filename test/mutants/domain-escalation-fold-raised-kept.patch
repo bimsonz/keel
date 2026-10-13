@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.fold-table
+# why: the fold passes over a second EscalationRaised where it is illegal, so a log holding two replays as if it held one.
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b88..09c85f4a 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -210,7 +210,7 @@ export const evolveEscalation = (
+   if (event.escalationId !== escalation.id) return illegal(escalation, event);
+   switch (event._tag) {
+     case "EscalationRaised":
+-      return illegal(escalation, event);
++      return escalation as never;
+     case "RulingGiven":
+       return escalation.state === "open" && escalation.options.some((o) => o.id === event.option)
+         ? {

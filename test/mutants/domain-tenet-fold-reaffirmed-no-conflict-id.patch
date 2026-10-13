@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.fold-table
+# why: the fold no longer refuses TenetReaffirmed on `event.conflictId !== tenet.conflictId`.
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 72d411ea..8ba29aaf 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -225,7 +225,7 @@ export const evolveTenet = (state: Tenet | undefined, committed: Committed<Tenet
+         ? { ...tenet, state: "contested", conflictId: event.conflictId }
+         : illegal(tenet, event);
+     case "TenetReaffirmed": {
+-      if (tenet.state !== "contested" || event.conflictId !== tenet.conflictId)
++      if (tenet.state !== "contested")
+         return illegal(tenet, event);
+       const { conflictId: _settled, ...standing } = tenet;
+       return { ...standing, state: "established" };

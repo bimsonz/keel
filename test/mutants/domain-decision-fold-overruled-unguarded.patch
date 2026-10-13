@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: the fold takes DecisionOverruled with its guard gone: `decision.state === "active"`.
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..5d583291 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -178,9 +178,7 @@ export const evolveDecision = (
+         ? { ...decision, state: "superseded", endedBy: event.by }
+         : illegal(decision, event);
+     case "DecisionOverruled":
+-      return decision.state === "active"
+-        ? { ...decision, state: "overruled", endedBy: event.by }
+-        : illegal(decision, event);
++      return { ...decision, state: "overruled", endedBy: event.by };
+     default: {
+       const unreachable: never = event;
+       return unreachable;

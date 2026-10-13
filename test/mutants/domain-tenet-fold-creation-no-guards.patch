@@ -1,0 +1,26 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.fold-table
+# why: the fold makes a tenet without the check `Arr.isReadonlyArrayNonEmpty(guards)`.
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 72d411ea..4267d4e5 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -204,16 +204,14 @@ export const evolveTenet = (state: Tenet | undefined, committed: Committed<Tenet
+   if (state === undefined) {
+     if (event._tag !== "TenetEstablished") return illegal(state, event);
+     const guards = event.guardIds;
+-    return Arr.isReadonlyArrayNonEmpty(guards)
+-      ? {
++    return {
+           id: event.tenetId,
+           subjectId: event.subjectId,
+           predicate: event.predicate,
+           value: event.value,
+           guards,
+           state: "established",
+-        }
+-      : illegal(state, event);
++        };
+   }
+   const tenet = state;
+   if (event.tenetId !== tenet.id) return illegal(tenet, event);

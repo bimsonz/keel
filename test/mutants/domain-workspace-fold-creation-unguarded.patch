@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: the fold makes a workspace from any event, where only WorkspaceForked may create one.
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af24..5230aa68 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -142,9 +142,7 @@ export const evolveWorkspace = (
+ ): Workspace => {
+   const event = committed.payload;
+   if (state === undefined) {
+-    return event._tag === "WorkspaceForked"
+-      ? { id: event.workspaceId, repo: event.repo, sourceRepo: event.sourceRepo, state: "ready" }
+-      : illegal(state, event);
++    return { id: event.workspaceId, repo: event.repo, sourceRepo: event.sourceRepo, state: "ready" };
+   }
+   const workspace = state;
+   if (event.workspaceId !== workspace.id) return illegal(workspace, event);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: the fold no longer refuses an event when `event.decisionId !== decision.id`.
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..9a9b2985 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -169,7 +169,7 @@ export const evolveDecision = (
+       : illegal(state, event);
+   }
+   const decision = state;
+-  if (event.decisionId !== decision.id) return illegal(decision, event);
++  
+   switch (event._tag) {
+     case "DecisionRecorded":
+       return illegal(decision, event);

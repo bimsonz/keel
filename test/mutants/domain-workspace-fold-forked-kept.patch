@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: the fold passes over a second WorkspaceForked where it is illegal, so a log holding two replays as if it held one.
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af24..8b75de81 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -150,7 +150,7 @@ export const evolveWorkspace = (
+   if (event.workspaceId !== workspace.id) return illegal(workspace, event);
+   switch (event._tag) {
+     case "WorkspaceForked":
+-      return illegal(workspace, event);
++      return workspace as never;
+     case "WorkspaceGranted":
+       return workspace.state === "ready"
+         ? {

@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: sketch.fold-table
+# why: the fold takes SketchPromoted also when `expired`, where it must refuse it.
+diff --git a/packages/core/src/domain/coordination/sketch-machine.ts b/packages/core/src/domain/coordination/sketch-machine.ts
+index ec61a917..8bfa25ee 100644
+--- a/packages/core/src/domain/coordination/sketch-machine.ts
++++ b/packages/core/src/domain/coordination/sketch-machine.ts
+@@ -142,9 +142,7 @@ export const evolveSketch = (
+     case "SketchOpened":
+       return illegal(sketch, event);
+     case "SketchPromoted":
+-      return expired
+-        ? illegal(sketch, event)
+-        : { ...sketch, state: "promoted", changeId: event.changeId };
++      return { ...sketch, state: "promoted", changeId: event.changeId };
+     case "SketchDiscarded":
+       return expired ? illegal(sketch, event) : { ...sketch, state: "discarded" };
+     case "SketchExpired":
