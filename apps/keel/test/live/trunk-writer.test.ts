@@ -16,6 +16,8 @@ const NAMESPACE = "keel-ws-00";
 const host = CodeHostArtifacts({ [NAMESPACE]: env.WORKSPACES });
 const fixture = artifactsFixture(NAMESPACE, env.WORKSPACES);
 const MAIN = "refs/heads/main";
+/** An admission that admits every pack. */
+const ADMITTED = () => Effect.void;
 /** These cases seed nothing, so the writer needs no signing key. */
 const UNSIGNED = { host: "keel.test", signingKey: undefined, signers: "[]" };
 
@@ -110,11 +112,11 @@ it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuse
       expect(yield* commit(staging, MAIN, { "README.md": "base\n" })).toBe(base);
       const first = yield* commit(staging, MAIN, { "README.md": "first\n" });
       const second = yield* commit(staging, MAIN, { "README.md": "second\n" });
-      yield* writer.push(base, first);
+      yield* writer.push(base, first, ADMITTED);
       const landed = yield* codeHost.head(trunk, MAIN);
-      const stale = yield* Effect.flip(writer.push(base, second));
+      const stale = yield* Effect.flip(writer.push(base, second, ADMITTED));
       const afterStale = yield* codeHost.head(trunk, MAIN);
-      yield* writer.push(first, second);
+      yield* writer.push(first, second, ADMITTED);
       const afterSecond = yield* codeHost.head(trunk, MAIN);
       return { base, first, second, landed, stale, afterStale, afterSecond };
     }),
@@ -128,7 +130,7 @@ it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuse
   expect(report.afterSecond).toBe(report.second);
 });
 
-it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes its push then sends to trunk", async () => {
+it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes its push admits and then sends to trunk, fetched from staging once", async () => {
   const trunk = fixture.fixture.scratch();
   const staging = fixture.fixture.scratch();
   const run = <A, E>(program: Effect.Effect<A, E, CodeHost | CodeHostFixture | TrunkWriter>) =>
@@ -143,16 +145,24 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
         ),
       ),
     );
-  // Every pack a receive-pack request carries from here on, by length; the request itself goes out untouched.
+  // Every pack a receive-pack request carries from here on, by length, and how many packs were asked for; each request itself goes out untouched.
   const sent: number[] = [];
+  let fetches = 0;
   const real = globalThis.fetch;
   vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body = init?.body;
     if (url.endsWith("/git-receive-pack") && body instanceof Uint8Array)
       sent.push(packLength(body));
+    if (url.endsWith("/git-upload-pack")) fetches += 1;
     return real(input, init);
   });
+  /** What each push gave its admission, in order. */
+  const admitted: number[] = [];
+  const admit = (packBytes: number) =>
+    Effect.sync(() => {
+      admitted.push(packBytes);
+    });
   // Lines that share nothing, so the first pack is a few kilobytes even compressed.
   const prose = Array.from(
     { length: 400 },
@@ -178,10 +188,12 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
       const again = yield* writer.packBytes(base, first);
       const unsent = [...sent];
       const pushing = Date.now();
-      yield* writer.push(base, first);
+      const fetchedBefore = fetches;
+      yield* writer.push(base, first, admit);
+      const pushFetches = fetches - fetchedBefore;
       const pushMs = Date.now() - pushing;
       const secondBytes = yield* writer.packBytes(first, second);
-      yield* writer.push(first, second);
+      yield* writer.push(first, second, admit);
       const whole = yield* writer.packBytes(base, second);
       const landed = yield* codeHost.head(trunk, MAIN);
       const history = yield* writer.historyBytes(second);
@@ -197,11 +209,12 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
         history,
         weighMs,
         pushMs,
+        pushFetches,
       };
     }),
   );
   console.log(
-    `LIVE packBytes: base → first weighed ${report.firstBytes} bytes (asked again: ${report.again}) and its push sent ${sent[0]}; first → second weighed ${report.secondBytes} and its push sent ${sent[1]}; base → second in one pack would weigh ${report.whole}, the two less one pack's 32 bytes = ${report.firstBytes + report.secondBytes - 32}`,
+    `LIVE packBytes: base → first weighed ${report.firstBytes} bytes (asked again: ${report.again}) and its push admitted ${admitted[0]}, sent ${sent[0]} and asked staging for ${report.pushFetches} pack; first → second weighed ${report.secondBytes} and its push sent ${sent[1]}; base → second in one pack would weigh ${report.whole}, the two less one pack's 32 bytes = ${report.firstBytes + report.secondBytes - 32}`,
   );
   console.log(
     `LIVE historyBytes: trunk at its base ${report.historyAtBase} bytes; after the two landings ${report.history}, and the meter's sum is ${report.historyAtBase} + (${report.firstBytes} - 32) + (${report.secondBytes} - 32) = ${report.historyAtBase + report.firstBytes - 32 + report.secondBytes - 32}. Weighing the first pack took ${report.weighMs} ms and pushing it ${report.pushMs} ms, from this machine`,
@@ -213,6 +226,8 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
   expect(report.unsent).toEqual([]);
   expect(report.again).toBe(report.firstBytes);
   expect(sent).toEqual([report.firstBytes, report.secondBytes]);
+  expect(admitted).toEqual(sent);
+  expect(report.pushFetches).toBe(1);
   expect(report.firstBytes).toBeGreaterThan(1024);
   expect(report.whole).toBe(report.firstBytes + report.secondBytes - 32);
   expect(report.landed).toBe(report.second);

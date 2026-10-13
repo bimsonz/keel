@@ -1,16 +1,16 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
 # kills: trunk.refused-too-large
-# why: A pack too large to weigh is tried again and again instead of refused, so its group stays open and every batch behind it waits
+# why: A pack over the cap is pushed again and again instead of refused, so its group stays open and every batch behind it waits
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index f4e7f68..e5b5242 100644
+index 174652d2..bf050c5a 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -455,7 +455,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-   /** The bytes this group holds of its org's quota. */
-   let admitted: number | undefined;
-   const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
--  if (Result.isFailure(weighed)) refused = "pack-too-large";
-+  if (Result.isFailure(weighed)) return "retry" satisfies PushOutcome;
-   else {
-     const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-     const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
+@@ -531,7 +531,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   if (Result.isFailure(pushed)) {
+     const failure = pushed.failure;
+     if (failure._tag === "NotAdmitted") refused = "repo-bytes-quota";
+-    else if (failure._tag === "PackTooLarge") refused = "pack-too-large";
++    else if (failure._tag === "PackTooLarge") return "retry" satisfies PushOutcome;
+     else if (failure._tag === "PushRejected" && failure.reason === "busy")
+       return "retry" satisfies PushOutcome;
+     // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.

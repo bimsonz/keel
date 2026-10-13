@@ -2,15 +2,19 @@
 # kills: trunk.admits-once
 # why: A landing is pushed without being admitted, so an org's repo bytes never grow and its quota never binds
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index f4e7f68..63456da 100644
+index 174652d2..563fe326 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -458,7 +458,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-   if (Result.isFailure(weighed)) refused = "pack-too-large";
-   else {
-     const bytes = weighed.success - PACK_OVERHEAD_BYTES;
--    const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
-+    const answer = yield* Effect.result(Effect.succeed({ limit: 0, remaining: 0 }));
-     if (Result.isFailure(answer)) refused = "repo-bytes-quota";
-     else admitted = bytes;
-   }
+@@ -522,11 +522,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
+   let refused: PushRefusedReason | undefined;
+   const pushed = yield* Effect.result(
+-    writer.push(trunk.wal.old, target, (packBytes) =>
+-      usage
+-        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
+-        .pipe(Effect.mapError(() => NOT_ADMITTED)),
+-    ),
++    writer.push(trunk.wal.old, target, () => Effect.void),
+   );
+   if (Result.isFailure(pushed)) {
+     const failure = pushed.failure;

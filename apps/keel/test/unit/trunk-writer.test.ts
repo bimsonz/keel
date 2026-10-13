@@ -1,6 +1,6 @@
 // TrunkWriter.push over a recording git server: the candidate's own pack is
-// fetched from staging and pushed to trunk with the WAL's old value, whatever
-// trunk's head reads now. Artifacts' own compare-and-swap is proven live
+// fetched from staging once, admitted on its length, and pushed to trunk with
+// the WAL's old value, whatever trunk's head reads now. Artifacts' own compare-and-swap is proven live
 // ([trunkwriter.live]); this proves what the adapter asks it to compare.
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, Instant } from "@keeltown/core/kernel";
@@ -34,6 +34,8 @@ const FROM = sha("a");
 const TO = sha("b");
 const MAIN = "refs/heads/main";
 const HOST = "keel.test";
+/** An admission that admits every pack. */
+const ADMITTED = () => Effect.void;
 /** A deployment with no signing key: enough for a writer that seeds nothing. */
 const UNSIGNED = { host: HOST, signingKey: undefined, signers: "[]" };
 
@@ -95,7 +97,9 @@ describe("TrunkWriter.push", () => {
         const { server, minted, layer, seeded } = pushing(["ok"]);
         const head = yield* seeded;
         expect(head).not.toBe(FROM);
-        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(layer));
+        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
+          Effect.provide(layer),
+        );
         expect(
           server.requests.map(({ auth, ...r }) => ({ ...r, auth: auth?.replace(/_\d+$/, "") })),
         ).toEqual([
@@ -123,7 +127,9 @@ describe("TrunkWriter.push", () => {
         const { layer, seeded } = pushing(["stale"]);
         yield* seeded;
         const error = yield* Effect.flip(
-          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(layer)),
+          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
+            Effect.provide(layer),
+          ),
         );
         expect(error).toMatchObject({ _tag: "PushRejected", reason: "stale" });
       }),
@@ -135,7 +141,7 @@ describe("TrunkWriter.push", () => {
       Effect.gen(function* () {
         const landed = pushing(["busy", "busy", "ok"]);
         yield* landed.seeded;
-        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(
+        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
           Effect.provide(landed.layer),
         );
         expect(landed.server.requests.filter((r) => r.service === "receive-pack")).toHaveLength(3);
@@ -144,7 +150,9 @@ describe("TrunkWriter.push", () => {
         const busy = pushing(["busy", "busy", "busy", "busy", "ok"]);
         yield* busy.seeded;
         const error = yield* Effect.flip(
-          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(busy.layer)),
+          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
+            Effect.provide(busy.layer),
+          ),
         );
         expect(error).toMatchObject({ _tag: "PushRejected", reason: "busy" });
         expect(busy.server.requests.filter((r) => r.service === "receive-pack")).toHaveLength(4);
@@ -160,10 +168,73 @@ describe("TrunkWriter.push", () => {
         const { server, layer, seeded } = pushing(["ok"], big);
         yield* seeded;
         const error = yield* Effect.flip(
-          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(layer)),
+          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
+            Effect.provide(layer),
+          ),
         );
         expect(error).toMatchObject({ _tag: "PackTooLarge", repo: TRUNK });
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.push-fetches-once] a push asks staging for its pack once, and what it admits is what trunk receives",
+    () =>
+      Effect.gen(function* () {
+        const pack = new Uint8Array(150_000);
+        pack.set(PACK);
+        const { server, layer, seeded } = pushing(["ok"], pack);
+        yield* seeded;
+        let admissions = 0;
+        yield* Effect.flatMap(TrunkWriter, (w) =>
+          w.push(FROM, TO, () =>
+            Effect.sync(() => {
+              admissions += 1;
+            }),
+          ),
+        ).pipe(Effect.provide(layer));
+        expect(admissions).toBe(1);
+        expect(server.requests.map((r) => r.service)).toEqual(["upload-pack", "receive-pack"]);
+        expect(server.received).toEqual([150_000]);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.push-admits-length] the admission is given the pack's own length, with none of its framing",
+    () =>
+      Effect.gen(function* () {
+        // Three side-bands' worth, so a count that kept the framing would differ.
+        const pack = new Uint8Array(150_000);
+        pack.set(PACK);
+        const { layer, seeded } = pushing(["ok"], pack);
+        yield* seeded;
+        const admitted: number[] = [];
+        yield* Effect.flatMap(TrunkWriter, (w) =>
+          w.push(FROM, TO, (packBytes) =>
+            Effect.sync(() => {
+              admitted.push(packBytes);
+            }),
+          ),
+        ).pipe(Effect.provide(layer));
+        expect(admitted).toEqual([150_000]);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.push-admits-first] a pack its admission refuses is never sent: the push fails as the admission did, and trunk is asked for nothing",
+    () =>
+      Effect.gen(function* () {
+        const { server, minted, layer, seeded } = pushing(["ok"]);
+        yield* seeded;
+        const error = yield* Effect.flip(
+          Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, () => Effect.fail("refused"))).pipe(
+            Effect.provide(layer),
+          ),
+        );
+        expect(error).toBe("refused");
+        expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+        // No write token for trunk was minted for a push that was refused.
+        expect(minted).toEqual(["prj-staging read 60s"]);
       }),
   );
 
@@ -182,7 +253,9 @@ describe("TrunkWriter.push", () => {
         // Weighing reads staging and writes nothing.
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
         expect(minted).toEqual(["prj-staging read 60s"]);
-        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(layer));
+        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO, ADMITTED)).pipe(
+          Effect.provide(layer),
+        );
         const [weighed, fetched] = server.requests;
         expect(weighed?.lines).toEqual([
           expect.stringMatching(new RegExp(`^want ${TO} `)),

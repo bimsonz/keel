@@ -2,17 +2,16 @@
 # kills: trunkwriter.cas
 # why: The push takes its old value from trunk's current head instead of the WAL, so a trunk that moved under the promotion is overwritten (a bare --force lost 3 of 30 updates in S1)
 diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
-index fe9c407..b7dd482 100644
+index 5dc45f70..8ccba324 100644
 --- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
-@@ -93,8 +93,9 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+@@ -161,7 +161,8 @@ export const TrunkWriterGitCore = (
+           }),
+         push: (from, to, admit) =>
            Effect.gen(function* () {
-             const source = yield* remoteOf(staging, "read");
-             const target = yield* remoteOf(trunk, "write");
+-            const move = promotion(from, to);
 +            const old = yield* headOf(trunk);
-             const outcome = yield* Effect.tryPromise({
--              try: () => relay(source, target, promotion(from, to)),
-+              try: () => relay(source, target, promotion(old ?? from, to)),
-               catch: (cause) => cause,
-             }).pipe(
-               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
++            const move = promotion(old ?? from, to);
+             const source = yield* remoteOf(staging, "read");
+             const pack = yield* Effect.tryPromise({
+               try: () => relayPack(source, move),

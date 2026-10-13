@@ -128,7 +128,7 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     /** Every first commit asked for with `seed`, in order; each answered `MEMORY_SEED`. */
     seeds: (): readonly { readonly name: string; readonly at: Instant }[] => [...seeds],
     synced: (repo: RepoRef) => targets.get(repoKey(repo)),
-    /** Every push asked for, in order, whatever came of it. */
+    /** Every push that was sent (its pack under the cap and admitted), in order, whatever came of it. */
     pushes: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...pushes],
     /** Moves trunk behind the writer's back, to exercise the read-back freeze. */
     interfere: (to: CommitSha) => {
@@ -140,14 +140,14 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     },
     /**
      * The pack that carries `to` weighs `bytes`, which is what `packBytes`
-     * answers for it (an empty pack's 32 when never weighed): over the
-     * receive-pack cap, weighing it and pushing it are PackTooLarge, and the
-     * push moves nothing.
+     * answers for it and what a push gives its `admit` (an empty pack's 32
+     * when never weighed): over the receive-pack cap, weighing it and pushing
+     * it are PackTooLarge, and the push moves nothing.
      */
     weigh: (to: CommitSha, bytes: number) => {
       weights.set(to, bytes);
     },
-    /** Every pack weighed with `packBytes`, in order. */
+    /** Every pack weighed apart with `packBytes`, in order: a push weighs its own and is not here. */
     weighed: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...weighed],
     /** Trunk's whole history at `at` weighs `bytes`, which is what `historyBytes` answers for it (an empty pack's 32 otherwise). */
     holds: (at: CommitSha, bytes: number) => {
@@ -168,19 +168,17 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             current = MEMORY_SEED;
             return MEMORY_SEED;
           }),
-        push: (from, to) =>
-          Effect.suspend((): Effect.Effect<void, PackTooLarge | UnexpectedHead> => {
-            pushes.push({ from, to });
+        push: (from, to, admit) =>
+          Effect.gen(function* () {
             const bytes = weights.get(to) ?? EMPTY_PACK_BYTES;
-            if (bytes > RECEIVE_PACK_CAP_BYTES) return Effect.fail(overTheCap(bytes));
+            if (bytes > RECEIVE_PACK_CAP_BYTES) return yield* Effect.fail(overTheCap(bytes));
+            yield* admit(bytes);
+            pushes.push({ from, to });
             if (from !== current)
-              return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
-            if (dropping > 0) {
-              dropping -= 1;
-              return Effect.void;
-            }
-            current = to;
-            return Effect.void;
+              return yield* Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
+            if (dropping > 0) dropping -= 1;
+            else current = to;
+            return undefined;
           }),
         historyBytes: (at) => Effect.sync(() => histories.get(at) ?? EMPTY_PACK_BYTES),
         packBytes: (from, to) =>

@@ -2,13 +2,13 @@
 # kills: relay.forward-only
 # why: a relay to a head behind the commit its target holds pushes the ref back, with an empty pack
 diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
-index c42d5927..e6cb02b8 100644
+index 7ea11313..7df76170 100644
 --- a/packages/gitcore/src/fetch.ts
 +++ b/packages/gitcore/src/fetch.ts
-@@ -287,8 +287,6 @@ export async function relay(
+@@ -302,8 +302,6 @@ export async function relaySend(
+   pack: Uint8Array,
+   options: Pick<RelayOptions, "busyRetries"> = {},
  ): Promise<RelayOutcome> {
-   if (move.from === move.to) return { kind: "unchanged" };
-   const pack = await relayPack(source, move, options);
 -  if (move.from !== null && move.haves === undefined && sendsNothing(pack))
 -    throw new RelayNotForward(move.from, move.to);
    const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };

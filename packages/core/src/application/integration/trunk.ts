@@ -106,6 +106,9 @@ const REPO_BYTES = "repo-bytes";
  */
 export const PACK_OVERHEAD_BYTES = 32;
 
+/** What a push fails with when its org's repo-bytes quota did not admit its pack. */
+const NOT_ADMITTED = { _tag: "NotAdmitted" } as const;
+
 /**
  * The org a project's trunk counts against. Every project is placed in an org
  * when it is created, before its trunk exists, so a project with no place is
@@ -480,13 +483,14 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA
  * advances trunk, the old head means push again, anything else freezes.
  *
- * Before every push the group's pack is weighed and admitted against its
- * org's repo-bytes quota, under the key `promotion:<sha>`, so the retries of
- * one group count once. A pack over the receive-pack cap or over the quota,
- * with trunk still on the old head, is PushRefused: the group is declined,
- * never left open, and what was admitted for it is given back first. A
- * project with no place is a defect: its group is neither weighed nor
- * pushed. A destroyed trunk pushes nothing, even a group it had opened.
+ * Every push admits its own pack against its org's repo-bytes quota before
+ * anything is sent, under the key `promotion:<sha>`, so the retries of one
+ * group count once: the writer fetches the pack once, and what it weighs is
+ * what it sends. A pack over the receive-pack cap or over the quota, with
+ * trunk still on the old head, is PushRefused: the group is declined, never
+ * left open, and nothing was counted for it. A project with no place is a
+ * defect: its group is neither weighed nor pushed. A destroyed trunk pushes
+ * nothing, even a group it had opened.
  */
 export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   projectId: ProjectId,
@@ -519,30 +523,23 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   const org = yield* orgOf(projectId);
   /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
   let refused: PushRefusedReason | undefined;
-  /** The bytes this group holds of its org's quota. */
-  let admitted: number | undefined;
-  const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
-  if (Result.isFailure(weighed)) refused = "pack-too-large";
-  else {
-    const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-    const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
-    if (Result.isFailure(answer)) refused = "repo-bytes-quota";
-    else admitted = bytes;
-  }
-  if (refused === undefined) {
-    const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
-    if (Result.isFailure(pushed)) {
-      const failure = pushed.failure;
-      if (failure._tag === "PackTooLarge") refused = "pack-too-large";
-      else if (failure._tag === "PushRejected" && failure.reason === "busy")
-        return "retry" satisfies PushOutcome;
-      // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
-    }
+  const pushed = yield* Effect.result(
+    writer.push(trunk.wal.old, target, (packBytes) =>
+      usage
+        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
+        .pipe(Effect.mapError(() => NOT_ADMITTED)),
+    ),
+  );
+  if (Result.isFailure(pushed)) {
+    const failure = pushed.failure;
+    if (failure._tag === "NotAdmitted") refused = "repo-bytes-quota";
+    else if (failure._tag === "PackTooLarge") refused = "pack-too-large";
+    else if (failure._tag === "PushRejected" && failure.reason === "busy")
+      return "retry" satisfies PushOutcome;
+    // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
   }
   if (refused !== undefined && (yield* writer.head) === trunk.wal.old) {
-    // Nothing landed and no retry can help. What the group was admitted is given back before it is declined: a crash between the two then leaves the group open, and the next pass ends it.
-    if (admitted !== undefined)
-      yield* usage.record(org, REPO_BYTES, -admitted, `giveback:${target}`);
+    // Nothing landed and no retry can help. Neither refusal counted anything: a pack over the cap was never admitted, and a refused admission counts nothing.
     // The domain declines the group, so its change bounces and trunk stays free.
     yield* promote(
       projectId,

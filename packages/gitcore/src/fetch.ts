@@ -286,7 +286,22 @@ export async function relay(
   options: RelayOptions = {},
 ): Promise<RelayOutcome> {
   if (move.from === move.to) return { kind: "unchanged" };
-  const pack = await relayPack(source, move, options);
+  return relaySend(target, move, await relayPack(source, move, options), options);
+}
+
+/**
+ * The sending half of a relay: pushes `pack`, which `relayPack(source, move)`
+ * answered, into `target`'s `move.ref` with `from` as the explicit old value.
+ * A caller that must decide on the pack before anything is sent (its length
+ * against a quota) fetches it once with `relayPack` and sends that very pack
+ * here. It throws what `relay` throws once it holds the pack.
+ */
+export async function relaySend(
+  target: GitRemote,
+  move: RelayMove,
+  pack: Uint8Array,
+  options: Pick<RelayOptions, "busyRetries"> = {},
+): Promise<RelayOutcome> {
   if (move.from !== null && move.haves === undefined && sendsNothing(pack))
     throw new RelayNotForward(move.from, move.to);
   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.push-admits-length"
+# kills: trunkwriter.push-admits-length
+# why: the admission is given no bytes whatever the pack weighs, so a landing of any size counts nothing against its org
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 5dc45f70..656c7e81 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -168,7 +168,7 @@ export const TrunkWriterGitCore = (
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(trunk)));
+             // Admitted on the pack in hand, before trunk is asked for anything: a refusal mints no write token.
+-            yield* admit(pack.length);
++            yield* admit(0);
+             const target = yield* remoteOf(trunk, "write");
+             const outcome = yield* Effect.tryPromise({
+               try: () => relaySend(target, move, pack),

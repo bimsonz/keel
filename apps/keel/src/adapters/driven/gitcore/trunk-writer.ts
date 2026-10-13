@@ -16,6 +16,7 @@ import {
   type RelayMove,
   relay,
   relayPack,
+  relaySend,
   rootCommit,
   uploadPackBytes,
   writePack,
@@ -61,7 +62,8 @@ export const tooLarge =
 /**
  * TrunkWriter over GitCore and the code host. A promotion relays the
  * candidate's own pack from staging into trunk, so the commit the verdict
- * covered lands byte for byte. The first commit of an empty project is
+ * covered lands byte for byte: the pack is fetched once, admitted on its
+ * length, and that very pack is sent. The first commit of an empty project is
  * Keel's own, signed with the deployment's key: no key, or one the signers
  * file does not vouch for at that time, is a defect before anything is
  * pushed. Tokens are minted per call and never leave this adapter; remotes
@@ -157,18 +159,25 @@ export const TrunkWriterGitCore = (
             yield* makeMain(tip, root.objects);
             return tip;
           }),
-        push: (from, to) =>
+        push: (from, to, admit) =>
           Effect.gen(function* () {
+            const move = promotion(from, to);
             const source = yield* remoteOf(staging, "read");
+            const pack = yield* Effect.tryPromise({
+              try: () => relayPack(source, move),
+              catch: (cause) => cause,
+            }).pipe(Effect.catch(tooLarge(trunk)));
+            // Admitted on the pack in hand, before trunk is asked for anything: a refusal mints no write token.
+            yield* admit(pack.length);
             const target = yield* remoteOf(trunk, "write");
             const outcome = yield* Effect.tryPromise({
-              try: () => relay(source, target, promotion(from, to)),
+              try: () => relaySend(target, move, pack),
               catch: (cause) => cause,
             }).pipe(
-              Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
+              Effect.catch((cause): Effect.Effect<never, PushRejected> =>
                 cause instanceof ReceivePackBusy
                   ? Effect.fail(new PushRejected({ reason: "busy" }))
-                  : tooLarge(trunk)(cause),
+                  : Effect.die(cause),
               ),
             );
             // A relay is never `unchanged` here: a promotion's `to` is never its `from`.

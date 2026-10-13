@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.push-fetches-once"
+# kills: trunkwriter.push-fetches-once
+# why: the pack is fetched a second time to be weighed, so every promotion asks staging for it twice: 4 to 6 s more on a 10 MB repository
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 5dc45f70..1e0322c2 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -168,7 +168,8 @@ export const TrunkWriterGitCore = (
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(trunk)));
+             // Admitted on the pack in hand, before trunk is asked for anything: a refusal mints no write token.
+-            yield* admit(pack.length);
++            const again = yield* Effect.promise(() => relayPack(source, move));
++            yield* admit(again.length);
+             const target = yield* remoteOf(trunk, "write");
+             const outcome = yield* Effect.tryPromise({
+               try: () => relaySend(target, move, pack),

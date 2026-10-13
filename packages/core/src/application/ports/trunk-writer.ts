@@ -53,17 +53,24 @@ export class TrunkWriter extends Context.Service<
      * longer held `from` (`stale`) or stayed busy (`busy`); nothing landed. A
      * pack over the receive-pack cap is PackTooLarge and lands nothing. The
      * caller reads the head back to learn the outcome.
+     *
+     * The pack is fetched from staging once. `admit` is run on its length in
+     * bytes (the pack itself, with none of its transport framing) before
+     * anything is asked of trunk, and that very pack is then sent: a failing
+     * `admit` is the push's failure and lands nothing. Trunk's repo grows by
+     * the length less the 32 bytes of a pack's header and trailer.
      */
-    readonly push: (
+    readonly push: <E>(
       from: CommitSha,
       to: CommitSha,
-    ) => Effect.Effect<void, PushRejected | UnexpectedHead | PackTooLarge>;
+      admit: (packBytes: number) => Effect.Effect<void, E>,
+    ) => Effect.Effect<void, PushRejected | UnexpectedHead | PackTooLarge | E>;
     /**
-     * The length in bytes of the pack `push(from, to)` relays: the same want
-     * and the same have, asked of staging, counted as the pack itself with
-     * none of its transport framing. Trunk's repo grows by that less the 32
-     * bytes of a pack's header and trailer. A pack over the receive-pack cap
-     * is PackTooLarge, as its push would be. It reads staging and writes
+     * The length in bytes of the pack `push(from, to)` relays, for a caller
+     * that pushes nothing (what a stopped group was admitted, to give it
+     * back): the same want and the same have, asked of staging, counted as
+     * `push` counts it for `admit`. A pack over the receive-pack cap is
+     * PackTooLarge, as its push would be. It reads staging and writes
      * nothing.
      */
     readonly packBytes: (from: CommitSha, to: CommitSha) => Effect.Effect<number, PackTooLarge>;

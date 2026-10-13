@@ -39,7 +39,6 @@ import {
   EventOutbox,
   OrgUsage,
   RELAY_PACK_CAP_BYTES,
-  TrunkWriter,
 } from "@keeltown/core/ports";
 import {
   makeClockMemory,
@@ -757,10 +756,29 @@ describe("the Trunk's promotion", () => {
         expect(yield* counted).toBe(held + 1_000);
         expect(yield* pushPromotion(PROJECT)).toBe("advanced");
         expect(yield* pushPromotion(PROJECT)).toBe("idle");
-        expect(w.writer.weighed()).toEqual([
+        expect(w.writer.pushes()).toEqual([
           { from: base, to: tip },
           { from: base, to: tip },
         ]);
+        expect(yield* counted).toBe(held + 1_000);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.push-weighs-once] a promotion asks its writer for the push alone: the pack is weighed by the push that sends it, never fetched apart",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const held = yield* counted;
+        const tip = yield* w.composed(1, base);
+        w.writer.weigh(tip, 1_032);
+        yield* deliver(verified(1, base));
+        yield* flushTrunk(PROJECT);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(w.writer.weighed()).toEqual([]);
+        expect(w.writer.pushes()).toEqual([{ from: base, to: tip }]);
         expect(yield* counted).toBe(held + 1_000);
       }).pipe(Effect.provide(w.layer));
     },
@@ -800,35 +818,6 @@ describe("the Trunk's promotion", () => {
         expect(w.writer.head()).toBe(next);
         expect(yield* counted).toBe(held + 500);
       }).pipe(Effect.provide(w.layer));
-    },
-  );
-
-  it.effect(
-    "[trunk.gives-back] a group refused after it was admitted gives its bytes back before it is declined",
-    () => {
-      const w = promotion();
-      // Weighed as a small pack and refused as too large when pushed: a refusal that follows an admission.
-      const light = Layer.effect(
-        TrunkWriter,
-        Effect.map(TrunkWriter, (writer) =>
-          TrunkWriter.of({ ...writer, packBytes: () => Effect.succeed(1_032) }),
-        ),
-      ).pipe(Layer.provide(w.writer.layer));
-      return Effect.gen(function* () {
-        const base = yield* w.seeded;
-        // What the create counted: the history at the base.
-        const held = yield* counted;
-        const tip = yield* w.composed(1, base);
-        w.writer.weigh(tip, 61 * 1024 * 1024);
-        yield* (yield* OrgUsage).record(ORG, "repo-bytes", 7, "held already");
-        yield* deliver(verified(1, base));
-        yield* flushTrunk(PROJECT);
-        expect(yield* pushPromotion(PROJECT)).toBe("declined");
-        expect(w.writer.pushes()).toEqual([{ from: base, to: tip }]);
-        const declined = (yield* trunkLog).filter((e) => e.type === "PromotionDeclined");
-        expect(declined.map((e) => e.payload)).toMatchObject([{ reason: "pack-too-large" }]);
-        expect(yield* counted).toBe(held + 7);
-      }).pipe(Effect.provide(Layer.merge(w.rest, light)));
     },
   );
 
