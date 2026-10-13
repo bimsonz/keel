@@ -2,10 +2,10 @@
 # kills: probe.runner-unavailable, probe.drafts-again
 # why: The draft step dies on an unavailable runner again, so the program never waits and drafts afresh
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 8289f601..f4b564fe 100644
+index d58d38d9..9876d298 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -330,9 +330,7 @@ export const draftConflict = (
+@@ -331,9 +331,7 @@ export const draftConflict = (
    }).pipe(
      Effect.catchTag("Unread", (u) => Effect.succeed(u)),
      // The VerifierDOs could not take the matrix: nothing about the probe, so the program drafts again later.
@@ -15,4 +15,4 @@ index 8289f601..f4b564fe 100644
 +    Effect.catchTag("ProbeRunnerUnavailable", (e) => Effect.die(e)),
    );
  
- /** A draft worth drafting again after a wait: the runner could not run it, or the model's rate limit ended it. */
+ /** The worlds a draft runs in besides A-noop, in the order the runner is asked about them. */
