@@ -9,6 +9,7 @@ import {
   Glob,
   type Json,
   type ProjectId,
+  type RunRef,
 } from "../../domain/kernel/index.ts";
 import {
   type Clock,
@@ -66,8 +67,10 @@ export interface ChangeSettings {
   readonly settings: PutProjectSettings;
   /** The id of whoever changes them: the event's `by`. */
   readonly by: string;
-  /** The same actor as the envelope names it (`user:<id>`): the commit's actor. */
+  /** The same actor as the envelope names it (`user:<id>`, `agent:<id>`): the commit's actor. */
   readonly actor: Actor;
+  /** The run an agent changes them in, when its token named one: the run the event names. */
+  readonly run?: RunRef | undefined;
   /** The request that carried the PUT. */
   readonly requestId: string;
 }
@@ -114,9 +117,11 @@ export const settingsOf: (
 });
 
 /**
- * Replaces the project's settings under operator authority (an absent
- * `verification` is `required`, an absent `visibility` `private`). One ProjectSettingsChanged audits every field
- * the PUT changes, from and to; an unchanged PUT commits nothing, so a retry
+ * Replaces the project's settings as whoever governs it, a person or an agent
+ * in a namespace of its own (an absent `verification` is `required`, an absent
+ * `visibility` `private`). One ProjectSettingsChanged audits every field the
+ * PUT changes, from and to, under the actor and the run the command names; an
+ * unchanged PUT commits nothing, so a retry
  * is a no-op by content. The cause is `settings:<requestId>`: a replay of the
  * request answers the settings as they stand, and the same request id with
  * other settings is IdempotencyConflict.
@@ -133,7 +138,7 @@ export const changeSettings: (
   ProjectNotFound | IdempotencyConflict,
   Clock | EntityStore | EventOutbox | ProjectNamespaces
 > = Effect.fn("integration/changeSettings")(function* (command: ChangeSettings) {
-  const { projectId, by, actor, requestId } = command;
+  const { projectId, by, actor, run, requestId } = command;
   const next: ProjectSettings = {
     protectedPaths: command.settings.protectedPaths,
     maxBatchSize: command.settings.maxBatchSize,
@@ -149,6 +154,7 @@ export const changeSettings: (
       cause: `settings:${requestId}`,
       fingerprint,
       actor,
+      ...(run === undefined ? {} : { run }),
       project: projectId,
     },
     (tx): Result.Result<Transition<ProjectSettings>, ProjectNotFound | IdempotencyConflict> => {

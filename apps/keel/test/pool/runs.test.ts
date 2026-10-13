@@ -21,6 +21,7 @@ import { Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
+import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import type { SocketFrame } from "../../src/adapters/driving/notices.ts";
 import { ChangeCodecs, decodeExit, RUN_HEADER } from "../../src/rpc/index.ts";
 import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
@@ -42,6 +43,9 @@ const REGISTER = `${BASE}/v1/oauth/register`;
 
 const agentStub = (agentId: AgentId) =>
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
+
+const projectStub = (projectId: ProjectId) =>
+  drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
 
 /** One run of the agent: what its token names, and a plain bearer for it. */
 interface Run {
@@ -411,6 +415,33 @@ const linkEnds = (agentId: AgentId) =>
       .map((event) => ({ actor: event.actor, run: event.run })),
   );
 
+/** The agent replaces a project's settings with `token`. */
+const putSettings = (token: string, projectId: ProjectId, settings: object) =>
+  asAgent(token, `/v1/projects/${projectId}/settings`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+
+const SettingsBy = Schema.Struct({ by: Schema.String });
+
+/** Each change of the project's settings as its own object committed it: who changed them, and under which run. */
+const settingsChanges = (projectId: ProjectId) =>
+  runInDurableObject(projectStub(projectId), (_instance: ProjectDO, state) =>
+    state.storage.sql
+      .exec<{ envelope: string }>(
+        "SELECT envelope FROM keel_events WHERE entity_kind = 'project' ORDER BY seq",
+      )
+      .toArray()
+      .map((row) => Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(row.envelope)))
+      .filter((event) => event.type === "ProjectSettingsChanged")
+      .map((event) => ({
+        actor: event.actor,
+        by: Schema.decodeUnknownSync(SettingsBy)(event.payload).by,
+        run: event.run,
+      })),
+  );
+
 describe("an agent's two runs, each with its own token", () => {
   it("[run.pool-inbox] the inbox by REST is the reading run's: what another does to a change it holds, never what it did itself, and what is for every run", async () => {
     const agent = await keyAgent();
@@ -529,6 +560,41 @@ describe("an agent's two runs, each with its own token", () => {
     expect(await linkEnds(agent.agentId)).toStrictEqual([
       { actor: agentActor(agent.agentId), run: agent.a.run },
       { actor: agentActor(agent.agentId), run: undefined },
+    ]);
+  });
+
+  it("[run.pool-settings] an agent replaces the settings of a project in its own namespace as itself, in its token's run and under none with a token that names none; its other project and another agent's refuse it", async () => {
+    const [agent, other] = [await keyAgent(), await keyAgent()];
+    const sibling: ProjectId = makeId("prj", ulid());
+    await placeProject(sibling, agent.agentId);
+    await establishProject(sibling);
+    const off = { protectedPaths: ["infra/**"], maxBatchSize: 1, verification: "off" };
+    const open = { protectedPaths: [], maxBatchSize: 1, visibility: "public" };
+
+    const inRun = await putSettings(agent.a.token, agent.projectId, off);
+    expect(inRun.status).toBe(200);
+    expect(await inRun.json()).toStrictEqual({ ...off, visibility: "private" });
+    expect((await putSettings(agent.plain, agent.projectId, open)).status).toBe(200);
+
+    // Its token names one project: another of its own answers that, and a private project of another agent is not there for it.
+    const foreign = await putSettings(agent.a.token, sibling, off);
+    const unseen = await putSettings(agent.a.token, other.projectId, off);
+    expect([foreign.status, unseen.status]).toStrictEqual([403, 404]);
+    expect((await foreign.json<{ detail: string }>()).detail).toBe("Refused: foreign-project.");
+    // Once its own agent makes that project public, the stranger sees it and still governs nothing there.
+    expect((await putSettings(other.b.token, other.projectId, open)).status).toBe(200);
+    const refused = await putSettings(agent.a.token, other.projectId, off);
+    expect(refused.status).toBe(403);
+    expect((await refused.json<{ detail: string }>()).detail).toBe("Refused: users-only.");
+
+    const own = { actor: agentActor(agent.agentId), by: agent.agentId };
+    expect(await settingsChanges(agent.projectId)).toStrictEqual([
+      { ...own, run: agent.a.run },
+      { ...own, run: undefined },
+    ]);
+    expect(await settingsChanges(sibling)).toStrictEqual([]);
+    expect(await settingsChanges(other.projectId)).toStrictEqual([
+      { actor: agentActor(other.agentId), by: other.agentId, run: other.b.run },
     ]);
   });
 

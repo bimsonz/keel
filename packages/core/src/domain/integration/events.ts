@@ -173,7 +173,7 @@ export const SettingChange = Schema.Struct({
   from: Schema.Unknown,
   to: Schema.Unknown,
 });
-/** An operator changed the project's settings: every change is audited, e.g. turning verification off. */
+/** Whoever governs the project changed its settings, a person or an agent in a namespace of its own: every change is audited, e.g. turning verification off. */
 export const ProjectSettingsChanged = Schema.TaggedStruct("ProjectSettingsChanged", {
   projectId: ProjectId,
   changes: Schema.Array(SettingChange),

@@ -269,6 +269,14 @@ function creatorOf(caller: Caller): Actor {
   throw new Error("a project's creation ran for neither an agent nor a user");
 }
 
+/** Who changes a project's settings: a person, or an agent in a namespace of its own, as the policy granted. */
+function settingsActorOf(caller: Caller): Actor {
+  const { principal } = caller;
+  if (principal._tag === "Agent") return { _tag: "Agent", agentId: principal.agentId };
+  if (principal._tag === "User") return { _tag: "User", userId: principal.userId };
+  throw new Error("a project's settings were put for neither an agent nor a user");
+}
+
 /** The project a read was granted, and who it reads as. */
 const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audience: Audience } => ({
   project: projectOf(caller).projectId,
@@ -1101,8 +1109,16 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           const { projectId, settings } = decoded.success;
           return run(
             caller,
-            actorOf(caller).pipe(
-              Effect.flatMap((actor) => putSettings(actor, projectId, settings, caller.requestId)),
+            // An agent's token names the run it changes them in: the audit carries it.
+            Effect.suspend(() =>
+              putSettings(
+                settingsActorOf(caller),
+                projectId,
+                settings,
+                caller.requestId,
+                caller.token?.run,
+              ),
+            ).pipe(
               Effect.match({
                 onSuccess: settingsOk,
                 onFailure: (error) => putSettingsError(caller, error),

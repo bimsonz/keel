@@ -123,15 +123,20 @@ export const getSettings: (
 ) => Effect.Effect<ProjectSettings, ProjectNotFound, Projects> = (projectId) =>
   Projects.use((projects) => projects.settings(projectId));
 
-/** Replaces the project's settings, audited by its Project DO under the actor's id. */
+/**
+ * Replaces the project's settings, audited by its Project DO under the actor's
+ * id, and in `run` when an agent's token named one.
+ */
 export const putSettings: (
   actor: Actor,
   projectId: ProjectId,
   settings: PutProjectSettings,
   requestId: string,
+  run?: RunRef,
 ) => Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict, Projects> = (
   actor,
   projectId,
   settings,
   requestId,
-) => Projects.use((projects) => projects.putSettings(actor, projectId, settings, requestId));
+  run,
+) => Projects.use((projects) => projects.putSettings(actor, projectId, settings, requestId, run));

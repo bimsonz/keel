@@ -23,7 +23,7 @@ const encodePut = Schema.encodeSync(PutSettingsCommand);
  * fingerprint. A start the DO refused crosses by shape and is rebuilt as the
  * port's error. `settings` answers the project's settings, or
  * ProjectNotFound; `putSettings` replaces them as the actor, whose id the
- * Project DO audits.
+ * Project DO audits, in the run it is given.
  * `liveAnchors` reads the Project DO's live index; a project never created
  * has none.
  */
@@ -59,7 +59,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
         }),
       settings: (projectId) =>
         callObject(ProjectCodecs.settings, () => project(projectId).settings()),
-      putSettings: (actor, projectId, settings, requestId) =>
+      putSettings: (actor, projectId, settings, requestId, run) =>
         callObject(ProjectCodecs.putSettings, () =>
           project(projectId).putSettings(
             encodePut({
@@ -67,6 +67,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
               settings,
               by: actorId(actor),
               actor: eventActorOf(actor),
+              ...(run === undefined ? {} : { run }),
               requestId,
             }),
           ),

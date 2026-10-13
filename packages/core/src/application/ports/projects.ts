@@ -98,8 +98,9 @@ export interface PutProjectSettings {
  * refuses another body under the same key with IdempotencyConflict. The DO
  * records the actor's id as the project's creator.
  * Precheck reads the protected globs from `settings`, and nothing else holds them.
- * `putSettings` replaces them as the actor, whom the doorway authorised. The
- * Project DO audits every changed field with ProjectSettingsChanged; an
+ * `putSettings` replaces them as the actor, whom the doorway authorised: a
+ * person, or an agent in a namespace of its own, in `run` when its token named
+ * one. The Project DO audits every changed field with ProjectSettingsChanged; an
  * unchanged PUT commits nothing, so a retry is a no-op by content.
  * `requestId` keys the commit: the same id with other settings is
  * IdempotencyConflict.
@@ -121,6 +122,7 @@ export class Projects extends Context.Service<
       projectId: ProjectId,
       settings: PutProjectSettings,
       requestId: string,
+      run?: RunRef,
     ) => Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict>;
     readonly liveAnchors: (projectId: ProjectId) => Effect.Effect<readonly SubjectAnchors[]>;
   }
