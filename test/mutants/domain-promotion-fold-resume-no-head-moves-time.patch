@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: a resume that names no head, an older event's form, moves the time trunk's head last changed, though the head stayed where it was
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..2f54e810 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -613,9 +613,7 @@ export const evolvePromotion = (
+             ...without(trunk, "wal", "frozen"),
+             head: event.head ?? trunk.head,
+             // A resume at another head changed trunk's head, whoever wrote that commit.
+-            ...(event.head === undefined || event.head === trunk.head
+-              ? {}
+-              : { advancedAt: committed.at }),
++            ...(event.head === trunk.head ? {} : { advancedAt: committed.at }),
+             phase: settled(trunk.queue),
+           }
+         : illegal(trunk, event);

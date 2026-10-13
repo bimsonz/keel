@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: an advance that carries no height, an older event's form, leaves trunk with no time for the head it just took
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..1d334cde 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -581,9 +581,9 @@ export const evolvePromotion = (
+         ? {
+             // An advance without a height (an older Trunk DO's) leaves the height unknown.
+             // A push landed: grouping resumes.
+-            ...without(trunk, "wal", "height", "solo"),
++            ...without(trunk, "wal", "height", "solo", "advancedAt"),
+             head: event.to,
+-            advancedAt: committed.at,
++            ...(event.height === undefined ? {} : { advancedAt: committed.at }),
+             promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
+             phase: settled(trunk.queue),
+             ...(event.height === undefined ? {} : { height: event.height }),

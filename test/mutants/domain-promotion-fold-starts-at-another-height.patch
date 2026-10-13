@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, promotion.height
+# why: the first fold starts trunk at height 1, so the first advance is refused or counted one too high
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..e9f83521 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -462,7 +462,7 @@ export const evolvePromotion = (
+           head: event.head,
+           queue: [],
+           promoted: [],
+-          height: 0,
++          height: 1,
+           advancedAt: committed.at,
+           ...(event.origin === undefined ? {} : { origin: event.origin }),
+         }

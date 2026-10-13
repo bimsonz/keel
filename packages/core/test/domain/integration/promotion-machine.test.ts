@@ -1448,6 +1448,8 @@ interface FoldedTrunk {
   readonly solo: boolean;
   readonly frozen: boolean;
   readonly promoted: number;
+  /** When its head last changed: the instant of the fold that changed it. */
+  readonly advancedAt?: Instant;
 }
 
 const slotOf = (b: Slot): Slot => ({ batchId: b.batchId, members: b.members });
@@ -1456,11 +1458,18 @@ const holds = (slots: readonly Slot[], batchId: BatchId): boolean =>
 const less = (slots: readonly Slot[], batchId: BatchId): readonly Slot[] =>
   slots.filter((s) => s.batchId !== batchId);
 /** The phase a trunk rests in once nothing is being pushed. */
+/** The instant the table folds each event at: before the tour began, so no trunk of it has it as its own. */
+const FOLDED_AT = Instant(T0 - 1);
+
 const rests = (queue: readonly Slot[]): Trunk["phase"] =>
   queue.length === 0 ? "idle" : "debouncing";
 
 /** The fold's from-table (state-machines.md § Promotion), typed apart from `evolvePromotion`. */
-const trunkFolds = (from: FoldedTrunk | undefined, event: TrunkEvent): FoldedTrunk | "illegal" => {
+const trunkFolds = (
+  from: FoldedTrunk | undefined,
+  event: TrunkEvent,
+  at: Instant,
+): FoldedTrunk | "illegal" => {
   if (from === undefined)
     return event._tag === "TrunkInitialized"
       ? {
@@ -1471,6 +1480,7 @@ const trunkFolds = (from: FoldedTrunk | undefined, event: TrunkEvent): FoldedTru
           solo: false,
           frozen: false,
           promoted: 0,
+          advancedAt: at,
         }
       : "illegal";
   const { group } = from;
@@ -1547,6 +1557,7 @@ const trunkFolds = (from: FoldedTrunk | undefined, event: TrunkEvent): FoldedTru
         ...landed,
         solo: false,
         head: event.to,
+        advancedAt: at,
         promoted: from.promoted + event.landings.length,
         phase: rests(from.queue),
         ...(event.height === undefined ? {} : { height: event.height }),
@@ -1561,7 +1572,15 @@ const trunkFolds = (from: FoldedTrunk | undefined, event: TrunkEvent): FoldedTru
       if (from.phase !== "frozen" || (group !== undefined && group.batches.length > 0))
         return "illegal";
       const { group: _dropped, ...resumed } = from;
-      return { ...resumed, frozen: false, head: event.head ?? from.head, phase: rests(from.queue) };
+      // Only a resume that names a head trunk is not at moves the time: one that names none (an older event) leaves it.
+      const moved = event.head !== undefined && event.head !== from.head;
+      return {
+        ...resumed,
+        frozen: false,
+        head: event.head ?? from.head,
+        ...(moved ? { advancedAt: at } : {}),
+        phase: rests(from.queue),
+      };
     }
     default: {
       const unreachable: never = event;
@@ -1614,7 +1633,15 @@ const trunkForms = (event: TrunkEvent): readonly TrunkEvent[] => {
     case "PromotionFrozen":
       return [event, { ...event, expected: STRAY }, { ...event, groupId: "another-group" }];
     case "PromotionResumed":
-      return [event, { ...event, head: undefined }, { ...event, head: STRAY }];
+      // With no head (an older event), at a head no trunk has, and at each head a trunk of the
+      // tour rests at: a resume at the head trunk already has is not one at another.
+      return [
+        event,
+        { ...event, head: undefined },
+        { ...event, head: STRAY },
+        { ...event, head: H0 },
+        { ...event, head: NEW },
+      ];
     default:
       return [event];
   }
@@ -1697,7 +1724,9 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked = [...toured, ...frozenUncomposed(toured)];
     const kinds = new Map<string, TrunkEvent>();
     for (const { event } of walked) if (!kinds.has(event._tag)) kinds.set(event._tag, event);
-    const firsts = new Set(kinds.values());
+    // By content: the kit keeps one object for each event's content, the last committed, and
+    // the tour commits the same TrunkInitialized each time it starts.
+    const firsts = new Set([...kinds.values()].map((e) => canonicalJson(asJson(e))));
     const cases = foldCases<Trunk, TrunkEvent, FoldedTrunk>({
       evolve: evolvePromotion,
       walked,
@@ -1719,6 +1748,7 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
         solo: t.solo === true,
         frozen: t.frozen !== undefined,
         promoted: t.promoted.length,
+        ...(t.advancedAt === undefined ? {} : { advancedAt: t.advancedAt }),
       }),
       shown: (f) => canonicalJson(asJson(f)),
       row: shapeOf,
@@ -1726,10 +1756,11 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
       // that names its group, a batch it holds or its head: at most eight of a kind for each
       // of those, so the thousands of freezes that expect its head leave its own group's in.
       meets: (t, event) =>
-        (t !== undefined && concerns(t, event)) || (firsts.has(event) && "the first of its kind"),
+        (t !== undefined && concerns(t, event)) ||
+        (firsts.has(canonicalJson(asJson(event))) && "the first of its kind"),
       most: 8,
       forms: trunkForms,
-      times: [T0],
+      times: [FOLDED_AT],
       table: trunkFolds,
     });
     const { folded, table } = foldLines(cases);
@@ -1738,8 +1769,8 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
     // eight events of a kind for each reason, in every form.
     const shape = foldShape(cases);
     expect({ ...shape, rows: shape.rows.length }).toEqual({
-      folds: 10064,
-      refused: 9126,
+      folds: 10969,
+      refused: 10010,
       rows: 53,
     });
   });

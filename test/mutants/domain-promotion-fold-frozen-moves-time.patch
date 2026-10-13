@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, trunk.advanced-at
+# why: a freeze moves the time trunk's head last changed, though a freeze is what stops the head moving
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..c82da27b 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -597,6 +597,7 @@ export const evolvePromotion = (
+       return atFlush || inGroup
+         ? {
+             ...trunk,
++            advancedAt: committed.at,
+             phase: "frozen",
+             frozen: {
+               expected: event.expected,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, trunk.advanced-at
+# why: a composed group moves the time trunk's head last changed, before anything is pushed
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..b7d07167 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -565,7 +565,7 @@ export const evolvePromotion = (
+         wal.groupId === event.groupId &&
+         wal.composed === undefined &&
+         sameChain(event.commits, wal)
+-        ? { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } }
++        ? { ...trunk, advancedAt: committed.at, wal: { ...wal, composed: event.sha, commits: event.commits } }
+         : illegal(trunk, event);
+ 
+     case "TrunkAdvanced":

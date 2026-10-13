@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, trunk.advanced-at
+# why: a batch whose push was refused moves the time trunk's head last changed, though trunk never moved
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..2aa68c2c 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -519,7 +519,7 @@ export const evolvePromotion = (
+         // The group's last batch ends it: trunk never moved, so there is nothing to read back.
+         const left: Trunk =
+           batches.length > 0
+-            ? { ...trunk, wal: { ...wal, batches } }
++            ? { ...trunk, advancedAt: committed.at, wal: { ...wal, batches } }
+             : { ...without(trunk, "wal"), phase: settled(trunk.queue) };
+         // Members sent to be verified again were refused as a group: promote one batch at a time.
+         return event.reason === "pack-too-large" && event.reverify.length > 0

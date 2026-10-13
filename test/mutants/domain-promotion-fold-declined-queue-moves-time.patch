@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, trunk.advanced-at
+# why: a batch declined from the queue moves the time trunk's head last changed, though the head did not move
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..f6721729 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -529,7 +529,7 @@ export const evolvePromotion = (
+       if (trunk.phase !== "debouncing" || !trunk.queue.some((b) => b.batchId === event.batchId))
+         return illegal(trunk, event);
+       const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
+-      return { ...trunk, queue, phase: settled(queue) };
++      return { ...trunk, advancedAt: committed.at, queue, phase: settled(queue) };
+     }
+ 
+     case "PromotionStarted": {

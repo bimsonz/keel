@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table, trunk.advanced-at
+# why: a promotion starting moves the time trunk's head last changed, before anything is pushed
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..2c1f52d9 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -547,6 +547,7 @@ export const evolvePromotion = (
+         return illegal(trunk, event);
+       return {
+         ...trunk,
++        advancedAt: committed.at,
+         phase: "promoting",
+         queue: trunk.queue.slice(event.batches.length),
+         wal: {
