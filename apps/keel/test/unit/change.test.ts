@@ -1002,7 +1002,7 @@ describe("a conflict of the change put to a person", () => {
         yield* receive(asked);
         const parked = yield* getChange(changeId);
         // Another conflict's decision, and a resolution with no decision, are not what it waits for.
-        yield* receive(resolved(OTHER_CONFLICT, DECISION));
+        const others = yield* receive(resolved(OTHER_CONFLICT, DECISION));
         yield* receive(resolved(CONFLICT));
         const waiting = yield* getChange(changeId);
         const ruling = resolved(CONFLICT, DECISION);
@@ -1020,6 +1020,8 @@ describe("a conflict of the change put to a person", () => {
           planHash: before.planHash,
         });
         expect(waiting.state).toBe("parked");
+        // The machine would hold such a resume back; the party does not ask for one, so nothing is reported.
+        expect(others?.problem).toBeUndefined();
         expect(resumed.state).toBe("queued");
         expect(resumed).toMatchObject({ laneId: before.laneId, planHash: before.planHash });
         expect([resumed.parkReason, resumed.escalationId, resumed.parkedFrom]).toEqual([
@@ -1187,7 +1189,7 @@ describe("a conflict of the change put to a person", () => {
   );
 
   it.effect(
-    "[t35.park-after-resume] a party with two conflicts before a person is resumed by the first ruling and parked again in the same commit under the other's escalation, and the second ruling leaves it queued",
+    "[t35.park-after-resume] a party with two conflicts before a person is not resumed by the first ruling: it stays parked, from then under the other's escalation, and the second ruling leaves it queued",
     () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
@@ -1208,9 +1210,10 @@ describe("a conflict of the change put to a person", () => {
         // The second escalation parks nothing more: the change already waits for the first.
         expect(waiting.escalationId).toBe(escalationIdOf(CONFLICT));
         expect(reaction?.problem).toBeUndefined();
-        expect(again.map((e) => e.type)).toEqual(["ChangeResumed", "ChangeParked"]);
-        expect(again.map((e) => e.causation)).toEqual([first.eventId, first.eventId]);
-        expect(again[0]?.payload).toMatchObject({ decisionId: DECISION });
+        // The machine refuses the resume while the other is open, so the first ruling commits one park and no resume.
+        expect(again.map((e) => e.type)).toEqual(["ChangeParked", "ChangeParked"]);
+        expect(again[0]?.payload).toMatchObject({ escalationId: escalationIdOf(CONFLICT) });
+        expect(again[1]?.causation).toBe(first.eventId);
         // Under the escalation still open, never the one just ruled on.
         expect(again[1]?.payload).toMatchObject({
           reason: "awaiting-ruling",

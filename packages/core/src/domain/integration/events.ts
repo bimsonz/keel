@@ -161,8 +161,6 @@ export const ProjectCreated = Schema.TaggedStruct("ProjectCreated", {
   projectId: ProjectId,
   name: Schema.String,
   by: Schema.String,
-  /** The project this one was forked from, when it is a fork. */
-  forkedFrom: Schema.optional(ProjectId),
 });
 /** A project and its repos are gone, deleted by an owner of its org or with the org. */
 export const ProjectDeleted = Schema.TaggedStruct("ProjectDeleted", {

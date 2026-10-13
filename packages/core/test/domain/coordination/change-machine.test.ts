@@ -6,6 +6,7 @@ import {
   type ChangeCommand,
   ChangeBounced,
   ChangeEvent,
+  ChangeParked,
   ChangeResumed,
   decideChange,
   type DerivedEffect,
@@ -22,6 +23,7 @@ import {
   CommitSha,
   type Committed,
   ContentHash,
+  type DecisionId,
   type EscalationId,
   IllegalTransition,
   Instant,
@@ -397,7 +399,12 @@ const build = (
         proofId: "proof",
       };
     case "Resume":
-      return { _tag: "Resume", decisionId: mint.next("dec") };
+      return {
+        _tag: "Resume",
+        decisionId: mint.next("dec"),
+        // Another of its conflicts is still with a person as often as a batch's blockers say one is.
+        awaitingRuling: step.awaited ? [mint.next("esc")] : [],
+      };
     case "Adopt":
       return {
         _tag: "Adopt",
@@ -469,7 +476,9 @@ const heldAfter = (
   events: readonly ChangeEvent[],
 ): Change | undefined => {
   if (keyOf(after) !== "parked:awaiting-ruling") return undefined;
-  return events.some((e) => e._tag === "ChangeParked" && e.reason === "awaiting-ruling")
+  // A park that finds it already waiting moves the question it waits on, never where it waits from.
+  return keyOf(before) !== "parked:awaiting-ruling" &&
+    events.some((e) => e._tag === "ChangeParked" && e.reason === "awaiting-ruling")
     ? before
     : held;
 };
@@ -483,6 +492,21 @@ const ruledAgainst: ChangeCommand = {
   reasons: ["the ruling let the other side stand"],
   nextActions: [],
 };
+
+/** The question a park names for a change that waits on none. */
+const QUESTION = makeId("esc", ulid(78));
+/** A park under the question the change already waits on. `build` mints a new question every time, so every step tries this one. */
+const parkedAgain = (change: Change | undefined): ChangeCommand => ({
+  _tag: "Park",
+  escalationId: change?.escalationId ?? QUESTION,
+});
+
+/** A park under one question, and a resume on a decision with the questions still open beside it. */
+const parkUnder = (escalationId: EscalationId): ChangeCommand => ({ _tag: "Park", escalationId });
+const resumeOn = (
+  decisionId: DecisionId,
+  ...awaitingRuling: readonly EscalationId[]
+): ChangeCommand => ({ _tag: "Resume", decisionId, awaitingRuling });
 
 /** Plays a plan the way the Change DO would: decide, commit each event through evolve, renew the lease on an authorised call. */
 const play = (plan: Plan): Trace => {
@@ -507,6 +531,7 @@ const play = (plan: Plan): Trace => {
         k === "Renew" ? [] : [attempt(before, build(k, before, step, plan, mint, issued), now)],
       ),
       attempt(before, ruledAgainst, now),
+      attempt(before, parkedAgain(before), now),
     ];
     const kind = choices[step.pick % choices.length] ?? "Lapse";
     if (kind === "Renew") {
@@ -614,7 +639,12 @@ const oracle = (
     case "Queue":
       return key === "verifying" && !anyBlocker(command.blockers) ? "queued" : "refused";
     case "Park":
-      return key === "verifying" || key === "queued" ? "parked:awaiting-ruling" : "refused";
+      // From the wait itself too, for another question than the one it waits on.
+      return key === "verifying" ||
+        key === "queued" ||
+        (key === "parked:awaiting-ruling" && command.escalationId !== before.escalationId)
+        ? "parked:awaiting-ruling"
+        : "refused";
     case "Batch":
       return key === "queued" &&
         !anyBlocker(command.blockers) &&
@@ -646,8 +676,10 @@ const oracle = (
     case "Land":
       return key === "integrating" ? "landed" : "refused";
     case "Resume":
-      // Back to where it was parked from.
-      return key === "parked:awaiting-ruling" ? parkedFrom : "refused";
+      // Back to where it was parked from, once no other question holds it.
+      return key === "parked:awaiting-ruling" && command.awaitingRuling.length === 0
+        ? parkedFrom
+        : "refused";
     case "Adopt":
       if (!lapsedAt(before, now)) return "refused";
       return key === "parked:lease-lapsed"
@@ -1159,6 +1191,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     const E1 = makeId("esc", ulid(11));
     const E2 = makeId("esc", ulid(12));
     const D1 = makeId("dec", ulid(13));
+    const D2 = makeId("dec", ulid(15));
     const B2 = makeId("bat", ulid(14));
     const awaiting = (...escalations: readonly EscalationId[]): Blockers => ({
       ...clear,
@@ -1166,26 +1199,27 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     });
     const verified = [declare, start, submit, precheck, compile].map((c) => [c, 1] as const);
     const queued = [...verified, [queue, 1] as const];
-    // Two escalations: parked for the first, the second raised while it is parked, the first ruled.
+    // Two escalations: parked for the first, the first ruled while the second is with a person. It is
+    // not resumed, so no batch can take it; the second ruling puts it back, and then it is batched.
     const twice = drive([
       ...queued,
       [{ _tag: "Park", escalationId: E1 }, 1],
-      [{ _tag: "Park", escalationId: E2 }, 1],
-      [{ _tag: "Resume", decisionId: D1 }, 1],
-      [{ _tag: "Batch", batchId: BATCH, blockers: awaiting(E2) }, 1],
+      [{ _tag: "Resume", decisionId: D1, awaitingRuling: [E2] }, 1],
+      [batch, 1],
+      [{ _tag: "Resume", decisionId: D2, awaitingRuling: [] }, 1],
       [batch, 1],
     ]);
     expect(twice.keys.slice(-5)).toEqual([
       "parked:awaiting-ruling",
       "parked:awaiting-ruling",
-      "queued",
+      "parked:awaiting-ruling",
       "queued",
       "integrating",
     ]);
     expect(twice.results.slice(-4).map(failureTag)).toEqual([
+      "ChangeBlocked",
       "ChangeStateRefused",
       undefined,
-      "ChangeBlocked",
       undefined,
     ]);
     // Escalated while in a batch, which it finishes; the batch fails and it is requeued.
@@ -1255,9 +1289,12 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
           if (keyOf(r.before) !== "parked:awaiting-ruling") return r.held === undefined;
           const { held } = r;
           if (held === undefined) return false;
-          // Wherever it waits, a resume tried there leads back to where the harness saw it parked.
+          // Wherever it waits, a resume tried there leads back to where the harness saw it first parked,
+          // unless another question holds it: then it leads nowhere.
           const landsBack = r.probes.every(
-            (probe) => probe.command._tag !== "Resume" || probe.key === keyOf(held),
+            (probe) =>
+              probe.command._tag !== "Resume" ||
+              probe.key === (probe.command.awaitingRuling.length === 0 ? keyOf(held) : undefined),
           );
           if (r.command?._tag !== "Resume" || !accepted(r) || r.after === undefined)
             return landsBack;
@@ -1273,7 +1310,11 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(fromVerifying).toBeGreaterThan(0);
 
     const park: ChangeCommand = { _tag: "Park", escalationId: makeId("esc", ulid(11)) };
-    const resume: ChangeCommand = { _tag: "Resume", decisionId: makeId("dec", ulid(13)) };
+    const resume: ChangeCommand = {
+      _tag: "Resume",
+      decisionId: makeId("dec", ulid(13)),
+      awaitingRuling: [],
+    };
     const verified = [declare, start, submit, precheck, compile].map((c) => [c, 1] as const);
     const queued = [...verified, [queue, 1] as const];
     const inQueue = drive(queued).state;
@@ -1285,6 +1326,10 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     const backAtVerifying = drive([...verified, [park, 1], [resume, 1]]);
     expect(backAtVerifying.keys.slice(-2)).toEqual(["parked:awaiting-ruling", "verifying"]);
     expect(backAtVerifying.state).toEqual(atVerifying);
+    // A park for another question while it waits moves none of that: it resumes to where it first parked.
+    const other: ChangeCommand = { _tag: "Park", escalationId: makeId("esc", ulid(12)) };
+    expect(drive([...queued, [park, 1], [other, 1], [resume, 1]]).state).toEqual(inQueue);
+    expect(drive([...verified, [park, 1], [other, 1], [resume, 1]]).state).toEqual(atVerifying);
     // A change parked before the origin was recorded has none: it resumes to Verifying, as it always did.
     const { parkedFrom: _unrecorded, ...older } = drive([...queued, [park, 1]]).state ?? {};
     expect(
@@ -1295,6 +1340,182 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
         }),
       ),
     ).toBe("verifying");
+  });
+
+  it("[change.no-resume-past-escalation] the ruling on one question never resumes a change another question still holds: the resume is refused naming what it waits for, and it stays parked until the last ruling", () => {
+    let heldBack = 0;
+    let released = 0;
+    assertReaching(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) => {
+          const carried = r.command?._tag === "Resume" ? r.command.awaitingRuling : [];
+          // Whatever was played: a resume that carried an awaited ruling commits nothing.
+          if (carried.length > 0 && eventsOf(r).length > 0) return false;
+          return r.probes.every(({ command, result, key }) => {
+            if (command._tag !== "Resume") return true;
+            const refused = Result.isFailure(result) ? result.failure : undefined;
+            // Anywhere but the wait it is the state that refuses it, whatever it carries.
+            if (keyOf(r.before) !== "parked:awaiting-ruling")
+              return refused !== undefined && refused._tag !== "ChangeBlocked";
+            const awaited = command.awaitingRuling;
+            if (awaited.length === 0) {
+              released++;
+              return key === keyOf(r.held);
+            }
+            heldBack++;
+            return (
+              refused?._tag === "ChangeBlocked" &&
+              refused.escalations?.join() === awaited.join() &&
+              refused.conflicts.length + refused.guards.length + refused.drift.length === 0 &&
+              refused.nextActions[0]?.kind === "wait"
+            );
+          });
+        }),
+      ),
+    );
+    expect(heldBack).toBeGreaterThan(0);
+    expect(released).toBeGreaterThan(0);
+
+    const E1 = makeId("esc", ulid(11));
+    const E2 = makeId("esc", ulid(12));
+    const D1 = makeId("dec", ulid(13));
+    const D2 = makeId("dec", ulid(15));
+    const waiting = "parked:awaiting-ruling";
+    const verified = [declare, start, submit, precheck, compile].map((c) => [c, 1] as const);
+    const queued = [...verified, [queue, 1] as const];
+    const inQueue = drive(queued).state;
+    // Two questions, the first ruled for the change: it is held back and no batch takes it; it waits on
+    // the second from there, and that ruling resumes it as the change that was first parked.
+    const firstThenSecond = drive([
+      ...queued,
+      [parkUnder(E1), 1],
+      [resumeOn(D1, E2), 1],
+      [batch, 1],
+      [parkUnder(E2), 1],
+      [resumeOn(D2), 1],
+    ]);
+    expect(firstThenSecond.keys.slice(-5)).toEqual([waiting, waiting, waiting, waiting, "queued"]);
+    expect(firstThenSecond.results.slice(-4).map(failureTag)).toEqual([
+      "ChangeBlocked",
+      "ChangeStateRefused",
+      undefined,
+      undefined,
+    ]);
+    expect(tags(firstThenSecond.log).slice(-3)).toEqual([
+      "ChangeParked",
+      "ChangeParked",
+      "ChangeResumed",
+    ]);
+    expect(firstThenSecond.state).toEqual(inQueue);
+    // The second ruled first: the change still waits on the first, a park under that question moves
+    // nothing, and the first ruling then finds no other open and resumes it.
+    const secondThenFirst = drive([
+      ...queued,
+      [parkUnder(E1), 1],
+      [resumeOn(D2, E1), 1],
+      [parkUnder(E1), 1],
+      [resumeOn(D1), 1],
+    ]);
+    expect(secondThenFirst.keys.slice(-4)).toEqual([waiting, waiting, waiting, "queued"]);
+    expect(secondThenFirst.results.slice(-3).map(failureTag)).toEqual([
+      "ChangeBlocked",
+      "ChangeStateRefused",
+      undefined,
+    ]);
+    expect(secondThenFirst.state).toEqual(inQueue);
+    // The first ruled for it and the second against it: the second finds it still waiting, and bounces it.
+    const thenAgainst = drive([
+      ...queued,
+      [parkUnder(E1), 1],
+      [resumeOn(D1, E2), 1],
+      [{ ...ruledAgainst, decisionId: D2 }, 1],
+    ]);
+    expect(thenAgainst.keys.slice(-2)).toEqual([waiting, "bounced"]);
+    expect(thenAgainst.log.at(-1)).toMatchObject({ _tag: "ChangeBounced", decisionId: D2 });
+    // The refusal names every question still open, blocks on nothing else, and says what the wait is for.
+    const heldFor = drive([...verified, [parkUnder(E1), 1], [resumeOn(D1, E2, E1), 1]]).results.at(
+      -1,
+    );
+    expect(
+      heldFor !== undefined && Result.isFailure(heldFor) ? heldFor.failure : undefined,
+    ).toMatchObject({
+      _tag: "ChangeBlocked",
+      escalations: [E2, E1],
+      conflicts: [],
+      guards: [],
+      drift: [],
+      nextActions: [
+        {
+          kind: "wait",
+          title: expect.stringContaining("resumes once they rule"),
+          args: { escalations: [E2, E1] },
+        },
+        { kind: "read" },
+      ],
+    });
+  });
+
+  it("[change.park-follows-question] a change that waits for a ruling takes the park for another question and waits on that one, from where it first parked; the question it already waits on parks it no further, and a change parked for a lapsed lease takes neither", () => {
+    let moved = 0;
+    let same = 0;
+    assertReaching(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every(({ command, result }) => {
+            const { before } = r;
+            if (command._tag !== "Park" || before === undefined) return true;
+            // A change parked for a lapsed lease waits for an adopter, not for a ruling.
+            if (keyOf(before) === "parked:lease-lapsed") return Result.isFailure(result);
+            if (keyOf(before) !== "parked:awaiting-ruling") return true;
+            if (command.escalationId === before.escalationId) {
+              same++;
+              return failureTag(result) === "ChangeStateRefused";
+            }
+            moved++;
+            if (Result.isFailure(result) || result.success.length !== 1) return false;
+            const after = result.success.reduce<Change | undefined>(
+              (s, payload) => evolveChange(s, { at: r.now, payload }),
+              before,
+            );
+            // Only the question moved: where it parked from, its lane, its plan and its lease are as they were.
+            return (
+              comparable(after) === comparable({ ...before, escalationId: command.escalationId })
+            );
+          }),
+        ),
+      ),
+    );
+    expect(moved).toBeGreaterThan(0);
+    expect(same).toBeGreaterThan(0);
+
+    const E1 = makeId("esc", ulid(11));
+    const E2 = makeId("esc", ulid(12));
+    const queued = [declare, start, submit, precheck, compile, queue].map((c) => [c, 1] as const);
+    const waiting = drive([...queued, [{ _tag: "Park", escalationId: E1 }, 1]]);
+    const parkedFor = (escalationId?: EscalationId): Committed<ChangeEvent> => ({
+      at: waiting.now,
+      payload: ChangeParked.make({
+        changeId: CHANGE,
+        reason: "awaiting-ruling",
+        ...(escalationId === undefined ? {} : { escalationId }),
+      }),
+    });
+    expect(evolveChange(waiting.state, parkedFor(E2))).toEqual({
+      ...waiting.state,
+      escalationId: E2,
+    });
+    // The fold takes no park under the question already waited on, and none that names no question.
+    expect(() => evolveChange(waiting.state, parkedFor(E1))).toThrow(IllegalTransition);
+    expect(() => evolveChange(waiting.state, parkedFor())).toThrow(IllegalTransition);
+    // A change parked for a lapsed lease is parked for no ruling, by decide or by the fold.
+    const lapsed = drive([
+      [declare, 1],
+      [{ _tag: "Lapse", leaseId: LEASE }, TTL],
+      [{ _tag: "Park", escalationId: E1 }, 1],
+    ]);
+    expect(lapsed.keys.slice(-2)).toEqual(["parked:lease-lapsed", "parked:lease-lapsed"]);
+    expect(failureTag(lapsed.results.at(-1))).toBe("ChangeStateRefused");
+    expect(() => evolveChange(lapsed.state, parkedFor(E1))).toThrow(IllegalTransition);
   });
 
   it("[change.refusals-guide] every refusal and every bounce tells the agent what to do next", () => {

@@ -98,6 +98,7 @@ import { subjectIdOf } from "./hashed-id.ts";
 import {
   consequenceAgainst,
   awaitedEscalation,
+  awaitedEscalations,
   blockersOf,
   hearConflict,
   partyConflictOf,
@@ -1636,6 +1637,9 @@ const commandFor = (
     case "ConflictEscalated": {
       hearConflict(store, event);
       const escalated = decodeEscalated(event.payload);
+      // A change that already waits for a ruling goes on waiting for that one: its park moves to another
+      // question only once the one it names is ruled on (`reactToBatch`).
+      if (change.parkReason === "awaiting-ruling") return undefined;
       // The machine says where a change parks; anywhere else it goes on as it was, and that is no problem.
       return Option.isSome(escalated)
         ? {
@@ -1671,10 +1675,14 @@ const commandFor = (
                 refusal: `${decisionId} ruled against ${change.id} on ${conflictId} and its bounce was refused in state ${change.state}: it may land as it is`,
               }),
         };
-      // Only the ruling on the escalation the change waits for resumes it.
+      // Only the ruling on the escalation the change waits for resumes it, and the machine takes that
+      // only when none of its other conflicts is still with a person.
       return change.parkReason === "awaiting-ruling" &&
         change.escalationId === escalationIdOf(conflictId)
-        ? { command: { _tag: "Resume", decisionId }, refusable: true }
+        ? {
+            command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+            refusable: true,
+          }
         : undefined;
     }
     case "VerdictIssued": {
@@ -1740,14 +1748,13 @@ const commandFor = (
 };
 
 /**
- * What follows a command that puts the change back in the queue. A resume or
- * a requeue leaves it there while another of its conflicts may still be with
- * a person: it then parks again in the same commit, as `planCompiled` parks
- * it on first queuing. The conflict just resolved was heard before this is
- * read, so the escalation ruled on is never the one it waits for.
+ * What follows a command that puts the change back in the queue. A requeue
+ * leaves it there while one of its conflicts may be with a person: it then
+ * parks in the same commit, as `planCompiled` parks it on first queuing. A
+ * resume needs none: the machine takes it only when nothing is awaited.
  */
 const heldAgain = (store: Store, command: ChangeCommand): readonly ChangeCommand[] => {
-  if (command._tag !== "Resume" && command._tag !== "Requeue") return [];
+  if (command._tag !== "Requeue") return [];
   const asked = awaitedEscalation(store);
   return asked === undefined ? [] : [{ _tag: "Park", escalationId: asked }];
 };
@@ -1768,8 +1775,9 @@ export interface BatchReaction {
  * ChangeParked where the machine parks a change, and that escalation's ruling
  * → ChangeResumed, or ChangeBounced by the ruling's decision when the ruling
  * goes against the change; a ruling against a change that is past the wait
- * and still on its way is a `problem`. A change resumed or requeued while another of its
- * conflicts is with a person → ChangeParked again, in the same commit. The
+ * and still on its way is a `problem`. A ruling that would resume a change while another of its
+ * conflicts is with a person is refused by the machine, and the change → ChangeParked under that
+ * other escalation; a change requeued with one awaited → ChangeParked in the same commit. The
  * cause is the delivery's dedupe key, so a redelivery is
  * a no-op. A refusal by the machine commits nothing and is reported as a
  * `problem`: a reaction never fails the delivery, which would be redelivered
@@ -1790,15 +1798,29 @@ export const reactToBatch = (
     reacting.command,
     ...heldAgain(tx.store, reacting.command),
   ]);
-  if (Result.isFailure(decided))
-    return reacting.refusable === true && decided.failure._tag === "ChangeStateRefused"
+  if (Result.isFailure(decided)) {
+    const { failure } = decided;
+    // The machine held a resume back for another question: the change waits on that one from here.
+    const next =
+      reacting.command._tag === "Resume" && failure._tag === "ChangeBlocked"
+        ? failure.escalations?.[0]
+        : undefined;
+    if (next !== undefined) {
+      const held = transition(tx, changeId, REACTION_REFUSALS, [
+        { _tag: "Park", escalationId: next },
+      ]);
+      if (Result.isSuccess(held))
+        return { drafts: held.success.drafts, ...inProject(tx.store, changeId) };
+    }
+    return reacting.refusable === true && failure._tag === "ChangeStateRefused"
       ? { drafts: [] }
       : {
           drafts: [],
           problem:
             reacting.refusal ??
-            `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
+            `${event.type} refused with ${failure._tag} in state ${change.state}`,
         };
+  }
   return {
     drafts: decided.success.drafts,
     ...inProject(tx.store, changeId),

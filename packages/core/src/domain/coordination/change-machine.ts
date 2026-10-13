@@ -221,7 +221,16 @@ export type ChangeCommand =
       readonly candidateId: CandidateId;
       readonly proofId: string;
     }
-  | { readonly _tag: "Resume"; readonly decisionId: DecisionId }
+  | {
+      readonly _tag: "Resume";
+      readonly decisionId: DecisionId;
+      /**
+       * The escalations of the change's conflicts still with a person once
+       * this ruling is recorded. While there is one the change is not resumed:
+       * the ruling on one question never releases it past another.
+       */
+      readonly awaitingRuling: readonly EscalationId[];
+    }
   | {
       readonly _tag: "Adopt";
       readonly agentId: AgentId;
@@ -300,14 +309,28 @@ const refuse = (change: Change, command: ChangeCommand): Decision =>
     }),
   );
 
+const NO_BLOCKERS: Blockers = {
+  openProvenConflicts: [],
+  failingGuards: [],
+  unresolvedHighDrift: [],
+  awaitingRuling: [],
+};
+
+const JOINS_ONCE_RULED =
+  "A person was asked about a conflict of this change: it joins a batch once they rule";
+const RESUMES_ONCE_RULED =
+  "A person was asked about another conflict of this change: it resumes once they rule";
+
 /**
  * The refusal of a blocked change, or undefined when nothing blocks it.
- * `awaited` are the rulings a batch must wait for; queueing passes none.
+ * `awaited` are the rulings a batch or a resume must wait for, and `wait`
+ * says which of the two; queueing passes none.
  */
 const blocked = (
   change: Change,
   blockers: Blockers,
   awaited: readonly EscalationId[] = [],
+  wait: string = JOINS_ONCE_RULED,
 ): Decision | undefined =>
   blockers.openProvenConflicts.length +
     blockers.failingGuards.length +
@@ -328,8 +351,7 @@ const blocked = (
               : [
                   {
                     kind: "wait" as const,
-                    title:
-                      "A person was asked about a conflict of this change: it joins a batch once they rule",
+                    title: wait,
                     args: { escalations: [...awaited] },
                   },
                 ]),
@@ -671,9 +693,14 @@ export const decideChange = (
         ])
       );
 
-    case "Park":
+    case "Park": {
       // Past its plan and not yet in a batch: a party cannot land past the question a person was asked.
-      return at("verifying", "queued")
+      // A change already waiting takes the park for another question, and waits on that one from then.
+      const another =
+        at("parked") &&
+        change.parkReason === "awaiting-ruling" &&
+        command.escalationId !== change.escalationId;
+      return at("verifying", "queued") || another
         ? Result.succeed([
             ChangeParked.make({
               changeId: id,
@@ -682,6 +709,7 @@ export const decideChange = (
             }),
           ])
         : refuse(change, command);
+    }
 
     case "Batch":
       if (!at("queued")) return refuse(change, command);
@@ -787,9 +815,13 @@ export const decideChange = (
         : refuse(change, command);
 
     case "Resume":
-      return at("parked") && change.parkReason === "awaiting-ruling"
-        ? Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
-        : refuse(change, command);
+      if (!(at("parked") && change.parkReason === "awaiting-ruling"))
+        return refuse(change, command);
+      // The ruling on one question does not release a change another question still holds.
+      return (
+        blocked(change, NO_BLOCKERS, command.awaitingRuling, RESUMES_ONCE_RULED) ??
+        Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
+      );
 
     case "Adopt":
       if (!isLapsed(change.lease, now)) {
@@ -1037,6 +1069,11 @@ export const evolveChange = (
       return change;
     case "ChangeParked":
       if (event.reason === "awaiting-ruling") {
+        // Already waiting, and held by another question: it waits on that one, from where it first parked.
+        if (from("parked") && change.parkReason === "awaiting-ruling")
+          return event.escalationId !== undefined && event.escalationId !== change.escalationId
+            ? { ...change, escalationId: event.escalationId }
+            : illegal(change, event);
         // It keeps its lane and its plan: the ruling puts it back where it waited.
         return change.state === "verifying" || change.state === "queued"
           ? {

@@ -1324,9 +1324,6 @@ model ProjectCreated {
   projectId: ProjectId;
   name: string;
   by: string;
-
-  /** The project this one was forked from, when it is a fork. */
-  forkedFrom?: ProjectId;
 }
 
 /** A project and its repos are gone, deleted by an owner of its org or with the org. */

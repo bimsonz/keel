@@ -16423,14 +16423,6 @@
           },
           "by": {
             "type": "string"
-          },
-          "forkedFrom": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ProjectId"
-              }
-            ],
-            "description": "The project this one was forked from, when it is a fork."
           }
         },
         "additionalProperties": {

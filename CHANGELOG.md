@@ -8,6 +8,11 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Changed (breaking)
 
+- **The ruling on one question never resumes a change another question still holds**. A change with two conflicts before a person was resumed by the first ruling, and the adapter parked it again in the same commit; the rule was the adapter's. It is now the machine's.
+  - Core: the Change's `Resume` command takes `awaitingRuling: EscalationId[]`, required: the escalations of the change's conflicts still with a person once the ruling is recorded, the fact `Batch` already takes in its blockers. While there is one the resume is refused `ChangeBlocked`, naming them in `escalations` with a `wait` first, after the state is checked; the change stays Parked. With none it is taken as before.
+  - Core: `Park` is also taken from Parked awaiting-ruling when it names another escalation than the one the change waits on. `ChangeParked` then moves `Change.escalationId` and nothing else: where it was parked from, its lane, its plan and its lease stay. The same escalation is refused, by decide and by the fold. No event's shape changes.
+  - The Change DO's reactions (in the same change): the resume carries `awaitedEscalations`; a resume refused as blocked is answered with a park under the first escalation it names, in place of the park that followed every resume; and an escalation heard while the change already waits for a ruling parks nothing.
+
 - **The policy's resources name a namespace, and the kind is read from the id**. It follows namespaces with a kind: a field called `org` that could hold a person's namespace is gone from the policy.
   - Core, renamed: `AgentPrincipal.org` → `namespace`; `ProjectResource.org` → `namespace` and `orgSuspended` → `namespaceSuspended`; `OrgResource {_tag: "Org", org, kind}` → `NamespaceResource {_tag: "Namespace", namespace}` (no `kind`: `namespaceKind(id)` says it); `ForkResource.target` is a `NamespaceResource`; `ProjectNameTaken.org` → `namespace`. `Membership.org`, `OrgId`, the Org events and actions, the reason `org-suspended`, and `org` on the Agent record, its token and its enrolment stay.
   - Core, the table: `ResourceKind` gains `Namespace`. `Operator_listProjects`, `Operator_createProject`, `Namespaces_getNamespace` and `ManageCredentials` are decided on a `Namespace`; `ManageMembers`, `ManageOwners` and `DeleteOrg` stay on `Org`, which now means a namespace that must be an org (any other is answered as missing).
@@ -514,6 +519,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Removed
 
+- `ProjectCreated.forkedFrom?`. Nothing wrote it: where a project started is recorded once, as `TrunkInitialized.origin`, and a project's view reads that.
 - The scope checks the policy replaced (the cutover): `satisfies` and the generated routes' scope test, the MCP tool filter, `confineBootstrap`/`BOOTSTRAP_MAY_CALL`, read-scope's `readsInstanceWide`/`projectScope`/`readScope`/`viewScope` with `TokenRequired`/`ForeignProject`/`ReadRefused`, `repoAccess`, `withdrawAuthority`'s scope test, and the inbox streams' own checks.
 - `scripts/deploy.ts` (tooling, no contract change): the console's block is gone. The console's Worker holds no credential, so the deploy no longer sets the observer's and operator's client credentials on it, nor generates `CONSOLE_CAPABILITY_KEY` and `CONSOLE_PRESENTER_KEY`, and `--rotate` is removed with them. The `console` entry of `.keel/<env>.json` is no longer read or written. `apps/console/wrangler.jsonc` loses its six `secrets.required` and its service binding to `keel`.
 - `L1_SUITE_PLAN` in `@keeltown/core/application/verification`: nothing runs a static plan; tests compile theirs (`suitePlan`, `workerAppPlan`, `guardedPlan` and `TEST_GUARD` in `@keeltown/testing`).

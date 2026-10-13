@@ -89,6 +89,8 @@ export const changeChart: Chart = {
               { target: c("queued"), guard: "parked from Queued" },
             ],
             ChangeBounced: c("bounced"),
+            // Held by another question: it waits on that one, from where it first parked.
+            ChangeParked: c("parked.awaitingRuling"),
             ...waits("parked.awaitingRuling"),
           },
         },
