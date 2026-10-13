@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.differs, rehome.raced
+# why: A destination of the same length counts as the same bytes, so a pointer that names another bundle is reported as carried
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..27fb3a98 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -146,7 +146,7 @@ export const unsettled = (move: Move): boolean =>
+ /** R2's etag for an object written in one put: the MD5 of its bytes. */
+ const MD5 = /^[0-9a-f]{32}$/;
+ 
+-const sameBytes = (a: Stored, b: Stored): boolean => a.size === b.size && a.etag === b.etag;
++const sameBytes = (a: Stored, b: Stored): boolean => a.size === b.size;
+ 
+ async function everyObjectUnder(bucket: Bucket, prefix: string, page: number): Promise<Stored[]> {
+   const found: Stored[] = [];

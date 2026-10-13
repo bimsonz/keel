@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.pages
+# why: Only the first page of a namespace's listing is carried, and the rest is left unread under the old id
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..7bac778a 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -159,7 +159,7 @@ async function everyObjectUnder(bucket: Bucket, prefix: string, page: number): P
+       ...(cursor === undefined ? {} : { cursor }),
+     });
+     found.push(...listed.objects);
+-    cursor = listed.truncated ? listed.cursor : undefined;
++    cursor = undefined;
+   } while (cursor !== undefined);
+   return found;
+ }

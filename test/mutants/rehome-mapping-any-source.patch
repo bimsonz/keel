@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/rehome-r2.test.ts
+# kills: rehome.mapping-refused
+# why: Any string is taken as the id to carry from: a path, or a user's id, becomes a prefix this step lists and copies
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..f46136cb 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -61,7 +61,7 @@ export function mappingOf(rows: unknown): readonly Rehoming[] {
+     const from = field(row, "from");
+     const to = field(row, "to");
+     const handle = field(row, "handle");
+-    if (typeof from !== "string" || !ORG.test(from))
++    if (typeof from !== "string")
+       throw new MappingRefused(`from ${JSON.stringify(from)} is not an org's id`);
+     if (typeof to !== "string" || !USER.test(to))
+       throw new MappingRefused(`${from}: to ${JSON.stringify(to)} is not a user's id`);

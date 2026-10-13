@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/rehome-r2.test.ts
+# kills: rehome.mapping-refused
+# why: Two orgs may be carried into one user's namespace, merging their objects
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..d1c992e4 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -69,7 +69,7 @@ export function mappingOf(rows: unknown): readonly Rehoming[] {
+       throw new MappingRefused(`${from}: handle ${JSON.stringify(handle)} is not a handle`);
+     if (mapping.some((seen) => seen.from === from))
+       throw new MappingRefused(`${from} is mapped twice`);
+-    if (mapping.some((seen) => seen.to === to))
++    if (mapping.some((seen) => seen.to === to && seen.from === from))
+       throw new MappingRefused(`${to} would take the objects of two orgs`);
+     mapping.push({ from, to, handle });
+   }

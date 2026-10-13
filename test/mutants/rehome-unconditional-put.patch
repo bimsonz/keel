@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.raced
+# why: The put no longer says 'only if nothing is there', so an object written after the look is overwritten
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..f2222222 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -176,7 +176,7 @@ async function copyOne(bucket: Bucket, source: Stored, destination: string): Pro
+     ...(object.httpMetadata === undefined ? {} : { httpMetadata: object.httpMetadata }),
+     ...(object.customMetadata === undefined ? {} : { customMetadata: object.customMetadata }),
+     md5: source.etag,
+-    onlyIf: { etagDoesNotMatch: "*" },
++    onlyIf: { etagDoesNotMatch: "0" },
+   });
+   if (written !== null) return "copied";
+   // Something was written there between the look and the put: it stays.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.each-to-its-own
+# why: Every org's objects are carried to the first user of the mapping: one person's namespace holds another's bundles
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..851ba874 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -206,7 +206,7 @@ export async function rehome(
+       const prefix = `ns/${from}/`;
+       // oxlint-disable no-await-in-loop -- one object after another, so the order printed is the order done
+       for (const source of await everyObjectUnder(bucket, prefix, options.page ?? 1000)) {
+-        const destination = `ns/${to}/${source.key.slice(prefix.length)}`;
++        const destination = `ns/${mapping[0]?.to ?? to}/${source.key.slice(prefix.length)}`;
+         const there = await bucket.head(destination);
+         const state: MoveState =
+           there !== null

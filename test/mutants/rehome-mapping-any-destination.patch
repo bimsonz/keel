@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/rehome-r2.test.ts
+# kills: rehome.mapping-refused
+# why: Any string is taken as the id to carry to, so objects can be written under an org's id or no id at all
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..d2770226 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -63,7 +63,7 @@ export function mappingOf(rows: unknown): readonly Rehoming[] {
+     const handle = field(row, "handle");
+     if (typeof from !== "string" || !ORG.test(from))
+       throw new MappingRefused(`from ${JSON.stringify(from)} is not an org's id`);
+-    if (typeof to !== "string" || !USER.test(to))
++    if (typeof to !== "string")
+       throw new MappingRefused(`${from}: to ${JSON.stringify(to)} is not a user's id`);
+     if (typeof handle !== "string" || !HANDLE.test(handle))
+       throw new MappingRefused(`${from}: handle ${JSON.stringify(handle)} is not a handle`);

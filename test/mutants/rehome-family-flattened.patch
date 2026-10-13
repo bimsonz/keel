@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.copy, rehome.dry
+# why: The destination keeps only the last segment of the key, so a bundle and a pointer of one hash collide and Keel reads neither
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..9a1dfa79 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -206,7 +206,7 @@ export async function rehome(
+       const prefix = `ns/${from}/`;
+       // oxlint-disable no-await-in-loop -- one object after another, so the order printed is the order done
+       for (const source of await everyObjectUnder(bucket, prefix, options.page ?? 1000)) {
+-        const destination = `ns/${to}/${source.key.slice(prefix.length)}`;
++        const destination = `ns/${to}/${source.key.slice(source.key.lastIndexOf("/") + 1)}`;
+         const there = await bucket.head(destination);
+         const state: MoveState =
+           there !== null

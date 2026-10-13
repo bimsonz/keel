@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.differs
+# why: A destination holding other bytes no longer stops the step from reading as done
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..b5af6a1a 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -141,7 +141,7 @@ export interface Move {
+ 
+ /** A move the operator must look at before the step counts as done. */
+ export const unsettled = (move: Move): boolean =>
+-  move.state === "differs" || move.state === "in-parts";
++  move.state === "in-parts";
+ 
+ /** R2's etag for an object written in one put: the MD5 of its bytes. */
+ const MD5 = /^[0-9a-f]{32}$/;

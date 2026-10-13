@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.copy
+# why: A copy loses its content type
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..7244345a 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -173,7 +173,6 @@ async function copyOne(bucket: Bucket, source: Stored, destination: string): Pro
+   const object = await bucket.get(source.key);
+   if (object === null) throw new Error(`${source.key}: listed, and gone before it was read`);
+   const written = await bucket.put(destination, await object.arrayBuffer(), {
+-    ...(object.httpMetadata === undefined ? {} : { httpMetadata: object.httpMetadata }),
+     ...(object.customMetadata === undefined ? {} : { customMetadata: object.customMetadata }),
+     md5: source.etag,
+     onlyIf: { etagDoesNotMatch: "*" },

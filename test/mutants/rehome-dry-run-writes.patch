@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.dry
+# why: A dry run copies: the operator's look at what would happen has already changed the buckets
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..8c286669 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -215,9 +215,7 @@ export async function rehome(
+               : "differs"
+             : !MD5.test(source.etag)
+               ? "in-parts"
+-              : options.apply
+-                ? await copyOne(bucket, source, destination)
+-                : "copy";
++              : await copyOne(bucket, source, destination);
+         moves.push({ bucket: name, source: source.key, destination, size: source.size, state });
+       }
+       // oxlint-enable no-await-in-loop

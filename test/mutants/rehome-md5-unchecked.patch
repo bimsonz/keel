@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.checked
+# why: R2 is not told the source's hash, so bytes garbled on the way are stored as the copy
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..47ca6ed4 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -175,7 +175,6 @@ async function copyOne(bucket: Bucket, source: Stored, destination: string): Pro
+   const written = await bucket.put(destination, await object.arrayBuffer(), {
+     ...(object.httpMetadata === undefined ? {} : { httpMetadata: object.httpMetadata }),
+     ...(object.customMetadata === undefined ? {} : { customMetadata: object.customMetadata }),
+-    md5: source.etag,
+     onlyIf: { etagDoesNotMatch: "*" },
+   });
+   if (written !== null) return "copied";

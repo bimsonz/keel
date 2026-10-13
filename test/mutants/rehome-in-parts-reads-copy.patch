@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/rehome-r2.test.ts
+# kills: rehome.in-parts
+# why: An object uploaded in parts is offered for copying, though nothing can check its copy
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..98f90630 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -213,7 +213,7 @@ export async function rehome(
+             ? sameBytes(there, source)
+               ? "same"
+               : "differs"
+-            : !MD5.test(source.etag)
++            : source.size < 0
+               ? "in-parts"
+               : options.apply
+                 ? await copyOne(bucket, source, destination)

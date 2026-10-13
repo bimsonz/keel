@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/rehome-r2.test.ts
+# kills: rehome.join-refused
+# why: The mapping is asked by this step's join whatever the migration re-homes by, so the copy can go to ids the migration never wrote
+diff --git a/scripts/lib/rehome-r2.ts b/scripts/lib/rehome-r2.ts
+index 3c8a6fae..58e76f4b 100644
+--- a/scripts/lib/rehome-r2.ts
++++ b/scripts/lib/rehome-r2.ts
+@@ -34,6 +34,7 @@ const oneSpaced = (sql: string): string => sql.replace(/\s+/g, " ");
+ export function mappingQueryFor(migration: string): string {
+   const rehomesProjects = /UPDATE projects\b[^;]*;/.exec(oneSpaced(migration))?.[0] ?? "";
+   if (
++    rehomesProjects === "never" &&
+     !rehomesProjects.includes(
+       `SET namespace_id = ( SELECT u.id FROM ${PERSONAL_ORG_JOIN} WHERE o.id = projects.namespace_id )`,
+     )
