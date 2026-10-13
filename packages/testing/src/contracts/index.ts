@@ -246,6 +246,27 @@ export function describeAgentDirectoryContract(
         }).pipe(Effect.provide(make())),
     );
     it.effect(
+      "[signup.directory] an agent that signed up by key comes back from its sponsor's list exactly as it is, its own keys with it and no other agent's",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const sponsor = freshUserId();
+          const first = signedUpAgent([
+            freshAgentKey(Instant(1_760_000_000_000)),
+            freshAgentKey(Instant(1_760_000_060_000)),
+          ]);
+          const second = { ...signedUpAgent(), createdAt: Instant(1_760_000_120_000) };
+          const unsponsored = signedUpAgent();
+          for (const agent of [first, second, unsponsored]) yield* directory.upsertAccount(agent);
+          yield* directory.sponsor(first.id, sponsor, 1);
+          yield* directory.sponsor(second.id, sponsor, 1);
+          expect(yield* directory.sponsoredBy(sponsor)).toEqual([
+            { ...first, sponsor },
+            { ...second, sponsor },
+          ]);
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
       "[signup.directory] an agent enrolled by a person comes back with no handle and no keys",
       () =>
         Effect.gen(function* () {

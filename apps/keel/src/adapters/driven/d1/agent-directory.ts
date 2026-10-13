@@ -34,7 +34,8 @@ const decodeAgentId = Schema.decodeUnknownSync(AgentId);
 const decodeKeyRows = Schema.decodeUnknownSync(Schema.Array(KeyRow));
 const encodeKey = Schema.encodeSync(AgentKey);
 
-function toAgent(row: unknown, keyRows: unknown): Agent {
+/** An agent from its row and its key rows. The keys are asked for by name: a row alone is never an agent. */
+function toAgent(row: unknown, keyRows: readonly unknown[]): Agent {
   const r = Schema.decodeUnknownSync(AgentRow)(row);
   const keys = decodeKeyRows(keyRows).map((key) => ({
     jkt: key.jkt,
@@ -92,7 +93,9 @@ export function AgentDirectoryD1(db: D1Database) {
         ).pipe(
           Effect.map(([found, keys]) => {
             const row = found?.results[0];
-            return row === undefined ? Option.none() : Option.some(toAgent(row, keys?.results));
+            return row === undefined
+              ? Option.none()
+              : Option.some(toAgent(row, keys?.results ?? []));
           }),
         ),
       findCredential: (clientId) =>
@@ -149,13 +152,32 @@ export function AgentDirectoryD1(db: D1Database) {
             .bind(sponsor, seq, agentId, seq)
             .run(),
         ).pipe(Effect.asVoid),
+      // The agents and their keys in one round trip, each agent given its own keys.
       sponsoredBy: (userId) =>
         Effect.promise(() =>
-          db
-            .prepare("SELECT * FROM agents WHERE sponsor_user = ? ORDER BY created_at, id")
-            .bind(userId)
-            .all(),
-        ).pipe(Effect.map(({ results }) => results.map(toAgent))),
+          db.batch([
+            db
+              .prepare("SELECT * FROM agents WHERE sponsor_user = ? ORDER BY created_at, id")
+              .bind(userId),
+            db
+              .prepare(
+                `SELECT agent_id, jkt, jwk, created_at FROM agent_keys
+                 WHERE agent_id IN (SELECT id FROM agents WHERE sponsor_user = ?) ORDER BY created_at, jkt`,
+              )
+              .bind(userId),
+          ]),
+        ).pipe(
+          Effect.map(([found, keys]) =>
+            (found?.results ?? []).map((row) =>
+              toAgent(
+                row,
+                (keys?.results ?? []).filter(
+                  (key) => Reflect.get(Object(key), "agent_id") === Reflect.get(Object(row), "id"),
+                ),
+              ),
+            ),
+          ),
+        ),
       // An agent's namespace, once placed, is never moved or cleared by a later write: its project never
       // moves, and an enrolment replayed by its key carries the namespace it was first made in, which
       // migration 0010 may since have re-homed. Its sponsor is never cleared by a record that lacks one.
