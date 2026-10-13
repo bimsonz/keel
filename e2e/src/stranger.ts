@@ -14,6 +14,9 @@
 //   (3) the neighbour and a visitor with no account cannot list, find or
 //       read that project, nor can git clone it; once the stranger makes it
 //       public they can, and once it is private again they cannot;
+//   (4) the stranger's namespace holds ten projects and is refused an
+//       eleventh, with the way on: the same project, asked for in an org the
+//       stranger makes, `walk-<run>-o`, is made;
 //   (end) the stranger's account owns a project, so it is not deleted; the
 //       neighbour's owns nothing, so it is, and its handle is never given out
 //       again.
@@ -21,9 +24,9 @@
 // passes for the stranger fails for the neighbour.
 //
 // Each run needs a run of its own, since a handle is taken for good. It
-// leaves behind the stranger's account with its one private project, the
-// agent, whose key is gone with the run, and the neighbour's handle. No
-// session, passkey, code, secret or key is printed.
+// leaves behind the stranger's account with ten private projects, their org
+// with one, the agent, whose key is gone with the run, and the neighbour's
+// handle. No session, passkey, code, secret or key is printed.
 import { tmpdir } from "node:os";
 import { generateAgentKey, KeelClient, KeelProblem, signUp as signUpByKey } from "@keeltown/sdk";
 import { type Account, AccountRefused, signIn, signUp } from "../../scripts/lib/account.ts";
@@ -37,6 +40,9 @@ const keelUrl = process.env.KEEL_URL ?? "";
 if (keelUrl === "") throw new Error("KEEL_URL is not set: the Keel to walk");
 const STRANGER = `walk-${run}-s`;
 const NEIGHBOUR = `walk-${run}-n`;
+const ORG = `walk-${run}-o`;
+/** How many projects a namespace holds, as the instance's default has it. */
+const ROOM = 10;
 const PROJECT = "walk";
 const key = (what: string) => `stranger:${run}:${what}`;
 
@@ -303,6 +309,68 @@ async function keepsAndShows(): Promise<void> {
   await seenAs("private again", false);
 }
 
+/** (4) a namespace holds ten projects: the eleventh is refused with the way on, and the stranger takes it. */
+async function fills(): Promise<void> {
+  if (stranger === undefined || projectId === undefined)
+    throw new Error("(4) needs the stranger's project");
+  const owner = stranger.client;
+  const empty = (namespace: string, name: string, what: string) =>
+    owner.createProject(
+      { namespace, name, source: { kind: "empty" } },
+      { idempotencyKey: key(what) },
+    );
+  /** How many projects of the stranger's own namespace their list names. */
+  const held = async () => {
+    let count = 0;
+    let cursor: string | undefined;
+    do {
+      const page = await owner.projects({
+        ...(cursor === undefined ? {} : { cursor }),
+        limit: 100,
+      });
+      count += page.items.filter((project) => project.namespace.handle === STRANGER).length;
+      cursor = page.nextCursor;
+    } while (cursor !== undefined);
+    return count;
+  };
+  const asked = Date.now();
+  for (let n = 2; n <= ROOM; n += 1) await empty(STRANGER, `walk-${n}`, `project-${n}`);
+  console.log(`     ${ROOM - 1} more projects in ${STRANGER}, in ${Date.now() - asked} ms`);
+  check((await held()) === ROOM, `(4) the stranger's namespace holds ${ROOM} projects`);
+
+  const over = `walk-${ROOM + 1}`;
+  const refused = await empty(STRANGER, over, "project-over").then(
+    () => undefined,
+    (error: unknown) => (error instanceof KeelProblem ? error : undefined),
+  );
+  check(
+    refused?.status === 403 && refused.code === "quota.exceeded",
+    `(4) one more is refused: ${refused?.status} ${refused?.code}`,
+  );
+  for (const next of refused?.nextActions ?? []) console.log(`       next: ${next.title}`);
+  check(
+    (refused?.nextActions ?? []).some(
+      (next) => next.kind === "call" && next.operationId === "Operator_createProject",
+    ),
+    "(4) the refusal says how to go on: create the project somewhere with room",
+  );
+  check(
+    (await held()) === ROOM && (await statusOf(owner.project(STRANGER, over))) === 404,
+    "(4) nothing was made, and its name holds no place",
+  );
+
+  const org = await asks("/organization/create", stranger.account.session.token, {
+    name: ORG,
+    slug: ORG,
+  });
+  check(org.status === 200, `(4) the stranger makes an org, ${ORG}: ${org.status}`);
+  const there = await empty(ORG, over, "project-in-org");
+  check(
+    there.namespace.handle === ORG && there.namespace.kind === "org",
+    "(4) the same project, asked for in that org, is made",
+  );
+}
+
 /** (end) an account that owns a project stays; one that owns nothing is deleted, and its handle with it. */
 async function leaves(): Promise<void> {
   if (stranger !== undefined && projectId !== undefined) {
@@ -342,7 +410,7 @@ async function leaves(): Promise<void> {
 }
 
 // Each part by itself, and the leaving always: a part that stops must not leave the neighbour behind.
-for (const part of [arrives, standsBehind, keepsAndShows, leaves]) {
+for (const part of [arrives, standsBehind, keepsAndShows, fills, leaves]) {
   try {
     await part();
   } catch (error) {
