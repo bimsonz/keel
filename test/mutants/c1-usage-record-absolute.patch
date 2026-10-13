@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.record-gives-back
+# why: A record replaces the count instead of adding to it, so a give-back wipes everything counted
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..67bdab7d 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -147,7 +147,7 @@ export const recordUsage = Effect.fn("identity/recordUsage")(function* (
+   store.transaction(() => {
+     const id = `${namespace}/${kind}/record/${key}`;
+     if (store.get(KEY, id) !== undefined) return;
+-    putUsed(store, namespace, kind, Math.max(0, usedAt(store, namespace, kind, now) + amount), now);
++    putUsed(store, namespace, kind, Math.max(0, amount), now);
+     store.put(KEY, id, encodeKeyed({ at: now }));
+   });
+ });

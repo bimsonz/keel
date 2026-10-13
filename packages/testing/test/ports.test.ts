@@ -54,7 +54,7 @@ const CONTRACT_PORTS = [
   "StagingWriter",
   "Trunks",
   "Lanes",
-  "OrgUsage",
+  "NamespaceUsage",
   "SessionStore",
   "Sessions",
   "Standings",

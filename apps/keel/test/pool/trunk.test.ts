@@ -22,19 +22,19 @@ import {
   EntityStore,
   EventOutbox,
   ImportTooLarge,
-  OrgUsage,
+  NamespaceUsage,
   RELAY_PACK_CAP_BYTES,
   RepoNotFound,
   Trunks,
 } from "@keeltown/core/ports";
 import {
-  freshOrg,
+  freshNamespace,
   makeAgentDirectoryMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
   makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
@@ -67,15 +67,15 @@ const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
 
 /**
  * A fresh project's Trunk DO with memory adapters in its runtime: a trunk
- * writer at `head`, and the project's place in an org of its own, which
+ * writer at `head`, and the project's place in a namespace of its own, which
  * `initialize` reads before it names a head and counts the history into.
  */
 async function placedTrunk(head: string) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const writer = makeTrunkWriterMemory(Schema.decodeUnknownSync(CommitSha)(head));
-  const org = freshOrg();
-  const usage = makeOrgUsageMemory();
+  const namespace = freshNamespace();
+  const usage = makeNamespaceUsageMemory();
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
       instance,
@@ -85,13 +85,13 @@ async function placedTrunk(head: string) {
           backbone(state.storage),
           makeCodeHostMemory().layer,
           writer.layer,
-          placedIn(projectId, org).layer,
+          placedIn(projectId, namespace).layer,
           usage.layer,
         ),
       ),
     );
   });
-  return { projectId, stub, writer, org, usage };
+  return { projectId, stub, writer, namespace, usage };
 }
 
 // The port's own suite, through the real object: each case's project is placed, its trunk not yet initialized.
@@ -249,8 +249,8 @@ describe("the Trunk DO", () => {
     const full = await placedTrunk(head);
     full.writer.holds(head, 4_000);
     await Effect.runPromise(
-      Effect.flatMap(OrgUsage, (usage) =>
-        usage.configure(full.org, { overrides: { "repo-bytes": 3_999 }, halted: false }),
+      Effect.flatMap(NamespaceUsage, (usage) =>
+        usage.configure(full.namespace, { overrides: { "repo-bytes": 3_999 }, halted: false }),
       ).pipe(Effect.provide(full.usage.layer)),
     );
     const overQuota = await refusal(full);
@@ -270,7 +270,7 @@ describe("the Trunk DO", () => {
     expect(overCap.status).toContain("is not initialized");
   });
 
-  it("[trunk.do.no-org] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {
+  it("[trunk.do.unplaced] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {
     const projectId: ProjectId = makeId("prj", ulid());
     const stub = trunkStub(projectId);
     const refused = decodeExit(
@@ -289,11 +289,11 @@ describe("the Trunk DO", () => {
 
 /**
  * A Trunk DO for a fresh project, initialized at staging's one commit,
- * promoting through memory adapters. The project is placed in an org before
- * its trunk is initialized: `placed` names that org and what its history
- * weighs, for a test that reads the org's count.
+ * promoting through memory adapters. The project is placed in a namespace before
+ * its trunk is initialized: `placed` names that namespace and what its history
+ * weighs, for a test that reads the namespace's count.
  */
-async function promoting(placed?: { readonly org: NamespaceId; readonly history: number }) {
+async function promoting(placed?: { readonly namespace: NamespaceId; readonly history: number }) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const staging = projectRepos(projectId).staging;
@@ -308,8 +308,8 @@ async function promoting(placed?: { readonly org: NamespaceId; readonly history:
     }),
   );
   writer.interfere(base);
-  const places = placedIn(projectId, placed?.org ?? freshOrg());
-  const usage = makeOrgUsageMemory();
+  const places = placedIn(projectId, placed?.namespace ?? freshNamespace());
+  const usage = makeNamespaceUsageMemory();
   if (placed !== undefined) writer.holds(base, placed.history);
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
@@ -645,15 +645,18 @@ describe("the Trunk DO's promotion", () => {
     expect(t.writer.head()).toBe(tip);
   });
 
-  it("[trunk.do.refused-quota] through the real object a project's history and each landing are counted into its org, and a batch over what is left is declined while a smaller one behind it lands", async () => {
-    const org = freshOrg();
-    const t = await promoting({ org, history: 1_000 });
+  it("[trunk.do.refused-quota] through the real object a project's history and each landing are counted into its namespace, and a batch over what is left is declined while a smaller one behind it lands", async () => {
+    const namespace = freshNamespace();
+    const t = await promoting({ namespace, history: 1_000 });
     const counting = <A, E>(
-      program: (usage: (typeof OrgUsage)["Service"]) => Effect.Effect<A, E>,
-    ) => Effect.runPromise(Effect.flatMap(OrgUsage, program).pipe(Effect.provide(t.usage.layer)));
+      program: (usage: (typeof NamespaceUsage)["Service"]) => Effect.Effect<A, E>,
+    ) =>
+      Effect.runPromise(
+        Effect.flatMap(NamespaceUsage, program).pipe(Effect.provide(t.usage.layer)),
+      );
     // The history counted at create leaves room for 500 bytes more.
     await counting((usage) =>
-      usage.configure(org, { overrides: { "repo-bytes": 1_500 }, halted: false }),
+      usage.configure(namespace, { overrides: { "repo-bytes": 1_500 }, halted: false }),
     );
     const big = await t.composed(1, t.base);
     const tip = await t.composed(2, t.base);
@@ -677,7 +680,7 @@ describe("the Trunk DO's promotion", () => {
       reason: "repo-bytes-quota",
     });
     // The create's 1,000 and the landing's 300: 200 are left of 1,500.
-    expect(await counting((usage) => usage.admit(org, "repo-bytes", 0, "probe"))).toEqual({
+    expect(await counting((usage) => usage.admit(namespace, "repo-bytes", 0, "probe"))).toEqual({
       limit: 1_500,
       remaining: 200,
     });

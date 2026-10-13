@@ -2,15 +2,15 @@
 # kills: trunk.import-admitted
 # why: An import admitted before trunk had its head is counted again after, so its namespace pays for it twice
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cee77cfe..9138eaf1 100644
+index 206f1740..9a8e60e8 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -236,7 +236,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -292,7 +292,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
        command: "Initialize",
      });
    // An import was admitted before trunk had its head; counting it here too would count it twice.
 -  if (trunk.origin?.kind !== "imported")
 +  if (trunk.origin?.kind !== "none")
-     yield* usage.record(org, REPO_BYTES, yield* writer.historyBytes(head), `create:${projectId}`);
-   return trunk;
- });
+     yield* usage.record(
+       namespace,
+       REPO_BYTES,

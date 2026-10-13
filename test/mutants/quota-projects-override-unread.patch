@@ -8,7 +8,7 @@ index 495f8db0..29c78725 100644
 @@ -81,7 +81,7 @@ export const createProject: (
    if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
      return yield* new IdempotencyConflict({ idempotencyKey });
-   const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+   const { overrides, halted } = yield* (yield* NamespaceUsage).settings(namespace);
 -  const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
 +  const atMost = quotaLimit("projects", DEFAULT_QUOTAS);
    yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/namespace-usage.test.ts -t "usage.do.prune"
+# kills: usage.do.prune
+# why: The prune runs once and is never armed again, so the keys still held after it are kept for good
+diff --git a/apps/keel/src/adapters/driving/do/namespace-usage.ts b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+index e1017b0b..eef88dee 100644
+--- a/apps/keel/src/adapters/driving/do/namespace-usage.ts
++++ b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+@@ -85,7 +85,7 @@ export class NamespaceUsageDO extends KeelObject implements NamespaceUsageRpc {
+     if (request.reason !== USAGE_PRUNE) return super.onDeadline(request);
+     const { kept } = await this.runtime.runPromise(pruneUsageKeys());
+     // This run's own request is on the table until it returns, so the next is armed whatever is there.
+-    if (kept > 0) await this.schedulePrune();
++    void kept;
+   }
+ 
+   /** Arms the prune a day from now unless it is armed already, so a burst of counts never postpones it. */

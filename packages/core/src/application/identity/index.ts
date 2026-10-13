@@ -172,7 +172,7 @@ export * from "./enrol.ts";
 export * from "./gate.ts";
 export * from "./inbox.ts";
 export * from "./invitations.ts";
-export * from "./org-usage.ts";
+export * from "./namespace-usage.ts";
 export * from "./reservations.ts";
 export * from "./session.ts";
 export * from "./sign-up.ts";

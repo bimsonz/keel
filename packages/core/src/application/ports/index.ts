@@ -39,7 +39,7 @@ export * from "./inbox.ts";
 export * from "./lanes.ts";
 export * from "./live-changes.ts";
 export * from "./memberships.ts";
-export * from "./org-usage.ts";
+export * from "./namespace-usage.ts";
 export * from "./probe-changes.ts";
 export * from "./probe-ledger.ts";
 export * from "./metrics.ts";

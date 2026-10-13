@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/namespace-usage.test.ts -t "usage.address"
+# kills: usage.address
+# why: Every namespace's usage object is looked for at another address, so each namespace's counts, keys and settings start again from nothing
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..d3ef3605 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -44,7 +44,7 @@ const settingsOf = (store: Store, namespace: NamespaceId): UsageSettings => {
+   return stored === undefined ? UNSET : decodeSettings(stored);
+ };
+ 
+-const ADDRESS = "usage:";
++const ADDRESS = "namespace-usage:";
+ const isNamespace = Schema.is(NamespaceId);
+ 
+ /** Where a namespace's usage object lives: `usage:<namespaceId>`. */

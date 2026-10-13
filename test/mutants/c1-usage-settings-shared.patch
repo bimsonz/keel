@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract.settings"
+# kills: usage.contract.settings
+# why: Settings are kept under one id for every namespace, so one namespace's limits and halt are every namespace's
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..076bb97c 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -40,7 +40,7 @@ type Store = (typeof EntityStore)["Service"];
+ const UNSET: UsageSettings = { overrides: {}, halted: false };
+ 
+ const settingsOf = (store: Store, namespace: NamespaceId): UsageSettings => {
+-  const stored = store.get(SETTINGS, namespace);
++  const stored = store.get(SETTINGS, "every-org");
+   return stored === undefined ? UNSET : decodeSettings(stored);
+ };
+ 
+@@ -181,5 +181,5 @@ export const configureUsage = Effect.fn("identity/configureUsage")(function* (
+   settings: UsageSettings,
+ ) {
+   const store = yield* EntityStore;
+-  yield* Effect.sync(() => store.put(SETTINGS, namespace, encodeSettings(settings)));
++  yield* Effect.sync(() => store.put(SETTINGS, "every-org", encodeSettings(settings)));
+ });

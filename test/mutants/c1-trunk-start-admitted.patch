@@ -8,7 +8,7 @@ index cee77cfe..317cc37e 100644
 @@ -211,7 +211,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
      );
    const writer = yield* TrunkWriter;
-   const usage = yield* OrgUsage;
+   const usage = yield* NamespaceUsage;
 -  if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
 +  if (trunkOf(yield* EntityStore, projectId) === undefined) {
      const bytes = yield* writer.historyBytes(head);

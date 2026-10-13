@@ -66,7 +66,7 @@ import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
-import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
+import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { LanesRpc } from "../adapters/driven/do-rpc/lanes.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
@@ -144,7 +144,7 @@ export function isolateLayer(
     NamespacesD1(env.DB),
     ProjectNamespacesD1(env.DB),
     // A namespace's own limits, read where a project is made.
-    OrgUsageRpc(env.ORG_USAGE),
+    NamespaceUsageRpc(env.NAMESPACE_USAGE),
     codeHost,
     // The clone URL serves a trunk through its host's own git remote, with a read token per request.
     overrides.repoServer ?? RepoServerArtifacts().pipe(Layer.provide(codeHost)),

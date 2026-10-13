@@ -1,11 +1,11 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
-# kills: trunk.no-org, trunk.no-org-init
-# why: A project with no place is counted against a made-up org, so its trunk is initialized and pushed with nobody's quota bounding it
+# kills: trunk.unplaced, trunk.unplaced-init
+# why: A project with no place is counted against a made-up namespace, so its trunk is initialized and pushed with nobody's quota bounding it
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cee77cfe..b2b3ed15 100644
+index 206f1740..884d8f86 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -21,6 +21,7 @@ import type {
+@@ -22,6 +22,7 @@ import type {
    EntityRef,
    EventEnvelope,
    Instant,
@@ -13,12 +13,12 @@ index cee77cfe..b2b3ed15 100644
    ProjectId,
  } from "../../domain/kernel/index.ts";
  import {
-@@ -116,9 +117,7 @@ export const PACK_OVERHEAD_BYTES = 32;
- const orgOf = (projectId: ProjectId) =>
+@@ -169,9 +170,7 @@ const NOT_ADMITTED = { _tag: "NotAdmitted" } as const;
+ const namespaceOf = (projectId: ProjectId) =>
    projectNamespace(projectId).pipe(
      Effect.catchTag("ProjectUnplaced", () =>
 -      Effect.die(
--        new Error(`project ${projectId} has no place: its trunk has no org to count against`),
+-        new Error(`project ${projectId} has no place: its trunk has no namespace to count against`),
 -      ),
 +      Effect.succeed("org_00000000000000000000000000" as NamespaceId),
      ),

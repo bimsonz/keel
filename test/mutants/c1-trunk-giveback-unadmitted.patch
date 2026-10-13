@@ -1,15 +1,15 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.gives-back-frozen"
 # kills: trunk.gives-back-frozen
-# why: Bytes are given back for a pack the quota had refused, so an org is credited for bytes it never held
+# why: Bytes are given back for a pack the quota had refused, so a namespace is credited for bytes it never held
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cf9cea3..433ae73 100644
+index 206f1740..c766ea2c 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -136,7 +136,6 @@ const giveBack = Effect.fn("integration/giveBack")(function* (
-   const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-   const usage = yield* OrgUsage;
-   const admitted = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${sha}`));
+@@ -198,7 +198,6 @@ const giveBack = Effect.fn("integration/giveBack")(function* (
+   const admitted = yield* Effect.result(
+     usage.admit(namespace, REPO_BYTES, bytes, `promotion:${sha}`),
+   );
 -  if (Result.isFailure(admitted)) return;
-   yield* usage.record(org, REPO_BYTES, -bytes, `giveback:${sha}`);
+   yield* usage.record(namespace, REPO_BYTES, -bytes, `giveback:${sha}`);
  });
  

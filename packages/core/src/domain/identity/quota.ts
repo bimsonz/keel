@@ -2,7 +2,7 @@ import { Result, Schema } from "effect";
 import { Instant, InstantSchema, NextAction } from "../kernel/index.ts";
 
 /**
- * What an org's usage is counted in. Repo bytes count
+ * What a namespace's usage is counted in. Repo bytes count
  * trunk only; container-minutes and model calls are per UTC day.
  */
 export const QuotaKind = Schema.Literals([
@@ -20,7 +20,7 @@ export type Quotas = Readonly<Record<QuotaKind, number>>;
 
 /**
  * The instance's defaults (R9): engineering defaults whoever runs the instance
- * adjusts in its configuration, each org's overrides taking precedence.
+ * adjusts in its configuration, each namespace's overrides taking precedence.
  */
 export const DEFAULT_QUOTAS: Quotas = {
   projects: 10,
@@ -48,7 +48,7 @@ const DAY_MS = 86_400_000;
 export const resetAt = (kind: QuotaKind, now: Instant): Instant | undefined =>
   DAILY_QUOTAS.has(kind) ? Instant((Math.floor(now / DAY_MS) + 1) * DAY_MS) : undefined;
 
-/** An admission to decide: `amount` more of `kind`, on top of the org's `used` in the current window. */
+/** An admission to decide: `amount` more of `kind`, on top of the namespace's `used` in the current window. */
 export interface QuotaAsk {
   readonly kind: QuotaKind;
   readonly amount: number;
@@ -56,7 +56,7 @@ export interface QuotaAsk {
   readonly now: Instant;
   /** The instance's limits, as its configuration sets them; `DEFAULT_QUOTAS` when absent. */
   readonly defaults?: Quotas;
-  /** The org's own limits, which take precedence. */
+  /** The namespace's own limits, which take precedence. */
   readonly overrides?: Partial<Quotas>;
   /** Whether the instance's configuration has stopped new verification spend. */
   readonly halted: boolean;
@@ -68,7 +68,7 @@ export interface QuotaAdmitted {
 }
 
 /**
- * An admission refused: over the org's limit (`limit`), or the instance's
+ * An admission refused: over the namespace's limit (`limit`), or the instance's
  * verification spend is stopped (`halted`). A daily kind says when it resets.
  */
 export class QuotaExceeded extends Schema.TaggedError<QuotaExceeded>()("QuotaExceeded", {
@@ -81,7 +81,7 @@ export class QuotaExceeded extends Schema.TaggedError<QuotaExceeded>()("QuotaExc
   nextActions: Schema.Array(NextAction),
 }) {}
 
-/** The limit an org has for `kind`: its override, else the instance's. */
+/** The limit a namespace has for `kind`: its override, else the instance's. */
 export const quotaLimit = (
   kind: QuotaKind,
   defaults: Quotas = DEFAULT_QUOTAS,
@@ -91,7 +91,7 @@ export const quotaLimit = (
 /**
  * Admits `amount` more of a kind, or refuses it with next actions. Admitted
  * exactly when the total stays within the limit; an amount or a count that is
- * negative or not finite is refused. The OrgUsage port serialises an org's
+ * negative or not finite is refused. The NamespaceUsage port serialises a namespace's
  * admissions and keeps its counts; this decides.
  */
 export const admitQuota = (ask: QuotaAsk): Result.Result<QuotaAdmitted, QuotaExceeded> => {
@@ -120,11 +120,11 @@ export const admitQuota = (ask: QuotaAsk): Result.Result<QuotaAdmitted, QuotaExc
         retryAt === undefined
           ? {
               kind: "escalate",
-              title: `The org is at its ${ask.kind} limit (${limit}); free some, or ask whoever runs this Keel to raise it`,
+              title: `The namespace is at its ${ask.kind} limit (${limit}); free some, or ask whoever runs this Keel to raise it`,
             }
           : {
               kind: "wait",
-              title: `The org has used its ${ask.kind} for today (${limit}); it resets at UTC midnight`,
+              title: `The namespace has used its ${ask.kind} for today (${limit}); it resets at UTC midnight`,
               args: { retryAt },
             },
       ],

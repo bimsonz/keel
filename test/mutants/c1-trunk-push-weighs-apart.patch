@@ -2,11 +2,11 @@
 # kills: trunk.push-weighs-once
 # why: the promotion weighs its pack apart before the push that weighs it again, so staging is asked for the same pack twice
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 174652d2..85e2af8a 100644
+index 206f1740..91899abe 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -521,6 +521,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-   const org = yield* orgOf(projectId);
+@@ -599,6 +599,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   const namespace = yield* namespaceOf(projectId);
    /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
    let refused: PushRefusedReason | undefined;
 +  yield* Effect.result(writer.packBytes(trunk.wal.old, target));

@@ -16,7 +16,7 @@ import type {
   Notifier,
   Namespaces,
   ProbeStore,
-  OrgUsage,
+  NamespaceUsage,
   ProjectNamespaces,
   Projects,
   ProjectViews,
@@ -81,7 +81,7 @@ export type IsolateServices =
   | ProjectNamespaces
   | Trunks
   | Lanes
-  | OrgUsage
+  | NamespaceUsage
   | RepoServer
   | WorkspacePool;
 

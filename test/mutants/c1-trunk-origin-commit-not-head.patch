@@ -2,13 +2,13 @@
 # kills: trunk.origin-head
 # why: An origin that names another commit than trunk's first head is recorded as given
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 7877cd8d..e582291f 100644
+index 206f1740..c491b29a 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -198,7 +198,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -261,7 +261,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
    origin: TrunkOrigin,
  ) {
-   const org = yield* orgOf(projectId);
+   const namespace = yield* namespaceOf(projectId);
 -  if (origin.kind !== "empty" && origin.commit !== head)
 +  if (origin.kind !== "empty" && origin.commit !== origin.commit)
      return yield* Effect.die(

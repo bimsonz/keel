@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/namespace-usage.test.ts -t "usage.do.prune"
+# kills: usage.do.prune
+# why: An admission arms no prune, so a namespace that only admits keeps every key for good
+diff --git a/apps/keel/src/adapters/driving/do/namespace-usage.ts b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+index 77e239ea..82dab488 100644
+--- a/apps/keel/src/adapters/driving/do/namespace-usage.ts
++++ b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+@@ -49,7 +49,6 @@ export class NamespaceUsageDO extends KeelObject implements NamespaceUsageRpc {
+         Effect.flatMap(({ kind, amount, key }) => admitUsage(namespace, kind, amount, key)),
+       ),
+     );
+-    await this.armPrune();
+     return answer;
+   }
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract.override"
+# kills: usage.contract.override
+# why: An admission is decided on the instance's limit whatever the namespace's own says, so a raised or lowered limit changes nothing
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..add6e089 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -110,7 +110,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+     }
+     const used = usedAt(store, namespace, kind, now);
+     const { overrides, halted } = settingsOf(store, namespace);
+-    const decided = admitQuota({ kind, amount, used, now, overrides, halted });
++    const decided = admitQuota({ kind, amount, used, now, halted });
+     if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);
+     store.put(
+       KEY,

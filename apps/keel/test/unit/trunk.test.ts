@@ -42,7 +42,7 @@ import {
   EntityStore,
   EventOutbox,
   ImportTooLarge,
-  OrgUsage,
+  NamespaceUsage,
   RELAY_PACK_CAP_BYTES,
 } from "@keeltown/core/ports";
 import {
@@ -50,7 +50,7 @@ import {
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeManualClock,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
   makeProjectNamespacesMemory,
   makeTrunkWriterMemory,
   MEMORY_SEED,
@@ -99,7 +99,7 @@ const ports = () => {
       makeEventOutboxMemory().layer,
       makeClockMemory().layer,
       places.layer,
-      makeOrgUsageMemory().layer,
+      makeNamespaceUsageMemory().layer,
       writer.layer,
     ),
   };
@@ -107,7 +107,7 @@ const ports = () => {
 
 /** ORG's repo bytes as counted now: what an admission of nothing finds used. */
 const counted = Effect.map(
-  Effect.flatMap(OrgUsage, (usage) => usage.admit(ORG, "repo-bytes", 0, `probe-${ulid()}`)),
+  Effect.flatMap(NamespaceUsage, (usage) => usage.admit(ORG, "repo-bytes", 0, `probe-${ulid()}`)),
   (answer) => answer.limit - answer.remaining,
 );
 
@@ -206,7 +206,7 @@ describe("the Trunk's origin", () => {
 
 /** ORG's repo bytes are `limit` from here on. */
 const allow = (limit: number) =>
-  Effect.flatMap(OrgUsage, (usage) =>
+  Effect.flatMap(NamespaceUsage, (usage) =>
     usage.configure(ORG, { overrides: { "repo-bytes": limit }, halted: false }),
   );
 
@@ -368,7 +368,7 @@ describe("the Trunk's first write", () => {
 
 describe("the Trunk's count at create", () => {
   it.effect(
-    "[trunk.create-counted] a project's whole history at its first head is counted into its org once, however often it is initialized",
+    "[trunk.create-counted] a project's whole history at its first head is counted into its namespace once, however often it is initialized",
     () => {
       const w = ports();
       w.writer.holds(sha("a"), 4_000);
@@ -384,7 +384,7 @@ describe("the Trunk's count at create", () => {
   );
 
   it.effect(
-    "[trunk.no-org-init] a project with no place is a defect that names it: it is given no trunk, and nothing is counted",
+    "[trunk.unplaced-init] a project with no place is a defect that names it: it is given no trunk, and nothing is counted",
     () => {
       const w = ports();
       unplace(w.places);
@@ -458,7 +458,7 @@ function promotion() {
   const writer = makeTrunkWriterMemory(sha("0"));
   const places = makeProjectNamespacesMemory();
   place(places);
-  const usage = makeOrgUsageMemory();
+  const usage = makeNamespaceUsageMemory();
   /** Everything but the trunk's writer, for a test that wraps the writer. */
   const rest = Layer.mergeAll(code.layer, outbox.layer, clock.layer, places.layer, usage.layer);
   const layer = Layer.merge(rest, writer.layer);
@@ -745,7 +745,7 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
-    "[trunk.no-org] a project with no place is a defect that names it, on every pass: its group is neither weighed, pushed nor counted, and stays open",
+    "[trunk.unplaced] a project with no place is a defect that names it, on every pass: its group is neither weighed, pushed nor counted, and stays open",
     () => {
       const w = promotion();
       return Effect.gen(function* () {
@@ -781,7 +781,7 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
-    "[trunk.admits-once] a landing is counted into its org as its pack less a pack's 32 bytes, once, however many times the group is pushed",
+    "[trunk.admits-once] a landing is counted into its namespace as its pack less a pack's 32 bytes, once, however many times the group is pushed",
     () => {
       const w = promotion();
       return Effect.gen(function* () {
@@ -826,7 +826,7 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
-    "[trunk.refused-quota] a pack over what is left of its org's repo bytes is never pushed: its batch is declined with the reason, nothing is counted, and a smaller batch behind it lands",
+    "[trunk.refused-quota] a pack over what is left of its namespace's repo bytes is never pushed: its batch is declined with the reason, nothing is counted, and a smaller batch behind it lands",
     () => {
       const w = promotion();
       return Effect.gen(function* () {
@@ -835,7 +835,7 @@ describe("the Trunk's promotion", () => {
         const held = yield* counted;
         const big = yield* w.composed(1, base);
         const next = yield* w.composed(2, base);
-        yield* (yield* OrgUsage).configure(ORG, {
+        yield* (yield* NamespaceUsage).configure(ORG, {
           overrides: { "repo-bytes": held + 500 },
           halted: false,
         });
@@ -909,7 +909,7 @@ describe("the Trunk's promotion", () => {
           // What the create counted: the history at the base.
           const held = yield* counted;
           const tip = yield* refused.composed(1, base);
-          const usage = yield* OrgUsage;
+          const usage = yield* NamespaceUsage;
           yield* usage.configure(ORG, { overrides: { "repo-bytes": held + 500 }, halted: false });
           yield* usage.record(ORG, "repo-bytes", 300, "held already");
           refused.writer.weigh(tip, 533);
@@ -924,7 +924,7 @@ describe("the Trunk's promotion", () => {
       }),
   );
 
-  it("[trunk.meter-sums] after any landings an org's repo bytes are its project's history at create plus each landed pack less 32 bytes", async () => {
+  it("[trunk.meter-sums] after any landings a namespace's repo bytes are its project's history at create plus each landed pack less 32 bytes", async () => {
     const weights = fc.array(fc.integer({ min: 32, max: 5_000_000 }), {
       minLength: 1,
       maxLength: 6,

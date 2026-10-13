@@ -7,7 +7,7 @@ index 495f8db0..510b5d6b 100644
 +++ b/packages/core/src/application/coordination/projects.ts
 @@ -82,7 +82,7 @@ export const createProject: (
      return yield* new IdempotencyConflict({ idempotencyKey });
-   const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+   const { overrides, halted } = yield* (yield* NamespaceUsage).settings(namespace);
    const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
 -  yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
 +  yield* places.assign({ projectId, namespace, name }).pipe(

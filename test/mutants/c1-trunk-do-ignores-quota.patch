@@ -1,14 +1,14 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.refused-quota"
 # kills: trunk.do.refused-quota
-# why: Through the real object: a pack the org's quota refused is pushed all the same
+# why: Through the real object: a pack the namespace's quota refused is pushed all the same
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 174652d2..e0897733 100644
+index 206f1740..fdf438b3 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -525,7 +525,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -603,7 +603,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
      writer.push(trunk.wal.old, target, (packBytes) =>
        usage
-         .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
+         .admit(namespace, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
 -        .pipe(Effect.mapError(() => NOT_ADMITTED)),
 +        .pipe(Effect.ignore),
      ),

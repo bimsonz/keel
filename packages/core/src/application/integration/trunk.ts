@@ -32,7 +32,7 @@ import {
   type EventDraft,
   EventOutbox,
   ImportTooLarge,
-  OrgUsage,
+  NamespaceUsage,
   RELAY_PACK_CAP_BYTES,
   type Transaction,
   type TrunkStanding,
@@ -146,7 +146,7 @@ export const trunkDestroyed = (
   projectId: ProjectId,
 ): boolean => store.get(DESTROYED, projectId) !== undefined;
 
-/** The quota a project's trunk counts against: its org's repo bytes. */
+/** The quota a project's trunk counts against: its namespace's repo bytes. */
 const REPO_BYTES = "repo-bytes";
 
 /**
@@ -156,27 +156,27 @@ const REPO_BYTES = "repo-bytes";
  */
 export const PACK_OVERHEAD_BYTES = 32;
 
-/** What a push fails with when its org's repo-bytes quota did not admit its pack. */
+/** What a push fails with when its namespace's repo-bytes quota did not admit its pack. */
 const NOT_ADMITTED = { _tag: "NotAdmitted" } as const;
 
 /**
- * The org a project's trunk counts against. Every project is placed in an org
+ * The namespace a project's trunk counts against. Every project is placed in a namespace
  * when it is created, before its trunk exists, so a project with no place is
  * a defect, named here: its trunk is never weighed or counted against a
  * guess, and never pushed unweighed. The place is read by `projectNamespace`,
  * the one read of it the Lane, the Trunk and the Workflows share.
  */
-const orgOf = (projectId: ProjectId) =>
+const namespaceOf = (projectId: ProjectId) =>
   projectNamespace(projectId).pipe(
     Effect.catchTag("ProjectUnplaced", () =>
       Effect.die(
-        new Error(`project ${projectId} has no place: its trunk has no org to count against`),
+        new Error(`project ${projectId} has no place: its trunk has no namespace to count against`),
       ),
     ),
   );
 
 /**
- * Takes a composed group's pack out of its org's repo bytes, for a group
+ * Takes a composed group's pack out of its namespace's repo bytes, for a group
  * that ends without landing, with no record beside the trunk of whether it
  * was admitted. The pack is weighed again and admitted under the promotion's
  * own key: that answers as it first did, or counts now if it was never
@@ -190,14 +190,16 @@ const giveBack = Effect.fn("integration/giveBack")(function* (
   old: CommitSha,
   sha: CommitSha,
 ) {
-  const org = yield* orgOf(projectId);
+  const namespace = yield* namespaceOf(projectId);
   const weighed = yield* Effect.result((yield* TrunkWriter).packBytes(old, sha));
   if (Result.isFailure(weighed)) return;
   const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-  const usage = yield* OrgUsage;
-  const admitted = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${sha}`));
+  const usage = yield* NamespaceUsage;
+  const admitted = yield* Effect.result(
+    usage.admit(namespace, REPO_BYTES, bytes, `promotion:${sha}`),
+  );
   if (Result.isFailure(admitted)) return;
-  yield* usage.record(org, REPO_BYTES, -bytes, `giveback:${sha}`);
+  yield* usage.record(namespace, REPO_BYTES, -bytes, `giveback:${sha}`);
 });
 
 /**
@@ -258,18 +260,18 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
   by: string,
   origin: TrunkOrigin,
 ) {
-  const org = yield* orgOf(projectId);
+  const namespace = yield* namespaceOf(projectId);
   if (origin.kind !== "empty" && origin.commit !== head)
     return yield* Effect.die(
       new Error(`trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`),
     );
   const writer = yield* TrunkWriter;
-  const usage = yield* OrgUsage;
+  const usage = yield* NamespaceUsage;
   if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
     const bytes = yield* writer.historyBytes(head);
     if (bytes > RELAY_PACK_CAP_BYTES)
       return yield* new ImportTooLarge({ projectId, bytes, limit: RELAY_PACK_CAP_BYTES });
-    yield* usage.admit(org, REPO_BYTES, bytes, `create:${projectId}`);
+    yield* usage.admit(namespace, REPO_BYTES, bytes, `create:${projectId}`);
   }
   // Initialize is refused only by a trunk that has its head; the machine's other refusals are not its to give.
   const committed = yield* promote(
@@ -291,7 +293,12 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
     });
   // An import was admitted before trunk had its head; counting it here too would count it twice.
   if (trunk.origin?.kind !== "imported")
-    yield* usage.record(org, REPO_BYTES, yield* writer.historyBytes(head), `create:${projectId}`);
+    yield* usage.record(
+      namespace,
+      REPO_BYTES,
+      yield* writer.historyBytes(head),
+      `create:${projectId}`,
+    );
   return trunk;
 });
 
@@ -538,7 +545,7 @@ export type PushOutcome =
   | "retry"
   /** Trunk holds a head the WAL does not explain: PromotionFrozen is committed, and a person must look. */
   | "frozen"
-  /** The group's push was refused (its pack is over the receive-pack cap, or over what is left of its org's repo-bytes quota) with trunk still on the old head: PromotionDeclined is committed for each batch, and the queue moves on. */
+  /** The group's push was refused (its pack is over the receive-pack cap, or over what is left of its namespace's repo-bytes quota) with trunk still on the old head: PromotionDeclined is committed for each batch, and the queue moves on. */
   | "declined"
   /** No group is open. */
   | "idle";
@@ -554,7 +561,7 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA
  * advances trunk, the old head means push again, anything else freezes.
  *
- * Every push admits its own pack against its org's repo-bytes quota before
+ * Every push admits its own pack against its namespace's repo-bytes quota before
  * anything is sent, under the key `promotion:<sha>`, so the retries of one
  * group count once: the writer fetches the pack once, and what it weighs is
  * what it sends. A pack over the receive-pack cap or over the quota, with
@@ -590,14 +597,14 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   const target = trunk === undefined ? undefined : pushTarget(trunk);
   if (trunk?.wal === undefined || target === undefined) return restingAs(trunk);
   const writer = yield* TrunkWriter;
-  const usage = yield* OrgUsage;
-  const org = yield* orgOf(projectId);
+  const usage = yield* NamespaceUsage;
+  const namespace = yield* namespaceOf(projectId);
   /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
   let refused: PushRefusedReason | undefined;
   const pushed = yield* Effect.result(
     writer.push(trunk.wal.old, target, (packBytes) =>
       usage
-        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
+        .admit(namespace, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
         .pipe(Effect.mapError(() => NOT_ADMITTED)),
     ),
   );
@@ -635,7 +642,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
  * stopped group's batches are declined for re-verification and promotion
  * resumes. A trunk that is not frozen is left as it is.
  *
- * The stopped group's pack is given back to its org's quota first, unless
+ * The stopped group's pack is given back to its namespace's quota first, unless
  * trunk's head is the very commit the group composed (it landed after all).
  * Known limit: a head that holds that commit further down its history is not
  * recognised, and one pack then goes uncounted.

@@ -26,7 +26,7 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
   makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
@@ -83,7 +83,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
             code.layer,
             writer.layer,
             placedIn(projectId).layer,
-            makeOrgUsageMemory().layer,
+            makeNamespaceUsageMemory().layer,
           ),
         ),
       );

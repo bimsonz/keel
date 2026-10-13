@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.admit-counts
+# why: An admitted amount is not counted, so a namespace is admitted past its limit one call at a time
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..7e2fb49d 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -111,7 +111,6 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+     const used = usedAt(store, namespace, kind, now);
+     const { overrides, halted } = settingsOf(store, namespace);
+     const decided = admitQuota({ kind, amount, used, now, overrides, halted });
+-    if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);
+     store.put(
+       KEY,
+       id,

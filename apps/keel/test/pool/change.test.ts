@@ -12,7 +12,7 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
   makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
@@ -620,7 +620,7 @@ async function realTrunk(projectId: ProjectId, lane: Awaited<ReturnType<typeof r
           lane.code.layer,
           writer.layer,
           placedIn(projectId).layer,
-          makeOrgUsageMemory().layer,
+          makeNamespaceUsageMemory().layer,
         ),
       ),
     );

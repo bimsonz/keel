@@ -1,23 +1,23 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
-# kills: trunk.no-org-init
-# why: A trunk is initialized before its project's place is asked for, so a project no org holds is left with a trunk that takes batches
+# kills: trunk.unplaced-init
+# why: A trunk is initialized before its project's place is asked for, so a project no namespace holds is left with a trunk that takes batches
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cee77cfe..0068e1e4 100644
+index 206f1740..d7b9088a 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -204,7 +204,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -260,7 +260,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
    by: string,
    origin: TrunkOrigin,
  ) {
--  const org = yield* orgOf(projectId);
+-  const namespace = yield* namespaceOf(projectId);
    if (origin.kind !== "empty" && origin.commit !== head)
      return yield* Effect.die(
        new Error(`trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`),
-@@ -224,6 +223,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -280,6 +279,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
      "initialize",
      head,
    ).pipe(Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }));
-+  const org = yield* orgOf(projectId);
++  const namespace = yield* namespaceOf(projectId);
    const trunk = trunkOf(yield* EntityStore, projectId);
    if (trunk === undefined)
      return yield* Effect.die(

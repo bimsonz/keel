@@ -39,7 +39,7 @@ import {
   makeTrunksMemory,
   makeWorkspacePoolMemory,
   makeUsersMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
@@ -115,7 +115,7 @@ function world() {
   const rows = makeBetterAuthMemory({ orgs: [{ id: ACME, slug: "acme" }] });
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
-      makeOrgUsageMemory().layer,
+      makeNamespaceUsageMemory().layer,
       directory.layer,
       projects.layer,
       makeTrunksMemory().layer,

@@ -11,7 +11,7 @@ import {
   type FanOut,
   type HumanGate,
   type Ids,
-  type OrgUsage,
+  type NamespaceUsage,
   type NamespaceAgents,
   type Namespaces,
   type ProjectAgents,
@@ -38,7 +38,7 @@ import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
-import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
+import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
@@ -197,14 +197,14 @@ export function poolServices(env: Env): Layer.Layer<PoolServices> {
   );
 }
 
-/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, and what counts each landing against the project's org. */
-export type TrunkServices = TrunkWriter | CodeHost | OrgUsage | ProjectNamespaces;
+/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, and what counts each landing against the project's namespace. */
+export type TrunkServices = TrunkWriter | CodeHost | NamespaceUsage | ProjectNamespaces;
 
 /**
  * The Trunk DO writes and syncs its project's trunk through GitCore over the
  * code host, and reads each candidate it promotes from staging. It finds its
- * project's org in D1's `projects` table and counts what it lands into that
- * org's usage object. `projectId` is read lazily, on first use, from the
+ * project's namespace in D1's `projects` table and counts what it lands into that
+ * namespace's usage object. `projectId` is read lazily, on first use, from the
  * object's name.
  */
 export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
@@ -213,7 +213,7 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
     return Layer.mergeAll(
       host,
       TrunkWriterGitCore(projectRepos(projectId()), commitSigning(env)).pipe(Layer.provide(host)),
-      OrgUsageRpc(env.ORG_USAGE),
+      NamespaceUsageRpc(env.NAMESPACE_USAGE),
       ProjectNamespacesD1(env.DB),
     );
   });

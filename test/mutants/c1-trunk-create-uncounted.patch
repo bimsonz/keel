@@ -1,16 +1,21 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.create-counted"
 # kills: trunk.create-counted
-# why: A new project's history is never counted, so an org's repos start free whatever their size
+# why: A new project's history is never counted, so a namespace's repos start free whatever their size
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cee77cfe..e9621509 100644
+index 206f1740..e0313edb 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -236,8 +236,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -292,13 +292,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
        command: "Initialize",
      });
    // An import was admitted before trunk had its head; counting it here too would count it twice.
 -  if (trunk.origin?.kind !== "imported")
--    yield* usage.record(org, REPO_BYTES, yield* writer.historyBytes(head), `create:${projectId}`);
+-    yield* usage.record(
+-      namespace,
+-      REPO_BYTES,
+-      yield* writer.historyBytes(head),
+-      `create:${projectId}`,
+-    );
    return trunk;
  });
  

@@ -2,15 +2,15 @@
 # kills: trunk.import-over-cap
 # why: An import no relay can carry is given a trunk, whose staging and mirror then never reach its head
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cee77cfe..f196bbd7 100644
+index 206f1740..44aad559 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -213,8 +213,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
-   const usage = yield* OrgUsage;
+@@ -269,8 +269,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+   const usage = yield* NamespaceUsage;
    if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
      const bytes = yield* writer.historyBytes(head);
 -    if (bytes > RELAY_PACK_CAP_BYTES)
 -      return yield* new ImportTooLarge({ projectId, bytes, limit: RELAY_PACK_CAP_BYTES });
-     yield* usage.admit(org, REPO_BYTES, bytes, `create:${projectId}`);
+     yield* usage.admit(namespace, REPO_BYTES, bytes, `create:${projectId}`);
    }
    // Initialize is refused only by a trunk that has its head; the machine's other refusals are not its to give.

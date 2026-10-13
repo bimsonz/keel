@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.daily-reset
+# why: Every kind resets at midnight, so a full repo quota is free again the next day
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..55e3638e 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -76,7 +76,7 @@ const putUsed = (
+   used: number,
+   now: Instant,
+ ): void => {
+-  const resetsAt = resetAt(kind, now);
++  const resetsAt = resetAt("container-minutes", now);
+   store.put(
+     COUNT,
+     countId(namespace, kind),

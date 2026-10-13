@@ -8,7 +8,7 @@ import {
   CodeHost,
   type EntityStore,
   EventOutbox,
-  OrgUsage,
+  NamespaceUsage,
   ProjectNamespaces,
   type ProjectPlace,
   Projects,
@@ -19,7 +19,7 @@ import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeEventOutboxMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
   makeManualClock,
   makeProjectNamespacesMemory,
   makeTrunksMemory,
@@ -113,7 +113,7 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
       makeWorkspacePoolMemory({ journal }).layer,
     ]),
   );
-  const usage = makeOrgUsageMemory();
+  const usage = makeNamespaceUsageMemory();
   const layer = Layer.mergeAll(
     projectObject,
     placed,
@@ -288,7 +288,7 @@ describe("createProject", () => {
       const { layer } = world();
       return Effect.gen(function* () {
         yield* seedSource;
-        const usage = yield* OrgUsage;
+        const usage = yield* NamespaceUsage;
         yield* usage.configure(ORG, { overrides: { projects: 2 }, halted: false });
         yield* creating(alice, "app-1", "create-1");
         yield* creating(alice, "app-2", "create-2");

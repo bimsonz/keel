@@ -37,7 +37,7 @@ import {
   makeUsersMemory,
   sampleOrgId,
   sampleSponsorId,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
@@ -70,7 +70,7 @@ const places = makeProjectNamespacesMemory();
 const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "forge" }] });
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
-    makeOrgUsageMemory().layer,
+    makeNamespaceUsageMemory().layer,
     directory,
     projects.layer,
     trunks.layer,

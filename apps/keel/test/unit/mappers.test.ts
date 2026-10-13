@@ -43,7 +43,7 @@ import {
   sampleOrgId,
   sampleProjectId,
   sampleSponsorId,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
 } from "@keeltown/testing";
 import { ulid } from "ulid";
 import { Layer, ManagedRuntime, Schema } from "effect";
@@ -142,7 +142,7 @@ function grantedSurface() {
   const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "stubs" }] });
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
-      makeOrgUsageMemory().layer,
+      makeNamespaceUsageMemory().layer,
       directory,
       projects.layer,
       makeTrunksMemory().layer,

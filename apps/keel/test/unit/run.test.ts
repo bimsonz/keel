@@ -26,7 +26,7 @@ import {
   makeTrunksMemory,
   makeWorkspacePoolMemory,
   makeUsersMemory,
-  makeOrgUsageMemory,
+  makeNamespaceUsageMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -37,7 +37,7 @@ const directory = makeAgentDirectoryMemory().layer;
 const inbox = makeInboxMemory();
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
-    makeOrgUsageMemory().layer,
+    makeNamespaceUsageMemory().layer,
     directory,
     makeProjectsMemory().layer,
     makeTrunksMemory().layer,

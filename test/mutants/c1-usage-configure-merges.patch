@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract.settings"
+# kills: usage.contract.settings
+# why: Configuring adds to the overrides already held instead of replacing them, so a limit can never be taken away again
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..bad9b8c6 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -181,5 +181,8 @@ export const configureUsage = Effect.fn("identity/configureUsage")(function* (
+   settings: UsageSettings,
+ ) {
+   const store = yield* EntityStore;
+-  yield* Effect.sync(() => store.put(SETTINGS, namespace, encodeSettings(settings)));
++  const overrides = { ...settingsOf(store, namespace).overrides, ...settings.overrides };
++  yield* Effect.sync(() =>
++    store.put(SETTINGS, namespace, encodeSettings({ ...settings, overrides })),
++  );
+ });

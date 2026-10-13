@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/namespace-usage.test.ts -t "usage.contract.apart"
+# kills: usage.contract.apart
+# why: The adapter addresses every namespace to one object, so every namespace counts into one total and shares one set of keys
+diff --git a/apps/keel/src/adapters/driven/do-rpc/namespace-usage.ts b/apps/keel/src/adapters/driven/do-rpc/namespace-usage.ts
+index a6eb5b26..259f25c4 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/namespace-usage.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/namespace-usage.ts
+@@ -13,7 +13,9 @@ import { callObject } from "./answer.ts";
+  */
+ export function NamespaceUsageRpc(objects: Env["NAMESPACE_USAGE"]): Layer.Layer<NamespaceUsage> {
+   const usage = (namespace: NamespaceId) =>
+-    objects.get(objects.idFromName(usageAddress(namespace)));
++    objects.get(
++      objects.idFromName(usageAddress(namespace).replace(/:.*/, ":org_00000000000000000000000000")),
++    );
+ 
+   return Layer.succeed(
+     NamespaceUsage,

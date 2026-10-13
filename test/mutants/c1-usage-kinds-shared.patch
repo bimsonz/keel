@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.apart
+# why: A namespace counts every kind into one total, so its projects spend its agents
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..a1867ca9 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -59,7 +59,7 @@ export const usageNamespace = (address: string | undefined): NamespaceId => {
+ };
+ 
+ /** Where a namespace's count of one kind is kept. */
+-const countId = (namespace: NamespaceId, kind: QuotaKind): string => `${namespace}/${kind}`;
++const countId = (namespace: NamespaceId, _kind: QuotaKind): string => namespace;
+ 
+ /** The namespace's count of `kind` in the window `now` falls in: a daily kind counted before its reset is zero again. */
+ const usedAt = (store: Store, namespace: NamespaceId, kind: QuotaKind, now: Instant): number => {

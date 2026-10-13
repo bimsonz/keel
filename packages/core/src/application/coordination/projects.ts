@@ -12,7 +12,7 @@ import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import { type NamespaceId, ProjectId, type RunRef } from "../../domain/kernel/index.ts";
 import {
   Clock,
-  OrgUsage,
+  NamespaceUsage,
   type ProjectRecord,
   ProjectNamespaces,
   Projects,
@@ -71,7 +71,7 @@ export const createProject: (
 ) => Effect.Effect<
   ProjectRecord,
   IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
-  Projects | ProjectNamespaces | OrgUsage | Clock
+  Projects | ProjectNamespaces | NamespaceUsage | Clock
 > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
   const { namespace, idempotencyKey } = input;
   const projectId = projectIdFor(actor, idempotencyKey);
@@ -80,7 +80,7 @@ export const createProject: (
   const placed = yield* places.byId(projectId);
   if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
     return yield* new IdempotencyConflict({ idempotencyKey });
-  const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+  const { overrides, halted } = yield* (yield* NamespaceUsage).settings(namespace);
   const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
   yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
     Effect.catchTag("NamespaceFull", (full) =>

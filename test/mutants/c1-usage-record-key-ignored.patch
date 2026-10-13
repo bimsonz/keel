@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.idempotent
+# why: A record ignores its key, so a retried record is counted twice
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..f58c4bbf 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -146,7 +146,6 @@ export const recordUsage = Effect.fn("identity/recordUsage")(function* (
+   const now = yield* (yield* Clock).now;
+   store.transaction(() => {
+     const id = `${namespace}/${kind}/record/${key}`;
+-    if (store.get(KEY, id) !== undefined) return;
+     putUsed(store, namespace, kind, Math.max(0, usedAt(store, namespace, kind, now) + amount), now);
+     store.put(KEY, id, encodeKeyed({ at: now }));
+   });

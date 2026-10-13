@@ -1,20 +1,22 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.admits-once"
 # kills: trunk.admits-once
-# why: A landing is pushed without being admitted, so an org's repo bytes never grow and its quota never binds
+# why: A landing is pushed without being admitted, so a namespace's repo bytes never grow and its quota never binds
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 174652d2..563fe326 100644
+index 206f1740..b9d92e8a 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -522,11 +522,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -599,13 +599,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   const namespace = yield* namespaceOf(projectId);
    /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
    let refused: PushRefusedReason | undefined;
-   const pushed = yield* Effect.result(
+-  const pushed = yield* Effect.result(
 -    writer.push(trunk.wal.old, target, (packBytes) =>
 -      usage
--        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
+-        .admit(namespace, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
 -        .pipe(Effect.mapError(() => NOT_ADMITTED)),
 -    ),
-+    writer.push(trunk.wal.old, target, () => Effect.void),
-   );
+-  );
++  const pushed = yield* Effect.result(writer.push(trunk.wal.old, target, () => Effect.void));
    if (Result.isFailure(pushed)) {
      const failure = pushed.failure;
+     if (failure._tag === "NotAdmitted") refused = "repo-bytes-quota";

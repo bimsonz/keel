@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "usage.contract"
+# kills: usage.contract.daily-reset
+# why: A daily count never resets, so a namespace that used its container-minutes once is refused for good
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index 9a5139b5..6a188407 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -66,7 +66,7 @@ const usedAt = (store: Store, namespace: NamespaceId, kind: QuotaKind, now: Inst
+   const stored = store.get(COUNT, countId(namespace, kind));
+   if (stored === undefined) return 0;
+   const count = decodeCount(stored);
+-  return count.resetsAt !== undefined && now >= count.resetsAt ? 0 : count.used;
++  return count.used;
+ };
+ 
+ const putUsed = (

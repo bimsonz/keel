@@ -2,15 +2,15 @@
 # kills: trunk.admits-once, trunk.meter-sums
 # why: A landing is counted as its whole pack, header and trailer too, so every landing charges 32 bytes the repo never stored
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 174652d2..3d135f67 100644
+index 206f1740..332a3f42 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -524,7 +524,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -602,7 +602,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
    const pushed = yield* Effect.result(
      writer.push(trunk.wal.old, target, (packBytes) =>
        usage
--        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
-+        .admit(org, REPO_BYTES, packBytes, `promotion:${target}`)
+-        .admit(namespace, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
++        .admit(namespace, REPO_BYTES, packBytes, `promotion:${target}`)
          .pipe(Effect.mapError(() => NOT_ADMITTED)),
      ),
    );

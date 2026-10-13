@@ -18,7 +18,11 @@ import {
 } from "./contracts/agent-sign-ups.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
-import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
+import {
+  describeNamespaceUsageContract,
+  freshNamespace,
+  type NamespaceUsageHarness,
+} from "./contracts/namespace-usage.ts";
 import { describeLanesContract } from "./contracts/lanes.ts";
 import { describeTrunksContract, type TrunksHarness } from "./contracts/trunks.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
@@ -58,7 +62,7 @@ import {
 } from "./contracts/syntax-source.ts";
 import { makeSyntaxSourceMemory } from "./memory/syntax-source.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
-import { makeOrgUsageMemory } from "./memory/org-usage.ts";
+import { makeNamespaceUsageMemory } from "./memory/namespace-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
 import { makeSponsorshipsMemory } from "./memory/sponsorships.ts";
 import {
@@ -177,7 +181,7 @@ import type {
   SyntaxSource,
   Trunks,
   Users,
-  OrgUsage,
+  NamespaceUsage,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -465,12 +469,12 @@ function memoryTrunksHarness(): TrunksHarness {
   };
 }
 
-/** In-memory OrgUsage counts for any org, on a clock the suite moves. */
-function memoryOrgUsageHarness(): OrgUsageHarness {
-  const usage = makeOrgUsageMemory();
+/** In-memory NamespaceUsage counts for any namespace, on a clock the suite moves. */
+function memoryNamespaceUsageHarness(): NamespaceUsageHarness {
+  const usage = makeNamespaceUsageMemory();
   return {
     layer: usage.layer,
-    org: () => Effect.sync(freshOrg),
+    namespace: () => Effect.sync(freshNamespace),
     now: Effect.sync(usage.clock.now),
     advance: (ms) => Effect.sync(() => usage.clock.advance(ms)),
   };
@@ -544,7 +548,10 @@ export const PORTS = {
   RepoServer: port(memoryRepoServer, describeRepoServerContract),
   Trunks: harnessed<Trunks, TrunksHarness>(memoryTrunksHarness, describeTrunksContract),
   Lanes: port(() => integration.makeLanesMemory().layer, describeLanesContract),
-  OrgUsage: harnessed<OrgUsage, OrgUsageHarness>(memoryOrgUsageHarness, describeOrgUsageContract),
+  NamespaceUsage: harnessed<NamespaceUsage, NamespaceUsageHarness>(
+    memoryNamespaceUsageHarness,
+    describeNamespaceUsageContract,
+  ),
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,
     pending("SubjectRegistry", ["byKey", "byAnchor", "mint"]),

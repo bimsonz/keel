@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/namespace-usage.test.ts -t "usage.do.prune"
+# kills: usage.do.prune
+# why: Every count re-arms the prune a day ahead, so a namespace counted at least daily never prunes
+diff --git a/apps/keel/src/adapters/driving/do/namespace-usage.ts b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+index e1017b0b..52ae6a86 100644
+--- a/apps/keel/src/adapters/driving/do/namespace-usage.ts
++++ b/apps/keel/src/adapters/driving/do/namespace-usage.ts
+@@ -90,7 +90,6 @@ export class NamespaceUsageDO extends KeelObject implements NamespaceUsageRpc {
+ 
+   /** Arms the prune a day from now unless it is armed already, so a burst of counts never postpones it. */
+   private async armPrune(): Promise<void> {
+-    if (armedAlarms(this.ctx.storage).some((alarm) => alarm.reason === USAGE_PRUNE)) return;
+     await this.schedulePrune();
+   }
+ 

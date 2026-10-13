@@ -77,7 +77,7 @@
       { "name": "PROJECT", "class_name": "ProjectDO" },
       { "name": "WORKSPACE_POOL", "class_name": "WorkspacePoolDO" },
       { "name": "PROJECTOR", "class_name": "ProjectorDO" },
-      { "name": "ORG_USAGE", "class_name": "OrgUsageDO" },
+      { "name": "NAMESPACE_USAGE", "class_name": "NamespaceUsageDO" },
       { "name": "NAMESPACE", "class_name": "NamespaceDO" },
       { "name": "MERGEBOX", "class_name": "MergeBox" },
       { "name": "BOXGATE", "class_name": "BoxGate" },
@@ -103,6 +103,8 @@
     },
     { "tag": "v2", "new_sqlite_classes": ["OrgUsageDO"] },
     { "tag": "v3", "new_sqlite_classes": ["NamespaceDO"] },
+    // Each namespace's counts move with the class: the objects and their storage are kept, at the same address.
+    { "tag": "v4", "renamed_classes": [{ "from": "OrgUsageDO", "to": "NamespaceUsageDO" }] },
   ],
   "workflows": [
     { "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" },

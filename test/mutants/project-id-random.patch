@@ -6,7 +6,7 @@ index 495f8db0..daaa3ce5 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
 @@ -74,7 +74,7 @@ export const createProject: (
-   Projects | ProjectNamespaces | OrgUsage | Clock
+   Projects | ProjectNamespaces | NamespaceUsage | Clock
  > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
    const { namespace, idempotencyKey } = input;
 -  const projectId = projectIdFor(actor, idempotencyKey);

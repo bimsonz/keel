@@ -16,7 +16,7 @@ index 495f8db0..dfc6b5a2 100644
 +    ...(input.run === undefined ? {} : { run: input.run }),
 +    idempotencyKey,
 +  });
-   const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+   const { overrides, halted } = yield* (yield* NamespaceUsage).settings(namespace);
    const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
    yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
 @@ -102,19 +109,7 @@ export const createProject: (

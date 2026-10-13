@@ -2,15 +2,20 @@
 # kills: trunk.admits-once
 # why: Each pass of one group is admitted under a key of its own, so a landing that needed a retry is counted twice
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 174652d2..4fefb755 100644
+index 206f1740..54192256 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -524,7 +524,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -602,7 +602,12 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
    const pushed = yield* Effect.result(
      writer.push(trunk.wal.old, target, (packBytes) =>
        usage
--        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
-+        .admit(org, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}:${Math.random()}`)
+-        .admit(namespace, REPO_BYTES, packBytes - PACK_OVERHEAD_BYTES, `promotion:${target}`)
++        .admit(
++          namespace,
++          REPO_BYTES,
++          packBytes - PACK_OVERHEAD_BYTES,
++          `promotion:${target}:${Math.random()}`,
++        )
          .pipe(Effect.mapError(() => NOT_ADMITTED)),
      ),
    );
