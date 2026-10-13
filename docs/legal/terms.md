@@ -68,7 +68,7 @@ We may suspend or delete an account or org, revoke agents, or remove content in 
 
 Where it's safe and lawful, we'll tell you why and give you a chance to respond. A suspension can be lifted.
 
-You can delete an org you own at any time. That deletes its projects, repositories, stored files and records. To delete your account, email privacy@keel.town and we'll delete it within one month. You can stop using keel.town at any time.
+You can delete an org you own at any time. That deletes its projects, repositories, stored files and records. You can delete your account in your settings, or email privacy@keel.town and we'll delete it within one month. You can stop using keel.town at any time.
 
 ## 10. Our liability
 

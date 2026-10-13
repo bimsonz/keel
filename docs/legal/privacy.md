@@ -99,7 +99,7 @@ You have the right to:
 - object to any use we base on legitimate interests;
 - receive the data you gave us in a portable form.
 
-To use any of these rights, email privacy@keel.town. We'll reply within one month. You can clone your repositories at any time. You can change your name, but not your handle, because it is your public address. Deleting your account removes your handle with it.
+To use any of these rights, email privacy@keel.town. We'll reply within one month. You can clone your repositories at any time. You can change your name, but not your handle, because it is your public address. If you delete your account, your handle is never given to anyone else.
 
 ## 11. Complaints
 

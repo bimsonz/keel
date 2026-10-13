@@ -68,7 +68,7 @@ const beside = (bearer: Jar, cookie: Jar): Carried => ({ jar: cookie, headers: b
 
 /**
  * Every route of Better Auth's that takes, sets, checks or resets a password,
- * with its account deletion, which asks for one: named here apart from the
+ * with the link its account deletion would mail: named here apart from the
  * list Keel disables, so a path that leaves that list is still asked for.
  */
 const PASSWORD_ROUTES = [
@@ -83,7 +83,6 @@ const PASSWORD_ROUTES = [
   "/email-otp/request-password-reset",
   "/email-otp/reset-password",
   "/forget-password/email-otp",
-  "/delete-user",
   "/delete-user/callback",
 ];
 
@@ -270,6 +269,7 @@ describe("no passwords at /v1/auth", () => {
       sendOtp: async () => {},
       github: { clientId: "id", clientSecret: "secret" },
       agents: { find: async () => undefined },
+      endSponsorships: async () => {},
     });
     const disabled: ReadonlySet<string> = new Set(DISABLED_PATHS);
     const naming: string[] = [];
@@ -285,6 +285,7 @@ describe("no passwords at /v1/auth", () => {
     }
     expect(mounted).toBeGreaterThan(50);
     expect(naming.length).toBeGreaterThan(8);
-    expect(naming.filter((path) => !disabled.has(path))).toEqual([]);
+    // Deleting an account is served, and refuses a body that carries a password ([ba.delete-own-way]).
+    expect(naming.filter((path) => !disabled.has(path))).toEqual(["/delete-user"]);
   });
 });

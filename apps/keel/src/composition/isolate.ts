@@ -6,7 +6,7 @@ import {
   type CodeHost,
   type Enrolments,
   type Sessions,
-  type Sponsorships,
+  Sponsorships,
   type Standings,
   type EventFeed,
   Inbox,
@@ -222,7 +222,12 @@ export interface AuthOverrides {
 }
 
 /** Better Auth's config over the Worker's D1, with GitHub only once both of its secrets are set. */
-function identity(env: Env, overrides: AuthOverrides, agents: AgentAccess): AuthConfig {
+function identity(
+  env: Env,
+  overrides: AuthOverrides,
+  agents: AgentAccess,
+  endSponsorships: AuthConfig["endSponsorships"],
+): AuthConfig {
   const { GITHUB_CLIENT_ID: clientId, GITHUB_CLIENT_SECRET: clientSecret } = env as Env & {
     readonly GITHUB_CLIENT_ID?: string;
     readonly GITHUB_CLIENT_SECRET?: string;
@@ -232,11 +237,41 @@ function identity(env: Env, overrides: AuthOverrides, agents: AgentAccess): Auth
     secret: env.BETTER_AUTH_SECRET,
     host: env.KEEL_HOST,
     agents,
+    endSponsorships,
     background: waitUntil,
     ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
   };
 }
+
+/**
+ * Ends every sponsor link a person holds, as that person: what deleting their
+ * account does once nothing refuses it. An agent that is revoked, or whose
+ * AgentSession names another sponsor or none, has no link of theirs to end.
+ * Each end takes a key of its own, so a later attempt never answers an
+ * earlier one in its place.
+ */
+const endSponsorships = (userId: UserId) =>
+  AgentDirectory.use((directory) => directory.sponsoredBy(userId)).pipe(
+    Effect.flatMap((sponsored) =>
+      Sponsorships.use((links) =>
+        Effect.forEach(
+          sponsored,
+          (agent) =>
+            links
+              .end(
+                { _tag: "User", userId },
+                { agentId: agent.id, idempotencyKey: `account-delete:${crypto.randomUUID()}` },
+              )
+              .pipe(
+                Effect.catchTag("AgentNotKnown", () => Effect.void),
+                Effect.catchTag("AgentStateRefused", () => Effect.void),
+              ),
+          { discard: true },
+        ),
+      ),
+    ),
+  );
 
 /** The app over a given layer. `isolateFor` caches the production one per Env; pool tests build their own. */
 export function makeIsolate(
@@ -245,14 +280,19 @@ export function makeIsolate(
   authOverrides: AuthOverrides = {},
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
-  const authConfig = identity(env, authOverrides, {
-    find: (agentId) =>
-      runtime.runPromise(
-        AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
-          Effect.map(Option.getOrUndefined),
+  const authConfig = identity(
+    env,
+    authOverrides,
+    {
+      find: (agentId) =>
+        runtime.runPromise(
+          AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+            Effect.map(Option.getOrUndefined),
+          ),
         ),
-      ),
-  });
+    },
+    (userId) => runtime.runPromise(endSponsorships(Schema.decodeSync(UserId)(userId))),
+  );
   const origin = `https://${env.KEEL_HOST}`;
   const handlers = makeHandlers(
     makeRunner(runtime),

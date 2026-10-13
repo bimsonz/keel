@@ -15,6 +15,7 @@ import {
   forgetSpentIds,
   TOKEN_PATH,
 } from "./agents.ts";
+import { forget, onlyOwner, ownedProjects, ownsProjects, soleOwnerOf } from "./closing.ts";
 import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
@@ -44,7 +45,8 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
  * which names a session by its id (sessions.ts). Keel has no passwords: every route that takes, sets,
  * checks or resets one is off, the email code's among them (it would set a
  * password with no session, and a handle would then sign in with it), and so
- * is Better Auth's account deletion, which asks for one.
+ * is the link Better Auth's account deletion would mail. A person deletes
+ * their account at `DELETE_PATH`, on a fresh passkey sign-in and no other way.
  */
 export const DISABLED_PATHS = [
   "/list-sessions",
@@ -60,9 +62,11 @@ export const DISABLED_PATHS = [
   "/email-otp/request-password-reset",
   "/email-otp/reset-password",
   "/forget-password/email-otp",
-  "/delete-user",
   "/delete-user/callback",
 ] as const;
+
+/** Where a person deletes their own account: Better Auth's route, with Keel's refusals before it (closing.ts). */
+const DELETE_PATH = "/delete-user";
 
 /**
  * Better Auth matches `disabledPaths` against the path a request asks for, so
@@ -95,8 +99,8 @@ const SIGN_IN =
 /**
  * Better Auth's routes that change how an account signs in, as it names them:
  * both steps of adding a passkey, removing one, linking or unlinking a
- * provider, and changing the address, by link or by code. Each needs a fresh
- * sign-in (fresh.ts).
+ * provider, and changing the address, by link or by code; and the one that
+ * ends it, deleting the account. Each needs a fresh sign-in (fresh.ts).
  */
 const CHANGES_SIGN_IN = new Set([
   "/passkey/generate-register-options",
@@ -107,6 +111,7 @@ const CHANGES_SIGN_IN = new Set([
   "/change-email",
   "/email-otp/request-email-change",
   "/email-otp/change-email",
+  DELETE_PATH,
 ]);
 
 /** Both steps of adding a passkey: all of them an account with no passkey may take (fresh.ts). */
@@ -142,6 +147,8 @@ export interface AuthConfig {
   readonly github?: { readonly clientId: string; readonly clientSecret: string };
   /** Keel's agents, as the token endpoint reads them. */
   readonly agents: AgentAccess;
+  /** Ends every sponsor link a person holds, as that person: the last thing done before their account is deleted. */
+  readonly endSponsorships: (userId: string) => Promise<void>;
   /**
    * Keeps the Worker alive for work Better Auth does after answering, such as
    * sending a code (it answers alike whether or not the address exists).
@@ -269,13 +276,14 @@ export function authOptions(config: AuthConfig) {
     const none = !(await holdsPasskey(db, carried.user.id));
     const first = none && ADDS_PASSKEY.has(ctx.path);
     if (first && mayAddFirstPasskey(signedIn, now)) return;
+    const what = ctx.path === DELETE_PATH ? "deleting your account" : "changing how you sign in";
     throw APIError.from("FORBIDDEN", {
       code: "FRESH_SIGN_IN_REQUIRED",
       message: first
         ? "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes"
         : none
-          ? "Add a passkey first, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes"
-          : "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+          ? `Add a passkey first, then retry: ${what} needs a passkey sign-in from the last ten minutes`
+          : `Sign in again with your passkey, then retry: ${what} needs a passkey sign-in from the last ten minutes`,
     });
   };
 
@@ -296,6 +304,28 @@ export function authOptions(config: AuthConfig) {
     },
     // Keel limits each IP at its mount with the Workers Rate Limiting binding.
     rateLimit: { enabled: false },
+    user: {
+      deleteUser: {
+        enabled: true,
+        // Every refusal is read before anything changes; the sponsor links end last, as the person.
+        beforeDelete: async (user) => {
+          const projects = await ownedProjects(db, user.id);
+          if (projects.length > 0) throw ownsProjects(projects);
+          const orgs = await soleOwnerOf(db, user.id);
+          if (orgs.length > 0) throw onlyOwner(orgs);
+          await config.endSponsorships(user.id);
+        },
+        // Better Auth has deleted the user by now, and the foreign keys what hangs off it.
+        afterDelete: async (user) => {
+          const handle: unknown = Reflect.get(user, "username");
+          await forget(db, {
+            id: user.id,
+            email: user.email,
+            handle: typeof handle === "string" ? handle : undefined,
+          });
+        },
+      },
+    },
     // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
     session: {
       // A row is written again once its session is used this long after the last write (sessions.ts).
@@ -338,6 +368,15 @@ export function authOptions(config: AuthConfig) {
             : undefined;
         if (DISABLED.has(ctx.path))
           throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+        // Better Auth would check a password, or hand a token to the mailed link's handler, past the router.
+        if (
+          ctx.path === DELETE_PATH &&
+          (ctx.body?.password !== undefined || ctx.body?.token !== undefined)
+        )
+          throw refuse(
+            "PASSKEY_ONLY",
+            "Keel deletes an account on a fresh passkey sign-in alone: send no password and no token",
+          );
         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
           const name: unknown = ctx.body?.username;
