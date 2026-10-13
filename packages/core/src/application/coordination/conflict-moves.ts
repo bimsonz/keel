@@ -1,7 +1,7 @@
 import { Effect, Option, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
-  agentActor,
+  byAgent,
   ConflictId,
   type EventEnvelope,
   type Instant,
@@ -209,7 +209,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
       cause: command.idempotencyKey,
       fingerprint,
       project: at.projectId,
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
     },
     conflictMove(conflictId, escalate),
   ).pipe(

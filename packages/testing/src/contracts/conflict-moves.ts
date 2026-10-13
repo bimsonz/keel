@@ -8,6 +8,7 @@ import {
   makeId,
   type NamespaceId,
   type ProjectId,
+  RunRef,
 } from "@keeltown/core/kernel";
 import {
   ConflictMoves,
@@ -17,7 +18,7 @@ import {
   type ResolveCommand,
   type SubjectRef,
 } from "@keeltown/core/ports";
-import { Effect, type Layer } from "effect";
+import { Effect, type Layer, Schema } from "effect";
 import { BUNDLE, conflictOn, DISCRIMINATING, ulid } from "./probe-ledger.ts";
 
 /**
@@ -71,6 +72,9 @@ const command = (conflictId: ConflictId, changeId: ResolveCommand["changeId"]) =
 const failed = (conflictId: ConflictId) =>
   ({ conflictId, attempts: 3, reason: "worlds-unbuildable" }) as const;
 
+/** The run that makes the move: one of an agent's, named on what it commits. */
+const LANE = Schema.decodeUnknownSync(RunRef)({ id: makeId("run", ulid()), label: "run-c" });
+
 const escalated = (log: readonly EventEnvelope[]) =>
   log.filter((event) => event.type === "ConflictEscalated");
 
@@ -93,6 +97,7 @@ export function describeConflictMovesContract(
           changeId: holder,
           agentId: agent,
           sponsor,
+          run: LANE,
           move: "escalate",
           note: "the two cannot both ship",
           idempotencyKey: "resolve-1",
@@ -124,6 +129,8 @@ export function describeConflictMovesContract(
           expect(escalated(log)).toHaveLength(1);
           expect(escalated(log)[0]).toMatchObject({
             actor: `agent:${agent}`,
+            // The move is the run's that made it: one agent's lanes are told apart by it.
+            run: LANE,
             project: at.projectId,
             payload: { conflictId, escalationId, reason: "human-class" },
             affected: [

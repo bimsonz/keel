@@ -15,6 +15,20 @@ scalar AgentId extends string;
 @pattern("^ses_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar SessionId extends string;
 
+/** One stream of an agent's work. An agent may have any number at once. */
+@pattern("^run_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar RunId extends string;
+
+/** What an agent calls one of its runs, such as `nightly-deps`: its own claim. Keel proves only that the run is the agent's. */
+@pattern("^[a-z0-9][a-z0-9._-]{0,63}$")
+scalar RunLabel extends string;
+
+/** A run as an event, a change and a session name it: its id, and its label when the agent gave one. */
+model RunRef {
+  id: RunId;
+  label?: RunLabel;
+}
+
 @pattern("^chg_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar ChangeId extends string;
 

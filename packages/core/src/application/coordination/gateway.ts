@@ -186,7 +186,12 @@ const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | un
     case "Agent":
       return lease === undefined
         ? undefined
-        : { _tag: "Lease", leaseId: lease, agentId: by.token.agentId };
+        : {
+            _tag: "Lease",
+            leaseId: lease,
+            agentId: by.token.agentId,
+            ...(by.token.run === undefined ? {} : { run: by.token.run }),
+          };
     case "Maintainer":
       return { _tag: "Maintainer", by: by.userId, projectId: by.projectId };
     default: {
@@ -488,6 +493,7 @@ export const resolveMove: (
         conflictId: input.conflictId,
         changeId: input.changeId,
         agentId: principal.agentId,
+        run: principal.run,
         sponsor: principal.sponsor,
         move: input.move,
         note: input.note,

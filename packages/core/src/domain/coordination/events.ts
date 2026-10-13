@@ -14,6 +14,7 @@ import {
   LeaseId,
   NextAction,
   ProjectId,
+  RunRef,
   SketchId,
   SubjectId,
   VerdictId,
@@ -36,6 +37,8 @@ import { Move } from "./change.ts";
 export const IntentDeclared = Schema.TaggedStruct("IntentDeclared", {
   changeId: ChangeId,
   agentId: AgentId,
+  /** The run of the agent that declared the change, when its token named one: the run that holds it. */
+  run: Schema.optional(RunRef),
   origin: ChangeOrigin,
   sketchId: Schema.optional(SketchId),
   revision: Schema.Int,
@@ -230,6 +233,8 @@ export const ChangeAdopted = Schema.TaggedStruct("ChangeAdopted", {
   changeId: ChangeId,
   previousAgentId: AgentId,
   agentId: AgentId,
+  /** The adopter's run, which holds the change from here; absent when the adopter's token named none. */
+  run: Schema.optional(RunRef),
   leaseId: LeaseId,
   briefRef: Schema.String,
 });

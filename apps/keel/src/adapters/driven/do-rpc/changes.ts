@@ -85,6 +85,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           const command = encodeDeclare({
             changeId,
             agentId: principal.agentId,
+            ...(principal.run === undefined ? {} : { run: principal.run }),
             projectId: principal.projectId,
             origin: "agent",
             ...intent,
@@ -116,6 +117,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).submit(
             encodeSubmit({
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               commitSha: input.commitSha,
               idempotencyKey: input.idempotencyKey,
@@ -127,6 +129,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).adopt(
             encodeAdopt({
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               projectId: principal.projectId,
               idempotencyKey: input.idempotencyKey,
             }),
@@ -141,6 +144,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).rebase(
             encodeRebase({
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               idempotencyKey: input.idempotencyKey,
             }),
@@ -156,6 +160,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).revise(
             encodeRevise({
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               ifMatchRevision: input.ifMatchRevision,
               ...(input.goal === undefined ? {} : { goal: input.goal }),
@@ -174,6 +179,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).rely(
             encodeRely({
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               premise: input.premise,
               idempotencyKey: input.idempotencyKey,

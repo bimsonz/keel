@@ -1,7 +1,7 @@
 import { Context, type Effect } from "effect";
 import type { IdempotencyConflict } from "../../domain/identity/index.ts";
 import type { Move } from "../../domain/coordination/index.ts";
-import type { AgentId, ChangeId, ConflictId, UserId } from "../../domain/kernel/index.ts";
+import type { AgentId, ChangeId, ConflictId, RunRef, UserId } from "../../domain/kernel/index.ts";
 import type { ConflictNotFound, MoveRefused } from "../../domain/verification/index.ts";
 import type { ConflictView, SubjectRef } from "./probe-ledger.ts";
 
@@ -10,6 +10,8 @@ export interface ResolveCommand {
   /** The party making the move. */
   readonly changeId: ChangeId;
   readonly agentId: AgentId;
+  /** The run of the agent that makes the move, when its token names one. */
+  readonly run?: RunRef | undefined;
   /** Who vouches for that agent: asked first when the move is `escalate`. */
   readonly sponsor?: UserId | undefined;
   readonly move: Move;

@@ -2,7 +2,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { type DeclareInput, type SubmitInput } from "@keeltown/core/application/coordination";
 import { FootprintEntry, Proposition } from "@keeltown/core/domain/coordination";
 import type { AgentToken } from "@keeltown/core/domain/identity";
-import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId, UserId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  ChangeId,
+  CommitSha,
+  LeaseId,
+  ProjectId,
+  RunRef,
+  UserId,
+} from "@keeltown/core/kernel";
 import { Changes, type WorkspaceGrant } from "@keeltown/core/ports";
 import { Effect, Fiber, type Layer, Schema } from "effect";
 
@@ -111,6 +119,25 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           });
           expect(result.workspace.token).not.toBe("");
           expect(result.preflight.suggestedMove).toBe("proceed");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[run.changes-port] a change declared under a token that names a run is held by that run, and one declared under none is held by none",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const run = Schema.decodeUnknownSync(RunRef)({ id: fresh("run"), label: "run-c" });
+          const held = yield* changes.declare(
+            { ...(yield* callerOf(harness)), run },
+            declaration(),
+          );
+          expect(held.change.run).toEqual(run);
+          const { run: _none, ...noRun } = yield* callerOf(harness);
+          const unheld = yield* changes.declare(noRun, declaration());
+          expect("run" in unheld.change).toBe(false);
         }).pipe(Effect.provide(harness.layer));
       },
     );

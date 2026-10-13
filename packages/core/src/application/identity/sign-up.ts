@@ -10,7 +10,7 @@ import {
   type PresentedKey,
   SignUpRefused,
 } from "../../domain/identity/index.ts";
-import { type AgentId, agentActor } from "../../domain/kernel/index.ts";
+import { type AgentId, byAgent } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   AgentSignUps,
@@ -54,7 +54,8 @@ export const signUp: (
         entity: { kind: "agent", id: agentId },
         cause: `sign-up:${command.key.jkt}`,
         fingerprint: command.key.jkt,
-        actor: agentActor(agentId),
+        // Signing up is the agent's own act, before it has a token and so before it has a run.
+        ...byAgent(agentId, undefined),
       },
       (tx) => {
         const stored = tx.store.get(AGENT, agentId);

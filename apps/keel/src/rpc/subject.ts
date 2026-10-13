@@ -12,7 +12,15 @@ import {
   World,
 } from "@keeltown/core/domain/verification";
 import { Move } from "@keeltown/core/domain/coordination";
-import { AgentId, ChangeId, ConflictId, ContentHash, ProbeId, UserId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  ChangeId,
+  ConflictId,
+  ContentHash,
+  ProbeId,
+  RunRef,
+  UserId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -66,6 +74,7 @@ export const ResolveCommand = Schema.Struct({
   conflictId: ConflictId,
   changeId: ChangeId,
   agentId: AgentId,
+  run: Schema.optional(RunRef),
   sponsor: Schema.optional(UserId),
   move: Move,
   note: Schema.optional(Schema.String),

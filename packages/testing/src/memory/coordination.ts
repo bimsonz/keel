@@ -377,6 +377,7 @@ export function makeChangesMemory(
             const change: Change = existing ?? {
               id: makeId("chg", sequentialId((sequence += 1))),
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               origin: "agent",
               state: "working",
               intent: {
@@ -472,9 +473,11 @@ export function makeChangesMemory(
                   },
                 ],
               });
+            const { run: _held, ...held } = change;
             const adopted: Change = {
-              ...change,
+              ...held,
               agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
               state:
                 change.state === "parked"
                   ? workspaces.has(changeId)

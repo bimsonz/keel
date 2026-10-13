@@ -30,6 +30,7 @@ import {
   LeaseId,
   NextAction,
   ProjectId,
+  RunRef,
   SketchId,
   UserId,
   VerdictId,
@@ -49,6 +50,8 @@ import { RepoRef, WorkspaceGrant } from "./workspace-pool.ts";
 export const DeclareCommand = Schema.Struct({
   changeId: ChangeId,
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   projectId: ProjectId,
   /** Absent means `agent`; the Auditor's revert declares through a platform path. */
   origin: ChangeOrigin.pipe(Schema.withDecodingDefaultKey(Effect.succeed("agent" as const))),
@@ -65,6 +68,8 @@ export type DeclareCommand = typeof DeclareCommand.Type;
 /** Submit a commit for a change. The lease is authorised in the DO alone; the key is the commit's cause. */
 export const SubmitCommand = Schema.Struct({
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   leaseId: LeaseId,
   commitSha: CommitSha,
   idempotencyKey: Schema.String,
@@ -74,6 +79,8 @@ export type SubmitCommand = typeof SubmitCommand.Type;
 /** Move a change onto trunk's head under its lease, after a textual bounce. */
 export const RebaseCommand = Schema.Struct({
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   leaseId: LeaseId,
   idempotencyKey: Schema.String,
 });
@@ -82,6 +89,8 @@ export type RebaseCommand = typeof RebaseCommand.Type;
 /** Revise a change's intent under its lease. `ifMatchRevision` is the revision the caller last read (If-Match). */
 export const ReviseCommand = Schema.Struct({
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   leaseId: LeaseId,
   ifMatchRevision: Schema.Int,
   goal: Schema.optional(Schema.NonEmptyString),
@@ -96,6 +105,8 @@ export type ReviseCommand = typeof ReviseCommand.Type;
 /** Add one premise to a change under its lease. */
 export const RelyCommand = Schema.Struct({
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   leaseId: LeaseId,
   premise: Proposition,
   idempotencyKey: Schema.String,
@@ -122,7 +133,11 @@ export type AwaitPlanCommand = typeof AwaitPlanCommand.Type;
  * maintainer of another project is answered ChangeNotFound.
  */
 export const WithdrawAuthority = Schema.Union([
-  Schema.TaggedStruct("Lease", { leaseId: LeaseId, agentId: AgentId }),
+  Schema.TaggedStruct("Lease", {
+    leaseId: LeaseId,
+    agentId: AgentId,
+    run: Schema.optional(RunRef),
+  }),
   Schema.TaggedStruct("Maintainer", { by: UserId, projectId: ProjectId }),
 ]);
 export type WithdrawAuthority = typeof WithdrawAuthority.Type;
@@ -142,6 +157,8 @@ export type AbandonCommand = typeof AbandonCommand.Type;
  */
 export const AdoptCommand = Schema.Struct({
   agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
   projectId: ProjectId,
   idempotencyKey: Schema.String,
 });

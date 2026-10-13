@@ -8,6 +8,7 @@ import {
   EscalationId,
   InstantSchema,
   LeaseId,
+  RunRef,
   SketchId,
   WorkspaceId,
 } from "../kernel/index.ts";
@@ -85,6 +86,8 @@ export const LEASE_TTL_MS = 15 * 60 * 1000;
 export const Change = Schema.Struct({
   id: ChangeId,
   agentId: AgentId,
+  /** The run of that agent which holds the change: the one that declared it, or last adopted it. */
+  run: Schema.optional(RunRef),
   origin: ChangeOrigin,
   state: ChangeState,
   parkReason: Schema.optional(ParkReason),

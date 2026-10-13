@@ -47,6 +47,9 @@ model EventRecord {
   /** Who caused the event. Absent when the platform did: Precheck, alarms, reactions, a landing. */
   actor?: EventActor;
 
+  /** The run of the agent that caused it, when its token named one: one agent has any number at once. */
+  run?: RunRef;
+
   /** The project the event belongs to. */
   project?: ProjectId;
 

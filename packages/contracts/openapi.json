@@ -8768,6 +8768,14 @@
           "agentId": {
             "$ref": "#/components/schemas/AgentId"
           },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The adopter's run, which holds the change from here; absent when the adopter's token named none."
+          },
           "leaseId": {
             "$ref": "#/components/schemas/LeaseId"
           },
@@ -12119,6 +12127,14 @@
             ],
             "description": "Who caused the event. Absent when the platform did: Precheck, alarms, reactions, a landing."
           },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The run of the agent that caused it, when its token named one: one agent has any number at once."
+          },
           "project": {
             "allOf": [
               {
@@ -12449,6 +12465,14 @@
           },
           "agentId": {
             "$ref": "#/components/schemas/AgentId"
+          },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The run of the agent that declared the change, when its token named one: the run that holds it."
           },
           "origin": {
             "$ref": "#/components/schemas/ChangeOrigin"
@@ -17578,6 +17602,34 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "RunId": {
+        "type": "string",
+        "pattern": "^run_[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "One stream of an agent's work. An agent may have any number at once."
+      },
+      "RunLabel": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+        "description": "What an agent calls one of its runs, such as `nightly-deps`: its own claim. Keel proves only that the run is the agent's."
+      },
+      "RunRef": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/RunId"
+          },
+          "label": {
+            "$ref": "#/components/schemas/RunLabel"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A run as an event, a change and a session name it: its id, and its label when the agent gave one."
       },
       "Scope": {
         "type": "string",

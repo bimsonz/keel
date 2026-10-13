@@ -1139,3 +1139,106 @@ describe("a conflict of the change put to a person", () => {
       ),
   );
 });
+
+describe("the run an agent's command names", () => {
+  const LANE = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0", label: "run-c" };
+  const OTHER = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V1", label: "run-b" };
+
+  /** Each event on the change, as who caused it and under which run. */
+  const caused = Effect.map(EventOutbox, (outbox) =>
+    outbox.log(changeRef).map((event) => ({
+      type: event.type,
+      actor: event.actor,
+      run: event.run,
+    })),
+  );
+
+  it.effect(
+    "[run.commands] declare, revise, submit and a withdrawal under the lease each name their run on every event they commit, and the platform's events name none",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring({ run: LANE }));
+        const leaseId = declared.change.lease.id;
+        expect(declared.change.run).toEqual(LANE);
+        yield* revise(
+          changeId,
+          Schema.decodeUnknownSync(ReviseCommand)({
+            agentId,
+            run: LANE,
+            leaseId,
+            ifMatchRevision: 1,
+            goal: "Revised by the same run",
+            premisesAdded: [],
+            premisesRetracted: [],
+            idempotencyKey: "revise-1",
+          }),
+        );
+        const sha = yield* pushToWorkspace;
+        yield* submit(
+          changeId,
+          Schema.decodeUnknownSync(SubmitCommand)({
+            agentId,
+            run: LANE,
+            leaseId,
+            commitSha: sha,
+            idempotencyKey: "submit-1",
+          }),
+        );
+        yield* abandon(
+          changeId,
+          Schema.decodeUnknownSync(AbandonCommand)({
+            authority: { _tag: "Lease", leaseId, agentId, run: LANE },
+            idempotencyKey: "abandon-1",
+          }),
+        );
+        const events = yield* caused;
+        const agents = events.filter((event) => event.actor === `agent:${agentId}`);
+        expect(new Set(agents.map((event) => event.type))).toEqual(
+          new Set([
+            "IntentDeclared",
+            "PreflightIssued",
+            "ChangeStarted",
+            "IntentRevised",
+            "ChangeSubmitted",
+            "ChangeWithdrawn",
+          ]),
+        );
+        expect(agents.filter((event) => event.run?.label !== "run-c")).toEqual([]);
+        expect(agents.every((event) => event.run?.id === LANE.id)).toBe(true);
+        expect(
+          events.filter((event) => event.actor === undefined && event.run !== undefined),
+        ).toEqual([]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[run.commands] a command of no run names none, and an adopted change is held by the adopter's run from its adoption on",
+    () => {
+      const { layer, clock } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        expect("run" in declared.change).toBe(false);
+        clock.advance(LEASE_TTL_MS);
+        const adopted = yield* adopt(
+          changeId,
+          Schema.decodeUnknownSync(AdoptCommand)({
+            agentId: adopterId,
+            run: OTHER,
+            projectId: sampleProjectId,
+            idempotencyKey: "adopt-1",
+          }),
+        ).pipe(Effect.map((answer) => answer.change));
+        expect(adopted.run).toEqual(OTHER);
+        const events = yield* caused;
+        expect(
+          events.filter((event) => event.actor === `agent:${agentId}`).map((event) => event.run),
+        ).toEqual([undefined, undefined, undefined]);
+        const adoption = events.filter((event) => event.type === "ChangeAdopted");
+        expect(adoption).toMatchObject([{ actor: `agent:${adopterId}`, run: OTHER }]);
+        expect((yield* getChange(changeId)).run).toEqual(OTHER);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});

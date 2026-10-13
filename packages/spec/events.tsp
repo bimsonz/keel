@@ -277,6 +277,9 @@ model IntentDeclared {
   _tag: "IntentDeclared";
   changeId: ChangeId;
   agentId: AgentId;
+
+  /** The run of the agent that declared the change, when its token named one: the run that holds it. */
+  run?: RunRef;
   origin: ChangeOrigin;
   sketchId?: SketchId;
   revision: integer;
@@ -532,6 +535,10 @@ model ChangeAdopted {
   changeId: ChangeId;
   previousAgentId: AgentId;
   agentId: AgentId;
+
+  /** The adopter's run, which holds the change from here; absent when the adopter's token named none. */
+  run?: RunRef;
+
   leaseId: LeaseId;
   briefRef: string;
 }

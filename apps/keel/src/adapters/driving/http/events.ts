@@ -95,6 +95,14 @@ function eventRecord(entry: EventFeedEntry) {
     seq: entry.seq,
     at: new Date(entry.at).toISOString(),
     ...(entry.actor === undefined ? {} : { actor: entry.actor }),
+    ...(entry.run === undefined
+      ? {}
+      : {
+          run: {
+            id: entry.run.id,
+            ...(entry.run.label === undefined ? {} : { label: entry.run.label }),
+          },
+        }),
     ...(entry.project === undefined ? {} : { project: entry.project }),
     ...(entry.label === undefined ? {} : { label: entry.label }),
     payload,

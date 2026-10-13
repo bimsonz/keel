@@ -9,8 +9,9 @@ import {
 } from "../../domain/identity/index.ts";
 import {
   type AgentId,
-  agentActor,
+  byAgent,
   type EventEnvelope,
+  type RunRef,
   type SessionId,
 } from "../../domain/kernel/index.ts";
 import { Session, SessionOpened } from "../../domain/memory/index.ts";
@@ -50,6 +51,8 @@ const decodeAgent = Schema.decodeUnknownSync(Agent);
 
 /** An agent's request to open a session, as the isolate sends it. */
 export interface OpenSessionCommand {
+  /** The run that opens the session, when the agent's token names one. */
+  readonly run?: RunRef | undefined;
   readonly harness?: string | undefined;
   readonly model?: string | undefined;
   readonly idempotencyKey: string;
@@ -88,7 +91,7 @@ export const openSession: (
       entity: { kind: "session", id: sessionId },
       cause: `session:${command.idempotencyKey}`,
       fingerprint: command.fingerprint,
-      actor: agentActor(agentId),
+      ...byAgent(agentId, command.run),
       // An agent that signed up by key has no project of its own, so its session names none.
       ...(projectId === undefined ? {} : { project: projectId }),
     },

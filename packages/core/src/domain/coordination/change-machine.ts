@@ -15,6 +15,7 @@ import {
   type Instant,
   type LeaseId,
   type NextAction,
+  type RunRef,
   type SketchId,
   type UserId,
   type VerdictId,
@@ -126,6 +127,7 @@ export type ChangeCommand =
       readonly _tag: "Declare";
       readonly changeId: ChangeId;
       readonly agentId: AgentId;
+      readonly run?: RunRef;
       readonly origin: ChangeOrigin;
       readonly sketchId?: SketchId;
       readonly goal: string;
@@ -223,6 +225,7 @@ export type ChangeCommand =
   | {
       readonly _tag: "Adopt";
       readonly agentId: AgentId;
+      readonly run?: RunRef;
       readonly leaseId: LeaseId;
       readonly briefRef: string;
     }
@@ -435,6 +438,7 @@ const declare = (command: Extract<ChangeCommand, { _tag: "Declare" }>): Decision
     IntentDeclared.make({
       changeId: command.changeId,
       agentId: command.agentId,
+      ...(command.run === undefined ? {} : { run: command.run }),
       origin: command.origin,
       ...(command.sketchId === undefined ? {} : { sketchId: command.sketchId }),
       revision: 1,
@@ -767,6 +771,7 @@ export const decideChange = (
           changeId: id,
           previousAgentId: change.agentId,
           agentId: command.agentId,
+          ...(command.run === undefined ? {} : { run: command.run }),
           leaseId: command.leaseId,
           briefRef: command.briefRef,
         }),
@@ -863,6 +868,7 @@ export const evolveChange = (
     return {
       id: event.changeId,
       agentId: event.agentId,
+      ...(event.run === undefined ? {} : { run: event.run }),
       origin: event.origin,
       state: "declared",
       intent: {
@@ -1007,9 +1013,12 @@ export const evolveChange = (
         : illegal(change, event);
     case "ChangeAdopted": {
       if (!isLapsed(change.lease, committed.at)) return illegal(change, event);
+      // The change is the adopter's run's from here, or no run's: never still the run that held it.
+      const { run: _held, ...held } = change;
       const adopted: Change = {
-        ...change,
+        ...held,
         agentId: event.agentId,
+        ...(event.run === undefined ? {} : { run: event.run }),
         lease: {
           id: event.leaseId,
           agentId: event.agentId,

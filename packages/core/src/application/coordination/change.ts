@@ -42,7 +42,7 @@ import {
 import {
   type Actor,
   type AgentId,
-  agentActor,
+  byAgent,
   userActor,
   type ChangeId,
   CommitSha,
@@ -59,6 +59,7 @@ import {
   type UserId,
   type VerdictId,
   WorkspaceId,
+  type RunRef,
 } from "../../domain/kernel/index.ts";
 import {
   ConflictEscalated,
@@ -224,6 +225,8 @@ export interface DeclareChange {
   /** The id the agent's AgentSession reserved for `idempotencyKey`. */
   readonly changeId: ChangeId;
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   readonly projectId: ProjectId;
   readonly origin: ChangeOrigin;
   readonly goal: string;
@@ -244,6 +247,8 @@ export interface DeclaredChange {
 
 export interface ReviseChange {
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
   readonly ifMatchRevision: number;
   readonly goal?: string | undefined;
@@ -262,6 +267,8 @@ export interface RevisedChange {
 /** Add one premise under the lease: a revision of one, and a subscription to its subject. */
 export interface RelyChange {
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
   readonly premise: Proposition;
   readonly idempotencyKey: string;
@@ -274,6 +281,8 @@ export interface NearbyChange {
 
 export interface SubmitChange {
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
   readonly commitSha: CommitSha;
   readonly idempotencyKey: string;
@@ -286,7 +295,12 @@ export interface SubmitChange {
  * is the change's.
  */
 export type Withdrawal =
-  | { readonly _tag: "Lease"; readonly leaseId: LeaseId; readonly agentId: AgentId }
+  | {
+      readonly _tag: "Lease";
+      readonly leaseId: LeaseId;
+      readonly agentId: AgentId;
+      readonly run?: RunRef | undefined;
+    }
   | { readonly _tag: "Maintainer"; readonly by: UserId; readonly projectId: ProjectId };
 
 export interface AbandonChange {
@@ -297,6 +311,8 @@ export interface AbandonChange {
 
 export interface RebaseChange {
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
   readonly idempotencyKey: string;
 }
@@ -310,6 +326,8 @@ export interface RebasedChange {
 
 export interface AdoptChange {
   readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
   /** The adopter's project, from its token. */
   readonly projectId: ProjectId;
   readonly idempotencyKey: string;
@@ -723,7 +741,7 @@ export const declare: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       project: command.projectId,
     },
     (tx) => {
@@ -746,6 +764,7 @@ export const declare: (
             _tag: "Declare",
             changeId,
             agentId: command.agentId,
+            ...(command.run === undefined ? {} : { run: command.run }),
             origin: command.origin,
             ...(command.sketchId === undefined ? {} : { sketchId: command.sketchId }),
             goal: command.goal,
@@ -807,7 +826,7 @@ export const revise: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("revise", command),
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       ...inProject(yield* EntityStore, changeId),
     },
     (tx) => {
@@ -869,7 +888,7 @@ export const rely: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("rely", command),
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       ...inProject(yield* EntityStore, changeId),
     },
     (tx) => {
@@ -975,7 +994,7 @@ export const submit: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("submit", command),
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       ...(held === undefined ? {} : { project: held.projectId }),
     },
     (tx) =>
@@ -1001,8 +1020,12 @@ export const submit: (
 });
 
 /** Who withdraws: the agent under its lease, or a maintainer by user id. */
-const withdrawnBy = ({ authority }: AbandonChange): Actor =>
-  authority._tag === "Maintainer" ? userActor(authority.by) : agentActor(authority.agentId);
+const withdrawnBy = ({
+  authority,
+}: AbandonChange): { readonly actor: Actor; readonly run?: RunRef } =>
+  authority._tag === "Maintainer"
+    ? { actor: userActor(authority.by) }
+    : byAgent(authority.agentId, authority.run);
 
 /**
  * Withdraws the change, under its lease or as a maintainer of its project. A
@@ -1022,7 +1045,7 @@ export const abandon: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("abandon", command),
-      actor: withdrawnBy(command),
+      ...withdrawnBy(command),
       ...inProject(yield* EntityStore, changeId),
     },
     (tx): Result.Result<Transition<Change>, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
@@ -1074,7 +1097,7 @@ export const adopt: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("adopt", command),
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       ...inProject(yield* EntityStore, changeId),
     },
     (
@@ -1095,6 +1118,7 @@ export const adopt: (
           {
             _tag: "Adopt",
             agentId: command.agentId,
+            ...(command.run === undefined ? {} : { run: command.run }),
             leaseId,
             // L1's brief is the change itself, as the adopter reads it.
             briefRef: `change:${changeId}@r${before?.intent.revision ?? 0}`,
@@ -1178,7 +1202,7 @@ export const rebase: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint,
-      actor: agentActor(command.agentId),
+      ...byAgent(command.agentId, command.run),
       project: held.projectId,
     },
     (tx) =>
