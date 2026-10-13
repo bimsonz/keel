@@ -221,6 +221,7 @@ const again = (title: string) => ({
 
 export function createProjectError(
   caller: Caller,
+  namespace: string,
   error: IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
 ): Operator_createProjectResult {
   switch (error._tag) {
@@ -230,7 +231,7 @@ export function createProjectError(
       return {
         status: 409,
         body: problem(409, "project.name_taken", caller.requestId, {
-          detail: `The org already has a project named "${error.name}", in some case.`,
+          detail: `${namespace} already has a project named "${error.name}", in some case.`,
           nextActions: [again("Choose another name")],
         }),
       };

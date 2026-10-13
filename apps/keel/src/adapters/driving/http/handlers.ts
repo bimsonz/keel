@@ -976,7 +976,9 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                     roleIn(caller.principal, target.namespace),
                   ),
                 ),
-                Effect.catch((error) => Effect.succeed(createProjectError(caller, error))),
+                Effect.catch((error) =>
+                  Effect.succeed(createProjectError(caller, input.namespace.toLowerCase(), error)),
+                ),
               );
             }),
           );

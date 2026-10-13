@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t "project.name-taken-names-place"
+# kills: project.name-taken-names-place
+# why: a name taken in a person's or an agent's own namespace is said to be an org's
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 9713d11a..dd300d29 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -231,7 +231,7 @@ export function createProjectError(
+       return {
+         status: 409,
+         body: problem(409, "project.name_taken", caller.requestId, {
+-          detail: `${namespace} already has a project named "${error.name}", in some case.`,
++          detail: `The org already has a project named "${error.name}", in some case.`,
+           nextActions: [again("Choose another name")],
+         }),
+       };

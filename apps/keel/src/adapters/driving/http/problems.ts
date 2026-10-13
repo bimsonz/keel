@@ -44,7 +44,7 @@ const TITLES: Record<ProblemCode, string> = {
   "repo.ref_not_found": "The project's trunk has no such branch or commit",
   "repo.path_not_found": "Nothing of that kind at this path",
   "agent.state_refused": "The agent's standing does not allow this",
-  "project.name_taken": "The org already has a project by that name",
+  "project.name_taken": "The namespace already has a project by that name",
   "project.import_refused": "Nothing was imported from that URL",
   "project.import_too_large": "The repository's history is larger than Keel imports",
   "quota.exceeded": "The namespace is at its quota",

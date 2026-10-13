@@ -4,6 +4,7 @@ import {
   CredentialRejected,
   IdempotencyConflict,
   type Principal,
+  ProjectNameTaken,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
 import type { Change } from "@keeltown/core/domain/coordination";
@@ -40,6 +41,7 @@ import { Layer, ManagedRuntime, Schema } from "effect";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
+import { createProjectError } from "../../src/adapters/driving/http/operator.ts";
 import { statusOk, submitError } from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
@@ -283,4 +285,30 @@ describe("a status read's next actions", () => {
       expect.objectContaining({ operationId: "adopt", args: { changeId: lapsed.id } }),
     ]);
   });
+});
+
+describe("a project's name that is taken", () => {
+  it.each([
+    { kind: "a person's own namespace", namespace: sampleSponsorId, handle: "ada" },
+    { kind: "an agent's own namespace", namespace: agentId, handle: "ada-builder" },
+    { kind: "an org", namespace: sampleOrgId, handle: "acme" },
+  ])(
+    "[project.name-taken-names-place] in $kind the refusal names the namespace by its handle",
+    ({ namespace, handle }) => {
+      const refused = createProjectError(
+        caller,
+        handle,
+        new ProjectNameTaken({ namespace, name: "notes" }),
+      );
+      expect([refused.status, refused.body]).toEqual([
+        409,
+        expect.objectContaining({
+          code: "project.name_taken",
+          title: "The namespace already has a project by that name",
+          detail: `${handle} already has a project named "notes", in some case.`,
+          nextActions: [expect.objectContaining({ operationId: "Operator_createProject" })],
+        }),
+      ]);
+    },
+  );
 });
