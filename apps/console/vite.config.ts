@@ -2,13 +2,15 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { type Plugin, defineConfig } from "vite";
 import { RESERVED_SEGMENTS } from "./src/contract/keel/index.ts";
+import { LEGAL } from "./src/legal/legal.ts";
 
 /**
- * The code viewer and the graph are files of their own, asked for by the pages that draw them
- * (src/views/later.tsx). Left to the page's first script, each would be asked for only once that script had
- * come and run. So the page's HTML asks at once, beside that script, going by the address alone: a file, a
- * commit and a conflict for the viewer, and Mission Control for the graph. It is a hint and no more: a wrong
- * one costs a download, and the page draws the same.
+ * The code viewer, the reader of Markdown and the graph are files of their own, asked for by the pages that
+ * draw them (src/views/later.tsx). Left to the page's first script, each would be asked for only once that
+ * script had come and run. So the page's HTML asks at once, beside that script, going by the address alone: a
+ * file, a commit and a conflict for the viewer, Mission Control for the graph, and a project's home, a
+ * directory and the two documents for the reader of Markdown. It is a hint and no more: a wrong one costs a
+ * download, and the page draws the same.
  */
 function early(): Plugin {
   return {
@@ -30,12 +32,16 @@ function early(): Plugin {
         };
         const hint = `(() => {
   const [first, project, place = ""] = location.pathname.split("/").filter((part) => part !== "");
-  if (project === undefined || ${JSON.stringify(RESERVED_SEGMENTS)}.includes(first)) return;
-  const files = ["mission-control", "subjects"].includes(place)
-    ? ${JSON.stringify(filesOf("MissionGraph"))}
-    : ["blob", "commit", "conflicts"].includes(place)
-      ? ${JSON.stringify(filesOf("CodeDiff"))}
-      : [];
+  const prose = ${JSON.stringify(filesOf("Markdown"))};
+  const text = project === undefined && ${JSON.stringify(Object.keys(LEGAL))}.includes(first);
+  if (!text && (project === undefined || ${JSON.stringify(RESERVED_SEGMENTS)}.includes(first))) return;
+  const files = text || ["", "tree"].includes(place)
+    ? prose
+    : ["mission-control", "subjects"].includes(place)
+      ? ${JSON.stringify(filesOf("MissionGraph"))}
+      : ["blob", "commit", "conflicts"].includes(place)
+        ? ${JSON.stringify(filesOf("CodeDiff"))}
+        : [];
   for (const file of files) {
     const link = document.createElement("link");
     link.rel = "modulepreload";

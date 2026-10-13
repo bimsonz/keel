@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.directory
+# why: a README in a directory is said to be at the root, so its links are counted from there
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..29c24f77 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -22,7 +22,7 @@ export function readmeAmong<Entry extends { kind: string; name: string }>(
+ /** The directory a file is in, from the repository's root: "" for a file at the root. */
+ export function directoryOf(path: string): string {
+   const cut = path.lastIndexOf("/");
+-  return cut === -1 ? "" : path.slice(0, cut);
++  return "";
+ }
+ 
+ /**

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.link-up
+# why: a link that climbs out of the repository is led to a path inside it
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..e2b71ed4 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -78,7 +78,7 @@ export function targetOf(href: string, dir: string): Target {
+   for (const part of written.split("/")) {
+     if (part === "" || part === ".") continue;
+     if (part !== "..") parts.push(plain(part));
+-    else if (parts.pop() === undefined) return { to: "nowhere" };
++    else parts.pop();
+   }
+   const path = parts.join("/");
+   return { to: "path", kind: path === "" || written.endsWith("/") ? "tree" : "blob", path };

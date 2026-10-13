@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.name
+# why: a README with no ending is shown before the README.md beside it
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..493471f0 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -4,7 +4,7 @@
+  * The names a README goes by. The first of them that a directory holds is the one shown, and letter case is
+  * not told apart: `readme.md` is `README.md`.
+  */
+-const NAMES = ["readme.md", "readme.markdown", "readme"] as const;
++const NAMES = ["readme", "readme.markdown", "readme.md"] as const;
+ 
+ /** The README among a directory's entries, if it holds one. A directory by one of the names is not one. */
+ export function readmeAmong<Entry extends { kind: string; name: string }>(

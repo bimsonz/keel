@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.link-elsewhere
+# why: an address whose scheme is in capitals is read as a path in the repository
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..b91718b3 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -43,7 +43,7 @@ export type Target =
+   | { to: "nowhere" };
+ 
+ /** An address that names where it is by itself: one with a scheme, or one that opens with a host. */
+-const NAMED = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
++const NAMED = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/;
+ 
+ /**
+  * The only such addresses a text leads to: a page on the web, and an address to write to. Any other scheme is

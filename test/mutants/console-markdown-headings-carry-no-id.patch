@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.anchored
+# why: no heading has an id, so no link reaches one
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..328a423b 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -88,7 +88,6 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+       <Place.Provider value={within}>
+         <ReactMarkdown
+           remarkPlugins={[remarkGfm]}
+-          rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
+           components={PARTS}
+         >
+           {source}

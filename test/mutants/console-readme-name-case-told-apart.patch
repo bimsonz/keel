@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.case
+# why: a README is one only when its name is in lower case
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..2db3a073 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -12,7 +12,7 @@ export function readmeAmong<Entry extends { kind: string; name: string }>(
+ ): Entry | undefined {
+   for (const name of NAMES) {
+     const found = entries.find(
+-      (entry) => entry.kind === "blob" && entry.name.toLowerCase() === name,
++      (entry) => entry.kind === "blob" && entry.name === name,
+     );
+     if (found !== undefined) return found;
+   }

@@ -8,6 +8,7 @@ import type { RepoBlob, RepoCommit, RepoCommitDiff, RepoTree } from "../contract
 import type { RepoNote } from "../contract/provisional.ts";
 import { type KeelRepository, NO_SUCH_PROJECT, RepoRefused } from "../source/repository.ts";
 import type { Visibility } from "./projects.ts";
+import { readmeAmong } from "./readme.ts";
 import type { World } from "./world.ts";
 
 /** Where in the repository the view is: among its files, or in its history. */
@@ -187,9 +188,7 @@ export class RepositoryReader {
       this.absent.add(key);
     });
     // A directory's README is shown beneath it.
-    const readme = this.trees
-      .get(key)
-      ?.entries.find((entry) => entry.kind === "blob" && /^readme\.md$/i.test(entry.name));
+    const readme = readmeAmong(this.trees.get(key)?.entries ?? []);
     if (readme === undefined) return;
     const beneath = this.keyOf(ref, readme.path);
     this.#once(`readme ${beneath}`, async () => {
@@ -385,9 +384,7 @@ function viewOf(
       kind: entry.kind,
       path: entry.path,
     }));
-    const named = entries.find(
-      (entry) => entry.kind === "blob" && /^readme\.md$/i.test(entry.name),
-    );
+    const named = readmeAmong(entries);
     const readme =
       named === undefined ? undefined : reader.blobs.get(reader.keyOf(ref, named.path));
     return {

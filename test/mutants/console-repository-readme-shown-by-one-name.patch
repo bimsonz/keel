@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/repository.test.ts
+# kills: repository.readme
+# why: a README by another of the names is read and never shown
+diff --git a/apps/console/src/engine/repository.ts b/apps/console/src/engine/repository.ts
+index 8a253b54..af9fa78a 100644
+--- a/apps/console/src/engine/repository.ts
++++ b/apps/console/src/engine/repository.ts
+@@ -384,7 +384,7 @@ function viewOf(
+       kind: entry.kind,
+       path: entry.path,
+     }));
+-    const named = readmeAmong(entries);
++    const named = entries.find((entry) => entry.name === "README.md");
+     const readme =
+       named === undefined ? undefined : reader.blobs.get(reader.keyOf(ref, named.path));
+     return {

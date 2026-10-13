@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.file
+# why: a directory called README is asked for as a file
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..24be7184 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -12,7 +12,7 @@ export function readmeAmong<Entry extends { kind: string; name: string }>(
+ ): Entry | undefined {
+   for (const name of NAMES) {
+     const found = entries.find(
+-      (entry) => entry.kind === "blob" && entry.name.toLowerCase() === name,
++      (entry) => entry.name.toLowerCase() === name,
+     );
+     if (found !== undefined) return found;
+   }

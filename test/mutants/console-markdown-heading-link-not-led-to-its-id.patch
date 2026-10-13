@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.anchored
+# why: a link to a heading is left at the words the README wrote, which is not the id the heading has
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..8b62cc33 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -31,7 +31,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {
+   const target = targetOf(href, within?.dir ?? "");
+   switch (target.to) {
+     case "heading": {
+-      const id = target.id.startsWith(ANCHOR) ? target.id : `${ANCHOR}${target.id}`;
++      const id = target.id;
+       return <a href={`#${id}`}>{children}</a>;
+     }
+     case "path":

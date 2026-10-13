@@ -18,14 +18,16 @@ export interface Landing {
 
 const README = `# demo
 
+![build: passing](https://img.example.invalid/build.svg)
+
 A small service with repositories, collaborators and permissions. It is the
-codebase the Keel scenarios change.
+codebase the Keel scenarios change. How to [run it](#run) is below.
 
 ## Layout
 
 - \`src/authz\`: who may do what. \`requirePermission\` is the one way in.
 - \`src/collaborators\`: adding and removing the people on a repository.
-- \`src/http.ts\`: the request, the session and the routes' plumbing.
+- [\`src/http.ts\`](src/http.ts): the request, the session and the routes' plumbing.
 
 ## Run
 
@@ -36,6 +38,10 @@ pnpm test
 
 Every request passes through \`requirePermission\`. What it promises about how
 fresh a permission is, other code relies on.
+
+<script>window.readmeRan = "a script"</script>
+
+<img src="https://img.example.invalid/pixel.png" onerror="window.readmeRan = 'an image'">
 `;
 
 const PACKAGE = `{

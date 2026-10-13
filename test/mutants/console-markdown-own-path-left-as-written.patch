@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.within
+# why: a README's link to a file beside it is left as written, which is no page of the project
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..07b31b70 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -36,7 +36,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {
+     }
+     case "path":
+       // A text in no repository has no pages of a repository to lead to: its address is the site's own.
+-      return within === undefined ? <a href={href}>{children}</a> : within.link(target, children);
++      return <a href={href}>{children}</a>;
+     case "elsewhere":
+       // Another site's page opens apart, and is not told where its reader came from. An address that is no
+       // page, as one to write to is, opens nothing of its own.

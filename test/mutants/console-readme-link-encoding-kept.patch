@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.link-plain
+# why: a path is named as the address encoded it, which is not the file's name
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..d4442a52 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -77,7 +77,7 @@ export function targetOf(href: string, dir: string): Target {
+   const parts = written.startsWith("/") || dir === "" ? [] : dir.split("/");
+   for (const part of written.split("/")) {
+     if (part === "" || part === ".") continue;
+-    if (part !== "..") parts.push(plain(part));
++    if (part !== "..") parts.push(part);
+     else if (parts.pop() === undefined) return { to: "nowhere" };
+   }
+   const path = parts.join("/");

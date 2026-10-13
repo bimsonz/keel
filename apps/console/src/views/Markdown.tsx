@@ -1,84 +1,99 @@
-// A README, drawn from the blocks it was read into. Every piece is an
-// element built here: nothing in the source is ever handed to the browser
-// as markup.
+// A README or a document, drawn from its Markdown. Every piece on the page is an element built from the text
+// as it was read: nothing in the source is ever handed to the browser as markup. Nothing here reads HTML, so
+// HTML written in the source is shown as the text it is and none of it is run, and the reader's own rule for
+// addresses is kept, which empties a `javascript:` address and its like.
 
-import type { ReactNode } from "react";
-import { type Block, type Inline, markdown } from "../engine/markdown.ts";
+import { type ReactNode, createContext, useContext } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeSlug from "rehype-slug";
+import remarkGfm from "remark-gfm";
+import { ANCHOR, targetOf } from "../engine/readme.ts";
 
-function spans(of: Inline[]): ReactNode {
-  return of.map((part, index) => {
-    // oxlint-disable-next-line react/no-array-index-key -- the pieces of a line are known by their place in it
-    const key = index;
-    if (part.kind === "text") return part.text;
-    if (part.kind === "code") return <code key={key}>{part.text}</code>;
-    if (part.kind === "strong") return <strong key={key}>{spans(part.of)}</strong>;
-    if (part.kind === "emphasis") return <em key={key}>{spans(part.of)}</em>;
-    return (
-      <a key={key} href={part.href} target="_blank" rel="noreferrer">
-        {spans(part.of)}
-      </a>
-    );
-  });
+/** Where a text is in its repository, for the page that knows the repository's addresses. */
+export interface Within {
+  /** The directory the text is in, from the repository's root: "" at the root. */
+  dir: string;
+  /** A link to a file or a directory of the repository, drawn by the page. */
+  link: (to: { kind: "tree" | "blob"; path: string }, children: ReactNode) => ReactNode;
 }
 
-function block(piece: Block, key: number): ReactNode {
-  switch (piece.kind) {
+const Place = createContext<Within | undefined>(undefined);
+
+/** True beneath a link: what is drawn there is the link's words, and never a second link inside it. */
+const Linked = createContext(false);
+
+/** An address of a page on another site. */
+const PAGE = /^(?:https?:)?\/\//i;
+
+/** An address as the text wrote it, led to where it goes. One that leads nowhere is its words alone. */
+function Lead({ href, children }: { href: string; children: ReactNode }) {
+  const within = useContext(Place);
+  const target = targetOf(href, within?.dir ?? "");
+  switch (target.to) {
     case "heading": {
-      const Tag = (["h1", "h2", "h3", "h4", "h5", "h6"] as const)[piece.level - 1] ?? "h6";
-      return <Tag key={key}>{spans(piece.of)}</Tag>;
+      const id = target.id.startsWith(ANCHOR) ? target.id : `${ANCHOR}${target.id}`;
+      return <a href={`#${id}`}>{children}</a>;
     }
-    case "paragraph":
-      return <p key={key}>{spans(piece.of)}</p>;
-    case "code":
-      return (
-        <pre key={key}>
-          <code>{piece.text}</code>
-        </pre>
-      );
-    case "list": {
-      const items = piece.items.map((item, index) => (
-        // oxlint-disable-next-line react/no-array-index-key -- a list's items are known by their place in it
-        <li key={index}>{spans(item)}</li>
-      ));
-      return piece.ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>;
-    }
-    case "quote":
-      return <blockquote key={key}>{spans(piece.of)}</blockquote>;
-    case "table":
-      return (
-        <div key={key} className="a-prose-table">
-          <table>
-            <thead>
-              <tr>
-                {piece.head.map((cell, column) => (
-                  // oxlint-disable-next-line react/no-array-index-key -- a cell is known by its place in the row
-                  <th key={column} scope="col">
-                    {spans(cell)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {piece.rows.map((row, at) => (
-                // oxlint-disable-next-line react/no-array-index-key -- a row is known by its place in the table
-                <tr key={at}>
-                  {row.map((cell, column) => (
-                    // oxlint-disable-next-line react/no-array-index-key -- a cell is known by its place in the row
-                    <td key={column}>{spans(cell)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    case "path":
+      // A text in no repository has no pages of a repository to lead to: its address is the site's own.
+      return within === undefined ? <a href={href}>{children}</a> : within.link(target, children);
+    case "elsewhere":
+      // Another site's page opens apart, and is not told where its reader came from. An address that is no
+      // page, as one to write to is, opens nothing of its own.
+      return PAGE.test(target.href) ? (
+        <a href={target.href} target="_blank" rel="noreferrer">
+          {children}
+        </a>
+      ) : (
+        <a href={target.href}>{children}</a>
       );
     default:
-      return <hr key={key} />;
+      return children;
   }
 }
 
-export function Markdown({ source }: { source: string }) {
+const PARTS: Components = {
+  a: function Anchor({ href, children }) {
+    return (
+      <Linked.Provider value>
+        <Lead href={href ?? ""}>{children}</Lead>
+      </Linked.Provider>
+    );
+  },
+  // An image is a link by its own words and is never fetched: one from elsewhere would tell that host who is
+  // reading, and Keel serves no file of a repository as an image.
+  img: function Image({ src, alt }) {
+    const words = alt === undefined || alt === "" ? (src ?? "") : alt;
+    return useContext(Linked) ? words : <Lead href={src ?? ""}>{words}</Lead>;
+  },
+  table: function Table({ children }) {
+    return (
+      <div className="a-prose-table">
+        <table>{children}</table>
+      </div>
+    );
+  },
+  th: function Head({ children, style }) {
+    return (
+      <th scope="col" style={style}>
+        {children}
+      </th>
+    );
+  },
+};
+
+export function Markdown({ source, within }: { source: string; within?: Within }) {
   return (
-    <div className="a-prose">{markdown(source).map((piece, index) => block(piece, index))}</div>
+    <div className="a-prose">
+      <Place.Provider value={within}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
+          components={PARTS}
+        >
+          {source}
+        </ReactMarkdown>
+      </Place.Provider>
+    </div>
   );
 }

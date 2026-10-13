@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.elsewhere
+# why: an address to write to opens an empty page
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..99c789e6 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -23,7 +23,7 @@ const Place = createContext<Within | undefined>(undefined);
+ const Linked = createContext(false);
+ 
+ /** An address of a page on another site. */
+-const PAGE = /^(?:https?:)?\/\//i;
++const PAGE = /^/;
+ 
+ /** An address as the text wrote it, led to where it goes. One that leads nowhere is its words alone. */
+ function Lead({ href, children }: { href: string; children: ReactNode }) {

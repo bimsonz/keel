@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts apps/console/test/unit/legal.test.ts
+# kills: markdown.table, legal.read
+# why: a table is left as lines of bars, in a README and in the privacy notice
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..8c464942 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -87,7 +87,6 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+     <div className="a-prose">
+       <Place.Provider value={within}>
+         <ReactMarkdown
+-          remarkPlugins={[remarkGfm]}
+           rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
+           components={PARTS}
+         >

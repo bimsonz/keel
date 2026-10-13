@@ -14,7 +14,7 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { CodeDiff, CodeFile, type LineNote } from "./later.tsx";
+import { CodeDiff, CodeFile, type LineNote, Markdown } from "./later.tsx";
 import type {
   BrowserEntry,
   CommitRow,
@@ -22,13 +22,14 @@ import type {
   RepositoryState,
   RepositoryView,
 } from "../engine/repository.ts";
+import { directoryOf } from "../engine/readme.ts";
 import { TRUNK } from "../route.ts";
 import { Link } from "../router.tsx";
 import type { RepoNote } from "../contract/provisional.ts";
 import type { Mode } from "../theme/mode.ts";
 import { Notice } from "./Frame.tsx";
-import { Markdown } from "./Markdown.tsx";
 import { ChangeLink } from "./links.tsx";
+import type { Within } from "./Markdown.tsx";
 import { Unverified, clockTime } from "./parts.tsx";
 
 type Ready = Extract<RepositoryState, { status: "ready" }>;
@@ -232,6 +233,16 @@ function Latest({ state, at }: { state: Ready; at: string }) {
   );
 }
 
+/**
+ * A README's link to a file or a directory of its own repository: this project's page of it, read where the
+ * README is read, at the ref shown.
+ */
+const inRepository =
+  (at: string): Within["link"] =>
+  (to, children) => (
+    <Link to={{ at: "code", kind: to.kind, ref: at, path: to.path }}>{children}</Link>
+  );
+
 function Tree({
   view,
   at,
@@ -274,7 +285,10 @@ function Tree({
             <h2 className="a-h a-mono">{view.readme.path}</h2>
           </header>
           <div className="px-6 py-5">
-            <Markdown source={view.readme.content} />
+            <Markdown
+              source={view.readme.content}
+              within={{ dir: directoryOf(view.readme.path), link: inRepository(at) }}
+            />
           </div>
         </section>
       )}

@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.no-html
+# why: the source is handed to the browser as markup, so the HTML in a README is elements and its handlers run
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..06fdd91b 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -86,13 +86,7 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+   return (
+     <div className="a-prose">
+       <Place.Provider value={within}>
+-        <ReactMarkdown
+-          remarkPlugins={[remarkGfm]}
+-          rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
+-          components={PARTS}
+-        >
+-          {source}
+-        </ReactMarkdown>
++        <div dangerouslySetInnerHTML={{ __html: source }} />
+       </Place.Provider>
+     </div>
+   );

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.code
+# why: a fenced block of code is not drawn
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..2d782b19 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -53,6 +53,9 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {
+ }
+ 
+ const PARTS: Components = {
++  pre: function Pre() {
++    return null;
++  },
+   a: function Anchor({ href, children }) {
+     return (
+       <Linked.Provider value>

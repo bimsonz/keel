@@ -24,6 +24,9 @@
     "better-auth": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-markdown": "catalog:",
+    "rehype-slug": "catalog:",
+    "remark-gfm": "catalog:",
     "uqr": "catalog:"
   },
   "devDependencies": {

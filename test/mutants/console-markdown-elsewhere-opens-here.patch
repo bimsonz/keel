@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.elsewhere
+# why: another site's page replaces the project's
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..ccdf44fe 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -41,7 +41,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {
+       // Another site's page opens apart, and is not told where its reader came from. An address that is no
+       // page, as one to write to is, opens nothing of its own.
+       return PAGE.test(target.href) ? (
+-        <a href={target.href} target="_blank" rel="noreferrer">
++        <a href={target.href} rel="noreferrer">
+           {children}
+         </a>
+       ) : (

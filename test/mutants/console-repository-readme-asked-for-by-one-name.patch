@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/repository.test.ts
+# kills: repository.readme
+# why: a README by another of the names is never asked for
+diff --git a/apps/console/src/engine/repository.ts b/apps/console/src/engine/repository.ts
+index 8a253b54..fe9122e4 100644
+--- a/apps/console/src/engine/repository.ts
++++ b/apps/console/src/engine/repository.ts
+@@ -188,7 +188,7 @@ export class RepositoryReader {
+       this.absent.add(key);
+     });
+     // A directory's README is shown beneath it.
+-    const readme = readmeAmong(this.trees.get(key)?.entries ?? []);
++    const readme = this.trees.get(key)?.entries.find((entry) => entry.name === "README.md");
+     if (readme === undefined) return;
+     const beneath = this.keyOf(ref, readme.path);
+     this.#once(`readme ${beneath}`, async () => {

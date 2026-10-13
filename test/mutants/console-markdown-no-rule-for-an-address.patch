@@ -1,0 +1,28 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/markdown.test.ts
+# kills: markdown.address
+# why: neither the reader's rule for an address nor the console's own is kept, so a link that runs a script is drawn
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..a917f537 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -72,7 +72,7 @@ export function targetOf(href: string, dir: string): Target {
+     const id = plain(href.slice(1)).toLowerCase();
+     return id === "" ? { to: "nowhere" } : { to: "heading", id };
+   }
+-  if (NAMED.test(href)) return LED.test(href) ? { to: "elsewhere", href } : { to: "nowhere" };
++  if (NAMED.test(href)) return { to: "elsewhere", href };
+   const written = href.split(/[?#]/, 1)[0] ?? "";
+   const parts = written.startsWith("/") || dir === "" ? [] : dir.split("/");
+   for (const part of written.split("/")) {
+diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
+index 27c3cc16..324998db 100644
+--- a/apps/console/src/views/Markdown.tsx
++++ b/apps/console/src/views/Markdown.tsx
+@@ -90,6 +90,7 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+           remarkPlugins={[remarkGfm]}
+           rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
+           components={PARTS}
++          urlTransform={(url) => url}
+         >
+           {source}
+         </ReactMarkdown>

@@ -103,6 +103,41 @@ describe("the repository view", () => {
     );
   });
 
+  it.each(["README", "readme.markdown", "ReadMe.MD"])(
+    "[repository.readme] reads the README beneath a directory by whichever of its names it has: %s",
+    async (name) => {
+      const source = createMockSource({ scenario: "s1", seed: 42 });
+      const asked: string[] = [];
+      // The same repository, with its README under another of the names.
+      const renamed: typeof source = {
+        ...source,
+        getTree: async (id, at) => {
+          const tree = await source.getTree(id, at);
+          return {
+            ...tree,
+            entries: tree.entries.map((entry) =>
+              entry.path === "README.md" ? { ...entry, name, path: name } : entry,
+            ),
+          };
+        },
+        getBlob: (id, at) => {
+          asked.push(at.path);
+          return source.getBlob(id, at.path === name ? { ...at, path: "README.md" } : at);
+        },
+      };
+      const player = showing(renamed);
+      await player.load();
+      player.seek(700_000);
+      const state = ready(await shown(player, { view: "code", path: "" }));
+      // It is asked for by its own name, and shown under it.
+      expect(asked).toEqual([name]);
+      expect(state.view.kind === "tree" && state.view.readme?.path).toBe(name);
+      expect(state.view.kind === "tree" && state.view.readme?.content.startsWith("# demo")).toBe(
+        true,
+      );
+    },
+  );
+
   it("shows a file with the reasons beside its lines, and the way back up", async () => {
     const player = await playerAt("s1", 700);
     const state = ready(await shown(player, { view: "code", path: "src/authz/cache.ts" }));

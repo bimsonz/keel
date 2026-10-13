@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Footer } from "../views/Footer.tsx";
-import { Markdown } from "../views/Markdown.tsx";
+import { Markdown } from "../views/later.tsx";
 import { TEXT } from "./documents.ts";
 import { LEGAL, type Legal } from "./legal.ts";
 

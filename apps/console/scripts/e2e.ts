@@ -819,6 +819,12 @@ expectEqual(
 );
 
 // The code: the project's files with its README beneath, a file with the reasons beside its lines, and trunk's history.
+// What the page asks of the host a README's images are on: nothing, whatever the README says.
+const imagesAsked: string[] = [];
+const noteImage = (request: { url(): string }): void => {
+  if (new URL(request.url()).hostname === "img.example.invalid") imagesAsked.push(request.url());
+};
+page.on("request", noteImage);
 await page.goto(at("", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.locator(".a-prose h2").first().waitFor();
 // Keel serves no clone address yet, and the console makes none up.
@@ -833,6 +839,53 @@ expectEqual(
   (await page.locator(".a-prose h2").allInnerTexts()).join(" | "),
   "Layout | Run",
 );
+// The README is drawn as a code host draws one: what it names in its own repository is this project's page of
+// it, a heading can be led to, and nothing written in it is run or fetched.
+const readme = page.getByRole("region", { name: "README.md" });
+expectEqual(
+  "code: a README's code block, as written",
+  (await readme.locator("pre code").allInnerTexts()).map(squash).join(" | "),
+  "pnpm install pnpm test",
+);
+expectEqual(
+  "code: a link in a README to a file beside it is this project's page of that file",
+  (await readme
+    .getByRole("link", { name: "src/http.ts" })
+    .getAttribute("href", { timeout: 2000 })
+    .catch(() => null)) ?? "no link",
+  "/acme/demo/blob/trunk/src/http.ts?scenario=s1&t=700&play=0",
+);
+expectEqual(
+  "code: an image in a README is a link by its words, and nothing is asked of its host",
+  [
+    `${await readme.locator("img").count()} drawn`,
+    (await readme
+      .getByRole("link", { name: "build: passing" })
+      .getAttribute("href", { timeout: 2000 })
+      .catch(() => null)) ?? "no link",
+    `${imagesAsked.length} asked for`,
+  ].join(" | "),
+  "0 drawn | https://img.example.invalid/build.svg | 0 asked for",
+);
+expectEqual(
+  "code: HTML written in a README is shown as text, and none of it is run",
+  [
+    `${await readme.locator("script").count()} scripts`,
+    `${await readme.getByText('<script>window.readmeRan = "a script"</script>').count()} shown as text`,
+    `ran: ${await page.evaluate(() => ("readmeRan" in window ? String(window.readmeRan) : "nothing"))}`,
+  ].join(" | "),
+  "0 scripts | 1 shown as text | ran: nothing",
+);
+await readme
+  .getByRole("link", { name: "run it" })
+  .click({ timeout: 5000 })
+  .catch(() => {});
+expectEqual(
+  "code: a link in a README to one of its headings reaches that heading",
+  `${new URL(page.url()).hash} | ${await page.evaluate(() => document.querySelector(":target")?.textContent ?? "no heading")}`,
+  "#user-content-run | Run",
+);
+page.off("request", noteImage);
 const tree = page.getByRole("navigation", { name: "File tree" });
 // The root is the whole list of files already, so nothing stands beside it.
 expectEqual("code: no list of files beside the root", String(await tree.count()), "0");
@@ -2461,11 +2514,15 @@ await asDeployed(street, { keel: staffed, sent: staffSent });
 await visitor.goto(`${built}/ada/demo/agents`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { level: 1, name: "Agents" }).waitFor();
 // Each name arrives with its agent's card: both are waited for, or ten seconds, and the check says which.
-await visitor
-  .getByRole("list", { name: AGENTS })
-  .getByText("declared as interactive")
-  .waitFor({ timeout: 10_000 })
-  .catch(() => undefined);
+for (const carded of ["declared as interactive", "tidy-otter"]) {
+  // oxlint-disable-next-line no-await-in-loop -- one card is waited for after the other, on the one page
+  await visitor
+    .getByRole("list", { name: AGENTS })
+    .getByText(carded)
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+}
 expectEqual(
   "visitor: a project's agents are named from Keel's cards: a handle where one signed itself up, a declared kind where one was enrolled",
   await agentRows(visitor),
@@ -4411,6 +4468,11 @@ await reading
   .click({ timeout: 5000 })
   .catch(() => {});
 await reading.waitForURL("**/privacy", { timeout: 5000 }).catch(() => {});
+// The document is drawn by a file of its own, asked for once the page knows it is drawing one.
+await reading
+  .locator("article h1")
+  .waitFor({ timeout: 5000 })
+  .catch(() => {});
 expectEqual(
   "legal: and from there the foot leads to the document",
   `${whereOf(reading)} ${squash((await reading.locator("article h1").allInnerTexts()).join(" "))}`,

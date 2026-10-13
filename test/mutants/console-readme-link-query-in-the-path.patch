@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/readme.test.ts
+# kills: readme.link-plain
+# why: what follows a ? in a link is read as part of the file's name
+diff --git a/apps/console/src/engine/readme.ts b/apps/console/src/engine/readme.ts
+index f5bbfa5f..3263ea3e 100644
+--- a/apps/console/src/engine/readme.ts
++++ b/apps/console/src/engine/readme.ts
+@@ -73,7 +73,7 @@ export function targetOf(href: string, dir: string): Target {
+     return id === "" ? { to: "nowhere" } : { to: "heading", id };
+   }
+   if (NAMED.test(href)) return LED.test(href) ? { to: "elsewhere", href } : { to: "nowhere" };
+-  const written = href.split(/[?#]/, 1)[0] ?? "";
++  const written = href.split("#", 1)[0] ?? "";
+   const parts = written.startsWith("/") || dir === "" ? [] : dir.split("/");
+   for (const part of written.split("/")) {
+     if (part === "" || part === ".") continue;
