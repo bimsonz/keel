@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.calls
+# why: every invitation rides one key, so a second is answered as the first
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 7807f0ec..25ba5deb 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -270,7 +270,7 @@ export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
+         ...body
+       }: Namespaces_inviteAgentInput = {
+         handle: org,
+-        "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
++        "idempotency-key": "console:invite-agent:the-same-key",
+         agent,
+         scopes: [...scopes],
+       };

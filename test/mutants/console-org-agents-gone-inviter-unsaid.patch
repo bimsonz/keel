@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.whose
+# why: a row whose inviter has left says nothing of it, though Keel's gate lets the agent do nothing there
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..5f8376cb 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -39,8 +39,7 @@ export function standingOf(agent: NamespaceAgent): string {
+ export function inviterOf(agent: NamespaceAgent, members: readonly Member[]): string {
+   if (agent.invitedBy === undefined) return "";
+   const inviter = members.find((member) => member.userId === agent.invitedBy);
+-  if (inviter === undefined)
+-    return "invited by someone who is no longer a member, so it cannot act here";
++  if (inviter === undefined) return "";
+   return inviter.you ? "invited by you" : `invited by ${inviter.handle ?? inviter.name}`;
+ }
+ 

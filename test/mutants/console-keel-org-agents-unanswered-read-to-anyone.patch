@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.read
+# why: the stand-in reads a visitor the invitations nobody has answered, which Keel reads its members alone
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..277547b4 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -650,7 +650,7 @@ export function createFakeKeel(
+           const members = kind === "org" && role !== undefined;
+           return Response.json({
+             items: [...rows.values()]
+-              .filter((row) => members || row.state === "joined")
++              .filter(() => true)
+               .map((row) => rowOf(row, members)),
+           } satisfies NamespaceAgents);
+         }

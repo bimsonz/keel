@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.calls
+# why: the invitation leaves out the scopes chosen, so Keel gives its default of both
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 7807f0ec..10621914 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -272,7 +272,6 @@ export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
+         handle: org,
+         "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
+         agent,
+-        scopes: [...scopes],
+       };
+       const response = await request(`${origin}${agentsAt(handle)}`, {
+         method: "POST",

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in looks for an agent by what could be no handle, where Keel's validators refuse it first
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..f5416c61 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -668,7 +668,6 @@ export function createFakeKeel(
+           if (
+             inviting &&
+             (typeof named !== "string" ||
+-              !AGENT_HANDLE.test(named) ||
+               !Array.isArray(asked) ||
+               asked.length < 1 ||
+               asked.length > 2 ||

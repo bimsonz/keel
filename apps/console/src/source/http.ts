@@ -29,7 +29,12 @@ import type {
   EventRecord,
   Inbox_listEventsInput,
   LatticeSet,
+  NamespaceAgent,
+  NamespaceAgents,
   NamespaceView,
+  Namespaces_inviteAgentInput,
+  Namespaces_listAgentsInput,
+  Namespaces_removeAgentInput,
   Operator_giveRulingInput,
   Operator_listEscalationsInput,
   Operator_putSettingsInput,
@@ -56,6 +61,7 @@ import {
   type KeelAgents,
   type KeelCommands,
   type KeelDirectory,
+  type KeelOrgAgents,
   type KeelSponsorship,
   type KeelEventSource,
   KeelRefused,
@@ -234,6 +240,64 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
         "idempotency-key": `console:end:${crypto.randomUUID()}`,
       };
       return moved("DELETE", `${encodeURIComponent(named)}/sponsor`, key);
+    },
+  };
+}
+
+/** Where Keel keeps an org's agents. */
+const agentsAt = (org: string): string => `/v1/namespaces/${encodeURIComponent(org)}/agents`;
+
+/**
+ * The agents in an org: Keel's own three operations at their own addresses. An invitation names the agent and
+ * what it is given in its body; a removal names the agent in its path. Each carries a key made for the one
+ * attempt and nothing of the page's beside it: Keel takes it as whoever is signed in.
+ */
+export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
+  const read = reader(options);
+  const request = options.fetch ?? fetch;
+  const origin = options.origin ?? "";
+  return {
+    async listAgents(org, signal) {
+      const input: Namespaces_listAgentsInput = { handle: org };
+      const response = await read(agentsAt(input.handle), signal);
+      if (!response.ok) throw await refusalOf(response);
+      return (await answered<NamespaceAgents>(response)).items;
+    },
+    async inviteAgent(org, agent, scopes) {
+      const {
+        handle,
+        "idempotency-key": key,
+        ...body
+      }: Namespaces_inviteAgentInput = {
+        handle: org,
+        "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
+        agent,
+        scopes: [...scopes],
+      };
+      const response = await request(`${origin}${agentsAt(handle)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": key },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw await refusalOf(response);
+      return answered<NamespaceAgent>(response);
+    },
+    async removeAgent(org, agentId) {
+      const {
+        handle,
+        agentId: named,
+        "idempotency-key": key,
+      }: Namespaces_removeAgentInput = {
+        handle: org,
+        agentId,
+        "idempotency-key": `console:remove-agent:${crypto.randomUUID()}`,
+      };
+      const response = await request(`${origin}${agentsAt(handle)}/${encodeURIComponent(named)}`, {
+        method: "DELETE",
+        headers: { "idempotency-key": key },
+      });
+      if (!response.ok) throw await refusalOf(response);
+      return answered<NamespaceAgent>(response);
     },
   };
 }

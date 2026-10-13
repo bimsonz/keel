@@ -21,6 +21,8 @@ import type {
   EventPage,
   EventRecord,
   LatticeSet,
+  NamespaceAgent,
+  NamespaceAgents,
   NamespaceRef,
   NamespaceView,
   NextAction,
@@ -77,6 +79,8 @@ export const MAINTAINERS_AFTER_MS = 30 * 60 * 1000;
  * table changes this is brought level with it. Everything else a public project's log holds is anyone's.
  */
 export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
+  "AgentInvited",
+  "AgentLeftNamespace",
   "AgentEnrolled",
   "AgentSuspended",
   "AgentReinstated",
@@ -136,7 +140,36 @@ export interface FakeKeel {
   standingOf(agentId: string): NonNullable<AgentProfile["state"]>;
   /** The reason an agent's pause was given, while it is paused. */
   pausedFor(agentId: string): string | undefined;
+  /**
+   * An agent accepts the invitation it has into an org, as its own call to Keel does: a test's way to an agent
+   * that has joined. The agent's own three calls are no page's.
+   */
+  accepts(org: string, agentId: string): void;
 }
+
+/** An agent's place in an org, as Keel keeps it while its invitation stands: an ended one is in no list. */
+interface Invited {
+  agentId: string;
+  /** The account of the member who invited it. */
+  by: string;
+  scopes: NonNullable<NamespaceAgent["scopes"]>;
+  state: "invited" | "joined";
+  invitedAt: string;
+  joinedAt?: string;
+}
+
+/** A handle, as Keel's contract has one, and the header every move carries: its validators refuse any other. */
+const AGENT_HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
+const keyed128 = (key: string): boolean => key.length >= 8 && key.length <= 128;
+
+/** Keel's refusal of someone who may not make a move in an org, with who to ask: `lacksRole`. */
+const lacksIn = (role: string): Response =>
+  problem(
+    403,
+    "auth.forbidden",
+    [{ kind: "escalate", title: `Ask ${role}: this needs that role` }],
+    "Refused: role.",
+  );
 
 /** Keel's way forward from a refused start: the same operation, asked again. */
 const again = (title: string): NextAction => ({
@@ -278,6 +311,12 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
+    /**
+     * The role an account has in an org, by the account's id and the org's handle, for a test that has an
+     * identity to ask. Where it names none, a reader's role in the project's own namespace is what `sessions`
+     * or `readerOf` gave them, and they are no member of any other.
+     */
+    roleIn?: (userId: string, org: string) => Role | undefined | Promise<Role | undefined>;
     /** The agents Keel knows by id beside the ones its log enrols, each as anyone may see it. */
     agents?: readonly AgentCard[];
     /**
@@ -382,6 +421,13 @@ export function createFakeKeel(
   });
   const agents = new Map([...working, ...(options.agents ?? [])].map((agent) => [agent.id, agent]));
   /**
+   * The agents with a place in each org, by the org's handle and then by the agent's id, oldest invitation
+   * first; and what each move's key was used for, so the same request asked again is answered as it was.
+   */
+  const invited = new Map<string, Map<string, Invited>>();
+  const moves = new Map<string, string>();
+  const ended = new Map<string, NamespaceAgent>();
+  /**
    * The projects made here, by the key each was made under, with what was asked: Keel's `createProject`. A
    * made project is its maker's to read, and holds a trunk and no entry yet.
    */
@@ -429,6 +475,13 @@ export function createFakeKeel(
     sponsorOf: (agentId) => behind.get(agentId),
     standingOf: (agentId) => standing.get(agentId) ?? "active",
     pausedFor: (agentId) => pauses.get(agentId),
+    accepts(org, agentId) {
+      const row = invited.get(org.toLowerCase())?.get(agentId);
+      if (row === undefined || row.state !== "invited")
+        throw new Error(`${agentId} has no invitation into ${org} to accept`);
+      row.state = "joined";
+      row.joinedAt = new Date(now()).toISOString();
+    },
     async fetch(request) {
       const url = new URL(request.url);
       const sent = request.method === "GET" ? "" : await request.text();
@@ -551,6 +604,170 @@ export function createFakeKeel(
         }
         if (ending) behind.delete(agentId);
         return Response.json(profileOf(known));
+      }
+
+      // The agents in an org: Keel's three operations, decided as its policy and its handlers decide them and
+      // in their order (`authorize.ts`, `apps/keel/src/adapters/driving/http/invitations.ts`). Keel reads anyone
+      // the agents that have joined, each by who it is; it reads a member the invitations not yet answered
+      // too, with what each gives and whose it is. A namespace that is no org has none, and takes none.
+      const among = /^\/v1\/namespaces\/([^/]+)\/agents(?:\/([^/]+))?$/.exec(url.pathname);
+      if (among !== null) {
+        const org = decodeURIComponent(among[1] ?? "").toLowerCase();
+        const agentId = among[2] === undefined ? undefined : decodeURIComponent(among[2]);
+        const kind =
+          (await options.whose?.(org))?.kind ??
+          ([...keyed.values()].includes(org)
+            ? "agent"
+            : org === project.namespace.handle
+              ? project.namespace.kind
+              : undefined);
+        const role =
+          reader?.id === undefined
+            ? undefined
+            : ((await options.roleIn?.(reader.id, org)) ??
+              (org === project.namespace.handle ? reader.role : undefined));
+        const rows = invited.get(org) ?? new Map<string, Invited>();
+        const rowOf = (
+          row: Invited,
+          members: boolean,
+          state: NamespaceAgent["state"] = row.state,
+        ): NamespaceAgent => {
+          const whom = agents.get(row.agentId);
+          return {
+            id: row.agentId,
+            name: whom?.name ?? row.agentId,
+            ...(whom?.handle === undefined ? {} : { handle: whom.handle }),
+            ...(whom?.kind === undefined ? {} : { kind: whom.kind }),
+            state,
+            ...(members
+              ? { scopes: [...row.scopes], invitedBy: row.by, invitedAt: row.invitedAt }
+              : {}),
+            ...(row.joinedAt === undefined ? {} : { joinedAt: row.joinedAt }),
+          };
+        };
+        if (agentId === undefined && request.method === "GET") {
+          if (kind === undefined) return gone();
+          const members = kind === "org" && role !== undefined;
+          return Response.json({
+            items: [...rows.values()]
+              .filter((row) => members || row.state === "joined")
+              .map((row) => rowOf(row, members)),
+          } satisfies NamespaceAgents);
+        }
+        const inviting = agentId === undefined && request.method === "POST";
+        const removing = agentId !== undefined && request.method === "DELETE";
+        if (inviting || removing) {
+          if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+          if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+          const key = request.headers.get("idempotency-key") ?? "";
+          const body = fields(sent);
+          const named = body.get("agent");
+          const asked = body.get("scopes") ?? ["agent:read", "agent:work"];
+          // Keel's own validators answer first: the key, and for an invitation a handle and one or two scopes.
+          if (!keyed128(key)) return problem(400, "request.invalid");
+          if (
+            inviting &&
+            (typeof named !== "string" ||
+              !AGENT_HANDLE.test(named) ||
+              !Array.isArray(asked) ||
+              asked.length < 1 ||
+              asked.length > 2 ||
+              !asked.every((scope) => scope === "agent:read" || scope === "agent:work"))
+          )
+            return problem(400, "request.invalid");
+          // The policy: a namespace that is no org is not there, and a move in one is a member's.
+          if (kind !== "org") return gone();
+          if (inviting) {
+            if (role === undefined) return lacksIn("a member");
+            if (reader.fresh !== true) return staleSignIn();
+            const scopes: Invited["scopes"] = Array.isArray(asked)
+              ? asked.filter((scope) => scope === "agent:read" || scope === "agent:work")
+              : [];
+            if (!scopes.includes("agent:read") || new Set(scopes).size !== scopes.length)
+              return problem(
+                400,
+                "request.invalid",
+                [],
+                "An invitation gives agent:read, or agent:read and agent:work, each named once.",
+              );
+            // An agent's handle is its own namespace's. A person's or an org's, and nobody's, are one answer.
+            const invitee = [...agents.values()].find((agent) => agent.handle === named);
+            if (invitee === undefined)
+              return problem(
+                404,
+                "resource.not_found",
+                [],
+                `No agent has the handle ${String(named)}.`,
+              );
+            const print = `${reader.id} ${[...scopes].toSorted().join(" ")}`;
+            const cause = `invite ${org} ${invitee.id} ${key}`;
+            const done = moves.get(cause);
+            const placed = rows.get(invitee.id);
+            // The same request asked again under its key is answered as it was; the key on another is refused.
+            if (done !== undefined && done !== print)
+              return problem(
+                409,
+                "request.idempotency_conflict",
+                [
+                  {
+                    kind: "call",
+                    title: "Call again with a fresh Idempotency-Key",
+                    operationId: "Namespaces_inviteAgent",
+                  },
+                ],
+                `Idempotency-Key ${key} was used for a different move on this invitation.`,
+              );
+            if (done !== undefined && placed !== undefined)
+              return Response.json(rowOf(placed, true), { status: 201 });
+            // One member answers for an agent in an org. The same member asking the same again changes nothing.
+            if (placed !== undefined) {
+              const same =
+                placed.by === reader.id &&
+                [...placed.scopes].toSorted().join(" ") === [...scopes].toSorted().join(" ");
+              if (!same)
+                return problem(
+                  409,
+                  "invitation.state_refused",
+                  [
+                    {
+                      kind: "read",
+                      title: "Read the org's agents and who invited each",
+                      operationId: "Namespaces_listAgents",
+                    },
+                  ],
+                  `${invitee.id} already has an invitation here, and one member answers for an agent in an org. Take it out first to invite it again or to change what it may do.`,
+                );
+              return Response.json(rowOf(placed, true), { status: 201 });
+            }
+            const row: Invited = {
+              agentId: invitee.id,
+              by: reader.id,
+              scopes,
+              state: "invited",
+              invitedAt: new Date(now()).toISOString(),
+            };
+            invited.set(org, rows.set(invitee.id, row));
+            moves.set(cause, print);
+            return Response.json(rowOf(row, true), { status: 201 });
+          }
+          // A removal is the inviter's, a maintainer's or an owner's: anyone else is told who to ask, whether
+          // or not the agent has a place here.
+          const placed = rows.get(agentId ?? "");
+          if (
+            role === undefined ||
+            (role === "member" && (placed === undefined || placed.by !== reader.id))
+          )
+            return lacksIn("a maintainer or an owner");
+          if (reader.fresh !== true) return staleSignIn();
+          const cause = `end ${org} ${agentId ?? ""} ${key}`;
+          const done = ended.get(cause);
+          if (done !== undefined) return Response.json(done);
+          if (placed === undefined) return gone();
+          rows.delete(placed.agentId);
+          const answer = rowOf(placed, true, "ended");
+          ended.set(cause, answer);
+          return Response.json(answer);
+        }
       }
 
       // Whose a handle is, Keel answers anyone: that a handle is someone's is no secret, and what it holds is.

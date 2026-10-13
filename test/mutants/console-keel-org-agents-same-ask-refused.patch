@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in refuses the same member's same ask once the agent has joined, where Keel answers the row
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..51789638 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -724,7 +724,7 @@ export function createFakeKeel(
+               const same =
+                 placed.by === reader.id &&
+                 [...placed.scopes].toSorted().join(" ") === [...scopes].toSorted().join(" ");
+-              if (!same)
++              if (!same || placed.state === "joined")
+                 return problem(
+                   409,
+                   "invitation.state_refused",

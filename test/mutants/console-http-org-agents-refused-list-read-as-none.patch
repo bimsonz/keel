@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.read
+# why: Keel's refusal to list an org's agents is shown as an org with none
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 7807f0ec..8b709e27 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -260,7 +260,7 @@ export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
+     async listAgents(org, signal) {
+       const input: Namespaces_listAgentsInput = { handle: org };
+       const response = await read(agentsAt(input.handle), signal);
+-      if (!response.ok) throw await refusalOf(response);
++      if (!response.ok) return [];
+       return (await answered<NamespaceAgents>(response)).items;
+     },
+     async inviteAgent(org, agent, scopes) {

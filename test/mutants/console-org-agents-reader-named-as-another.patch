@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.whose
+# why: the reader's own invitation names them as it would another member
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..2d2fbda5 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -41,7 +41,7 @@ export function inviterOf(agent: NamespaceAgent, members: readonly Member[]): st
+   const inviter = members.find((member) => member.userId === agent.invitedBy);
+   if (inviter === undefined)
+     return "invited by someone who is no longer a member, so it cannot act here";
+-  return inviter.you ? "invited by you" : `invited by ${inviter.handle ?? inviter.name}`;
++  return `invited by ${inviter.handle ?? inviter.name}`;
+ }
+ 
+ /** Keel takes a removal from the member who invited the agent, from a maintainer and from an owner. */

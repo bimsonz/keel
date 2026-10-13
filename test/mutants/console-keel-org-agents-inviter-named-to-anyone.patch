@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.read
+# why: the stand-in names who invited an agent, and what it was given, to a reader who is no member
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..9f49205d 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -651,7 +651,7 @@ export function createFakeKeel(
+           return Response.json({
+             items: [...rows.values()]
+               .filter((row) => members || row.state === "joined")
+-              .map((row) => rowOf(row, members)),
++              .map((row) => rowOf(row, true)),
+           } satisfies NamespaceAgents);
+         }
+         const inviting = agentId === undefined && request.method === "POST";

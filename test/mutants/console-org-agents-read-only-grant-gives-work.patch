@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.words
+# why: the choice worded Read only asks Keel for work too
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..8c15dc05 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -10,7 +10,7 @@ export type Grant = "work" | "read";
+ 
+ export const SCOPES: Record<Grant, readonly Scope[]> = {
+   work: ["agent:read", "agent:work"],
+-  read: ["agent:read"],
++  read: ["agent:read", "agent:work"],
+ };
+ 
+ export const GRANTS: readonly { grant: Grant; label: string }[] = [

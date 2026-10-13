@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.key
+# why: the stand-in takes an invitation another site's page sent with the member's cookie
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..d99cf536 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -658,7 +658,6 @@ export function createFakeKeel(
+         const removing = agentId !== undefined && request.method === "DELETE";
+         if (inviting || removing) {
+           if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+-          if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+           const key = request.headers.get("idempotency-key") ?? "";
+           const body = fields(sent);
+           const named = body.get("agent");

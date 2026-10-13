@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.words
+# why: an org's home lists an invitation nobody has answered among the agents that joined
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..2106468e 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -56,5 +56,5 @@ export function removalOf(agent: NamespaceAgent): "Remove" | "Withdraw" {
+ 
+ /** The agents that have joined: all that anyone but a member is read, and all an org's home lists. */
+ export function joinedOf(listed: readonly NamespaceAgent[]): NamespaceAgent[] {
+-  return listed.filter((agent) => agent.state === "joined");
++  return listed.filter((agent) => agent.state !== "ended");
+ }

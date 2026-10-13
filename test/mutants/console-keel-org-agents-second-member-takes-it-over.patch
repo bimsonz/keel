@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in answers another member's invitation of an agent somebody answers for as if it were theirs
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..f3483682 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -722,7 +722,6 @@ export function createFakeKeel(
+             // One member answers for an agent in an org. The same member asking the same again changes nothing.
+             if (placed !== undefined) {
+               const same =
+-                placed.by === reader.id &&
+                 [...placed.scopes].toSorted().join(" ") === [...scopes].toSorted().join(" ");
+               if (!same)
+                 return problem(

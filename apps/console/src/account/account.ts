@@ -90,6 +90,8 @@ export interface Org {
 /** A member of an org, as a code host shows one: by handle and name, and never by an address. */
 export interface Member {
   id: string;
+  /** Their account's id, which is how Keel names a person where it names one: who invited an agent, say. */
+  userId: string;
   role: Role;
   name: string;
   handle?: string;
@@ -259,6 +261,7 @@ function memberOf(answer: MemberAnswer, reader: Who): Member {
   const handle = answer.user.username;
   return {
     id: answer.id,
+    userId: answer.userId,
     role: roleOf(answer.role),
     name: answer.user.name,
     ...(typeof handle === "string" && handle !== "" ? { handle } : {}),

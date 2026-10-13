@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in takes an invitation from someone who is no member of the org
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..e4d5762e 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -678,7 +678,6 @@ export function createFakeKeel(
+           // The policy: a namespace that is no org is not there, and a move in one is a member's.
+           if (kind !== "org") return gone();
+           if (inviting) {
+-            if (role === undefined) return lacksIn("a member");
+             if (reader.fresh !== true) return staleSignIn();
+             const scopes: Invited["scopes"] = Array.isArray(asked)
+               ? asked.filter((scope) => scope === "agent:read" || scope === "agent:work")

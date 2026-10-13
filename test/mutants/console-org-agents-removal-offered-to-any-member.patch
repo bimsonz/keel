@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.offered
+# why: a plain member is offered the removal of an agent another member invited, which Keel refuses
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..948f4b68 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -46,7 +46,7 @@ export function inviterOf(agent: NamespaceAgent, members: readonly Member[]): st
+ 
+ /** Keel takes a removal from the member who invited the agent, from a maintainer and from an owner. */
+ export function mayRemove(agent: NamespaceAgent, role: Role, readerId: string): boolean {
+-  return manages(role) || agent.invitedBy === readerId;
++  return manages(role) || agent.invitedBy !== undefined;
+ }
+ 
+ /** What taking a row out is called: an invitation nobody answered is withdrawn, an agent that joined removed. */

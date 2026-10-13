@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.words
+# why: a row does not say the day Keel says the agent joined
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 5773f376..283720d4 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -28,7 +28,7 @@ export function givenOf(agent: NamespaceAgent): string {
+ export function standingOf(agent: NamespaceAgent): string {
+   if (agent.state === "invited") return "invited, not yet accepted";
+   if (agent.state === "ended") return "ended";
+-  return agent.joinedAt === undefined ? "joined" : `joined ${agent.joinedAt.slice(0, 10)}`;
++  return "joined";
+ }
+ 
+ /**

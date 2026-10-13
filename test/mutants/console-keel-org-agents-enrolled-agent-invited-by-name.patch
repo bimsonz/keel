@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in invites an agent by its name, where Keel knows one by its handle alone
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..381e7284 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -691,7 +691,7 @@ export function createFakeKeel(
+                 "An invitation gives agent:read, or agent:read and agent:work, each named once.",
+               );
+             // An agent's handle is its own namespace's. A person's or an org's, and nobody's, are one answer.
+-            const invitee = [...agents.values()].find((agent) => agent.handle === named);
++            const invitee = [...agents.values()].find((agent) => agent.handle === named || agent.name === named);
+             if (invitee === undefined)
+               return problem(
+                 404,

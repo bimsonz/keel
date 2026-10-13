@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.key
+# why: the stand-in takes a move whose key Keel's validators refuse
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..32e09646 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -664,7 +664,6 @@ export function createFakeKeel(
+           const named = body.get("agent");
+           const asked = body.get("scopes") ?? ["agent:read", "agent:work"];
+           // Keel's own validators answer first: the key, and for an invitation a handle and one or two scopes.
+-          if (!keyed128(key)) return problem(400, "request.invalid");
+           if (
+             inviting &&
+             (typeof named !== "string" ||

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in answers the same member's ask for other scopes as if nothing differed, where Keel refuses it
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..a296197f 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -722,8 +722,7 @@ export function createFakeKeel(
+             // One member answers for an agent in an org. The same member asking the same again changes nothing.
+             if (placed !== undefined) {
+               const same =
+-                placed.by === reader.id &&
+-                [...placed.scopes].toSorted().join(" ") === [...scopes].toSorted().join(" ");
++                placed.by === reader.id;
+               if (!same)
+                 return problem(
+                   409,

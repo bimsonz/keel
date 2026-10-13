@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.inviter
+# why: the stand-in identity says everyone is a member of every org, so Keel reads a stranger what is its members'
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 998fe7ce..6678a5ff 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -723,7 +723,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+           { field: "userId", value: userId },
+         ],
+       });
+-      return member === null ? undefined : roleOf(member.role);
++      return member === null ? "member" : roleOf(member.role);
+     },
+   };
+ }

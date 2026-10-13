@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.remove
+# why: the stand-in takes a removal from someone who is in no org
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..aef1bfa0 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -754,7 +754,6 @@ export function createFakeKeel(
+           // or not the agent has a place here.
+           const placed = rows.get(agentId ?? "");
+           if (
+-            role === undefined ||
+             (role === "member" && (placed === undefined || placed.by !== reader.id))
+           )
+             return lacksIn("a maintainer or an owner");

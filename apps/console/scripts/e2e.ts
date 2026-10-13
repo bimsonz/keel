@@ -10,7 +10,7 @@
 //   node scripts/e2e.ts
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type BrowserContext, type Page, chromium } from "playwright";
+import { type BrowserContext, type Locator, type Page, chromium } from "playwright";
 import { encode } from "uqr";
 import { build, preview } from "vite";
 import { createAccount } from "../src/account/account.ts";
@@ -1781,6 +1781,7 @@ const open = createFakeKeel({
   visibility: "public",
   readerOf,
   whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
   ahead: AHEAD,
 });
 const shut = createFakeKeel({
@@ -1788,6 +1789,7 @@ const shut = createFakeKeel({
   visibility: "private",
   readerOf,
   whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
   ahead: AHEAD,
 });
 
@@ -4564,6 +4566,249 @@ expectEqual(
   `/signup | "hopper" is taken: a handle is one person's, one agent's or one org's | nobody's`,
 );
 await leaving.close();
+
+// An agent invited into an org, on the org's members page. Two people who signed up by passkey on a Keel that
+// knows two agents by their handles: Noether makes an org and owns it, and Franklin joins it as a plain member.
+const inviting = createIdentity(built, { emailCodes: false });
+const OTTER = {
+  id: "agt_00000000000000000000T1DY0T",
+  name: "Tidy Otter",
+  handle: "tidy-otter",
+} as const;
+// A name with nowhere to break: what a phone's width has to wrap.
+const UNBROKEN = {
+  id: "agt_000000000000000000UNBR0KEN",
+  name: "Anagentwhosenamehasnowheretobreakinitsrowonthescreenofaphone",
+  handle: "unbroken-heron",
+} as const;
+const hosting = createFakeKeel({
+  namespace: NAMESPACE,
+  agents: [OTTER, UNBROKEN],
+  readerOf: async (request) => inviting.reads(request),
+  whose: async (handle) =>
+    (await inviting.whose(handle)) ??
+    [OTTER, UNBROKEN]
+      .filter((agent) => agent.handle === handle)
+      .map((agent) => ({ id: agent.id, kind: "agent" as const }))[0],
+  roleIn: (userId, org) => inviting.roleIn(userId, org),
+});
+const arrive = async (handle: string): Promise<Page> => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await asDeployed(context, { keel: hosting, identity: inviting });
+  const arrived = watch(await context.newPage(), `an org's agents, ${handle}`);
+  const device = await context.newCDPSession(arrived);
+  await device.send("WebAuthn.enable");
+  await device.send("WebAuthn.addVirtualAuthenticator", { options: DEVICE });
+  await arrived.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+  await arrived.getByLabel("Handle").fill(handle);
+  await arrived.getByRole("button", { name: "Create your account with a passkey" }).click();
+  await arrived.waitForURL(`${built}/`);
+  return arrived;
+};
+const noether = await arrive("noether");
+const franklin = await arrive("franklin");
+await noether.goto(`${built}/new/org`, { waitUntil: "domcontentloaded" });
+await noether.getByLabel("Name").fill("Symmetry");
+await noether.getByLabel("Handle").fill("symmetry");
+await noether.getByRole("button", { name: "Make the org" }).click();
+await noether.getByRole("heading", { level: 1, name: /^Symmetry/ }).waitFor();
+await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await noether.getByLabel("Invite by handle").fill("franklin");
+await noether.getByLabel("Role for the invitation").selectOption("member");
+await noether.getByRole("button", { name: "Invite", exact: true }).click();
+const joining = noether.locator("[data-invitation-link]");
+await joining.waitFor();
+await franklin.goto(new URL(await joining.innerText()).href, { waitUntil: "domcontentloaded" });
+await franklin.getByRole("button", { name: "Join" }).click();
+await franklin.getByRole("heading", { level: 1, name: /^Symmetry/ }).waitFor();
+
+const orgAgentsOn = (shown: Page): Locator => shown.locator('main section[aria-label="Agents"]');
+const orgAgentList = (shown: Page): Locator =>
+  orgAgentsOn(shown).getByRole("list", { name: "Agents of this org" });
+const orgAgentRows = async (shown: Page): Promise<string[]> =>
+  (await orgAgentList(shown).getByRole("listitem").allInnerTexts()).map(squash);
+/** The page has come to say something of an agent, or to a refusal: whichever Keel's answer made it. */
+const answeredOn = async (shown: Page, row: string): Promise<void> => {
+  await Promise.race([
+    orgAgentList(shown).getByText(row).first().waitFor({ timeout: 10_000 }),
+    orgAgentsOn(shown).getByRole("alert").first().waitFor({ timeout: 10_000 }),
+  ]).catch(() => undefined);
+};
+const refusalOn = async (shown: Page): Promise<string> =>
+  (await orgAgentsOn(shown).getByRole("alert").count()) === 0
+    ? "no refusal"
+    : squash(await orgAgentsOn(shown).getByRole("alert").first().innerText());
+const inviteAgent = async (shown: Page, handle: string, grant?: string): Promise<void> => {
+  await orgAgentsOn(shown).getByLabel("The agent's handle").fill(handle);
+  if (grant !== undefined)
+    await orgAgentsOn(shown)
+      .getByLabel("What the agent may do here")
+      .selectOption({ label: grant });
+  await orgAgentsOn(shown).getByRole("button", { name: "Invite agent" }).click();
+};
+const lastInvitation = (): string =>
+  hosting.calls.findLast((call) => call.method === "POST" && call.path.endsWith("/agents"))?.body ??
+  "nothing asked";
+
+// Any member invites: Franklin is a plain one. What the row then says is what Keel answered.
+await franklin.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await orgAgentsOn(franklin).getByText("No agent has been invited into this org.").waitFor();
+await inviteAgent(franklin, "tidy-otter", "Read only");
+await answeredOn(franklin, "Tidy Otter");
+expectEqual(
+  "org agents: a plain member invites an agent by its handle to read alone, and the row says what Keel answered",
+  `${(await orgAgentRows(franklin)).join(" | ")} | ${lastInvitation()}`,
+  'Tidy Otter reads · invited, not yet accepted · invited by you Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+);
+// A handle no agent has, typed with a space either side of it: Keel is asked for the handle, and says so.
+await inviteAgent(franklin, " nobody-here ");
+await orgAgentsOn(franklin)
+  .getByRole("alert")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "org agents: a handle no agent has is refused in Keel's own sentence, and nobody is invited",
+  `${await refusalOn(franklin)} | ${(await orgAgentRows(franklin)).length} listed`,
+  "No agent has the handle nobody-here. | 1 listed",
+);
+
+// The owner reads who invited it, and invites a second one to read and work.
+await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await answeredOn(noether, "Tidy Otter");
+await inviteAgent(noether, "unbroken-heron");
+await answeredOn(noether, UNBROKEN.name);
+const invitedBy = (rows: readonly string[]): string =>
+  rows.map((row) => /invited by \S+/.exec(row)?.[0] ?? "by nobody").join(" | ");
+expectEqual(
+  "org agents: each row names the member who invited the agent: by handle, and as you where it is the reader",
+  `${invitedBy(await orgAgentRows(noether))} | ${lastInvitation()}`,
+  'invited by franklin | invited by you | {"agent":"unbroken-heron","scopes":["agent:read","agent:work"]}',
+);
+const removals = (shown: Page): Promise<string[]> =>
+  orgAgentList(shown)
+    .getByRole("button")
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") ?? ""));
+await franklin.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await answeredOn(franklin, UNBROKEN.name);
+expectEqual(
+  "org agents: a plain member is offered the removal of the agent they invited and of no other, an owner of each",
+  `${(await removals(franklin)).join(", ")} | ${(await removals(noether)).length}`,
+  "Withdraw Tidy Otter | 2",
+);
+// At a phone's width a name with nowhere to break wraps. A box that cannot grow keeps to the screen while its
+// words run out of it, so what is measured is where each piece of text is drawn, beside each box.
+await noether.setViewportSize({ width: 390, height: 844 });
+expectEqual(
+  "org agents: at a phone's width no word of the section, and no part of it, runs past the screen",
+  String(
+    await noether.evaluate(() => {
+      const section = document.querySelector('main section[aria-label="Agents"]');
+      if (section === null) return "no section";
+      const edges = [section, ...section.querySelectorAll("*")].map(
+        (part) => part.getBoundingClientRect().right,
+      );
+      const words = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let word = words.nextNode(); word !== null; word = words.nextNode()) {
+        const drawn = document.createRange();
+        drawn.selectNodeContents(word);
+        edges.push(drawn.getBoundingClientRect().right);
+      }
+      return Math.max(...edges) <= window.innerWidth;
+    }),
+  ),
+  "true",
+);
+await shot(noether, "org-agents-phone");
+await noether.setViewportSize({ width: 1280, height: 900 });
+
+// The agent accepts, which is its own call to Keel. The row says it has joined, and its removal is called that.
+hosting.accepts("symmetry", OTTER.id);
+const today = new Date().toISOString().slice(0, 10);
+await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await answeredOn(noether, "Tidy Otter");
+await shot(noether, "org-agents");
+expectEqual(
+  "org agents: an agent that accepted is said to have joined, its name goes to its own page, and its removal is called that",
+  `${String((await orgAgentRows(noether))[0]?.includes(`joined ${today}`))} | ${String(await orgAgentList(noether).getByRole("link", { name: "Tidy Otter" }).getAttribute("href"))} | ${(await removals(noether)).join(", ")}`,
+  `true | /tidy-otter | Remove Tidy Otter, Withdraw ${UNBROKEN.name}`,
+);
+
+// The org's home lists the agents that have joined, to its members and to anyone: who each is, and nothing of
+// who invited it or of an invitation nobody has answered.
+const joinedOn = async (shown: Page): Promise<string> => {
+  await shown
+    .getByRole("main")
+    .getByRole("heading", { level: 1 })
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+  await orgAgentsOn(shown)
+    .getByRole("listitem")
+    .first()
+    .waitFor({ timeout: 5000 })
+    .catch(() => undefined);
+  return (await orgAgentsOn(shown).count()) === 0
+    ? "no section"
+    : `${(await orgAgentsOn(shown).getByRole("listitem").allInnerTexts()).map(squash).join(" | ")} | ${String(
+        await orgAgentsOn(shown)
+          .getByRole("link")
+          .first()
+          .getAttribute("href", { timeout: 2000 })
+          .catch(() => "no link"),
+      )}`;
+};
+const onlooking = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(onlooking, { keel: hosting, identity: inviting });
+const onlooker = watch(await onlooking.newPage(), "an org's agents, a visitor");
+await onlooker.goto(`${built}/symmetry`, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "org agents: a visitor is listed the agents that have joined the org, each by who it is and linked to its page",
+  await joinedOn(onlooker),
+  `Tidy Otter joined ${today} | /tidy-otter`,
+);
+await onlooking.close();
+await noether.goto(`${built}/symmetry`, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "org agents: a member's home of the org lists the ones that have joined, and no invitation nobody has answered",
+  await joinedOn(noether),
+  `Tidy Otter joined ${today} | /tidy-otter`,
+);
+
+// Ten minutes on, Keel takes no removal from this sign-in: it says so and how to go on, and the page offers the
+// passkey touch that answers it.
+await inviting.age();
+await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
+await answeredOn(noether, "Tidy Otter");
+const takeOut = orgAgentList(noether).getByRole("button", {
+  name: /^(Remove|Withdraw) Tidy Otter$/,
+});
+if ((await takeOut.count()) > 0) await takeOut.click();
+await orgAgentsOn(noether)
+  .getByRole("alert")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const touchForAgents = orgAgentsOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
+expectEqual(
+  "org agents: a removal from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and the agent is still there",
+  `${await refusalOn(noether)} | ${await touchForAgents.count()} offered | ${(await orgAgentRows(noether)).length} listed`,
+  "This needs a fresh sign-in: a passkey sign-in from the last ten minutes. Sign in again with your passkey, then retry | 1 offered | 2 listed",
+);
+// One touch signs in afresh and asks again what Keel refused.
+if ((await touchForAgents.count()) > 0) await touchForAgents.click();
+await orgAgentList(noether)
+  .getByText("Tidy Otter")
+  .first()
+  .waitFor({ state: "detached", timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "org agents: one touch signs in afresh and asks again what Keel refused, and the agent is out of the org",
+  `${invitedBy(await orgAgentRows(noether))} | ${(await orgAgentRows(noether)).length} listed | ${await refusalOn(noether)}`,
+  "invited by you | 1 listed | no refusal",
+);
+await noether.context().close();
+await franklin.context().close();
 
 await browser.close();
 await new Promise<void>((resolve) => {

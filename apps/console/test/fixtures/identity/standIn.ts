@@ -20,7 +20,7 @@ import {
   organization,
   username,
 } from "better-auth/plugins";
-import { ac, roles } from "../../../src/account/roles.ts";
+import { type Role, ac, roleOf, roles } from "../../../src/account/roles.ts";
 import { RESERVED_SEGMENTS } from "../../../src/contract/keel/index.ts";
 
 /** A code "sent" by email, read back by the test as its person would read their email. */
@@ -58,6 +58,11 @@ export interface Identity {
   touched(userId: string): Promise<void>;
   /** Whose a handle is here, as Keel says it of a namespace: a person's or an org's, by its account's id, or nobody's. */
   whose(handle: string): Promise<{ id: string; kind: "user" | "org" } | undefined>;
+  /**
+   * The role an account has in an org, by the org's handle, as Keel's gate reads a membership. None where
+   * there is no such org or the account is no member of it.
+   */
+  roleIn(userId: string, org: string): Promise<Role | undefined>;
 }
 
 /** The tables Better Auth keeps with these plugins: the ones spike 27 saw it create. The adapter copies the whole store, so it is a plain object. */
@@ -703,6 +708,22 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
         where: [{ field: "slug", value: named }],
       });
       return org === null ? undefined : { id: org.id, kind: "org" };
+    },
+    async roleIn(userId, org) {
+      const { adapter } = await auth.$context;
+      const named = await adapter.findOne<{ id: string }>({
+        model: "organization",
+        where: [{ field: "slug", value: org.toLowerCase() }],
+      });
+      if (named === null) return undefined;
+      const member = await adapter.findOne<{ role: string }>({
+        model: "member",
+        where: [
+          { field: "organizationId", value: named.id },
+          { field: "userId", value: userId },
+        ],
+      });
+      return member === null ? undefined : roleOf(member.role);
     },
   };
 }

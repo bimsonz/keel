@@ -15,7 +15,7 @@ import type {
   NamespaceView,
   ProjectView,
 } from "../contract/keel/index.ts";
-import type { KeelDirectory, KeelSponsorship } from "../source/types.ts";
+import type { KeelDirectory, KeelOrgAgents, KeelSponsorship } from "../source/types.ts";
 import {
   type Account,
   type Closed,
@@ -27,6 +27,7 @@ import {
   type Who,
   nameOf,
 } from "./account.ts";
+import { JoinedAgents, OrgAgents } from "./OrgAgents.tsx";
 import { Card, HANDLE, Refusal, SELECT, go, useAsking } from "./parts.tsx";
 import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
 
@@ -232,7 +233,15 @@ function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
   );
 }
 
-function Home({ page, directory }: { page: OrgPage; directory: KeelDirectory }) {
+function Home({
+  page,
+  directory,
+  agents,
+}: {
+  page: OrgPage;
+  directory: KeelDirectory;
+  agents: KeelOrgAgents;
+}) {
   const projects = useProjects(directory, page.org.handle);
   return (
     <>
@@ -269,6 +278,7 @@ function Home({ page, directory }: { page: OrgPage; directory: KeelDirectory }) 
           Members and invitations
         </a>
       </section>
+      <JoinedAgents agents={agents} org={page.org.handle} />
     </>
   );
 }
@@ -375,11 +385,13 @@ function InviteForm({
 
 function Members({
   account,
+  agents,
   page,
   who,
   read,
 }: {
   account: Account;
+  agents: KeelOrgAgents;
   page: OrgPage;
   who: Who;
   read: () => Promise<void>;
@@ -479,6 +491,7 @@ function Members({
           </ul>
         )}
       </section>
+      <OrgAgents account={account} agents={agents} page={page} who={who} />
     </>
   );
 }
@@ -581,11 +594,13 @@ function OrgSettings({
 export function NamespacePublic({
   directory,
   sponsorship,
+  agents,
   handle,
   signedIn,
 }: {
   directory: KeelDirectory;
   sponsorship: KeelSponsorship;
+  agents: KeelOrgAgents;
   handle: string;
   signedIn: boolean;
 }) {
@@ -645,6 +660,8 @@ export function NamespacePublic({
           <ProjectList projects={projects} />
         )}
       </section>
+      {/* Keel reads anyone the agents that have joined an org. No other kind of namespace has any. */}
+      {namespace.kind === "org" && <JoinedAgents agents={agents} org={namespace.handle} />}
     </div>
   );
 }
@@ -703,6 +720,7 @@ export function NamespacePages({
   account,
   directory,
   sponsorship,
+  agents,
   who,
   handle,
   tab,
@@ -710,6 +728,7 @@ export function NamespacePages({
   account: Account;
   directory: KeelDirectory;
   sponsorship: KeelSponsorship;
+  agents: KeelOrgAgents;
   who: Who;
   handle: string;
   tab: OrgTab;
@@ -720,7 +739,13 @@ export function NamespacePages({
   if (held === undefined) return null;
   if (held === null && tab === "home")
     return (
-      <NamespacePublic directory={directory} sponsorship={sponsorship} handle={handle} signedIn />
+      <NamespacePublic
+        directory={directory}
+        sponsorship={sponsorship}
+        agents={agents}
+        handle={handle}
+        signedIn
+      />
     );
   if (held === null)
     return (
@@ -735,8 +760,10 @@ export function NamespacePages({
     );
   return (
     <OrgFrame page={held} tab={tab}>
-      {tab === "home" && <Home page={held} directory={directory} />}
-      {tab === "members" && <Members account={account} page={held} who={who} read={read} />}
+      {tab === "home" && <Home page={held} directory={directory} agents={agents} />}
+      {tab === "members" && (
+        <Members account={account} agents={agents} page={held} who={who} read={read} />
+      )}
       {tab === "settings" && (
         // The name typed starts from the org's own, whichever org the address goes on to name.
         <OrgSettings key={held.org.id} account={account} page={held} read={read} />

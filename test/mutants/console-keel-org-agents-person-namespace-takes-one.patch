@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in decides an invitation into a person's own namespace, which Keel reads as not there
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..ea527e10 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -676,7 +676,7 @@ export function createFakeKeel(
+           )
+             return problem(400, "request.invalid");
+           // The policy: a namespace that is no org is not there, and a move in one is a member's.
+-          if (kind !== "org") return gone();
++          if (kind === undefined) return gone();
+           if (inviting) {
+             if (role === undefined) return lacksIn("a member");
+             if (reader.fresh !== true) return staleSignIn();

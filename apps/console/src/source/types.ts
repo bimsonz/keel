@@ -187,6 +187,24 @@ export interface KeelSponsorship extends KeelAgents {
   end(agentId: string): Promise<Keel.AgentProfile>;
 }
 
+/**
+ * The agents in an org. Keel reads anyone the agents that have joined it; it reads a member the invitations not
+ * yet answered too, with what each gives and who made it. A member invites an agent by its handle and answers
+ * for it there, and Keel takes an invitation or a removal only from a passkey sign-in of the last ten minutes.
+ */
+export interface KeelOrgAgents {
+  /** Keel's list for this reader, oldest invitation first: `GET /v1/namespaces/{handle}/agents`. */
+  listAgents(org: string, signal?: AbortSignal): Promise<Keel.NamespaceAgent[]>;
+  /** Invites the agent of that handle to read, or to read and work. Answers its row as it then stands. */
+  inviteAgent(
+    org: string,
+    agent: string,
+    scopes: readonly Keel.Scope[],
+  ): Promise<Keel.NamespaceAgent>;
+  /** Takes an agent out of the org, or withdraws an invitation it has not answered. Answers the row, ended. */
+  removeAgent(org: string, agentId: string): Promise<Keel.NamespaceAgent>;
+}
+
 export class KeelRefused extends Error {
   readonly code: string;
   readonly status: number;

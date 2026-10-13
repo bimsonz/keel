@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.refused
+# why: the stand-in gives an agent work without read, which Keel never gives
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index b0dbd6fd..cf3fc1bd 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -683,7 +683,7 @@ export function createFakeKeel(
+             const scopes: Invited["scopes"] = Array.isArray(asked)
+               ? asked.filter((scope) => scope === "agent:read" || scope === "agent:work")
+               : [];
+-            if (!scopes.includes("agent:read") || new Set(scopes).size !== scopes.length)
++            if (new Set(scopes).size !== scopes.length)
+               return problem(
+                 400,
+                 "request.invalid",

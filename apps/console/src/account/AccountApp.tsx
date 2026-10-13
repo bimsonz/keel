@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
-import { createHttpDirectory, createHttpSponsorship } from "../source/http.ts";
+import { createHttpDirectory, createHttpOrgAgents, createHttpSponsorship } from "../source/http.ts";
 import type { KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
@@ -760,6 +760,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   // A namespace's projects are Keel's own to list, to whoever is reading: the same read the home makes.
   const directory = useMemo(() => createHttpDirectory(), []);
   const sponsorship = useMemo(() => createHttpSponsorship(), []);
+  const orgAgents = useMemo(() => createHttpOrgAgents(), []);
   // An agent's link opened while this page is up changes the fragment and loads nothing: it is taken out of the
   // address as the first was, and the page begins again with what it carried.
   const [held, setHeld] = useState({ link, taken: 0 });
@@ -853,6 +854,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
         account={account}
         directory={directory}
         sponsorship={sponsorship}
+        agents={orgAgents}
         who={reader.who}
         handle={handle}
         tab={tab}
@@ -863,6 +865,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
       <NamespacePublic
         directory={directory}
         sponsorship={sponsorship}
+        agents={orgAgents}
         handle={place.handle}
         signedIn={false}
       />

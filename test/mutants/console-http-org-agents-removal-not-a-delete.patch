@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.calls
+# why: a removal is sent as another method than Keel's operation has
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 7807f0ec..86c6f711 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -293,7 +293,7 @@ export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
+         "idempotency-key": `console:remove-agent:${crypto.randomUUID()}`,
+       };
+       const response = await request(`${origin}${agentsAt(handle)}/${encodeURIComponent(named)}`, {
+-        method: "DELETE",
++        method: "POST",
+         headers: { "idempotency-key": key },
+       });
+       if (!response.ok) throw await refusalOf(response);
