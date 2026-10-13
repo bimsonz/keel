@@ -2,10 +2,10 @@
 # kills: sdk.routes-total
 # why: an operation drops out of the route table, so the SDK cannot call it and nothing says so
 diff --git a/packages/sdk/src/routes.ts b/packages/sdk/src/routes.ts
-index 4c896e1..a122994 100644
+index c3bd44f4..7146859e 100644
 --- a/packages/sdk/src/routes.ts
 +++ b/packages/sdk/src/routes.ts
-@@ -67,11 +67,6 @@ export const ROUTES = {
+@@ -109,11 +109,6 @@ export const ROUTES = {
    },
    nearby: { method: "GET", path: "/changes/{changeId}/nearby" },
    adopt: { method: "POST", path: "/changes/{changeId}/adopt", headers: ["idempotency-key"] },
@@ -14,6 +14,6 @@ index 4c896e1..a122994 100644
 -    path: "/changes/{changeId}/rebase",
 -    headers: ["keel-lease", "idempotency-key"],
 -  },
-   sketch: { method: "POST", path: "/sketches", headers: ["idempotency-key"] },
    Workspaces_refreshWorkspaceToken: {
      method: "POST",
+     path: "/workspaces/{workspaceId}/token",

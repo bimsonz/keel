@@ -2,13 +2,13 @@
 # kills: a11.declare
 # why: the isolate mints its own idempotency key, so a retried declare opens a second change
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index 93b133e..1412881 100644
+index e063a0fe..6e47cf64 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -163,7 +163,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
+@@ -190,7 +190,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
+     footprint: fields.footprint,
      premises: fields.premises,
      ...(fields.declaredEffects === undefined ? {} : { declaredEffects: fields.declaredEffects }),
-     ...(fields.fromSketch === undefined ? {} : { fromSketch: fields.fromSketch }),
 -    idempotencyKey: input["idempotency-key"],
 +    idempotencyKey: crypto.randomUUID(),
    }));

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "spec.removed"
+# kills: spec.removed
+# why: a hand route answers at /v1/sketches again, so an operation the contract no longer has is served and no table says so
+diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
+index 5743ba5e..f185f16c 100644
+--- a/apps/keel/src/adapters/driving/http/app.ts
++++ b/apps/keel/src/adapters/driving/http/app.ts
+@@ -91,6 +91,9 @@ export function makeApp(options: AppOptions) {
+   const deps = routeDeps(options.gate);
+   registerInboxStreams(app, deps, options.streams);
+ 
++  app.post("/v1/sketches", (c) =>
++    problemResponse(503, "service.not_implemented", c.get("requestId")),
++  );
+   app.notFound((c) => problemResponse(404, "resource.not_found", c.get("requestId")));
+   app.onError((error, c) =>
+     answerUnhandled(error, c.get("requestId") ?? crypto.randomUUID(), options.rethrowContractDrift),
