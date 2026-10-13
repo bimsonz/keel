@@ -1,19 +1,22 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { compare, SubjectKey } from "../../../src/domain/coordination/index.ts";
-import { Instant } from "../../../src/domain/kernel/index.ts";
+import { Instant, makeId } from "../../../src/domain/kernel/index.ts";
 import {
   admit,
+  type Conflict,
   type ConflictCommand,
   ConflictEvent,
   type ConflictKind,
   decideConflict,
+  evolveConflict,
   type ProbeCommand,
   replayConflict,
 } from "../../../src/domain/verification/index.ts";
 import { conflictChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import type { Fold } from "../../support/machine.ts";
 import {
   BATCH,
@@ -24,9 +27,11 @@ import {
   conflictLog,
   conflictOracle,
   CONFLICT,
+  DECISION,
   EFFECTS,
   ESCALATION,
   eventsIn,
+  foldsIntoConflict,
   GUARD,
   type Ledger,
   type LedgerCommand,
@@ -35,6 +40,7 @@ import {
   ledgerTour,
   planArb,
   PREMISE,
+  PROBE,
   type Record_,
   run,
   SUBJECT,
@@ -512,6 +518,170 @@ describe("the Conflict chart", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked: readonly Fold<Ledger, LedgerEvent>[] = ledgerTour();
     expect(offChart(conflictChart, walked, conflictView)).toEqual([]);
     expect(uncovered(conflictChart, walked, conflictView)).toEqual([]);
+  });
+});
+
+const ANOTHER = makeId("cfl", `${"0".repeat(25)}2`);
+const ANOTHER_PROBE = makeId("prb", `${"0".repeat(25)}2`);
+
+/** The conflict's own half of the pair's tour: its states, and the events that fold into it. */
+const conflictTour = (): readonly Fold<Conflict, ConflictEvent>[] =>
+  ledgerTour().flatMap(({ before, event, after }) =>
+    foldsIntoConflict(event) && after.conflict !== undefined
+      ? [{ before: before?.conflict, event, after: after.conflict }]
+      : [],
+  );
+
+/** What the fold's table is about: whose the conflict is, its kind and state, the probe drafted for it, the suite cells recorded and how it ended. */
+interface Folded {
+  readonly id: Conflict["id"];
+  readonly kind: ConflictKind;
+  readonly state: Conflict["state"];
+  readonly probe?: string;
+  /** Each suite cell recorded, by world, check and run, with its answer. */
+  readonly cells: Readonly<Record<string, string>>;
+  readonly escalation?: string;
+  readonly resolved?: string;
+}
+
+/** The proof that settles each kind with no probe (state-machines.md § Conflict, Suspected to Proven); a semantic conflict has none. */
+const PROOF_OF: Readonly<Partial<Record<ConflictKind, string>>> = {
+  textual: "merge-refused",
+  precedent: "guard",
+  interaction: "interaction",
+};
+
+/** The fold's from-table (state-machines.md § Conflict), typed apart from `evolveConflict`. */
+const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illegal" => {
+  if (from === undefined)
+    return event._tag === "ConflictSuspected"
+      ? { id: event.conflictId, kind: event.kind, state: "suspected", cells: {} }
+      : "illegal";
+  if (event.conflictId !== from.id) return "illegal";
+  const undecided = from.state === "suspected" || from.state === "probing";
+  switch (event._tag) {
+    case "ConflictSuspected":
+      return "illegal";
+    case "ProbeDrafted":
+      return from.state === "suspected"
+        ? { ...from, state: "probing", probe: event.probeId }
+        : "illegal";
+    case "ProbeRan":
+      return from.state === "probing" && event.probeId === from.probe ? from : "illegal";
+    case "WorldCheckRan": {
+      // A suite's cell is a fact of a conflict whose probe was drafted, whatever it has become; a cell is recorded once.
+      const cell = `${event.world} ${event.check} run ${event.run}`;
+      return from.probe !== undefined && from.cells[cell] === undefined
+        ? { ...from, cells: { ...from.cells, [cell]: event.outcome } }
+        : "illegal";
+    }
+    case "ConflictProven": {
+      const proof = event.evidence;
+      const proves =
+        proof._tag === "probe"
+          ? from.state === "probing" && proof.probeId === from.probe
+          : from.state === "suspected" && PROOF_OF[from.kind] === proof._tag;
+      return proves ? { ...from, state: "proven" } : "illegal";
+    }
+    case "ConflictDismissed":
+      return undecided ? { ...from, state: "dismissed" } : "illegal";
+    case "ConflictEscalated":
+      // Unprovable is what an undecided conflict becomes; a proven one escalates as human-class.
+      return (event.reason === "unprovable" ? undecided : from.state === "proven")
+        ? { ...from, state: "escalated", escalation: event.escalationId }
+        : "illegal";
+    case "ConflictResolved":
+      // A proven conflict resolves by a move; an escalated one only on a ruling's decision.
+      return from.state === "proven" ||
+        (from.state === "escalated" && event.decisionId !== undefined)
+        ? {
+            ...from,
+            state: "resolved",
+            resolved: `${event.move}${event.decisionId === undefined ? "" : ` by ${event.decisionId}`}`,
+          }
+        : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+/**
+ * Each event in every form the fold could tell apart: another probe's cell, a
+ * suite cell with the other answer and of another run, each kind of proof, each
+ * reason to escalate, a resolution with and without a decision; and every one
+ * of those as another conflict's.
+ */
+const conflictForms = (event: ConflictEvent): readonly ConflictEvent[] => {
+  const forms = ((): readonly ConflictEvent[] => {
+    switch (event._tag) {
+      case "ProbeRan":
+        return [event, { ...event, probeId: ANOTHER_PROBE }];
+      case "WorldCheckRan":
+        return [
+          event,
+          { ...event, outcome: event.outcome === "pass" ? "fail" : "pass" },
+          { ...event, run: event.run === 1 ? 2 : 1 },
+        ];
+      case "ConflictProven":
+        return [
+          { ...event, evidence: { _tag: "probe", probeId: PROBE } },
+          { ...event, evidence: { _tag: "probe", probeId: ANOTHER_PROBE } },
+          { ...event, evidence: { _tag: "guard", guardId: GUARD } },
+          { ...event, evidence: { _tag: "merge-refused", batchId: BATCH } },
+          { ...event, evidence: { _tag: "interaction", batchId: BATCH } },
+        ];
+      case "ConflictEscalated":
+        return [
+          { ...event, reason: "human-class" },
+          { ...event, reason: "unprovable" },
+        ];
+      case "ConflictResolved": {
+        const { decisionId: _decision, ...bare } = event;
+        return [bare, { ...bare, decisionId: DECISION }];
+      }
+      default:
+        return [event];
+    }
+  })();
+  return forms.flatMap((form) => [form, { ...form, conflictId: ANOTHER }]);
+};
+
+describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[conflict.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Conflict, ConflictEvent, Folded>({
+      evolve: evolveConflict,
+      walked: conflictTour(),
+      summary: (c) => ({
+        id: c.id,
+        kind: c.kind,
+        state: c.state,
+        ...(c.probeId === undefined ? {} : { probe: c.probeId }),
+        cells: Object.fromEntries(
+          (c.checks ?? []).map((k) => [`${k.world} ${k.check} run ${k.run}`, k.outcome]),
+        ),
+        ...(c.escalationId === undefined ? {} : { escalation: c.escalationId }),
+        ...(c.move === undefined
+          ? {}
+          : { resolved: `${c.move}${c.decisionId === undefined ? "" : ` by ${c.decisionId}`}` }),
+      }),
+      shown: (f) =>
+        [
+          `${f.id} ${f.kind} ${f.state}`,
+          ...(f.probe === undefined ? [] : [`probe ${f.probe}`]),
+          ...Object.entries(f.cells).map(([cell, outcome]) => `${cell} ${outcome}`),
+          ...(f.escalation === undefined ? [] : [`escalated as ${f.escalation}`]),
+          ...(f.resolved === undefined ? [] : [f.resolved]),
+        ].join(", "),
+      forms: conflictForms,
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    const shape = foldShape(cases);
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 8968, refused: 8492, rows: 76 });
   });
 });
 

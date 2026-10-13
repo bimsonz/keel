@@ -1,11 +1,14 @@
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { Instant } from "../../../src/domain/kernel/index.ts";
+import { Instant, makeId } from "../../../src/domain/kernel/index.ts";
 import {
   admit,
   type ConflictCommand,
   type DraftFailure,
+  evolveProbe,
   MAX_DRAFT_ATTEMPTS,
+  type Probe,
+  type ProbeCell,
   type ProbeCommand,
   ProbeDiscarded,
   ProbeStateRefused,
@@ -15,6 +18,8 @@ import {
 import { probeChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
+import type { Fold } from "../../support/machine.ts";
 import {
   BUNDLE,
   CHANGE_A,
@@ -25,6 +30,7 @@ import {
   EFFECTS,
   ESCALATION,
   eventsIn,
+  foldsIntoProbe,
   GUARD,
   type Ledger,
   type LedgerCommand,
@@ -270,6 +276,167 @@ describe("the Probe → Guard chart", { timeout: PROPERTY_TIMEOUT }, () => {
       P({ _tag: "Retire", decisionId: DECISION }),
     ]);
     expect(retired.state?.probe?.state).toBe("retired");
+  });
+});
+
+const ANOTHER = makeId("prb", `${"0".repeat(25)}2`);
+const ANOTHER_CONFLICT = makeId("cfl", `${"0".repeat(25)}2`);
+const ANOTHER_GUARD = makeId("grd", `${"0".repeat(25)}2`);
+
+/** The probe's own half of the pair's tour: its states, and the events that fold into it. */
+const probeTour = (): readonly Fold<Probe, ProbeEvent>[] =>
+  ledgerTour().flatMap(({ before, event, after }) =>
+    foldsIntoProbe(event) && after.probe !== undefined
+      ? [{ before: before?.probe, event, after: after.probe }]
+      : [],
+  );
+
+/** What the fold's table is about: whose the probe is, its conflict, its state, the cells of its matrix recorded and how it ended. */
+interface Folded {
+  readonly id: Probe["id"];
+  readonly conflict: Probe["conflictId"];
+  readonly state: Probe["state"];
+  readonly cells: readonly ProbeCell[];
+  readonly ended?: string;
+}
+
+/** What the matrix recorded so far says: admitted, still pending, or the reason it is rejected for. */
+const matrixSays = (cells: readonly ProbeCell[]): string => {
+  const admission = admit(cells);
+  return admission._tag === "rejected" ? admission.reason : admission._tag;
+};
+
+/**
+ * The fold's from-table (state-machines.md § Probe → Guard), typed apart from
+ * `evolveProbe`. On a probe that is there, the table compares a cell's conflict
+ * with the probe's and an admission's and a discard's with nothing: those two
+ * name the probe, and the owning object folds only its own conflict's log.
+ */
+const folds = (from: Folded | undefined, event: ProbeEvent): Folded | "illegal" => {
+  if (from === undefined) {
+    if (event._tag === "ProbeDrafted")
+      return { id: event.probeId, conflict: event.conflictId, state: "calibrating", cells: [] };
+    // Every draft failed: the probe begins discarded, by the one event that names its conflict.
+    return event._tag === "ProbeDiscarded" &&
+      event.reason === "draft-failed" &&
+      event.conflictId !== undefined
+      ? {
+          id: event.probeId,
+          conflict: event.conflictId,
+          state: "discarded",
+          cells: [],
+          ended: "draft-failed",
+        }
+      : "illegal";
+  }
+  const calibrating = from.state === "calibrating";
+  switch (event._tag) {
+    case "ProbeDrafted":
+      return "illegal";
+    case "ProbeRan":
+      return calibrating &&
+        event.probeId === from.id &&
+        event.conflictId === from.conflict &&
+        !from.cells.some((c) => c.world === event.world && c.run === event.run)
+        ? {
+            ...from,
+            cells: [...from.cells, { world: event.world, run: event.run, outcome: event.outcome }],
+          }
+        : "illegal";
+    case "GuardAdmitted":
+      // Admission is computed from the cells: a log cannot admit a probe its matrix does not.
+      return calibrating && event.probeId === from.id && matrixSays(from.cells) === "admitted"
+        ? { ...from, state: "admitted", ended: event.guardId }
+        : "illegal";
+    case "ProbeDiscarded":
+      // And it cannot discard one for a reason the matrix does not give.
+      return calibrating && event.probeId === from.id && matrixSays(from.cells) === event.reason
+        ? { ...from, state: "discarded", ended: event.reason }
+        : "illegal";
+    case "GuardRetired":
+      return from.state === "admitted" && event.guardId === from.ended
+        ? { ...from, state: "retired", ended: `${from.ended} by ${event.decisionId}` }
+        : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+/**
+ * Each event in every form the fold could tell apart: another probe's and
+ * another conflict's, a cell with another answer, an admission of another
+ * guard, a discard for each reason with and without its conflict, and a
+ * retirement of another guard.
+ */
+const probeForms = (event: ProbeEvent): readonly ProbeEvent[] => {
+  switch (event._tag) {
+    case "ProbeDrafted":
+      return [event, { ...event, probeId: ANOTHER }, { ...event, conflictId: ANOTHER_CONFLICT }];
+    case "ProbeRan":
+      return [
+        event,
+        { ...event, probeId: ANOTHER },
+        { ...event, conflictId: ANOTHER_CONFLICT },
+        { ...event, outcome: event.outcome === "pass" ? "fail" : "pass" },
+      ];
+    case "GuardAdmitted":
+      return [
+        event,
+        { ...event, probeId: ANOTHER },
+        { ...event, conflictId: ANOTHER_CONFLICT },
+        { ...event, guardId: ANOTHER_GUARD },
+      ];
+    case "ProbeDiscarded": {
+      const { conflictId: _conflict, detail: _detail, ...bare } = event;
+      return (["non-discriminating", "unstable", "draft-failed"] as const).flatMap(
+        (reason): ProbeEvent[] => [
+          { ...bare, reason },
+          { ...bare, reason, conflictId: CONFLICT },
+          { ...bare, reason, conflictId: ANOTHER_CONFLICT },
+          { ...bare, reason, conflictId: CONFLICT, probeId: ANOTHER },
+        ],
+      );
+    }
+    case "GuardRetired":
+      return [event, { ...event, guardId: ANOTHER_GUARD }];
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+describe("the Probe → Guard fold", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[probe.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Probe, ProbeEvent, Folded>({
+      evolve: evolveProbe,
+      walked: probeTour(),
+      summary: (p) => ({
+        id: p.id,
+        conflict: p.conflictId,
+        state: p.state,
+        cells: p.cells,
+        ...(p.discarded === undefined ? {} : { ended: p.discarded }),
+        ...(p.guardId === undefined
+          ? {}
+          : { ended: p.retiredBy === undefined ? p.guardId : `${p.guardId} by ${p.retiredBy}` }),
+      }),
+      shown: (f) =>
+        [
+          `${f.id} of ${f.conflict} ${f.state}`,
+          ...f.cells.map((c) => `${c.world} run ${c.run} ${c.outcome}`),
+          ...(f.ended === undefined ? [] : [f.ended]),
+        ].join(", "),
+      forms: probeForms,
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    const shape = foldShape(cases);
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 2262, refused: 1973, rows: 26 });
   });
 });
 
