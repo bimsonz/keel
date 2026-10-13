@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts
 # kills: link.card-public
-# why: the public card of an agent that signed itself up leaves out its namespace, so nothing a reader is shown says where its own projects live
+# why: the public card of an agent that signed itself up leaves out its handle, so nothing a reader is shown names the agent's own namespace
 diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
-index 957b536c..4d368f3e 100644
+index 6b034fd1..ca584381 100644
 --- a/apps/keel/src/adapters/driving/http/sponsorship.ts
 +++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
-@@ -247,7 +247,6 @@ export function cardOk(
+@@ -242,7 +242,6 @@ export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentRe
+     body: {
        id: agent.id,
        name: agent.name,
-       ...(agent.handle === undefined ? {} : { handle: agent.handle }),
--      ...(own === undefined ? {} : { namespace: { handle: own.handle, kind: own.kind } }),
+-      ...(agent.handle === undefined ? {} : { handle: agent.handle }),
        ...(agent.kind === undefined ? {} : { kind: agent.kind }),
        ...(org === undefined ? {} : { org }),
      },
