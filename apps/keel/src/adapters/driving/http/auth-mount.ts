@@ -18,7 +18,7 @@ export interface AuthMount {
   readonly admitToken: (key: string) => Promise<boolean>;
 }
 
-/** How long an address waits once the token limit refuses it: the limiter's own window. */
+/** How long an address waits once the token limit refuses it: the limiter's own window (`TOKEN_LIMIT`'s period in wrangler.jsonc). */
 export const TOKEN_WINDOW_SECONDS = 60;
 
 /**

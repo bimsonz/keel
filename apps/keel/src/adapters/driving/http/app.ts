@@ -42,8 +42,6 @@ export const DOCUMENT_PATH = "/v1/openapi.json";
 /** The spec's `Auth_exchangeToken`: open to anyone, so each address is limited ahead of it. */
 const TOKEN_PATH = "/v1/oauth/token";
 
-/** The limiter's window (`TOKEN_LIMIT`'s period in wrangler.jsonc): the longest a refused address waits. */
-
 /** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
