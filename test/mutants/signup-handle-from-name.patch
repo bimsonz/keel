@@ -2,10 +2,10 @@
 # kills: signup.http
 # why: an agent's handle is the name it gives itself, so any agent takes any free name at sign-up, a person's or an org's among them
 diff --git a/packages/core/src/application/identity/sign-up.ts b/packages/core/src/application/identity/sign-up.ts
-index 29dc4e1..6e09d2c 100644
+index 5129b22c..62336782 100644
 --- a/packages/core/src/application/identity/sign-up.ts
 +++ b/packages/core/src/application/identity/sign-up.ts
-@@ -110,7 +110,7 @@ export const signUpAgent: (
+@@ -118,7 +118,7 @@ export const signUpAgent: (
    const known = yield* (yield* AgentDirectory).findAgent(agentId);
    const agent = yield* (yield* AgentSignUps).signUp({
      agentId,

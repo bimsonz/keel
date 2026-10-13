@@ -2,7 +2,7 @@
 # kills: discovery.client
 # why: an agent that holds no key is answered as a client with an empty key set, where the provider's own handling of a client it cannot authenticate is all that refuses it
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 409ba6d..c349913 100644
+index 5a71018f..2e9798a2 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
 @@ -94,7 +94,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {

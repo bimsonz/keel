@@ -2,10 +2,10 @@
 # kills: dpop.bound-token
 # why: a bound token presented as a plain bearer skips the binding check, so a thief only has to drop the scheme
 diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-index 90bba1a..c91f4b1 100644
+index cc561cb0..0b4d8cfe 100644
 --- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
-@@ -87,7 +87,7 @@ export async function verifyAgentToken(
+@@ -77,7 +77,7 @@ export async function verifyAgentToken(
    }
    try {
      const { internalAdapter } = await auth.$context;

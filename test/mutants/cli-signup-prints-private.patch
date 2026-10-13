@@ -2,7 +2,7 @@
 # kills: cli.signup
 # why: sign-up prints the private key it has just stored, so the key is in the terminal's scrollback and in any log the output went to
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..b3a3721 100644
+index d67193a5..c9a4abda 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -349,7 +349,7 @@ async function signUpCommand(

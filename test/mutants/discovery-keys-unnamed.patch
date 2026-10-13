@@ -2,7 +2,7 @@
 # kills: token.any-of-its-keys
 # why: an agent's keys are handed to the provider with no names, so it cannot pick the key a request was signed by and an agent with a second key gets no token with either
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 409ba6d..016b5a1 100644
+index 5a71018f..65969354 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
 @@ -105,7 +105,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {

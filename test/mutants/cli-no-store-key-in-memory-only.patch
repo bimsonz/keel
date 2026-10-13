@@ -2,7 +2,7 @@
 # kills: cli.signup-no-store
 # why: with no key store sign-up makes a key and signs up anyway, so the account exists and its key is gone when the command ends
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..8533a42 100644
+index d67193a5..e5589a1b 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -330,15 +330,15 @@ async function signUpCommand(

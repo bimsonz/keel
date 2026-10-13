@@ -2,7 +2,7 @@
 # kills: sdk.key-signup
 # why: sign-up sends the key with no proof that the sender holds it, which Keel refuses, so no agent signs up through the SDK
 diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
-index c780180..9bd345c 100644
+index c7801805..9bd345c1 100644
 --- a/packages/sdk/src/agent-key.ts
 +++ b/packages/sdk/src/agent-key.ts
 @@ -282,7 +282,6 @@ export async function signUp(request: SignUpRequest): Promise<SignedUp> {

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-migration.test.ts
+# kills: migration.agents-rebuild
+# why: dropping the agents table drops its indexes, and the rebuild makes only the one it knew of, so a person's list of the agents they stand behind scans the table
+diff --git a/apps/keel/migrations/0013_agent_keys.sql b/apps/keel/migrations/0013_agent_keys.sql
+index e50cc8f9..1a465c75 100644
+--- a/apps/keel/migrations/0013_agent_keys.sql
++++ b/apps/keel/migrations/0013_agent_keys.sql
+@@ -38,7 +38,6 @@ INSERT INTO agents_v3 (id, name, kind, scopes, state, revocation_epoch, created_
+ DROP TABLE agents;
+ ALTER TABLE agents_v3 RENAME TO agents;
+ CREATE INDEX agents_by_project ON agents (project_id);
+-CREATE INDEX agents_by_sponsor ON agents (sponsor_user);
+ 
+ CREATE TABLE credentials (
+   client_id   TEXT PRIMARY KEY,

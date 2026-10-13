@@ -2,7 +2,7 @@
 # kills: sdk.key-token
 # why: a token is bound to the account's own key, which Keel refuses, and which would put the key that never expires on every request
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 4320047..94f0b65 100644
+index d2d9c292..09b4419c 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -131,7 +131,7 @@ export class KeelClient {

@@ -2,7 +2,7 @@
 # kills: run.envelope
 # why: the outbox stamps the actor on an event and leaves the run off, so every event of an agent with several runs reads as the whole agent's
 diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
-index 022dee2..9150d30 100644
+index 022dee2b..9150d303 100644
 --- a/packages/core/src/application/ports/event-outbox.ts
 +++ b/packages/core/src/application/ports/event-outbox.ts
 @@ -278,7 +278,6 @@ export function envelopesFor(

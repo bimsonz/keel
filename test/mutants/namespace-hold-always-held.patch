@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.namespaces-agent
+# why: the hold answers yes without reading who holds the handle, so a sign-up goes on with a handle that is another account's
+diff --git a/apps/keel/src/adapters/driven/d1/namespaces.ts b/apps/keel/src/adapters/driven/d1/namespaces.ts
+index 7135f070..b617d0d8 100644
+--- a/apps/keel/src/adapters/driven/d1/namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/namespaces.ts
+@@ -76,7 +76,7 @@ export function NamespacesD1(db: D1Database) {
+               db.prepare(`SELECT id FROM namespaces WHERE handle = ?`).bind(held),
+             ]),
+           );
+-          return holder?.results[0]?.id === agent;
++          return holder !== undefined;
+         }),
+     }),
+   );

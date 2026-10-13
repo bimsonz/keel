@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.agent-token
+# why: a session or a token of the secret exchange is taken under the DPoP scheme, which promises a key binding neither has
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 7fd2d651..5c355050 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -214,8 +214,7 @@ export async function gate(
+           deps.challenge(door, answer),
+         );
+       credential = { _tag: "Claims", claims: answer };
+-    } else if (scheme !== "Bearer") return refused({ refused: "invalid" });
+-    else if (JWT.test(token)) credential = { _tag: "Token", token };
++    } else if (JWT.test(token)) credential = { _tag: "Token", token };
+     else {
+       const user = await session(only(request.headers, "authorization"));
+       if (user === null) return refused({ refused: "invalid" });

@@ -2,7 +2,7 @@
 # kills: signup.id-from-key
 # why: an agent's id is made from 66 bits of its key's thumbprint, so a second key that names the same account can be searched for
 diff --git a/packages/core/src/domain/identity/agent-key.ts b/packages/core/src/domain/identity/agent-key.ts
-index a61d641..a9ce121 100644
+index a61d641f..a9ce1217 100644
 --- a/packages/core/src/domain/identity/agent-key.ts
 +++ b/packages/core/src/domain/identity/agent-key.ts
 @@ -50,7 +50,7 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";

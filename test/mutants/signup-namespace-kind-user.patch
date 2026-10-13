@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-sign-up.test.ts
+# kills: signup.http
+# why: an agent's namespace is written as a person's, so its handle resolves to a user that does not exist and the policy treats what it owns as a person's
+diff --git a/apps/keel/src/adapters/driven/d1/namespaces.ts b/apps/keel/src/adapters/driven/d1/namespaces.ts
+index 7135f070..505ac2e1 100644
+--- a/apps/keel/src/adapters/driven/d1/namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/namespaces.ts
+@@ -70,7 +70,7 @@ export function NamespacesD1(db: D1Database) {
+             db.batch<{ id: string }>([
+               db
+                 .prepare(
+-                  `INSERT OR IGNORE INTO namespaces (id, handle, kind, created_at) VALUES (?, ?, 'agent', ?)`,
++                  `INSERT OR IGNORE INTO namespaces (id, handle, kind, created_at) VALUES (?, ?, 'user', ?)`,
+                 )
+                 .bind(agent, held, now),
+               db.prepare(`SELECT id FROM namespaces WHERE handle = ?`).bind(held),

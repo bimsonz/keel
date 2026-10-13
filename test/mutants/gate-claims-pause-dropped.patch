@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.claims
+# why: a suspended agent that signed itself up is admitted as active, so a sponsor's pause stops nothing it does with its own token
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 93010ae3..da31e8d5 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -200,7 +200,7 @@ export const principalOf: (
+           org,
+           ...(projectId === undefined ? {} : { projectId }),
+           scopes: claims.scopes,
+-          paused: agent.state === "suspended",
++          paused: false,
+           standing: governs ? { _tag: "Governs" } : { _tag: "None" },
+         },
+         token: claims,

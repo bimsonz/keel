@@ -2,7 +2,7 @@
 # kills: signup.key-proof
 # why: a sign-up's proof may be made by any key, so anyone signs up a public key they do not hold, under a name of their choosing
 diff --git a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
-index 67d8181..eb46938 100644
+index 67d81814..eb469384 100644
 --- a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
 @@ -48,7 +48,6 @@ export async function provenKey(request: {

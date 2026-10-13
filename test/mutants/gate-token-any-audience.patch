@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: dpop.audience
+# why: the token check takes a token issued for any of Keel's resources at every door, so a token an MCP client was given for the MCP server works against the API
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index cc561cb0..2e1921cb 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -67,7 +67,7 @@ export async function verifyAgentToken(
+       jwksCacheKey: SIGNING_KEYS,
+       verifyOptions: {
+         issuer: `${origin}${AUTH_BASE_PATH}`,
+-        audience: resource,
++        audience: [origin, `${origin}/mcp`],
+         typ: "at+jwt",
+         algorithms: ["EdDSA"],
+       },

@@ -2,7 +2,7 @@
 # kills: sdk.key-proof
 # why: a proof names its URL with the query, which Keel compares without one, so every call with a query is refused
 diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
-index c780180..a55733b 100644
+index c7801805..a55733b3 100644
 --- a/packages/sdk/src/agent-key.ts
 +++ b/packages/sdk/src/agent-key.ts
 @@ -167,7 +167,7 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro

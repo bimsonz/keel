@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-migration.test.ts
+# kills: migration.agents-rebuild
+# why: the rebuild copies the columns agents had before the sponsor link, so every agent's sponsor_seq goes back to 0 and a late enrolment projection may overwrite a sponsor a link event wrote
+diff --git a/apps/keel/migrations/0013_agent_keys.sql b/apps/keel/migrations/0013_agent_keys.sql
+index e50cc8f9..101bcbcd 100644
+--- a/apps/keel/migrations/0013_agent_keys.sql
++++ b/apps/keel/migrations/0013_agent_keys.sql
+@@ -33,8 +33,8 @@ CREATE TABLE agents_v3 (
+   sponsor_seq      INTEGER NOT NULL DEFAULT 0,
+   handle           TEXT
+ );
+-INSERT INTO agents_v3 (id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user, sponsor_seq)
+-  SELECT id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user, sponsor_seq FROM agents;
++INSERT INTO agents_v3 (id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user)
++  SELECT id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user FROM agents;
+ DROP TABLE agents;
+ ALTER TABLE agents_v3 RENAME TO agents;
+ CREATE INDEX agents_by_project ON agents (project_id);

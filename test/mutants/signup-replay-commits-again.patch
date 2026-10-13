@@ -2,7 +2,7 @@
 # kills: agent.sign-up
 # why: the same key signing up again commits AgentSignedUp a second time, so every retry of a sign-up is another event in the log and on the feed
 diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
-index 68c39af..659c6a4 100644
+index 3c428c89..77b2520c 100644
 --- a/packages/core/src/domain/identity/agent-machine.ts
 +++ b/packages/core/src/domain/identity/agent-machine.ts
 @@ -129,7 +129,9 @@ export const decideAgent = (

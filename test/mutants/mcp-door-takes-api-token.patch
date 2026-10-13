@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-sign-up.test.ts
+# kills: signup.http
+# why: the MCP endpoint passes the gate at the API's door, so it takes a token issued for the API and refuses the one issued for it
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 4e86121c..46ce8be9 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -76,7 +76,7 @@ export function makeMcpEndpoint(
+     const presented = presentedToken(request.headers.get("authorization") ?? "");
+     if (presented === null)
+       return unauthenticated(deps.challenge("mcp"), "A bearer token is required");
+-    const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
++    const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false });
+     if (gated instanceof Response)
+       return unauthenticated(
+         gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),

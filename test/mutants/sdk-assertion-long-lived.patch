@@ -2,7 +2,7 @@
 # kills: sdk.key-assertion
 # why: a signed token request says it is good for ten minutes, which Keel refuses, so no agent using the SDK gets a token
 diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
-index c780180..1df5504 100644
+index c7801805..1df55049 100644
 --- a/packages/sdk/src/agent-key.ts
 +++ b/packages/sdk/src/agent-key.ts
 @@ -175,7 +175,7 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro

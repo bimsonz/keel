@@ -2,7 +2,7 @@
 # kills: sdk.key-thumbprint
 # why: a key's thumbprint is taken over its members out of order, so it is not the thumbprint Keel computes and the agent names a key Keel does not know
 diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
-index c780180..184593c 100644
+index c7801805..184593c2 100644
 --- a/packages/sdk/src/agent-key.ts
 +++ b/packages/sdk/src/agent-key.ts
 @@ -135,7 +135,7 @@ export function thumbprint(jwk: PublicJwk): Promise<string> {

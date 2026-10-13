@@ -2,7 +2,7 @@
 # kills: token.standing
 # why: a suspended or revoked agent is given claims, so only the provider's disabled-client check stands between a paused agent and a new token
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index d21f06d..617ba1e 100644
+index d21f06d1..617ba1eb 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
 @@ -70,8 +70,6 @@ const asLabel = Schema.decodeUnknownOption(RunLabel);

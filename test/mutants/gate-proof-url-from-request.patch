@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.agent-token
+# why: the address a proof is checked against is taken from the request as it arrived, Host and all, so a proof made for another host is good here
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 7fd2d651..13cfe687 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -195,7 +195,7 @@ export async function gate(
+           proof: request.headers.get("dpop") ?? undefined,
+           method: request.method,
+           // Keel's own origin, never the request's Host: a proof is for the address Keel answers on.
+-          url: `${deps.origin}${new URL(request.url).pathname}`,
++          url: request.url.split("?")[0] ?? request.url,
+         },
+         door,
+       );

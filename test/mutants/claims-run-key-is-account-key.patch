@@ -2,7 +2,7 @@
 # kills: token.run-key-apart
 # why: a token may be bound to the account's own key, so the key that never expires signs every request and a run's leak is the account's
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index d21f06d..7902a92 100644
+index d21f06d1..7902a92f 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
 @@ -73,8 +73,6 @@ export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunC

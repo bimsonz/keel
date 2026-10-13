@@ -2,7 +2,7 @@
 # kills: run.commit-sites
 # why: a use-case names the agent as its commit's actor itself, so the next one written the same way drops the run and nothing notices
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index c360c49..724db69 100644
+index 464826c0..82bf97d3 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
 @@ -209,7 +209,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio

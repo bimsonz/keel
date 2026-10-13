@@ -2,10 +2,10 @@
 # kills: token.rate-limit
 # why: a token request is admitted whatever its limiter answers, so one address guesses at signed requests without end
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index 7922f0d..890c834 100644
+index af681a40..abe847a7 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
-@@ -68,7 +68,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+@@ -91,7 +91,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
        const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
        if (path === mount.tokenPath) {
          // By address alone, as the token endpoint is limited: an agent's id is public.

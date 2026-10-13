@@ -2,7 +2,7 @@
 # kills: signup.key-proof
 # why: a sign-up's proof is checked against the URL the proof itself names, so a proof an agent made for any other request signs its key up here
 diff --git a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
-index 67d8181..e98b865 100644
+index 67d81814..e98b8658 100644
 --- a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
 @@ -1,6 +1,7 @@

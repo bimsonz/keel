@@ -2,7 +2,7 @@
 # kills: token.run
 # why: a run's id is made from its label alone, so two agents that both call a run `main` share one run
 diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
-index d21f06d..87f9314 100644
+index d21f06d1..87f93149 100644
 --- a/packages/core/src/domain/identity/run.ts
 +++ b/packages/core/src/domain/identity/run.ts
 @@ -26,7 +26,7 @@ export type RunName =

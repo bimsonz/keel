@@ -2,13 +2,13 @@
 # kills: run.commands
 # why: a withdrawal under the lease commits under the agent with no run, so nothing says which lane gave the change up
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 196147a..9471d30 100644
+index c37e2d09..c0886994 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1024,7 +1024,7 @@ const withdrawnBy = ({
+@@ -1025,7 +1025,7 @@ const withdrawnBy = ({
  }: AbandonChange): { readonly actor: Actor; readonly run?: RunRef } =>
    authority._tag === "Maintainer"
-     ? { actor: `operator:${authority.by}` }
+     ? { actor: userActor(authority.by) }
 -    : byAgent(authority.agentId, authority.run);
 +    : byAgent(authority.agentId, undefined);
  

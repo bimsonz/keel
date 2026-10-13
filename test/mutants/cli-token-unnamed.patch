@@ -2,7 +2,7 @@
 # kills: cli.token
 # why: the token handed to a tool names no project and no run, so what the tool does is in no project and of no run
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..d6a25c2 100644
+index d67193a5..6697aaab 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -389,7 +389,6 @@ async function keyCommand(

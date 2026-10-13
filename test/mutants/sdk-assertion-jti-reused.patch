@@ -2,7 +2,7 @@
 # kills: sdk.key-assertion
 # why: every signed token request carries the same id, so an agent's second request for a token is refused as the first one again
 diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
-index c780180..712e9ba 100644
+index c7801805..712e9bad 100644
 --- a/packages/sdk/src/agent-key.ts
 +++ b/packages/sdk/src/agent-key.ts
 @@ -196,7 +196,7 @@ export async function clientAssertion(

@@ -2,7 +2,7 @@
 # kills: run.change
 # why: a change adopted by a token of no run is still held by the run that had it, so the lane that let it lapse goes on being told about it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c4d56b..9f99067 100644
+index 6c4d56bd..9f99067b 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
 @@ -1014,7 +1014,7 @@ export const evolveChange = (

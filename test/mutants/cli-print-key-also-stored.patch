@@ -2,7 +2,7 @@
 # kills: cli.signup-no-store
 # why: a key made for a secret manager is also written over the key this machine holds, so the machine's own agent loses its key
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..41fcc7b 100644
+index d67193a5..5dd945f1 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -322,6 +322,7 @@ async function signUpCommand(

@@ -2,10 +2,10 @@
 # kills: sdk.key-call
 # why: a bound token is presented as a plain bearer with no proof, which Keel refuses: a token bound to a key needs the key shown
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 4320047..440c348 100644
+index d2d9c292..e57b7076 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -230,7 +230,7 @@ export class KeelClient {
+@@ -232,7 +232,7 @@ export class KeelClient {
      const binding = this.#binding();
      /** How the token is presented: under the DPoP scheme with a proof for this request when it is bound to a key. */
      const presenting = async (token: string): Promise<Record<string, string>> =>

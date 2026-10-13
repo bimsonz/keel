@@ -2,7 +2,7 @@
 # kills: discovery.client
 # why: an agent's record is passed to the provider whole, so a record that holds a person's scope asks for it on an agent's token
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 409ba6d..1973b10 100644
+index 5a71018f..8af83919 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
 @@ -106,7 +106,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {

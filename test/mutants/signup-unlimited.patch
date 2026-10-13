@@ -2,10 +2,10 @@
 # kills: signup.rate-limit
 # why: sign-up admits a request whatever its limiter answers, so one address makes accounts without end
 diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
-index 29da9a5..3c316f9 100644
+index 43e3a5f3..906bfff0 100644
 --- a/apps/keel/src/adapters/driving/http/app.ts
 +++ b/apps/keel/src/adapters/driving/http/app.ts
-@@ -74,7 +74,7 @@ export function makeApp(options: AppOptions) {
+@@ -75,7 +75,7 @@ export function makeApp(options: AppOptions) {
    // An agent's sign-up is counted as a person's is: by address, under the sign-in limit.
    app.use(REGISTER_PATH, async (c, next) => {
      const ip = c.req.header("cf-connecting-ip") ?? "unknown";

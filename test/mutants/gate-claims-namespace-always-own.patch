@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.claims
+# why: the agent is stood in its own namespace whatever project its token names, so the policy reads another's project as the agent's own
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 93010ae3..cf26d144 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -191,7 +191,7 @@ export const principalOf: (
+         projectId === undefined
+           ? Option.none()
+           : yield* ProjectNamespaces.use((places) => places.byId(projectId));
+-      const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
++      const org = Option.match(place, { onNone: () => own, onSome: () => own });
+       const governs = projectId === undefined || (Option.isSome(place) && org === own);
+       return {
+         principal: {

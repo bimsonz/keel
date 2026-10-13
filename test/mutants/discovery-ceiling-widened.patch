@@ -2,7 +2,7 @@
 # kills: discovery.client
 # why: every agent may be granted every agent scope whatever its record holds, so an agent given read alone gets a token that works
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 409ba6d..6a126c3 100644
+index 5a71018f..14862421 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
 @@ -106,7 +106,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {

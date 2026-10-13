@@ -2,7 +2,7 @@
 # kills: signup.directory
 # why: every agent in a sponsor's list is given all of the list's keys, so one sponsored agent reads as holding another's key
 diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-index a7ad46a..d8a6688 100644
+index 6e403fdc..8988094f 100644
 --- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
 +++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
 @@ -171,9 +171,7 @@ export function AgentDirectoryD1(db: D1Database) {

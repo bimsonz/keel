@@ -2,7 +2,7 @@
 # kills: cli.signup-no-store
 # why: the key is printed only after Keel has answered, so a crash between the two leaves an account whose only key was never shown
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..30b5953 100644
+index d67193a5..629a2167 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -321,8 +321,8 @@ async function signUpCommand(

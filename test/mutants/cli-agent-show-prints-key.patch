@@ -2,7 +2,7 @@
 # kills: cli.agent-show
 # why: `agent show` prints the stored key with the rest, so asking who the agent is puts its private key on the screen
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 7295afd..a010944 100644
+index d67193a5..52b3f747 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
 @@ -375,6 +375,7 @@ async function keyCommand(

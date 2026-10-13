@@ -2,7 +2,7 @@
 # kills: cli.signup
 # why: a profile is taken as it is typed, so a name with a space or a quote in it reaches the key store's own command line
 diff --git a/packages/cli/src/agent-key.ts b/packages/cli/src/agent-key.ts
-index b927d02..ebd26ec 100644
+index b927d029..ebd26ec5 100644
 --- a/packages/cli/src/agent-key.ts
 +++ b/packages/cli/src/agent-key.ts
 @@ -28,7 +28,7 @@ export class KeyError extends Error {}
