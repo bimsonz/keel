@@ -3,10 +3,12 @@
 //
 // No credential is given and none is kept. The script reads `<origin>/start`
 // and takes every address, method, header and field name after that from what
-// it read. It brings only what an arriving agent holds: a key it has just
-// made, and the proofs and the signed request that key makes.
+// it read, but for `/llms.txt`, which a reader finds by its name. It brings
+// only what an arriving agent holds: a key it has just made, and the proofs
+// and the signed request that key makes.
 //   (a) /start answers the walk as JSON, and as text to a reader that asks for
-//       nothing;
+//       nothing, and those answers and /llms.txt name the catalogue in a Link
+//       header;
 //   (b) the key signs up at the address the page gives, with the body the page
 //       spells out;
 //   (c) it asks the page's token endpoint for a token, bound to a key made for
@@ -15,7 +17,9 @@
 //       the handle sign-up gave it; the same request with no token is refused,
 //       and the refusal's challenge leads back to /start in two reads;
 //   (e) every document the page lists answers, and the token asked for by the
-//       MCP door's name is taken at /mcp, where the API's is refused.
+//       MCP door's name is taken at /mcp, where the API's is refused;
+//   (f) the document, the walk, the MCP server's card and the MCP server as it
+//       answers server/discover say one release's version.
 // Each run is a new key, so a new agent: run it on purpose. No token or key is printed.
 import { clientAssertion, dpopProof, generateAgentKey, runKey } from "@keeltown/sdk";
 
@@ -150,6 +154,23 @@ async function walk(): Promise<void> {
       words.startsWith(`# ${text(door["name"])}\n`),
     "(a) a reader that asks for nothing is answered the same walk as text",
   );
+  // The catalogue, named by each answer's own header (RFC 9727): on the walk, and on the index a reader finds by its conventional name.
+  const documentOf = (rel: string) =>
+    text(
+      record(
+        list(door["documents"])
+          .map(record)
+          .find((document) => text(document["rel"]) === rel),
+      )["url"],
+    );
+  const index = await fetch(`${origin}/llms.txt`);
+  await index.body?.cancel();
+  const pointer = `<${documentOf("api-catalog")}>; rel="api-catalog"`;
+  check(
+    documentOf("api-catalog") !== "" &&
+      [page, plain, index].every((answer) => answer.headers.get("link") === pointer),
+    "(a) the walk, as JSON and as text, and /llms.txt each name the catalogue in a Link header",
+  );
   const ids = list(door["steps"]).map((step) => text(record(step)["id"]));
   check(
     ids.slice(0, 4).join() === "key,sign-up,token,whoami",
@@ -267,6 +288,56 @@ async function walk(): Promise<void> {
   check(
     forMcp !== "" && taken !== 401 && taken !== 403 && refused === 401,
     `(e) a token asked for by the MCP door's name is taken at /mcp (${taken}), and the API's is refused there (${refused})`,
+  );
+
+  // (f) one release's version, wherever Keel says one.
+  const versionAt = async (rel: string, ...path: string[]) => {
+    const body: unknown = await (await fetch(documentOf(rel))).json().catch(() => undefined);
+    return text(path.reduce<unknown>((inner, key) => record(inner)[key], body));
+  };
+  const revision = "2026-07-28";
+  const discovering = await fetch(text(mcp["endpoint"]), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${forMcp}`,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": revision,
+      "mcp-method": "server/discover",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "server/discover",
+      params: {
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": revision,
+          "io.modelcontextprotocol/clientInfo": { name: "keel-door-walk", version: "0" },
+          "io.modelcontextprotocol/clientCapabilities": {},
+        },
+      },
+    }),
+  });
+  // The answer is one JSON body or one event of a stream.
+  const discoveryBody = await discovering.text();
+  const message = discoveryBody.startsWith("{")
+    ? discoveryBody
+    : (discoveryBody
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        ?.slice(6) ?? "{}");
+  const discovered: unknown = JSON.parse(message);
+  // The current revision has no handshake: a server names itself in the `_meta` of its answers.
+  const meta = record(record(record(discovered)["result"])["_meta"]);
+  const serverSays = text(record(meta["io.modelcontextprotocol/serverInfo"])["version"]);
+  const [published, carded] = [
+    await versionAt("service-desc", "info", "version"),
+    await versionAt("mcp-server-card", "version"),
+  ];
+  check(
+    /^(?!0\.0\.0$)\d+\.\d+\.\d+$/.test(published) &&
+      [text(door["version"]), carded, serverSays].every((said) => said === published),
+    `(f) the document, the walk, the MCP server's card and the MCP server say one release's version: ${published}, ${text(door["version"])}, ${carded}, ${serverSays}`,
   );
 }
 

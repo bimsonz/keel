@@ -650,9 +650,11 @@ const CACHED = { "cache-control": "public, max-age=300" };
 export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
   let made: FrontDoor | undefined;
   const door = (): FrontDoor => (made ??= frontDoor(openApiDocument, where));
+  // RFC 9727: a reader of either page is told where the catalogue is by the answer's own header.
+  const catalogued = { link: `<${where.origin}${CATALOG_PATH}>; rel="api-catalog"` };
   app.get(START_PATH, (c) => {
     const accept = c.req.header("accept") ?? "";
-    const headers = { ...CACHED, vary: "accept" };
+    const headers = { ...CACHED, ...catalogued, vary: "accept" };
     if (accept.includes("application/json")) return Response.json(door(), { headers });
     const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
     return new Response(startMarkdown(door()), {
@@ -663,7 +665,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
     LLMS_PATH,
     () =>
       new Response(llmsText(door()), {
-        headers: { ...CACHED, "content-type": "text/plain; charset=utf-8" },
+        headers: { ...CACHED, ...catalogued, "content-type": "text/plain; charset=utf-8" },
       }),
   );
   app.get(CATALOG_PATH, () =>

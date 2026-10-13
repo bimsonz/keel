@@ -6,7 +6,7 @@ import { sampleProjectId } from "@keeltown/testing";
 import { describe, expect, it } from "vitest";
 import type { DoorField, DoorStep, FrontDoor } from "../../src/adapters/driving/http/front-door.ts";
 import { assertionBy, freshAddress, newKey, proofBy } from "./agent-keys.ts";
-import { BASE, drainOutbox, mcp, worker } from "./helpers.ts";
+import { BASE, drainOutbox, mcp, mcpResult, worker } from "./helpers.ts";
 
 /** The one address an arriving agent is given. The walk reads every other from an answer. */
 const START = `${BASE}/start`;
@@ -152,6 +152,14 @@ const challenged = (response: Response): string => {
     /resource_metadata="([^"]+)"/.exec(response.headers.get("www-authenticate") ?? "") ?? [];
   if (url === undefined) throw new Error("the refusal's challenge names no resource document");
   return url;
+};
+
+/** An answer's status and what its Link header names: the target and its relation. */
+const linkOf = async (url: string, accept?: string) => {
+  const response = await worker(url, accept === undefined ? {} : { headers: { accept } });
+  const [, target, rel] =
+    /^<([^>]+)>; rel="([^"]+)"$/.exec(response.headers.get("link") ?? "") ?? [];
+  return [response.status, target, rel];
 };
 
 const documentAt = async (url: string): Promise<Json> => {
@@ -444,6 +452,54 @@ describe("the front door: what an agent that knows only Keel's address is told",
     const [remote] = list(card["remotes"]).map(record);
     expect([remote?.["type"], remote?.["url"]]).toEqual(["streamable-http", door.mcp.endpoint]);
     expect(door.mcp.endpoint).toBe(mcpResource["resource"]);
+  });
+
+  it("[door.version] the published document carries a release's version, and the walk, the MCP server as it answers server/discover and its card at both places say that same one", async () => {
+    const published = await documentAt(`${BASE}/v1/openapi.json`);
+    const version = record(published["info"])["version"];
+    // A release's number: three parts, and not the one a document is given when it declares none.
+    expect(String(version)).toMatch(/^(?!0\.0\.0$)\d+\.\d+\.\d+$/);
+
+    const door = await doorAsJson();
+    const { signer } = await generateAgentKey();
+    const { agentId } = await signUp({ baseUrl: BASE, signer, fetch: keel });
+    const token = await createKeelClient({
+      baseUrl: BASE,
+      agentId,
+      key: signer,
+      bound: false,
+      fetch: keel,
+      resource: door.mcp.resource,
+    }).token();
+    // The current revision has no handshake: a server names itself in the `_meta` of its answers.
+    const discovered = await mcpResult(await mcp(token, "server/discover"));
+    const server = record(record(discovered["_meta"])["io.modelcontextprotocol/serverInfo"]);
+    const cards = await Promise.all(
+      ["/mcp/server-card", "/.well-known/mcp/server-card.json"].map(
+        async (path) => (await documentAt(`${BASE}${path}`))["version"],
+      ),
+    );
+    expect({
+      walk: door.version,
+      server: [server["name"], server["version"]],
+      cards,
+    }).toEqual({ walk: version, server: ["keel", version], cards: [version, version] });
+    await settled(agentId);
+  });
+
+  it("[door.link] the walk, in each of the three ways it is asked for, and the index name the catalogue in a Link header of their answer (RFC 9727), and the address the header gives is the catalogue's", async () => {
+    const catalogue = `${BASE}/.well-known/api-catalog`;
+    expect([
+      await linkOf(START),
+      await linkOf(START, "text/markdown"),
+      await linkOf(START, "application/json"),
+      await linkOf(`${BASE}/llms.txt`),
+    ]).toEqual(Array.from({ length: 4 }, () => [200, catalogue, "api-catalog"]));
+    const linkset = await worker(catalogue);
+    expect([linkset.status, linkset.headers.get("content-type")]).toEqual([
+      200,
+      'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"',
+    ]);
   });
 
   it("[door.mcp-token] the token the SDK asks for by the MCP door's name, as the page gives it, is taken at /mcp and refused at the API; one asked for by no name is the API's, and /mcp refuses it", async () => {

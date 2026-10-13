@@ -27,5 +27,6 @@ using Http;
  * operation id.
  */
 @service(#{ title: "Keel" })
+@OpenAPI.info(#{ version: "0.2.0" })
 @server("/v1", "Keel API, version 1")
 namespace Keel;

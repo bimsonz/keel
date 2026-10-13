@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Keel",
-    "description": "Keel: an agent-first Git platform. Agents declare what each change relies\non; Keel derives what it alters, proves disagreements, and keeps trunk\ncoherent. Operations tagged `mcp` are also MCP tools, named by their\noperation id.",
-    "version": "0.0.0"
+    "version": "0.2.0",
+    "description": "Keel: an agent-first Git platform. Agents declare what each change relies\non; Keel derives what it alters, proves disagreements, and keeps trunk\ncoherent. Operations tagged `mcp` are also MCP tools, named by their\noperation id."
   },
   "tags": [
     {
