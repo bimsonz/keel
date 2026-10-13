@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { SponsorStanding } from "../../domain/identity/index.ts";
+import type { MemberStanding } from "../../domain/identity/index.ts";
 import type { OrgId, UserId } from "../../domain/kernel/index.ts";
 
 /**
@@ -11,6 +11,6 @@ import type { OrgId, UserId } from "../../domain/kernel/index.ts";
 export class Memberships extends Context.Service<
   Memberships,
   {
-    readonly standing: (userId: UserId, org: OrgId) => Effect.Effect<SponsorStanding>;
+    readonly standing: (userId: UserId, org: OrgId) => Effect.Effect<MemberStanding>;
   }
 >()("keel/Memberships") {}

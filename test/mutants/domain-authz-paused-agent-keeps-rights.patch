@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-paused
+# why: a paused agent keeps its rights: only the decision refuses it, and anything that reads its rights does not
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..bca2b9f4 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -234,7 +234,6 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
+  * not rest on the gate having filled the standing truthfully.
+  */
+ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
+-  if (agent.paused) return NONE;
+   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
+   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+   const standing = standingOn(agent, resource);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-paused
+# why: a paused agent is still granted what anyone is
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..be44227d 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -476,7 +476,7 @@ const whyNoRule = (
+     : "users-only";
+ 
+ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decision => {
+-  if (principal.paused) return refused("agent-paused");
++  if (principal.paused && need !== "anyone") return refused("agent-paused");
+   switch (need) {
+     case "anyone":
+     case "self":

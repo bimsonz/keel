@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.private-is-missing, authz.org-isolation
+# why: an agent with no standing counts as inside the org of its token's project, so it can tell a private project from a missing one
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..eee6a4e0 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -358,7 +358,7 @@ const lacksRole = (need: "member" | "maintain" | "own"): Decision =>
+ const insideOrg = (principal: UserPrincipal | AgentPrincipal, org: string): boolean =>
+   principal._tag === "User"
+     ? roleIn(principal.memberships, org) !== undefined
+-    : principal.org === org && principal.standing._tag !== "None";
++    : principal.org === org;
+ 
+ /**
+  * Whether the resource is there for this caller to be refused: a private or

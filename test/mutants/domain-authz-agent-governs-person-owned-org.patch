@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-never-governs-a-person
+# why: the governing rights are taken out on a person's projects but not on the person's org itself, so an agent deletes it or changes its owners
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..42fc4fb0 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -245,7 +245,8 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+   if (!agent.scopes.includes("agent:read")) rights.delete("read");
+   if (!agent.scopes.includes("agent:work")) rights.delete("work");
+-  if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
++  if (resource.personOwned && resource._tag === "Project")
++    for (const right of GOVERNING) rights.delete(right);
+   return rights;
+ };
+ 

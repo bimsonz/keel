@@ -118,7 +118,11 @@ const agentOf = (projectId: ProjectId) =>
     org: sampleOrgId,
     projectId,
     scopes: ["agent:read", "agent:work"],
-    sponsor: { userId: sampleSponsorId, role: "member", suspended: false },
+    paused: false,
+    standing: {
+      _tag: "Invited",
+      by: { userId: sampleSponsorId, role: "member", suspended: false },
+    },
   });
 /** A member of the org that holds every project here: it reads them all, the private ones too. */
 const member = caller({

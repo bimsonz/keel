@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-never-governs-a-person
+# why: an agent that governs a namespace a person also owns loses its read and its work there, not only its governing
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..4258cedb 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -237,7 +237,10 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (agent.paused) return NONE;
+   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
+   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+-  const standing = standingOn(agent, resource);
++  const standing =
++    resource.personOwned && agent.standing._tag === "Governs"
++      ? "None"
++      : standingOn(agent, resource);
+   const rights = new Set<Right>();
+   if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+   if (standing !== "None") rights.add("read");

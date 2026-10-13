@@ -285,7 +285,26 @@ describe("project bootstrap", () => {
       key("prj"),
     );
     expect([project.status, project.body.detail]).toEqual([403, "Refused: users-only."]);
+    const made = await call(
+      via,
+      await maintainer(),
+      "POST",
+      "/projects",
+      { org: "pool", name: projectName("forge"), source: SOURCE },
+      key("prj"),
+    );
+    expect(made.status).toBe(201);
     const enrol = await call(
+      via,
+      agent,
+      "POST",
+      "/agents",
+      { ...agentRequest, name: "worker", projectId: made.body.id },
+      key("agt"),
+    );
+    expect([enrol.status, enrol.body.detail]).toEqual([403, "Refused: users-only."]);
+    // A project this app does not hold is missing to an agent as to anyone, before any role is weighed.
+    const nowhere = await call(
       via,
       agent,
       "POST",
@@ -293,6 +312,6 @@ describe("project bootstrap", () => {
       { ...agentRequest, name: "worker", projectId: seeded.agent.projectId },
       key("agt"),
     );
-    expect([enrol.status, enrol.body.detail]).toEqual([403, "Refused: users-only."]);
+    expect(nowhere.status).toBe(404);
   });
 });

@@ -3,9 +3,11 @@ import type { NextAction } from "../kernel/index.ts";
 import { AccessRefused, AuthenticationRequired, NotVisible, type RefusalReason } from "./errors.ts";
 import type {
   AgentPrincipal,
+  AgentStanding,
   ForkResource,
   InstanceResource,
   Membership,
+  MemberStanding,
   MissingResource,
   OrgResource,
   Principal,
@@ -19,18 +21,20 @@ import type {
 /**
  * What an action asks of its caller:
  * - `anyone`: no one is refused; `self`: any user or agent, on its own record;
- *   `user`: any user; `handle`: any user, even one without a handle yet;
+ *   `account`: any user or agent; `user`: any user; `handle`: any user, even
+ *   one without a handle yet;
  * - `read`: reads the resource (public projects to anyone, private ones to their
  *   org's members); `readMembers`: reads what only members see;
- * - `work`: an agent's work on its own project (agents only);
+ * - `work`: an agent's work on its token's project (agents only);
  *   `workOrMaintain`: that, or a maintainer's;
- * - `member`, `maintain`, `own`: that role or above in the resource's org
- *   (users only); `sponsorOrMaintain`: the sponsor of the agent concerned, or a
- *   maintainer.
+ * - `member`, `maintain`, `own`: that role or above in the resource's org, or
+ *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
+ *   sponsor of the agent concerned, or whoever holds `maintain`.
  */
 export type Need =
   | "anyone"
   | "self"
+  | "account"
   | "user"
   | "handle"
   | "read"
@@ -118,7 +122,7 @@ export const SPEC_ACTIONS = {
  */
 export const NON_SPEC_ACTIONS = {
   SetHandle: rule("Self", "handle"),
-  CreateOrg: rule("Instance", "user"),
+  CreateOrg: rule("Instance", "account"),
   /** Invite, remove, or move a member between member and maintainer. */
   ManageMembers: rule("Org", "maintain"),
   /** Make or unmake an owner. */
@@ -158,7 +162,7 @@ export interface Grant {
 
 export type AuthorizationRefusal = AuthenticationRequired | NotVisible | AccessRefused;
 
-/** What a principal may do on a resource. Governance by an agent is never one of them. */
+/** What a principal may do on a resource. */
 export type Right = "read" | "work" | "member" | "maintain" | "own";
 
 const ROLE_RIGHTS: Readonly<Record<Role, readonly Right[]>> = {
@@ -191,30 +195,57 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
 const orgOf = (resource: Resource): string | undefined =>
   resource._tag === "Project" || resource._tag === "Org" ? resource.org : undefined;
 
-/** The agent's sponsor's role in the agent's org: absent once the sponsor has left it. */
-const sponsorRole = (agent: AgentPrincipal): Role | undefined => agent.sponsor.role;
-
-const isOwnProject = (agent: AgentPrincipal, resource: Resource): boolean =>
+/** Whether the resource is the project the agent's token is for. A token that names none is for no project. */
+const isTokenProject = (agent: AgentPrincipal, resource: Resource): boolean =>
   resource._tag === "Project" &&
   resource.org === agent.org &&
   resource.projectId === agent.projectId;
 
+/** Whether the member who invited an agent still answers for it: a member of the org, not suspended. */
+const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
+
 /**
- * An agent's rights: what its scopes allow on its own project, and a public
- * read elsewhere, always within what its sponsor may do. Work needs the sponsor
- * to be a member; `operator` and `observer` confer nothing.
+ * The standing an agent brings to a resource. A token is for at most one
+ * project, so its standing in the namespace counts on that project and on the
+ * namespace itself, never on another of its projects. Everywhere else, and once
+ * its inviter no longer answers for it, the agent is the public.
+ */
+const standingOn = (
+  agent: AgentPrincipal,
+  resource: ProjectResource | OrgResource,
+): AgentStanding["_tag"] => {
+  const { standing } = agent;
+  if (resource.org !== agent.org) return "None";
+  if (resource._tag === "Project" && resource.projectId !== agent.projectId) return "None";
+  return standing._tag === "Invited" && !answers(standing.by) ? "None" : standing._tag;
+};
+
+/** The rights of whoever governs. Where a person owns, they are people's alone. */
+const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
+
+/**
+ * An agent's rights, by where it stands: everything where it
+ * governs, `read` and `work` on its token's project where a member invited it,
+ * and a read of what is public anywhere else. A paused agent has none. Its
+ * scopes cap `read` and `work`; `operator` and `observer` confer nothing.
+ *
+ * No agent governs where a person owns: on such a resource `member`, `maintain`
+ * and `own` are taken out last, whatever the standing says, so the rule does
+ * not rest on the gate having filled the standing truthfully.
  */
 const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
-  if (agent.sponsor.suspended) return NONE;
-  const sponsor = rightsByRole(sponsorRole(agent), resource);
-  const own = isOwnProject(agent, resource);
+  if (agent.paused) return NONE;
+  if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
+  if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+  const standing = standingOn(agent, resource);
   const rights = new Set<Right>();
-  if (agent.scopes.includes("agent:read") && sponsor.has("read")) {
-    const publicRead =
-      resource._tag === "Org" || (resource._tag === "Project" && resource.visibility === "public");
-    if (own || publicRead) rights.add("read");
-  }
-  if (own && agent.scopes.includes("agent:work") && sponsor.has("member")) rights.add("work");
+  if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+  if (standing !== "None") rights.add("read");
+  if (standing !== "None" && resource._tag === "Project") rights.add("work");
+  if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+  if (!agent.scopes.includes("agent:read")) rights.delete("read");
+  if (!agent.scopes.includes("agent:work")) rights.delete("work");
+  if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
   return rights;
 };
 
@@ -230,7 +261,7 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
       );
     }
     case "Agent":
-      return sponsorRole(principal) === undefined ? NONE : agentRights(principal, resource);
+      return agentRights(principal, resource);
     case "Anonymous":
       return rightsByRole(undefined, resource);
     default: {
@@ -267,19 +298,29 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title: "Enrol an agent to do this work: work is done by agents",
     operationId: "Operator_enrolAgent",
   },
-  "users-only": { kind: "escalate", title: "Ask your sponsor: only a person may do this" },
-  "sponsor-suspended": {
+  "users-only": {
     kind: "escalate",
-    title: "Your sponsor is suspended; ask a member of the org to sponsor a new credential",
+    title: "Ask a person: an agent may not do this, and governs nothing a person owns",
   },
-  "sponsor-left": {
+  "agent-paused": {
     kind: "escalate",
-    title: "Your sponsor left the org; ask a member of the org to sponsor a new credential",
+    title:
+      "You are paused; ask your sponsor, or a maintainer of your project's org, to reinstate you",
+  },
+  "inviter-suspended": {
+    kind: "escalate",
+    title:
+      "The member who answers for you in this org is suspended; ask another member to invite you",
+  },
+  "inviter-left": {
+    kind: "escalate",
+    title: "The member who answers for you in this org left it; ask a member to invite you",
   },
   "org-suspended": { kind: "escalate", title: "Ask whoever runs this Keel to reinstate the org" },
   "foreign-project": {
     kind: "escalate",
-    title: "This is not your project; ask your sponsor to enrol an agent in it",
+    title:
+      "Your token is for another project, or you have no standing in this one; use a token for it, or ask a member of its org to invite you",
   },
   scope: {
     kind: "call",
@@ -309,11 +350,15 @@ const lacksRole = (need: "member" | "maintain" | "own"): Decision =>
     }),
   );
 
-/** Whether a member of the resource's org is asking. Agents count as members of their own org. */
+/**
+ * Whether a member of the resource's org is asking. An agent counts as inside
+ * the org of its token's project while it has a standing there, also one whose
+ * inviter no longer answers for it: it is told why it is refused.
+ */
 const insideOrg = (principal: UserPrincipal | AgentPrincipal, org: string): boolean =>
   principal._tag === "User"
     ? roleIn(principal.memberships, org) !== undefined
-    : principal.org === org;
+    : principal.org === org && principal.standing._tag !== "None";
 
 /**
  * Whether the resource is there for this caller to be refused: a private or
@@ -362,6 +407,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   switch (need) {
     case "anyone":
     case "self":
+    case "account":
     case "user":
       return granted();
     case "work":
@@ -399,33 +445,84 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   }
 };
 
+/** Why an agent may not read or work on what it sees. */
+const whyNoWork = (
+  agent: AgentPrincipal,
+  resource: ProjectResource | OrgResource,
+): Exclude<RefusalReason, "role"> => {
+  if (!isTokenProject(agent, resource)) return "foreign-project";
+  const { standing } = agent;
+  switch (standing._tag) {
+    case "Invited":
+      if (standing.by.suspended) return "inviter-suspended";
+      return standing.by.role === undefined ? "inviter-left" : "scope";
+    case "Governs":
+      return "scope";
+    default:
+      return "foreign-project";
+  }
+};
+
+/**
+ * Why an agent may not govern what it sees: only a person may, or it governs
+ * the namespace and its token is for another of its projects.
+ */
+const whyNoRule = (
+  agent: AgentPrincipal,
+  resource: ProjectResource | OrgResource,
+): Exclude<RefusalReason, "role"> =>
+  agent.standing._tag === "Governs" && resource.org === agent.org && !resource.personOwned
+    ? "foreign-project"
+    : "users-only";
+
 const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decision => {
-  if (principal.sponsor.suspended) return refused("sponsor-suspended");
+  if (principal.paused) return refused("agent-paused");
   switch (need) {
     case "anyone":
     case "self":
+    case "account":
       return granted();
-    case "read":
-    case "readMembers":
-    case "work":
-    case "workOrMaintain":
-      break;
-    default:
+    case "user":
+    case "handle":
       return refused("users-only");
+    default:
+      break;
   }
-  if (sponsorRole(principal) === undefined) return refused("sponsor-left");
-  if (resource._tag !== "Project" && resource._tag !== "Org" && resource._tag !== "Missing")
-    return hidden();
+  if (resource._tag === "Fork") return refused("users-only");
+  if (resource._tag !== "Project" && resource._tag !== "Org") return hidden();
   const unseen = notSeen(principal, resource);
   if (unseen !== undefined) return unseen;
-  const own = isOwnProject(principal, resource);
-  if (!own && resource._tag === "Project" && (need !== "read" || resource.visibility === "private"))
-    return refused("foreign-project");
-  if (resource._tag === "Org" && need !== "read") return refused("foreign-project");
   const rights = rightsOf(principal, resource);
-  if (need === "read" || need === "readMembers")
-    return rights.has("read") ? granted(own ? "members" : "public") : refused("scope");
-  return rights.has("work") ? granted() : refused("scope");
+  const asMember =
+    rights.has("member") ||
+    (resource._tag === "Project" && standingOn(principal, resource) !== "None");
+  switch (need) {
+    case "read":
+      if (rights.has("read")) return granted(asMember ? "members" : "public");
+      return refused(
+        resource._tag === "Org" || resource.visibility === "public"
+          ? "scope"
+          : whyNoWork(principal, resource),
+      );
+    case "readMembers":
+      return rights.has("read") && asMember
+        ? granted("members")
+        : refused(whyNoWork(principal, resource));
+    case "work":
+      return rights.has("work") ? granted() : refused(whyNoWork(principal, resource));
+    case "workOrMaintain":
+      return rights.has("work") || rights.has("maintain")
+        ? granted()
+        : refused(whyNoWork(principal, resource));
+    case "member":
+    case "maintain":
+    case "own":
+      return rights.has(need) ? granted() : refused(whyNoRule(principal, resource));
+    case "sponsorOrMaintain":
+      return rights.has("maintain") ? granted() : refused(whyNoRule(principal, resource));
+    default:
+      return hidden();
+  }
 };
 
 /**
@@ -441,11 +538,14 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
  *   fields: the gate answers the operation's own not-found, so a private
  *   resource and a missing one read the same.
  * - 403 `AccessRefused`: the caller sees the resource but may not do this, with
- *   a reason and next actions. A foreign project in the agent's own org is
- *   `foreign-project`; one in another org is NotVisible.
+ *   a reason and next actions. A private project of the agent's org that its
+ *   token is not for is `foreign-project`; one in another org is NotVisible.
  *
- * Work is agents' only, and governance users' only. An agent never exceeds its
- * sponsor. No principal stands above an org's owners: there is no instance role.
+ * Work is agents' only. Governance is people's wherever a person owns: an agent
+ * governs only its own namespace, or an org it created that no person owns, and
+ * an agent a member invited works and never governs. A sponsor gives an agent
+ * no rights. No principal stands above an org's owners: there is no instance
+ * role.
  */
 export const authorize = <A extends Action>(
   principal: Principal,

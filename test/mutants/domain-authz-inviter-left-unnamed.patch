@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-invited-read-work
+# why: an agent whose inviter left is told its scope is short, not that the invitation ended
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..b4031b37 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -455,7 +455,7 @@ const whyNoWork = (
+   switch (standing._tag) {
+     case "Invited":
+       if (standing.by.suspended) return "inviter-suspended";
+-      return standing.by.role === undefined ? "inviter-left" : "scope";
++      return "scope";
+     case "Governs":
+       return "scope";
+     default:

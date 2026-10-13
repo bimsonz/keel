@@ -63,6 +63,10 @@ const perItem = () => Effect.succeed(PER_ITEM);
  * A project as the policy needs it: its org (from its place), whether that org
  * is suspended, and its visibility (from its settings). A project with no place
  * or no settings is missing.
+ *
+ * `personOwned` is true of every org today: only a signed-in person makes one,
+ * and an org keeps its last owner. Whoever lets an agent own a namespace reads
+ * it from the namespace's owners here and in `orgNamed`.
  */
 export const projectResource = (
   projectId: ProjectId,
@@ -85,6 +89,7 @@ export const projectResource = (
         onNone: () => false,
         onSome: (record) => record.suspended,
       }),
+      personOwned: true,
       ...(sponsor === undefined ? {} : { sponsor }),
     } satisfies ProjectResource;
   });
@@ -101,9 +106,12 @@ const projectNamed = (id: unknown) =>
     onSome: (projectId) => projectResource(projectId),
   });
 
-/** The agent's own project: the one work is ever done in. Anyone else asks about nothing. */
+/**
+ * The agent's own project: the one its token names, where work is ever done.
+ * Anyone else, and an agent whose token names none, asks about nothing.
+ */
 const ownProject = (_input: unknown, caller: Caller) =>
-  caller.principal._tag === "Agent"
+  caller.principal._tag === "Agent" && caller.principal.projectId !== undefined
     ? projectResource(caller.principal.projectId)
     : Effect.succeed(MISSING);
 
@@ -158,7 +166,8 @@ const orgNamed = (name: string) =>
     Effect.map(
       Option.match({
         onNone: () => MISSING,
-        onSome: (org) => ({ _tag: "Org", org: org.org, suspended: org.suspended }) as const,
+        onSome: (org) =>
+          ({ _tag: "Org", org: org.org, suspended: org.suspended, personOwned: true }) as const,
       }),
     ),
   );

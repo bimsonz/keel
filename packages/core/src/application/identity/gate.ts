@@ -77,7 +77,9 @@ export type GateRefusal =
  * Who is asking: a Keel token is an agent, a
  * session is a user, and nothing is anonymous. An agent
  * stands on its D1 row: its epoch, its org, and its sponsor's standing in that
- * org, read on every request. A token whose `org` is not its agent's current
+ * org, read on every request. Until an invitation is a record of its own, the
+ * member who enrolled an agent is the member who invited it: the agent stands
+ * `Invited` by its sponsor. A token whose `org` is not its agent's current
  * one (minted before the agent was placed) is stale, and the agent exchanges
  * its credential again.
  */
@@ -110,7 +112,8 @@ export const principalOf: (
             org,
             projectId: agent.projectId,
             scopes: token.scopes,
-            sponsor,
+            paused: agent.state === "suspended",
+            standing: { _tag: "Invited", by: sponsor },
           },
           token,
         };

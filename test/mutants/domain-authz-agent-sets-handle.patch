@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.any-account
+# why: an agent takes a handle as a person does
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..2d7c80ec 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -481,9 +481,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+     case "anyone":
+     case "self":
+     case "account":
++    case "handle":
+       return granted();
+     case "user":
+-    case "handle":
+       return refused("users-only");
+     default:
+       break;

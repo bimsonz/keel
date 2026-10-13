@@ -275,7 +275,7 @@ describe("[authz.sponsor-left] an agent never outlasts its sponsor's membership"
     expect([refused.status, refused.body["code"], refused.body["detail"]]).toEqual([
       403,
       "auth.forbidden",
-      "Refused: sponsor-left.",
+      "Refused: inviter-left.",
     ]);
   });
 });

@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-governs-its-own, authz.outsider-public-only
+# why: an agent that governs a namespace governs every project of it on a token for one of them
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..9561b60c 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -216,7 +216,12 @@ const standingOn = (
+ ): AgentStanding["_tag"] => {
+   const { standing } = agent;
+   if (resource.org !== agent.org) return "None";
+-  if (resource._tag === "Project" && resource.projectId !== agent.projectId) return "None";
++  if (
++    resource._tag === "Project" &&
++    resource.projectId !== agent.projectId &&
++    standing._tag !== "Governs"
++  )
++    return "None";
+   return standing._tag === "Invited" && !answers(standing.by) ? "None" : standing._tag;
+ };
+ 

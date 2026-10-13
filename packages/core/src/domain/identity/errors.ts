@@ -64,12 +64,16 @@ export class NotVisible extends Schema.TaggedError<NotVisible>()("NotVisible", {
 
 /**
  * Why a caller who sees the resource may not act on it:
- * - `user-suspended`, `org-suspended`, `sponsor-suspended`: suspended by whoever runs the instance;
- * - `sponsor-left`: the agent's sponsor is no longer a member of its org;
+ * - `user-suspended`, `org-suspended`: suspended by whoever runs the instance;
+ * - `agent-paused`: the agent is paused, and has no rights anywhere until it is reinstated;
+ * - `inviter-left`, `inviter-suspended`: the member who invited the agent into
+ *   the org is no longer a member of it, or is suspended;
  * - `handle-required`: a user must choose a handle before anything else;
  * - `role`: the caller's role in the org is too low;
- * - `agents-only`: work is done by agents; `users-only`: governance is done by people;
- * - `foreign-project`: an agent's request on a project of its org that is not its own;
+ * - `agents-only`: work is done by agents; `users-only`: only a person may do
+ *   this, as governing whatever a person owns;
+ * - `foreign-project`: an agent's request on a project its token is not for, or
+ *   one it has no standing in;
  * - `scope`: the agent's token lacks the scope;
  * - `private-source`: a private project forks only within its own org.
  */
@@ -79,8 +83,9 @@ export const RefusalReason = Schema.Literals([
   "role",
   "agents-only",
   "users-only",
-  "sponsor-suspended",
-  "sponsor-left",
+  "agent-paused",
+  "inviter-suspended",
+  "inviter-left",
   "org-suspended",
   "foreign-project",
   "scope",

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.any-account
+# why: a person cannot make an org: making one is kept to agents
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..223bae29 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -407,7 +407,6 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+   switch (need) {
+     case "anyone":
+     case "self":
+-    case "account":
+     case "user":
+       return granted();
+     case "work":

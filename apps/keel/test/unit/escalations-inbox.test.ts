@@ -161,7 +161,8 @@ const agentOf = (org: OrgId, projectId: ProjectId, sponsor: UserId): Caller =>
       org,
       projectId,
       scopes: ["agent:read", "agent:work"],
-      sponsor: { userId: sponsor, role: "member", suspended: false },
+      paused: false,
+      standing: { _tag: "Invited", by: { userId: sponsor, role: "member", suspended: false } },
     },
     {
       agentId: AGENT,

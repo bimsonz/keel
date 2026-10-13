@@ -2,15 +2,14 @@
 # kills: a11.scope-gate
 # why: the REST gate admits any verified token, whatever scope the operation demands
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 7b9bc8d..780ac10 100644
+index 3f965345..f2aaa164 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -228,7 +228,7 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
-       resource._tag === "Org" || (resource._tag === "Project" && resource.visibility === "public");
-     if (own || publicRead) rights.add("read");
-   }
--  if (own && agent.scopes.includes("agent:work") && sponsor.has("member")) rights.add("work");
-+  if (own && sponsor.has("member")) rights.add("work");
+@@ -244,7 +244,6 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (standing !== "None" && resource._tag === "Project") rights.add("work");
+   if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+   if (!agent.scopes.includes("agent:read")) rights.delete("read");
+-  if (!agent.scopes.includes("agent:work")) rights.delete("work");
+   if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
    return rights;
  };
- 

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-governs-its-own
+# why: an agent that governs a namespace no person owns holds member and maintain there but not own
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..9563c1bd 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -242,7 +242,8 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+   if (standing !== "None") rights.add("read");
+   if (standing !== "None" && resource._tag === "Project") rights.add("work");
+-  if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
++  if (standing === "Governs")
++    for (const right of GOVERNING) if (right !== "own") rights.add(right);
+   if (!agent.scopes.includes("agent:read")) rights.delete("read");
+   if (!agent.scopes.includes("agent:work")) rights.delete("work");
+   if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);

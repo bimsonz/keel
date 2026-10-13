@@ -156,7 +156,11 @@ function grantedSurface() {
       org: sampleOrgId,
       projectId: sampleProjectId,
       scopes: ["agent:read", "agent:work"],
-      sponsor: { userId: sampleSponsorId, role: "member", suspended: false },
+      paused: false,
+      standing: {
+        _tag: "Invited",
+        by: { userId: sampleSponsorId, role: "member", suspended: false },
+      },
     },
     {
       agentId,

@@ -68,23 +68,48 @@ export interface UserPrincipal {
 }
 
 /**
- * The user who minted an agent's credential, as the gate reads it now: `role`
- * is the sponsor's role in the agent's org, absent once the sponsor has left it.
+ * A user's standing in an org, as the gate reads it now: `role` is the user's
+ * strongest role there, absent once the user has left it.
  */
-export interface SponsorStanding {
+export interface MemberStanding {
   readonly userId: UserId;
   readonly role?: Role;
   readonly suspended: boolean;
 }
 
-/** A Keel JWT: an agent confined to one project of one org, never exceeding its sponsor. */
+/**
+ * Where an agent stands in the namespace its token is for:
+ * - `Governs`: the namespace is the agent's own, or an org it created;
+ * - `Invited`: a member invited it there and answers for it. `by` is that
+ *   member's standing now, so an invitation counts only while its inviter holds
+ *   a role and is not suspended;
+ * - `None`: it has no standing there, and is the public.
+ *
+ * A sponsor is no standing: the link between a person and an agent carries no
+ * rights, so the policy never reads it of an agent.
+ */
+export type AgentStanding =
+  | { readonly _tag: "Governs" }
+  | { readonly _tag: "Invited"; readonly by: MemberStanding }
+  | { readonly _tag: "None" };
+
+/**
+ * A Keel JWT: an agent acting as itself. The agent is tied to no project, but
+ * each token is for one run in one namespace and at most one of its projects,
+ * so the principal carries that namespace (`org`), the project when the token
+ * names one, and the agent's standing there. A new agent's first token names
+ * no project: it stands in its own namespace, where it makes its first.
+ * `paused` is the Agent machine's `suspended` state: a paused agent has no
+ * rights anywhere.
+ */
 export interface AgentPrincipal {
   readonly _tag: "Agent";
   readonly agentId: AgentId;
   readonly org: OrgId;
-  readonly projectId: ProjectId;
+  readonly projectId?: ProjectId;
   readonly scopes: readonly Scope[];
-  readonly sponsor: SponsorStanding;
+  readonly paused: boolean;
+  readonly standing: AgentStanding;
 }
 
 export interface AnonymousPrincipal {
@@ -117,16 +142,21 @@ export interface SelfResource {
   readonly _tag: "Self";
 }
 
+/**
+ * An org. `personOwned` says a person is among its owners: no agent governs
+ * there, whatever its standing says.
+ */
 export interface OrgResource {
   readonly _tag: "Org";
   readonly org: OrgId;
   readonly suspended: boolean;
+  readonly personOwned: boolean;
 }
 
 /**
- * A project, with what the policy needs to know about it. `sponsor` is the
- * sponsor of the agent an action concerns (a ruling on its escalation, its
- * standing), when there is one.
+ * A project, with what the policy needs to know about it. `personOwned` is its
+ * org's: a person is among the owners. `sponsor` is the sponsor of the agent an
+ * action concerns (a ruling on its escalation, its standing), when there is one.
  */
 export interface ProjectResource {
   readonly _tag: "Project";
@@ -134,6 +164,7 @@ export interface ProjectResource {
   readonly projectId: ProjectId;
   readonly visibility: Visibility;
   readonly orgSuspended: boolean;
+  readonly personOwned: boolean;
   readonly sponsor?: UserId;
 }
 

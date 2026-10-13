@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-invited-read-work, authz.agent-governs-its-own
+# why: an agent reads without the agent:read scope
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 3f965345..4b5e8fc9 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -243,7 +243,6 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+   if (standing !== "None") rights.add("read");
+   if (standing !== "None" && resource._tag === "Project") rights.add("work");
+   if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+-  if (!agent.scopes.includes("agent:read")) rights.delete("read");
+   if (!agent.scopes.includes("agent:work")) rights.delete("work");
+   if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
+   return rights;

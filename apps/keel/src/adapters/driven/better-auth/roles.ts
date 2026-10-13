@@ -48,7 +48,12 @@ export function decideAsRole(role: Role, action: OrgAction) {
     suspended: false,
     memberships: [{ org: SOME_ORG, role }],
   };
-  return authorize(member, action, { _tag: "Org", org: SOME_ORG, suspended: false });
+  return authorize(member, action, {
+    _tag: "Org",
+    org: SOME_ORG,
+    suspended: false,
+    personOwned: true,
+  });
 }
 
 const hasStatements = (action: string): action is keyof typeof ORG_STATEMENTS =>
