@@ -425,6 +425,15 @@ const ownedRequestArb = fc
   );
 /** Whether an action is decided on a namespace: any namespace's, or an org's own. */
 const onNamespace = (a: Action): boolean => kindOf(a) === "Namespace" || kindOf(a) === "Org";
+/**
+ * Who holds `read` on an agent's account, written apart from `rightsOf`: a
+ * visitor, a person in good standing with a handle, and an agent that is not
+ * paused and may read.
+ */
+const readsAccounts = (p: Principal): boolean =>
+  p._tag === "Anonymous" ||
+  (p._tag === "User" && !p.suspended && p.handle !== undefined) ||
+  (p._tag === "Agent" && !p.paused && p.scopes.includes("agent:read"));
 /** The actions decided on a project or on a namespace. */
 const actionsOn = (kind: "Project" | "Namespace"): readonly Action[] =>
   ACTION_NAMES.filter((a) => (kind === "Project" ? kindOf(a) === "Project" : onNamespace(a)));
@@ -1127,11 +1136,11 @@ describe("authorize", () => {
         resourceArb("Agent"),
         (principal, action, resource) => {
           if (resource._tag !== "Agent" && resource._tag !== "Missing") return false;
-          const rights = [...rightsOf(principal, resource)];
+          const rights = [...rightsOf(principal, resource)].join();
           return (
             outcome(decide(principal, action, resource)) ===
               onAccount(principal, needOf(action), resource) &&
-            rights.every((right) => right === "read")
+            rights === (resource._tag === "Agent" && readsAccounts(principal) ? "read" : "")
           );
         },
       ),
@@ -1290,6 +1299,32 @@ describe("authorize", () => {
         }),
       ),
     ).toBe("404");
+  });
+});
+
+describe("authorize: the rows a sponsor's link is made by", () => {
+  it("[authz.sponsor-rows] any account asks for a sponsor, and only a person approves a link or lists the agents behind them", () => {
+    // Typed apart from the table. The handlers check no caller's kind: these rows are all that does.
+    const LINK_ROWS = [
+      "Agents_approveSponsor: Self user",
+      "Agents_listSponsored: Self user",
+      "askSponsor: Self self",
+    ];
+    const rows = ["Agents_approveSponsor", "Agents_listSponsored", "askSponsor"].filter(isAction);
+    expect(rows.map((a) => `${a}: ${kindOf(a)} ${needOf(a)}`)).toEqual(LINK_ROWS);
+    const answers = (who: Principal): string =>
+      rows.map((a) => outcome(decide(who, a, { _tag: "Self" }))).join(" ");
+    fc.assert(
+      fc.property(
+        agentArb,
+        (agent) => answers({ ...agent, paused: false }) === "403:users-only 403:users-only ok:",
+      ),
+    );
+    expect(answers(user())).toBe("ok: ok: ok:");
+    expect(answers(ANON)).toBe("401 401 401");
+    expect(answers(agentOn(PRJ_1, { paused: true }))).toBe(
+      "403:agent-paused 403:agent-paused 403:agent-paused",
+    );
   });
 });
 
