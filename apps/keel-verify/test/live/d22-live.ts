@@ -22,13 +22,12 @@
 //     step longer than A's, and the stored plan carries `guard:<guardId>` pinned
 //     to the probe's bundle hash;
 //   - the five world checks are recorded on the conflict after it was proven.
-// `wrangler tail` on keel and keel-verify records the serving versions, and is
-// searched for bare "internal error" lines. Every change the run leaves open is
-// abandoned at the end. KEEL_URL overrides keel.town; KEEL_ARCHIVE_BUCKET names
+// What is deployed to keel and keel-verify is read before and after the run,
+// and must be the same. Every change the run leaves open is abandoned at the
+// end. KEEL_URL overrides keel.town; KEEL_ARCHIVE_BUCKET names
 // the bucket the plans are stored in when it is not the committed config's.
-import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { namespaceKey } from "@keeltown/core/application/verification";
 import {
@@ -159,32 +158,17 @@ async function ended(
 const stepNamed = (steps: readonly Step[], name: string): Step | undefined =>
   steps.find((s) => s.name === name || s.name.replace(/-\d+$/, "") === name);
 
-/** `wrangler tail` on a Worker, into a file: every event it delivers names the version that ran it. */
-function tail(worker: string): { file: string; stop: () => { versions: string[]; text: string } } {
-  const file = join(mkdtempSync(join(tmpdir(), "keel-d22-tail-")), `${worker}.jsonl`);
-  writeFileSync(file, "");
-  const child = spawn("pnpm", ["exec", "wrangler", "tail", worker, "--format", "json"], {
-    cwd: KEEL,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: wranglerEnv,
-  });
-  const chunks: Buffer[] = [];
-  child.stdout.on("data", (b: Buffer) => {
-    chunks.push(b);
-    appendFileSync(file, b);
-  });
-  return {
-    file,
-    stop: () => {
-      child.kill("SIGTERM");
-      const text = Buffer.concat(chunks).toString("utf8");
-      const versions = [...text.matchAll(/"scriptVersion":\s*\{\s*"id":\s*"([0-9a-f-]+)"/g)].map(
-        (m) => m[1] ?? "",
-      );
-      return { versions, text };
-    },
-  };
-}
+/**
+ * What is deployed to a Worker, as wrangler reports it: its versions and
+ * their shares. Read before and after a run, since a tail is never started:
+ * enabling one replaces every Durable Object of the Worker.
+ */
+const deployed = (worker: string): string =>
+  wrangler("deployments", "status", "--name", worker)
+    .trim()
+    .split("\n")
+    .filter((l) => /version|Version|%/.test(l))
+    .join(" | ");
 
 const archiveBucket = (): string => {
   const named = process.env["KEEL_ARCHIVE_BUCKET"];
@@ -215,17 +199,13 @@ const check = (ok: boolean, what: string) => {
 };
 
 const open: string[] = [];
-const tails = { keel: tail("keel"), verify: tail("keel-verify") };
+const serving: Record<string, string> = {};
 let operator: KeelClient | undefined;
 try {
-  for (const worker of ["keel", "keel-verify"])
-    console.log(
-      `     ${worker} deployed: ${wrangler("deployments", "status", "--name", worker)
-        .trim()
-        .split("\n")
-        .filter((l) => /version|Version|%/.test(l))
-        .join(" | ")}`,
-    );
+  for (const worker of ["keel", "keel-verify"]) {
+    serving[worker] = deployed(worker);
+    console.log(`     ${worker} deployed: ${serving[worker]}`);
+  }
   operator = operatorClient();
   const admin = operator;
   const project = await admin.createProject(
@@ -391,6 +371,14 @@ try {
     console.log(`     end: ${brief(probe.output, 600)}`);
     const guardStep = stepNamed(probe.steps, "guard");
     console.log(`     guard step: ${brief(guardStep?.output, 400)}`);
+    const stepOrder = probe.steps.map((s) => s.name.replace(/-\d+$/, ""));
+    console.log(`     runner step: ${brief(stepNamed(probe.steps, "runner")?.output, 400)}`);
+    check(
+      stepOrder.includes("runner") &&
+        stepOrder.indexOf("worlds") < stepOrder.indexOf("runner") &&
+        stepOrder.indexOf("runner") < stepOrder.indexOf("draft"),
+      "the Probe asked whether a probe could run in its worlds, after reading them and before any draft",
+    );
     check(
       probe.status === "complete" && Reflect.get(Object(probe.output), "outcome") === "admitted",
       "the Probe Workflow completed as admitted",
@@ -665,15 +653,15 @@ try {
       failures += 1;
     }
   }
-  for (const [worker, tailed] of Object.entries(tails)) {
-    const { versions, text } = tailed.stop();
-    const counts = Object.entries(
-      versions.reduce<Record<string, number>>((m, v) => ({ ...m, [v]: (m[v] ?? 0) + 1 }), {}),
-    );
-    const internal = text.match(/internal error/g)?.length ?? 0;
-    console.log(`     ${worker} tail (${tailed.file}): ${JSON.stringify(counts)}`);
-    console.log(`     ${worker} tail: ${internal} "internal error" line(s)`);
-    check(versions.length > 0, `${worker}'s tail delivered events during the run`);
+  for (const [worker, before] of Object.entries(serving)) {
+    let after: string;
+    try {
+      after = deployed(worker);
+    } catch (error) {
+      after = `unread (${error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error)})`;
+    }
+    check(after === before, `${worker}'s deployment is the one the run began on`);
+    if (after !== before) console.log(`     ${worker} now: ${after}`);
   }
 }
 console.log(failures === 0 ? "\nall D2.2 live checks hold" : `\n${failures} check(s) failed`);

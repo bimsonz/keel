@@ -13,12 +13,12 @@
 //           to a `bounce` verdict under its own plan's hash, ChangeBounced, and
 //           no landing. This is the arm that can fail.
 // Each case is judged from the project's event feed. KeelVerify's instance is
-// `keel-verify-<BatchFormed eventId>`, read back with wrangler; `wrangler tail`
-// on keel-verify records the version that served the runs. Every change the
-// run leaves open is abandoned at the end. KEEL_URL overrides keel.town.
-import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+// `keel-verify-<BatchFormed eventId>`, read back with wrangler. What is
+// deployed to keel-verify is read before and after the run, and must be the
+// same. Every change the run leaves open is abandoned at the end. KEEL_URL
+// overrides keel.town.
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cloneWorkspace, commitAndPush } from "../../../../e2e/src/lib/git.ts";
 import { KeelClient, KeelProblem } from "../../../../packages/sdk/src/index.ts";
@@ -154,30 +154,17 @@ function describeVerify(id: string): { status: string; steps: string[]; verdict:
   };
 }
 
-/** `wrangler tail` on a Worker, into a file: every event it delivers names the version that ran it. */
-function tail(worker: string): { file: string; stop: () => string[] } {
-  const file = join(mkdtempSync(join(tmpdir(), "keel-d21-tail-")), `${worker}.jsonl`);
-  writeFileSync(file, "");
-  const child = spawn("pnpm", ["exec", "wrangler", "tail", worker, "--format", "json"], {
-    cwd: KEEL,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, npm_config_userconfig: "/dev/null", WRANGLER_SEND_METRICS: "false" },
-  });
-  const chunks: Buffer[] = [];
-  child.stdout.on("data", (b: Buffer) => chunks.push(b));
-  return {
-    file,
-    stop: () => {
-      child.kill("SIGTERM");
-      const text = Buffer.concat(chunks).toString("utf8");
-      writeFileSync(file, text);
-      const versions = [...text.matchAll(/"scriptVersion":\s*\{\s*"id":\s*"([0-9a-f-]+)"/g)].map(
-        (m) => m[1] ?? "",
-      );
-      return versions;
-    },
-  };
-}
+/**
+ * What is deployed to a Worker, as wrangler reports it: its versions and
+ * their shares. Read before and after a run, since a tail is never started:
+ * enabling one replaces every Durable Object of the Worker.
+ */
+const deployed = (worker: string): string =>
+  wrangler("deployments", "status", "--name", worker)
+    .trim()
+    .split("\n")
+    .filter((l) => /version|Version|%/.test(l))
+    .join(" | ");
 
 interface Case {
   readonly name: "land" | "bounce";
@@ -217,16 +204,11 @@ const check = (ok: boolean, what: string) => {
 };
 
 const open: { changeId: string }[] = [];
-const verifyTail = tail("keel-verify");
+const serving: Record<string, string> = {};
 let operator: KeelClient | undefined;
 try {
-  console.log(
-    `     keel-verify deployed: ${wrangler("deployments", "status", "--name", "keel-verify")
-      .trim()
-      .split("\n")
-      .filter((l) => /version|Version|%/.test(l))
-      .join(" | ")}`,
-  );
+  serving["keel-verify"] = deployed("keel-verify");
+  console.log(`     keel-verify deployed: ${serving["keel-verify"]}`);
   operator = operatorClient();
   const project = await operator.createProject(
     { namespace: ORG, name: PROJECT, source: { kind: "template", name: FIXTURE } },
@@ -363,12 +345,16 @@ try {
       failures += 1;
     }
   }
-  const versions = verifyTail.stop();
-  const counts = Object.entries(
-    versions.reduce<Record<string, number>>((m, v) => ({ ...m, [v]: (m[v] ?? 0) + 1 }), {}),
-  );
-  console.log(`     keel-verify tail (${verifyTail.file}): ${JSON.stringify(counts)}`);
-  check(versions.length > 0, "keel-verify's tail delivered events during the run");
+  for (const [worker, before] of Object.entries(serving)) {
+    let after: string;
+    try {
+      after = deployed(worker);
+    } catch (error) {
+      after = `unread (${error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error)})`;
+    }
+    check(after === before, `${worker}'s deployment is the one the run began on`);
+    if (after !== before) console.log(`     ${worker} now: ${after}`);
+  }
 }
 console.log(failures === 0 ? "\nall D2.1 live checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
