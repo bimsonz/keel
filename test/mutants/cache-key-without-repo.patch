@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: cache.by-repo
+# why: Keys name the id alone, so an object one repo holds is served as any other repo's
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -172,7 +172,7 @@
+ 
+ /** A key no other deployment, repo or kind of read shares. */
+ const keyOf = (host: string, kind: string, repo: RepoRef, ids: readonly string[]) =>
+-  `https://${host}/_cache/code/v1/${kind}/${[repo.namespace, repo.name, ...ids].map(encodeURIComponent).join("/")}`;
++  `https://${host}/_cache/code/v1/${kind}/${[...ids].map(encodeURIComponent).join("/")}`;
+ 
+ /** The shared tier's value under `key`; anything amiss reads as a miss. */
+ const fromShared = <A>(shared: Cache | undefined, key: string, codec: Codec<A>) =>

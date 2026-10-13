@@ -21,6 +21,7 @@ import {
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { CodeHostReadCache, makeMemoryTier } from "../adapters/driven/artifacts/read-cache.ts";
 import { RepoServerArtifacts } from "../adapters/driven/artifacts/repo-server.ts";
 import {
   resourceChallenge,
@@ -104,8 +105,14 @@ export function isolateLayer(
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
   const directory = AgentDirectoryD1(env.DB);
-  // The repo read API reads trunks, which live in the core namespace alone.
-  const codeHost = overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS });
+  // The repo read API reads trunks, which live in the core namespace alone. What it reads by id
+  // is cached, behind each handler's authorisation: in this isolate's memory, then the colo's cache.
+  const codeHost = CodeHostReadCache({
+    host: env.KEEL_HOST,
+    memory: makeMemoryTier(),
+    shared: caches.default,
+    background: waitUntil,
+  }).pipe(Layer.provide(overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS })));
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),

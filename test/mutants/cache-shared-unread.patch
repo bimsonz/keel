@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: cache.shared
+# why: The colo's cache is written but never read, so each isolate reads every object from the host again
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -177,7 +177,7 @@
+ /** The shared tier's value under `key`; anything amiss reads as a miss. */
+ const fromShared = <A>(shared: Cache | undefined, key: string, codec: Codec<A>) =>
+   Effect.tryPromise(async () => {
+-    const found = await shared?.match(key);
++    const found = await Promise.resolve(undefined);
+     return found === undefined
+       ? undefined
+       : codec.decode(new Uint8Array(await found.arrayBuffer()));

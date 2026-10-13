@@ -117,6 +117,25 @@ describe("the repo read API's doorway", () => {
       });
   });
 
+  it("[cache.after-gate] what the project's own agent read, and the cache now keeps, is still refused to a stranger and to no token", async () => {
+    const { via, heads } = await repoApp();
+    const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    const other = await tokenFor(await seedForeignAgent());
+    const head = heads.get(PRIVATE);
+    const read = (path: string, authorization?: string) =>
+      via(`${BASE}/v1/projects/${PRIVATE}/repo/${path}`, {
+        headers: authorization === undefined ? {} : { authorization },
+      }).then(async (r) => ({ status: r.status, body: await r.json<{ code?: string }>() }));
+    const missing = { status: 404, body: { code: "resource.not_found" } };
+
+    for (const path of [`blob?ref=${head}&path=README.md`, `commits/${head}`, `tree?ref=${head}`]) {
+      expect(await read(path, `Bearer ${own}`)).toMatchObject({ status: 200 });
+      expect(await read(path, `Bearer ${own}`)).toMatchObject({ status: 200 });
+      expect(await read(path, `Bearer ${other}`)).toMatchObject(missing);
+      expect(await read(path)).toMatchObject(missing);
+    }
+  });
+
   it("[views.trunk.wired] the trunk's route answers through the real doorway: anyone reads a public project's trunk, a private one's is read by its own agent, and a stranger is told the project is missing", async () => {
     const { via, heads } = await repoApp();
     const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));

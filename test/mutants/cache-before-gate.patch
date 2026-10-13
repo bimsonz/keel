@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/repo.test.ts -t cache.after-gate
+# kills: cache.after-gate
+# why: A cache of answers by URL sits in front of the gate, so what one caller may read is served to any caller
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -401,6 +401,15 @@
+     rethrowContractDrift: env.KEEL_ENV === "test",
+     databaseAway: isD1Unavailable,
+   });
++  const passOn = app.fetch;
++  const answered = new Map<string, Response>();
++  app.fetch = async (request, ...rest) => {
++    const hit = request.method === "GET" ? answered.get(request.url) : undefined;
++    if (hit !== undefined) return hit.clone();
++    const response = await passOn(request, ...rest);
++    if (request.method === "GET" && response.status === 200) answered.set(request.url, response.clone());
++    return response;
++  };
+   return { runtime, app };
+ }
+ 

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: cache.misses-not-kept
+# why: A repo's no for a commit is kept, so the commit is never seen once it is pushed
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -251,7 +251,7 @@
+         diffTrees: (repo, base, head) =>
+           cached(options, key("diff", repo, base, head), CHANGES, host.diffTrees(repo, base, head)),
+         hasCommit: (repo, sha) =>
+-          cached(options, key("has", repo, sha), HELD, host.hasCommit(repo, sha), (held) => held),
++          cached(options, key("has", repo, sha), HELD, host.hasCommit(repo, sha), () => true),
+       }),
+     ),
+   );

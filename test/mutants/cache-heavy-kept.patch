@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: cache.bounded
+# why: A value of any weight is kept, so one large blob empties the memory tier
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -50,7 +50,6 @@
+       return found.value;
+     },
+     set: (key: string, value: unknown, bytes: number) => {
+-      if (bytes > limits.bytes / 8) return;
+       const before = held.get(key);
+       if (before !== undefined) {
+         held.delete(key);

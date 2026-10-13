@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: cache.bounded
+# why: Memory drops nothing, so an isolate's cache grows without bound
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -59,7 +59,7 @@
+       held.set(key, { value, bytes });
+       weight += bytes;
+       for (const [oldest, entry] of held) {
+-        if (held.size <= limits.entries && weight <= limits.bytes) break;
++        break;
+         held.delete(oldest);
+         weight -= entry.bytes;
+       }
