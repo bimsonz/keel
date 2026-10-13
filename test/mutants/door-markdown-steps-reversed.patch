@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: the markdown gives the steps in the opposite order to the JSON, so a reader of the text is told to read its status before it has a key
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..4718346d 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -545,7 +545,7 @@ export function startMarkdown(door: FrontDoor): string {
+     "",
+     `Every address, method and field below is read from ${door.origin}${DOCUMENT_PATH}. The same steps as JSON: ask for \`${door.start}\` with \`Accept: application/json\`.`,
+     "",
+-    ...door.steps.flatMap(stepLines),
++    ...door.steps.toReversed().flatMap(stepLines),
+     "## MCP",
+     "",
+     `- endpoint: \`${door.mcp.endpoint}\``,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/key-client.test.ts
+# kills: sdk.key-resource
+# why: a client made for the MCP door asks for a token without naming it, so it is handed the API's token, which /mcp refuses
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 49c1eafa..b0dc6c6a 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -158,7 +158,6 @@ export class KeelClient {
+         audience: issuer,
+       }),
+     });
+-    if (credentials.resource !== undefined) form.set("resource", credentials.resource);
+     if (credentials.project !== undefined) form.set("project", credentials.project);
+     if (credentials.run !== undefined) form.set("run", credentials.run);
+     if (credentials.scopes !== undefined) form.set("scope", credentials.scopes.join(" "));

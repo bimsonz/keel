@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.mcp-token
+# kills: door.mcp-token
+# why: the page gives the API's own name as the resource to ask an MCP token for, so the token an agent gets by following it is refused at /mcp
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..6e94d23b 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -426,7 +426,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+     steps,
+     mcp: {
+       endpoint: `${origin}${MCP_PATH}`,
+-      resource: `${origin}${MCP_PATH}`,
++      resource: origin,
+       metadata: `${origin}${PROTECTED_RESOURCE}${MCP_PATH}`,
+       card: `${origin}${card}`,
+       tools,

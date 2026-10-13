@@ -1,16 +1,16 @@
 # expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
 # kills: authz.unauthenticated-next
-# why: a caller with no credential is told only to sign in or exchange a secret, so an agent holding nothing but a key is never told it can sign up with it.
+# why: a caller with no credential is told only to read the walk, so an agent holding nothing but a key is never told by the answer that it can sign up with it.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index bd9f562f..327bc52f 100644
+index 4095960b..1aff9d09 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -389,7 +389,7 @@ const SIGN_IN: NextAction = {
+@@ -400,7 +400,7 @@ export const READ_START: NextAction = {
  };
  
- const unauthenticated = (): Decision =>
--  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_UP, SIGN_IN] }));
-+  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_IN] }));
+ /** What a caller with no good credential is told: an agent signs up with a key, and the walk says the rest. */
+-export const ARRIVE: readonly NextAction[] = [SIGN_UP, READ_START];
++export const ARRIVE: readonly NextAction[] = [READ_START];
  
- const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
-   "user-suspended": {
+ const unauthenticated = (): Decision =>
+   Result.fail(new AuthenticationRequired({ nextActions: [...ARRIVE] }));

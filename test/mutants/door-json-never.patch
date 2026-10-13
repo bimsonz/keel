@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.walk
+# kills: door.walk
+# why: /start answers markdown to a client that asked for JSON, so a client that reads the steps as data has nothing to read
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..ee259b49 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -653,7 +653,6 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+   app.get(START_PATH, (c) => {
+     const accept = c.req.header("accept") ?? "";
+     const headers = { ...CACHED, vary: "accept" };
+-    if (accept.includes("application/json")) return Response.json(door(), { headers });
+     const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
+     return new Response(startMarkdown(door()), {
+       headers: { ...headers, "content-type": `${type}; charset=utf-8` },

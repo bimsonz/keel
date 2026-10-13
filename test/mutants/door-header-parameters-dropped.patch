@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a step leaves out the headers the operation declares, so sign-up is spelled out with no proof and is refused
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..a4b3f390 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -221,7 +221,6 @@ function operationStep(
+   const say = text(operation["description"]);
+   const headers = [
+     ...(media === undefined ? [] : [{ name: "content-type", required: true, value: media[0] }]),
+-    ...sent("header"),
+   ];
+   const query = sent("query");
+   return {

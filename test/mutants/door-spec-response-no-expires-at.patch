@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.token-spec
+# kills: door.token-spec
+# why: the spec's token answer leaves out a field Keel's real answer carries, so a client that holds the answer to the spec refuses it
+# regen
+diff --git a/packages/spec/auth.tsp b/packages/spec/auth.tsp
+index ce9ecec6..0482c170 100644
+--- a/packages/spec/auth.tsp
++++ b/packages/spec/auth.tsp
+@@ -102,7 +102,6 @@ model AgentTokenResponse {
+   expires_in: int32;
+ 
+   /** When it expires, in seconds since the epoch: the token's own `exp`. */
+-  expires_at: int64;
+ 
+   /** Space-separated scopes granted. */
+   scope: string;

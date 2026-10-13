@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: the card carries a list of tools, which its schema has no place for: a card describes how to reach the server, and the server says what it offers
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..b36300c8 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -622,6 +622,7 @@ export function serverCard(door: FrontDoor): unknown {
+     title: door.name,
+     description: firstSentence(door.about),
+     websiteUrl: door.start,
++    tools: door.mcp.tools,
+     remotes: [
+       {
+         type: "streamable-http",

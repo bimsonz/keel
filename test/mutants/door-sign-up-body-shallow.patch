@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.walk
+# kills: door.walk
+# why: sign-up's body is spelled out one level deep, so the page names `jwks` and never says the key goes in its `keys`, and a client that follows the page cannot build the request
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..70028519 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -257,7 +257,7 @@ function operationStep(
+  */
+ export const WALK = [
+   { id: "key", title: "Make a key", model: "RegistrationJwk" },
+-  { id: "sign-up", operationId: "Auth_registerClient", depth: 3, keep: ["client_id", "handle"] },
++  { id: "sign-up", operationId: "Auth_registerClient", depth: 1, keep: ["client_id", "handle"] },
+   { id: "token", title: "Ask for a token", model: "AgentTokenRequest" },
+   {
+     id: "whoami",

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-session-hidden
+# kills: run.pool-session-hidden
+# why: opening a session does not declare the 404 it answers for a project the agent cannot see, so the contract check turns that answer into a 500
+# regen
+diff --git a/packages/spec/sessions.tsp b/packages/spec/sessions.tsp
+index f7a3791c..76340305 100644
+--- a/packages/spec/sessions.tsp
++++ b/packages/spec/sessions.tsp
+@@ -44,5 +44,5 @@ interface Sessions {
+   ): {
+     @statusCode statusCode: 201;
+     @body body: Session;
+-  } | NotFound | Conflict | StandardErrors;
++  } | Conflict | StandardErrors;
+ }

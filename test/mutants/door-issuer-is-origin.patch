@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: the token step names the origin as the issuer a signed request is addressed to, and the token endpoint refuses that audience
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..5ecc8bfe 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -379,7 +379,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+         keep: TOKEN_KEEPS.map((path) => kept(document, answer, path, TOKEN_ANSWER)),
+       },
+       here: {
+-        issuer: `${origin}${where.issuerPath}`,
++        issuer: origin,
+         metadata: `${origin}${AUTHORIZATION_SERVER}`,
+       },
+     };

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a field the document fixes to one value is shown with none, so an agent must guess `grant_type` and the assertion's type
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..26cf1d9d 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -102,7 +102,6 @@ function fieldOf(
+   return {
+     name,
+     required,
+-    ...(values.length === 1 && only !== undefined ? { value: only } : {}),
+     ...(values.length > 1 ? { oneOf: values } : {}),
+     ...(pattern === undefined ? {} : { pattern }),
+     ...(say === undefined ? {} : { say: flat(say) }),

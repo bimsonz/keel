@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a step is titled by its operation's id and not by the summary the document gives it, so the page reads as a list of identifiers
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..d77bcff0 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -226,7 +226,7 @@ function operationStep(
+   const query = sent("query");
+   return {
+     id: asked.id,
+-    title: text(operation["summary"]) ?? operationId,
++    title: operationId,
+     ...(say === undefined ? {} : { say: flat(say) }),
+     operationId,
+     method,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a field the walk says to keep is not looked for in the answer's schema, so the page goes on naming a field after the spec has dropped it
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..08f87e3d 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -128,7 +128,6 @@ function kept(document: unknown, schema: unknown, path: string, from: string): D
+     (inner, key) => {
+       const whole = resolve(document, inner.schema);
+       const property = record(whole["properties"])[key];
+-      if (property === undefined) throw new Error(`${from} answers no \`${path}\``);
+       return { schema: property, required: texts(whole["required"]).includes(key) };
+     },
+     { schema, required: true },

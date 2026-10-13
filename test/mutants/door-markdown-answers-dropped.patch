@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: the markdown leaves out what each answer hands on, so a reader of the text is never told to keep the agent's id, the token or the workspace's remote, which the JSON says
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..a06cb316 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -531,7 +531,7 @@ function stepLines(step: DoorStep, index: number): string[] {
+     ...part(`Body (\`${step.contentType ?? ""}\`)`, step.body),
+     ...(step.answer === undefined
+       ? []
+-      : part(`Answers ${step.answer.status.join(" or ")}; keep`, step.answer.keep)),
++      : []),
+     "",
+   ];
+ }

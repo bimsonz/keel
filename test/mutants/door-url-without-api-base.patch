@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a step's address leaves out the base path the document's server gives, so every request the page spells out goes to a path Keel does not serve
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..20f89ca2 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -336,7 +336,7 @@ export interface DoorPlace {
+ /** The door, from the published document and where this instance is. Pure: the same document and place give the same door. */
+ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+   const { origin } = where;
+-  const api = `${origin}${text(at(list(at(document, "servers"))[0], "url")) ?? ""}`;
++  const api = origin;
+   const tokenUrl = text(
+     at(
+       document,

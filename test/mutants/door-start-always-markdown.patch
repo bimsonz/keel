@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: /start is typed as markdown for every reader, so a browser that asked for nothing downloads the page where it should show it
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..3c015a32 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -654,7 +654,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+     const accept = c.req.header("accept") ?? "";
+     const headers = { ...CACHED, vary: "accept" };
+     if (accept.includes("application/json")) return Response.json(door(), { headers });
+-    const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
++    const type = "text/markdown";
+     return new Response(startMarkdown(door()), {
+       headers: { ...headers, "content-type": `${type}; charset=utf-8` },
+     });

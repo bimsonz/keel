@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: the card is served beside the endpoint alone, so a scanner that asks at the well-known place finds no card
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..5c5ec682 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -17,7 +17,7 @@ export const LLMS_PATH = "/llms.txt";
+ /** RFC 9727. */
+ export const CATALOG_PATH = "/.well-known/api-catalog";
+ /** The card's recommended place, beside the endpoint, and the older well-known one a scanner asks at. */
+-export const CARD_PATHS = ["/mcp/server-card", "/.well-known/mcp/server-card.json"] as const;
++export const CARD_PATHS = ["/mcp/server-card"] as const;
+ 
+ const DOCUMENT_PATH = "/v1/openapi.json";
+ const AUTHORIZATION_SERVER = "/.well-known/oauth-authorization-server";

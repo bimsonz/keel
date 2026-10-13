@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: the catalogue is typed as plain JSON, so a client that asks for a linkset by its type and profile does not know it has one
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..c08fdc14 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -670,8 +670,6 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+     Response.json(apiCatalog(door()), {
+       headers: {
+         ...CACHED,
+-        "content-type":
+-          'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"',
+       },
+     }),
+   );

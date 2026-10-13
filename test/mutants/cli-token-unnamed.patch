@@ -2,14 +2,14 @@
 # kills: cli.token
 # why: the token handed to a tool names no project and no run, so what the tool does is in no project and of no run
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 74a3f8f8..46f07162 100644
+index 6fe1dc07..eb868a86 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -423,7 +423,6 @@ async function keyCommand(
+@@ -425,7 +425,6 @@ async function keyCommand(
      agentId: held.agentId,
      key: held.signer,
      bound: false,
 -    ...target(values, io.env),
+     // Each of Keel's doors takes only a token asked for by its own name.
+     ...(values.mcp === true ? { resource: `${baseUrl.replace(/\/+$/, "")}/mcp` } : {}),
      ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
-   }).token();
-   io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);

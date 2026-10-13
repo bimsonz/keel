@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: the token step gives the address of the exchange of a secret and not the security scheme's, so a signed request is sent where nothing reads it
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..e8df1d2f 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -367,7 +367,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+       title,
+       ...(say === undefined || only !== undefined ? {} : { say: flat(say) }),
+       method: "POST",
+-      url: `${origin}${tokenUrl}`,
++      url: `${api}/oauth/token`,
+       contentType: "application/x-www-form-urlencoded",
+       headers: [
+         { name: "content-type", required: true, value: "application/x-www-form-urlencoded" },

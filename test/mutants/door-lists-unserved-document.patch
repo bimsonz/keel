@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: the page, the index and the catalogue name the API's document at a path Keel does not serve, so the one link an agent follows for the rest is dead
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..8ce14326 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -19,7 +19,7 @@ export const CATALOG_PATH = "/.well-known/api-catalog";
+ /** The card's recommended place, beside the endpoint, and the older well-known one a scanner asks at. */
+ export const CARD_PATHS = ["/mcp/server-card", "/.well-known/mcp/server-card.json"] as const;
+ 
+-const DOCUMENT_PATH = "/v1/openapi.json";
++const DOCUMENT_PATH = "/openapi.json";
+ const AUTHORIZATION_SERVER = "/.well-known/oauth-authorization-server";
+ const PROTECTED_RESOURCE = "/.well-known/oauth-protected-resource";
+ const SIGNERS_PATH = "/.well-known/keel/allowed-signers";

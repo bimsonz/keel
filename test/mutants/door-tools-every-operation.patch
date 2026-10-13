@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: every operation is listed as an MCP tool, tagged or not, so the page names tools the MCP server does not have
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..82765be7 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -405,7 +405,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+   const tools = Object.entries(record(at(document, "paths"))).flatMap(([path, item]) =>
+     Object.entries(record(item)).flatMap(([method, operation]): DoorTool[] => {
+       const name = text(at(operation, "operationId"));
+-      if (name === undefined || !texts(at(operation, "tags")).includes("mcp")) return [];
++      if (name === undefined) return [];
+       return [
+         {
+           name,

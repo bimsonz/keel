@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts -t gate.challenge-none
+# kills: gate.challenge-none
+# why: a token Keel cannot take is answered with sign-up alone, so an agent that has an account is told nothing about asking for a new token
+diff --git a/apps/keel/src/adapters/driving/http/problems.ts b/apps/keel/src/adapters/driving/http/problems.ts
+index 9e48b8f7..50429f1b 100644
+--- a/apps/keel/src/adapters/driving/http/problems.ts
++++ b/apps/keel/src/adapters/driving/http/problems.ts
+@@ -15,7 +15,7 @@ export type NextAction = ProblemBody["nextActions"][number];
+  * credential at all: an agent signs up with a key, and the walk says the rest.
+  */
+ export const arrival = (): NextAction[] =>
+-  ARRIVE.map(({ kind, title, operationId }) => ({
++  ARRIVE.slice(0, 1).map(({ kind, title, operationId }) => ({
+     kind,
+     title,
+     ...(operationId === undefined ? {} : { operationId }),

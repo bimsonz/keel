@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.found
+# kills: door.found
+# why: a resource's document does not name the walk, so the chain a 401's challenge starts ends at a document that says how a token is presented and not how to get one
+diff --git a/apps/keel/src/adapters/driven/better-auth/discovery.ts b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+index 292f1728..925de6bb 100644
+--- a/apps/keel/src/adapters/driven/better-auth/discovery.ts
++++ b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+@@ -76,7 +76,7 @@ export async function protectedResourceDocument(
+       dpop_signing_alg_values_supported: [...KEY_ALGORITHMS],
+     });
+   return Response.json(
+-    { ...provided, resource_documentation: where.startUrl },
++    provided,
+     { headers: CACHED },
+   );
+ }

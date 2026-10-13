@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.token-spec
+# kills: door.token-spec
+# why: the security scheme names the exchange of a secret as where a token is asked for, which is not the endpoint the discovery document names or the one a key's request is sent to
+# regen
+diff --git a/packages/spec/common.tsp b/packages/spec/common.tsp
+index 6183c3f4..b1e23dd1 100644
+--- a/packages/spec/common.tsp
++++ b/packages/spec/common.tsp
+@@ -132,7 +132,7 @@ scalar SubjectKey extends string;
+  */
+ model KeelClientCredentials {
+   type: OAuth2FlowType.clientCredentials;
+-  tokenUrl: "/v1/auth/oauth2/token";
++  tokenUrl: "/v1/oauth/token";
+ 
+   // No `scopes` here: a flow's scopes override the per-operation scopes the
+   // aliases below pass as OAuth2Auth's second argument, and every operation

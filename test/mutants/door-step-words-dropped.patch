@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: a step leaves out the operation's description, so the page gives an address and never says what to send there or why
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index af1e9706..a543a9ec 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -227,7 +227,6 @@ function operationStep(
+   return {
+     id: asked.id,
+     title: text(operation["summary"]) ?? operationId,
+-    ...(say === undefined ? {} : { say: flat(say) }),
+     operationId,
+     method,
+     url: `${api}${path}`,
