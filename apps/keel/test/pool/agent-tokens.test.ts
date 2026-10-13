@@ -12,6 +12,7 @@ import {
   newKey,
   requestToken,
   seedKeyAgent,
+  type TestKey,
 } from "./agent-keys.ts";
 import { BASE, seedUser, uniqueHandle, worker } from "./helpers.ts";
 
@@ -184,6 +185,37 @@ describe("a token for an agent that holds only a key", () => {
         await requestToken("agt_00000000000000000000000000", stranger, { runKey: run }),
       ),
     ).toMatchObject({ error: "invalid_client" });
+  });
+
+  it("[token.any-of-its-keys] an agent with two keys gets its token with a request signed by either, and still by no other", async () => {
+    const first = await newKey();
+    const second = await newKey();
+    const agent = await seedKeyAgent(first, { keys: [first.key, second.key] });
+    for (const key of [first, second]) {
+      const token = await granted(await requestToken(agent.id, key, { runKey: await newKey() }));
+      expect(decodeJwt(token.access_token).sub).toBe(agent.id);
+    }
+    expect(
+      await refusal(await requestToken(agent.id, await newKey(), { runKey: await newKey() })),
+    ).toEqual({ status: 401, error: "invalid_client" });
+  });
+
+  it("[token.any-of-its-keys] a request that does not name its key is taken while the agent has one key, and refused once it has two", async () => {
+    const only = await newKey();
+    const single = await seedKeyAgent(only);
+    const run = await newKey();
+    const unnamed = async (agentId: string, key: TestKey) =>
+      requestToken(agentId, key, {
+        runKey: run,
+        assertion: await assertionBy(key, agentId, { named: false }),
+      });
+    expect((await unnamed(single.id, only)).status).toBe(200);
+    const first = await newKey();
+    const double = await seedKeyAgent(first, { keys: [first.key, (await newKey()).key] });
+    expect(await refusal(await unnamed(double.id, first))).toEqual({
+      status: 401,
+      error: "invalid_client",
+    });
   });
 
   it("[token.key-only] a suspended agent and a revoked one get no token", async () => {

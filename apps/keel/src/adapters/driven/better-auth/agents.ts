@@ -103,7 +103,9 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
         tokenEndpointAuthMethod: "private_key_jwt",
         grantTypes: ["client_credentials"],
         redirectUris: [],
-        jwks: JSON.stringify({ keys: agent.keys.map((key) => key.jwk) }),
+        // Each key is named by its thumbprint: the provider picks the key a request names, and
+        // tries none when an agent has several and the request names none.
+        jwks: JSON.stringify({ keys: agent.keys.map((key) => ({ ...key.jwk, kid: key.jkt })) }),
         clientCredentialsScopes: agent.scopes.filter(isGrantable),
         // A token is bound when its request carries a proof; a tool that cannot sign gets a plain one.
         dpopBoundAccessTokens: false,

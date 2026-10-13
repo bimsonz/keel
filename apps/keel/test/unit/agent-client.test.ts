@@ -21,7 +21,7 @@ const keysOf = (answer: unknown): unknown =>
   JSON.parse(String(Reflect.get(Object(answer), "jwks")));
 
 describe("an agent as the token endpoint's provider reads a client", () => {
-  it("[discovery.client] an agent that signed up by key is a client that asks with a signed request, and its keys are its own alone", async () => {
+  it("[discovery.client] an agent that signed up by key is a client that asks with a signed request, and its keys are its own alone, each named by its thumbprint", async () => {
     const agent = signedUpAgent([freshAgentKey(), freshAgentKey()]);
     const other = signedUpAgent();
     const answer = await client([other, agent], agent.id);
@@ -33,7 +33,10 @@ describe("an agent as the token endpoint's provider reads a client", () => {
       grantTypes: ["client_credentials"],
       redirectUris: [],
     });
-    expect(keysOf(answer)).toEqual({ keys: agent.keys?.map((key) => key.jwk) });
+    // Each key is named by its thumbprint, which is how a request signed by one of several says which.
+    expect(keysOf(answer)).toEqual({
+      keys: agent.keys?.map((key) => ({ ...key.jwk, kid: key.jkt })),
+    });
   });
 
   it("[discovery.client] a suspended agent and a revoked one are disabled clients", async () => {

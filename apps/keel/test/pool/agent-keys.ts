@@ -79,6 +79,8 @@ export interface AssertionOptions {
   readonly audience?: string;
   /** How long the assertion says it lasts, in seconds. */
   readonly lifetime?: number;
+  /** False leaves out the header that names the signing key. */
+  readonly named?: boolean;
 }
 
 /** A client assertion (RFC 7523): the agent asking for a token as itself, signed by `key`. */
@@ -89,7 +91,11 @@ export async function assertionBy(
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({})
-    .setProtectedHeader({ alg: "EdDSA", typ: "client-authentication+jwt" })
+    .setProtectedHeader({
+      alg: "EdDSA",
+      typ: "client-authentication+jwt",
+      ...(options.named === false ? {} : { kid: key.key.jkt }),
+    })
     .setIssuer(agentId)
     .setSubject(agentId)
     .setAudience(options.audience ?? ISSUER)
