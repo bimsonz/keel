@@ -13,7 +13,12 @@ import {
   evolveAgent,
   IdempotencyConflict,
 } from "../../domain/identity/index.ts";
-import { AgentId, type EventEnvelope, UserId } from "../../domain/kernel/index.ts";
+import {
+  type Actor as EventActor,
+  AgentId,
+  type EventEnvelope,
+  UserId,
+} from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   type AgentStanding,
@@ -31,8 +36,8 @@ export type StandingMove = "suspend" | "reinstate" | "revoke";
 
 /** A suspension, reinstatement or revocation, as the isolate sends it. */
 export interface StandingChange {
-  /** Who moves it, as `operator:<the actor's id>`: the events' `by` and the commit's actor. */
-  readonly by: `operator:${string}`;
+  /** Who moves it, as the envelope names an actor (`user:<id>`): the events' `by` and the commit's actor. */
+  readonly by: EventActor;
   /** Why the agent is suspended; a suspension needs one, the others take none. */
   readonly reason?: string | undefined;
   readonly idempotencyKey: string;

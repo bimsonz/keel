@@ -1,4 +1,4 @@
-import { type Actor, actorId } from "@keeltown/core/domain/identity";
+import { type Actor, eventActorOf } from "@keeltown/core/domain/identity";
 import type { AgentId } from "@keeltown/core/kernel";
 import { type StandingInput, Standings } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -15,9 +15,9 @@ export interface StandingsStub {
 const encodeStanding = Schema.encodeSync(StandingCommand);
 
 /**
- * `Standings` over each agent's AgentSession DO. The actor, as
- * `operator:<its id>`, is the events' `by`; the fingerprint hashes the move and
- * its reason, so a retry is told apart from a reused key.
+ * `Standings` over each agent's AgentSession DO. The actor, as the envelope
+ * names it (`user:<its id>`), is the events' `by`; the fingerprint hashes the
+ * move and its reason, so a retry is told apart from a reused key.
  */
 export function StandingsRpc(
   agentSession: (agentId: AgentId) => StandingsStub,
@@ -28,7 +28,7 @@ export function StandingsRpc(
         fingerprintOf({ move: kind, reason: input.reason ?? null }),
       );
       const command = encodeStanding({
-        by: `operator:${actorId(actor)}`,
+        by: eventActorOf(actor),
         ...(input.reason === undefined ? {} : { reason: input.reason }),
         idempotencyKey: input.idempotencyKey,
         fingerprint,

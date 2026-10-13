@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { changeStanding, enrol, standingOf } from "@keeltown/core/application/identity";
-import { makeId } from "@keeltown/core/kernel";
+import { makeId, userActor } from "@keeltown/core/kernel";
 import { EventOutbox } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
@@ -34,7 +34,7 @@ function enrolledAgent() {
   return { directory, layer, enrolled };
 }
 
-const by = "operator:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0" as const;
+const by = userActor(makeId("usr", "01JZ8PT2C4E6G8J0M2N4Q6S8V0"));
 const row = (directory: ReturnType<typeof makeAgentDirectoryMemory>) => {
   const agent = directory.agents.get(agentId);
   return agent === undefined ? undefined : [agent.state, agent.revocationEpoch];

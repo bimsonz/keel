@@ -76,7 +76,7 @@ export const exchangeToken: (
   const agent = yield* directory.findAgent(agentId.value);
   // A credential whose agent has gone is as good as a wrong secret.
   if (Option.isNone(agent)) return yield* new CredentialRejected();
-  const reason = whyNotAdmitted(agent.value, null);
+  const reason = whyNotAdmitted(agent.value);
   if (reason !== null) return yield* new AgentNotAdmitted({ agentId: agent.value.id, reason });
   const held = new Set(agent.value.scopes);
   const scopes = request.scopes ?? agent.value.scopes;

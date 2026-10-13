@@ -37,6 +37,18 @@ export const SPONSOR_ASK = "sponsor-ask";
 /** How long an agent's request for a sponsor stays good. */
 export const SPONSOR_ASK_MS = 10 * 60_000;
 
+/**
+ * Whether two hashes are the same, in time that depends on their length alone.
+ * The comparison never stops at the first difference, so how long a wrong code
+ * took to refuse says nothing about how much of it was right.
+ */
+export function sameHash(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i += 1) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return difference === 0;
+}
+
 const Ask = Schema.Struct({ codeHash: Schema.NonEmptyString, expiresAt: Schema.Int });
 
 const decodeAgent = Schema.decodeUnknownSync(Agent);
@@ -193,7 +205,7 @@ export const approveSponsor: (
       if (command.codeHash === undefined) return undefined;
       const stored = tx.store.get(SPONSOR_ASK, agentId);
       const ask = stored === undefined ? undefined : decodeAsk(stored);
-      return ask !== undefined && ask.codeHash === command.codeHash && ask.expiresAt > tx.at
+      return ask !== undefined && sameHash(ask.codeHash, command.codeHash) && ask.expiresAt > tx.at
         ? undefined
         : new SponsorRequestRefused({ agentId });
     },

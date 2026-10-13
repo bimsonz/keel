@@ -52,6 +52,7 @@ import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
 import { makeHandlers } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
+import { doorwayOf } from "./doorway.ts";
 
 /**
  * The isolate's composition root: the one place `env` becomes objects. One
@@ -132,7 +133,17 @@ function gateDeps(
     origin: `https://${host}`,
     sessionUser: async (headers) => {
       const session = await auth().api.getSession({ headers });
-      return session === null ? null : Option.getOrNull(decodeUserId(session.user.id));
+      if (session === null) return null;
+      const userId = Option.getOrNull(decodeUserId(session.user.id));
+      if (userId === null) return null;
+      const by: unknown = session.session["signedInBy"];
+      return {
+        userId,
+        signedIn: {
+          by: typeof by === "string" ? by : null,
+          at: new Date(session.session.createdAt).getTime(),
+        },
+      };
     },
     admit: (credential: Credential) =>
       runtime.runPromise(
@@ -206,7 +217,11 @@ export function makeIsolate(
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
   const authConfig = identity(env, authOverrides);
-  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig));
+  const handlers = makeHandlers(
+    makeRunner(runtime),
+    signInMethods(authConfig),
+    doorwayOf(env.KEEL_HOST),
+  );
   /**
    * Better Auth starts its initialisation (D1 included) when it is made and
    * shares that promise, and its adapter's schema check, with every later

@@ -90,12 +90,13 @@ export const EnrolCommand = Schema.Struct({
 });
 
 /**
- * An operator suspends, reinstates or revokes the agent. `by` is
- * `operator:<agentId>`, the events' `by` and the commit's actor; `reason` is
- * a suspension's. The commit's cause is `standing:<idempotencyKey>`.
+ * A person suspends, reinstates or revokes the agent. `by` is who, as the
+ * envelope names an actor (`user:<id>`): the events' `by` and the commit's
+ * actor; `reason` is a suspension's. The commit's cause is
+ * `standing:<idempotencyKey>`.
  */
 export const StandingCommand = Schema.Struct({
-  by: Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+  by: Actor,
   reason: Schema.optional(Schema.NonEmptyString),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,

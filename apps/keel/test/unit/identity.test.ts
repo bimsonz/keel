@@ -82,10 +82,24 @@ describe("identity/whoami", () => {
     }).pipe(Effect.provide(layers())),
   );
 
+  it.effect(
+    "answers a suspended agent as it stands: the policy, not this read, refuses a paused agent",
+    () =>
+      Effect.gen(function* () {
+        const identity = yield* whoami({
+          agentId,
+          projectId: sampleProjectId,
+          scopes: ["agent:read"],
+          revocationEpoch: 2,
+        });
+        expect(identity.agent.state).toBe("suspended");
+      }).pipe(Effect.provide(layers({ state: "suspended" }))),
+  );
+
   it.effect.each<{ override: Partial<Agent>; epoch: number; reason: string }>([
-    { override: { state: "suspended" }, epoch: 2, reason: "suspended" },
     { override: { state: "revoked" }, epoch: 2, reason: "revoked" },
     { override: {}, epoch: 1, reason: "stale-epoch" },
+    { override: { state: "suspended" }, epoch: 1, reason: "stale-epoch" },
   ])("fails AgentNotAdmitted as $reason", ({ override, epoch, reason }) =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts -t link.actor-user
+# kills: link.actor-user
+# why: a person's pause is recorded under the old operator spelling, which names nobody the policy knows
+diff --git a/apps/keel/src/adapters/driven/do-rpc/standings.ts b/apps/keel/src/adapters/driven/do-rpc/standings.ts
+index 05f005c7..2106f51d 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/standings.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/standings.ts
+@@ -28,7 +28,7 @@ export function StandingsRpc(
+         fingerprintOf({ move: kind, reason: input.reason ?? null }),
+       );
+       const command = encodeStanding({
+-        by: eventActorOf(actor),
++        by: `operator:${actor._tag === "User" ? actor.userId : actor.agentId}`,
+         ...(input.reason === undefined ? {} : { reason: input.reason }),
+         idempotencyKey: input.idempotencyKey,
+         fingerprint,

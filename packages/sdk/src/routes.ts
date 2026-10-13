@@ -2,7 +2,7 @@ import type { WireInputs, WireOutputs } from "@keeltown/contracts";
 
 /** Where each input key of an operation goes on the wire; every other key is the JSON body. */
 export interface Route {
-  readonly method: "GET" | "POST" | "PUT";
+  readonly method: "GET" | "POST" | "PUT" | "DELETE";
   /** Relative to `/v1`, with `{name}` for each path parameter. */
   readonly path: string;
   readonly query?: readonly string[];
@@ -25,6 +25,19 @@ export type UnroutedOperation = keyof typeof UNROUTED;
  */
 export const ROUTES = {
   whoami: { method: "GET", path: "/agents/me" },
+  askSponsor: { method: "POST", path: "/agents/me/sponsor-request" },
+  Agents_listSponsored: { method: "GET", path: "/agents/sponsored" },
+  Agents_approveSponsor: {
+    method: "PUT",
+    path: "/agents/{agentId}/sponsor",
+    headers: ["idempotency-key"],
+  },
+  Agents_endSponsorship: {
+    method: "DELETE",
+    path: "/agents/{agentId}/sponsor",
+    headers: ["idempotency-key"],
+  },
+  Agents_getAgent: { method: "GET", path: "/agents/{agentId}" },
   SignIn_methods: { method: "GET", path: "/auth/methods" },
   declare: { method: "POST", path: "/changes", headers: ["idempotency-key"] },
   change: { method: "GET", path: "/changes/{changeId}" },

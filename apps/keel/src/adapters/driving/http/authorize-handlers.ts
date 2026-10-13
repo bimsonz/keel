@@ -1,4 +1,5 @@
 import {
+  type AgentResource,
   type AuthenticationRequired,
   type AuthorizationRefusal,
   authorize,
@@ -147,6 +148,31 @@ const agentProject = (id: unknown) =>
   });
 
 /**
+ * An agent's own account, with the person who stands behind it: what a pause,
+ * the end of its sponsor's link and a read of the agent are decided on. The
+ * directory's row has the sponsor before a link move answers, so the next
+ * request is decided on it.
+ */
+const agentAccount = (id: unknown) =>
+  Option.match(decodeAgentId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (agentId) =>
+      AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+        Effect.map(
+          Option.match({
+            onNone: () => MISSING,
+            onSome: (agent) =>
+              ({
+                _tag: "Agent",
+                agentId: agent.id,
+                ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+              }) satisfies AgentResource,
+          }),
+        ),
+      ),
+  });
+
+/**
  * The project an escalation's question is about, with the user asked first:
  * what a ruling is decided on. An escalation the Projector has not heard
  * raised is missing.
@@ -192,8 +218,9 @@ const projectByName = (orgName: string, name: string) =>
 
 /**
  * What each operation is decided on. Work is only ever in the agent's own
- * project; reads of a change are decided on the change's project; a move on an
- * agent on the agent's project and sponsor; a ruling on the project its
+ * project; reads of a change are decided on the change's project; a revocation
+ * on the agent's project and sponsor; a pause, the end of a sponsor's link and a
+ * read of an agent on the agent's own account; a ruling on the project its
  * escalation is about and the user asked first. A person's list of escalations
  * spans projects, so each item is decided on its own; an agent's is its own
  * project's. Operations not implemented yet that
@@ -206,7 +233,12 @@ export const RESOLVERS: Resolvers = {
   Lattices_listLattices: instance,
   whoami: self,
   inbox: self,
+  askSponsor: self,
   Users_me: self,
+  Agents_approveSponsor: self,
+  Agents_listSponsored: self,
+  Agents_endSponsorship: (input) => agentAccount(input.agentId),
+  Agents_getAgent: (input) => agentAccount(input.agentId),
 
   Operator_listProjects: perItem,
   Operator_createProject: (input) => orgNamed(input.org),
@@ -243,8 +275,8 @@ export const RESOLVERS: Resolvers = {
     caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
   Operator_giveRuling: (input) => escalationProject(input.escalationId),
   Operator_enrolAgent: (input) => projectNamed(input.projectId),
-  Operator_suspendAgent: (input) => agentProject(input.agentId),
-  Operator_reinstateAgent: (input) => agentProject(input.agentId),
+  Operator_suspendAgent: (input) => agentAccount(input.agentId),
+  Operator_reinstateAgent: (input) => agentAccount(input.agentId),
   Operator_revokeAgent: (input) => agentProject(input.agentId),
 
   declare: ownProject,

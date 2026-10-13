@@ -65,6 +65,7 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
         requestId: c.get("requestId"),
         principal: admitted.principal,
         ...(admitted.token === undefined ? {} : { token: admitted.token }),
+        ...(admitted.signedIn === undefined ? {} : { signedIn: admitted.signedIn }),
         signal: c.req.raw.signal,
       };
     },

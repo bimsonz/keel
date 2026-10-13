@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: a caller the agent's own record no longer takes for a party is told the agent's state, where a stranger reads no such agent
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 44b9dcb8..02491f91 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -215,9 +215,7 @@ export function endError(
+     case "AgentStateRefused":
+       // The policy granted the caller on the directory's row and the agent's own record says
+       // otherwise: the link moved in between, and the agent is no more the caller's than a stranger's.
+-      return error.reason === "not-a-party"
+-        ? { status: 404, body: problem(404, "resource.not_found", caller.requestId) }
+-        : stateRefused(caller, error);
++      return stateRefused(caller, error);
+     case "IdempotencyConflict":
+       return idempotencyConflict(caller, error, "Agents_endSponsorship");
+     default: {

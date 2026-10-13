@@ -168,6 +168,17 @@ export interface ProjectResource {
   readonly sponsor?: UserId;
 }
 
+/**
+ * An agent's own account, with the person who stands behind it when there is
+ * one. It belongs to no org: what is decided on it is between the agent and its
+ * sponsor, and to everyone else it is not there.
+ */
+export interface AgentResource {
+  readonly _tag: "Agent";
+  readonly agentId: AgentId;
+  readonly sponsor?: UserId;
+}
+
 /** Nothing by that name. Answered exactly as a private resource the caller cannot see. */
 export interface MissingResource {
   readonly _tag: "Missing";
@@ -185,5 +196,6 @@ export type Resource =
   | SelfResource
   | OrgResource
   | ProjectResource
+  | AgentResource
   | MissingResource
   | ForkResource;

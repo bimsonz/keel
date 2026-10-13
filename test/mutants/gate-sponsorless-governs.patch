@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.sponsorless
+# kills: gate.sponsorless
+# why: an agent with nobody behind it is said to govern its org, so losing its sponsor gives it more than it had
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index d525ea77..832de14e 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -118,7 +118,7 @@ export const principalOf: (
+         const { org, sponsor: sponsorId } = agent;
+         const standing: AgentStanding =
+           sponsorId === undefined
+-            ? { _tag: "None" }
++            ? { _tag: "Governs" }
+             : {
+                 _tag: "Invited",
+                 by: yield* Memberships.use((memberships) => memberships.standing(sponsorId, org)),

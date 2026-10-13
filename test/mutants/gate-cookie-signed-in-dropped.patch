@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.signed-in
+# kills: gate.signed-in
+# why: a cookie session is admitted without how it was signed in, so the console's own session is never fresh
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 4a8e747a..4303324f 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -144,7 +144,7 @@ export async function gate(
+       });
+     const user = await session(only(request.headers, "cookie"));
+     if (user !== null)
+-      credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
++      credential = { _tag: "Session", userId: user.userId, signedIn: { by: null, at: 0 } };
+   }
+   const answer = await deps.admit(credential);
+   if (!("admitted" in answer)) return refusal(answer, requestId);

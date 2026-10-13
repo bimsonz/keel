@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts -t link.sponsor-real
+# kills: link.sponsor-real
+# why: the agent's object is sent and keeps the code itself, so whoever reads its storage can stand behind the agent
+diff --git a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+index ab4d9cb7..3dbeea59 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+@@ -45,7 +45,7 @@ export function SponsorshipsRpc(
+       ask: (agentId) =>
+         Effect.gen(function* () {
+           const code = freshCode();
+-          const codeHash = yield* Effect.promise(() => sha256Of(code));
++          const codeHash = code;
+           const expiresAt = yield* callObject(AgentSessionCodecs.askSponsor, () =>
+             agentSession(agentId).askSponsor(encodeAsk({ codeHash })),
+           );
+@@ -55,7 +55,7 @@ export function SponsorshipsRpc(
+         Effect.gen(function* () {
+           const { asked } = approval;
+           const codeHash =
+-            asked._tag === "Code" ? yield* Effect.promise(() => sha256Of(asked.code)) : undefined;
++            asked._tag === "Code" ? asked.code : undefined;
+           const fingerprint = yield* Effect.promise(() =>
+             fingerprintOf({ by: approval.by, asked: asked._tag, codeHash: codeHash ?? null }),
+           );

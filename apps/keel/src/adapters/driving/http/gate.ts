@@ -1,4 +1,4 @@
-import type { Admitted, Credential } from "@keeltown/core/application/identity";
+import type { Admitted, Credential, SignedIn } from "@keeltown/core/application/identity";
 import type { UserId } from "@keeltown/core/kernel";
 import { bearerToken } from "./caller.ts";
 import { problemResponse } from "./problems.ts";
@@ -12,14 +12,21 @@ export type GateRefusal =
   | { readonly refused: "revoked" }
   | { readonly refused: "unplaced"; readonly agentId: string };
 
+/** The user a session names, with how and when that session was signed in. */
+export interface SessionUser {
+  readonly userId: UserId;
+  readonly signedIn: SignedIn;
+}
+
 export interface GateDeps {
   /** `https://<KEEL_HOST>`: the one origin a request authenticated by the session cookie may come from. */
   readonly origin: string;
   /**
-   * The user a Better Auth session names, from these headers' cookie or bearer, or null when there is
-   * none. It makes Better Auth for the call: never one kept beyond the request.
+   * The user a Better Auth session names, from these headers' cookie or bearer, with the session's
+   * sign-in method and time, or null when there is none. It makes Better Auth for the call: never
+   * one kept beyond the request.
    */
-  readonly sessionUser: (headers: Headers) => Promise<UserId | null>;
+  readonly sessionUser: (headers: Headers) => Promise<SessionUser | null>;
   /** The principal for a credential, or why it is refused. */
   readonly admit: (
     credential: Credential,
@@ -52,12 +59,18 @@ function refusal(answer: GateRefusal, requestId: string): Response {
   switch (answer.refused) {
     case "revoked":
       return problemResponse(401, "auth.revoked", requestId, {
-        nextActions: [{ kind: "escalate", title: "Ask the agent's sponsor to reinstate it" }],
+        nextActions: [
+          {
+            kind: "escalate",
+            title:
+              "This agent is revoked for good; ask a member of the project's org to enrol a new one",
+          },
+        ],
       });
     case "unplaced":
       console.error("agent unplaced", { requestId, agentId: answer.agentId });
       return problemResponse(403, "auth.agent_unplaced", requestId, {
-        detail: `Agent ${answer.agentId} has no org or sponsor: it was enrolled before tenancy and has not been placed in an org.`,
+        detail: `Agent ${answer.agentId} has no org: it was enrolled before tenancy and has not been placed in one.`,
         nextActions: [
           {
             kind: "escalate",
@@ -91,6 +104,10 @@ function refusal(answer: GateRefusal, requestId: string): Response {
  * cookie authenticates may change nothing unless it comes from Keel's own
  * origin: a mutation without that Origin is refused (fail closed). A stale
  * cookie reads as anonymous. MCP passes `cookies: false`: it takes bearers only.
+ *
+ * A session is admitted with how and when it was signed in, so an operation
+ * that wants a fresh sign-in can ask it of its caller. A paused agent is
+ * admitted too: the policy answers it, not the gate.
  */
 export async function gate(
   request: Request,
@@ -100,7 +117,7 @@ export async function gate(
 ): Promise<Gated | Response> {
   const started = Date.now();
   let sessionMs = 0;
-  const session = async (headers: Headers): Promise<UserId | null> => {
+  const session = async (headers: Headers): Promise<SessionUser | null> => {
     const at = Date.now();
     const user = await deps.sessionUser(headers);
     sessionMs = Date.now() - at;
@@ -113,9 +130,9 @@ export async function gate(
     if (bearer === null) return refusal({ refused: "invalid" }, requestId);
     if (JWT.test(bearer)) credential = { _tag: "Token", token: bearer };
     else {
-      const userId = await session(only(request.headers, "authorization"));
-      if (userId === null) return refusal({ refused: "invalid" }, requestId);
-      credential = { _tag: "Session", userId };
+      const user = await session(only(request.headers, "authorization"));
+      if (user === null) return refusal({ refused: "invalid" }, requestId);
+      credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
     }
   } else if (options.cookies && hasSessionCookie(request.headers.get("cookie"))) {
     if (!SAFE_METHODS.has(request.method) && request.headers.get("origin") !== deps.origin)
@@ -125,8 +142,9 @@ export async function gate(
           { kind: "escalate", title: "Send it from Keel's own pages, or with a bearer token" },
         ],
       });
-    const userId = await session(only(request.headers, "cookie"));
-    if (userId !== null) credential = { _tag: "Session", userId };
+    const user = await session(only(request.headers, "cookie"));
+    if (user !== null)
+      credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
   }
   const answer = await deps.admit(credential);
   if (!("admitted" in answer)) return refusal(answer, requestId);

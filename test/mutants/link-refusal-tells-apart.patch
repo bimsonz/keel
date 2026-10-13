@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: an approval for an agent that does not exist is answered apart from a wrong code, so a code's holder learns which agents exist
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 44b9dcb8..ed3015df 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -191,6 +191,12 @@ export function approveError(
+ ): Agents_approveSponsorResult {
+   switch (error._tag) {
+     case "AgentNotKnown":
++      return {
++        status: 404,
++        body: problem(404, "resource.not_found", caller.requestId, {
++          detail: `No agent ${error.agentId}.`,
++        }),
++      };
+     case "SponsorRequestRefused":
+       return noSuchRequest(caller);
+     case "AgentStateRefused":

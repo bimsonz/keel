@@ -307,11 +307,367 @@
         ]
       }
     },
+    "/agents/me/sponsor-request": {
+      "post": {
+        "operationId": "askSponsor",
+        "summary": "Ask for a sponsor",
+        "description": "Ask for a sponsor: a person who stands behind you. Keel answers a code, good once and for ten\nminutes, and the page where a signed-in person approves it: show that person the URL. A new\nrequest replaces the last. A sponsor gives you no rights; your questions go to them, and they\nmay pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SponsorRequestEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents",
+          "mcp"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/agents/sponsored": {
+      "get": {
+        "operationId": "Agents_listSponsored",
+        "summary": "List the agents you sponsor",
+        "description": "The agents the caller stands behind, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SponsoredAgents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/agents/{agentId}": {
+      "get": {
+        "operationId": "Agents_getAgent",
+        "summary": "Get an agent",
+        "description": "Who an agent is, as anyone may see it.",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/agents/{agentId}/reinstate": {
       "post": {
         "operationId": "Operator_reinstateAgent",
         "summary": "Reinstate an agent",
-        "description": "Reinstate a suspended agent: its tokens are accepted again.",
+        "description": "Reinstate a paused agent: its requests are answered again. Its sponsor's alone, on a fresh sign-in.",
         "parameters": [
           {
             "name": "agentId",
@@ -583,11 +939,300 @@
         ]
       }
     },
+    "/agents/{agentId}/sponsor": {
+      "put": {
+        "operationId": "Agents_approveSponsor",
+        "summary": "Sponsor an agent",
+        "description": "Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in\nfrom the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,\nused or run out, and an agent that does not exist, are one answer (404). An agent another\nperson already stands behind is refused (409 `agent.state_refused`).",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveSponsorRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "Agents_endSponsorship",
+        "summary": "Stop sponsoring an agent",
+        "description": "End the link between an agent and its sponsor: the sponsor, on a fresh sign-in (403\n`auth.fresh_sign_in_required` otherwise), or the agent itself. A paused agent is reinstated by\nit. To anyone else the agent's link is not there (404).",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/agents/{agentId}/suspend": {
       "post": {
         "operationId": "Operator_suspendAgent",
         "summary": "Suspend an agent",
-        "description": "Suspend an agent: its next request is refused until an operator reinstates it. Only an active\nagent can be suspended (409 `agent.state_refused` otherwise).",
+        "description": "Pause an agent: every request it makes is refused (403, `agent-paused`) until its sponsor\nreinstates it. Only the agent's sponsor may, on a fresh sign-in (403\n`auth.fresh_sign_in_required` otherwise); to anyone else the agent is not there (404). Only an\nactive agent can be suspended (409 `agent.state_refused` otherwise).",
         "parameters": [
           {
             "name": "agentId",
@@ -6905,6 +7550,33 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "AgentCard": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentKind"
+          },
+          "org": {
+            "type": "string",
+            "description": "The org the agent works in, by its handle."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What anyone may see of an agent: who it is and where it works. Never who stands behind it, nor who\ninvited it anywhere."
+      },
       "AgentEnrolled": {
         "type": "object",
         "required": [
@@ -7135,7 +7807,7 @@
           "suspended",
           "revoked"
         ],
-        "description": "An agent's standing. An operator suspends and reinstates; revocation is final."
+        "description": "An agent's standing. Its sponsor pauses and reinstates it; revocation is final."
       },
       "AgentSuspended": {
         "type": "object",
@@ -7271,6 +7943,22 @@
           "not": {}
         },
         "description": "A change with the same intent as `changeId` landed. A notice for `changeId`'s agent, committed on the project."
+      },
+      "ApproveSponsorRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The code the agent was given and showed you."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "AuditCompleted": {
         "type": "object",
@@ -14885,6 +15573,7 @@
           "auth.cross_site",
           "auth.agent_unplaced",
           "auth.revoked",
+          "auth.fresh_sign_in_required",
           "request.invalid",
           "request.idempotency_conflict",
           "request.precondition_failed",
@@ -16567,6 +17256,101 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "SponsorRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Good once, until `expiresAt`. Whoever holds it can stand behind you: show it to that person only."
+          },
+          "url": {
+            "type": "string",
+            "description": "The page where a signed-in person approves. The code is in its fragment, so it is in no request line."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent's request for a sponsor: the code it shows a person, and where that person approves it."
+      },
+      "SponsorRequestEnvelope": {
+        "type": "object",
+        "required": [
+          "ok",
+          "summary",
+          "result",
+          "findings",
+          "next",
+          "notices",
+          "cost"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, written for the agent."
+          },
+          "result": {
+            "$ref": "#/components/schemas/SponsorRequest"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "maxItems": 3
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CallCost"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
+      "SponsoredAgents": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentProfile"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agents a person stands behind."
       },
       "SubjectId": {
         "type": "string",

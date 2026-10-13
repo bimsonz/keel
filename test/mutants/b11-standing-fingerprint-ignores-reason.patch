@@ -2,9 +2,10 @@
 # kills: b11.standing-route
 # why: a suspension's key reused with another reason replays the first, where it should be a conflict
 diff --git a/apps/keel/src/adapters/driven/do-rpc/standings.ts b/apps/keel/src/adapters/driven/do-rpc/standings.ts
+index 05f005c7..6cd65a3a 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/standings.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/standings.ts
-@@ -25,7 +25,7 @@
+@@ -25,7 +25,7 @@ export function StandingsRpc(
    const move = (kind: "suspend" | "reinstate" | "revoke") => (actor: Actor, input: StandingInput) =>
      Effect.gen(function* () {
        const fingerprint = yield* Effect.promise(() =>
@@ -12,4 +13,4 @@ diff --git a/apps/keel/src/adapters/driven/do-rpc/standings.ts b/apps/keel/src/a
 +        fingerprintOf({ move: kind }),
        );
        const command = encodeStanding({
-         by: `operator:${actorId(actor)}`,
+         by: eventActorOf(actor),

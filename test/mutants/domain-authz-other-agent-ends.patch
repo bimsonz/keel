@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: any agent is taken for the agent whose account it is, so one agent ends another's sponsor link
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..f7861404 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -514,7 +514,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+     // Its own account is there for it, and no other agent's: it may leave its sponsor, and only a person pauses.
+     case "sponsor":
+     case "sponsorOrSelf":
+-      if (resource._tag !== "Agent" || resource.agentId !== principal.agentId) return hidden();
++      if (resource._tag !== "Agent") return hidden();
+       return need === "sponsorOrSelf" ? granted() : refused("users-only");
+     default:
+       break;

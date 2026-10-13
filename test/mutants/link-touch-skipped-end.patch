@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.touch
+# kills: link.touch
+# why: a person ends a sponsor's link on any session, so a stolen session cuts an agent loose from the person who answers for it
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 4ef7b714..55b3fcf0 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -469,7 +469,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+               ),
+             );
+           // An agent has no session to make fresh: the touch is asked of the person.
+-          return caller.principal._tag === "Agent" ? end() : touched(caller, end);
++          return end();
+         },
+         Agents_listSponsored: (caller: Caller) =>
+           run(

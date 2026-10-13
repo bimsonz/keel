@@ -1,3 +1,4 @@
+import type { SignedIn } from "@keeltown/core/application/identity";
 import type { AgentToken, Audience, Principal, Resource } from "@keeltown/core/domain/identity";
 
 export type { AgentToken };
@@ -12,6 +13,8 @@ export interface Caller {
   readonly principal: Principal;
   /** The token an agent presented: what the work use-cases take. */
   readonly token?: AgentToken;
+  /** How and when a user's session was signed in: what an operation that wants a fresh sign-in asks. */
+  readonly signedIn?: SignedIn;
   /** Who a granted read sees as: set by `authorizeHandlers` on reads. */
   readonly audience?: Audience;
   /** What the call was decided on, as `authorizeHandlers` resolved it: its handler reads the project from here. */

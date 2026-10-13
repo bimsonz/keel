@@ -25,6 +25,7 @@ type EnvelopedOperation = {
  */
 const ENVELOPED: Readonly<Record<EnvelopedOperation, true>> = {
   whoami: true,
+  askSponsor: true,
   declare: true,
   revise: true,
   rely: true,

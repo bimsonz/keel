@@ -36,6 +36,11 @@ const PROPOSITION = {
  */
 const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<unknown>>> = {
   whoami: (c) => c.whoami(),
+  askSponsor: (c) => c.askSponsor(),
+  Agents_getAgent: (c) => c.agent("agt_1"),
+  Agents_listSponsored: (c) => c.sponsoredAgents(),
+  Agents_approveSponsor: (c) => c.approveSponsor("agt_1", "CODE"),
+  Agents_endSponsorship: (c) => c.endSponsorship("agt_1"),
   SignIn_methods: (c) => c.signInMethods(),
   Sessions_openSession: (c) => c.openSession({ harness: "h" }),
   declare: (c) => c.declare({ goal: "g", footprint: [], premises: [] }),

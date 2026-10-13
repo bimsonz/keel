@@ -110,7 +110,11 @@ function world() {
       places.layer,
     ),
   );
-  const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
+  const handlers = makeHandlers(
+    makeRunner(runtime),
+    { emailCode: false, github: false },
+    { origin: "https://keel.test", fresh: () => true },
+  );
   /** Raises a question about a fresh conflict of `project`, asking `sponsor` first. */
   const raise = async (namespace: OrgId, project: ProjectId, sponsor: UserId, question: string) => {
     const conflictId = makeId("cfl", ulid());

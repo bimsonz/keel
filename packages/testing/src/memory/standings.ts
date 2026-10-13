@@ -1,5 +1,5 @@
 import {
-  actorId,
+  eventActorOf,
   type Agent,
   AgentNotKnown,
   decideAgent,
@@ -71,9 +71,9 @@ export function makeStandingsMemory() {
             return agent;
           });
         return Standings.of({
-          suspend: (actor, input) => move(`operator:${actorId(actor)}`, input, "suspend"),
-          reinstate: (actor, input) => move(`operator:${actorId(actor)}`, input, "reinstate"),
-          revoke: (actor, input) => move(`operator:${actorId(actor)}`, input, "revoke"),
+          suspend: (actor, input) => move(eventActorOf(actor), input, "suspend"),
+          reinstate: (actor, input) => move(eventActorOf(actor), input, "reinstate"),
+          revoke: (actor, input) => move(eventActorOf(actor), input, "revoke"),
         });
       }),
     ),

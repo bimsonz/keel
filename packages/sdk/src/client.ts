@@ -172,7 +172,7 @@ export class KeelClient {
       else body[key] = value;
     }
     const search = params.size > 0 ? `?${params.toString()}` : "";
-    const sendsBody = route.method !== "GET";
+    const sendsBody = route.method !== "GET" && route.method !== "DELETE";
     if (sendsBody) headers["content-type"] = "application/json";
     return {
       url: `${this.#api}${path}${search}`,
@@ -203,6 +203,52 @@ export class KeelClient {
 
   whoami(options?: CallOptions): Promise<WireOutputs["whoami"]> {
     return this.call("whoami", {}, options);
+  }
+
+  /**
+   * The calling agent asks for a sponsor: a code, good once and for ten minutes, and the page where
+   * a signed-in person approves it. A new request replaces the last.
+   */
+  askSponsor(options?: CallOptions): Promise<WireOutputs["askSponsor"]> {
+    return this.call("askSponsor", {}, options);
+  }
+
+  /** Who an agent is, as anyone may see it: its name, its kind and the org it works in. */
+  agent(agentId: string, options?: CallOptions): Promise<WireOutputs["Agents_getAgent"]> {
+    return this.call("Agents_getAgent", { agentId }, options);
+  }
+
+  /** The agents the signed-in person stands behind. */
+  sponsoredAgents(options?: CallOptions): Promise<WireOutputs["Agents_listSponsored"]> {
+    return this.call("Agents_listSponsored", {}, options);
+  }
+
+  /**
+   * The signed-in person stands behind an agent, with the code it showed them. Keel wants a fresh
+   * sign-in for it: a passkey sign-in from the last ten minutes.
+   */
+  approveSponsor(
+    agentId: string,
+    code: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_approveSponsor"]> {
+    return this.call(
+      "Agents_approveSponsor",
+      { agentId, code, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Ends the link between an agent and its sponsor: the sponsor's call, on a fresh sign-in, or the agent's own. */
+  endSponsorship(
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_endSponsorship"]> {
+    return this.call(
+      "Agents_endSponsorship",
+      { agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
   }
 
   /** The sign-in methods this instance offers besides a passkey. */
@@ -645,7 +691,7 @@ export class KeelClient {
     );
   }
 
-  /** Operator: suspends an agent; its next request is refused until it is reinstated. */
+  /** The agent's sponsor pauses it, on a fresh sign-in: every request it makes is refused until it is reinstated. */
   suspendAgent(
     agentId: string,
     request: SuspendAgentRequest,
@@ -658,7 +704,7 @@ export class KeelClient {
     );
   }
 
-  /** Operator: reinstates a suspended agent. */
+  /** The agent's sponsor reinstates it, on a fresh sign-in. */
   reinstateAgent(
     agentId: string,
     options: Idempotent = {},

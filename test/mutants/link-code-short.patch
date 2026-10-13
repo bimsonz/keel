@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts -t link.sponsor-real
+# kills: link.sponsor-real
+# why: the code an agent is given is eight characters, forty bits, where it alone lets a person stand behind the agent
+diff --git a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+index ab4d9cb7..ca70273a 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+@@ -25,7 +25,7 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+ 
+ /** 32 random characters of Crockford base32, 160 bits: the code an agent shows a person, kept only as its hash. */
+ function freshCode(): string {
+-  return [...crypto.getRandomValues(new Uint8Array(32))]
++  return [...crypto.getRandomValues(new Uint8Array(8))]
+     .map((byte) => CROCKFORD[byte % 32] ?? "0")
+     .join("");
+ }

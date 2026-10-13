@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: any person with a handle is granted what an agent's sponsor is, so a stranger pauses an agent or ends its link
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..b9863520 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -433,9 +433,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+     // An agent's account is there only for the person who stands behind it.
+     case "sponsor":
+     case "sponsorOrSelf":
+-      return resource._tag === "Agent" && resource.sponsor === principal.userId
+-        ? granted()
+-        : hidden();
++      return resource._tag === "Agent" ? granted() : hidden();
+     default:
+       break;
+   }

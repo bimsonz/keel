@@ -2,14 +2,14 @@
 # kills: sponsorships.contract
 # why: any code is taken while the agent has a live request, so whoever knows an agent is asking can become its sponsor
 diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
-index a1432471..919ae58f 100644
+index ecafc3dd..38d11158 100644
 --- a/packages/core/src/application/identity/sponsorship.ts
 +++ b/packages/core/src/application/identity/sponsorship.ts
-@@ -193,7 +193,7 @@ export const approveSponsor: (
+@@ -205,7 +205,7 @@ export const approveSponsor: (
        if (command.codeHash === undefined) return undefined;
        const stored = tx.store.get(SPONSOR_ASK, agentId);
        const ask = stored === undefined ? undefined : decodeAsk(stored);
--      return ask !== undefined && ask.codeHash === command.codeHash && ask.expiresAt > tx.at
+-      return ask !== undefined && sameHash(ask.codeHash, command.codeHash) && ask.expiresAt > tx.at
 +      return ask !== undefined && ask.expiresAt > tx.at
          ? undefined
          : new SponsorRequestRefused({ agentId });

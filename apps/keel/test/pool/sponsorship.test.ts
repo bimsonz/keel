@@ -1,15 +1,26 @@
-import { env } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { makeId } from "@keeltown/core/kernel";
-import { Enrolments, Sponsorships } from "@keeltown/core/ports";
+import { SPONSOR_ASK } from "@keeltown/core/application/identity";
+import { makeId, type ProjectId } from "@keeltown/core/kernel";
+import { Enrolments, EntityStore, EventOutbox, Sponsorships } from "@keeltown/core/ports";
 import { sampleProjectId } from "@keeltown/testing";
 import { Effect, Exit, Layer } from "effect";
 import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
+import { sha256Of } from "../../src/adapters/driven/do-rpc/answer.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { SponsorshipsRpc } from "../../src/adapters/driven/do-rpc/sponsorships.ts";
+import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { drainAfter } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  establishProject,
+  placeProject,
+  seedUser,
+  uniqueHandle,
+} from "./helpers.ts";
 
 const agentSession = (agentId: string) =>
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
@@ -96,6 +107,167 @@ describe("the sponsor link on the real AgentSession DO", () => {
         "a person now stands behind you: your questions go to them, and they may pause you",
         ["whoami"],
       ],
+    ]);
+  });
+});
+
+interface Answer {
+  readonly status: number;
+  readonly body: Record<string, unknown>;
+}
+
+/** One request through the real Worker, as `bearer` (nobody when null), with a JSON body when given. */
+async function http(
+  bearer: string | null,
+  method: string,
+  path: string,
+  body?: object,
+): Promise<Answer> {
+  const headers = new Headers();
+  if (bearer !== null) headers.set("authorization", `Bearer ${bearer}`);
+  if (method !== "GET") headers.set("idempotency-key", `key-${ulid()}`);
+  if (body !== undefined) headers.set("content-type", "application/json");
+  const response = await exports.default.fetch(`${BASE}/v1${path}`, {
+    method,
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  return { status: response.status, body: Object(await response.json()) };
+}
+
+const refusal = (a: Answer) => [a.status, a.body["code"], a.body["detail"]];
+
+describe("the sponsor link through the real Worker", () => {
+  it("[link.sponsor-real] an agent asks, a person on a fresh passkey sign-in approves, pauses and reinstates it, and a paused agent's every request is answered by the policy", async () => {
+    const projectId: ProjectId = makeId("prj", ulid());
+    await placeProject(projectId);
+    await establishProject(projectId);
+    const member = await seedUser(uniqueHandle("member"), { signedInBy: "passkey" });
+    const enrolment = await http(member.token, "POST", "/agents", {
+      name: "link-agent",
+      kind: "interactive",
+      scopes: ["agent:read", "agent:work"],
+      projectId,
+    });
+    expect(enrolment.status).toBe(201);
+    const agentId = String(Object(enrolment.body["agent"]).id);
+    const session = agentSession(agentId);
+    const credentials = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: String(enrolment.body["clientId"]),
+      client_secret: String(enrolment.body["clientSecret"]),
+    });
+    const exchange = async () => {
+      const response = await exports.default.fetch(`${BASE}/v1/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: credentials,
+      });
+      return { status: response.status, body: Object(await response.json()) };
+    };
+    const token = String((await exchange()).body["access_token"]);
+    const me = () => http(token, "GET", "/agents/me");
+
+    // The member who enrolled it stands behind it; the agent itself leaves, and asks.
+    expect(Object(Object((await me()).body["result"]).agent).sponsor).toBe(member.userId);
+    const left = await http(token, "DELETE", `/agents/${agentId}/sponsor`);
+    expect(left.status).toBe(200);
+    expect(left.body).not.toHaveProperty("sponsor");
+    const asked = await http(token, "POST", "/agents/me/sponsor-request");
+    expect(asked.status).toBe(201);
+    const { code, url } = Object(asked.body["result"]);
+    // 160 bits, in the fragment of Keel's own page, and only its hash at rest.
+    expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{32}$/);
+    expect(url).toBe(`https://${env.KEEL_HOST}/sponsor#agent=${agentId}&code=${code}`);
+    const kept = await runInDurableObject(session, (instance: AgentSessionDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EntityStore, (store) => JSON.stringify(store.get(SPONSOR_ASK, agentId))),
+      ),
+    );
+    expect(kept).toContain(await sha256Of(code));
+    expect(kept).not.toContain(code);
+
+    // A session signed in by a code is asked for a fresh sign-in, and the code stays good.
+    const coded = await seedUser(uniqueHandle("coded"), { role: null, signedInBy: "email-otp" });
+    const approving = { code };
+    expect(
+      refusal(await http(coded.token, "PUT", `/agents/${agentId}/sponsor`, approving)).slice(0, 2),
+    ).toEqual([403, "auth.fresh_sign_in_required"]);
+    const sponsor = await seedUser(uniqueHandle("sponsor"), { role: null, signedInBy: "passkey" });
+    const approved = await http(sponsor.token, "PUT", `/agents/${agentId}/sponsor`, approving);
+    expect(approved).toMatchObject({ status: 200, body: { id: agentId, sponsor: sponsor.userId } });
+
+    // The three paths under /agents each reach their own operation.
+    const mine = await http(sponsor.token, "GET", "/agents/sponsored");
+    expect(mine.body).toMatchObject({ items: [{ id: agentId, sponsor: sponsor.userId }] });
+    expect(await http(null, "GET", `/agents/${agentId}`)).toEqual({
+      status: 200,
+      body: { id: agentId, name: "link-agent", kind: "interactive", org: "pool" },
+    });
+    expect(Object(Object((await me()).body["result"]).agent).sponsor).toBe(sponsor.userId);
+
+    // Only the sponsor pauses: the member who enrolled it and a maintainer of its org read no such agent.
+    const maintainer = await seedUser(uniqueHandle("maintainer"), {
+      role: "maintainer",
+      signedInBy: "passkey",
+    });
+    const pausing = { reason: "runaway retries" };
+    for (const other of [member, maintainer])
+      expect(
+        refusal(await http(other.token, "POST", `/agents/${agentId}/suspend`, pausing)),
+      ).toEqual([404, "resource.not_found", undefined]);
+    const paused = await http(sponsor.token, "POST", `/agents/${agentId}/suspend`, pausing);
+    expect(paused).toMatchObject({ status: 200, body: { state: "suspended" } });
+
+    // Paused, the agent is admitted and the policy answers it, with what to do next; no token is minted for it.
+    const refused = await me();
+    expect(refusal(refused)).toEqual([403, "auth.forbidden", "Refused: agent-paused."]);
+    expect(refused.body["nextActions"]).toMatchObject([
+      { kind: "escalate", title: "You are paused; ask your sponsor to reinstate you" },
+    ]);
+    expect(refusal(await http(token, "DELETE", `/agents/${agentId}/sponsor`)).slice(0, 2)).toEqual([
+      403,
+      "auth.forbidden",
+    ]);
+    const minted = await exchange();
+    expect(minted.status).not.toBe(200);
+    expect(minted.body).not.toHaveProperty("access_token");
+
+    const reinstated = await http(sponsor.token, "POST", `/agents/${agentId}/reinstate`);
+    expect(reinstated).toMatchObject({ status: 200, body: { state: "active" } });
+    expect((await me()).status).toBe(200);
+  });
+
+  it("[link.actor-user] a pause and its end are recorded as the person's own, `user:<id>`, on the event and in its `by`", async () => {
+    const projectId: ProjectId = makeId("prj", ulid());
+    await placeProject(projectId);
+    await establishProject(projectId);
+    const sponsor = await seedUser(uniqueHandle("sponsor"), { signedInBy: "passkey" });
+    const enrolment = await http(sponsor.token, "POST", "/agents", {
+      name: "recorded-agent",
+      kind: "interactive",
+      scopes: ["agent:read"],
+      projectId,
+    });
+    const agentId = String(Object(enrolment.body["agent"]).id);
+    const session = agentSession(agentId);
+    const pausing = { reason: "runaway retries" };
+    expect((await http(sponsor.token, "POST", `/agents/${agentId}/suspend`, pausing)).status).toBe(
+      200,
+    );
+    expect((await http(sponsor.token, "POST", `/agents/${agentId}/reinstate`)).status).toBe(200);
+    const log = await runInDurableObject(session, (instance: AgentSessionDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "agent", id: agentId })),
+      ),
+    );
+    const moves = log
+      .filter((event) => event.type === "AgentSuspended" || event.type === "AgentReinstated")
+      .map((event) => [event.type, event.actor, Object(event.payload).by]);
+    const by = `user:${sponsor.userId}`;
+    expect(moves).toEqual([
+      ["AgentSuspended", by, by],
+      ["AgentReinstated", by, by],
     ]);
   });
 });

@@ -1,4 +1,4 @@
-import { actorId } from "@keeltown/core/domain/identity";
+import { actorId, eventActorOf } from "@keeltown/core/domain/identity";
 import type { ProjectId } from "@keeltown/core/kernel";
 import { Projects, RepoNotFound } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -57,7 +57,13 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
       putSettings: (actor, projectId, settings, requestId) =>
         callObject(ProjectCodecs.putSettings, () =>
           project(projectId).putSettings(
-            encodePut({ projectId, settings, by: actorId(actor), requestId }),
+            encodePut({
+              projectId,
+              settings,
+              by: actorId(actor),
+              actor: eventActorOf(actor),
+              requestId,
+            }),
           ),
         ),
       liveAnchors: (projectId) =>

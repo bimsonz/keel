@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: a paused agent is let through to end its sponsor's link, so it leaves the person who paused it and the pause ends with the link
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..28878343 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -502,7 +502,7 @@ const whyNoRule = (
+     : "users-only";
+ 
+ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decision => {
+-  if (principal.paused) return refused("agent-paused");
++  if (principal.paused && need !== "sponsorOrSelf") return refused("agent-paused");
+   switch (need) {
+     case "anyone":
+     case "self":

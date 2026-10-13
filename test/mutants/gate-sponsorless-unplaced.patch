@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.sponsorless
+# kills: gate.sponsorless
+# why: an agent with nobody behind it is refused as unplaced, so an agent that left its sponsor can never ask for another
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index d525ea77..8a59e414 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -113,7 +113,8 @@ export const principalOf: (
+       case "Token": {
+         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+         const agent = yield* admit(token);
+-        if (agent.org === undefined) return yield* new AgentUnplaced({ agentId: agent.id });
++        if (agent.org === undefined || agent.sponsor === undefined)
++          return yield* new AgentUnplaced({ agentId: agent.id });
+         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
+         const { org, sponsor: sponsorId } = agent;
+         const standing: AgentStanding =

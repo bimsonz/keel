@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t change.abandon-maintainer
+# kills: change.abandon-maintainer
+# why: a maintainer's withdrawal is recorded under the old operator spelling, not as the user who made it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 72b7000a..02527982 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1002,7 +1002,7 @@ export const submit: (
+ 
+ /** Who withdraws: the agent under its lease, or a maintainer by user id. */
+ const withdrawnBy = ({ authority }: AbandonChange): Actor =>
+-  authority._tag === "Maintainer" ? userActor(authority.by) : agentActor(authority.agentId);
++  authority._tag === "Maintainer" ? `operator:${authority.by}` : agentActor(authority.agentId);
+ 
+ /**
+  * Withdraws the change, under its lease or as a maintainer of its project. A

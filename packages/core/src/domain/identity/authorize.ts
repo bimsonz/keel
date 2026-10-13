@@ -3,6 +3,7 @@ import type { NextAction } from "../kernel/index.ts";
 import { AccessRefused, AuthenticationRequired, NotVisible, type RefusalReason } from "./errors.ts";
 import type {
   AgentPrincipal,
+  AgentResource,
   AgentStanding,
   ForkResource,
   InstanceResource,
@@ -24,12 +25,16 @@ import type {
  *   `account`: any user or agent; `user`: any user; `handle`: any user, even
  *   one without a handle yet;
  * - `read`: reads the resource (public projects to anyone, private ones to their
- *   org's members); `readMembers`: reads what only members see;
+ *   org's members, an agent's account to anyone as the public); `readMembers`:
+ *   reads what only members see;
  * - `work`: an agent's work on its token's project (agents only);
  *   `workOrMaintain`: that, or a maintainer's;
  * - `member`, `maintain`, `own`: that role or above in the resource's org, or
  *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
- *   sponsor of the agent concerned, or whoever holds `maintain`.
+ *   sponsor of the agent concerned, or whoever holds `maintain`;
+ * - `sponsor`: the person who stands behind the agent the action is on, and
+ *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
+ *   the agent itself.
  */
 export type Need =
   | "anyone"
@@ -44,10 +49,12 @@ export type Need =
   | "member"
   | "sponsorOrMaintain"
   | "maintain"
-  | "own";
+  | "own"
+  | "sponsor"
+  | "sponsorOrSelf";
 
 /** The kind of resource an action is decided on. */
-export type ResourceKind = "Instance" | "Self" | "Org" | "Project" | "Fork";
+export type ResourceKind = "Instance" | "Self" | "Org" | "Project" | "Agent" | "Fork";
 
 export interface ActionRule {
   readonly resource: ResourceKind;
@@ -63,7 +70,12 @@ export const SPEC_ACTIONS = {
   SignIn_methods: rule("Instance", "anyone"),
   whoami: rule("Self", "self"),
   inbox: rule("Self", "self"),
+  askSponsor: rule("Self", "self"),
   Users_me: rule("Self", "user"),
+  // Approving is the person's own act: the code the agent showed them is what lets them, and
+  // nothing about the agent is decided or told before the code is checked.
+  Agents_approveSponsor: rule("Self", "user"),
+  Agents_listSponsored: rule("Self", "user"),
 
   Operator_listProjects: rule("Org", "read"),
   Operator_createProject: rule("Org", "member"),
@@ -89,6 +101,7 @@ export const SPEC_ACTIONS = {
   Repo_listCommits: rule("Project", "read"),
   Repo_getCommit: rule("Project", "read"),
   Repo_getTree: rule("Project", "read"),
+  Agents_getAgent: rule("Agent", "read"),
 
   Operator_getSettings: rule("Project", "readMembers"),
   Operator_listEscalations: rule("Project", "readMembers"),
@@ -108,9 +121,11 @@ export const SPEC_ACTIONS = {
 
   Operator_enrolAgent: rule("Project", "member"),
   Operator_giveRuling: rule("Project", "sponsorOrMaintain"),
-  Operator_suspendAgent: rule("Project", "sponsorOrMaintain"),
-  Operator_reinstateAgent: rule("Project", "sponsorOrMaintain"),
   Operator_revokeAgent: rule("Project", "sponsorOrMaintain"),
+  // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.
+  Operator_suspendAgent: rule("Agent", "sponsor"),
+  Operator_reinstateAgent: rule("Agent", "sponsor"),
+  Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
   Operator_putSettings: rule("Project", "maintain"),
 } as const satisfies Record<string, ActionRule>;
 
@@ -148,6 +163,7 @@ interface ResourceOfKind {
   readonly Self: SelfResource;
   readonly Org: OrgResource | MissingResource;
   readonly Project: ProjectResource | MissingResource;
+  readonly Agent: AgentResource | MissingResource;
   readonly Fork: ForkResource;
 }
 export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["resource"]];
@@ -187,6 +203,8 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
     case "Org":
       if (resource.suspended) return NONE;
       return role === undefined ? READ : new Set(ROLE_RIGHTS[role]);
+    case "Agent":
+      return READ;
     default:
       return NONE;
   }
@@ -235,6 +253,7 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
  */
 const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
   if (agent.paused) return NONE;
+  if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
   const standing = standingOn(agent, resource);
@@ -304,8 +323,7 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   },
   "agent-paused": {
     kind: "escalate",
-    title:
-      "You are paused; ask your sponsor, or a maintainer of your project's org, to reinstate you",
+    title: "You are paused; ask your sponsor to reinstate you",
   },
   "inviter-suspended": {
     kind: "escalate",
@@ -412,10 +430,18 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
       return granted();
     case "work":
       return refused("agents-only");
+    // An agent's account is there only for the person who stands behind it.
+    case "sponsor":
+    case "sponsorOrSelf":
+      return resource._tag === "Agent" && resource.sponsor === principal.userId
+        ? granted()
+        : hidden();
     default:
       break;
   }
   if (resource._tag === "Fork") return fork(principal, resource);
+  // An agent that exists is there for anyone to read, as the public: who it is, never who stands behind it.
+  if (resource._tag === "Agent") return need === "read" ? granted("public") : hidden();
   if (resource._tag !== "Project" && resource._tag !== "Org" && resource._tag !== "Missing")
     return hidden();
   const unseen = notSeen(principal, resource);
@@ -485,10 +511,19 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     case "user":
     case "handle":
       return refused("users-only");
+    // Its own account is there for it, and no other agent's: it may leave its sponsor, and only a person pauses.
+    case "sponsor":
+    case "sponsorOrSelf":
+      if (resource._tag !== "Agent" || resource.agentId !== principal.agentId) return hidden();
+      return need === "sponsorOrSelf" ? granted() : refused("users-only");
     default:
       break;
   }
   if (resource._tag === "Fork") return refused("users-only");
+  if (resource._tag === "Agent") {
+    if (need !== "read") return hidden();
+    return rightsOf(principal, resource).has("read") ? granted("public") : refused("scope");
+  }
   if (resource._tag !== "Project" && resource._tag !== "Org") return hidden();
   const unseen = notSeen(principal, resource);
   if (unseen !== undefined) return unseen;
@@ -546,6 +581,13 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
  * an agent a member invited works and never governs. A sponsor gives an agent
  * no rights. No principal stands above an org's owners: there is no instance
  * role.
+ *
+ * An agent's own account belongs to no org. Anyone reads it, as the public.
+ * What is decided on it (pausing it, ending its sponsor's link) is its
+ * sponsor's, and the link's end the agent's own too; to everyone else, a
+ * maintainer of an org it works in among them, such a move is NotVisible. A
+ * paused agent is refused before that, so it cannot leave the sponsor who
+ * paused it.
  */
 export const authorize = <A extends Action>(
   principal: Principal,

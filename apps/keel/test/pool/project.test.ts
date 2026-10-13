@@ -38,6 +38,8 @@ const SOURCE = { namespace: "keel-core", name: "seed-app" };
 async function projectUnderTest() {
   const projectId: ProjectId = makeId("prj", ulid());
   const operator: AgentId = makeId("agt", ulid());
+  /** Who replaces the settings: a person, by id. */
+  const maintainer = makeId("usr", ulid());
   const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
   const journal: string[] = [];
   const code = makeCodeHostMemory();
@@ -82,7 +84,13 @@ async function projectUnderTest() {
   ) =>
     decodeExit(
       ProjectCodecs.putSettings,
-      await stub.putSettings({ projectId, settings: put, by: operator, requestId }),
+      await stub.putSettings({
+        projectId,
+        settings: put,
+        by: maintainer,
+        actor: `user:${maintainer}`,
+        requestId,
+      }),
     );
   /** The project entity's events, in `seq` order. */
   const log = () =>
@@ -95,6 +103,7 @@ async function projectUnderTest() {
     projectId,
     stub,
     operator,
+    maintainer,
     journal,
     trunks,
     pool,
@@ -171,9 +180,9 @@ describe("a project's settings over real RPC", () => {
       _tag: "ProjectSettingsChanged",
       projectId: p.projectId,
       changes: [{ field: "verification", from: "required", to: "off" }],
-      by: p.operator,
+      by: p.maintainer,
     });
-    expect(changes[0]).toMatchObject({ actor: `operator:${p.operator}`, project: p.projectId });
+    expect(changes[0]).toMatchObject({ actor: `user:${p.maintainer}`, project: p.projectId });
   });
 
   it("[b12.settings-audit] audits every field a PUT changes, and an absent verification turns it back on", async () => {
@@ -247,7 +256,7 @@ describe("a project's settings through the operator routes", () => {
     expect(await got.json()).toEqual({ ...off, visibility: "private" });
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
-      actor: `operator:${user.userId}`,
+      actor: `user:${user.userId}`,
       payload: { by: user.userId },
     });
   });

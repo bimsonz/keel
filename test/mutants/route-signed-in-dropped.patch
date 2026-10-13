@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts -t link.sponsor-real
+# kills: link.sponsor-real
+# why: the routes build a caller without its session's sign-in, so no person can approve, pause or end a link through the real doorway
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index e5bbd0a4..6763e50e 100644
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -65,7 +65,6 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
+         requestId: c.get("requestId"),
+         principal: admitted.principal,
+         ...(admitted.token === undefined ? {} : { token: admitted.token }),
+-        ...(admitted.signedIn === undefined ? {} : { signedIn: admitted.signedIn }),
+         signal: c.req.raw.signal,
+       };
+     },

@@ -5,6 +5,7 @@ import {
   changeStanding,
   endSponsorship,
   enrol,
+  sameHash,
 } from "@keeltown/core/application/identity";
 import { makeId, userActor } from "@keeltown/core/kernel";
 import {
@@ -16,6 +17,7 @@ import {
   ulidOf,
 } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
+import * as fc from "fast-check";
 
 const agentId = makeId("agt", ulidOf(41));
 const first = makeId("usr", ulidOf(42));
@@ -59,7 +61,7 @@ describe("[link.sponsor-inline] a sponsor link is in the directory when its move
         yield* enrolled;
         expect(row(directory)).toEqual([first, "active"]);
         yield* changeStanding(agentId, "suspend", {
-          by: `operator:${first}`,
+          by: `user:${first}`,
           reason: "paused by its sponsor",
           idempotencyKey: "suspend-1",
           fingerprint: "suspend-body",
@@ -89,4 +91,30 @@ describe("[link.sponsor-inline] a sponsor link is in the directory when its move
       }).pipe(Effect.provide(layer));
     },
   );
+});
+
+const HEX_DIGITS = "0123456789abcdef".split("");
+
+describe("[link.code-compare] a code's hash is compared whole", () => {
+  it("[link.code-compare] two hashes are the same only when every character is, at any length", () => {
+    const hex = fc.string({
+      unit: fc.constantFrom(...HEX_DIGITS),
+      minLength: 1,
+      maxLength: 64,
+    });
+    fc.assert(fc.property(hex, hex, (a, b) => sameHash(a, b) === (a === b)));
+    // One character changed anywhere, the first and the last among them.
+    fc.assert(
+      fc.property(hex, fc.nat(), fc.constantFrom(...HEX_DIGITS), (a, at, c) => {
+        const i = at % a.length;
+        const b = a.slice(0, i) + c + a.slice(i + 1);
+        return sameHash(a, b) === (a === b);
+      }),
+    );
+    expect(sameHash("sha256:abc", "sha256:abc")).toBe(true);
+    expect(sameHash("sha256:abc", "sha256:abd")).toBe(false);
+    expect(sameHash("sha256:abc", "tha256:abc")).toBe(false);
+    expect(sameHash("sha256:abc", "sha256:ab")).toBe(false);
+    expect(sameHash("sha256:abc", "sha256:abcd")).toBe(false);
+  });
 });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: an agent is granted the sponsor's own moves on its account, so it reinstates itself after its sponsor paused it
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..0c68e630 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -515,7 +515,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+     case "sponsor":
+     case "sponsorOrSelf":
+       if (resource._tag !== "Agent" || resource.agentId !== principal.agentId) return hidden();
+-      return need === "sponsorOrSelf" ? granted() : refused("users-only");
++      return granted();
+     default:
+       break;
+   }

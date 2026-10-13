@@ -1,9 +1,9 @@
 import { Effect, Option, Schema } from "effect";
 import {
-  admits,
   type Agent,
   AgentNotAdmitted,
   AgentNotKnown,
+  type AgentStanding,
   type AgentToken,
   type Principal,
   TokenRejected,
@@ -11,22 +11,34 @@ import {
 import { AgentId, UserId } from "../../domain/kernel/index.ts";
 import { AgentDirectory, Memberships, TokenIssuer, Users } from "../ports/index.ts";
 
+/**
+ * How and when a session was signed in: `by` is the method as the sign-in
+ * adapter names it (null for a session made before methods were recorded), `at`
+ * the time in epoch milliseconds. The gate decides nothing on it; an operation
+ * that wants a fresh sign-in asks it of the caller.
+ */
+export interface SignedIn {
+  readonly by: string | null;
+  readonly at: number;
+}
+
 /** What a request presents, as the doorway reads it: a Keel token, a user's session, or nothing. */
 export type Credential =
   | { readonly _tag: "Token"; readonly token: string }
-  | { readonly _tag: "Session"; readonly userId: UserId }
+  | { readonly _tag: "Session"; readonly userId: UserId; readonly signedIn: SignedIn }
   | { readonly _tag: "None" };
 
-/** Who the gate admitted, and for an agent the token it verified. */
+/** Who the gate admitted: for an agent the token it verified, for a user how its session was signed in. */
 export interface Admitted {
   readonly principal: Principal;
   readonly token?: AgentToken;
+  readonly signedIn?: SignedIn;
 }
 
 /**
  * An agent enrolled before tenancy that the cutover has not placed: it has no
- * org or no sponsor, so no rights can be derived for it. Refused by name, never
- * given a default.
+ * org, so there is nowhere for it to stand. Refused by name, never given a
+ * default.
  */
 export class AgentUnplaced extends Schema.TaggedError<AgentUnplaced>()("AgentUnplaced", {
   agentId: AgentId,
@@ -37,21 +49,20 @@ export class UserNotKnown extends Schema.TaggedError<UserNotKnown>()("UserNotKno
   userId: UserId,
 }) {}
 
-/** Why an agent may not act, or null when it may. */
-export function whyNotAdmitted(
-  agent: Agent,
-  principal: AgentToken | null,
-): AgentNotAdmitted["reason"] | null {
+/** Why no token is minted for an agent, or null when one is: only an active agent is given one. */
+export function whyNotAdmitted(agent: Agent): AgentNotAdmitted["reason"] | null {
   if (agent.state === "suspended") return "suspended";
   if (agent.state === "revoked") return "revoked";
-  if (principal !== null && !admits(agent, principal)) return "stale-epoch";
   return null;
 }
 
 /**
- * The agent behind a verified token, if it may still act: the token's
- * revocation epoch must match the agent's current one. It reads only the
- * AgentDirectory, so the request gate never calls an AgentSession DO.
+ * The agent behind a verified token, if it is still an agent of Keel's: a
+ * revoked one is refused, and the token's revocation epoch must match the
+ * agent's current one. A suspended agent is let through as it stands, so the
+ * policy answers each of its requests with why (`agent-paused`) and what to do
+ * next. It reads only the AgentDirectory, so the request gate never calls an
+ * AgentSession DO.
  */
 export const admit: (
   principal: AgentToken,
@@ -61,8 +72,10 @@ export const admit: (
   const directory = yield* AgentDirectory;
   const agent = yield* directory.findAgent(principal.agentId);
   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
-  const reason = whyNotAdmitted(agent.value, principal);
-  if (reason !== null) return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason });
+  if (agent.value.state === "revoked")
+    return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason: "revoked" });
+  if (principal.revocationEpoch !== agent.value.revocationEpoch)
+    return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason: "stale-epoch" });
   return agent.value;
 });
 
@@ -78,10 +91,12 @@ export type GateRefusal =
  * session is a user, and nothing is anonymous. An agent
  * stands on its D1 row: its epoch, its org, and its sponsor's standing in that
  * org, read on every request. Until an invitation is a record of its own, the
- * member who enrolled an agent is the member who invited it: the agent stands
- * `Invited` by its sponsor. A token whose `org` is not its agent's current
- * one (minted before the agent was placed) is stale, and the agent exchanges
- * its credential again.
+ * person behind an agent is the member who invited it: the agent stands
+ * `Invited` by its sponsor. With nobody behind it, nobody answers for it in its
+ * org, and it stands there as the public: it still reads who it is and may ask
+ * for a sponsor. A token whose `org` is not its agent's current one (minted
+ * before the agent was placed) is stale, and the agent exchanges its credential
+ * again. A user is admitted with how and when its session was signed in.
  */
 export const principalOf: (
   credential: Credential,
@@ -93,18 +108,21 @@ export const principalOf: (
       case "Session": {
         const user = yield* Users.use((users) => users.principal(credential.userId));
         if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
-        return { principal: user.value };
+        return { principal: user.value, signedIn: credential.signedIn };
       }
       case "Token": {
         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
         const agent = yield* admit(token);
-        if (agent.org === undefined || agent.sponsor === undefined)
-          return yield* new AgentUnplaced({ agentId: agent.id });
+        if (agent.org === undefined) return yield* new AgentUnplaced({ agentId: agent.id });
         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
         const { org, sponsor: sponsorId } = agent;
-        const sponsor = yield* Memberships.use((memberships) =>
-          memberships.standing(sponsorId, org),
-        );
+        const standing: AgentStanding =
+          sponsorId === undefined
+            ? { _tag: "None" }
+            : {
+                _tag: "Invited",
+                by: yield* Memberships.use((memberships) => memberships.standing(sponsorId, org)),
+              };
         return {
           principal: {
             _tag: "Agent",
@@ -113,7 +131,7 @@ export const principalOf: (
             projectId: agent.projectId,
             scopes: token.scopes,
             paused: agent.state === "suspended",
-            standing: { _tag: "Invited", by: sponsor },
+            standing,
           },
           token,
         };

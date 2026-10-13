@@ -168,7 +168,12 @@ export interface SeededUser {
  */
 export async function seedUser(
   handle: string,
-  options: { readonly role?: Role | null; readonly org?: OrgId } = {},
+  options: {
+    readonly role?: Role | null;
+    readonly org?: OrgId;
+    /** How the session was signed in, made now: `passkey` is what a fresh sign-in is. Unrecorded when absent. */
+    readonly signedInBy?: string;
+  } = {},
 ): Promise<SeededUser> {
   const org = options.org ?? POOL_ORG;
   if (org === POOL_ORG) await seedOrg(POOL_ORG, "pool", POOL_SPONSOR, "pool-sponsor");
@@ -180,8 +185,16 @@ export async function seedUser(
   const role = options.role === undefined ? "member" : options.role;
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId) VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(ulid(), new Date(Date.now() + 3_600_000).toISOString(), token, at, at, userId),
+      `INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId, signedInBy) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      ulid(),
+      new Date(Date.now() + 3_600_000).toISOString(),
+      token,
+      at,
+      at,
+      userId,
+      options.signedInBy ?? null,
+    ),
     ...(role === null
       ? []
       : [

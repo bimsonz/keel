@@ -43,6 +43,7 @@ import {
   type Actor,
   type AgentId,
   agentActor,
+  userActor,
   type ChangeId,
   CommitSha,
   type ConflictId,
@@ -1001,7 +1002,7 @@ export const submit: (
 
 /** Who withdraws: the agent under its lease, or a maintainer by user id. */
 const withdrawnBy = ({ authority }: AbandonChange): Actor =>
-  authority._tag === "Maintainer" ? `operator:${authority.by}` : agentActor(authority.agentId);
+  authority._tag === "Maintainer" ? userActor(authority.by) : agentActor(authority.agentId);
 
 /**
  * Withdraws the change, under its lease or as a maintainer of its project. A

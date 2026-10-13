@@ -250,7 +250,7 @@ describe("declare", () => {
         const log = (yield* EventOutbox).log({ kind: "change", id: changeId });
         expect(log.at(-1)).toMatchObject({
           type: "ChangeWithdrawn",
-          actor: `operator:${maintainer}`,
+          actor: `user:${maintainer}`,
           payload: { by: maintainer },
         });
       }).pipe(Effect.provide(layer));

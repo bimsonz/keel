@@ -173,7 +173,7 @@ describe("abandoning a change through the doorways", () => {
     );
   });
 
-  it("[a11.abandon-operator] a maintainer of the project's org withdraws with no lease: 200, ChangeWithdrawn by the maintainer, as operator:<id>", async () => {
+  it("[a11.abandon-operator] a maintainer of the project's org withdraws with no lease: 200, ChangeWithdrawn by the maintainer, as user:<id>", async () => {
     const { c } = await heldChange();
     const maintainer = await seedUser(uniqueHandle("maintainer"), { role: "maintainer" });
     const { token } = maintainer;
@@ -186,7 +186,7 @@ describe("abandoning a change through the doorways", () => {
     expect(withdrawn.body.result.change).toMatchObject({ id: c.changeId, state: "withdrawn" });
     expect((await c.current()).state).toBe("withdrawn");
     expect(event).toMatchObject({
-      actor: `operator:${maintainer.userId}`,
+      actor: `user:${maintainer.userId}`,
       payload: { by: maintainer.userId },
     });
     expect(tools).toContain("abandon");

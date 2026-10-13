@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: whoever does not stand behind an agent is refused by role instead of told nothing, so a stranger learns that the agent exists and has a sponsor
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..5a7f3836 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -435,7 +435,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+     case "sponsorOrSelf":
+       return resource._tag === "Agent" && resource.sponsor === principal.userId
+         ? granted()
+-        : hidden();
++        : lacksRole("maintain");
+     default:
+       break;
+   }

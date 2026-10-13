@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: the approval page's URL carries the code in its query, so the code is in the request line of every server and log the page load passes
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 44b9dcb8..097536f7 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -34,7 +34,7 @@ export const decodeLinkAgent = Schema.decodeUnknownOption(AgentId);
+  * and the code in the fragment, so neither is in a request line or a log.
+  */
+ export function approvalUrl(origin: string, agentId: string, code: string): string {
+-  return `${origin}/sponsor#agent=${encodeURIComponent(agentId)}&code=${encodeURIComponent(code)}`;
++  return `${origin}/sponsor?agent=${encodeURIComponent(agentId)}&code=${encodeURIComponent(code)}`;
+ }
+ 
+ export function askOk(origin: string, agentId: AgentId, request: SponsorRequest): AskSponsorResult {

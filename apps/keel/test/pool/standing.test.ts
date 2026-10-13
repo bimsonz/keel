@@ -46,7 +46,10 @@ async function call(token: string, path: string, key?: string, body?: object): P
   return { status: response.status, body: await response.json() };
 }
 
-/** The status the agent's own token now gets: what the request gate makes of its directory row. */
+/**
+ * The status the agent's own token now gets, by its directory row: 200 while
+ * active, the policy's 403 while paused, the gate's 401 once revoked.
+ */
 async function gate(token: string): Promise<number> {
   const response = await exports.default.fetch(`${BASE}/v1/agents/me`, {
     headers: { authorization: `Bearer ${token}` },
@@ -55,12 +58,18 @@ async function gate(token: string): Promise<number> {
   return response.status;
 }
 
-/** A maintainer of org `pool`, and an agent it enrolled over REST in a project of the org, with a token of the agent's. */
+/**
+ * A maintainer of org `pool` on a fresh passkey sign-in, and an agent it
+ * enrolled over REST in a project of the org, so it is the agent's sponsor,
+ * with a token of the agent's.
+ */
 async function enrolled() {
   const projectId: ProjectId = makeId("prj", ulid());
   await placeProject(projectId);
   await establishProject(projectId);
-  const operator = (await seedUser(uniqueHandle("maintainer"), { role: "maintainer" })).token;
+  const operator = (
+    await seedUser(uniqueHandle("maintainer"), { role: "maintainer", signedInBy: "passkey" })
+  ).token;
   const enrolment = await call(operator, "/agents", `enrol-${ulid()}`, {
     name: "standing-agent",
     kind: "interactive",
@@ -91,7 +100,7 @@ describe("[b11.standing-route] a maintainer's moves on an agent's standing", () 
       reason: "runaway retries",
     });
     expect(suspended).toMatchObject({ status: 200, body: { id: agentId, state: "suspended" } });
-    expect(await gate(token)).toBe(401);
+    expect(await gate(token)).toBe(403);
 
     const again = await call(operator, `/agents/${agentId}/suspend`, "suspend-0002", {
       reason: "still running away",
@@ -156,7 +165,7 @@ describe("[b11.standing-repair] the Projector repeats a standing in the director
         }),
       ),
     ]);
-    await vi.waitFor(async () => expect(await gate(token)).toBe(401), {
+    await vi.waitFor(async () => expect(await gate(token)).toBe(403), {
       timeout: 5_000,
       interval: 50,
     });

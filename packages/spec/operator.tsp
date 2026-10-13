@@ -175,8 +175,10 @@ interface Operator {
   } | NotFound | Conflict | StandardErrors;
 
   /**
-   * Suspend an agent: its next request is refused until an operator reinstates it. Only an active
-   * agent can be suspended (409 `agent.state_refused` otherwise).
+   * Pause an agent: every request it makes is refused (403, `agent-paused`) until its sponsor
+   * reinstates it. Only the agent's sponsor may, on a fresh sign-in (403
+   * `auth.fresh_sign_in_required` otherwise); to anyone else the agent is not there (404). Only an
+   * active agent can be suspended (409 `agent.state_refused` otherwise).
    */
   @summary("Suspend an agent")
   @useAuth(SessionAuth)
@@ -184,7 +186,7 @@ interface Operator {
   @post
   suspendAgent(@path agentId: AgentId, ...IdempotencyKey, @body body: SuspendAgentRequest): AgentProfile | NotFound | Conflict | StandardErrors;
 
-  /** Reinstate a suspended agent: its tokens are accepted again. */
+  /** Reinstate a paused agent: its requests are answered again. Its sponsor's alone, on a fresh sign-in. */
   @summary("Reinstate an agent")
   @useAuth(SessionAuth)
   @route("/agents/{agentId}/reinstate")

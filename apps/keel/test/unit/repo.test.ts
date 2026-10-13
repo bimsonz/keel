@@ -77,7 +77,11 @@ const runtime = ManagedRuntime.make(
   ),
 );
 afterAll(() => runtime.dispose());
-const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
+const handlers = makeHandlers(
+  makeRunner(runtime),
+  { emailCode: false, github: false },
+  { origin: "https://keel.test", fresh: () => true },
+);
 
 const settings = (visibility: "private" | "public"): ProjectSettings => ({
   protectedPaths: [],

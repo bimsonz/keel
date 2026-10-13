@@ -2,6 +2,7 @@ import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectNotFound, ProjectSettingsChanged } from "../../domain/integration/index.ts";
 import {
+  type Actor,
   canonicalJson,
   contentHashOf,
   type EntityRef,
@@ -61,8 +62,10 @@ const FIELDS = ["protectedPaths", "maxBatchSize", "verification", "visibility"] 
 export interface ChangeSettings {
   readonly projectId: ProjectId;
   readonly settings: PutProjectSettings;
-  /** The operator's id: the event's `by`, and its actor `operator:<by>`. */
+  /** The id of whoever changes them: the event's `by`. */
   readonly by: string;
+  /** The same actor as the envelope names it (`user:<id>`): the commit's actor. */
+  readonly actor: Actor;
   /** The request that carried the PUT. */
   readonly requestId: string;
 }
@@ -123,7 +126,7 @@ export const changeSettings: (
   ProjectNotFound | IdempotencyConflict,
   Clock | EntityStore | EventOutbox
 > = Effect.fn("integration/changeSettings")(function* (command: ChangeSettings) {
-  const { projectId, by, requestId } = command;
+  const { projectId, by, actor, requestId } = command;
   const next: ProjectSettings = {
     protectedPaths: command.settings.protectedPaths,
     maxBatchSize: command.settings.maxBatchSize,
@@ -138,7 +141,7 @@ export const changeSettings: (
       entity,
       cause: `settings:${requestId}`,
       fingerprint,
-      actor: `operator:${by}`,
+      actor,
       project: projectId,
     },
     (tx): Result.Result<Transition<ProjectSettings>, ProjectNotFound | IdempotencyConflict> => {

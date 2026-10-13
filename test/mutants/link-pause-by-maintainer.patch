@@ -1,0 +1,33 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.pause
+# kills: link.pause
+# why: pausing is decided on the agent's project again, so a maintainer of an org the agent works in pauses an agent they do not stand behind
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 6eb2d409..9dcef476 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -275,8 +275,8 @@ export const RESOLVERS: Resolvers = {
+     caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
+   Operator_giveRuling: (input) => escalationProject(input.escalationId),
+   Operator_enrolAgent: (input) => projectNamed(input.projectId),
+-  Operator_suspendAgent: (input) => agentAccount(input.agentId),
+-  Operator_reinstateAgent: (input) => agentAccount(input.agentId),
++  Operator_suspendAgent: (input) => agentProject(input.agentId),
++  Operator_reinstateAgent: (input) => agentProject(input.agentId),
+   Operator_revokeAgent: (input) => agentProject(input.agentId),
+ 
+   declare: ownProject,
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..dc875580 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -123,8 +123,8 @@ export const SPEC_ACTIONS = {
+   Operator_giveRuling: rule("Project", "sponsorOrMaintain"),
+   Operator_revokeAgent: rule("Project", "sponsorOrMaintain"),
+   // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.
+-  Operator_suspendAgent: rule("Agent", "sponsor"),
+-  Operator_reinstateAgent: rule("Agent", "sponsor"),
++  Operator_suspendAgent: rule("Project", "sponsorOrMaintain"),
++  Operator_reinstateAgent: rule("Project", "sponsorOrMaintain"),
+   Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
+   Operator_putSettings: rule("Project", "maintain"),
+ } as const satisfies Record<string, ActionRule>;

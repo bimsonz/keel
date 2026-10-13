@@ -2,15 +2,15 @@
 # kills: sponsorships.contract
 # why: a request for a sponsor never runs out, so a code shown once stays good for as long as the agent does not ask again
 diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
-index a1432471..59d9b773 100644
+index ecafc3dd..f5852fa0 100644
 --- a/packages/core/src/application/identity/sponsorship.ts
 +++ b/packages/core/src/application/identity/sponsorship.ts
-@@ -193,7 +193,7 @@ export const approveSponsor: (
+@@ -205,7 +205,7 @@ export const approveSponsor: (
        if (command.codeHash === undefined) return undefined;
        const stored = tx.store.get(SPONSOR_ASK, agentId);
        const ask = stored === undefined ? undefined : decodeAsk(stored);
--      return ask !== undefined && ask.codeHash === command.codeHash && ask.expiresAt > tx.at
-+      return ask !== undefined && ask.codeHash === command.codeHash
+-      return ask !== undefined && sameHash(ask.codeHash, command.codeHash) && ask.expiresAt > tx.at
++      return ask !== undefined && sameHash(ask.codeHash, command.codeHash)
          ? undefined
          : new SponsorRequestRefused({ agentId });
      },

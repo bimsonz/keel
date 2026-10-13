@@ -2,14 +2,14 @@
 # kills: b12.settings-audit
 # why: the settings change is recorded as the agent's, not under operator authority
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index a2f353b..b84559d 100644
+index 51fe63d1..24a3f452 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
-@@ -132,7 +132,7 @@ export const changeSettings: (
+@@ -141,7 +141,7 @@ export const changeSettings: (
        entity,
        cause: `settings:${requestId}`,
        fingerprint,
--      actor: `operator:${by}`,
+-      actor,
 +      actor: `agent:${by}`,
        project: projectId,
      },

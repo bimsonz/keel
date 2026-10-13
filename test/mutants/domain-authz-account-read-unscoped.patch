@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: an agent reads another agent's account without the read scope its token was cut to
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..4de08c04 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -253,7 +253,7 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
+  */
+ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
+   if (agent.paused) return NONE;
+-  if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
++  if (resource._tag === "Agent") return READ;
+   if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
+   if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+   const standing = standingOn(agent, resource);

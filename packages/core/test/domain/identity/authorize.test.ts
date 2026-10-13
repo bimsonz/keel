@@ -6,6 +6,7 @@ import {
   ACTIONS,
   type Action,
   type AgentPrincipal,
+  type AgentResource,
   type AgentStanding,
   authorize,
   type AuthorizationRefusal,
@@ -150,6 +151,20 @@ const orgResArb: fc.Arbitrary<OrgResource> = fc.record({
   personOwned: fc.boolean(),
 });
 const MISSING: MissingResource = { _tag: "Missing" };
+/** Every agent drawn as a principal is the first; the second is another agent's account. */
+const BOT = makeId("agt", ulid(1));
+const OTHER_BOT = makeId("agt", ulid(2));
+/** An agent's account: the drawn agent's own or another's, with a known person behind it or nobody. */
+const accountArb: fc.Arbitrary<AgentResource> = fc
+  .record({
+    agentId: fc.constantFrom(BOT, OTHER_BOT),
+    sponsor: fc.option(fc.constantFrom(...USERS), { nil: undefined }),
+  })
+  .map(({ sponsor, ...a }) => ({
+    _tag: "Agent",
+    ...a,
+    ...(sponsor === undefined ? {} : { sponsor }),
+  }));
 const forkArb: fc.Arbitrary<ForkResource> = fc.record({
   _tag: fc.constant("Fork"),
   source: fc.oneof(
@@ -173,6 +188,11 @@ const resourceArb = (kind: ResourceKind): fc.Arbitrary<Resource> => {
     case "Project":
       return fc.oneof(
         { weight: 6, arbitrary: projectArb },
+        { weight: 1, arbitrary: fc.constant(MISSING) },
+      );
+    case "Agent":
+      return fc.oneof(
+        { weight: 6, arbitrary: accountArb },
         { weight: 1, arbitrary: fc.constant(MISSING) },
       );
     case "Fork":
@@ -336,8 +356,50 @@ const ofResource = (principal: Principal, resource: Resource): boolean => {
   }
 };
 
-/** The actions decided on something an org owns: a project, the org itself, or a fork into it. */
-const OWNED_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) !== "Instance" && kindOf(a) !== "Self");
+/**
+ * The actions decided on something an org owns: a project, the org itself, or
+ * a fork into it. An agent's own account is no org's.
+ */
+const OWNED_ACTIONS = ACTION_NAMES.filter(
+  (a) => kindOf(a) !== "Instance" && kindOf(a) !== "Self" && kindOf(a) !== "Agent",
+);
+/** The actions decided on an agent's own account. */
+const ACCOUNT_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) === "Agent");
+
+/**
+ * The policy on an agent's account, said again apart from `authorize`: anyone
+ * who may read reads it as the public; a move on it is its sponsor's, and the
+ * link's end the agent's own too; to everyone else it is not there.
+ */
+const onAccount = (
+  principal: Principal,
+  need: Need,
+  resource: AgentResource | MissingResource,
+): string => {
+  const there = resource._tag === "Agent";
+  switch (principal._tag) {
+    case "Anonymous":
+      if (need !== "read") return "401";
+      return there ? "ok:public" : "404";
+    case "User":
+      if (principal.suspended) return "403:user-suspended";
+      if (principal.handle === undefined) return "403:handle-required";
+      if (!there) return "404";
+      if (need === "read") return "ok:public";
+      return resource.sponsor === principal.userId ? "ok:" : "404";
+    case "Agent":
+      if (principal.paused) return "403:agent-paused";
+      if (!there) return "404";
+      if (need === "read")
+        return principal.scopes.includes("agent:read") ? "ok:public" : "403:scope";
+      if (resource.agentId !== principal.agentId) return "404";
+      return need === "sponsorOrSelf" ? "ok:" : "403:users-only";
+    default: {
+      const unreachable: never = principal;
+      return unreachable;
+    }
+  }
+};
 const ownedRequestArb = fc
   .constantFrom(...OWNED_ACTIONS)
   .chain((action) =>
@@ -653,6 +715,7 @@ describe("authorize", () => {
       Self: { _tag: "Self" },
       Project: project(PRJ_1, "private"),
       Org: into(ORG_1),
+      Agent: { _tag: "Agent", agentId: BOT },
       Fork: { _tag: "Fork", source: project(PRJ_1, "private"), target: into(ORG_1) },
     };
     const taken = OWNED_ACTIONS.filter((a) => GOVERNING.has(needOf(a))).flatMap((action) => {
@@ -950,6 +1013,7 @@ describe("authorize", () => {
         Self: { _tag: "Self" },
         Project: project(PRJ_1, "public", { personOwned }),
         Org: into(ORG_1, { personOwned }),
+        Agent: { _tag: "Agent", agentId: BOT },
         Fork: {
           _tag: "Fork",
           source: project(PRJ_1, "public", { personOwned }),
@@ -1014,6 +1078,84 @@ describe("authorize", () => {
     expect(outcome(authorize(user({ suspended: true }), "whoami", { _tag: "Self" }))).toBe(
       "403:user-suspended",
     );
+  });
+
+  it("[authz.agent-resource] an agent's account is read by anyone as the public; only its sponsor pauses it, only its sponsor or the agent itself ends the link, and to everyone else such a move is not there", () => {
+    fc.assert(
+      fc.property(
+        principalArb,
+        fc.constantFrom(...ACCOUNT_ACTIONS),
+        resourceArb("Agent"),
+        (principal, action, resource) => {
+          if (resource._tag !== "Agent" && resource._tag !== "Missing") return false;
+          const rights = [...rightsOf(principal, resource)];
+          return (
+            outcome(decide(principal, action, resource)) ===
+              onAccount(principal, needOf(action), resource) &&
+            rights.every((right) => right === "read")
+          );
+        },
+      ),
+    );
+    expect(ACCOUNT_ACTIONS.map((a) => `${a}: ${needOf(a)}`).toSorted()).toEqual([
+      "Agents_endSponsorship: sponsorOrSelf",
+      "Agents_getAgent: read",
+      "Operator_reinstateAgent: sponsor",
+      "Operator_suspendAgent: sponsor",
+    ]);
+    const [ann, , cy] = USERS;
+    if (ann === undefined || cy === undefined) throw new Error("three users are drawn from");
+    const account: AgentResource = { _tag: "Agent", agentId: BOT, sponsor: ann };
+    const sponsor = user({ userId: ann });
+    // An owner of the org the agent works in, who does not stand behind it.
+    const owner = user({ userId: cy, memberships: [{ org: ORG_1, role: "owner" }] });
+    const itself = agentOn(PRJ_1);
+    const another = agentOn(PRJ_1, { agentId: OTHER_BOT });
+    const moves = ["Operator_suspendAgent", "Operator_reinstateAgent", "Agents_endSponsorship"];
+    const read = (who: Principal, on: AgentResource | MissingResource = account) =>
+      moves.filter(isAction).map((move) => outcome(decide(who, move, on)));
+    expect(read(sponsor)).toEqual(["ok:", "ok:", "ok:"]);
+    // Whoever does not stand behind it cannot tell it from an agent that does not exist.
+    expect(read(owner)).toEqual(["404", "404", "404"]);
+    expect(read(owner, MISSING)).toEqual(["404", "404", "404"]);
+    expect(read(sponsor, MISSING)).toEqual(["404", "404", "404"]);
+    // The agent leaves its sponsor; only a person pauses.
+    expect(read(itself)).toEqual(["403:users-only", "403:users-only", "ok:"]);
+    expect(read(another)).toEqual(["404", "404", "404"]);
+    // Paused, it is refused before anything else, so it cannot leave the sponsor who paused it.
+    expect(read({ ...itself, paused: true })).toEqual([
+      "403:agent-paused",
+      "403:agent-paused",
+      "403:agent-paused",
+    ]);
+    expect(read(ANON)).toEqual(["401", "401", "401"]);
+    expect(read(user({ userId: ann, suspended: true }))).toEqual([
+      "403:user-suspended",
+      "403:user-suspended",
+      "403:user-suspended",
+    ]);
+    // With nobody behind it, nobody pauses it.
+    const alone: AgentResource = { _tag: "Agent", agentId: BOT };
+    expect(read(sponsor, alone)).toEqual(["404", "404", "404"]);
+    expect(read(itself, alone)).toEqual(["403:users-only", "403:users-only", "ok:"]);
+    // Anyone reads who the agent is, and as the public: its sponsor too.
+    const card = (who: Principal, on: AgentResource | MissingResource = account) =>
+      outcome(authorize(who, "Agents_getAgent", on));
+    expect([ANON, owner, sponsor, itself, another].map((who) => card(who))).toEqual([
+      "ok:public",
+      "ok:public",
+      "ok:public",
+      "ok:public",
+      "ok:public",
+    ]);
+    expect([ANON, owner, sponsor, itself].map((who) => card(who, MISSING))).toEqual([
+      "404",
+      "404",
+      "404",
+      "404",
+    ]);
+    expect(card(agentOn(PRJ_1, { scopes: ["agent:work"] }))).toBe("403:scope");
+    expect(card({ ...itself, paused: true })).toBe("403:agent-paused");
   });
 
   it("[authz.spec-covered] every operation in the spec is decided by the policy, and only those are spec actions", () => {

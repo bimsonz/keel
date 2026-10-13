@@ -1,7 +1,7 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { Anchor, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
+import { Actor, Anchor, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -23,9 +23,10 @@ export const ProjectSettings = Schema.Struct({
 
 /**
  * Replace the project's settings (an absent `verification` is `required`, an
- * absent `visibility` `private`). `by` is the actor's id. The Project DO
- * commits one ProjectSettingsChanged naming every changed field, with `by` and
- * the actor `operator:<by>`; an unchanged PUT commits nothing. `requestId` keys the commit: a replay answers the settings
+ * absent `visibility` `private`). `by` is the actor's id, and `actor` the same
+ * actor as the envelope names it (`user:<id>`). The Project DO commits one
+ * ProjectSettingsChanged naming every changed field, with `by`, under that
+ * actor; an unchanged PUT commits nothing. `requestId` keys the commit: a replay answers the settings
  * as they stand, and the same id with other settings is IdempotencyConflict.
  */
 export const PutSettingsCommand = Schema.Struct({
@@ -37,6 +38,7 @@ export const PutSettingsCommand = Schema.Struct({
     visibility: Schema.optional(Visibility),
   }),
   by: Schema.NonEmptyString,
+  actor: Actor,
   requestId: Schema.NonEmptyString,
 });
 

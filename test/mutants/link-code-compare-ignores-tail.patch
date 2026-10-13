@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts -t link.code-compare
+# kills: link.code-compare
+# why: the last character of a code's hash is never compared, so sixteen hashes pass for each one asked
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index ecafc3dd..a9a763df 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -45,7 +45,7 @@ export const SPONSOR_ASK_MS = 10 * 60_000;
+ export function sameHash(a: string, b: string): boolean {
+   if (a.length !== b.length) return false;
+   let difference = 0;
+-  for (let i = 0; i < a.length; i += 1) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
++  for (let i = 0; i < a.length - 1; i += 1) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+   return difference === 0;
+ }
+ 

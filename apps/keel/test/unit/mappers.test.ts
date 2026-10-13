@@ -180,7 +180,11 @@ function grantedSurface() {
     suspended: false,
     memberships: [{ org: sampleOrgId, role: "owner" }],
   });
-  const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
+  const handlers = makeHandlers(
+    makeRunner(runtime),
+    { emailCode: false, github: false },
+    { origin: "https://keel.test", fresh: () => true },
+  );
   return { runtime, handlers, callers: [agent, owner] };
 }
 

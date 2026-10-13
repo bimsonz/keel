@@ -2,10 +2,11 @@
 # kills: gate.origin
 # why: a cookie-signed mutation with no Origin header passes, so a request from a context that sends none changes things on the user's behalf (the check must fail closed)
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 4a8e747a..0a23412e 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -110,7 +110,8 @@
-       credential = { _tag: "Session", userId };
+@@ -135,7 +135,8 @@ export async function gate(
+       credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
      }
    } else if (options.cookies && hasSessionCookie(request.headers.get("cookie"))) {
 -    if (!SAFE_METHODS.has(request.method) && request.headers.get("origin") !== deps.origin)

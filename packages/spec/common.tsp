@@ -152,6 +152,7 @@ union ProblemCode {
   authCrossSite: "auth.cross_site",
   authAgentUnplaced: "auth.agent_unplaced",
   authRevoked: "auth.revoked",
+  authFreshSignInRequired: "auth.fresh_sign_in_required",
   requestInvalid: "request.invalid",
   requestIdempotencyConflict: "request.idempotency_conflict",
   requestPreconditionFailed: "request.precondition_failed",

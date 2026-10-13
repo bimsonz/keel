@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.touch
+# kills: link.touch
+# why: an approval is taken on any session, so whoever holds a person's old session and an agent's code makes that person the agent's sponsor
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 4ef7b714..0647f298 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -429,7 +429,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+           );
+         },
+         Agents_approveSponsor: (caller: Caller, input: Input<"Agents_approveSponsor">) =>
+-          touched(caller, () => {
++          (() => {
+             const agentId = decodeLinkAgent(input.agentId);
+             if (Option.isNone(agentId)) return noSuchRequest(caller);
+             return run(
+@@ -451,7 +451,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 }),
+               ),
+             );
+-          }),
++          })(),
+         Agents_endSponsorship: (caller: Caller, input: Input<"Agents_endSponsorship">) => {
+           const end = () =>
+             run(

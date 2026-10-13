@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.agent-resource
+# kills: authz.agent-resource
+# why: an agent's account gives a visitor no read, so the page where a person approves an agent cannot show who is asking
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4a5aca00..a141d239 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -204,7 +204,7 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
+       if (resource.suspended) return NONE;
+       return role === undefined ? READ : new Set(ROLE_RIGHTS[role]);
+     case "Agent":
+-      return READ;
++      return NONE;
+     default:
+       return NONE;
+   }

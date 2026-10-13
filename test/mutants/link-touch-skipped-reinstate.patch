@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.touch
+# kills: link.touch
+# why: a paused agent is reinstated on any session, so a stale session undoes a sponsor's pause
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 4ef7b714..4b89afbe 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -967,7 +967,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+         Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
+           touched(caller, () => standing(caller, "Operator_suspendAgent", input, suspendAgent)),
+         Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
+-          touched(caller, () => standing(caller, "Operator_reinstateAgent", input, reinstateAgent)),
++          standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
+         Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
+           standing(caller, "Operator_revokeAgent", input, revokeAgent),
+         Operator_listEscalations: (caller: Caller, input: Input<"Operator_listEscalations">) => {

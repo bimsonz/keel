@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts -t link.code-compare
+# kills: link.code-compare
+# why: a hash that only begins with the stored one is taken for it
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index ecafc3dd..318a528b 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -43,7 +43,6 @@ export const SPONSOR_ASK_MS = 10 * 60_000;
+  * took to refuse says nothing about how much of it was right.
+  */
+ export function sameHash(a: string, b: string): boolean {
+-  if (a.length !== b.length) return false;
+   let difference = 0;
+   for (let i = 0; i < a.length; i += 1) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+   return difference === 0;

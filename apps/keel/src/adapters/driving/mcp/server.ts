@@ -35,6 +35,7 @@ function toolDeps(admitted: Admitted): ToolDeps<Caller> {
       requestId: crypto.randomUUID(),
       principal: admitted.principal,
       ...(admitted.token === undefined ? {} : { token: admitted.token }),
+      ...(admitted.signedIn === undefined ? {} : { signedIn: admitted.signedIn }),
       signal: context.http?.req?.signal ?? new AbortController().signal,
     }),
     noContext: () => ({ content: [{ type: "text", text: "Not authenticated." }], isError: true }),

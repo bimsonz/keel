@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.touch
+# kills: link.touch
+# why: a pause is taken on any session, so a session signed in by an emailed code stops an agent
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 4ef7b714..9a9b36f7 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -965,7 +965,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+           );
+         },
+         Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
+-          touched(caller, () => standing(caller, "Operator_suspendAgent", input, suspendAgent)),
++          standing(caller, "Operator_suspendAgent", input, suspendAgent),
+         Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
+           touched(caller, () => standing(caller, "Operator_reinstateAgent", input, reinstateAgent)),
+         Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>

@@ -2,10 +2,10 @@
 # kills: authz.any-account
 # why: an agent takes a handle as a person does
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..2d7c80ec 100644
+index 4a5aca00..c4311ac2 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -481,9 +481,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+@@ -507,9 +507,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
      case "anyone":
      case "self":
      case "account":
@@ -14,5 +14,5 @@ index 3f965345..2d7c80ec 100644
      case "user":
 -    case "handle":
        return refused("users-only");
-     default:
-       break;
+     // Its own account is there for it, and no other agent's: it may leave its sponsor, and only a person pauses.
+     case "sponsor":

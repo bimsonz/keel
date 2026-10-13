@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts -t link.sponsor-real
+# kills: link.sponsor-real
+# why: the gate refuses a suspended agent itself, so a paused agent reads 401 as if revoked and is never told that it is paused or what to do
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index d525ea77..c6c8ce5a 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -72,7 +72,7 @@ export const admit: (
+   const directory = yield* AgentDirectory;
+   const agent = yield* directory.findAgent(principal.agentId);
+   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
+-  if (agent.value.state === "revoked")
++  if (agent.value.state !== "active")
+     return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason: "revoked" });
+   if (principal.revocationEpoch !== agent.value.revocationEpoch)
+     return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason: "stale-epoch" });

@@ -43,6 +43,7 @@ import {
 } from "@keeltown/core/application/integration";
 import {
   type Actor,
+  type AgentResource,
   type Audience,
   authorize,
   GrantableScope,
@@ -54,7 +55,14 @@ import {
   ProjectId as ProjectIdSchema,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { type EscalationReader, Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
+import {
+  AgentDirectory,
+  type EscalationReader,
+  Orgs,
+  ProjectOrgs,
+  type Projects,
+  Sponsorships,
+} from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import {
@@ -115,6 +123,19 @@ import {
   treeOk,
 } from "./repo.ts";
 import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
+import {
+  approveError,
+  askError,
+  askOk,
+  cardNotFound,
+  cardOk,
+  decodeLinkAgent,
+  endError,
+  freshSignInRequired,
+  linkOk,
+  noSuchRequest,
+  sponsoredOk,
+} from "./sponsorship.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -190,6 +211,21 @@ function projectOf(caller: Caller): ProjectResource {
   if (caller.resource?._tag !== "Project")
     throw new Error("a project's operation ran without its project resolved");
   return caller.resource;
+}
+
+/** The agent's account the call was decided on, as `authorizeHandlers` resolved it. */
+function accountOf(caller: Caller): AgentResource {
+  if (caller.resource?._tag !== "Agent")
+    throw new Error("an operation on an agent's account ran without its account resolved");
+  return caller.resource;
+}
+
+/** Who ends a sponsor's link: the agent itself, or the person the policy granted. */
+function linkActorOf(caller: Caller): Actor {
+  const { principal } = caller;
+  if (principal._tag === "Agent") return { _tag: "Agent", agentId: principal.agentId };
+  if (principal._tag === "User") return { _tag: "User", userId: principal.userId };
+  throw new Error("a link's end ran for neither an agent nor a user");
 }
 
 /** The project a read was granted, and who it reads as. */
@@ -300,7 +336,18 @@ export interface SignInMethods {
   readonly github: boolean;
 }
 
-export function makeHandlers(run: Runner, signIn: SignInMethods) {
+/** What composition tells the handlers of the doorway they stand in. */
+export interface Doorway {
+  /** `https://<KEEL_HOST>`: where the console's pages are. */
+  readonly origin: string;
+  /** Whether the caller's session is a fresh sign-in, by the sign-in adapter's own rule. */
+  readonly fresh: (caller: Caller) => boolean;
+}
+
+export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorway) {
+  /** A person's move that wants a fresh sign-in: refused here, before its port is called. */
+  const touched = <A>(caller: Caller, move: () => A) =>
+    doorway.fresh(caller) ? move() : freshSignInRequired(caller.requestId);
   /** An operator's move on an agent's standing, answered as the agent's profile. */
   const standing = (
     caller: Caller,
@@ -368,6 +415,89 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
                   }),
                 ),
               ),
+        askSponsor: (caller: Caller) => {
+          const { principal } = caller;
+          if (principal._tag !== "Agent") return agentsOnly(caller.requestId);
+          return run(
+            caller,
+            Sponsorships.use((links) => links.ask(principal.agentId)).pipe(
+              Effect.match({
+                onSuccess: (request) => askOk(doorway.origin, principal.agentId, request),
+                onFailure: (error) => askError(caller, error),
+              }),
+            ),
+          );
+        },
+        Agents_approveSponsor: (caller: Caller, input: Input<"Agents_approveSponsor">) =>
+          touched(caller, () => {
+            const agentId = decodeLinkAgent(input.agentId);
+            if (Option.isNone(agentId)) return noSuchRequest(caller);
+            return run(
+              caller,
+              actorOf(caller).pipe(
+                Effect.flatMap((actor) =>
+                  Sponsorships.use((links) =>
+                    links.approve({
+                      agentId: agentId.value,
+                      by: actor.userId,
+                      asked: { _tag: "Code", code: input.code },
+                      idempotencyKey: input["idempotency-key"],
+                    }),
+                  ),
+                ),
+                Effect.match({
+                  onSuccess: linkOk,
+                  onFailure: (error) => approveError(caller, error),
+                }),
+              ),
+            );
+          }),
+        Agents_endSponsorship: (caller: Caller, input: Input<"Agents_endSponsorship">) => {
+          const end = () =>
+            run(
+              caller,
+              Sponsorships.use((links) =>
+                links.end(linkActorOf(caller), {
+                  agentId: accountOf(caller).agentId,
+                  idempotencyKey: input["idempotency-key"],
+                }),
+              ).pipe(
+                Effect.match({
+                  onSuccess: linkOk,
+                  onFailure: (error) => endError(caller, error),
+                }),
+              ),
+            );
+          // An agent has no session to make fresh: the touch is asked of the person.
+          return caller.principal._tag === "Agent" ? end() : touched(caller, end);
+        },
+        Agents_listSponsored: (caller: Caller) =>
+          run(
+            caller,
+            actorOf(caller).pipe(
+              Effect.flatMap((actor) =>
+                AgentDirectory.use((directory) => directory.sponsoredBy(actor.userId)),
+              ),
+              Effect.map(sponsoredOk),
+            ),
+          ),
+        Agents_getAgent: (caller: Caller, _input: Input<"Agents_getAgent">) =>
+          run(
+            caller,
+            Effect.gen(function* () {
+              const agent = yield* AgentDirectory.use((directory) =>
+                directory.findAgent(accountOf(caller).agentId),
+              );
+              if (Option.isNone(agent)) return cardNotFound(caller);
+              const { org } = agent.value;
+              const place =
+                org === undefined ? Option.none() : yield* Orgs.use((orgs) => orgs.byId(org));
+              return cardOk(
+                agent.value,
+                Option.match(place, { onNone: () => undefined, onSome: (record) => record.name }),
+              );
+            }),
+          ),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
             caller,
@@ -835,9 +965,9 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
           );
         },
         Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
-          standing(caller, "Operator_suspendAgent", input, suspendAgent),
+          touched(caller, () => standing(caller, "Operator_suspendAgent", input, suspendAgent)),
         Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
-          standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
+          touched(caller, () => standing(caller, "Operator_reinstateAgent", input, reinstateAgent)),
         Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
           standing(caller, "Operator_revokeAgent", input, revokeAgent),
         Operator_listEscalations: (caller: Caller, input: Input<"Operator_listEscalations">) => {
