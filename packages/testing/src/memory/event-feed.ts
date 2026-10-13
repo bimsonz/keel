@@ -1,27 +1,43 @@
-import type { EventEnvelope } from "@keeltown/core/kernel";
+import type { EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { EventFeed, type EventFeedEntry } from "@keeltown/core/ports";
-import { Duration, Effect, Layer } from "effect";
+import { Duration, Clock as EffectClock, Effect, Layer } from "effect";
 
 /** Positions sort as strings: twelve digits, as the Projector's. */
 const position = (n: number) => String(n).padStart(12, "0");
 
 /**
  * The Projector's feed as an array: `append` is an arrival. A waiting read
- * answers on the next arrival, or with an empty page at its deadline.
+ * answers on the next arrival it reads, or with an empty page at its
+ * deadline. A read by project filters the array: the plain statement of what
+ * the Projector's index answers.
  */
 export function makeEventFeedMemory() {
   const entries: EventFeedEntry[] = [];
   let waiting = new Set<() => void>();
-  const page = (after: number, limit: number) => {
-    const events = entries.slice(after, after + Math.min(Math.max(limit, 1), 500));
-    return { events, cursor: position(after + events.length) };
+  const page = (after: number, limit: number, project?: ProjectId) => {
+    const max = Math.min(Math.max(limit, 1), 500);
+    if (project === undefined) {
+      const events = entries.slice(after, after + max);
+      return { events, cursor: position(after + events.length) };
+    }
+    const mine = entries.flatMap((entry, index) =>
+      index >= after && entry.project === project ? [{ entry, at: index + 1 }] : [],
+    );
+    const cut = mine[max - 1];
+    return {
+      events: mine.slice(0, max).map((each) => each.entry),
+      // Cut by the limit, the last one returned; otherwise the head, past every other project's events.
+      cursor: position(
+        mine.length > max && cut !== undefined ? cut.at : Math.max(entries.length, after),
+      ),
+    };
   };
-  const nextArrival = (seconds: number): Effect.Effect<void> =>
+  const nextArrival = (millis: number): Effect.Effect<void> =>
     Effect.callback<void>((resume) => {
       const wake = () => resume(Effect.void);
       waiting.add(wake);
       return Effect.sync(() => waiting.delete(wake));
-    }).pipe(Effect.timeoutOption(Duration.seconds(seconds)), Effect.asVoid);
+    }).pipe(Effect.timeoutOption(Duration.millis(millis)), Effect.asVoid);
   return {
     entries,
     append: (event: EventEnvelope, label?: string): void => {
@@ -33,13 +49,17 @@ export function makeEventFeedMemory() {
     layer: Layer.succeed(
       EventFeed,
       EventFeed.of({
-        read: ({ cursor, limit = 100, waitSeconds }) =>
+        read: ({ cursor, limit = 100, waitSeconds, project }) =>
           Effect.gen(function* () {
             const after = cursor === undefined ? 0 : Number(cursor);
-            if (page(after, limit).events.length === 0 && waitSeconds > 0) {
-              yield* nextArrival(waitSeconds);
+            const deadline = (yield* EffectClock.currentTimeMillis) + waitSeconds * 1000;
+            // An arrival the read does not hold (another project's) leaves it waiting for the next.
+            while (page(after, limit, project).events.length === 0) {
+              const left = deadline - (yield* EffectClock.currentTimeMillis);
+              if (left <= 0) break;
+              yield* nextArrival(left);
             }
-            return page(after, limit);
+            return page(after, limit, project);
           }),
       }),
     ),

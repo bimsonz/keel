@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { EventEnvelope } from "../../domain/kernel/index.ts";
+import { EventEnvelope, type ProjectId } from "../../domain/kernel/index.ts";
 import { EntityStore, type Stored } from "../ports/index.ts";
 
 /**
@@ -17,7 +17,20 @@ export const FEED = {
   counter: "label-counter",
   /** Per project, kind and entity: the label it was given, so it is given once. */
   given: "label-given",
+  /** A project's entries in arrival order: `<project>/<n>` → the entry's position in the feed. Dense per project. */
+  byProject: "feed-project",
+  /** Per project: how many of its entries are indexed. */
+  projectHead: "feed-project-head",
+  /** The position the index by project is complete to. */
+  indexed: { kind: "feed-indexed", id: "self" },
 } as const;
+
+/**
+ * The positions one receipt, or one read by project, indexes at most. A feed
+ * recorded before the index existed is caught up in steps of this size, never
+ * in one long transaction.
+ */
+export const FEED_INDEX_STEP = 5_000;
 
 /** The events one feed read answers with, unless it asks for fewer; never more than `FEED_PAGE_MAX`. */
 export const FEED_PAGE = 100;
@@ -28,7 +41,12 @@ export type FeedEntry = EventEnvelope & { readonly label?: string };
 
 export interface FeedPage {
   readonly events: readonly FeedEntry[];
-  /** The last position read; an empty page keeps the cursor it was given. */
+  /**
+   * The last position read; an empty page keeps the cursor it was given. A
+   * read by project moves past other projects' events: its cursor is the last
+   * entry returned when the limit cut the page, and otherwise the position
+   * the project's index is complete to.
+   */
   readonly cursor: string;
 }
 
@@ -117,10 +135,45 @@ export function labelGiven(
   return typeof label === "string" ? label : undefined;
 }
 
+const indexedTo = (store: Store): number => {
+  const indexed = store.get(FEED.indexed.kind, FEED.indexed.id);
+  return typeof indexed === "number" ? indexed : 0;
+};
+
+const projectHeadOf = (store: Store, project: string): number => {
+  const head = store.get(FEED.projectHead, project);
+  return typeof head === "number" ? head : 0;
+};
+
+/**
+ * Indexes the feed's next positions by project, at most `step` of them, in
+ * position order, so each project's index is dense and in arrival order.
+ * Answers the position the index is now complete to: the head, once it is
+ * level. It writes, so it runs inside a transaction: the receipt's, or a read
+ * by project's own.
+ */
+export function indexFeed(store: Store, step: number = FEED_INDEX_STEP): number {
+  const from = indexedTo(store);
+  const to = Math.min(headOf(store), from + step);
+  if (to <= from) return from;
+  for (let at = from + 1; at <= to; at += 1) {
+    const stored = store.get(FEED.kind, position(at));
+    const project = isRecord(stored) ? stored["project"] : undefined;
+    if (typeof project !== "string") continue;
+    const count = projectHeadOf(store, project) + 1;
+    store.put(FEED.byProject, `${project}/${position(count)}`, at);
+    store.put(FEED.projectHead, project, count);
+  }
+  store.put(FEED.indexed.kind, FEED.indexed.id, to);
+  return to;
+}
+
 /**
  * Records an arrived event at the feed's next position, with its label if it
- * gets one. Synchronous: it runs inside the receipt's transaction, so a
- * redelivery (a no-op receipt) never numbers anything twice.
+ * gets one, and indexes it under its project (with a step of any backlog
+ * recorded before the index existed). Synchronous: it runs inside the
+ * receipt's transaction, so a redelivery (a no-op receipt) never numbers
+ * anything twice.
  */
 export function recordFeed(store: Store, event: EventEnvelope): void {
   const next = headOf(store) + 1;
@@ -129,25 +182,75 @@ export function recordFeed(store: Store, event: EventEnvelope): void {
   store.put(FEED.head.kind, FEED.head.id, next);
   const label = labelFor(store, event);
   if (label !== undefined) store.put(FEED.label, position(next), label);
+  indexFeed(store);
 }
 
-/** The events after `cursor`, oldest first, at most `limit` (1–500). Positions are dense, so each is read by key. */
+/** The entry at a position with its label, when the feed holds one there. */
+const entryAt = (store: Store, at: number): FeedEntry | undefined => {
+  const stored = store.get(FEED.kind, position(at));
+  if (stored === undefined) return undefined;
+  const label = store.get(FEED.label, position(at));
+  return typeof label === "string" ? { ...decode(stored), label } : decode(stored);
+};
+
+/**
+ * A project's events after `after`, oldest first, at most `max`: its index is
+ * searched for its first entry past the cursor, and the entries are read by
+ * key, so a page costs the project's own entries and never the feed's. The
+ * index is moved a step first. While it is behind the head (a feed recorded
+ * before it existed), the page holds only what is indexed and its cursor
+ * never passes the indexed position, so nothing between is skipped.
+ */
+function readProject(store: Store, project: ProjectId, after: number, max: number): FeedPage {
+  const indexed = store.transaction(() => indexFeed(store));
+  const count = projectHeadOf(store, project);
+  const positionOf = (n: number): number => {
+    const at = store.get(FEED.byProject, `${project}/${position(n)}`);
+    return typeof at === "number" ? at : 0;
+  };
+  // The first of the project's entries after the cursor, by binary search.
+  let low = 1;
+  let high = count + 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (positionOf(middle) > after) high = middle;
+    else low = middle + 1;
+  }
+  const events: FeedEntry[] = [];
+  let last = after;
+  let n = low;
+  for (; n <= count && events.length < max; n += 1) {
+    last = positionOf(n);
+    const entry = entryAt(store, last);
+    if (entry !== undefined) events.push(entry);
+  }
+  // Cut by the limit, more of the project's follow the last one returned; otherwise the reader has all that is indexed.
+  return { events, cursor: position(n <= count ? last : Math.max(indexed, after)) };
+}
+
+/**
+ * The events after `cursor`, oldest first, at most `limit` (1–500). Positions
+ * are dense, so each is read by key. With `project`, only that project's
+ * events, sought through its index (`readProject`).
+ */
 export const readFeed: (
   cursor: string | undefined,
   limit?: number,
+  project?: ProjectId,
 ) => Effect.Effect<FeedPage, never, EntityStore> = Effect.fn("memory/readFeed")(function* (
   cursor: string | undefined,
   limit: number = FEED_PAGE,
+  project?: ProjectId,
 ) {
   const store = yield* EntityStore;
   const after = cursor === undefined ? 0 : Number(cursor);
-  const last = Math.min(headOf(store), after + Math.min(Math.max(limit, 1), FEED_PAGE_MAX));
+  const max = Math.min(Math.max(limit, 1), FEED_PAGE_MAX);
+  if (project !== undefined) return readProject(store, project, after, max);
+  const last = Math.min(headOf(store), after + max);
   const events: FeedEntry[] = [];
   for (let at = after + 1; at <= last; at += 1) {
-    const stored = store.get(FEED.kind, position(at));
-    if (stored === undefined) continue;
-    const label = store.get(FEED.label, position(at));
-    events.push(typeof label === "string" ? { ...decode(stored), label } : decode(stored));
+    const entry = entryAt(store, at);
+    if (entry !== undefined) events.push(entry);
   }
   return { events, cursor: last > after ? position(last) : position(after) };
 });

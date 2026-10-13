@@ -2,14 +2,14 @@
 # kills: a11.events
 # why: the feed is read from its start whatever cursor the caller gave
 diff --git a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
-index 3542150..ba23ed6 100644
+index 374e693b..7cddb8da 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
 @@ -20,7 +20,6 @@ export function EventFeedRpc(projector: () => ProjectorStub): Layer.Layer<EventF
-       read: ({ cursor, limit, waitSeconds }) =>
+       read: ({ cursor, limit, waitSeconds, project }) =>
          callObject(ProjectorCodecs.read, () =>
            projector().read({
 -            ...(cursor === undefined ? {} : { cursor }),
              ...(limit === undefined ? {} : { limit }),
              waitMs: waitSeconds * 1000,
-           }),
+             ...(project === undefined ? {} : { project }),

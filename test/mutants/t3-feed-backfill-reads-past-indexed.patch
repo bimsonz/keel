@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/feed-project.test.ts -t t3.feed-index-backfill
+# kills: t3.feed-index-backfill
+# why: a read while the index is behind answers the head as its cursor, so the project's events between what is indexed and the head are skipped for good
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index b3954509..83c2d375 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -225,7 +225,10 @@ function readProject(store: Store, project: ProjectId, after: number, max: numbe
+     if (entry !== undefined) events.push(entry);
+   }
+   // Cut by the limit, more of the project's follow the last one returned; otherwise the reader has all that is indexed.
+-  return { events, cursor: position(n <= count ? last : Math.max(indexed, after)) };
++  return {
++    events,
++    cursor: position(n <= count ? last : Math.max(indexed, headOf(store), after)),
++  };
+ }
+ 
+ /**

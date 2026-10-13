@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { EventEnvelope, Instant } from "@keeltown/core/kernel";
+import { EventEnvelope, Instant, ProjectId } from "@keeltown/core/kernel";
 import { EventFeed } from "@keeltown/core/ports";
 import { Effect, Fiber, type Layer, Schema } from "effect";
 
@@ -17,8 +17,8 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 
-/** A change's event, as its DO would commit it. Its eventId is how a case finds it on the feed. */
-const event = (seq: number): EventEnvelope => {
+/** A change's event, as its DO would commit it, in `project` when given. Its eventId is how a case finds it on the feed. */
+const event = (seq: number, project?: string): EventEnvelope => {
   const entity = { kind: "change", id: `chg_${ulid()}` };
   return Schema.decodeUnknownSync(EventEnvelope)({
     eventId: `evt_${ulid()}`,
@@ -30,8 +30,12 @@ const event = (seq: number): EventEnvelope => {
     affected: [],
     notified: [],
     payload: { _tag: "ChangeBounced" },
+    ...(project === undefined ? {} : { project }),
   });
 };
+
+const decodeProject = Schema.decodeUnknownSync(ProjectId);
+const freshProject = () => decodeProject(`prj_${ulid()}`);
 
 /** The feed's head: read on until a page comes back empty. */
 const head = Effect.gen(function* () {
@@ -44,6 +48,9 @@ const head = Effect.gen(function* () {
 });
 
 const POSITION = /^\d{12}$/;
+
+const idsOf = (page: { readonly events: readonly EventEnvelope[] }) =>
+  page.events.map((e) => e.eventId);
 
 export function describeEventFeedContract(adapter: string, make: () => EventFeedHarness) {
   describe(`EventFeed contract: ${adapter}`, () => {
@@ -112,6 +119,76 @@ export function describeEventFeedContract(adapter: string, make: () => EventFeed
         expect(Date.now() - started).toBeLessThan(10_000);
       }).pipe(Effect.provide(harness.layer));
     });
+
+    it.live(
+      "[feed.project] a read by project answers only that project's events, in arrival order: its cursor is the last one returned when the limit cut the page, and past every other project's events once it is caught up",
+      () => {
+        const harness = make();
+        const [a, b] = [freshProject(), freshProject()];
+        return Effect.gen(function* () {
+          const feed = yield* EventFeed;
+          const from = yield* head;
+          const arrived = [
+            event(1, a),
+            event(2, b),
+            event(3, a),
+            event(4),
+            event(5, b),
+            event(6, a),
+            event(7, b),
+          ];
+          for (const e of arrived) yield* harness.arrive(e);
+          const ids = (...indexes: number[]) => indexes.map((index) => arrived[index]?.eventId);
+
+          const cut = yield* feed.read({ cursor: from, limit: 2, waitSeconds: 0, project: a });
+          // Cut after the project's second event: the whole feed read on from that cursor starts at the next arrival.
+          const afterCut = yield* feed.read({ cursor: cut.cursor, waitSeconds: 0 });
+          const rest = yield* feed.read({
+            cursor: cut.cursor,
+            limit: 2,
+            waitSeconds: 0,
+            project: a,
+          });
+          // Caught up: the cursor is at the head, past the other project's last event.
+          const beyond = yield* feed.read({ cursor: rest.cursor, waitSeconds: 0 });
+          const again = yield* feed.read({ cursor: rest.cursor, waitSeconds: 0, project: a });
+          const others = yield* feed.read({ cursor: from, waitSeconds: 0, project: b });
+
+          expect(idsOf(cut)).toEqual(ids(0, 2));
+          expect(idsOf(afterCut)).toEqual(ids(3, 4, 5, 6));
+          expect(idsOf(rest)).toEqual(ids(5));
+          expect(beyond.events).toEqual([]);
+          expect(again).toEqual({ events: [], cursor: rest.cursor });
+          expect(idsOf(others)).toEqual(ids(1, 4, 6));
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[feed.project] a waiting read by project is not answered by another project's arrival, and is by its own",
+      () => {
+        const harness = make();
+        const [a, b] = [freshProject(), freshProject()];
+        return Effect.gen(function* () {
+          const feed = yield* EventFeed;
+          const from = yield* head;
+          const started = Date.now();
+          const waiting = yield* Effect.forkChild(
+            feed.read({ cursor: from, waitSeconds: 20, project: a }),
+          );
+          yield* Effect.sleep("200 millis");
+          yield* harness.arrive(event(1, b));
+          yield* Effect.sleep("500 millis");
+          const mine = event(2, a);
+          yield* harness.arrive(mine);
+          const page = yield* Fiber.join(waiting);
+          // Answered by its own project's event, and so only after it arrived.
+          expect(page.events.map((e) => e.eventId)).toEqual([mine.eventId]);
+          expect(Date.now() - started).toBeGreaterThanOrEqual(650);
+          expect(Date.now() - started).toBeLessThan(10_000);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
 
     it.live(
       "[feed.deadline] answers an empty page, keeping the cursor, when the wait runs out",

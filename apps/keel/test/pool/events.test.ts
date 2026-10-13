@@ -64,6 +64,31 @@ async function arrive(
   return event;
 }
 
+/** `count` changes starting in `project`, delivered to the Projector a couple of hundred at a time. */
+async function flood(project: ProjectId, count: number) {
+  const encode = Schema.encodeSync(EventEnvelope);
+  for (let sent = 0; sent < count; sent += 200) {
+    const batch = Array.from({ length: Math.min(200, count - sent) }, () => {
+      const changeId = makeId("chg", ulid());
+      return encode(
+        Schema.decodeUnknownSync(EventEnvelope)({
+          eventId: makeId("evt", ulid()),
+          type: "ChangeStarted",
+          entity: { kind: "change", id: changeId },
+          seq: 1,
+          at: Date.UTC(2026, 9, 11, 9),
+          dedupeKey: `change:${changeId}/events-test/ChangeStarted#1`,
+          project,
+          affected: [],
+          notified: [],
+          payload: { _tag: "ChangeStarted", changeId, workspaceId: makeId("wsp", ulid()) },
+        }),
+      );
+    });
+    await projector().receive(batch);
+  }
+}
+
 /** The feed's end as `token` sees it: read on until a page comes back empty. */
 async function head(token: string) {
   let page = await events(token, "?limit=500");
@@ -132,6 +157,45 @@ describe("GET /v1/events", () => {
     const unplaced = await arrive(makeId("prj", ulid()));
     const after = await events(member, `?cursor=${seenByMember.body.nextCursor}`);
     expect(after.body.items.map((e) => e.eventId)).not.toContain(unplaced.eventId);
+  });
+
+  it("[t3.feed-project-wait] an agent's waiting read is answered by its own project's next event, and is not woken by another project's", async () => {
+    const { projectA, projectB } = await tenancy();
+    const agent = await tokenFor(await seedAgent({ projectId: projectA }, ["agent:read"]));
+    const from = await head(agent);
+    const started = Date.now();
+    const waiting = events(agent, `?cursor=${from}&wait=20`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await arrive(projectB);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const mine = await arrive(projectA);
+    const page = await waiting;
+    // Its own event, and so only after that arrived: the other project's did not answer it.
+    expect(page.body.items.map((e) => e.eventId)).toEqual([mine.eventId]);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(750);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it("[t3.feed-project-pages] a project's events behind hundreds of another's come in one page, whose cursor is past them all", async () => {
+    const { projectA, projectB, member } = await tenancy();
+    const agent = await tokenFor(await seedAgent({ projectId: projectA }, ["agent:read"]));
+    const from = await head(agent);
+    const first = await arrive(projectA);
+    await flood(projectB, 600);
+    const [second, third] = [await arrive(projectA), await arrive(projectA)];
+
+    // One request of a hundred: a walk of the whole feed would have reached only the first.
+    const page = await events(agent, `?cursor=${from}&limit=100`);
+    expect(page.body.items.map((e) => e.eventId)).toEqual([
+      first.eventId,
+      second.eventId,
+      third.eventId,
+    ]);
+    const after = await events(agent, `?cursor=${page.body.nextCursor}`);
+    expect(after.body).toEqual({ items: [], nextCursor: page.body.nextCursor });
+    // The cursor is past every one of the other project's events: a member reading on from it finds none.
+    const beyond = await events(member, `?cursor=${page.body.nextCursor}&limit=500`);
+    expect(beyond.body.items).toEqual([]);
   });
 
   it("[a11.events-cursor] refuses a cursor that is not a feed position, naming it", async () => {

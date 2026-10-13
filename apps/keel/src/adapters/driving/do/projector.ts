@@ -81,8 +81,13 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     const waiters = this.waiters;
     const program = Schema.decodeUnknownEffect(ProjectorRead)(request).pipe(
       Effect.orDie,
-      Effect.flatMap(({ cursor, limit, waitMs }) =>
-        waiters.until(waitMs ?? 0, readFeed(cursor, limit), (page) => page.events.length > 0),
+      Effect.flatMap(({ cursor, limit, waitMs, project }) =>
+        // A read by project waits for that project's next event: another's arrival re-reads and finds none.
+        waiters.until(
+          waitMs ?? 0,
+          readFeed(cursor, limit, project),
+          (page) => page.events.length > 0,
+        ),
       ),
     );
     return this.answer(ProjectorCodecs.read, program);

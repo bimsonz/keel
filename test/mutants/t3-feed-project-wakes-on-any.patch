@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t t3.feed-project-wait
+# kills: t3.feed-project-wait
+# why: a waiting read is answered whenever its cursor would move, so another project's arrival wakes an agent with an empty page
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 650a761e..311b3edf 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -86,7 +86,7 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+         waiters.until(
+           waitMs ?? 0,
+           readFeed(cursor, limit, project),
+-          (page) => page.events.length > 0,
++          (page) => page.events.length > 0 || page.cursor !== cursor,
+         ),
+       ),
+     );

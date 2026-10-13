@@ -236,6 +236,9 @@ const readable = (event: EventFeedEntry, audience: Audience | undefined): boolea
 /**
  * The events of a page the scope reads: one project's, or each one whose
  * project is readable, asked once per project; of those, what `readable` keeps.
+ * A project's page is already sought by project in the feed; the check here
+ * stays, so a feed that did not seek (an older Projector answering a newer
+ * doorway) still serves a reader nothing of another project.
  */
 const kept = (
   scope: FeedScope,
@@ -262,9 +265,11 @@ const kept = (
 
 /**
  * The event feed after `cursor`, waiting up to `waitSeconds` (0–30) for an
- * event, as far as `scope` reads it. A page keeps only the events the scope
- * reads, so it may hold fewer than `limit`, or none, while its cursor still
- * moves past the rest.
+ * event, as far as `scope` reads it. One project's read is sought through
+ * that project's index in the feed, so a page is the project's next `limit`
+ * and its cursor moves past every other project's events at once. A page
+ * keeps only the events the scope reads, so it may hold fewer than `limit`,
+ * or none, while its cursor still moves past the rest.
  */
 export const readEvents: (
   scope: FeedScope,
@@ -279,6 +284,7 @@ export const readEvents: (
       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
       ...(input.limit === undefined ? {} : { limit: input.limit }),
       waitSeconds: clampWait(input.waitSeconds),
+      ...(scope._tag === "Project" ? { project: scope.project } : {}),
     }),
   ).pipe(
     Effect.flatMap((page) =>

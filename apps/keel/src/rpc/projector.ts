@@ -39,11 +39,16 @@ import { EscalationRecord } from "./namespace.ts";
 /** A feed position: twelve digits, so positions sort as strings. */
 const Position = Schema.String.check(Schema.isPattern(/^\d{12}$/));
 
-/** Read the feed after `cursor` (from its start when absent): at most `limit` (1–500, default 100) events, waiting up to `waitMs` (0–30,000) for one. */
+/**
+ * Read the feed after `cursor` (from its start when absent): at most `limit`
+ * (1–500, default 100) events, waiting up to `waitMs` (0–30,000) for one.
+ * With `project`, only that project's events, sought through its index.
+ */
 export const ProjectorRead = Schema.Struct({
   cursor: Schema.optional(Position),
   limit: Schema.optional(Schema.Int),
   waitMs: Schema.optional(Schema.Int),
+  project: Schema.optional(ProjectId),
 });
 
 /**

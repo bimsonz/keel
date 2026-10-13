@@ -17,12 +17,13 @@ export function EventFeedRpc(projector: () => ProjectorStub): Layer.Layer<EventF
   return Layer.succeed(
     EventFeed,
     EventFeed.of({
-      read: ({ cursor, limit, waitSeconds }) =>
+      read: ({ cursor, limit, waitSeconds, project }) =>
         callObject(ProjectorCodecs.read, () =>
           projector().read({
             ...(cursor === undefined ? {} : { cursor }),
             ...(limit === undefined ? {} : { limit }),
             waitMs: waitSeconds * 1000,
+            ...(project === undefined ? {} : { project }),
           }),
         ),
     }),

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t t3.feed-project-pages
+# kills: t3.feed-project-pages
+# why: the doorway does not name the project to the feed, so a project's page is cut from the whole instance's log and its events come a few to a request
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 99830384..22254d3c 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -284,7 +284,6 @@ export const readEvents: (
+       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+       ...(input.limit === undefined ? {} : { limit: input.limit }),
+       waitSeconds: clampWait(input.waitSeconds),
+-      ...(scope._tag === "Project" ? { project: scope.project } : {}),
+     }),
+   ).pipe(
+     Effect.flatMap((page) =>

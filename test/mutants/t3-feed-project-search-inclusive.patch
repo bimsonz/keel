@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/feed-project.test.ts -t t3.feed-project
+# kills: t3.feed-project
+# why: the search of a project's index takes the entry at the cursor as after it, so the last event of each page is served again on the next
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index b3954509..a925a4ee 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -213,7 +213,7 @@ function readProject(store: Store, project: ProjectId, after: number, max: numbe
+   let high = count + 1;
+   while (low < high) {
+     const middle = Math.floor((low + high) / 2);
+-    if (positionOf(middle) > after) high = middle;
++    if (positionOf(middle) >= after) high = middle;
+     else low = middle + 1;
+   }
+   const events: FeedEntry[] = [];
