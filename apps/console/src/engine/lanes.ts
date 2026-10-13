@@ -27,8 +27,11 @@ import type {
   ConflictState,
   Outcome,
   Pending,
+  ShownClass,
   World as WorldId,
 } from "../domain/state.ts";
+import { agentName, shownAgent } from "./audience.ts";
+import type { Cards } from "./holder.ts";
 import { sidesOf } from "./sides.ts";
 import {
   type ChangeEntry,
@@ -45,7 +48,8 @@ export type GraphNode = { id: string } & (
   | {
       kind: "agent";
       label: string;
-      agentClass: AgentClass;
+      /** `unnamed` where this reader's log has not enrolled it: its name is then its card's, and no class is written. */
+      agentClass: ShownClass;
       harness: string;
       /** What the agent called the run it holds the change under, where it named one. */
       run?: string;
@@ -273,7 +277,12 @@ interface Ranked {
   since: number;
 }
 
-export function lanesOf(world: World, now: number, options: LaneOptions = {}): Lanes {
+export function lanesOf(
+  world: World,
+  now: number,
+  options: LaneOptions = {},
+  cards: Cards = new Map(),
+): Lanes {
   const shown = options.shown ?? LANES;
 
   // ── What is still going on ──
@@ -393,7 +402,8 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
     edges: GraphEdge[],
     holds?: { text: string; derived: boolean },
   ): string => {
-    const by = world.agents.get(change.agentId);
+    const enrolled = world.agents.get(change.agentId);
+    const card = cards.get(change.agentId);
     const changeNode = `change:${change.id}`;
     const place = where(world, change);
     nodes.push({
@@ -408,12 +418,14 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       ...(place === undefined ? {} : { where: place }),
       ...(change.unverified ? { unverified: true } : {}),
     });
-    if (by !== undefined) {
-      const agentNode = `agent:${by.id}:${change.id}`;
+    // An agent is drawn beside its change where the reader has a name for it: the log's, or its card's.
+    if (agentName(enrolled, card) !== undefined) {
+      const by = shownAgent(enrolled, card);
+      const agentNode = `agent:${change.agentId}:${change.id}`;
       nodes.push({
         id: agentNode,
         kind: "agent",
-        label: by.name,
+        label: by.label,
         agentClass: by.class,
         harness: by.harness,
         ...(change.run?.label === undefined ? {} : { run: change.run.label }),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.holders
+# why: Keel is asked for the card of something that is no agent: a change the log does not hold
+diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
+index 4dcefc18..7ef02603 100644
+--- a/apps/console/src/engine/holder.ts
++++ b/apps/console/src/engine/holder.ts
+@@ -23,7 +23,7 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
+   const holders = new Set<string>();
+   for (const changeId of changeIds) {
+     const change = world.changes.get(changeId);
+-    if (change !== undefined) holders.add(change.agentId);
++    holders.add(change?.agentId ?? changeId);
+   }
+   return [...holders];
+ }

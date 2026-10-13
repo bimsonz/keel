@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.panel
+# why: a subject's panel names an agent from the log's enrolment alone, and never from Keel's card
+diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
+index 957c3b5a..375ef649 100644
+--- a/apps/console/src/engine/subject.ts
++++ b/apps/console/src/engine/subject.ts
+@@ -176,7 +176,7 @@ export function subjectDetailOf(
+             label: change.label,
+             goal: change.goal,
+             state: change.state,
+-            agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
++            agent: agentName(by) ?? "an agent",
+             agentClass: by?.class ?? "unnamed",
+           };
+         }),

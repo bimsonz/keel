@@ -58,6 +58,23 @@ describe("who Keel reads a project's log to", () => {
       class: "real",
       harness: "",
     });
+    // Its card names it as the agents' pages do, and its class stays what the log enrolled it as.
+    expect(
+      shownAgent(world.agents.get("agt_1"), { id: "agt_1", name: "Ada", kind: "hosted" }),
+    ).toEqual({ label: "Ada", class: "real", harness: "" });
+  });
+
+  it("[audience.card] names an agent the reader's log has not enrolled from Keel's card of it, and gives it no class for what the card says it declared", () => {
+    expect(
+      shownAgent(undefined, { id: "agt_9", name: "Otter", kind: "hosted", namespace: "acme" }),
+    ).toEqual({ label: "Otter", class: "unnamed", harness: "" });
+    expect(shownAgent(undefined, { id: "agt_8", name: "Heron", handle: "calm-heron" })).toEqual({
+      label: "Heron",
+      class: "unnamed",
+      harness: "",
+    });
+    // Keel knows no agent by that id, or its card is not read yet: there is no name to give.
+    expect(shownAgent(undefined, null)).toEqual({ label: "Agent", class: "unnamed", harness: "" });
   });
 
   it("[audience.funnel] leaves the stage where a person is asked uncounted for a reader who is not shown the questions", () => {

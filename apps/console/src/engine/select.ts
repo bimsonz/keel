@@ -100,7 +100,7 @@ const nameOf = (world: World, changeId: string): string =>
   world.changes.get(changeId)?.label ?? changeId.slice(-4);
 
 /** One side of a conflict, as Keel named it, with what the log says of its change. */
-function party(world: World, side: ConflictSide, letter: "A" | "B"): Party {
+function party(world: World, cards: Cards, side: ConflictSide, letter: "A" | "B"): Party {
   const change = world.changes.get(side.changeId);
   const { proposition, told } = side;
   return {
@@ -108,7 +108,10 @@ function party(world: World, side: ConflictSide, letter: "A" | "B"): Party {
     changeId: side.changeId,
     label: nameOf(world, side.changeId),
     goal: change?.goal ?? "",
-    agent: shownAgent(change === undefined ? undefined : world.agents.get(change.agentId)),
+    agent:
+      change === undefined
+        ? shownAgent(undefined)
+        : shownAgent(world.agents.get(change.agentId), cards.get(change.agentId)),
     proposition: {
       role: side.role,
       relation: proposition.relation,
@@ -291,13 +294,17 @@ export function conflictPageFrom(
     detail.subject === undefined
       ? undefined
       : [...world.subjects.values()].find((minted) => minted.key === detail.subject);
+  const cards: Cards = resources.cards ?? new Map();
   // The question is in Keel's shape where Keel reads it to this reader: to the project's members, and nobody else.
   const asked = detail.escalation;
   const { decision } = detail;
   const parties =
     detail.sides === undefined
       ? undefined
-      : { A: party(world, detail.sides.holder, "A"), B: party(world, detail.sides.other, "B") };
+      : {
+          A: party(world, cards, detail.sides.holder, "A"),
+          B: party(world, cards, detail.sides.other, "B"),
+        };
   const timeline: TimelineItem[] = (conflict?.timeline ?? []).map((entry, index, all) => ({
     at: entry.at,
     type: entry.type,
@@ -539,14 +546,14 @@ function annotationsOf(world: World, change: ChangeEntry, diff: ChangeDiff): Dif
 }
 
 /** One change among several with the same intent, as it stands now. */
-function intentRowOf(world: World, change: ChangeEntry): IntentRow {
+function intentRowOf(world: World, cards: Cards, change: ChangeEntry): IntentRow {
   const by = world.agents.get(change.agentId);
   const verdict = world.verdicts.get(change.verdictIds.at(-1) ?? "");
   return {
     id: change.id,
     label: change.label,
     goal: change.goal,
-    agent: shownAgent(by),
+    agent: shownAgent(by, cards.get(change.agentId)),
     state: change.state,
     revision: change.revision,
     declaredAt: change.declaredAt,
@@ -562,20 +569,24 @@ function intentRowOf(world: World, change: ChangeEntry): IntentRow {
  * has since landed or been withdrawn stays: Keel named it, and its state says what became of it. Nothing here
  * orders them by anything else.
  */
-function sameIntentOf(world: World, change: ChangeEntry): ChangePageState["sameIntent"] {
+function sameIntentOf(
+  world: World,
+  cards: Cards,
+  change: ChangeEntry,
+): ChangePageState["sameIntent"] {
   const others = change.alternatives.flatMap((told): AlternativeRow[] => {
     const other = world.changes.get(told.changeId);
     return other === undefined
       ? []
       : [
           {
-            ...intentRowOf(world, other),
+            ...intentRowOf(world, cards, other),
             ...(told.landed === undefined ? {} : { landed: told.landed }),
             next: told.next,
           },
         ];
   });
-  return others.length === 0 ? undefined : { self: intentRowOf(world, change), others };
+  return others.length === 0 ? undefined : { self: intentRowOf(world, cards, change), others };
 }
 
 export function changePageOf(
@@ -585,7 +596,8 @@ export function changePageOf(
 ): ChangePageState | null {
   const change = world.changes.get(changeId);
   if (change === undefined) return null;
-  const sameIntent = sameIntentOf(world, change);
+  const cards: Cards = resources.cards ?? new Map();
+  const sameIntent = sameIntentOf(world, cards, change);
   const by = world.agents.get(change.agentId);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
   const cause = world.conflicts.get(bounce?.conflictId ?? "");
@@ -623,8 +635,8 @@ export function changePageOf(
         ? {}
         : { laneLabel: change.laneId.replace("lane-", "Lane ") }),
     },
-    agent: { ...shownAgent(by), model: by?.model ?? "" },
-    held: heldUnder(resources.cards ?? new Map(), change),
+    agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
+    held: heldUnder(cards, change),
     session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },
     intent: {
       goal: change.goal,

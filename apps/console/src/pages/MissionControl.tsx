@@ -4,7 +4,7 @@
 import { Suspense, lazy, useCallback, useState } from "react";
 import type { AgentClass } from "../domain/state.ts";
 import { LANES, lanesOf } from "../engine/lanes.ts";
-import { useClock, usePlayer, useSelected } from "../engine/react.tsx";
+import { useClock, useHolderCards, usePlayer, useSelected } from "../engine/react.tsx";
 import { trunkStatsOf } from "../engine/select.ts";
 import { subjectDetailOf } from "../engine/subject.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -31,20 +31,32 @@ export function MissionControlPage({ subject, mode }: { subject?: string; mode: 
   const clock = useClock(0.5);
   // A subject open beside the graph has its lane shown and open in it, however far down it comes.
   const lanes = useSelected(
-    (world, { t }) =>
-      lanesOf(world, t, {
-        opened,
-        closed,
-        shown,
-        ...(subject === undefined ? {} : { pinned: subject }),
-      }),
+    (world, { t, cards }) =>
+      lanesOf(
+        world,
+        t,
+        {
+          opened,
+          closed,
+          shown,
+          ...(subject === undefined ? {} : { pinned: subject }),
+        },
+        cards,
+      ),
     [opened, closed, shown, subject, clock],
   );
   const trunk = useSelected((world, { t }) => trunkStatsOf(world, t), [clock]);
   const detail = useSelected(
-    (world) => (subject === undefined ? null : subjectDetailOf(world, subject)),
+    (world, { cards }) => (subject === undefined ? null : subjectDetailOf(world, subject, cards)),
     [subject],
   );
+  // An agent is drawn beside its change, and named in the subject's panel, once the reader has a name for it.
+  useHolderCards([
+    ...lanes.lanes.flatMap((lane) =>
+      lane.nodes.flatMap((node) => (node.kind === "change" ? [node.changeId] : [])),
+    ),
+    ...(detail?.changes.listed.map((change) => change.id) ?? []),
+  ]);
   const toggle = useCallback((key: string, to: boolean): void => {
     const [into, outOf] = to ? [setOpened, setClosed] : [setClosed, setOpened];
     into((before) => new Set([...before, key]));

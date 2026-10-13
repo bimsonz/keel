@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.card
+# why: an agent the reader's log has not enrolled is given a class from the kind its card says it declared, which is the agent's own word and not Keel's
+diff --git a/apps/console/src/engine/audience.ts b/apps/console/src/engine/audience.ts
+index 5b88dce1..521aed96 100644
+--- a/apps/console/src/engine/audience.ts
++++ b/apps/console/src/engine/audience.ts
+@@ -56,6 +56,6 @@ export function shownAgent(
+ } {
+   const label = agentName(by, card) ?? "Agent";
+   return by === undefined
+-    ? { label, class: "unnamed", harness: "" }
++    ? { label, class: card?.kind === "hosted" ? "hosted" : "unnamed", harness: "" }
+     : { label, class: by.class, harness: by.harness };
+ }

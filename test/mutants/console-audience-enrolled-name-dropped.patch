@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.agent
+# why: an agent the log enrolled has no name until its card is read, and none at all where a source has no cards
+diff --git a/apps/console/src/engine/audience.ts b/apps/console/src/engine/audience.ts
+index 5b88dce1..5e37cdf4 100644
+--- a/apps/console/src/engine/audience.ts
++++ b/apps/console/src/engine/audience.ts
+@@ -39,7 +39,7 @@ export function membersOf(namespace: { handle: string; kind?: NamespaceKind }):
+ export const agentName = (
+   by: AgentEntry | undefined,
+   card?: AgentCard | null,
+-): string | undefined => card?.name ?? by?.name;
++): string | undefined => card?.name;
+ 
+ /**
+  * An agent as a page names it. Its class and its harness are its enrolment's alone: a card says what the agent

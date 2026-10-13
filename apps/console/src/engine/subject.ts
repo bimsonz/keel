@@ -3,6 +3,8 @@
 // on it right now. This is what Mission Control opens beside the graph when a subject is selected.
 
 import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
+import { agentName } from "./audience.ts";
+import type { Cards } from "./holder.ts";
 import { type Tone, subjectOf } from "./lanes.ts";
 import type { World } from "./world.ts";
 
@@ -67,7 +69,11 @@ const SETTLED = new Set<ConflictState>(["resolved", "dismissed"]);
 const LISTED = 8;
 
 /** `subject` is a subject's id or its key. */
-export function subjectDetailOf(world: World, subject: string): SubjectDetail | null {
+export function subjectDetailOf(
+  world: World,
+  subject: string,
+  cards: Cards = new Map(),
+): SubjectDetail | null {
   const entry = world.subjects.get(subject) ?? world.subjectByKey(subject);
   if (entry === undefined) return null;
 
@@ -170,7 +176,7 @@ export function subjectDetailOf(world: World, subject: string): SubjectDetail | 
             label: change.label,
             goal: change.goal,
             state: change.state,
-            agent: by?.name ?? "an agent",
+            agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
             agentClass: by?.class ?? "unnamed",
           };
         }),

@@ -2124,24 +2124,64 @@ expectEqual(
 await shot(visitor, "visitor-escalations");
 await visitor.goto(`${built}/ada/demo/changes`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("link").first().waitFor();
+// The log a visitor is read enrols nobody. Keel reads anyone an agent's card, so each row's agent is named from
+// it once it is read: the name is waited for, or ten seconds, and the check says which.
+const namedFromCard = (shown: Page, name: string): Promise<void> =>
+  shown
+    .getByRole("main")
+    .getByText(name, { exact: true })
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+const agentsNamed = async (shown: Page, within = "main"): Promise<string> =>
+  [
+    ...new Set(
+      (
+        await shown
+          .locator(within)
+          .getByText(/^(an agent|Agent( [AB])?)$/)
+          .allInnerTexts()
+      ).map(squash),
+    ),
+  ]
+    .toSorted()
+    .join(", ");
+const classesWritten = (shown: Page): Promise<number> =>
+  shown.getByText(/\b(REAL|HOSTED|SYNTHETIC)\b/).count();
+await visitor.goto(`${built}/ada/demo/changes?state=parked`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("link").first().waitFor();
+await namedFromCard(visitor, "Agent A");
+await namedFromCard(visitor, "Agent B");
+expectEqual(
+  "visitor: the list of changes names each change's agent from Keel's card of it, and writes no class",
+  `${await agentsNamed(visitor)} | ${await classesWritten(visitor)} classes`,
+  "Agent A, Agent B | 0 classes",
+);
 await shot(visitor, "visitor-changes");
 await visitor.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("heading").first().waitFor();
 await visitor.waitForTimeout(500);
 await shot(visitor, "visitor-change");
-// Keel names a project's agents to its members. A visitor is shown that a change has an agent, and neither
-// which nor of what kind: no class is made up for it.
+// Keel reads an agent's enrolment to its project's members and its card to anyone. So a visitor is shown a
+// change's agent by its card's name and of no class: what a card says is the agent's own declaration, and no
+// class is made up from it.
+await visitor
+  .getByRole("complementary")
+  .getByText("Agent B", { exact: true })
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
-  "visitor: a change's agent is not named, and is given no class Keel did not say",
+  "visitor: a change's agent is named from Keel's card of it, and is given no class Keel did not say",
   `${squash(
     await visitor
       .getByRole("complementary")
-      .getByText("Agent", { exact: true })
+      .getByText(/^Agent( [AB])?$/)
       .last()
       .innerText()
       .catch(() => "no agent shown"),
-  )} | ${await visitor.getByText(/\b(REAL|HOSTED|SYNTHETIC)\b/).count()} classes`,
-  "Agent | 0 classes",
+  )} | ${await classesWritten(visitor)} classes`,
+  "Agent B | 0 classes",
 );
 await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("heading").last().waitFor();
@@ -2165,7 +2205,25 @@ expectEqual(
   ),
   "1",
 );
+await namedFromCard(visitor, "Agent A");
+await namedFromCard(visitor, "Agent B");
+expectEqual(
+  "visitor: each side of a conflict names its agent from that agent's card, and writes no class",
+  `${await agentsNamed(visitor)} | ${await classesWritten(visitor)} classes`,
+  "Agent A, Agent B | 0 classes",
+);
 await shot(visitor, "visitor-conflict");
+// Mission Control draws an agent beside its change once the reader has a name for it: for a visitor, its card's.
+await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
+await graphDrawn(visitor);
+await namedFromCard(visitor, "Agent A");
+await namedFromCard(visitor, "Agent B");
+expectEqual(
+  "visitor: Mission Control draws each agent beside its change under its card's name, with its run and no class",
+  `${await agentsNamed(visitor, ".a-fn")} | ${await visitor.getByText("run “collab-revocation”", { exact: true }).count()} run | ${await classesWritten(visitor)} classes`,
+  "Agent A, Agent B | 1 run | 0 classes",
+);
+await shot(visitor, "visitor-mission-control");
 await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("heading").last().waitFor();
 const wayIn =
@@ -2240,6 +2298,7 @@ expectEqual(
     ...new Set(
       open.calls.map((call) =>
         call.path
+          .replace(/\/v1\/agents\/agt_[0-9A-Z]+$/, "/v1/agents/{id}")
           .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
           .replace(/\/v1\/probes\/[^/]+\/source$/, "/v1/probes/{id}/source")
           .replace(
@@ -2253,7 +2312,7 @@ expectEqual(
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/agents/{id} /v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(

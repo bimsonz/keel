@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.change
+# why: a change's own page names its agent from the log's enrolment alone, and never from Keel's card
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 0ce015a6..5ff8ca62 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -635,7 +635,7 @@ export function changePageOf(
+         ? {}
+         : { laneLabel: change.laneId.replace("lane-", "Lane ") }),
+     },
+-    agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
++    agent: { ...shownAgent(by), model: by?.model ?? "" },
+     held: heldUnder(cards, change),
+     session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },
+     intent: {

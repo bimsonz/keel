@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.holders
+# why: an agent that holds several of a page's changes is asked for once a change, not once
+diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
+index 4dcefc18..13403656 100644
+--- a/apps/console/src/engine/holder.ts
++++ b/apps/console/src/engine/holder.ts
+@@ -25,7 +25,7 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
+     const change = world.changes.get(changeId);
+     if (change !== undefined) holders.add(change.agentId);
+   }
+-  return [...holders];
++  return changeIds.flatMap((id) => (holders.has(world.changes.get(id)?.agentId ?? "") ? [world.changes.get(id)?.agentId ?? ""] : []));
+ }
+ 
+ export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {

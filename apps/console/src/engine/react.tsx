@@ -1,4 +1,5 @@
 import { publicOnly } from "./audience.ts";
+import { holdersOf } from "./holder.ts";
 import {
   type ReactNode,
   createContext,
@@ -73,6 +74,20 @@ export function useWorldVersion(perSecond = 8): number {
   const player = usePlayer();
   const store = useMemo(() => throttled(player, perSecond), [player, perSecond]);
   return useSyncExternalStore(store.subscribe, store.snapshot);
+}
+
+/**
+ * Ask Keel for its card of the agent that holds each of these changes, once for each agent: the changes a page
+ * names an agent beside. The log names a holder by its id alone, so its name and its handle are its card's.
+ */
+export function useHolderCards(changeIds: readonly string[]): void {
+  const player = usePlayer();
+  const shown = changeIds.join(" ");
+  const asked = useSelected(
+    (world) => holdersOf(world, shown === "" ? [] : shown.split(" ")).join(" "),
+    [shown],
+  );
+  useEffect(() => player.wantCards(asked === "" ? [] : asked.split(" ")), [player, asked]);
 }
 
 /** Re-renders as the clock moves, at most `perSecond` times a second. */

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { changeNamed } from "../engine/lists.ts";
-import { usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
+import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
 import { changePageOf } from "../engine/select.ts";
 import type { ChangeTab } from "../route.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -23,6 +23,10 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
   const state = useSelected(
     (world, resources) => (id === undefined ? null : changePageOf(world, id, resources)),
     [id],
+  );
+  // The change's own agent, and the agent of each change Keel told it has its intent.
+  useHolderCards(
+    id === undefined ? [] : [id, ...(state?.sameIntent?.others.map((row) => row.id) ?? [])],
   );
   if (state === null)
     return (

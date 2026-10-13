@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.node
+# why: Mission Control draws an agent beside its change only where the log enrolled it, so a visitor's graph and a signed-up agent's change have none
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index 1c6edc00..8f089563 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -419,7 +419,7 @@ export function lanesOf(
+       ...(change.unverified ? { unverified: true } : {}),
+     });
+     // An agent is drawn beside its change where the reader has a name for it: the log's, or its card's.
+-    if (agentName(enrolled, card) !== undefined) {
++    if (enrolled !== undefined) {
+       const by = shownAgent(enrolled, card);
+       const agentNode = `agent:${change.agentId}:${change.id}`;
+       nodes.push({

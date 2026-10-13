@@ -12,6 +12,7 @@
 
 import type { EscalationCategory } from "../contract/events.ts";
 import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
+import { agentName } from "./audience.ts";
 import { type Cards, type HeldUnder, heldUnder } from "./holder.ts";
 import { subjectOf } from "./lanes.ts";
 import type { ChangeEntry, ConflictEntry, EscalationEntry, World } from "./world.ts";
@@ -256,8 +257,8 @@ export function changesOf(
         name: names.changes.get(change.id) ?? change.id,
         goal: change.goal,
         state: change.state,
-        // An agent Keel has not named to this reader is one all the same.
-        agent: by?.name ?? "an agent",
+        // An agent the reader has no name for is one all the same.
+        agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
         agentClass: by?.class ?? "unnamed",
         held: heldUnder(cards, change),
         ...(subject === undefined ? {} : { subject }),

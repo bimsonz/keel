@@ -2,7 +2,7 @@
 
 import { HandPalmIcon } from "@phosphor-icons/react";
 import { type ChangeFilter, PAGE, changesOf } from "../engine/lists.ts";
-import { useSelected } from "../engine/react.tsx";
+import { useHolderCards, useSelected } from "../engine/react.tsx";
 import {
   CHANGE_TONE,
   CONFLICT_TONE,
@@ -60,6 +60,7 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
     (world, from) => changesOf(world, filter, shown, from.cards),
     [filter, shown],
   );
+  useHolderCards(list.rows.map((row) => row.id));
   const any = Object.values(list.counts).some((count) => count > 0);
   const [title, body] = any
     ? EMPTY[filter]

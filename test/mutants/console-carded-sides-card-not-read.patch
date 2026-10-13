@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/carded.test.ts
+# kills: carded.sides
+# why: a conflict's sides name their agents from the log's enrolment alone, and never from Keel's card
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 0ce015a6..b239946e 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -111,7 +111,7 @@ function party(world: World, cards: Cards, side: ConflictSide, letter: "A" | "B"
+     agent:
+       change === undefined
+         ? shownAgent(undefined)
+-        : shownAgent(world.agents.get(change.agentId), cards.get(change.agentId)),
++        : shownAgent(world.agents.get(change.agentId)),
+     proposition: {
+       role: side.role,
+       relation: proposition.relation,

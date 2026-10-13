@@ -81,9 +81,13 @@ function Body({ node }: { node: GraphNode }) {
           <div className="min-w-0">
             <div className="truncate font-semibold text-kumo-strong">{node.label}</div>
             <div className="truncate text-[13px] text-kumo-subtle">
-              {CLASS_WORD[node.agentClass]}
-              {node.harness !== "" && ` · ${node.harness}`}
-              {node.run !== undefined && ` · run “${node.run}”`}
+              {[
+                CLASS_WORD[node.agentClass],
+                node.harness,
+                node.run === undefined ? "" : `run “${node.run}”`,
+              ]
+                .filter((part) => part !== "")
+                .join(" · ")}
             </div>
           </div>
         </div>

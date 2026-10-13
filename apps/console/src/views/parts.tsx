@@ -307,7 +307,11 @@ export function AgentTag({
   return (
     <span
       className="inline-flex items-center gap-1.5 text-sm text-kumo-default"
-      title={agentClass === "unnamed" ? "Keel names a project's agents to its members." : undefined}
+      title={
+        agentClass === "unnamed"
+          ? "Keel has not told this reader whether this agent is real, hosted or synthetic."
+          : undefined
+      }
     >
       <AgentMark agentClass={agentClass} />
       <span className="font-medium text-kumo-strong">{label}</span>

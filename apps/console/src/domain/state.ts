@@ -42,9 +42,9 @@ export type Tier = 0 | 1 | 2;
 export type AgentClass = "real" | "hosted" | "synthetic";
 
 /**
- * An agent's class as a page shows it. `unnamed` is an agent Keel has not named to this reader: its enrolment
- * is read to its project's members, so anyone else is shown that a change has an agent and not which, or of
- * what kind.
+ * An agent's class as a page shows it. `unnamed` is an agent whose enrolment this reader's log does not hold:
+ * Keel reads an enrolment to its project's members, and an agent that signed itself up has none. No class is
+ * written for it. Its name, where it has one, is its public card's.
  */
 export type ShownClass = AgentClass | "unnamed";
 
