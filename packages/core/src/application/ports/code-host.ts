@@ -103,8 +103,26 @@ export class PathNotFound extends Schema.TaggedError<PathNotFound>()("PathNotFou
   path: Schema.String,
 }) {}
 
+/** A branch by its full ref name, and its head. An import answers the one branch that came. */
+export interface Imported {
+  readonly ref: string;
+  readonly commit: CommitSha;
+}
+
 /**
- * Repositories on the code host: create, fork, mint scoped tokens, read
+ * The host imported nothing from the URL, and made no repository.
+ * `not-found`: no repository there that anyone may read (a private one reads
+ * the same). `not-git`: what answers there is not a git repository.
+ * `unreachable`: the upstream did not answer. `too-large`: its history is
+ * more than the host imports. `no-branch`: it lacks the branch named, or
+ * holds no branch at all.
+ */
+export class ImportRefused extends Schema.TaggedError<ImportRefused>()("ImportRefused", {
+  reason: Schema.Literals(["not-found", "not-git", "unreachable", "too-large", "no-branch"]),
+}) {}
+
+/**
+ * Repositories on the code host: create, fork, import, mint scoped tokens, read
  * (trees, files, commits and first-parent history), diff and delete. **Never writes git content**: every write is a git push.
  * Missing repos, refs and objects are typed errors; transport failures are defects.
  */
@@ -118,12 +136,31 @@ export class CodeHost extends Context.Service<
       source: RepoRef,
       target: RepoRef,
     ) => Effect.Effect<RepoRef, RepoNotFound | RepoAlreadyExists>;
+    /**
+     * Makes `target` from a public Git repository's history: one branch of
+     * it, the one named by `source.ref` (a branch's short name) or else the
+     * upstream's default, under its own name. Answers that branch and its
+     * head as the new repo itself advertises them, never as `info` reports a
+     * default branch. `source.url` is an https URL with no credential in it:
+     * the caller has read it with `importUrl`. A refusal leaves no repo
+     * behind; RepoAlreadyExists leaves the existing one as it was.
+     */
+    readonly import: (
+      source: { readonly url: string; readonly ref?: string | undefined },
+      target: RepoRef,
+    ) => Effect.Effect<Imported, RepoAlreadyExists | ImportRefused>;
     readonly mintToken: (
       repo: RepoRef,
       access: "read" | "write",
       ttlSeconds: number,
     ) => Effect.Effect<RepoToken, RepoNotFound>;
     readonly info: (repo: RepoRef) => Effect.Effect<RepoInfo, RepoNotFound>;
+    /**
+     * Every branch the repo holds, by full ref name, with its head, as the
+     * repo itself advertises them: the only way to learn which branch an
+     * import brought once its answer is lost. A repo with no commit holds none.
+     */
+    readonly branches: (repo: RepoRef) => Effect.Effect<readonly Imported[], RepoNotFound>;
     /** The commit a full ref name (`refs/heads/main`) points at. */
     readonly head: (
       repo: RepoRef,

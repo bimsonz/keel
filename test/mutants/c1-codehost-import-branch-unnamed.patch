@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: artifacts.import
+# why: The branch the caller named is never handed to the binding, so the upstream's default comes whatever was asked for
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 033b5d8e..79393921 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -268,7 +268,6 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
+             const made = await binding(target).import({
+               source: {
+                 url: source.url,
+-                ...(source.ref === undefined ? {} : { branch: source.ref }),
+               },
+               target: { name: target.name },
+             });

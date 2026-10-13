@@ -4,6 +4,8 @@ import { CommitSha, Instant, type ProjectId } from "@keeltown/core/kernel";
 import {
   CodeHost,
   type CommitInfo,
+  type Imported,
+  ImportRefused,
   KEEL_TRUNK_REF,
   ObjectNotFound,
   PathNotFound,
@@ -38,12 +40,38 @@ import {
   ZERO_OID,
 } from "@keeltown/gitcore";
 import { Clock as EffectClock, Effect, Layer, Schema } from "effect";
-import { buildCommit, buildTree, CodeHostFixture } from "../code-host-fixture.ts";
+import {
+  buildCommit,
+  buildTree,
+  CodeHostFixture,
+  type UpstreamBranch,
+  type Upstreams,
+} from "../code-host-fixture.ts";
 
 interface MemoryRepo {
   readonly refs: Map<string, CommitSha>;
   readonly objects: Map<string, GitObject>;
 }
+
+/** What answers at a URL the memory host is asked to import from: a repository, or a refusal. */
+type MemoryUpstream =
+  | {
+      readonly byDefault: string;
+      readonly branches: ReadonlyMap<string, CommitSha>;
+      readonly objects: ReadonlyMap<string, GitObject>;
+    }
+  | { readonly refuses: ImportRefused["reason"] };
+
+const BRANCH = "refs/heads/";
+const upstreamBranch = (name: string, commit: CommitSha): UpstreamBranch => ({
+  name,
+  ref: `${BRANCH}${name}`,
+  commit,
+});
+/** The memory host's upstreams: a repository of two branches and a page that is not git; any other URL holds nothing. */
+const UPSTREAM_URL = "https://git.memory.test/upstream/repo";
+const NOT_GIT_URL = "https://git.memory.test/not/git";
+const MISSING_URL = "https://git.memory.test/upstream/none";
 
 const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 const plain = (repo: RepoRef) => ({ namespace: repo.namespace, name: repo.name });
@@ -94,6 +122,7 @@ const fromGit = <A>(repo: RepoRef, run: () => Promise<A>) =>
  */
 export function makeCodeHostMemory() {
   const repos = new Map<string, MemoryRepo>();
+  const upstreams = new Map<string, MemoryUpstream>([[NOT_GIT_URL, { refuses: "not-git" }]]);
   let scratch = 0;
   let tokens = 0;
 
@@ -155,6 +184,23 @@ export function makeCodeHostMemory() {
         repos.set(repoKey(target), { refs: new Map(from.refs), objects: new Map(from.objects) });
         return Effect.succeed(target);
       }),
+    import: (source, target) =>
+      Effect.suspend((): Effect.Effect<Imported, RepoAlreadyExists | ImportRefused> => {
+        if (repos.has(repoKey(target))) return Effect.fail(alreadyExists(target));
+        const upstream = upstreams.get(source.url) ?? { refuses: "not-found" as const };
+        if ("refuses" in upstream)
+          return Effect.fail(new ImportRefused({ reason: upstream.refuses }));
+        // One branch comes, under its own name: the one named, or the upstream's default.
+        const branch = source.ref ?? upstream.byDefault;
+        const commit = upstream.branches.get(branch);
+        if (commit === undefined) return Effect.fail(new ImportRefused({ reason: "no-branch" }));
+        const ref = `${BRANCH}${branch}`;
+        repos.set(repoKey(target), {
+          refs: new Map([[ref, commit]]),
+          objects: new Map(upstream.objects),
+        });
+        return Effect.succeed({ ref, commit });
+      }),
     mintToken: (repo, access, ttlSeconds) =>
       Effect.gen(function* () {
         yield* find(repo);
@@ -170,6 +216,13 @@ export function makeCodeHostMemory() {
         remote: `memory://${repoKey(repo)}.git`,
         defaultBranch: "main",
       })),
+    branches: (repo) =>
+      Effect.map(find(repo), (found) =>
+        [...found.refs]
+          .filter(([ref]) => ref.startsWith(BRANCH))
+          .map(([ref, commit]) => ({ ref, commit }))
+          .toSorted((a, b) => (a.ref < b.ref ? -1 : 1)),
+      ),
     head: (repo, ref) =>
       Effect.flatMap(find(repo), (found) => {
         const sha = found.refs.get(ref);
@@ -263,10 +316,38 @@ export function makeCodeHostMemory() {
         found.refs.set(ref, sha);
         return sha;
       }),
+    upstreams: Effect.promise(async (): Promise<Upstreams> => {
+      const objects = new Map<string, GitObject>();
+      const commit = async (file: string, parents: readonly string[]) => {
+        const built = await buildTree({ "README.md": file });
+        const made = await buildCommit(built.tree, parents);
+        for (const [id, o] of built.objects) objects.set(id, o);
+        objects.set(made.oid, made.object);
+        return toCommitSha(made.oid);
+      };
+      const first = await commit("upstream\n", []);
+      const next = await commit("upstream, next\n", [first]);
+      upstreams.set(UPSTREAM_URL, {
+        byDefault: "trunk",
+        branches: new Map([
+          ["trunk", first],
+          ["next", next],
+        ]),
+        objects,
+      });
+      return {
+        url: UPSTREAM_URL,
+        byDefault: upstreamBranch("trunk", first),
+        other: upstreamBranch("next", next),
+        missing: MISSING_URL,
+        notGit: NOT_GIT_URL,
+      };
+    }),
   });
 
   return {
     repos,
+    upstreams,
     fixture,
     layer: Layer.mergeAll(Layer.succeed(CodeHost, host), Layer.succeed(CodeHostFixture, fixture)),
   };

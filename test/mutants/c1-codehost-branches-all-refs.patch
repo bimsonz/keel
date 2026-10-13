@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: artifacts.import
+# why: HEAD and tags are counted among a repo's branches, so no import is read as having brought one branch
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 033b5d8e..008375b0 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -84,7 +84,6 @@ async function advertisedBranches(handle: ArtifactsRepo): Promise<Imported[]> {
+   try {
+     const refs = await advertisedRefs({ url: info.remote, token: token.plaintext });
+     return [...refs]
+-      .filter(([ref]) => ref.startsWith(BRANCH))
+       .map(([ref, hash]) => ({ ref, commit: toCommitSha(hash) }))
+       .toSorted((a, b) => (a.ref < b.ref ? -1 : 1));
+   } finally {

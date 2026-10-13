@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: artifacts.import-empty
+# why: An import that brought no branch is refused with its empty repo left behind, so the next attempt finds the name taken
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 033b5d8e..314ddd04 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -293,9 +293,7 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
+             if (branch !== undefined && others.length === 0) return Effect.succeed(branch);
+             // An upstream with no commit imports as a repo with no branch: nothing to start a trunk from.
+             return came.length === 0
+-              ? Effect.promise(() => binding(target).delete(target.name)).pipe(
+-                  Effect.andThen(Effect.fail(new ImportRefused({ reason: "no-branch" }))),
+-                )
++              ? Effect.fail(new ImportRefused({ reason: "no-branch" }))
+               : Effect.die(new Error(`an import brought ${came.length} branches, not one`));
+           }),
+         ),

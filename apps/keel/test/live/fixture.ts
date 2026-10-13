@@ -1,10 +1,33 @@
 import { CommitSha } from "@keeltown/core/kernel";
 import { RepoNotFound, type RepoRef } from "@keeltown/core/ports";
 import { receivePack, writePack, ZERO_OID } from "@keeltown/gitcore";
-import { buildCommit, buildTree, CodeHostFixture } from "@keeltown/testing";
+import { buildCommit, buildTree, CodeHostFixture, type Upstreams } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
+
+/**
+ * Real upstreams for the import cases. The repository is GitHub's own demo:
+ * small, public, unchanged for years, and its default branch is `master`.
+ * The missing one is a name under Keel's own account that holds nothing (a
+ * private repository answers the same); the page that is not git is Keel's
+ * sign-in page.
+ */
+const UPSTREAMS: Upstreams = {
+  url: "https://github.com/octocat/Hello-World",
+  byDefault: {
+    name: "master",
+    ref: "refs/heads/master",
+    commit: toCommitSha("7fd1a60b01f91b314f59955a4e4d4e80d8edf11d"),
+  },
+  other: {
+    name: "test",
+    ref: "refs/heads/test",
+    commit: toCommitSha("b3cbd5bbd7e81436d2eee04537ea2b4c0cad4cdf"),
+  },
+  missing: "https://github.com/bimsonz/keel-no-such-repository",
+  notGit: "https://keel.town/sign-in",
+};
 
 /**
  * CodeHostFixture for a real Artifacts namespace: a commit is built with
@@ -67,6 +90,7 @@ export function artifactsFixture(namespace: string, binding: Artifacts) {
             : Effect.die(e),
         ),
       ),
+    upstreams: Effect.succeed(UPSTREAMS),
   });
   return { made, fixture, layer: Layer.succeed(CodeHostFixture, fixture) };
 }

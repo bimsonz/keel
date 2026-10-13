@@ -2,6 +2,8 @@ import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   CodeHost,
   type CommitInfo,
+  type Imported,
+  ImportRefused,
   ObjectNotFound,
   PathNotFound,
   RefNotFound,
@@ -52,6 +54,43 @@ const unlessTaken = (repo: RepoRef) => (e: unknown) =>
     : Effect.die(e);
 
 const BRANCH = "refs/heads/";
+
+/**
+ * Why the binding imported nothing, as the port says it. On the edge the
+ * error carries a `code`; through wrangler's remote-binding proxy only the
+ * message survives (each read live, 13 Oct), so both are recognised. A
+ * missing branch is told by its message first, since its code is not
+ * documented; a repository that asks for a credential is private or absent,
+ * and reads as not found. Over the memory limit has no measured message.
+ */
+const importRefusal = (e: unknown): ImportRefused["reason"] | undefined => {
+  if (!(e instanceof Error)) return undefined;
+  const code = (e as Error & { readonly code?: unknown }).code;
+  const says = (pattern: RegExp) => pattern.test(e.message);
+  if (says(/^(ArtifactsError: )?Branch not found\b/)) return "no-branch";
+  if (code === "REMOTE_AUTH_REQUIRED" || says(/ requires authentication \(HTTP 401\)/))
+    return "not-found";
+  if (code === "NOT_FOUND" || says(/^(ArtifactsError: )?Repository ".*" was not found\b/))
+    return "not-found";
+  if (code === "INVALID_URL" || says(/\bdoes not point to a git repository\b/)) return "not-git";
+  if (code === "UPSTREAM_UNAVAILABLE" || says(/\bupstream service is unavailable\b/))
+    return "unreachable";
+  return code === "MEMORY_LIMIT" ? "too-large" : undefined;
+};
+
+/** The repo's branches from its own advertisement, in name order, read with a minute-long token that is revoked once read. */
+async function advertisedBranches(handle: ArtifactsRepo): Promise<Imported[]> {
+  const [info, token] = await Promise.all([handle.info(), handle.createToken("read", 60)]);
+  try {
+    const refs = await advertisedRefs({ url: info.remote, token: token.plaintext });
+    return [...refs]
+      .filter(([ref]) => ref.startsWith(BRANCH))
+      .map(([ref, hash]) => ({ ref, commit: toCommitSha(hash) }))
+      .toSorted((a, b) => (a.ref < b.ref ? -1 : 1));
+  } finally {
+    await handle.revokeToken(token.plaintext);
+  }
+}
 
 /** A fork whose target name was taken, carried out of the binding call to become RepoAlreadyExists. */
 const TAKEN = Symbol("taken");
@@ -222,6 +261,45 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
           : Effect.die(
               new Error("a fork lands in its source's namespace; the target names another"),
             ),
+      // The binding reports `main` as an imported repo's default branch whatever came (live, 13 Oct): the repo's own advertisement names the branch.
+      import: (source, target) =>
+        Effect.tryPromise({
+          try: async () => {
+            const made = await binding(target).import({
+              source: {
+                url: source.url,
+                ...(source.ref === undefined ? {} : { branch: source.ref }),
+              },
+              target: { name: target.name },
+            });
+            await revoke(binding(target), target.name, made.token);
+            const handle = await binding(target).get(target.name);
+            try {
+              return await advertisedBranches(handle);
+            } finally {
+              handle[Symbol.dispose]();
+            }
+          },
+          catch: (e) => e,
+        }).pipe(
+          Effect.catch((e): Effect.Effect<never, RepoAlreadyExists | ImportRefused> => {
+            const reason = importRefusal(e);
+            return reason === undefined
+              ? unlessTaken(target)(e)
+              : Effect.fail(new ImportRefused({ reason }));
+          }),
+          Effect.flatMap((came): Effect.Effect<Imported, ImportRefused> => {
+            const [branch, ...others] = came;
+            if (branch !== undefined && others.length === 0) return Effect.succeed(branch);
+            // An upstream with no commit imports as a repo with no branch: nothing to start a trunk from.
+            return came.length === 0
+              ? Effect.promise(() => binding(target).delete(target.name)).pipe(
+                  Effect.andThen(Effect.fail(new ImportRefused({ reason: "no-branch" }))),
+                )
+              : Effect.die(new Error(`an import brought ${came.length} branches, not one`));
+          }),
+        ),
+      branches: (repo) => onRepo(repo, advertisedBranches),
       mintToken: (repo, access, ttlSeconds) =>
         onRepo(repo, (handle) => handle.createToken(access, ttlSeconds)).pipe(
           Effect.map((t) => ({

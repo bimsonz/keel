@@ -12,6 +12,25 @@ import {
 } from "@keeltown/gitcore";
 import { Context, type Effect } from "effect";
 
+/** A branch of an upstream as an import brings it: its short name, its full ref name and its head. */
+export interface UpstreamBranch {
+  readonly name: string;
+  readonly ref: string;
+  readonly commit: CommitSha;
+}
+
+/** What a host can be asked to import, and what it must refuse. */
+export interface Upstreams {
+  /** A public repository's URL. Its default branch is `byDefault`, which is not `main`; `other` is another of its branches. */
+  readonly url: string;
+  readonly byDefault: UpstreamBranch;
+  readonly other: UpstreamBranch;
+  /** A URL where no repository is, or none anyone may read. */
+  readonly missing: string;
+  /** A URL where something answers that is not a git repository. */
+  readonly notGit: string;
+}
+
 /** A file as the fixture writes it. A bare string or bytes is a regular file; a submodule's `data` is its commit id. */
 export type FixtureFile =
   | string
@@ -47,6 +66,8 @@ export class CodeHostFixture extends Context.Service<
       files: FixtureFiles,
       merged?: readonly CommitSha[],
     ) => Effect.Effect<CommitSha, RepoNotFound>;
+    /** The upstreams this host's import cases run against. */
+    readonly upstreams: Effect.Effect<Upstreams>;
   }
 >()("keel-testing/CodeHostFixture") {}
 

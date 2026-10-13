@@ -306,6 +306,97 @@ export function describeCodeHostContract(
         }).pipe(Effect.provide(make())),
     );
 
+    it.live(
+      "[codehost.contract.branches] branches lists every branch with its head, in name order, and nothing for a repo with no commit",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const repo = yield* freshRepo;
+          expect(yield* host.branches(repo)).toEqual([]);
+          const main = yield* fixture.commit(repo, MAIN, BASE);
+          const side = yield* fixture.commit(repo, "refs/heads/a/side", HEAD, [main]);
+          expect(yield* host.branches(repo)).toEqual([
+            { ref: "refs/heads/a/side", commit: side },
+            { ref: MAIN, commit: main },
+          ]);
+          expect(yield* tagOf(host.branches(fixture.scratch()))).toBe("RepoNotFound");
+          // What an import answered is what the repo's branches say afterwards.
+          const { url } = yield* fixture.upstreams;
+          const target = fixture.scratch();
+          const came = yield* host.import({ url }, target);
+          expect(yield* host.branches(target)).toEqual([came]);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.contract.import] an import brings one branch under its own name and answers it with its head",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const { url, byDefault, other } = yield* fixture.upstreams;
+          const target = fixture.scratch();
+          expect(yield* host.import({ url }, target)).toEqual({
+            ref: byDefault.ref,
+            commit: byDefault.commit,
+          });
+          expect(yield* host.head(target, byDefault.ref)).toBe(byDefault.commit);
+          expect((yield* host.readCommit(target, byDefault.commit)).sha).toBe(byDefault.commit);
+          // The upstream's default branch is not main, and nothing called main came with it.
+          expect(byDefault.ref).not.toBe(MAIN);
+          expect(yield* tagOf(host.head(target, MAIN))).toBe("RefNotFound");
+          // A named branch comes instead of the default one, and alone.
+          const named = fixture.scratch();
+          expect(yield* host.import({ url, ref: other.name }, named)).toEqual({
+            ref: other.ref,
+            commit: other.commit,
+          });
+          expect(yield* host.head(named, other.ref)).toBe(other.commit);
+          expect(yield* tagOf(host.head(named, byDefault.ref))).toBe("RefNotFound");
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.contract.import-refused] an import of nothing, of something that is not git or of a branch the upstream lacks is refused, and no repo is left",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const { url, missing, notGit } = yield* fixture.upstreams;
+          const refusals = [
+            [{ url: missing }, "not-found"],
+            [{ url: notGit }, "not-git"],
+            [{ url, ref: "no-such-branch" }, "no-branch"],
+          ] as const;
+          for (const [source, reason] of refusals) {
+            const target = fixture.scratch();
+            expect([source, yield* Effect.flip(host.import(source, target))]).toMatchObject([
+              source,
+              { _tag: "ImportRefused", reason },
+            ]);
+            expect([source, yield* tagOf(host.info(target))]).toEqual([source, "RepoNotFound"]);
+          }
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.contract.import-exists] an import onto a taken name fails RepoAlreadyExists and leaves that repo as it was",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const { url } = yield* fixture.upstreams;
+          const taken = yield* freshRepo;
+          const kept = yield* fixture.commit(taken, MAIN, HEAD);
+          expect(yield* Effect.flip(host.import({ url }, taken))).toMatchObject({
+            _tag: "RepoAlreadyExists",
+            repo: { namespace: taken.namespace, name: taken.name },
+          });
+          expect(yield* host.head(taken, MAIN)).toBe(kept);
+        }).pipe(Effect.provide(make())),
+    );
+
     it.live("[codehost.info] info gives each repo its own git remote and the default branch", () =>
       Effect.gen(function* () {
         const host = yield* CodeHost;

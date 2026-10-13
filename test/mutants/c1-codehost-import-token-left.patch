@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: artifacts.import
+# why: The read token an advertisement was read with is left active on the new trunk
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 033b5d8e..924748e7 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -88,7 +88,7 @@ async function advertisedBranches(handle: ArtifactsRepo): Promise<Imported[]> {
+       .map(([ref, hash]) => ({ ref, commit: toCommitSha(hash) }))
+       .toSorted((a, b) => (a.ref < b.ref ? -1 : 1));
+   } finally {
+-    await handle.revokeToken(token.plaintext);
++    await Promise.resolve();
+   }
+ }
+ 

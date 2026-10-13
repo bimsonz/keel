@@ -1,6 +1,7 @@
 /**
- * An Artifacts binding in memory, for the token rules only: repos, their
- * tokens and their state. Reads and git content are the live tests' job.
+ * An Artifacts binding in memory, for the token rules and the import's
+ * answers only: repos, their tokens and their state, and what an import was
+ * asked for. Reads and git content are the live tests' job.
  */
 interface FakeToken {
   readonly id: string;
@@ -16,8 +17,17 @@ class NotFound extends Error {
 const unfaked = (what: string) =>
   Promise.reject(new Error(`the fake Artifacts binding does not do ${what}`));
 
+/** The remote the fake gives a repo: what a test's `fetch` is asked for its refs at. */
+export const fakeRemote = (name: string) => `https://fake.invalid/git/ns/${name}.git`;
+
+type ImportParams = Parameters<Artifacts["import"]>[0];
+
 export class FakeArtifacts implements Artifacts {
   readonly repos = new Map<string, FakeToken[]>();
+  /** Every import asked for, as the binding was handed it. */
+  readonly imports: ImportParams[] = [];
+  /** What the next import throws in place of importing. */
+  refusal: Error | undefined;
   private minted = 0;
 
   private mint(name: string, scope: "read" | "write"): FakeToken {
@@ -41,7 +51,7 @@ export class FakeArtifacts implements Artifacts {
       name,
       description: null,
       defaultBranch: "main",
-      remote: `https://fake.invalid/git/ns/${name}.git`,
+      remote: fakeRemote(name),
       token: token.plaintext,
     };
   }
@@ -81,7 +91,19 @@ export class FakeArtifacts implements Artifacts {
         return Promise.resolve(t !== undefined);
       },
       fork: (target) => Promise.resolve(this.created(target)),
-      info: () => unfaked("info"),
+      info: () =>
+        Promise.resolve({
+          id: name,
+          name,
+          description: null,
+          defaultBranch: "main",
+          remote: fakeRemote(name),
+          createdAt: "",
+          updatedAt: "",
+          lastPushAt: null,
+          source: null,
+          readOnly: false,
+        }),
       readBlob: () => unfaked("readBlob"),
       readTree: () => unfaked("readTree"),
       readCommit: () => unfaked("readCommit"),
@@ -96,8 +118,17 @@ export class FakeArtifacts implements Artifacts {
     return Promise.resolve(this.repos.delete(name));
   }
 
-  import(): Promise<ArtifactsCreateRepoResult> {
-    return unfaked("import");
+  /** As the binding does: `main` is reported as the default branch whatever the upstream's is. */
+  import(params: ImportParams): Promise<ArtifactsCreateRepoResult> {
+    this.imports.push(params);
+    const refusal = this.refusal;
+    this.refusal = undefined;
+    if (refusal !== undefined) return Promise.reject(refusal);
+    if (this.repos.has(params.target.name))
+      return Promise.reject(
+        new Error(`ArtifactsError: repo already exists: ${params.target.name}`),
+      );
+    return Promise.resolve(this.created(params.target.name));
   }
 
   list(): Promise<ArtifactsRepoListResult> {
