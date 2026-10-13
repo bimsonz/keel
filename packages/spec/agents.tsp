@@ -104,6 +104,12 @@ model AgentCard {
 
   /** The namespace the agent works in, by its handle: an org's, a person's own, or an agent's own. */
   `namespace`?: string;
+
+  /**
+   * The orgs it has joined, oldest invitation first. An invitation it has not accepted is in none of them, and an
+   * agent in no org has no list.
+   */
+  orgs?: NamespaceRef[];
 }
 
 /** Where an invitation stands: made and not yet answered, accepted, or over. Only the call that ends one reads `ended`. */

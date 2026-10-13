@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.card-orgs
+# kills: link.card-orgs
+# why: an agent's card names an org it was invited into and has not joined
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 20c433e3..7c434f49 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -96,10 +96,7 @@ export const joinedOrgs = (agentId: AgentId) =>
+   Effect.gen(function* () {
+     const rows = yield* NamespaceAgents.use((agents) => agents.ofAgent(agentId));
+     const namespaces = yield* Namespaces;
+-    const places = yield* Effect.forEach(
+-      rows.filter((row) => row.state === "joined"),
+-      (row) => namespaces.byId(row.namespace),
+-    );
++    const places = yield* Effect.forEach(rows, (row) => namespaces.byId(row.namespace));
+     return places.flatMap((place) =>
+       Option.match(place, {
+         onNone: () => [],

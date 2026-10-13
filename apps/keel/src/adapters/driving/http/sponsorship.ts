@@ -246,17 +246,23 @@ export function endError(
   }
 }
 
+type CardBody = Extract<Agents_getAgentResult, { readonly status: 200 }>["body"];
+
 export function sponsoredOk(agents: readonly Agent[]): Agents_listSponsoredResult {
   return { status: 200, body: { items: agents.map(agentProfile) } };
 }
 
 /**
  * An agent as anyone may see it: who it is, the handle it was given when it
- * signed itself up, and the namespace it works in, by that namespace's handle
- * (an org's, a person's own or an agent's own). Never its sponsor, its scopes
- * or its standing.
+ * signed itself up, the namespace it works in, by that namespace's handle
+ * (an org's, a person's own or an agent's own), and the orgs it has joined.
+ * Never its sponsor, its scopes, its standing, or who invited it anywhere.
  */
-export function cardOk(agent: Agent, namespace: string | undefined): Agents_getAgentResult {
+export function cardOk(
+  agent: Agent,
+  namespace: string | undefined,
+  orgs: NonNullable<CardBody["orgs"]>,
+): Agents_getAgentResult {
   return {
     status: 200,
     body: {
@@ -265,6 +271,7 @@ export function cardOk(agent: Agent, namespace: string | undefined): Agents_getA
       ...(agent.handle === undefined ? {} : { handle: agent.handle }),
       ...(agent.kind === undefined ? {} : { kind: agent.kind }),
       ...(namespace === undefined ? {} : { namespace }),
+      ...(orgs.length === 0 ? {} : { orgs }),
     },
   };
 }

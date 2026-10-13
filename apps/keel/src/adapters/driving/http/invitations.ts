@@ -87,6 +87,27 @@ export function agentNamespace(invitation: Invitation, place: NamespaceRecord): 
   };
 }
 
+/**
+ * The orgs an agent has joined, as anyone reads them on its card: each by its
+ * handle, oldest invitation first. An invitation not yet accepted is in none,
+ * and who made any of them is never read.
+ */
+export const joinedOrgs = (agentId: AgentId) =>
+  Effect.gen(function* () {
+    const rows = yield* NamespaceAgents.use((agents) => agents.ofAgent(agentId));
+    const namespaces = yield* Namespaces;
+    const places = yield* Effect.forEach(
+      rows.filter((row) => row.state === "joined"),
+      (row) => namespaces.byId(row.namespace),
+    );
+    return places.flatMap((place) =>
+      Option.match(place, {
+        onNone: () => [],
+        onSome: (found) => [{ handle: found.handle, kind: found.kind }],
+      }),
+    );
+  });
+
 const notFound = (caller: Caller, detail?: string) => ({
   status: 404 as const,
   body: problem(

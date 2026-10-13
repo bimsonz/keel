@@ -8646,6 +8646,13 @@
           "namespace": {
             "type": "string",
             "description": "The namespace the agent works in, by its handle: an org's, a person's own, or an agent's own."
+          },
+          "orgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamespaceRef"
+            },
+            "description": "The orgs it has joined, oldest invitation first. An invitation it has not accepted is in none of them, and an\nagent in no org has no list."
           }
         },
         "additionalProperties": {

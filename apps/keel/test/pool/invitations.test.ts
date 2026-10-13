@@ -360,6 +360,47 @@ describe("an agent's invitation into an org, through the real Worker", () => {
     ]);
   });
 
+  it("[link.card-orgs] anyone reads on an agent's card the orgs it has joined: none while its invitation waits, the org once it accepts beside one still waiting, none again once it is taken out, and never who invited it", async () => {
+    const first = await anOrg();
+    const second = await anOrg();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const card = async () => (await http(null, "GET", `/agents/${agent.agentId}`)).body;
+    expect(await card()).not.toHaveProperty("orgs");
+
+    for (const { slug, member } of [first, second]) {
+      const invited = await http(member.token, "POST", `/namespaces/${slug}/agents`, {
+        agent: agent.handle,
+      });
+      expect(invited.status).toBe(201);
+    }
+    expect(await card()).not.toHaveProperty("orgs");
+
+    expect((await http(own, "PUT", `/agents/me/namespaces/${first.slug}`)).status).toBe(200);
+    const joined = await card();
+    expect(joined["orgs"]).toEqual([{ handle: first.slug, kind: "org" }]);
+    expect(JSON.stringify(joined)).not.toContain(first.member.userId);
+    // Whoever reads it reads the same card: the member who invited it, and the agent itself.
+    for (const reader of [first.member.token, own])
+      expect((await http(reader, "GET", `/agents/${agent.agentId}`)).body).toEqual(joined);
+
+    expect((await http(own, "PUT", `/agents/me/namespaces/${second.slug}`)).status).toBe(200);
+    expect((await card())["orgs"]).toEqual([
+      { handle: first.slug, kind: "org" },
+      { handle: second.slug, kind: "org" },
+    ]);
+
+    const removed = await http(
+      first.member.token,
+      "DELETE",
+      `/namespaces/${first.slug}/agents/${agent.agentId}`,
+    );
+    expect(removed.status).toBe(200);
+    expect((await card())["orgs"]).toEqual([{ handle: second.slug, kind: "org" }]);
+    expect((await http(own, "DELETE", `/agents/me/namespaces/${second.slug}`)).status).toBe(200);
+    expect(await card()).not.toHaveProperty("orgs");
+  });
+
   it("[link.own-namespace] a person's own namespace takes no invitation: an agent is invited into an org", async () => {
     const person = await seedUser(uniqueHandle("solo"), { role: null, signedInBy: "passkey" });
     const agent = await keyAgent();

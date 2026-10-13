@@ -154,7 +154,7 @@ import {
   noSuchRequest,
   sponsoredOk,
 } from "./sponsorship.ts";
-import { invitationHandlers } from "./invitations.ts";
+import { invitationHandlers, joinedOrgs } from "./invitations.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -626,6 +626,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               return cardOk(
                 agent.value,
                 Option.match(place, { onNone: () => undefined, onSome: (record) => record.handle }),
+                yield* joinedOrgs(agent.value.id),
               );
             }),
           ),
