@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t rpc.defect-line
+# kills: rpc.defect-line
+# why: the line names the defect and not what caused it
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index ee64819f..529bf3a4 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -40,7 +40,6 @@ export function describeDefect(defect: unknown): DefectLine {
+     name: defect.name,
+     message: defect.message,
+     ...(defect.stack === undefined ? {} : { stack: defect.stack }),
+-    ...(defect.cause === undefined ? {} : { cause: causeOf(defect.cause) }),
+     marks,
+   };
+ }

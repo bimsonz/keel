@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t rpc.defect-line
+# kills: rpc.defect-line
+# why: a mark the platform set to false is logged as set
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index ee64819f..4954b635 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -33,7 +33,7 @@ const causeOf = (cause: unknown, depth = 0): string =>
+ 
+ export function describeDefect(defect: unknown): DefectLine {
+   const marks = MARKS.filter(
+-    (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) === true,
++    (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) !== undefined,
+   );
+   if (!(defect instanceof Error)) return { name: typeof defect, message: text(defect), marks };
+   return {

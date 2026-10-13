@@ -4,16 +4,13 @@ import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { registerRoutes } from "../../../generated/http/app.gen.ts";
-import {
-  type AppEnv,
-  ResponseContractError,
-  UndeclaredStatusError,
-} from "../../../generated/http/runtime.gen.ts";
+import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
 import { type AuthMount, registerAuth, TOKEN_WINDOW_SECONDS } from "./auth-mount.ts";
 import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
+import { answerUnhandled } from "./run.ts";
 import { registerSigners } from "./signers.ts";
 import { registerWellKnown, type WellKnown } from "./well-known.ts";
 
@@ -88,15 +85,9 @@ export function makeApp(options: AppOptions) {
   registerInboxStreams(app, deps, options.streams);
 
   app.notFound((c) => problemResponse(404, "resource.not_found", c.get("requestId")));
-  app.onError((error, c) => {
-    if (error instanceof ResponseContractError || error instanceof UndeclaredStatusError) {
-      console.error("contract drift", error);
-      if (options.rethrowContractDrift) throw error;
-    } else {
-      console.error("defect", error);
-    }
-    return problemResponse(500, "internal.defect", c.get("requestId") ?? crypto.randomUUID());
-  });
+  app.onError((error, c) =>
+    answerUnhandled(error, c.get("requestId") ?? crypto.randomUUID(), options.rethrowContractDrift),
+  );
 
   const routed = registerRoutes(app, () => options.handlers, deps);
   // After the spec's routes, so one under /v1/auth (SignIn_methods) answers before Better Auth's catch-all.

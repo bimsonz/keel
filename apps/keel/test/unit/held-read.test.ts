@@ -61,6 +61,8 @@ describe("a read an object holds", () => {
             ops: "held-read",
             read: "feed",
             readAgain: "Durable Object reset because its code was updated.",
+            name: "Error",
+            marks: ["durableObjectReset"],
           },
         ]);
       });

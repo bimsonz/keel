@@ -1,6 +1,6 @@
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { Cause, Effect, Exit } from "effect";
-import { decodeExit, type ExitCodec } from "../../../rpc/index.ts";
+import { decodeExit, describeDefect, type ExitCodec } from "../../../rpc/index.ts";
 
 /**
  * A Durable Object's answer, back in the hexagon: its Exit envelope decoded
@@ -49,13 +49,8 @@ export function callHeldRead<A, E>(
   return callObject(codec, () => call(waitMs)).pipe(
     Effect.catchDefect((defect): Effect.Effect<A, E> => {
       if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
-      console.warn(
-        JSON.stringify({
-          ops: "held-read",
-          read,
-          readAgain: defect instanceof Error ? defect.message : String(defect),
-        }),
-      );
+      const { name, message, marks } = describeDefect(defect);
+      console.warn(JSON.stringify({ ops: "held-read", read, readAgain: message, name, marks }));
       return callObject(codec, () => call(0));
     }),
   );

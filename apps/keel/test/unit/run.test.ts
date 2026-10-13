@@ -22,7 +22,7 @@ import {
   makeUsersMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const clock = makeClockMemory().layer;
@@ -73,5 +73,46 @@ describe("a client abort interrupts the request's fiber (pitfall 4)", () => {
     expect(result).toMatchObject({ status: 503, body: { code: "service.unavailable" } });
     expect(released).toBe(true);
     expect(performance.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe("the line a request's defect leaves", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("[http.defect-line] names the defect a handler's effect died with, under the request id, and answers 500", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // What a held call is rejected with when the platform resets its object: the marks are the platform's.
+    const defect = Object.assign(
+      new Error("Durable Object reset because its code was updated.", {
+        cause: new TypeError("storage is gone"),
+      }),
+      { durableObjectReset: true, retryable: true },
+    );
+    const result = await run(
+      {
+        requestId: "req-defect",
+        principal: { _tag: "Anonymous" },
+        signal: new AbortController().signal,
+      },
+      Effect.die(defect),
+    );
+    expect(result).toMatchObject({
+      status: 500,
+      body: { code: "internal.defect", detail: "Incident req-defect." },
+    });
+    // One argument, a string: an Error inside a logged object prints as `{}`.
+    expect(error.mock.calls).toHaveLength(1);
+    expect(error.mock.calls[0]).toHaveLength(1);
+    expect(JSON.parse(String(error.mock.calls[0]?.[0]))).toEqual({
+      ops: "defect",
+      requestId: "req-defect",
+      name: "Error",
+      message: "Durable Object reset because its code was updated.",
+      stack: defect.stack,
+      cause: "TypeError: storage is gone",
+      marks: ["durableObjectReset", "retryable"],
+    });
   });
 });

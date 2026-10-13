@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-read
+# kills: rpc.held-read
+# why: a healed read's line says what message cut it and not the platform's marks, so a reset cannot be told from the object's own throw
+diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+index f2b53a3d..b644d77c 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+@@ -50,7 +50,7 @@ export function callHeldRead<A, E>(
+     Effect.catchDefect((defect): Effect.Effect<A, E> => {
+       if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
+       const { name, message, marks } = describeDefect(defect);
+-      console.warn(JSON.stringify({ ops: "held-read", read, readAgain: message, name, marks }));
++      console.warn(JSON.stringify({ ops: "held-read", read, readAgain: message }));
+       return callObject(codec, () => call(0));
+     }),
+   );

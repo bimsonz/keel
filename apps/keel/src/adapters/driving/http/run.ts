@@ -25,8 +25,13 @@ import type {
   Users,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
+import {
+  ResponseContractError,
+  UndeclaredStatusError,
+} from "../../../generated/http/runtime.gen.ts";
+import { describeDefect } from "../../../rpc/index.ts";
 import type { Caller } from "./caller.ts";
-import { notImplemented, problem, type ProblemBody } from "./problems.ts";
+import { notImplemented, problem, type ProblemBody, problemResponse } from "./problems.ts";
 
 /** The services the isolate runtime provides to use-cases reached over HTTP and MCP. */
 export type IsolateServices =
@@ -53,6 +58,26 @@ export type IsolateServices =
   | Memberships
   | Namespaces
   | ProjectNamespaces;
+
+/**
+ * One line a request that hit a defect, found by its request id: the defect's
+ * name, message, stack and cause as strings, and the platform's marks on it.
+ */
+export function logDefect(ops: "defect" | "contract-drift", requestId: string, defect: unknown) {
+  console.error(JSON.stringify({ ops, requestId, ...describeDefect(defect) }));
+}
+
+/**
+ * What a request answers when something was thrown past its handler: logged in
+ * one line under the request id, then 500. A response that broke its contract
+ * is logged apart from a defect, and thrown on where the tests ask for it.
+ */
+export function answerUnhandled(error: unknown, requestId: string, rethrowContractDrift: boolean) {
+  const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
+  logDefect(drift ? "contract-drift" : "defect", requestId, error);
+  if (drift && rethrowContractDrift) throw error;
+  return problemResponse(500, "internal.defect", requestId);
+}
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =
@@ -85,7 +110,7 @@ export function makeRunner(runtime: ManagedRuntime.ManagedRuntime<IsolateService
         }),
       };
     }
-    console.error("defect", { requestId: caller.requestId, defect });
+    logDefect("defect", caller.requestId, defect);
     return {
       status: 500,
       body: problem(500, "internal.defect", caller.requestId, {

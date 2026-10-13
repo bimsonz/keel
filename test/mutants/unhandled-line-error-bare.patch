@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t http.unhandled-line
+# kills: http.unhandled-line
+# why: what was thrown past a handler is logged with no request id to find it by and no marks
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index 6de0fa72..8642ed3a 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -74,7 +74,7 @@ export function logDefect(ops: "defect" | "contract-drift", requestId: string, d
+  */
+ export function answerUnhandled(error: unknown, requestId: string, rethrowContractDrift: boolean) {
+   const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
+-  logDefect(drift ? "contract-drift" : "defect", requestId, error);
++  console.error("defect", error);
+   if (drift && rethrowContractDrift) throw error;
+   return problemResponse(500, "internal.defect", requestId);
+ }

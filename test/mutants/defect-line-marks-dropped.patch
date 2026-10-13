@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t rpc.defect-line
+# kills: rpc.defect-line
+# why: the line loses the platform's marks, so a restarted object reads as one whose own code threw
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index ee64819f..87b24e21 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -33,7 +33,7 @@ const causeOf = (cause: unknown, depth = 0): string =>
+ 
+ export function describeDefect(defect: unknown): DefectLine {
+   const marks = MARKS.filter(
+-    (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) === true,
++    (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) === null,
+   );
+   if (!(defect instanceof Error)) return { name: typeof defect, message: text(defect), marks };
+   return {

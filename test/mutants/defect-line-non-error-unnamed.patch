@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t rpc.defect-line
+# kills: rpc.defect-line
+# why: a defect that is no Error is logged as if it were one
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index ee64819f..63194e5b 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -35,7 +35,7 @@ export function describeDefect(defect: unknown): DefectLine {
+   const marks = MARKS.filter(
+     (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) === true,
+   );
+-  if (!(defect instanceof Error)) return { name: typeof defect, message: text(defect), marks };
++  if (!(defect instanceof Error)) return { name: "Error", message: text(defect), marks };
+   return {
+     name: defect.name,
+     message: defect.message,

@@ -2,20 +2,15 @@
 # kills: rpc.held-read
 # why: a read that was read again leaves no line, so a restart under held reads cannot be told from none
 diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
-index 3fa64d93..6b412f47 100644
+index f2b53a3d..e7a2da76 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
-@@ -49,13 +49,6 @@ export function callHeldRead<A, E>(
-   return callObject(codec, () => call(waitMs)).pipe(
+@@ -50,7 +50,7 @@ export function callHeldRead<A, E>(
      Effect.catchDefect((defect): Effect.Effect<A, E> => {
        if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
--      console.warn(
--        JSON.stringify({
--          ops: "held-read",
--          read,
--          readAgain: defect instanceof Error ? defect.message : String(defect),
--        }),
--      );
+       const { name, message, marks } = describeDefect(defect);
+-      console.warn(JSON.stringify({ ops: "held-read", read, readAgain: message, name, marks }));
++      void [name, message, marks];
        return callObject(codec, () => call(0));
      }),
    );

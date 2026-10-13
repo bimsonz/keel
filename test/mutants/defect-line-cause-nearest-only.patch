@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts -t rpc.defect-line
+# kills: rpc.defect-line
+# why: only the nearest cause is named, and the one under it, where the fault began, is lost
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index ee64819f..70ac9a13 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -28,7 +28,7 @@ const text = (value: unknown): string => {
+ /** A cause and the causes under it, nearest first, to a depth that ends a cycle. */
+ const causeOf = (cause: unknown, depth = 0): string =>
+   cause instanceof Error && cause.cause !== undefined && depth < 4
+-    ? `${text(cause)} <- ${causeOf(cause.cause, depth + 1)}`
++    ? text(cause)
+     : text(cause);
+ 
+ export function describeDefect(defect: unknown): DefectLine {

@@ -6,6 +6,7 @@
  */
 export * from "./agent-session.ts";
 export * from "./change.ts";
+export * from "./defect.ts";
 export * from "./events.ts";
 export * from "./exit.ts";
 export * from "./keel-verify.ts";
