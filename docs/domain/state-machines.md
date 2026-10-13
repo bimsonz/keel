@@ -497,14 +497,15 @@ stateDiagram-v2
   Active --> Active: AgentUnsponsored
   Suspended --> Active: AgentReinstated
   Suspended --> Revoked: AgentRevoked
-  Suspended --> Suspended: AgentSponsored
   Revoked --> [*]
 ```
 <!-- /chart:agent -->
 
 **Terminal:** Revoked. Revocation bumps the agent's revocation epoch by exactly one (an agent enrols at epoch 0), so every token minted before it fails verification. A suspended agent's tokens fail too, until it is reinstated.
 
-**The sponsor link.** A person stands behind an agent: `Sponsor` commits `AgentSponsored`, and `EndSponsorship` (the sponsor, or the agent itself) commits `AgentUnsponsored`. An agent has at most one sponsor: the same person sponsoring again commits nothing, and another is refused until the first has switched the link off. The link carries no rights. A sponsor's pause ends with the link: ending it while the agent is suspended commits `AgentReinstated` first, since nobody else could reinstate it. A revoked agent takes neither command and keeps the record of who stood behind it.
+**The sponsor link.** A person stands behind an agent: `Sponsor` commits `AgentSponsored`, and `EndSponsorship` commits `AgentUnsponsored`. An agent has at most one sponsor: the same person sponsoring again commits nothing, and another is refused until the first has switched the link off. The link carries no rights. Only its two parties end it, the sponsor or the agent itself; anyone else is refused as no party to it, and the event names which of the two it was. A revoked agent takes neither command and keeps the record of who stood behind it.
+
+**A pause holds.** A suspended agent becomes active again by a reinstatement, or by its sponsor ending the link: that commits `AgentReinstated` first, since nobody else could reinstate it. Nothing else lifts a pause. The agent cannot leave its sponsor while it is paused, and nobody becomes the sponsor of a paused agent, so a person who was not behind the agent when it was paused never lifts the pause by leaving. Both are refused with the reason that the agent is paused.
 
 **Invariant:** declaration fidelity routes review; it never judges the agent.
 

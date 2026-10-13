@@ -264,7 +264,6 @@ export const agentChart: Chart = {
       on: {
         AgentReinstated: a("active"),
         AgentRevoked: a("revoked"),
-        AgentSponsored: a("suspended"),
       },
     },
     revoked: { type: "final" },

@@ -40,7 +40,9 @@ export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>
 /**
  * The command is not valid in the agent's current state. `reason` says why
  * when the state's name does not: another person already sponsors the agent,
- * or nobody does.
+ * or nobody does; whoever asked to end the link is neither the sponsor nor the
+ * agent; or the agent is paused, when it cannot leave its sponsor and nobody
+ * new can stand behind it.
  */
 export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
   "AgentStateRefused",
@@ -48,7 +50,9 @@ export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
     agentId: AgentId,
     state: Schema.optional(AgentState),
     command: Schema.String,
-    reason: Schema.optional(Schema.Literals(["sponsor-held", "not-sponsored"])),
+    reason: Schema.optional(
+      Schema.Literals(["sponsor-held", "not-sponsored", "not-a-party", "paused"]),
+    ),
   },
 ) {}
 

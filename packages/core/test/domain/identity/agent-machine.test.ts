@@ -11,12 +11,16 @@ import {
   replayAgent,
 } from "../../../src/domain/identity/index.ts";
 import {
+  type Actor,
+  agentActor,
   canonicalJson,
   type Committed,
   IllegalTransition,
   Instant,
   type Json,
   makeId,
+  userActor,
+  type UserId,
 } from "../../../src/domain/kernel/index.ts";
 import { agentChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
@@ -43,6 +47,9 @@ const AGENT = makeId("agt", "0".repeat(26));
 const PROJECT = makeId("prj", "0".repeat(26));
 const SPONSOR = makeId("usr", "1".repeat(26));
 const OTHER = makeId("usr", "2".repeat(26));
+/** A person who never stands behind the agent, and another agent: neither is a party to its link. */
+const STRANGER = makeId("usr", "3".repeat(26));
+const ELSEWHERE = makeId("agt", "9".repeat(26));
 
 type Kind = AgentCommand["_tag"];
 type Key = "none" | Agent["state"];
@@ -57,7 +64,7 @@ const KINDS: readonly Kind[] = [
 const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Enroll"],
   active: ["Suspend", "Suspend", "Revoke", "Sponsor", "EndSponsorship"],
-  suspended: ["Reinstate", "Reinstate", "Revoke", "Sponsor", "EndSponsorship"],
+  suspended: ["Reinstate", "Reinstate", "Revoke", "EndSponsorship"],
   revoked: KINDS,
 };
 
@@ -138,12 +145,16 @@ const oracle = (before: Agent | undefined, command: AgentCommand): Key | "refuse
     case "Revoke":
       return before.state === "revoked" ? "refused" : "revoked";
     case "Sponsor":
-      return before.state === "revoked" ||
-        (before.sponsor !== undefined && before.sponsor !== command.by)
-        ? "refused"
-        : before.state;
-    case "EndSponsorship":
-      return before.state === "revoked" || before.sponsor === undefined ? "refused" : "active";
+      if (before.state === "revoked") return "refused";
+      if (before.sponsor !== undefined)
+        return before.sponsor === command.by ? before.state : "refused";
+      return before.state === "suspended" ? "refused" : before.state;
+    case "EndSponsorship": {
+      if (before.state === "revoked" || before.sponsor === undefined) return "refused";
+      const leaving = command.by === `agent:${before.id}`;
+      if (!leaving && command.by !== `user:${before.sponsor}`) return "refused";
+      return leaving && before.state === "suspended" ? "refused" : "active";
+    }
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -170,11 +181,14 @@ const linked = (model: Linked, command: AgentCommand): Linked | "refused" => {
     case "Revoke":
       return { ...model, state: "revoked" };
     case "Sponsor":
-      return model.sponsor === undefined || model.sponsor === command.by
-        ? { ...model, sponsor: command.by }
-        : "refused";
-    case "EndSponsorship":
-      return model.sponsor === undefined ? "refused" : { state: "active" };
+      if (model.sponsor !== undefined) return model.sponsor === command.by ? model : "refused";
+      return model.state === "suspended" ? "refused" : { ...model, sponsor: command.by };
+    case "EndSponsorship": {
+      if (model.sponsor === undefined) return "refused";
+      const leaving = command.by === agentActor(AGENT);
+      if (!leaving && command.by !== userActor(model.sponsor)) return "refused";
+      return leaving && model.state === "suspended" ? "refused" : { state: "active" };
+    }
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -182,15 +196,198 @@ const linked = (model: Linked, command: AgentCommand): Linked | "refused" => {
   }
 };
 
+/** Whoever might ask to end the link: each person who may hold it, the agent, and two who are no party to it. */
+const ENDERS: readonly Actor[] = [
+  userActor(SPONSOR),
+  userActor(OTHER),
+  agentActor(AGENT),
+  userActor(STRANGER),
+  agentActor(ELSEWHERE),
+];
+
 const linkArb: fc.Arbitrary<AgentCommand> = fc.oneof(
-  fc.constantFrom<AgentCommand>(
-    { _tag: "Suspend", reason: "runaway retries", by: `user:${SPONSOR}` },
-    { _tag: "Reinstate", by: `user:${SPONSOR}` },
-    { _tag: "Revoke", by: `user:${SPONSOR}` },
-    { _tag: "EndSponsorship", by: `user:${SPONSOR}` },
-  ),
-  fc.constantFrom(SPONSOR, OTHER).map((by): AgentCommand => ({ _tag: "Sponsor", by })),
+  {
+    weight: 4,
+    arbitrary: fc.constantFrom<AgentCommand>(
+      { _tag: "Suspend", reason: "runaway retries", by: `user:${SPONSOR}` },
+      { _tag: "Suspend", reason: "runaway retries", by: `user:${SPONSOR}` },
+      { _tag: "Reinstate", by: `user:${SPONSOR}` },
+      { _tag: "Revoke", by: `user:${SPONSOR}` },
+    ),
+  },
+  {
+    weight: 3,
+    arbitrary: fc.constantFrom(SPONSOR, OTHER).map((by): AgentCommand => ({ _tag: "Sponsor", by })),
+  },
+  {
+    weight: 4,
+    arbitrary: fc
+      .constantFrom(...ENDERS)
+      .map((by): AgentCommand => ({ _tag: "EndSponsorship", by })),
+  },
 );
+
+/**
+ * Runs of the link's commands. Half of them open with a sponsor taken, and
+ * half of those with the agent then paused: a paused agent with a sponsor is
+ * what the link's rules turn on, and drawn commands alone reach it in few runs.
+ */
+const linkRunArb: fc.Arbitrary<readonly AgentCommand[]> = fc
+  .tuple(
+    fc.constantFrom<readonly AgentCommand[]>(
+      [],
+      [],
+      [{ _tag: "Sponsor", by: SPONSOR }],
+      [
+        { _tag: "Sponsor", by: SPONSOR },
+        { _tag: "Suspend", reason: "runaway retries", by: `user:${SPONSOR}` },
+      ],
+    ),
+    fc.array(linkArb, { maxLength: 16, size: "max" }),
+  )
+  .map(([opening, rest]) => [...opening, ...rest]);
+
+/**
+ * A run of the link's commands on an enrolled agent. `sponsor` is who stood
+ * behind the agent before each step as the harness saw the commands land,
+ * kept apart from the agent's own record of it.
+ */
+const walk = (commands: readonly AgentCommand[]) => {
+  let agent = drive([build("Enroll")]).state;
+  let held: UserId | undefined;
+  return commands.map((command) => {
+    const before = agent;
+    const sponsor = held;
+    const result = decideAgent(agent, command, { now: T0, agentId: AGENT });
+    const events = eventsOf(result);
+    for (const payload of events) agent = evolveAgent(agent, { at: T0, payload });
+    if (command._tag === "Sponsor" && events.length > 0) held = command.by;
+    if (command._tag === "EndSponsorship" && events.length > 0) held = undefined;
+    return { command, events, before, after: agent, sponsor };
+  });
+};
+
+/** Whether an event an EndSponsorship committed names who ended the link, and the sponsor it ended. */
+const namesItsEnder = (event: AgentEvent, by: Actor, sponsor: UserId | undefined): boolean => {
+  if (event._tag === "AgentUnsponsored") return event.by === by && event.sponsor === sponsor;
+  return event._tag === "AgentReinstated" && event.by === by;
+};
+
+/** What the fold's table is about: an agent's state, who stands behind it, and its revocation epoch. */
+interface Folded {
+  readonly state: Agent["state"];
+  readonly sponsor?: UserId;
+  readonly epoch: number;
+}
+
+/** The fold's from-table (state-machines.md § Agent), typed apart from `evolveAgent`. */
+const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" => {
+  if (from === undefined) {
+    if (event._tag !== "AgentEnrolled") return "illegal";
+    return event.sponsor === undefined
+      ? { state: "active", epoch: 0 }
+      : { state: "active", sponsor: event.sponsor, epoch: 0 };
+  }
+  if (event.agentId !== AGENT) return "illegal";
+  switch (event._tag) {
+    case "AgentEnrolled":
+      return "illegal";
+    case "AgentSuspended":
+      return from.state === "active" ? { ...from, state: "suspended" } : "illegal";
+    case "AgentReinstated":
+      return from.state === "suspended" ? { ...from, state: "active" } : "illegal";
+    case "AgentRevoked":
+      return from.state !== "revoked" && event.revocationEpoch === from.epoch + 1
+        ? { ...from, state: "revoked", epoch: event.revocationEpoch }
+        : "illegal";
+    case "AgentSponsored":
+      return from.state !== "revoked" && from.sponsor === undefined
+        ? { ...from, sponsor: event.sponsor }
+        : "illegal";
+    case "AgentUnsponsored":
+      return from.state === "active" && from.sponsor === event.sponsor
+        ? { state: "active", epoch: from.epoch }
+        : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+const shown = (folded: Folded | "illegal" | undefined): string => {
+  if (folded === undefined) return "none";
+  if (folded === "illegal") return "illegal";
+  return `${folded.state}, ${folded.sponsor ?? "alone"}, epoch ${folded.epoch}`;
+};
+const seen = (agent: Agent | undefined): string =>
+  shown(
+    agent === undefined
+      ? undefined
+      : {
+          state: agent.state,
+          epoch: agent.revocationEpoch,
+          ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+        },
+  );
+
+/** What the fold does with an event: where it lands, or that it refused it as illegal. */
+const foldOf = (agent: Agent | undefined, event: AgentEvent): string => {
+  try {
+    return seen(evolveAgent(agent, { at: T0, payload: event }));
+  } catch (error) {
+    return error instanceof IllegalTransition ? "illegal" : `threw ${String(error)}`;
+  }
+};
+
+/** Each state a run reaches, alone and with a sponsor: the commands that reach it, and what it is. */
+const REACHED: readonly { readonly by: readonly Kind[]; readonly is: Folded | undefined }[] = [
+  { by: [], is: undefined },
+  { by: ["Enroll"], is: { state: "active", epoch: 0 } },
+  { by: ["Enroll", "Sponsor"], is: { state: "active", sponsor: SPONSOR, epoch: 0 } },
+  { by: ["Enroll", "Suspend"], is: { state: "suspended", epoch: 0 } },
+  { by: ["Enroll", "Sponsor", "Suspend"], is: { state: "suspended", sponsor: SPONSOR, epoch: 0 } },
+  { by: ["Enroll", "Revoke"], is: { state: "revoked", epoch: 1 } },
+  { by: ["Enroll", "Sponsor", "Revoke"], is: { state: "revoked", sponsor: SPONSOR, epoch: 1 } },
+];
+
+/**
+ * Every event in each form the fold could tell apart: this agent's or
+ * another's, with or without a sponsor at enrolment, the held sponsor or
+ * another, and the epoch before, at and after the next.
+ */
+const eventForms = (epoch: number): readonly AgentEvent[] =>
+  [AGENT, ELSEWHERE].flatMap((agentId): AgentEvent[] => [
+    {
+      _tag: "AgentEnrolled",
+      agentId,
+      projectId: PROJECT,
+      name: "builder",
+      kind: "hosted",
+      scopes: ["agent:work"],
+    },
+    {
+      _tag: "AgentEnrolled",
+      agentId,
+      projectId: PROJECT,
+      name: "builder",
+      kind: "hosted",
+      scopes: ["agent:work"],
+      sponsor: OTHER,
+    },
+    { _tag: "AgentSuspended", agentId, reason: "runaway retries", by: "operator:zb" },
+    { _tag: "AgentReinstated", agentId, by: "operator:zb" },
+    ...[epoch, epoch + 1, epoch + 2].map((revocationEpoch): AgentEvent => ({
+      _tag: "AgentRevoked",
+      agentId,
+      revocationEpoch,
+      by: "operator:zb",
+    })),
+    ...[SPONSOR, OTHER].flatMap((sponsor): AgentEvent[] => [
+      { _tag: "AgentSponsored", agentId, sponsor },
+      { _tag: "AgentUnsponsored", agentId, sponsor, by: userActor(sponsor) },
+    ]),
+  ]);
 
 const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 const comparable = (a: Agent | undefined): string =>
@@ -355,7 +552,7 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[link.sponsor-machine] an agent has one sponsor at most, only by that person's Sponsor, and ending the link reinstates a paused agent", () => {
     fc.assert(
-      fc.property(fc.array(linkArb, { maxLength: 16, size: "max" }), (commands) => {
+      fc.property(linkRunArb, (commands) => {
         let agent = drive([build("Enroll")]).state;
         let model: Linked = { state: "active" };
         for (const command of commands) {
@@ -401,6 +598,127 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(reason(revoked.results[3])).toBe("state");
     expect(reason(revoked.results[4])).toBe("state");
     expect(revoked.state?.sponsor).toBe(SPONSOR);
+  });
+
+  it("[agent.pause-holds] a pause is lifted by a Reinstate or by the sponsor ending the link, and by nothing the agent or a newcomer does", () => {
+    fc.assert(
+      fc.property(linkRunArb, (commands) =>
+        walk(commands).every(({ command, before, after, sponsor }) => {
+          if (before?.state !== "suspended") return true;
+          // Nobody new stands behind a paused agent.
+          if (after?.sponsor !== undefined && after.sponsor !== sponsor) return false;
+          if (after?.state !== "active") return true;
+          return (
+            command._tag === "Reinstate" ||
+            (command._tag === "EndSponsorship" &&
+              sponsor !== undefined &&
+              command.by === userActor(sponsor))
+          );
+        }),
+      ),
+    );
+
+    const sponsor: AgentCommand = { _tag: "Sponsor", by: SPONSOR };
+    const pause = build("Suspend");
+    const leave: AgentCommand = { _tag: "EndSponsorship", by: agentActor(AGENT) };
+
+    // Paused, the agent cannot leave its sponsor: refused by name, and the link and the pause stand.
+    const leaves = drive([build("Enroll"), sponsor, pause, leave]);
+    expect(reason(leaves.results[3])).toBe("paused");
+    expect(leaves.state).toMatchObject({ state: "suspended", sponsor: SPONSOR });
+
+    // Nobody becomes the sponsor of a paused agent, so no newcomer's leaving lifts its pause.
+    const newcomer = drive([
+      build("Enroll"),
+      pause,
+      { _tag: "Sponsor", by: OTHER },
+      { _tag: "EndSponsorship", by: userActor(OTHER) },
+    ]);
+    expect(reason(newcomer.results[2])).toBe("paused");
+    expect(reason(newcomer.results[3])).toBe("not-sponsored");
+    expect(seen(newcomer.state)).toBe("suspended, alone, epoch 0");
+
+    // The sponsor it has may approve again while it is paused, as a replayed approval does: nothing is committed.
+    const replayed = drive([build("Enroll"), sponsor, pause, sponsor]);
+    expect(replayed.results[3]).toEqual(Result.succeed([]));
+    expect(seen(replayed.state)).toBe(`suspended, ${SPONSOR}, epoch 0`);
+  });
+
+  it("[agent.link-parties] only the sponsor or the agent itself ends the link, and the record names who did", () => {
+    fc.assert(
+      fc.property(linkRunArb, (commands) =>
+        walk(commands).every(({ command, events, before, after, sponsor }) => {
+          if (command._tag !== "EndSponsorship") return true;
+          const party =
+            sponsor !== undefined &&
+            (command.by === userActor(sponsor) || command.by === agentActor(AGENT));
+          return party
+            ? events.every((event) => namesItsEnder(event, command.by, sponsor))
+            : events.length === 0 && comparable(after) === comparable(before);
+        }),
+      ),
+    );
+
+    const sponsor: AgentCommand = { _tag: "Sponsor", by: SPONSOR };
+    const ended = { _tag: "AgentUnsponsored", agentId: AGENT, sponsor: SPONSOR };
+
+    // A stranger, another agent and an operator of old are no party to the link.
+    const outsiders: readonly Actor[] = [
+      userActor(STRANGER),
+      userActor(OTHER),
+      agentActor(ELSEWHERE),
+      "operator:zb",
+    ];
+    for (const by of outsiders) {
+      const tried = drive([build("Enroll"), sponsor, { _tag: "EndSponsorship", by }]);
+      expect(reason(tried.results[2])).toBe("not-a-party");
+      expect(seen(tried.state)).toBe(`active, ${SPONSOR}, epoch 0`);
+    }
+
+    // The sponsor ends it, or the agent leaves it, and the event says which.
+    for (const by of [userActor(SPONSOR), agentActor(AGENT)]) {
+      const done = drive([build("Enroll"), sponsor, { _tag: "EndSponsorship", by }]);
+      expect(done.results[2]).toEqual(Result.succeed([{ ...ended, by }]));
+      expect(seen(done.state)).toBe("active, alone, epoch 0");
+    }
+
+    // Paused, only the sponsor ends it, and the reinstatement names the sponsor too.
+    const by = userActor(SPONSOR);
+    const lifted = drive([
+      build("Enroll"),
+      sponsor,
+      build("Suspend"),
+      { _tag: "EndSponsorship", by },
+    ]);
+    expect(lifted.results[3]).toEqual(
+      Result.succeed([
+        { _tag: "AgentReinstated", agentId: AGENT, by },
+        { ...ended, by },
+      ]),
+    );
+  });
+
+  it("[agent.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = REACHED.flatMap(({ by, is }) => {
+      const agent = drive(by.map(build)).state;
+      return eventForms(is?.epoch ?? 0).map((event) => {
+        const from = `${shown(is)} + ${event._tag} ${canonicalJson(asJson(event))}`;
+        return {
+          folded: `${from}: ${foldOf(agent, event)}`,
+          table: `${from}: ${shown(folds(is, event))}`,
+        };
+      });
+    });
+    expect(cases.map((c) => c.folded)).toEqual(cases.map((c) => c.table));
+    // Seven states by twenty-two events, a good share of them on each side of the table.
+    expect(cases).toHaveLength(154);
+    expect(cases.filter((c) => c.table.endsWith(": illegal")).length).toBeGreaterThan(100);
+    expect(cases.filter((c) => !c.table.endsWith(": illegal")).length).toBeGreaterThan(15);
+
+    // Each of those states is the one the commands beside it reach.
+    expect(REACHED.map(({ by }) => seen(drive(by.map(build)).state))).toEqual(
+      REACHED.map(({ is }) => shown(is)),
+    );
   });
 });
 

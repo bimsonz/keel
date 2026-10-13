@@ -1,11 +1,14 @@
 import { Result } from "effect";
 import {
+  type Actor,
+  agentActor,
   type AgentId,
   type Committed,
   IllegalTransition,
   type Instant,
   type OrgId,
   type ProjectId,
+  userActor,
   type UserId,
 } from "../kernel/index.ts";
 import type { Agent, AgentKind, Scope } from "./agent.ts";
@@ -37,8 +40,8 @@ export type AgentCommand =
   | { readonly _tag: "Revoke"; readonly by: string }
   /** A person stands behind the agent. The agent asked first: the caller holds that proof. */
   | { readonly _tag: "Sponsor"; readonly by: UserId }
-  /** The sponsor switches the link off, or the agent leaves it. */
-  | { readonly _tag: "EndSponsorship"; readonly by: string };
+  /** The sponsor switches the link off, or the agent leaves it: `by` is one of the two. */
+  | { readonly _tag: "EndSponsorship"; readonly by: Actor };
 
 /** Facts from I/O: the time, and the agent this decision is about (the AgentSession DO's key). */
 export interface AgentFacts {
@@ -57,8 +60,13 @@ type Decision = Result.Result<readonly AgentEvent[], AgentRejection>;
  *
  * An agent has at most one sponsor. The same person sponsoring again commits
  * nothing, and another is refused until the first has switched the link off.
- * A sponsor's pause ends with the link: ending it while the agent is suspended
- * reinstates the agent first, since nobody else could.
+ * Only its two parties end the link: the sponsor, or the agent itself.
+ *
+ * A pause holds until a Reinstate, or until the sponsor ends the link: that
+ * reinstates the agent first, since nobody else could. The agent cannot leave
+ * the link while it is paused, and nobody becomes the sponsor of a paused
+ * agent, so no one who was not behind it when it was paused lifts the pause
+ * by leaving.
  */
 export const decideAgent = (
   state: Agent | undefined,
@@ -115,12 +123,16 @@ export const decideAgent = (
           ]);
     case "Sponsor":
       if (agent.state === "revoked") return refuse();
-      if (agent.sponsor === undefined)
-        return Result.succeed([AgentSponsored.make({ agentId: agent.id, sponsor: command.by })]);
-      return agent.sponsor === command.by ? Result.succeed([]) : refuse("sponsor-held");
+      if (agent.sponsor !== undefined)
+        return agent.sponsor === command.by ? Result.succeed([]) : refuse("sponsor-held");
+      if (agent.state === "suspended") return refuse("paused");
+      return Result.succeed([AgentSponsored.make({ agentId: agent.id, sponsor: command.by })]);
     case "EndSponsorship": {
       if (agent.state === "revoked") return refuse();
       if (agent.sponsor === undefined) return refuse("not-sponsored");
+      const leaving = command.by === agentActor(agent.id);
+      if (!leaving && command.by !== userActor(agent.sponsor)) return refuse("not-a-party");
+      if (leaving && agent.state === "suspended") return refuse("paused");
       const ended = AgentUnsponsored.make({
         agentId: agent.id,
         sponsor: agent.sponsor,
