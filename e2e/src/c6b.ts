@@ -214,8 +214,8 @@ async function importAndLand(): Promise<void> {
         ? [e.payload.commitSha]
         : [],
     )[0] ?? "";
-  // A workspace granted now is a fork of trunk. One forked before the landing is brought to
-  // trunk's head as an agent would bring it. It is abandoned once read.
+  // The reader is declared as soon as the landing is read, before the pool's own refresh may
+  // have run: its workspace is granted at trunk's head all the same. It is abandoned once read.
   const reader = await declareWhenPooled(
     agent,
     { goal: `6b ${run}: read trunk`, footprint: [{ path: file, op: "edit" }] },
@@ -225,14 +225,10 @@ async function importAndLand(): Promise<void> {
   const tokenR = reader.workspace.token;
   const dirR = cloneWorkspace(reader.workspace.remote, tokenR);
   dirs.push(dirR);
-  if (!holdsCommit(dirR, landed)) {
-    await agent.rebase(reader.change.id, {
-      lease: reader.lease.id,
-      idempotencyKey: key(`${run}:${IMPORTED}:reader:rebase`),
-    });
-    git(dirR, ["fetch", "-q", "origin", "keel/trunk"], tokenR);
-    console.log("     the reader's workspace was forked before the landing: trunk fetched into it");
-  }
+  check(
+    git(dirR, ["rev-parse", "HEAD"]) === landed,
+    "(b) a workspace declared as the change landed is granted at trunk's head: its clone checks out the landed commit",
+  );
   const signers = await keelSigners(dirR, agent, keelUrl);
   check(
     holdsCommit(dirR, landed) &&

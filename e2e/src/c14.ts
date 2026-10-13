@@ -132,10 +132,17 @@ async function enrolled(operator: KeelClient, name: string, projectId: string) {
 const dirs: string[] = [];
 try {
   const operator = new KeelClient({ baseUrl: keelUrl, session });
-  const project = await operator.createProject(
-    { namespace: ORG, name: PROJECT, source: { kind: "template", name: FIXTURE } },
-    { idempotencyKey: key("project") },
-  );
+  // Made once, and found by its name on every later run. A key replays only while Keel reads
+  // the request as it first did, and a deploy has changed how a project's start is written.
+  const project =
+    (await operator.project(ORG, PROJECT).catch((error: unknown) => {
+      if (error instanceof KeelProblem && error.status === 404) return undefined;
+      throw error;
+    })) ??
+    (await operator.createProject(
+      { namespace: ORG, name: PROJECT, source: { kind: "template", name: FIXTURE } },
+      { idempotencyKey: key("project:2") },
+    ));
   await operator.putSettings(project.id, {
     protectedPaths: [],
     maxBatchSize: 1,
@@ -172,8 +179,8 @@ try {
   const dirA = cloneWorkspace(a.workspace.remote, tokenA);
   const dirB = cloneWorkspace(b.workspace.remote, tokenB);
   dirs.push(dirA, dirB);
-  // A slot forked before trunk last moved is behind it. The first change then starts from
-  // trunk's head, as an agent told to rebase would, so (a) holds on any run of this project.
+  // A workspace is granted at trunk's head, whenever trunk last moved: (h) holds it to that.
+  // Where it fails, the first change is rebased onto trunk so the rest of the run still reads.
   const trunkAtStart = (await first.commits(project.id, { limit: 1 })).items[0]?.sha ?? "";
   for (const [who, dir] of [
     ["first", dirA],
@@ -415,8 +422,9 @@ try {
   for (const e of notAgents) console.log(`     not an agent's: ${line(e)}`);
   check(notAgents.length === 0, "(h) every WorkspacePushed in the run is an agent's push");
 
-  // (i) Keel signs what it lands. A workspace granted now is forked from trunk, so its clone
-  // holds what the run landed; it is abandoned once read.
+  // (i) Keel signs what it lands. The reader is declared as soon as the last landing is read,
+  // before the pool's own refresh may have run: its workspace is granted at trunk's head all
+  // the same, so its plain clone holds everything the run landed. It is abandoned once read.
   const reader = await declareWhenPooled(
     first,
     { goal: `rebase ${run}: read trunk`, footprint: footprint() },
@@ -435,7 +443,11 @@ try {
   for (const sha of held)
     console.log(`     ${show(sha, "%h %G? signed by %GS, committed by %cn <%ce> %cI")}`);
   check(
-    held.length >= 2,
+    git(dirR, ["rev-parse", "HEAD"]) === landed[0],
+    "(i) the reader's workspace, declared as the last change landed, was granted at trunk's head",
+  );
+  check(
+    held.length === landed.length && landed.length === 4,
     `(i) the reader's workspace holds ${held.length} of the 4 landed commits`,
   );
   check(
