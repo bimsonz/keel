@@ -88,6 +88,37 @@ describe("the console's Worker", () => {
     expect(await response.text()).toContain('<div id="root"');
   });
 
+  it.each([
+    ["GET", "/v1/whoami"],
+    ["POST", "/v1/auth/sign-in/passkey"],
+    ["POST", "/mcp"],
+    ["GET", "/mcp/server-card"],
+    ["GET", "/start"],
+    ["GET", "/llms.txt"],
+    ["GET", "/.well-known/keel/allowed-signers"],
+  ])("[console.keel-paths] %s %s reaches Keel as it came, past the page", async (method, path) => {
+    const body = method === "POST" ? "{}" : undefined;
+    const response = await SELF.fetch(`${CONSOLE}${path}?x=1`, {
+      method,
+      headers: { authorization: "Bearer a-token" },
+      ...(body === undefined ? {} : { body }),
+    });
+    expect(await response.json()).toEqual({
+      keel: `${method} ${path}?x=1`,
+      authorization: "Bearer a-token",
+      body: body ?? "",
+    });
+  });
+
+  it.each(["/v1", "/mcpx", "/starter", "/llms.txtx", "/.well-known"])(
+    "[console.keel-paths] %s is no path of Keel's: it is the page",
+    async (path) => {
+      const response = await SELF.fetch(`${CONSOLE}${path}`);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(await response.text()).toContain('<div id="root"');
+    },
+  );
+
   it("[console.no-proxy] reads nothing of Keel for anyone: where its proxy was is the page, whatever key is shown", async () => {
     const response = await SELF.fetch(`${CONSOLE}/api/v1/events?limit=5`, {
       headers: { authorization: "Bearer test-presenter-key" },

@@ -170,6 +170,54 @@ describe("the console's Worker", () => {
     expect(r.keel).toEqual([]);
   });
 
+  it("[handler.keel-paths] hands Keel's own paths to Keel as they came, and answers what Keel answers", async () => {
+    const r = rig();
+    const sent = [
+      new Request(`${ORIGIN}/v1/whoami`, { headers: { authorization: "Bearer a-token" } }),
+      new Request(`${ORIGIN}/v1/auth/sign-in/passkey?x=1`, {
+        method: "POST",
+        headers: { cookie: "__Secure-keel.session_token=s", origin: ORIGIN },
+        body: "{}",
+      }),
+      new Request(`${ORIGIN}/mcp`, { method: "POST", body: "{}" }),
+      new Request(`${ORIGIN}/mcp/server-card`),
+      new Request(`${ORIGIN}/start`),
+      new Request(`${ORIGIN}/llms.txt`),
+      new Request(`${ORIGIN}/.well-known/keel/allowed-signers`),
+    ];
+    const asked = await watchingFetch(async () => {
+      for (const request of sent) {
+        // oxlint-disable-next-line no-await-in-loop -- one after another, in the order asserted below
+        expect(await r.fetch(request)).toBe(r.answer);
+      }
+    });
+    // The very requests, so nothing of one was read, dropped or added on the way.
+    expect(r.keel).toHaveLength(sent.length);
+    for (const [at, request] of sent.entries()) expect(r.keel[at]).toBe(request);
+    expect(asked).toEqual([]);
+    expect(r.assets).toEqual([]);
+  });
+
+  it.each([
+    "/v1",
+    "/v12/whoami",
+    "/a/v1/whoami",
+    "/mcpx",
+    "/mcp.json",
+    "/starter",
+    "/start/",
+    "/start/here",
+    "/llms.txtx",
+    "/llms.txt/x",
+    "/.well-known",
+    "/a/.well-known/x",
+  ])("[handler.keel-paths] %s is no path of Keel's: it is the page", async (path) => {
+    const r = rig();
+    const answer = await r.ask(path, { headers: { authorization: "Bearer a-token" } });
+    expect(await answer.text()).toBe("the page");
+    expect(r.keel).toEqual([]);
+  });
+
   // Where nothing is run first, the assets answer a path that is no file with the page, and the
   // Worker's code never runs: seen on keel.town, where every clone address answered HTML.
   it("[console.git-first] the Worker's config runs it first for every path it hands to Keel, and for no place in the page", () => {
@@ -191,6 +239,25 @@ describe("the console's Worker", () => {
       "/acme/forge.git/blob/trunk/README.md",
       "/assets/index.js",
     ])
+      expect([path, firstFor(path)]).toEqual([path, false]);
+  });
+
+  // A site with no routes has only this Worker at its door: Keel's own paths must reach its code.
+  it("[console.keel-first] the Worker's config runs it first for each of Keel's own paths, and for no handle that begins like one", () => {
+    const first = runFirst();
+    const firstFor = (path: string) => first.some((glob) => glob.test(path));
+    for (const path of [
+      "/v1/whoami",
+      "/v1/auth/sign-in/passkey",
+      "/mcp",
+      "/mcp/server-card",
+      "/start",
+      "/llms.txt",
+      "/.well-known/keel/allowed-signers",
+      "/.well-known/oauth-authorization-server",
+    ])
+      expect([path, firstFor(path)]).toEqual([path, true]);
+    for (const path of ["/v1", "/v12/whoami", "/mcpx", "/starter", "/llms.txtx", "/.well-known"])
       expect([path, firstFor(path)]).toEqual([path, false]);
   });
 });
