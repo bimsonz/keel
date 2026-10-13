@@ -2,15 +2,14 @@
 # kills: places.namespace
 # why: a visitor who opens a namespace's own page is sent to sign in, so nobody reads a person's or an org's public projects without an account
 diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
-index 4e187fe..894780a 100644
+index 086041f..ca165f1 100644
 --- a/apps/console/src/places.ts
 +++ b/apps/console/src/places.ts
-@@ -124,7 +124,7 @@ export function sentFrom(
- ): string | null {
-   const asked = `${here.pathname}${here.search}`;
-   // A namespace's page is anyone's to open: Keel shows a visitor its public projects, and nothing else of it.
--  const open = place.at === "login" || place.at === "signup" || place.at === "namespace";
-+  const open = place.at === "login" || place.at === "signup";
+@@ -137,7 +137,6 @@ export function sentFrom(
+   const open =
+     place.at === "login" ||
+     place.at === "signup" ||
+-    place.at === "namespace" ||
+     place.at === "sponsor";
    if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
    if (place.at === "login") return nextOf(here.search);
-   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);

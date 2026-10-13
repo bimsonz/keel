@@ -4,6 +4,7 @@ import { AccountApp } from "./account/AccountApp.tsx";
 import { App } from "./App.tsx";
 import { legalOf } from "./legal/legal.ts";
 import { LegalPage } from "./legal/LegalPage.tsx";
+import { takeLink } from "./account/sponsorLink.ts";
 import { hrefOf, placeOf } from "./places.ts";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./styles.css";
@@ -19,6 +20,9 @@ const place = placeOf(window.location.pathname, window.location.search);
 if (place?.at === "namespace" && window.location.pathname !== hrefOf(place))
   window.history.replaceState(null, "", `${hrefOf(place)}${window.location.search}`);
 
+// What an agent's link carries is read here, before anything is drawn, and taken out of the address at once.
+const link = place?.at === "sponsor" ? takeLink(window.location, window.history) : null;
+
 createRoot(root).render(
   <StrictMode>
     {legal !== null ? (
@@ -26,7 +30,7 @@ createRoot(root).render(
     ) : place === null ? (
       <App />
     ) : (
-      <AccountApp place={place} />
+      <AccountApp place={place} link={link} />
     )}
   </StrictMode>,
 );

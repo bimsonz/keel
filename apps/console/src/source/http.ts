@@ -18,6 +18,8 @@
 import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";
 import type {
+  AgentCard,
+  Agents_approveSponsorInput,
   EscalationPage,
   EscalationView,
   EventPage,
@@ -47,6 +49,7 @@ import {
   type ChangeDiff,
   type KeelCommands,
   type KeelDirectory,
+  type KeelSponsorship,
   type KeelEventSource,
   KeelRefused,
   type KeelResources,
@@ -136,6 +139,43 @@ function reader(options: HttpOptions): (path: string, signal?: AbortSignal) => P
   const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
   return (path, signal) => request(`${origin}${path}`, signal === undefined ? {} : { signal });
+}
+
+/**
+ * Standing behind an agent. The card is a read anyone may make, by the agent's id. The approval carries the
+ * code in its body and in nothing else: not the path, not the query, not a header. Its key is made for the one
+ * attempt, of nothing the code could be read from.
+ */
+export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorship {
+  const read = reader(options);
+  const request = options.fetch ?? fetch;
+  const origin = options.origin ?? "";
+  return {
+    async findAgent(agentId, signal) {
+      const response = await read(`/v1/agents/${encodeURIComponent(agentId)}`, signal);
+      // An agent Keel knows none of by that id.
+      if (response.status === 404) return null;
+      if (!response.ok) throw await refusalOf(response);
+      return answered<AgentCard>(response);
+    },
+    async approve(agentId, code) {
+      const {
+        agentId: named,
+        "idempotency-key": key,
+        ...body
+      }: Agents_approveSponsorInput = {
+        agentId,
+        "idempotency-key": `console:sponsor:${crypto.randomUUID()}`,
+        code,
+      };
+      const response = await request(`${origin}/v1/agents/${encodeURIComponent(named)}/sponsor`, {
+        method: "PUT",
+        headers: { "content-type": "application/json", "idempotency-key": key },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw await refusalOf(response);
+    },
+  };
 }
 
 export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {

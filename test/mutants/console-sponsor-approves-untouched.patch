@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.touch-first
+# why: the approval is sent before the passkey touch, so it goes as whoever was signed in and without the act the page asks for
+diff --git a/apps/console/src/account/sponsoring.ts b/apps/console/src/account/sponsoring.ts
+index e04c9f5..d168d93 100644
+--- a/apps/console/src/account/sponsoring.ts
++++ b/apps/console/src/account/sponsoring.ts
+@@ -23,9 +23,9 @@ export async function standBehind(
+   link: SponsorLink,
+   reader: Who | null,
+ ): Promise<Stood> {
++  await sponsoring.approve(link.agentId, link.code);
+   const signedIn = await sponsoring.signIn();
+   if (reader !== null && signedIn.id !== reader.id) return { is: "changed", to: signedIn };
+-  await sponsoring.approve(link.agentId, link.code);
+   return { is: "approved", as: signedIn };
+ }
+ 

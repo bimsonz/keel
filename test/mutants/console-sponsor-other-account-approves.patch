@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.other-account
+# why: a passkey of another account than the one reading approves at once, so a person stands behind an agent as an account the page never named to them
+diff --git a/apps/console/src/account/sponsoring.ts b/apps/console/src/account/sponsoring.ts
+index e04c9f5..77a03de 100644
+--- a/apps/console/src/account/sponsoring.ts
++++ b/apps/console/src/account/sponsoring.ts
+@@ -24,7 +24,6 @@ export async function standBehind(
+   reader: Who | null,
+ ): Promise<Stood> {
+   const signedIn = await sponsoring.signIn();
+-  if (reader !== null && signedIn.id !== reader.id) return { is: "changed", to: signedIn };
+   await sponsoring.approve(link.agentId, link.code);
+   return { is: "approved", as: signedIn };
+ }

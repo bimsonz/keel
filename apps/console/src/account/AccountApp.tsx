@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
-import { createHttpDirectory } from "../source/http.ts";
+import { createHttpDirectory, createHttpSponsorship } from "../source/http.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
 import {
@@ -30,6 +30,8 @@ import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
+import { Sponsor } from "./Sponsor.tsx";
+import { type SponsorLink, takeLink } from "./sponsorLink.ts";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
 
@@ -40,8 +42,11 @@ type Reader =
   | { is: "visitor" }
   | { is: "user"; who: Who };
 
-/** Who is reading, asked of Keel once. A page that changes it goes to another address, where it is asked again. */
-function useReader(account: Account): Reader {
+/**
+ * Who is reading, asked of Keel once. A page that changes it goes to another address, where it is asked again;
+ * the sponsor's page alone stays, since what it holds is in memory, and says who its touch signed in.
+ */
+function useReader(account: Account): [Reader, (who: Who) => void] {
   const [reader, setReader] = useState<Reader>({ is: "reading" });
   useEffect(() => {
     let here = true;
@@ -59,7 +64,8 @@ function useReader(account: Account): Reader {
       here = false;
     };
   }, [account]);
-  return reader;
+  const signedIn = useCallback((who: Who) => setReader({ is: "user", who }), []);
+  return [reader, signedIn];
 }
 
 /** A handle, as it is typed: what is wrong with it, said under the field. */
@@ -704,11 +710,26 @@ function Shell({
   );
 }
 
-export function AccountApp({ place }: { place: Place }) {
+export function AccountApp({ place, link }: { place: Place; link: SponsorLink | null }) {
   const account = useMemo(() => createAccount({ origin: window.location.origin }), []);
   // A namespace's projects are Keel's own to list, to whoever is reading: the same read the home makes.
   const directory = useMemo(() => createHttpDirectory(), []);
-  const reader = useReader(account);
+  const sponsorship = useMemo(() => createHttpSponsorship(), []);
+  // An agent's link opened while this page is up changes the fragment and loads nothing: it is taken out of the
+  // address as the first was, and the page begins again with what it carried.
+  const [held, setHeld] = useState({ link, taken: 0 });
+  const onSponsor = place.at === "sponsor";
+  useEffect(() => {
+    if (!onSponsor) return undefined;
+    const take = (): void => {
+      if (window.location.hash === "") return;
+      const carried = takeLink(window.location, window.history);
+      setHeld((before) => ({ link: carried, taken: before.taken + 1 }));
+    };
+    window.addEventListener("hashchange", take);
+    return () => window.removeEventListener("hashchange", take);
+  }, [onSponsor]);
+  const [reader, signedIn] = useReader(account);
   useEffect(() => {
     applyMode(
       new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark",
@@ -769,6 +790,17 @@ export function AccountApp({ place }: { place: Place }) {
     page = <NamespacePublic directory={directory} handle={place.handle} signedIn={false} />;
   else if (reader.is === "user" && place.at === "invite")
     page = <Invite account={account} who={reader.who} id={place.id} />;
+  else if (place.at === "sponsor" && (reader.is === "user" || reader.is === "visitor"))
+    page = (
+      <Sponsor
+        key={held.taken}
+        account={account}
+        sponsorship={sponsorship}
+        who={reader.is === "user" ? reader.who : null}
+        link={held.link}
+        onSignedIn={signedIn}
+      />
+    );
   return (
     <Shell reader={reader} handle={handle} orgs={orgs}>
       {page}

@@ -3106,6 +3106,166 @@ expectEqual(
   String(sentAtTheDoor.filter((request) => request.authorization !== undefined).length),
   "0",
 );
+
+// An agent asks a person to stand behind it, and hands them a link with a code in its fragment. Whoever holds
+// the code can stand behind the agent, so the page keeps it in memory alone: out of the address at once, in no
+// storage, and sent only in the body of the one call that approves. Opening the link approves nothing; one tap
+// is a passkey touch and then that call. Keel here knows two agents, and reads who asks from its identity.
+const BETA = {
+  id: "agt_0000000000000000000000BETA",
+  name: "beta",
+  kind: "hosted",
+  org: "acme",
+} as const;
+const GAMMA = { id: "agt_000000000000000000000GAMMA", name: "gamma", kind: "interactive" } as const;
+const sponsoring = createFakeKeel({
+  namespace: NAMESPACE,
+  agents: [BETA, GAMMA],
+  readerOf: async (request) => passkeysAlone.reads(request),
+});
+// The route put on last is the one that answers: from here this context's Keel is the one with the agents.
+const sentForAnAgent: Sent[] = [];
+await asDeployed(door, { keel: sponsoring, identity: passkeysAlone, sent: sentForAnAgent });
+/** Everything the page asked of anyone from here on, as the browser sent it. */
+const askedOfAnyone: { line: string; where: string; body: string }[] = [];
+newcomer.on("request", (request) =>
+  askedOfAnyone.push({
+    line: `${request.method()} ${new URL(request.url()).pathname}`,
+    where: `${request.url()} ${JSON.stringify(request.headers())}`,
+    body: request.postData() ?? "",
+  }),
+);
+const linkTo = (agent: { id: string }, code: string): string =>
+  `${built}/sponsor#agent=${agent.id}&code=${code}`;
+const standBehind = (shown: Page, agent: { name: string }) =>
+  shown.getByRole("button", { name: `Stand behind ${agent.name}` });
+/** Waits for the sponsor's page to have said something, whatever it is. */
+const sponsorPage = async (shown: Page, agent: { name: string }): Promise<void> => {
+  await shown.getByRole("heading", { level: 1 }).waitFor();
+  await standBehind(shown, agent)
+    .waitFor({ timeout: 5000 })
+    .catch(() => undefined);
+};
+const forBeta = sponsoring.askSponsor(BETA.id);
+await newcomer.goto(linkTo(BETA, forBeta.code), { waitUntil: "domcontentloaded" });
+await sponsorPage(newcomer, BETA);
+await shot(newcomer, "sponsor");
+expectEqual(
+  "sponsor: the page names the agent as Keel shows it to anyone, and who would stand behind it",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${squash(await newcomer.locator("main dl").innerText())} | ${await standBehind(newcomer, BETA).count()} button | ${await newcomer.getByText("You approve with a passkey, as turing.").count()}`,
+  "Stand behind beta? | Agent beta Declared as hosted Works in acme | 1 button | 1",
+);
+expectEqual(
+  "sponsor: the code is out of the address at once, and in no storage and no cookie the page can read",
+  await newcomer.evaluate(
+    (code) =>
+      `${location.pathname}${location.search}${location.hash} | ${String(
+        JSON.stringify([
+          Object.entries(localStorage),
+          Object.entries(sessionStorage),
+          document.cookie,
+          history.state,
+        ]).includes(code),
+      )}`,
+    forBeta.code,
+  ),
+  "/sponsor | false",
+);
+expectEqual(
+  "sponsor: opening the link asks Keel who the agent is and nothing more, and approves nothing",
+  `${askedOfAnyone
+    .filter((asked) => asked.line.includes("/v1/agents"))
+    .map((asked) => asked.line)
+    .join(
+      ", ",
+    )} | ${sponsoring.sponsorOf(BETA.id) ?? "nobody"} | ${askedOfAnyone.filter((asked) => `${asked.where} ${asked.body}`.includes(forBeta.code)).length} with the code`,
+  `GET /v1/agents/${BETA.id} | nobody | 0 with the code`,
+);
+await newcomer.setViewportSize({ width: 390, height: 844 });
+expectEqual(
+  "sponsor: at a phone's width the button is whole on the screen",
+  await standBehind(newcomer, BETA).evaluate(
+    (button) =>
+      `${String(button.getBoundingClientRect().left >= 0)} ${String(button.getBoundingClientRect().right <= window.innerWidth)}`,
+  ),
+  "true true",
+);
+await shot(newcomer, "sponsor-phone");
+await newcomer.setViewportSize({ width: 1280, height: 900 });
+// One tap: the device's passkey signs them in afresh, and the approval goes as them.
+await standBehind(newcomer, BETA).click();
+await newcomer
+  .getByRole("heading", { level: 1, name: "You stand behind beta" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const turing = await passkeysAlone.whose("turing");
+expectEqual(
+  "sponsor: one tap, a passkey touch and then the approval, stands the person behind the agent",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(BETA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(BETA.id))} | ${await standBehind(newcomer, BETA).count()} button`,
+  "You stand behind beta | turing | 0 button",
+);
+const withTheCode = askedOfAnyone.filter((asked) =>
+  `${asked.where} ${asked.body}`.includes(forBeta.code),
+);
+expectEqual(
+  "sponsor: the code rode in the body of the one call that approves, and in no address and no header",
+  `${withTheCode.map((asked) => asked.line).join(", ")} | ${withTheCode.filter((asked) => asked.where.includes(forBeta.code)).length} in an address or a header`,
+  `PUT /v1/agents/${BETA.id}/sponsor | 0 in an address or a header`,
+);
+// A code that is no longer good: the agent asked again, and a new request replaces the last. Keel says so and
+// what to do next, the button goes, and the page adds no line of its own.
+const stale = sponsoring.askSponsor(GAMMA.id);
+const forGamma = sponsoring.askSponsor(GAMMA.id);
+await newcomer.goto(linkTo(GAMMA, stale.code), { waitUntil: "domcontentloaded" });
+await sponsorPage(newcomer, GAMMA);
+if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+await newcomer
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sponsor: a code that is no longer good is refused in what Keel said, with Keel's way forward and none of the page's own, and no second try",
+  `${(await newcomer.getByRole("alert").count()) === 0 ? "no refusal" : squash(await newcomer.getByRole("alert").innerText())} | ${await standBehind(newcomer, GAMMA).count()} button | ${await newcomer.getByText("Ask the agent for a new link.").count()} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"}`,
+  "No agent is asking for a sponsor with that code. Ask the agent to ask again, and approve with its new code | 0 button | 0 | nobody",
+);
+// A link that is not whole asks Keel nothing. It is opened over the page that is up, as a second link would be:
+// only the fragment changes and nothing is loaded, and it is taken out of the address all the same.
+const before = askedOfAnyone.length;
+await newcomer.goto(`${built}/sponsor#code=${forGamma.code}`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("heading", { level: 1 }).waitFor();
+await newcomer.waitForTimeout(300);
+expectEqual(
+  "sponsor: a link that is not whole says so, is taken out of the address all the same, and asks Keel for no agent",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${await newcomer.evaluate(() => `${location.pathname}${location.hash}`)} | ${askedOfAnyone.slice(before).filter((asked) => asked.line.includes("/v1/agents")).length} asked`,
+  "This link is not whole | /sponsor | 0 asked",
+);
+// A visitor is not sent to sign in: the link's code would not survive the trip. The same button is theirs, and
+// its touch signs them in before the approval goes, as them.
+await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();
+await newcomer.waitForURL(`${built}/`);
+await newcomer.goto(linkTo(GAMMA, forGamma.code), { waitUntil: "domcontentloaded" });
+await sponsorPage(newcomer, GAMMA);
+expectEqual(
+  "sponsor: a visitor stays on the page, is told the touch signs them in, and is offered the same button",
+  `${new URL(newcomer.url()).pathname} | ${squash(await newcomer.locator("header").first().innerText())} | ${await standBehind(newcomer, GAMMA).count()} button | ${await newcomer.getByText("the same touch signs you in").count()}`,
+  "/sponsor | Keel | 1 button | 1",
+);
+if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+await newcomer
+  .getByRole("heading", { level: 1, name: "You stand behind gamma" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sponsor: a visitor's one tap signs them in and stands them behind the agent, and the frame says who they are",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(GAMMA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(GAMMA.id))} | ${squash(await newcomer.locator("header").first().innerText())}`,
+  "You stand behind gamma | turing | Keel turing",
+);
+expectEqual(
+  "sponsor: the page sent Keel no Authorization",
+  String(sentForAnAgent.filter((request) => request.authorization !== undefined).length),
+  "0",
+);
 await door.close();
 
 // Where Keel serves no identity yet, the pages say so, and take nobody for a visitor to be signed up.

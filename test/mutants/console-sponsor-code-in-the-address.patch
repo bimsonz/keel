@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.code-in-body
+# why: the code an agent showed one person rides in the approval's address, so it is in a request line, a log and a history
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 1cb08e4..3158f1d 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -168,7 +168,7 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
+         "idempotency-key": `console:sponsor:${crypto.randomUUID()}`,
+         code,
+       };
+-      const response = await request(`${origin}/v1/agents/${encodeURIComponent(named)}/sponsor`, {
++      const response = await request(`${origin}/v1/agents/${encodeURIComponent(named)}/sponsor?code=${encodeURIComponent(code)}`, {
+         method: "PUT",
+         headers: { "content-type": "application/json", "idempotency-key": key },
+         body: JSON.stringify(body),

@@ -153,6 +153,17 @@ export interface KeelCommands {
 }
 
 /** Keel refused something, and said why. `next` is the ways forward it gave, each by its title. */
+/**
+ * Standing behind an agent: Keel's public card of one, and a person's approval of the code it showed them.
+ * The approval is the signed-in person's, and Keel takes it only from a passkey sign-in of the last ten minutes.
+ */
+export interface KeelSponsorship {
+  /** Who an agent is, as Keel shows anyone: never who stands behind it. Null where Keel knows none by that id. */
+  findAgent(agentId: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
+  /** Stands behind the agent with the code it showed. The code rides in the body of this one call, and nowhere else. */
+  approve(agentId: string, code: string): Promise<void>;
+}
+
 export class KeelRefused extends Error {
   readonly code: string;
   readonly status: number;

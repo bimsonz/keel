@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.spent
+# why: any refusal of Keel's ends the link, so a sign-in that was not fresh loses the person the code they could have used after another touch
+diff --git a/apps/console/src/account/sponsoring.ts b/apps/console/src/account/sponsoring.ts
+index e04c9f5..b76b526 100644
+--- a/apps/console/src/account/sponsoring.ts
++++ b/apps/console/src/account/sponsoring.ts
+@@ -35,4 +35,4 @@ export async function standBehind(
+  * fresh, a touch the person called off and a Keel that could not be reached leave it to be tried again.
+  */
+ export const spent = (error: unknown): boolean =>
+-  error instanceof KeelRefused && (error.status === 404 || error.status === 409);
++  error instanceof KeelRefused;

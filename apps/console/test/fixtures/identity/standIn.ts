@@ -40,6 +40,11 @@ export interface Identity {
   lapse(invitationId: string): Promise<void>;
   /** Puts every session made so far more than ten minutes behind it, as time would: none of them is fresh now. */
   age(): Promise<void>;
+  /**
+   * Who a request is from, as Keel's gate reads its session, and whether that session was signed in by a passkey
+   * in the last ten minutes. Null where it carries none.
+   */
+  reads(request: Request): Promise<{ id: string; fresh: boolean } | null>;
   /** Whose a handle is here, as Keel says it of a namespace: a person's or an org's, by its account's id, or nobody's. */
   whose(handle: string): Promise<{ id: string; kind: "user" | "org" } | undefined>;
 }
@@ -412,6 +417,14 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
           update: { createdAt: made },
         });
       }
+    },
+    async reads(request) {
+      const carried = await auth.api.getSession({ headers: request.headers });
+      if (carried === null) return null;
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the session's own added field
+      const by = (carried.session as { signedInBy?: unknown }).signedInBy;
+      const made = new Date(carried.session.createdAt).getTime();
+      return { id: carried.user.id, fresh: by === "passkey" && Date.now() - made <= FRESH_FOR_MS };
     },
     async whose(handle) {
       const context = await auth.$context;

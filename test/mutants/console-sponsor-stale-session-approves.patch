@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.refused
+# why: the stand-in for Keel takes an approval from any session, where Keel refuses one not signed in by a passkey in the last ten minutes: the page's handling of that refusal would be tested against nothing
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 2c0f390..09cc920 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -403,7 +403,6 @@ export function createFakeKeel(
+       if (link !== null && request.method === "PUT") {
+         if (reader === null) return problem(401, "auth.required");
+         // Only a passkey sign-in of the last ten minutes approves.
+-        if (reader.fresh !== true) return staleSignIn();
+         const agentId = decodeURIComponent(link[1] ?? "");
+         const known = agents.get(agentId);
+         const asked = asks.get(agentId);

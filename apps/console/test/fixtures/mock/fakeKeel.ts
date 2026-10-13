@@ -14,6 +14,8 @@
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
+  AgentCard,
+  AgentProfile,
   EscalationPage,
   EscalationView,
   EventPage,
@@ -25,6 +27,7 @@ import type {
   ProbeSource,
   ProjectSettings,
   ProjectView,
+  SponsorRequest,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
@@ -57,7 +60,7 @@ export type Role = NonNullable<ProjectView["viewer"]>["role"];
  * project's namespace where they are a member of it; or null, a visitor. `sponsor` says they are the person the
  * question's agent names: the one Keel asks first.
  */
-export type Reader = { role?: Role; sponsor?: boolean } | null;
+export type Reader = { role?: Role; sponsor?: boolean; id?: string; fresh?: boolean } | null;
 
 /**
  * How long a question waits for the person asked first before Keel lists it to its namespace's maintainers
@@ -123,7 +126,14 @@ export interface FakeKeel {
   events(): readonly AnyEvent[];
   /** The project it holds, as it names it to a reader who is not a member of its namespace. */
   project: ProjectView;
+  /** An agent asks for a sponsor, as Keel's `askSponsor` answers it: a code good once and for ten minutes. */
+  askSponsor(agentId: string): SponsorRequest;
+  /** Who stands behind an agent, by the id its reader was known by; nobody, where it has no sponsor. */
+  sponsorOf(agentId: string): string | undefined;
 }
+
+/** How long an agent's code is good for. */
+export const SPONSOR_CODE_FOR_MS = 600_000;
 
 const RULINGS: ReadonlySet<string> = new Set(S1_CHOICES.map((option) => option.id));
 
@@ -171,6 +181,43 @@ function problem(
   };
   return Response.json(body, { status, headers: { "content-type": "application/problem+json" } });
 }
+
+/** Keel's answer to a session that was not signed in by a passkey in the last ten minutes: `freshSignInRequired`. */
+const staleSignIn = (): Response =>
+  problem(
+    403,
+    "auth.fresh_sign_in_required",
+    [{ kind: "escalate", title: "Sign in again with your passkey, then retry" }],
+    "This needs a fresh sign-in: a passkey sign-in from the last ten minutes.",
+  );
+
+/**
+ * Keel's one answer to an approval that finds no live request, `noSuchRequest`: the code is wrong, used or run
+ * out, or there is no such agent, and nothing in it says which.
+ */
+const noSuchRequest = (): Response =>
+  problem(
+    404,
+    "resource.not_found",
+    [{ kind: "escalate", title: "Ask the agent to ask again, and approve with its new code" }],
+    "No agent is asking for a sponsor with that code.",
+  );
+
+/** Keel's answer to a link asked for an agent that has a sponsor: `stateRefused`, `sponsor-held`. */
+const sponsorHeld = (agentId: string): Response =>
+  problem(
+    409,
+    "agent.state_refused",
+    [
+      {
+        kind: "call",
+        title: "End the link the agent has first",
+        operationId: "Agents_endSponsorship",
+        args: { agentId },
+      },
+    ],
+    `${agentId} already has a sponsor, and an agent has one.`,
+  );
 
 /** Keel's refusal of someone who lacks a role, with the way forward it gives: `authorize.ts`, `lacksRole`. */
 const lacks = (role: string): Response =>
@@ -220,6 +267,10 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
+    /** The agents Keel knows by id, each as anyone may see it. */
+    agents?: readonly AgentCard[];
+    /** The sessions, by their cookie's value, signed in by a passkey in the last ten minutes. Every other is stale. */
+    freshly?: readonly string[];
     /**
      * The session, by its cookie's value, of the person the question's agent names: Keel asks them first, and
      * its namespace's maintainers once `MAINTAINERS_AFTER_MS` has passed. Left out, with `sponsored` unset, the
@@ -274,8 +325,12 @@ export function createFakeKeel(
       )?.[1];
       const role = held === undefined ? undefined : options.sessions?.[held];
       if (role === undefined) return null;
-      const sponsor = held === options.sponsor ? { sponsor: true } : {};
-      return role === "stranger" ? sponsor : { role, ...sponsor };
+      const known = {
+        id: held ?? "",
+        fresh: options.freshly?.includes(held ?? "") === true,
+        ...(held === options.sponsor ? { sponsor: true } : {}),
+      };
+      return role === "stranger" ? known : { role, ...known };
     });
   const sponsored = options.sponsor !== undefined || options.sponsored === true;
   const now = options.now ?? Date.now;
@@ -295,10 +350,28 @@ export function createFakeKeel(
     state: ruled === undefined ? "open" : "ruled",
   });
 
+  const agents = new Map((options.agents ?? []).map((agent) => [agent.id, agent]));
+  /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
+  const asks = new Map<string, { code: string; until: number }>();
+  const behind = new Map<string, string>();
+
   return {
     calls,
     events: () => log.events,
     project,
+    askSponsor(agentId) {
+      // A new request replaces the last. Keel refuses the ask of an agent that has a sponsor; here it is let
+      // through, so a test reaches the approval's own refusal of one: a link made while a request was live.
+      const code = `spn_${crypto.randomUUID().replaceAll("-", "")}`;
+      const until = now() + SPONSOR_CODE_FOR_MS;
+      asks.set(agentId, { code, until });
+      return {
+        code,
+        url: `https://keel.test/sponsor#agent=${encodeURIComponent(agentId)}&code=${encodeURIComponent(code)}`,
+        expiresAt: new Date(until).toISOString(),
+      };
+    },
+    sponsorOf: (agentId) => behind.get(agentId),
     async fetch(request) {
       const url = new URL(request.url);
       const sent = request.method === "GET" ? "" : await request.text();
@@ -317,6 +390,47 @@ export function createFakeKeel(
       /** The project is shown to its namespace's members, and to anyone where it is public. To the rest it is not there. */
       const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
+
+      // Who an agent is, Keel answers anyone: its card, and never who stands behind it.
+      const card = /^\/v1\/agents\/([^/]+)$/.exec(url.pathname);
+      if (card !== null && request.method === "GET") {
+        const known = agents.get(decodeURIComponent(card[1] ?? ""));
+        return known === undefined ? gone() : Response.json(known satisfies AgentCard);
+      }
+
+      // A person stands behind an agent with the code it showed them: Keel's `approveSponsor`.
+      const link = /^\/v1\/agents\/([^/]+)\/sponsor$/.exec(url.pathname);
+      if (link !== null && request.method === "PUT") {
+        if (reader === null) return problem(401, "auth.required");
+        // Only a passkey sign-in of the last ten minutes approves.
+        if (reader.fresh !== true) return staleSignIn();
+        const agentId = decodeURIComponent(link[1] ?? "");
+        const known = agents.get(agentId);
+        const asked = asks.get(agentId);
+        // A code that is wrong, used or run out, and an agent that is not there, are one answer, and it comes
+        // before anything the agent's own standing would say: a code that is no good learns nothing of an agent.
+        if (
+          known === undefined ||
+          asked === undefined ||
+          asked.code !== fields(sent).get("code") ||
+          now() > asked.until
+        )
+          return noSuchRequest();
+        if (behind.has(agentId)) return sponsorHeld(agentId);
+        asks.delete(agentId);
+        behind.set(agentId, reader.id ?? "");
+        return Response.json({
+          id: known.id,
+          projectId: project.id,
+          name: known.name,
+          kind: known.kind,
+          scopes: [],
+          sponsor: reader.id ?? "",
+          revocationEpoch: 0,
+          state: "active",
+          createdAt: new Date(now()).toISOString(),
+        } satisfies AgentProfile);
+      }
 
       // Whose a handle is, Keel answers anyone: that a handle is someone's is no secret, and what it holds is.
       const whose = /^\/v1\/namespaces\/([^/]+)$/.exec(url.pathname);

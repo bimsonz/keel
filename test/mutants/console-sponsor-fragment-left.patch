@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.fragment-gone
+# why: the link's fragment stays in the address once read, so the code is in the history and in any address a person copies
+diff --git a/apps/console/src/account/sponsorLink.ts b/apps/console/src/account/sponsorLink.ts
+index 0be6869..501aed2 100644
+--- a/apps/console/src/account/sponsorLink.ts
++++ b/apps/console/src/account/sponsorLink.ts
+@@ -27,6 +27,5 @@ export function takeLink(
+   history: Pick<History, "replaceState" | "state">,
+ ): SponsorLink | null {
+   const link = linkOf(at.hash);
+-  if (at.hash !== "") history.replaceState(history.state, "", `${at.pathname}${at.search}`);
+   return link;
+ }

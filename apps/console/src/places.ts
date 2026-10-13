@@ -20,7 +20,9 @@ export type Place =
   /** An org's members and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
   | { at: "org"; org: string; tab: Exclude<OrgTab, "home"> }
   /** An invitation to an org, as the person it was made to opens it. */
-  | { at: "invite"; id: string };
+  | { at: "invite"; id: string }
+  /** Where an agent sends the person it asks to stand behind it. What it asks is in the fragment, never here. */
+  | { at: "sponsor" };
 
 const UNDER_ORGS: readonly Exclude<OrgTab, "home">[] = ["members", "settings"];
 
@@ -66,6 +68,8 @@ export function placeOf(pathname: string, search = ""): Place | null {
       return { at: "signup" };
     case "settings":
       return { at: "settings" };
+    case "sponsor":
+      return { at: "sponsor" };
     case "device":
       return { at: "device", userCode: new URLSearchParams(search).get("user_code") ?? "" };
     default:
@@ -128,7 +132,13 @@ export function sentFrom(
 ): string | null {
   const asked = `${here.pathname}${here.search}`;
   // A namespace's page is anyone's to open: Keel shows a visitor its public projects, and nothing else of it.
-  const open = place.at === "login" || place.at === "signup" || place.at === "namespace";
+  // The sponsor's page is too: its one tap signs a visitor in, and a trip to sign in would lose what the
+  // agent's link carried, which is kept nowhere but in the page's memory.
+  const open =
+    place.at === "login" ||
+    place.at === "signup" ||
+    place.at === "namespace" ||
+    place.at === "sponsor";
   if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
   if (place.at === "login") return nextOf(here.search);
   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);

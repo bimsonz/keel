@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: places.sponsor
+# why: a visitor who opens an agent's link is sent to sign in, and what the link carried, held only in the page's memory, is lost on the way
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 086041f..dc70ce8 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -137,8 +137,7 @@ export function sentFrom(
+   const open =
+     place.at === "login" ||
+     place.at === "signup" ||
+-    place.at === "namespace" ||
+-    place.at === "sponsor";
++    place.at === "namespace";
+   if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
+   if (place.at === "login") return nextOf(here.search);
+   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);
