@@ -15,6 +15,7 @@ import {
 } from "../../../src/domain/identity/index.ts";
 import { Actor, Instant, makeId } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const DAY = 86_400_000;
@@ -64,7 +65,7 @@ const askArb = fc
 describe("quota admission", () => {
   it("[quota.boundary] an ask is admitted exactly when the org's total stays within its limit, its override first", () => {
     let atLimit = 0;
-    fc.assert(
+    assertReaching(
       fc.property(askArb, (ask) => {
         const limit = limitOf(ask.kind, ask.defaults, ask.overrides);
         if (ask.used + ask.amount === limit) atLimit++;
@@ -190,7 +191,7 @@ const changeArb = fc
 describe("tenancy", () => {
   it("[tenancy.ended-membership-revokes] ending a membership revokes exactly the live agents its user sponsored in that org", () => {
     let revoked = 0;
-    fc.assert(
+    assertReaching(
       fc.property(changeArb, fc.array(agentArb, { maxLength: 8 }), (change, agents) => {
         const got = revokedBy(change, agents);
         revoked += got.length;

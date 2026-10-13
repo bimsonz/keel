@@ -23,6 +23,7 @@ import {
 import { candidateChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
@@ -522,7 +523,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[candidate.fenced] a result for another attempt or chain epoch is refused and changes nothing", () => {
     let fencedSeen = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).every((r) =>
           r.probes
@@ -546,7 +547,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[candidate.bisect-only-unattributed] only a multi-change failure nobody is blamed for is bisected", () => {
     let bisected = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).every((r) =>
           r.probes
@@ -570,7 +571,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[candidate.attribution-is-member] a failure is blamed on a member, a kind, or nobody yet, never on a stranger", () => {
     let strangers = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).every((r) =>
           r.probes.every((p) => {
@@ -604,7 +605,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[candidate.bundle-refused] a bundle refused for an assembled batch turns it Red, blamed on a member or the infrastructure, and is never bisected", () => {
     let refused = 0;
     let strangers = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).every((r) =>
           r.probes.every((p) => {

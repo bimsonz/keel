@@ -34,6 +34,7 @@ import {
 import { promotionChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
 const T0 = Instant(1_760_000_000_000);
@@ -560,7 +561,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[promotion.retry-pushes-recorded] once composed, the group's SHA never changes: a recompose that differs freezes, and trunk advances only to the recorded SHA", () => {
     let recomposes = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r) => {
           const recorded = r.before?.phase === "promoting" ? r.before.wal?.composed : undefined;
@@ -730,7 +731,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[promotion.fifo] a group is the front of the queue in arrival order, and nothing passes a batch that must wait", () => {
     let waits = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r) =>
           r.probes.every((p) => {
@@ -987,7 +988,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.landings] an advance lands every member of its group once, in order, each with its own batch's candidate and proof and its commit on trunk", () => {
     let advances = 0;
     let doubles = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r) =>
           [r.taken, ...r.probes].every((p) => {

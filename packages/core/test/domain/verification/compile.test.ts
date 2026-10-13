@@ -34,6 +34,7 @@ import {
   probeOf,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const ok = (c: FlowCase): FlowPlan => Result.getOrThrow(compile(c.spec, c.facts, emptyDefaults));
 const errorsOf = (c: FlowCase): readonly CompileError[] => {
@@ -643,7 +644,7 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
   it("[flow.guard-policy] a guard step carries its predicate's policy, and a predicate the change's policy leaves out is advise", () => {
     let defaulted = 0;
     let named = 0;
-    fc.assert(
+    assertReaching(
       fc.property(guardedCaseArb(), (c) => {
         const plan = ok(c);
         const specs = new Map(c.spec.steps.map((s) => [s.id, s]));

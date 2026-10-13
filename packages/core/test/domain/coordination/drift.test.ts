@@ -25,6 +25,7 @@ import {
   tenetArb,
 } from "../../arbitraries/graph.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const touchedPaths = [
   "src/authz/check.ts",
@@ -215,7 +216,7 @@ describe("drift", () => {
 
   it("[drift.silent-retraction-iff-contradicting] an undeclared effect is a silent retraction exactly when it contradicts another change's must premise or a tenet", () => {
     let retractions = 0;
-    fc.assert(
+    assertReaching(
       fc.property(scenarioArb, (s) =>
         run(s).every((f) => {
           if (f._tag === "footprint") return true;

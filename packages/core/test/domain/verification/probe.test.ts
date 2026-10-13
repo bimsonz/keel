@@ -6,6 +6,7 @@ import {
   type World,
 } from "../../../src/domain/verification/index.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const outcome: fc.Arbitrary<ProbeOutcome> = fc.constantFrom("pass", "fail", "n/a");
 
@@ -67,7 +68,7 @@ const good: RunCells = { trunk: "pass", A: "pass", B: "pass", AB: "fail", "A-noo
 describe("probe admission", () => {
   it("[probe.admitted-means-discriminating] an admitted probe passed on trunk or did not apply, passed for the holder, failed combined and failed against the do-nothing mutant, on every run", () => {
     let admitted = 0;
-    fc.assert(
+    assertReaching(
       fc.property(matrixArb, (runs) => {
         if (admit(cellsOf(runs))._tag !== "admitted") return true;
         admitted++;

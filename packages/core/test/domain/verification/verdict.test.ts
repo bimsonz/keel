@@ -26,6 +26,7 @@ import {
   probeOf,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
 
 const failures: readonly InfraFailure[] = [
@@ -197,7 +198,7 @@ const res = (plan: FlowPlan, id: string, outcome: string, world?: FlowWorld): St
 describe("verdict", () => {
   it("[verdict.bounce-only-on-proof-or-ruling] a bounce rests only on unoverridden fails from proof or a ruling", () => {
     let bounces = 0;
-    fc.assert(
+    assertReaching(
       fc.property(runArb, ({ plan, results }) => {
         const v = Result.getOrThrow(verdict(plan, { results }, "verdict/1"));
         if (v.outcome !== "bounce") return true;
@@ -475,7 +476,7 @@ const verdictOf = (plan: FlowPlan, results: readonly StepResult[]) =>
 describe("verdict: guards take their predicate's policy", () => {
   it("[verdict.guard-policy] under advise or annotate a guard's proof fail never bounces and is listed as advice; under block it bounces as any proof fail does", () => {
     let mattered = 0;
-    fc.assert(
+    assertReaching(
       fc.property(
         fc.oneof(
           { weight: 3, arbitrary: runArbOf(guardedCaseArb()) },

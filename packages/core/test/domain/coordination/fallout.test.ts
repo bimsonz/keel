@@ -26,6 +26,7 @@ import {
   tenetArb,
 } from "../../arbitraries/graph.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const reliedOn = (f: Fallout): Proposition =>
   f.target._tag === "premise" ? f.target.premise.proposition : f.target.tenet.proposition;
@@ -75,7 +76,7 @@ const cacheEffect = (value: string, declared: boolean): DerivedEffect => ({
 describe("fallout", () => {
   it("[fallout.conflict-only-on-contradiction] a conflict needs a same-key contradiction against a must premise or a tenet", () => {
     let conflicts = 0;
-    fc.assert(
+    assertReaching(
       fc.property(graphArb, ({ change, effect, premises, tenets }) =>
         fallout(change, effect, premises, tenets)
           .filter((f) => f._tag === "conflict")
@@ -205,7 +206,7 @@ describe("fallout", () => {
 
   it("[fallout.declared] a declared effect falls out as the same effect derived and declared would, and is never a silent retraction", () => {
     let conflicts = 0;
-    fc.assert(
+    assertReaching(
       fc.property(graphArb, ({ change, effect, premises, tenets }) => {
         const declared = fallout(change, declaredEffect(effect.proposition), premises, tenets);
         const derived = fallout(change, { ...effect, declared: true }, premises, tenets);

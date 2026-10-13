@@ -30,6 +30,7 @@ import {
 } from "../../../src/domain/kernel/index.ts";
 import { propositionArb } from "../../arbitraries/coordination.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { changeChart, leaseChart } from "../../charts/charts.ts";
 import { type Fold, type Machine, tour } from "../../support/machine.ts";
@@ -971,7 +972,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.no-orphan] an agent-owned change always holds an Active lease; a lapse under the platform parks it on the way back", () => {
     let lapsedHandBacks = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) => {
           const owned =
@@ -1015,7 +1016,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.lapse-parks-agent-owned-only] the lease alarm parks agent-owned states and leaves platform-owned ones where they are", () => {
     let parkedByAlarm = 0;
     let keptByAlarm = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan)
           .records.filter((r) => r.kind === "Lapse" && eventsOf(r).length > 0)
@@ -1045,7 +1046,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.cannot-queue-blocked] a change is never queued with a Proven conflict open, a failing guard or unresolved high drift", () => {
     let refused = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan)
           .records.filter(
@@ -1073,7 +1074,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.blocked-never-batched] from Queued, a proven conflict ends Bounced, never Integrating", () => {
     let pulled = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan)
           .records.filter(
@@ -1107,7 +1108,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.no-batch-past-escalation] a change enters no batch while a person has yet to rule on one of its conflicts, and is queued all the same", () => {
     let held = 0;
     let queuedAnyway = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) => {
           const batched = eventsOf(r).some((e) => e._tag === "ChangeBatched");
@@ -1231,7 +1232,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.resume-returns] a resumed change is the change that was parked: back in the state it was parked from, in its lane and under its plan", () => {
     let fromQueued = 0;
     let fromVerifying = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) => {
           if (keyOf(r.before) !== "parked:awaiting-ruling") return r.held === undefined;
@@ -1415,7 +1416,7 @@ describe("rebasing a change", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.rebase-stale-from] a rebase from anything but the change's base, or onto that base itself, is refused with a read of the change", () => {
     let stale = 0;
     let onto = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         rebasesTried(run(plan)).every(({ before, now, command, result }) => {
           const key = keyOf(before);
@@ -1447,7 +1448,7 @@ describe("rebasing a change", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.submit-after-rebase] every submission carries the change's base at that moment, so a submit after a rebase is judged against the new base", () => {
     let afterRebase = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) => {
         let base: CommitSha | undefined;
         let rebased = false;
@@ -1806,7 +1807,7 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.bounce-declined] promotion's declined batch bounces a change only while it is integrating in that batch, and the bounce names that batch and its reason, no verdict and no conflict, with the way forward for that reason", () => {
     let bounced = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) =>
           r.probes.every((p) => {
@@ -2111,7 +2112,7 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
 
   it("[change.landed-commit] a change carries its commit on trunk from the moment it lands, and never before", () => {
     let landings = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (plan) => {
         let onTrunk: string | undefined;
         return run(plan).records.every((r) => {

@@ -21,6 +21,7 @@ import {
 import { tenetChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { failureTag, type Fold, type Machine, memo, play, tour } from "../../support/machine.ts";
 
@@ -397,7 +398,7 @@ describe("the Tenet machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[tenet.retract-needs-ruling] under block, a contested tenet is retracted only on a ruling", () => {
     let ruled = 0;
     let refused = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r, i) =>
           r.probes.every((p) => {
@@ -428,7 +429,7 @@ describe("the Tenet machine", { timeout: PROPERTY_TIMEOUT }, () => {
     let retracted = 0;
     let unproven = 0;
     let stranger = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r, i) =>
           r.probes.every((p) => {
@@ -498,7 +499,7 @@ describe("the Tenet machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[tenet.reaffirm-on-settled] a contested tenet is reaffirmed only once its conflict is dismissed, or resolved by distinguish or yield", () => {
     let reaffirmed = 0;
     let open = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r, i) =>
           r.probes.every((p) => {
@@ -539,7 +540,7 @@ describe("the Tenet machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[tenet.contest-party] an established tenet is contested only by an open conflict that names it as a party", () => {
     let contestedBy = 0;
     let notParty = 0;
-    fc.assert(
+    assertReaching(
       fc.property(planArb, (steps) =>
         run(steps).every((r, i) =>
           r.probes.every((p) => {

@@ -14,6 +14,7 @@ import {
 } from "../../../src/domain/delivery/index.ts";
 import { makeId } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const PROJECT = makeId("prj", ulid(1));
@@ -315,7 +316,7 @@ describe("a project's deploy targets", () => {
 
   it("[deploy-target.clear] clears a name that is set with one event, and refuses a name that is not", () => {
     let cleared = 0;
-    fc.assert(
+    assertReaching(
       fc.property(stepsArb, (steps) => {
         const { trace } = play(steps);
         const clears = trace.filter((p) => p.step._tag === "clear");

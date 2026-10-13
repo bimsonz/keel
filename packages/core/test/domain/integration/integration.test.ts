@@ -27,6 +27,7 @@ import {
 } from "../../../src/domain/integration/index.ts";
 import { changeIdArb, changeIds, graphPropositionArb } from "../../arbitraries/graph.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const id = (n: number) => makeId("chg", String(n).padStart(26, "0"));
 const batchId = (n: number) => makeId("bat", String(n).padStart(26, "0"));
@@ -112,7 +113,7 @@ const meets = (a: Footprints, b: Footprints): boolean =>
 describe("commutation", () => {
   it("[commutation.sound] a batch commutes only when C1 to C6 all hold", () => {
     let commuted = 0;
-    fc.assert(
+    assertReaching(
       fc.property(commutationArb, (input) => {
         if (commutation(input)._tag !== "commutes") return true;
         commuted++;
