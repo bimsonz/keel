@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.upheld
+# why: the stand-in names a guard for a decision whose ruling upheld the effect and retired the guard
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..364768ed 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -466,10 +466,7 @@ export function createFakeKeel(
+             : upheldOf(sides, resolved.against ?? []);
+         // A guard is drawn from the premise, so a ruling for the effect leaves its guard holding nothing.
+         const asserted = JSON.stringify(sides?.premise?.proposition);
+-        const standing =
+-          guard !== undefined &&
+-          !retired &&
+-          upheld.some((proposition) => JSON.stringify(proposition) === asserted);
++        const standing = guard !== undefined;
+         return {
+           id: decisionId,
+           label: recorded.label ?? "D-0",

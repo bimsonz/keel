@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.standing
+# why: a decision no guard holds is said to bounce a change that fails its guard
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..413b3fd8 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -103,7 +103,7 @@ export type Standing = "blocks" | "unguarded" | "ended";
+ 
+ export function standingOf(view: Pick<DecisionView, "state" | "guards">): Standing {
+   if (view.state !== "active") return "ended";
+-  return view.guards.length > 0 ? "blocks" : "unguarded";
++  return "blocks";
+ }
+ 
+ /** One decision's page: Keel's read of it, and what the project's log calls each thing that read names. */

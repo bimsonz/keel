@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.pages
+# why: every page asked for is the first, so the list repeats and never moves on
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..656034f4 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -44,7 +44,6 @@ export async function readDecisions(
+     const page = await source.listDecisions(
+       {
+         ...(subject === undefined ? {} : { subject }),
+-        ...(cursor === undefined ? {} : { cursor }),
+       },
+       signal,
+     );

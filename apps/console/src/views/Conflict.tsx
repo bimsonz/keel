@@ -21,21 +21,13 @@ import {
   EvidenceList,
   OutcomeWord,
   Panel,
+  RELATION_WORD,
   RunMark,
   clockTime,
   dateTime,
 } from "./parts.tsx";
 
 // ─── The two propositions, on the lattice ───────────────────────────────────
-
-const RELATION_WORD: Record<string, string> = {
-  is: "is",
-  "at-most": "at most",
-  "at-least": "at least",
-  not: "is not",
-  before: "before",
-  after: "after",
-};
 
 /** A premise is declared by the agent that holds it: Keel takes it as that agent's word. */
 const PREMISE = { declared: true, evidenceClass: "testimony" } as const;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.turns
+# why: a decision overruled while its page is open is still drawn as standing
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..f158bde9 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -179,7 +179,7 @@ export function decisionDetailOf(
+  */
+ export function turnsOf(world: World): string {
+   return [
+-    ...[...world.decisions.values()].map((decision) => `d:${decision.id}:${decision.state}`),
++    ...[...world.decisions.values()].map((decision) => `d:${decision.id}`),
+     ...[...world.conflicts.values()].flatMap((conflict) =>
+       conflict.decisionId === undefined
+         ? []

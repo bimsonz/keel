@@ -432,6 +432,11 @@ export class World {
    * conflict as `told` is: the bounce names the decision and no conflict, and the two come in no fixed order.
    */
   readonly ruled = new Map<string, string[]>();
+  /**
+   * The changes Keel bounced citing each decision, by the decision's id, in the order each first was. A later
+   * bounce for another cause replaces a change's latest bounce and not this: it was still bounced citing it.
+   */
+  readonly citing = new Map<string, string[]>();
   /** The latest status of each step, keyed `subject/stepId`. */
   readonly steps = new Map<string, StepObservation>();
   /** The latest counters only the platform knows. */
@@ -831,6 +836,16 @@ export class World {
           // A bounce by a guard that holds a decision is a verdict's, and names the decision among its ways on.
           const cited = citedIn(nextActions ?? []);
           if (cited !== undefined) change.bounce.cites = cited;
+          // The verdict a bounce names is the change's own to show, though it judged the batch the change was in:
+          // Keel runs a plan on a batch's candidate, and a failed batch's verdict names no change itself.
+          if (verdictId !== undefined && !change.verdictIds.includes(verdictId)) {
+            change.verdictIds.push(verdictId);
+            change.verdictRevision = change.revision;
+          }
+          // A change is counted once for a decision, however many of its bounces cited it.
+          const citing = cited === undefined ? undefined : (this.citing.get(cited) ?? []);
+          if (cited !== undefined && citing !== undefined && !citing.includes(change.id))
+            this.citing.set(cited, [...citing, change.id]);
         }
         break;
       }

@@ -5,7 +5,7 @@
 import { type AnchorHTMLAttributes, type ReactNode, createContext, useContext } from "react";
 import type { HeldUnder } from "../engine/holder.ts";
 import { type Names, namesIn } from "../engine/lists.ts";
-import { useSelected } from "../engine/react.tsx";
+import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { ChangeTab, ConflictTab } from "../route.ts";
 import { Link } from "../router.tsx";
 
@@ -21,7 +21,7 @@ function useNames(): Names {
   const names = useContext(NamesContext);
   if (names === null)
     throw new Error(
-      "a link to a change, a conflict or an escalation needs a NamesProvider above it",
+      "a link to a change, a conflict, an escalation or a decision needs a NamesProvider above it",
     );
   return names;
 }
@@ -65,6 +65,27 @@ export function EscalationLink({ id, children, ...rest }: { id: string } & Ancho
       {children}
     </Link>
   );
+}
+
+/** Whether a decision has a page to open: Keel remembers a project's decisions, and a test fixture has no memory. */
+export function useRemembered(): boolean {
+  return usePlayer().source.decisions !== undefined;
+}
+
+/** A decision's page, where there is one to open; the words alone where there is none. */
+export function DecisionLink({ id, children, ...rest }: { id: string } & Anchor) {
+  const name = useNames().decisions.get(id) ?? id;
+  if (!useRemembered()) return <span className={rest.className}>{children}</span>;
+  return (
+    <Link to={{ at: "decision", name }} {...rest}>
+      {children}
+    </Link>
+  );
+}
+
+/** What an address calls a decision: Keel's label for it, or its id where the log gave it none. */
+export function DecisionName({ id }: { id: string }) {
+  return <>{useNames().decisions.get(id) ?? id}</>;
 }
 
 /** The agent that holds a change: its page in this project. */

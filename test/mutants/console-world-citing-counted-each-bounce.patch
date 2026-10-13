@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.citing
+# why: a change bounced twice citing a decision is listed twice
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 2cd64494..eafa7cc9 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -844,7 +844,7 @@ export class World {
+           }
+           // A change is counted once for a decision, however many of its bounces cited it.
+           const citing = cited === undefined ? undefined : (this.citing.get(cited) ?? []);
+-          if (cited !== undefined && citing !== undefined && !citing.includes(change.id))
++          if (cited !== undefined && citing !== undefined)
+             this.citing.set(cited, [...citing, change.id]);
+         }
+         break;

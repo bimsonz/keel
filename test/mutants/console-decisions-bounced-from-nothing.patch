@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.detail
+# why: no change is listed as bounced citing a decision
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..0ae516f4 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -160,7 +160,7 @@ export function decisionDetailOf(
+         ...(guard === undefined ? {} : { conflictId: guard.conflictId }),
+       };
+     }),
+-    bounced: (world.citing.get(view.id) ?? []).map(change),
++    bounced: [],
+     ...(publicOnly
+       ? {}
+       : {

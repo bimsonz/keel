@@ -10,6 +10,7 @@
 //   P/changes                      the changes        P/changes/<n>[/verification|/files|/alternatives]
 //   P/conflicts                    the conflicts      P/conflicts/<C-n>[/probe|/evidence]
 //   P/escalations                  the questions      P/escalations/<E-n>
+//   P/decisions[?subject=<key>]    what was ruled     P/decisions/<D-n>
 //   P/mission-control              the live graph     P/subjects/<key>      with that subject open
 //   P/insights[/funnel|/benchmark]
 //   P/agents                       the agents at work   P/agents/<handle>   one agent's runs here
@@ -43,6 +44,10 @@ export type Route =
   | { at: "conflict"; name: string; tab: ConflictTab }
   | { at: "escalations"; filter: EscalationFilter; shown: number }
   | { at: "escalation"; name: string }
+  /** The project's decisions as Keel lists them, or the ones on one subject. */
+  | { at: "decisions"; subject?: string }
+  /** One decision, by Keel's label for it, or by its id where a link has only that. */
+  | { at: "decision"; name: string }
   | { at: "mission-control"; subject?: string }
   | { at: "insights"; tab: InsightsTab }
   | { at: "agents"; shown: number }
@@ -138,6 +143,13 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
           ...(listed(ESCALATION_FILTERS, query) ?? { filter: "open", shown: PAGE }),
         };
       return more.length > 0 ? MISSING : { at: "escalation", name: first };
+    case "decisions": {
+      if (first !== undefined) return more.length > 0 ? MISSING : { at: "decision", name: first };
+      const subject = query.get("subject");
+      return subject === null || subject === ""
+        ? { at: "decisions" }
+        : { at: "decisions", subject };
+    }
     case "mission-control":
       return first === undefined ? { at: "mission-control" } : MISSING;
     case "subjects":
@@ -219,6 +231,10 @@ function pathOf(route: Route): string[] {
       return ["conflicts", route.name, ...(route.tab === "overview" ? [] : [route.tab])];
     case "escalation":
       return ["escalations", route.name];
+    case "decisions":
+      return ["decisions"];
+    case "decision":
+      return ["decisions", route.name];
     case "insights":
       return ["insights", ...(route.tab === "trunk" ? [] : [route.tab])];
     case "agents":
@@ -234,6 +250,10 @@ function pathOf(route: Route): string[] {
 
 /** A place's own parameters: a list's filter where it is not the first, and its count where it is more than a page. */
 function queryOf(route: Route): string {
+  if (route.at === "decisions")
+    return route.subject === undefined
+      ? ""
+      : new URLSearchParams({ subject: route.subject }).toString();
   if (
     route.at !== "changes" &&
     route.at !== "conflicts" &&

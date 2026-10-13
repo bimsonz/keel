@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.named
+# why: an address that calls a decision by Keel's label finds none
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 5d3d70d3..bfd0a592 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -162,7 +162,7 @@ export const conflictNamed = (world: World, name: string): ConflictEntry | undef
+ export const escalationNamed = (world: World, name: string): EscalationEntry | undefined =>
+   named(world.escalations, name);
+ export const decisionNamed = (world: World, name: string): DecisionEntry | undefined =>
+-  named(world.decisions, name);
++  world.decisions.get(name);
+ 
+ /** What an address calls every change, conflict, escalation and decision, by id: read once for a whole list, or a whole page. */
+ export interface Names {

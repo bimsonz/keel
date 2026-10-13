@@ -445,6 +445,7 @@ export interface ChangePageState {
     deletions: number;
   };
   precedents: {
+    decisionId: string;
     decisionLabel: string;
     summary: string;
     decidedAt: string;

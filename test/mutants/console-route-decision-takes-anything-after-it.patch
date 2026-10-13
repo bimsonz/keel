@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.decisions
+# why: an address with something after a decision's name opens the decision
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 58751472..861a41fb 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -144,7 +144,7 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
+         };
+       return more.length > 0 ? MISSING : { at: "escalation", name: first };
+     case "decisions": {
+-      if (first !== undefined) return more.length > 0 ? MISSING : { at: "decision", name: first };
++      if (first !== undefined) return { at: "decision", name: first };
+       const subject = query.get("subject");
+       return subject === null || subject === ""
+         ? { at: "decisions" }

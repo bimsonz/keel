@@ -79,8 +79,14 @@ describe("a conflict proven against a change", () => {
     expect(page?.bounce).toEqual({
       at: first.at,
       next: first.payload.nextActions?.map((action) => action.title),
+      // The guard that failed holds a decision, and Keel's next action names it: the bounce is still the verdict's.
+      cites: [...player.world.decisions.keys()][0],
     });
     expect(page?.bounce?.next.length).toBeGreaterThan(0);
+    // The verdict judged the change's batch and names no change: the bounce is what ties it to this one.
+    expect(player.world.verdicts.get(first.payload.verdictId ?? "")?.subject).not.toBe(
+      first.payload.changeId,
+    );
     expect(page?.verdict?.id).toBe(first.payload.verdictId);
   });
 

@@ -81,10 +81,9 @@ describe("one subject, read off the world", () => {
     expect(detail?.tenets).toBe(1);
   });
 
-  it("nine days on: both conflicts, newest first, and the change the guard bounced", async () => {
+  it("nine days on: history's one conflict, since a failing guard opens none, and the change the guard bounced", async () => {
     const detail = await detailAt("s2", 9999);
     expect(detail?.conflicts.map((conflict) => [conflict.label, conflict.kind])).toEqual([
-      ["C-2", "precedent"],
       ["C-1", "semantic"],
     ]);
     expect(detail?.changes.listed).toMatchObject([

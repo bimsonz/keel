@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/s2.test.ts
+# kills: s2.as-keel-commits
+# why: the fixture's bounce names no decision to read, so nothing cites one
+diff --git a/apps/console/test/fixtures/mock/s2.ts b/apps/console/test/fixtures/mock/s2.ts
+index e5e06908..dedc06ce 100644
+--- a/apps/console/test/fixtures/mock/s2.ts
++++ b/apps/console/test/fixtures/mock/s2.ts
+@@ -529,7 +529,7 @@ export function generateS2(seed: number): GeneratedLog {
+     {
+       kind: "call",
+       title: `Read decision ${decisionId}, which the failed guard holds: ${S2_DECIDED}`,
+-      operationId: "Memory_getDecision",
++      operationId: "Memory_listDecisions",
+       args: { decisionId },
+     },
+   ];

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.citing, decisions.detail
+# why: the fold forgets which changes were bounced citing a decision
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 2cd64494..b9fdc48a 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -845,7 +845,7 @@ export class World {
+           // A change is counted once for a decision, however many of its bounces cited it.
+           const citing = cited === undefined ? undefined : (this.citing.get(cited) ?? []);
+           if (cited !== undefined && citing !== undefined && !citing.includes(change.id))
+-            this.citing.set(cited, [...citing, change.id]);
++            this.citing.delete(cited);
+         }
+         break;
+       }

@@ -165,6 +165,31 @@ export interface KeelInvited {
 }
 
 /**
+ * A project's decisions as Keel remembers them: what each ruling chose, and what it settled of the conflict it
+ * ruled. Keel reads them to whoever reads the project, a visitor to a public one among them.
+ */
+export interface KeelDecisions {
+  /**
+   * A page of the project's decisions, newest first, or of the ones on one subject: `GET /v1/decisions`. The
+   * page after it is asked for with the cursor Keel gave, and the last page names none.
+   */
+  listDecisions(
+    asked: { subject?: string; cursor?: string },
+    signal?: AbortSignal,
+  ): Promise<Keel.DecisionPage>;
+  /**
+   * One decision by Keel's id for it: `GET /v1/decisions/{decisionId}`. Null where Keel reads this reader none
+   * by that id: one it never recorded and one of a project the reader is not read are the same answer.
+   */
+  getDecision(decisionId: string, signal?: AbortSignal): Promise<Keel.DecisionView | null>;
+}
+
+/** A project's source that has Keel's memory of its decisions: a test fixture's has none. */
+export interface KeelRemembered {
+  decisions: KeelDecisions;
+}
+
+/**
  * What the console may change in a project's log, so it is its own port. Keel decides who may: the reader's own session
  * is all the console sends. A ruling is never applied optimistically: its effect arrives through the log.
  */

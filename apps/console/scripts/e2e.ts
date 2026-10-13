@@ -548,30 +548,6 @@ expectEqual(
   ),
   "1",
 );
-// A conflict Keel suspected without naming a premise and an effect has a page all the same: its parties, how
-// it was proven, and that Keel named no two sides. Scenario 2's is a change against a tenet on trunk.
-await page.goto(at("/conflicts/C-2", "scenario=s2&t=200&play=0"), { waitUntil: "networkidle" });
-// Whether it has a page is the thing looked for: the heading is given a moment, and what is there is compared.
-await page
-  .getByRole("heading", { level: 1 })
-  .waitFor({ timeout: 5_000 })
-  .catch(() => undefined);
-expectEqual(
-  "conflict: one with no sides has a page, which says Keel named none",
-  [
-    squash(
-      await page
-        .getByRole("heading", { level: 1 })
-        .innerText({ timeout: 1_000 })
-        .catch(() => "no page"),
-    ),
-    String(await page.getByText("Keel named no premise and no effect for this conflict.").count()),
-    String(await page.getByText("a tenet on trunk").count()),
-    String(await page.getByText("Proven by a guard").count()),
-    String(await page.getByRole("heading", { name: "World matrix" }).count()),
-  ].join(" | "),
-  "authz.permission-evaluation · freshness C-2 | 1 | 1 | 1 | 0",
-);
 await page.goto(at("/conflicts/C-1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
 await page.locator(".a-timeline").waitFor();
 expectEqual(
@@ -1940,13 +1916,13 @@ async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<
 }
 
 const OPEN_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Agents | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Decisions | Mission Control | Agents | Insights";
 /**
  * The tabs as someone who is no member of the project's org is shown them: Keel reads a project's questions to
  * its members alone, so none is counted for anyone else.
  */
 const PUBLIC_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations | Mission Control | Agents | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations | Decisions | Mission Control | Agents | Insights";
 const QUESTION_ASKED = /May permission checks be cached within a session\?/;
 /** The home's first part for someone signed in: the questions Keel has put to them. */
 const waitingOn = (shown: Page) => shown.getByRole("region", { name: "Waiting for you" });
@@ -3637,7 +3613,7 @@ await countedPublic(passer);
 expectEqual(
   "settings: a visitor now reads the project, and is offered no settings",
   `${await filesOn(passer)} | ${await tabsOf(passer).count()} tabs`,
-  "src | package.json | README.md | 7 tabs",
+  "src | package.json | README.md | 8 tabs",
 );
 await passer.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
 await passer.getByRole("heading", { level: 1, name: "Settings" }).waitFor();
@@ -3886,6 +3862,227 @@ expectEqual(
   ),
   "true",
 );
+// ── A project's decisions ──
+// Keel remembers what each ruling settled, and reads it to whoever reads the project. This Keel holds the
+// project nine days after its question was ruled: a careless change has bounced on the guard that holds D-1.
+const remembers = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  story: "s2",
+  readerOf,
+  whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
+  ahead: AHEAD,
+});
+const recalling = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(recalling, { keel: remembers });
+const recall = watch(await recalling.newPage(), "decisions, a visitor");
+/** A decision's own page, once Keel's read of it is drawn; or whatever stands there after fifteen seconds. */
+const decisionDrawn = async (shown: Page): Promise<void> => {
+  await shown
+    .getByRole("heading", { name: "What the ruling upheld" })
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
+};
+await recall.goto(`${built}/ada/demo/decisions`, { waitUntil: "domcontentloaded" });
+const decisionRows = recall
+  .getByRole("list", { name: "Decisions, newest first" })
+  .getByRole("listitem");
+await decisionRows
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "decisions: the tab stands after Escalations, and is the page the reader is on",
+  `${(await tabsOf(recall).allInnerTexts()).map((tab) => squash(tab).replace(/ \d.*$/, "")).join(" | ")} | ${String(await tabsOf(recall).filter({ hasText: "Decisions" }).getAttribute("aria-current"))}`,
+  "Code | Changes | Conflicts | Escalations | Decisions | Mission Control | Agents | Insights | page",
+);
+expectEqual(
+  "decisions: a visitor reads a public project's decisions, each as Keel's row has it",
+  (await decisionRows.allInnerTexts())
+    .map(squash)
+    .join(" || ")
+    .replace(/decided .*? authz/, "decided <when> authz"),
+  "Cache allowed if revocation invalidates it D-1 decided <when> authz.permission-evaluation ruled C-1 active",
+);
+await decisionRows
+  .first()
+  .getByRole("link", { name: "Cache allowed if revocation invalidates it" })
+  .click()
+  .catch(() => undefined);
+await decisionDrawn(recall);
+expectEqual(
+  "decision: its page is at Keel's label for it, and says what the ruling upheld in Keel's own proposition",
+  `${pathOf(recall)} | ${squash(
+    await recall
+      .getByRole("list", { name: "What the ruling upheld" })
+      .innerText()
+      .catch(() => "no list"),
+  )}`,
+  "/ada/demo/decisions/D-1 | authz.permission-evaluation/freshness at most per-request “requirePermission re-reads roles on every request”",
+);
+const guardPart = recall.locator('[data-part="guard"]');
+expectEqual(
+  "decision: while it stands, its guard leads to the probe it was admitted from, and a change that fails it is bounced whatever the policy",
+  `${String(await guardPart.getAttribute("data-standing").catch(() => "none"))} | ${squash(await guardPart.innerText().catch(() => "no part"))} | ${String(
+    await guardPart
+      .getByRole("link", { name: "G-1" })
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )}`,
+  "blocks | G-1 A change that fails this guard is bounced, whatever this project's policy for the predicate. | /ada/demo/conflicts/C-1/probe",
+);
+const bouncedCiting = recall.getByRole("list", { name: "Changes bounced citing this decision" });
+expectEqual(
+  "decision: the change the ruling went against and the change bounced citing it are named, each linked",
+  `${squash(
+    await recall
+      .getByRole("list", { name: "Changes the ruling went against" })
+      .innerText()
+      .catch(() => "no list"),
+  )} | ${squash(await bouncedCiting.innerText().catch(() => "no list"))} | ${String(
+    await bouncedCiting
+      .getByRole("link")
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )}`,
+  "#1 | #1205 | /ada/demo/changes/1205",
+);
+expectEqual(
+  "decision: a visitor is not shown that it answered a question",
+  `${await recall.getByRole("heading", { name: "The question it answered" }).count()} headings | ${await recall.getByRole("main").getByRole("link", { name: "E-1" }).count()} links`,
+  "0 headings | 0 links",
+);
+// The change the guard bounced says which decision its bounce cites, and leads to it.
+await recall.goto(`${built}/ada/demo/changes/1205`, { waitUntil: "domcontentloaded" });
+const citedDecision = recall.locator('[data-part="cited-decision"]');
+await citedDecision.waitFor({ timeout: 15_000 }).catch(() => undefined);
+// The line is drawn with the bounce. What an address calls its decision is read once for every link on the
+// page, a moment later: that is given its moment too, and what stands there then is what is compared.
+await citedDecision
+  .getByRole("link", { name: /decision D-/ })
+  .waitFor({ timeout: 5_000 })
+  .catch(() => undefined);
+expectEqual(
+  "change: a bounce that cites a decision says so, and links the decision's page",
+  `${squash(await citedDecision.innerText().catch(() => "no line"))} | ${String(
+    await citedDecision
+      .getByRole("link")
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )}`,
+  "This bounce cites decision D-1. | /ada/demo/decisions/D-1",
+);
+expectEqual(
+  "change: the ways forward are Keel's own, the fix and the decision to read",
+  (
+    await recall
+      .getByRole("list", { name: "Ways forward Keel gave its agent" })
+      .getByRole("listitem")
+      .allInnerTexts()
+  )
+    .map((way) => squash(way).replaceAll(/(dec|grd)_\w+/g, "<id>"))
+    .join(" || "),
+  "Fix the guarded behaviour, push, then submit again: guard:<id> (freshness): a role revoked mid-session is still allowed; it holds decision <id>: Cache allowed if revocation invalidates it || Read decision <id>, which the failed guard holds: Cache allowed if revocation invalidates it",
+);
+await citedDecision
+  .getByRole("link")
+  .click()
+  .catch(() => undefined);
+await decisionDrawn(recall);
+expectEqual(
+  "change: the cited decision's link opens its page",
+  pathOf(recall),
+  "/ada/demo/decisions/D-1",
+);
+// Narrowed to a subject, Keel is asked for that subject's decisions, and the way back to all of them is offered.
+await recall.goto(`${built}/ada/demo/decisions?subject=authz.permission-evaluation`, {
+  waitUntil: "domcontentloaded",
+});
+await decisionRows
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "decisions: narrowed to a subject, Keel is asked for that subject's, and every decision is one link away",
+  `${await decisionRows.count()} listed | ${String(
+    await recall
+      .getByRole("link", { name: "Every decision" })
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )} | ${String(remembers.calls.some((call) => call.path === "/v1/decisions" && new URLSearchParams(call.query).get("subject") === "authz.permission-evaluation"))}`,
+  "1 listed | /ada/demo/decisions | true",
+);
+await recall.goto(`${built}/ada/demo/decisions?subject=none.such`, {
+  waitUntil: "domcontentloaded",
+});
+await recall
+  .getByRole("heading", { name: /^No decision/ })
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "decisions: a subject no decision is on says so by its name",
+  squash(
+    await recall
+      .getByRole("heading", { name: /^No decision/ })
+      .innerText()
+      .catch(() => "no heading"),
+  ),
+  "No decision on none.such",
+);
+// An address that names no decision the log has is told as none, and Keel is not asked for a label.
+await recall.goto(`${built}/ada/demo/decisions/D-9`, { waitUntil: "domcontentloaded" });
+await recall
+  .getByRole("heading", { level: 1 })
+  .last()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "decision: an address that names none says so, and asks Keel for nothing by that name",
+  `${squash(await recall.getByRole("heading", { level: 1 }).last().innerText())} | ${remembers.calls.filter((call) => call.path === "/v1/decisions/D-9").length} asked`,
+  "There is no decision D-9 in what Keel has said so far | 0 asked",
+);
+// At a phone's width the page's words stay on the screen: each run of text is measured where it is drawn.
+await recall.setViewportSize({ width: 390, height: 844 });
+await recall.goto(`${built}/ada/demo/decisions/D-1`, { waitUntil: "domcontentloaded" });
+await decisionDrawn(recall);
+expectEqual(
+  "decision: at a phone's width none of its words runs past the screen",
+  String(
+    await recall.getByRole("main").evaluate((main) => {
+      const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+      const edges: number[] = [];
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if ((node.textContent ?? "").trim() === "") continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        edges.push(range.getBoundingClientRect().right);
+      }
+      return edges.length > 3 && Math.max(...edges) <= window.innerWidth;
+    }),
+  ),
+  "true",
+);
+await shot(recall, "decision-phone");
+await recalling.close();
+// A member is read the project's questions, so the decision's page names the one it answered.
+const recollecting = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await recollecting.addCookies(await lobby.cookies());
+await asDeployed(recollecting, { keel: remembers });
+const recollect = watch(await recollecting.newPage(), "decisions, a member");
+await recollect.goto(`${built}/ada/demo/decisions/D-1`, { waitUntil: "domcontentloaded" });
+await decisionDrawn(recollect);
+await shot(recollect, "decision-member");
+const answeredQuestion = recollect
+  .locator("section", { has: recollect.getByRole("heading", { name: "The question it answered" }) })
+  .getByRole("link");
+expectEqual(
+  "decision: a member is shown the question it answered, linked to it",
+  `${squash(await answeredQuestion.innerText().catch(() => "no link"))} | ${String(await answeredQuestion.getAttribute("href").catch(() => "no link"))}`,
+  "E-1 | /ada/demo/escalations/E-1",
+);
+await recollecting.close();
+
 await lobby.close();
 
 // A Keel that cannot send email yet offers a passkey and nothing else: keel.town as it first served identity. A

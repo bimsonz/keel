@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.turns
+# why: a bounce that cites a decision does not turn its page
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..6002df46 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -186,6 +186,5 @@ export function turnsOf(world: World): string {
+         : [`c:${conflict.id}:${conflict.decisionId}:${(conflict.against ?? []).join(",")}`],
+     ),
+     ...[...world.guards.values()].map((guard) => `g:${guard.id}:${guard.state}`),
+-    ...[...world.citing].map(([decision, changes]) => `b:${decision}:${changes.join(",")}`),
+   ].join(" ");
+ }

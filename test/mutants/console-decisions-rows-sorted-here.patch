@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.rows
+# why: the list is put in an order of the console's own, not the one Keel gave
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..645bd31b 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -75,7 +75,7 @@ export interface Called {
+ 
+ /** A page of the list, in the order Keel gave it: nothing is sorted or left out here. */
+ export function decisionRowsOf(items: readonly DecisionView[], world: World): DecisionRow[] {
+-  return items.map((view) => ({
++  return items.toSorted((a, b) => a.id.localeCompare(b.id)).map((view) => ({
+     id: view.id,
+     label: view.label,
+     summary: view.summary,

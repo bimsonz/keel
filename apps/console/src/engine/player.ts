@@ -10,6 +10,7 @@ import type {
   KeelAgents,
   KeelCommands,
   KeelInvited,
+  KeelRemembered,
   KeelSettings,
   KeelEventSource,
   KeelResources,
@@ -25,9 +26,10 @@ export type ConsoleSource = KeelEventSource &
   KeelResources &
   KeelRepository &
   KeelCommands &
-  // A fixture's source holds no settings and no agent's card: only Keel does.
+  // A fixture's source holds no settings, no memory of decisions and no agent's card: only Keel does.
   Partial<KeelSettings> &
   Partial<KeelInvited> &
+  Partial<KeelRemembered> &
   Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;

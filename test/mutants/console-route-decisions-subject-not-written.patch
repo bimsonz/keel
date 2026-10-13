@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.decisions
+# why: a link to one subject's decisions leads to every decision
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 58751472..a38e1610 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -253,7 +253,7 @@ function queryOf(route: Route): string {
+   if (route.at === "decisions")
+     return route.subject === undefined
+       ? ""
+-      : new URLSearchParams({ subject: route.subject }).toString();
++      : "";
+   if (
+     route.at !== "changes" &&
+     route.at !== "conflicts" &&

@@ -42,6 +42,12 @@ const ADDRESSES: [string, Route][] = [
   ["/acme/demo/escalations", { at: "escalations", filter: "open", shown: 50 }],
   ["/acme/demo/escalations?state=closed", { at: "escalations", filter: "closed", shown: 50 }],
   ["/acme/demo/escalations/E-1", { at: "escalation", name: "E-1" }],
+  ["/acme/demo/decisions", { at: "decisions" }],
+  [
+    "/acme/demo/decisions?subject=authz.permission-evaluation",
+    { at: "decisions", subject: "authz.permission-evaluation" },
+  ],
+  ["/acme/demo/decisions/D-1", { at: "decision", name: "D-1" }],
   ["/acme/demo/mission-control", { at: "mission-control" }],
   [
     "/acme/demo/subjects/authz.permission-evaluation",
@@ -135,12 +141,27 @@ describe("the console's addresses", () => {
     expect(parse("/acme/demo/agents/tidy-otter/run_1", "").route).toEqual({ at: "missing" });
   });
 
+  it("[route.decisions] gives the project's decisions a list, narrowed by a subject where one is named, and each decision an address", () => {
+    // A decision is called by Keel's label for it, or by Keel's id where a link has only that: one segment.
+    expect(read("/acme/demo/decisions/dec_01").route).toEqual({ at: "decision", name: "dec_01" });
+    // A decision has no part with an address of its own.
+    expect(read("/acme/demo/decisions/D-1/extra").route).toEqual({ at: "missing" });
+    // A subject that names nothing narrows nothing, and the list's address stays bare.
+    expect(read("/acme/demo/decisions?subject=").route).toEqual({ at: "decisions" });
+    expect(href("acme", "demo", { at: "decisions" })).toBe("/acme/demo/decisions");
+    // The subject rides beside whatever every link carries.
+    expect(href("acme", "demo", { at: "decisions", subject: "a.b" }, "theme=dark")).toBe(
+      "/acme/demo/decisions?subject=a.b&theme=dark",
+    );
+  });
+
   it("says an address names nothing rather than guess at it", () => {
     for (const address of [
       "/acme/demo/nowhere",
       "/acme/demo/changes/7/nowhere",
       "/acme/demo/conflicts/C-1/files",
       "/acme/demo/escalations/E-1/extra",
+      "/acme/demo/decisions/D-1/extra",
       "/acme/demo/insights/nowhere",
       "/acme/demo/agents/tidy-otter/runs",
       "/acme/demo/commit",

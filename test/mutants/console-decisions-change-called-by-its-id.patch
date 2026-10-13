@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.detail
+# why: a change is called by Keel's id where the log gave it a number
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..92137593 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -138,7 +138,7 @@ export function decisionDetailOf(
+   world: World,
+   publicOnly: boolean,
+ ): DecisionDetail {
+-  const change = (id: string): Called => ({ id, label: world.changes.get(id)?.label ?? id });
++  const change = (id: string): Called => ({ id, label: id });
+   const conflict = decisionRowsOf([view], world)[0]?.conflict;
+   return {
+     id: view.id,

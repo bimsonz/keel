@@ -794,6 +794,7 @@ export function changePageOf(
       deletions: counts.reduce((sum, count) => sum + count.deletions, 0),
     },
     precedents: change.precedents.map((precedent) => ({
+      decisionId: precedent.decisionId,
       decisionLabel: world.decisions.get(precedent.decisionId)?.label ?? "",
       summary: precedent.summary,
       decidedAt: precedent.decidedAt,

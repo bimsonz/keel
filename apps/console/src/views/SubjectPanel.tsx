@@ -8,7 +8,7 @@ import type { Tone } from "../engine/lanes.ts";
 import type { SubjectDetail } from "../engine/subject.ts";
 import { PAGE } from "../engine/lists.ts";
 import { Link } from "../router.tsx";
-import { ChangeLink, ConflictLink } from "./links.tsx";
+import { ChangeLink, ConflictLink, DecisionLink, useRemembered } from "./links.tsx";
 import { AgentMark, agentLine, clockTime } from "./parts.tsx";
 
 const STANDING: Record<Tone, string> = {
@@ -53,6 +53,7 @@ function Section({
 const NONE = "text-sm text-kumo-subtle";
 
 export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
+  const remembered = useRemembered();
   const live = detail.premises.reduce((sum, premise) => sum + premise.live, 0);
   const landed = detail.premises.reduce((sum, premise) => sum + premise.landed, 0);
   const open = detail.conflicts.filter(
@@ -179,14 +180,27 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
         )}
       </Section>
 
-      <Section title="Decisions">
+      <Section
+        title="Decisions"
+        {...(remembered && detail.decisions.length > 0
+          ? {
+              aside: (
+                <Link to={{ at: "decisions", subject: detail.key }} className="a-link">
+                  As Keel remembers them
+                </Link>
+              ),
+            }
+          : {})}
+      >
         {detail.decisions.length === 0 ? (
           <p className={NONE}>No person has ruled on this subject.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {detail.decisions.map((decision) => (
               <li key={decision.id} className="flex items-baseline gap-2 text-base">
-                <b className="font-semibold text-kumo-strong">{decision.label}</b>
+                <DecisionLink id={decision.id} className="font-semibold text-kumo-strong">
+                  {decision.label}
+                </DecisionLink>
                 <span className="min-w-0 text-sm text-kumo-default">
                   {decision.chosen}
                   {decision.state !== "active" && ` (${decision.state})`}

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.upheld
+# why: the stand-in says the premise stood where the ruling went against its holder
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..6c69ab89 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -332,7 +332,7 @@ function upheldOf(
+   const holderLost = against.includes(premise.holder);
+   const authorLost = against.includes(effect.changeId);
+   if (holderLost === authorLost) return [];
+-  return [authorLost ? premise.proposition : effect.proposition];
++  return [premise.proposition];
+ }
+ 
+ export function createFakeKeel(

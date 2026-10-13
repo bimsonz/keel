@@ -33,6 +33,10 @@ import type {
   NamespaceAgents,
   NamespaceView,
   Namespaces_inviteAgentInput,
+  DecisionPage,
+  DecisionView,
+  Memory_getDecisionInput,
+  Memory_listDecisionsInput,
   Namespaces_listAgentsInput,
   Namespaces_removeAgentInput,
   Operator_giveRulingInput,
@@ -68,6 +72,7 @@ import {
   type KeelDirectory,
   type KeelInvited,
   type KeelOrgAgents,
+  type KeelRemembered,
   type KeelSponsorship,
   type KeelEventSource,
   KeelRefused,
@@ -92,6 +97,7 @@ export type HttpSource = KeelEventSource &
   KeelCommands &
   KeelSettings &
   KeelInvited &
+  KeelRemembered &
   KeelAgents;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
@@ -544,6 +550,28 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         },
       );
       if (!response.ok) throw await refusalOf(response);
+    },
+    // Keel's memory of the project's decisions: its two reads, each with nothing of the page's added. The list
+    // names the project, and one decision is asked for by its own id, which Keel reads to whoever reads the
+    // project it was ruled in.
+    decisions: {
+      async listDecisions(asked, signal) {
+        const input: Memory_listDecisionsInput = { project: project.id, ...asked };
+        const response = await read(`/v1/decisions${queryOf({ ...input })}`, signal);
+        if (!response.ok) throw await refusalOf(response);
+        return answered<DecisionPage>(response);
+      },
+      async getDecision(decisionId, signal) {
+        const input: Memory_getDecisionInput = { decisionId };
+        const response = await read(
+          `/v1/decisions/${encodeURIComponent(input.decisionId)}`,
+          signal,
+        );
+        // Keel's one answer for a decision it never recorded and for one this reader is not read.
+        if (response.status === 404) return null;
+        if (!response.ok) throw await refusalOf(response);
+        return answered<DecisionView>(response);
+      },
     },
     // The agents invited to this one project: Keel's own three operations at the project's own address. Each
     // move carries a key made for the one attempt and nothing of the page's beside it.

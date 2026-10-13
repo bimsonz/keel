@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.not-found
+# why: the stand-in words a decision that is not there otherwise than Keel does
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..97717bb2 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1444,7 +1444,7 @@ export function createFakeKeel(
+                   operationId: "Memory_listDecisions",
+                 },
+               ],
+-              `No decision ${id} in a project you can read.`,
++              `No decision ${id}.`,
+             )
+           : Response.json(view satisfies DecisionView);
+       }

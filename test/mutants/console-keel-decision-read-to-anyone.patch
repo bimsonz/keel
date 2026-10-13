@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.read-by, decisions.not-found
+# why: the stand-in reads a private project's decision to someone the project is not read to
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..7ccdb562 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1432,7 +1432,7 @@ export function createFakeKeel(
+       const remembering = /^\/v1\/decisions\/([^/]+)$/.exec(url.pathname);
+       if (remembering !== null && request.method === "GET") {
+         const id = decodeURIComponent(remembering[1] ?? "");
+-        const view = visible ? remembered().find((one) => one.id === id) : undefined;
++        const view = remembered().find((one) => one.id === id);
+         return view === undefined
+           ? problem(
+               404,

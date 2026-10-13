@@ -4,15 +4,16 @@
 // authors are gone. A fresh REAL session is asked to simplify the permissions
 // code: preflight surfaces Decision D-1 as dated, scoped evidence, the agent
 // keeps the invalidation, and lands with the stance "followed". A careless
-// hosted agent strips the invalidation: guard G-1 fails, and the change
-// bounces, citing D-1.
+// hosted agent strips the invalidation: its batch's verification runs guard
+// G-1, which holds D-1 and fails, and the change bounces on that verdict,
+// citing D-1 and pointing its agent to it. That is all Keel commits of it: no
+// conflict is opened from a failing guard, and nothing is said of a tenet.
 //
 // The log opens with scenario 1 told in full, stamped nine days in the past,
 // so the world this story starts from is exactly the one that story left.
 
 import type { EntityRef } from "../../../src/contract/envelope.ts";
-import type { PrecedentRef } from "../../../src/contract/events.ts";
-import type { EvidenceLine } from "../../../src/contract/provisional.ts";
+import type { NextAction, PrecedentRef } from "../../../src/contract/events.ts";
 import { createRng } from "../prng.ts";
 import { type GeneratedLog, ScriptBuilder } from "./builder.ts";
 import { HEAD_2, continueInvalidate, land, planForB, prelude } from "./s1.ts";
@@ -23,6 +24,11 @@ const SUBJECT_KEY = "authz.permission-evaluation";
 const NINE_DAYS = 9 * 24 * 3600;
 const HEAD_1143 = "71f0c2ab94e6d3857a1b0c9e4f2d68a35b7c0e19";
 const HEAD_1144 = "c5a8e02f7b3d914a6e0c8f2b5d7a913e4f6b0c2d";
+/** The tree the careless change's candidate was assembled as. It never became trunk's. */
+const HEAD_H = "9e3b6d0c5a1f48e7b2d60c93f5a8e1d47b0c6a2e";
+
+/** What history's ruling decided, as its decision's summary says it: a guard's failure cites it in these words. */
+export const S2_DECIDED = "Cache allowed if revocation invalidates it";
 
 /** The changes' numbers, as Keel's Projector gives them. This project has seen some since the first two. */
 const NUMBER_C = "#1204";
@@ -36,7 +42,7 @@ export function generateS2(seed: number): GeneratedLog {
   // ── History: the conflict, the ruling, the guard, both changes landed ──
   b.offset = -NINE_DAYS;
   const p = prelude(b);
-  const { decisionId, tenetId } = continueInvalidate(b, p);
+  const { decisionId } = continueInvalidate(b, p);
   const decidedAt = b.isoAt(472.4);
   b.offset = 0;
   // …and trunk has advanced 1,143 times since the decision. One event stands for them here.
@@ -163,7 +169,7 @@ export function generateS2(seed: number): GeneratedLog {
   });
   b.at(8.3).emit({
     type: "PrecedentSurfaced",
-    entity: decision,
+    entity: changeRef(changeC),
     payload: { decisionId, changeId: changeC },
   });
   const grantedC = b.at(8.4).emit({
@@ -359,7 +365,7 @@ export function generateS2(seed: number): GeneratedLog {
   });
   b.at(30.3).emit({
     type: "PrecedentSurfaced",
-    entity: decision,
+    entity: changeRef(changeH),
     payload: { decisionId, changeId: changeH },
   });
   const grantedH = b.at(30.4).emit({
@@ -399,7 +405,7 @@ export function generateS2(seed: number): GeneratedLog {
   p.stepRun(131.1, precheckH, changeH, "diff", 0, 0.1, "passed");
   p.stepRun(131.3, precheckH, changeH, "protected", 0, 0.1, "passed");
   p.stepRun(131.6, precheckH, changeH, "extract", 1, 1.7, "passed");
-  const derivedH = b.at(134).emit({
+  b.at(134).emit({
     type: "EffectsDerived",
     entity: changeRef(changeH),
     payload: {
@@ -454,55 +460,88 @@ export function generateS2(seed: number): GeneratedLog {
   p.stepRun(135.3, precheckH, changeH, "unit", 1, 3.0, "passed");
   p.stepRun(138.4, precheckH, changeH, "guard", 1, 2.6, "failed", 0.0005);
 
-  // The guard failed in the change's own plan, at Precheck, before any batch exists: a fact of the change.
-  // (Which world a change's own plan names is not said anywhere yet. Here: the change alone, A.)
-  b.at(141).emit({
-    type: "GuardFailed",
+  // Keel judges a batch's candidate, never a change alone: the verdict that bounces this change is its batch's.
+  // The guard holds an active decision, so its failure blocks whatever the project's policy for the predicate.
+  const batch = b.at(139).id("bat");
+  const batchRef: EntityRef = { kind: "batch", id: batch };
+  const queued = b.emit({
+    type: "ChangeQueued",
     entity: changeRef(changeH),
-    payload: { guardId: p.guard, changeId: changeH, world: "A" },
+    payload: { changeId: changeH, laneId: "lane-1" },
   });
+  const formed = b.at(139.5).emit({
+    type: "BatchFormed",
+    entity: batchRef,
+    payload: {
+      batchId: batch,
+      laneId: "lane-1",
+      members: [changeH],
+      base: HEAD_1144,
+      attempt: 1,
+      chainEpoch: 1,
+      x: { label: "L1·4", heldApart: [] },
+    },
+    causation: queued,
+  });
+  b.at(139.6).emit({
+    type: "ChangeBatched",
+    entity: changeRef(changeH),
+    payload: { changeId: changeH, batchId: batch },
+    causation: formed,
+  });
+  const candidate = b.at(140.2).id("cnd");
+  const candidateRef: EntityRef = { kind: "candidate", id: candidate };
+  b.emit({
+    type: "CandidateAssembled",
+    entity: candidateRef,
+    payload: {
+      candidateId: candidate,
+      batchId: batch,
+      treeSha: HEAD_H,
+      composer: "gitcore",
+      tier: 0,
+      tierReason: "Paths are disjoint from head, so no merge engine is needed",
+    },
+  });
+  const instance = `keelverify:${batch}:1`;
+  const planHash = `plan:${batch.slice(-6).toLowerCase()}`;
+  b.at(140.6).emit({
+    type: "VerificationStarted",
+    entity: candidateRef,
+    payload: { candidateId: candidate, batchId: batch, instanceId: instance, planHash },
+  });
+  p.stepRun(140.8, instance, batch, "unit", 1, 3.0, "passed");
 
-  // A failing guard is proof by itself: no probe has to be drafted.
-  const conflict = b.at(141.2).id("cfl");
-  const conflictRef: EntityRef = { kind: "conflict", id: conflict };
-  const suspected = b.emit({
-    type: "ConflictSuspected",
-    entity: conflictRef,
-    label: "C-2",
-    payload: {
-      conflictId: conflict,
-      kind: "precedent",
-      parties: tenetId === undefined ? [changeH] : [changeH, tenetId],
-      subjectId: p.subject,
-      subjectKey: SUBJECT_KEY,
-      predicate: "freshness",
+  // The verdict's evidence and the ways forward are worded as Keel's `settleVerdict` words them: the failed
+  // step, then the guard cited with the decision it holds, and a next action that reads that decision.
+  const failed = `guard:${p.guard} (freshness): a role revoked mid-session is still allowed; it holds decision ${decisionId}: ${S2_DECIDED}`;
+  const evidence = [
+    `guard:${p.guard}: fail (proof, tier 1: one throwaway isolate per world)`,
+    `guard failed: ${failed}`,
+  ];
+  const nextActions: NextAction[] = [
+    {
+      kind: "call",
+      title: `Fix the guarded behaviour, push, then submit again: ${failed}`,
+      operationId: "submit",
+      args: { failingGuards: [failed] },
     },
-    causation: derivedH,
-  });
-  if (tenetId !== undefined) {
-    b.at(141.3).emit({
-      type: "TenetContested",
-      entity: { kind: "tenet", id: tenetId },
-      payload: { tenetId, conflictId: conflict },
-      causation: suspected,
-    });
-  }
-  b.at(141.4).emit({
-    type: "ConflictProven",
-    entity: conflictRef,
-    payload: {
-      conflictId: conflict,
-      evidence: { _tag: "guard", guardId: p.guard },
-      x: { cost: { ms: 2_600, usd: 0.0005 } },
+    {
+      kind: "call",
+      title: `Read decision ${decisionId}, which the failed guard holds: ${S2_DECIDED}`,
+      operationId: "Memory_getDecision",
+      args: { decisionId },
     },
-  });
-  const reasons: EvidenceLine[] = [
+  ];
+  const verdictH = b.at(144.4).id("vrd");
+  // What a verdict's own view would list, for the fixtures' pages that read one: Keel serves no such view yet.
+  b.reasons(verdictH, "bounce", [
     {
       class: "proof",
       summary: "Guard G-1 fails against this change, three runs out of three",
       by: "Verification Plan · Tier 1 isolate",
       ref: `grd:${p.guard}`,
-      at: b.isoAt(141),
+      at: b.isoAt(143.4),
     },
     {
       class: "ruling",
@@ -520,47 +559,30 @@ export function generateS2(seed: number): GeneratedLog {
       ref: "src/authz/cache.ts#PermissionCache",
       at: b.isoAt(134),
     },
-  ];
-  const verdictH = b.at(141.6).id("vrd");
+  ]);
   b.emit({
     type: "VerdictIssued",
     entity: { kind: "verdict", id: verdictH },
     payload: {
       verdictId: verdictH,
-      subject: changeH,
+      subject: batch,
       outcome: "bounce",
-      evidence: b.reasons(verdictH, "bounce", reasons),
-      planHash: "plan:1b7e…90ad",
-      x: {
-        summary: "Guard G-1 fails: the change strips the invalidation that Decision D-1 requires",
-      },
+      evidence,
+      planHash,
+      nextActions,
     },
   });
-  b.at(141.7).emit({
+  // A batch of one's failure is its member's: Keel blames the change, and the change bounces on the verdict.
+  b.at(144.5).emit({
+    type: "BatchFailed",
+    entity: batchRef,
+    payload: { batchId: batch, candidateId: candidate, verdictId: verdictH, attribution: changeH },
+  });
+  b.at(144.6).emit({
     type: "ChangeBounced",
     entity: changeRef(changeH),
-    payload: {
-      changeId: changeH,
-      verdictId: verdictH,
-      reasons: reasons.map((line) => line.ref),
-      nextActions: [
-        { kind: "call", title: "Keep the invalidation on revocation", operationId: "revise" },
-        { kind: "escalate", title: "Or ask for Decision D-1 to be overruled" },
-      ],
-    },
+    payload: { changeId: changeH, verdictId: verdictH, reasons: evidence, nextActions },
   });
-  b.at(141.8).emit({
-    type: "ConflictResolved",
-    entity: conflictRef,
-    payload: { conflictId: conflict, move: "yield", decisionId },
-  });
-  if (tenetId !== undefined) {
-    b.at(141.9).emit({
-      type: "TenetReaffirmed",
-      entity: { kind: "tenet", id: tenetId },
-      payload: { tenetId, conflictId: conflict },
-    });
-  }
 
   // History's question was answered nine days ago: nothing holds this story.
   return { ...b.build(), gates: [] };

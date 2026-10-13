@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.detail
+# why: a guard is not tied to the conflict whose proof it was admitted from, so it leads to no probe
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..4cef7b3d 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -157,7 +157,6 @@ export function decisionDetailOf(
+       return {
+         id,
+         label: guard?.label ?? id,
+-        ...(guard === undefined ? {} : { conflictId: guard.conflictId }),
+       };
+     }),
+     bounced: (world.citing.get(view.id) ?? []).map(change),

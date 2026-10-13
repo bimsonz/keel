@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.pages
+# why: every page Keel has is asked for, whatever the reader asked to see
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..626862ab 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -39,7 +39,7 @@ export async function readDecisions(
+ ): Promise<DecisionsRead> {
+   const items: DecisionView[] = [];
+   let cursor: string | undefined;
+-  for (let asked = 0; asked < Math.max(pages, 1); asked += 1) {
++  for (let asked = 0; asked < 99; asked += 1) {
+     // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+     const page = await source.listDecisions(
+       {

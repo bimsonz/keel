@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.read-by
+# why: a decision Keel reads this reader none of is shown as Keel failing
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 2cd0b7b6..04aab5eb 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -567,8 +567,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           `/v1/decisions/${encodeURIComponent(input.decisionId)}`,
+           signal,
+         );
+-        // Keel's one answer for a decision it never recorded and for one this reader is not read.
+-        if (response.status === 404) return null;
+         if (!response.ok) throw await refusalOf(response);
+         return answered<DecisionView>(response);
+       },

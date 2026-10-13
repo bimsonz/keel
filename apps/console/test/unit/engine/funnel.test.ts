@@ -182,20 +182,14 @@ describe("the review funnel, read off the scripted scenarios", () => {
     expect(row(state, 5)).toMatchObject({ reached: 0, open: 0 });
   });
 
-  it("counts a guard that bounces a change as proof, with no new probe and no new question", async () => {
+  it("counts nothing for a guard that bounces a change: it opens no conflict, no probe and no question", async () => {
     const state = funnelOf((await playerAt("s2", 9999)).world);
-    // History holds the first conflict, which went to a person; the guard settled the second by itself.
+    // History holds the one conflict, which went to a person. The guard's failure is a line of a verdict.
     expect(row(state, 3)).toMatchObject({ reached: 1, passedOn: 1 });
-    expect(row(state, 4)).toMatchObject({
-      reached: 2,
-      settled: 1,
-      passedOn: 1,
-      proven: 1,
-      dismissed: 0,
-    });
+    expect(row(state, 4)).toMatchObject({ reached: 1, passedOn: 1, proven: 0, dismissed: 0 });
     expect(row(state, 5)).toMatchObject({ reached: 1, settled: 1 });
-    // The first probe's fifteen runs, and the guard's one run against the careless change.
-    expect(row(state, 4)?.usd).toBeCloseTo(15 * 0.00014 + 0.0005, 9);
+    // The first probe's fifteen runs, and nothing beside them.
+    expect(row(state, 4)?.usd).toBeCloseTo(15 * 0.00014, 9);
   });
 });
 

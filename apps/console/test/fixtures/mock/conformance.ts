@@ -219,9 +219,17 @@ const RULES: Record<EventType, Rule[]> = {
   DecisionOverruled: [
     { kind: "decision", idField: "decisionId", from: ["active"], to: "overruled" },
   ],
-  PrecedentSurfaced: [{ kind: "decision", idField: "decisionId", from: ["active"] }],
+  // Keel commits a precedent it surfaced to a change, and a change's distinguishing itself from one, on the
+  // change: the decision is named, and must stand.
+  PrecedentSurfaced: [
+    change(undefined),
+    { kind: "decision", idField: "decisionId", from: ["active"] },
+  ],
   PrecedentFollowed: [{ kind: "decision", idField: "decisionId", from: ["active"] }],
-  PrecedentDistinguished: [{ kind: "decision", idField: "decisionId", from: ["active"] }],
+  PrecedentDistinguished: [
+    change(undefined),
+    { kind: "decision", idField: "decisionId", from: ["active"] },
+  ],
   OverruleRequested: [{ kind: "decision", idField: "decisionId", from: ["active"] }],
   TenetEstablished: [{ kind: "tenet", idField: "tenetId", from: null, to: "established" }],
   TenetContested: [{ kind: "tenet", idField: "tenetId", from: ["established"], to: "contested" }],

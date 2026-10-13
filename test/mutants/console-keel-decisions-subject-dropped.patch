@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.joined
+# why: the stand-in's read of a decision names no subject, so the list narrowed to one is empty
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..024886aa 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -486,7 +486,6 @@ export function createFakeKeel(
+           escalationId: answered,
+           project: project.id,
+           ...(conflictId === undefined ? {} : { conflictId }),
+-          ...(sides?.subjectKey === undefined ? {} : { subject: sides.subjectKey }),
+           holds: upheld,
+           ...(resolved?.against === undefined ? {} : { against: [...resolved.against] }),
+           guards: standing ? [guard] : [],

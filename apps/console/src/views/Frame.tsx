@@ -6,6 +6,7 @@ import { Badge } from "@cloudflare/kumo";
 import {
   ChartBarIcon,
   CodeIcon,
+  GavelIcon,
   GearIcon,
   GitDiffIcon,
   GraphIcon,
@@ -29,6 +30,7 @@ export type TabId =
   | "changes"
   | "conflicts"
   | "escalations"
+  | "decisions"
   | "mission-control"
   | "agents"
   | "insights"
@@ -56,6 +58,7 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
     Icon: HandPalmIcon,
     to: { at: "escalations", filter: "open", shown: PAGE },
   },
+  { id: "decisions", label: "Decisions", Icon: GavelIcon, to: { at: "decisions" } },
   {
     id: "mission-control",
     label: "Mission Control",
@@ -83,6 +86,9 @@ export function tabOf(route: Route): TabId | undefined {
     case "escalations":
     case "escalation":
       return "escalations";
+    case "decisions":
+    case "decision":
+      return "decisions";
     case "mission-control":
       return "mission-control";
     case "agents":
@@ -179,6 +185,7 @@ export function Frame({
   projects,
   reader,
   settings = false,
+  decisions = false,
   children,
 }: {
   /** The projects this reader may go to, where Keel has named them. */
@@ -194,6 +201,8 @@ export function Frame({
   counts?: OpenCounts;
   /** Whether the project's settings are this reader's to change: the Settings tab is offered to them alone. */
   settings?: boolean;
+  /** Whether the source holds Keel's memory of the project's decisions: the Decisions tab is offered where it does. */
+  decisions?: boolean;
   children: ReactNode;
 }) {
   const { namespace, project, route } = useWhere();
@@ -281,7 +290,9 @@ export function Frame({
         </div>
         {counts !== undefined && (
           <nav aria-label="Project" className="a-tabs a-tabs-frame px-4">
-            {TABS.filter((tab) => tab.id !== "settings" || settings).map((tab) => (
+            {TABS.filter(
+              (tab) => (tab.id !== "settings" || settings) && (tab.id !== "decisions" || decisions),
+            ).map((tab) => (
               // The tab's own page is its list. On a thing in that list, the tab is where the reader is, and not the page they are on.
               <Link
                 key={tab.id}

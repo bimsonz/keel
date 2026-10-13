@@ -323,6 +323,43 @@ export function AgentTag({
   );
 }
 
+// ─── Propositions ───────────────────────────────────────────────────────────
+
+/** How a proposition's relation is said in a sentence. One Keel adds later is said by its own name. */
+export const RELATION_WORD: Record<string, string> = {
+  is: "is",
+  "at-most": "at most",
+  "at-least": "at least",
+  not: "is not",
+  before: "before",
+  after: "after",
+};
+
+/** One proposition on one line: its subject, then what it says of it. */
+export function PropositionLine({
+  proposition,
+}: {
+  proposition: {
+    subject: string;
+    predicate: string;
+    relation: string;
+    value: string | number | boolean;
+    unit?: string | undefined;
+  };
+}) {
+  return (
+    <p className="text-base leading-snug text-kumo-strong">
+      <span className="a-mono text-kumo-default">{proposition.subject}</span>
+      <span className="mx-1.5 text-kumo-inactive">/</span>
+      <span className="font-semibold">
+        {proposition.predicate} {RELATION_WORD[proposition.relation] ?? proposition.relation}{" "}
+        {String(proposition.value)}
+        {proposition.unit !== undefined && ` ${proposition.unit}`}
+      </span>
+    </p>
+  );
+}
+
 // ─── Layout helpers ─────────────────────────────────────────────────────────
 
 export function Panel({

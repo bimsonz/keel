@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.read-by
+# why: the stand-in lists a private project's decisions to someone it is not read to
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index d1342551..6793bd99 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1408,7 +1408,7 @@ export function createFakeKeel(
+       // one among them (`decisions.ts` among Keel's handlers). The list is of the project it names, a page at
+       // a time from after the decision its cursor names; a project this reader is not read is not there.
+       if (url.pathname === "/v1/decisions" && request.method === "GET") {
+-        if (!visible || url.searchParams.get("project") !== project.id) return gone();
++        if (url.searchParams.get("project") !== project.id) return gone();
+         const cursor = url.searchParams.get("cursor");
+         if (cursor !== null && !cursor.startsWith("dec_")) return problem(400, "request.invalid");
+         const subject = url.searchParams.get("subject");

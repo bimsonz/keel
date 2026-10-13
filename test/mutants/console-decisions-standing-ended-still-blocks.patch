@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.standing
+# why: a decision that was superseded or overruled is said to block still
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..293090ca 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -102,7 +102,6 @@ export function decisionRowsOf(items: readonly DecisionView[], world: World): De
+ export type Standing = "blocks" | "unguarded" | "ended";
+ 
+ export function standingOf(view: Pick<DecisionView, "state" | "guards">): Standing {
+-  if (view.state !== "active") return "ended";
+   return view.guards.length > 0 ? "blocks" : "unguarded";
+ }
+ 

@@ -14,6 +14,8 @@ import { ConflictPage } from "./pages/Conflict.tsx";
 import { ConflictsPage } from "./pages/Conflicts.tsx";
 import { EscalationPage } from "./pages/Escalation.tsx";
 import { EscalationsPage } from "./pages/Escalations.tsx";
+import { DecisionPage } from "./pages/Decision.tsx";
+import { DecisionsPage } from "./pages/Decisions.tsx";
 import { HomePage } from "./pages/Home.tsx";
 import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
@@ -158,6 +160,10 @@ function Page({ route, mode, project }: { route: Route; mode: Mode; project: Pro
       return <EscalationsPage filter={route.filter} shown={route.shown} />;
     case "escalation":
       return <EscalationPage name={route.name} />;
+    case "decisions":
+      return <DecisionsPage {...(route.subject === undefined ? {} : { subject: route.subject })} />;
+    case "decision":
+      return <DecisionPage name={route.name} />;
     case "mission-control":
       return (
         <MissionControlPage
@@ -186,6 +192,7 @@ function pageOf(route: Route, address: string): string {
     route.at === "changes" ||
     route.at === "conflicts" ||
     route.at === "escalations" ||
+    route.at === "decisions" ||
     route.at === "mission-control" ||
     route.at === "code" ||
     route.at === "insights" ||
@@ -245,6 +252,8 @@ function Console({
           {...(found.forkedFrom === undefined ? {} : { forkedFrom: found.forkedFrom })}
           // Keel holds a project's settings, so a test fixture, which is not Keel, has none to offer.
           settings={maintains(found) && player.source.getSettings !== undefined}
+          // Keel remembers a project's decisions, and a test fixture has no memory of its own to read.
+          decisions={player.source.decisions !== undefined}
           {...(reader === undefined ? {} : { reader })}
           {...(player.loaded ? { counts } : {})}
         >

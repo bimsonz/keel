@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts apps/console/test/unit/engine/bounce.test.ts
+# kills: decisions.verdict-tied, change.bounce-verdict
+# why: a change bounced on its batch's verdict shows no verdict, since that verdict names the batch
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 2cd64494..6de55876 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -839,8 +839,6 @@ export class World {
+           // The verdict a bounce names is the change's own to show, though it judged the batch the change was in:
+           // Keel runs a plan on a batch's candidate, and a failed batch's verdict names no change itself.
+           if (verdictId !== undefined && !change.verdictIds.includes(verdictId)) {
+-            change.verdictIds.push(verdictId);
+-            change.verdictRevision = change.revision;
+           }
+           // A change is counted once for a decision, however many of its bounces cited it.
+           const citing = cited === undefined ? undefined : (this.citing.get(cited) ?? []);

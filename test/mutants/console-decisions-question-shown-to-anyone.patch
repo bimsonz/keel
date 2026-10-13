@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.question-members
+# why: a visitor is shown that a decision answered a question, which Keel reads to members alone
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..3b11d1a7 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -161,7 +161,7 @@ export function decisionDetailOf(
+       };
+     }),
+     bounced: (world.citing.get(view.id) ?? []).map(change),
+-    ...(publicOnly
++    ...(publicOnly && view.id === ""
+       ? {}
+       : {
+           question: {

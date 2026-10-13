@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.turns
+# why: a guard retired while a decision's page is open is still drawn as holding it
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..5524ea09 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -185,7 +185,7 @@ export function turnsOf(world: World): string {
+         ? []
+         : [`c:${conflict.id}:${conflict.decisionId}:${(conflict.against ?? []).join(",")}`],
+     ),
+-    ...[...world.guards.values()].map((guard) => `g:${guard.id}:${guard.state}`),
++    ...[...world.guards.values()].map((guard) => `g:${guard.id}`),
+     ...[...world.citing].map(([decision, changes]) => `b:${decision}:${changes.join(",")}`),
+   ].join(" ");
+ }

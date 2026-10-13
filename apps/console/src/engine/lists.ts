@@ -15,7 +15,7 @@ import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../do
 import { agentName } from "./audience.ts";
 import { type Cards, type HeldUnder, heldUnder } from "./holder.ts";
 import { subjectOf } from "./lanes.ts";
-import type { ChangeEntry, ConflictEntry, EscalationEntry, World } from "./world.ts";
+import type { ChangeEntry, ConflictEntry, DecisionEntry, EscalationEntry, World } from "./world.ts";
 
 /** How many rows a list shows before it is asked for more. */
 export const PAGE = 50;
@@ -161,12 +161,15 @@ export const conflictNamed = (world: World, name: string): ConflictEntry | undef
   named(world.conflicts, name);
 export const escalationNamed = (world: World, name: string): EscalationEntry | undefined =>
   named(world.escalations, name);
+export const decisionNamed = (world: World, name: string): DecisionEntry | undefined =>
+  named(world.decisions, name);
 
-/** What an address calls every change, conflict and escalation, by id: read once for a whole list, or a whole page. */
+/** What an address calls every change, conflict, escalation and decision, by id: read once for a whole list, or a whole page. */
 export interface Names {
   changes: Map<string, string>;
   conflicts: Map<string, string>;
   escalations: Map<string, string>;
+  decisions: Map<string, string>;
 }
 
 export function namesIn(world: World): Names {
@@ -174,6 +177,7 @@ export function namesIn(world: World): Names {
     changes: namesOf(world.changes, "#"),
     conflicts: namesOf(world.conflicts),
     escalations: namesOf(world.escalations),
+    decisions: namesOf(world.decisions),
   };
 }
 

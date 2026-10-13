@@ -1334,7 +1334,7 @@ export function continueInvalidate(
   // B meets the decision as precedent, follows it, and comes back.
   b.at(480).emit({
     type: "PrecedentSurfaced",
-    entity: { kind: "decision", id: decisionId },
+    entity: changeRef(p.changeB),
     payload: { decisionId, changeId: p.changeB },
   });
   b.at(500).emit({

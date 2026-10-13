@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.rows
+# why: a conflict the reader's log does not name is called by an id nobody was given
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..0b895e4a 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -87,7 +87,7 @@ export function decisionRowsOf(items: readonly DecisionView[], world: World): De
+       : {
+           conflict: {
+             id: view.conflictId,
+-            label: world.conflicts.get(view.conflictId)?.label ?? "",
++            label: world.conflicts.get(view.conflictId)?.label ?? view.conflictId,
+           },
+         }),
+   }));

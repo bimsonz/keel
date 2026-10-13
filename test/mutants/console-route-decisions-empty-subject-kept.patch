@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.decisions
+# why: an address with an empty subject narrows the list to nothing
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 58751472..4bfe73ae 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -146,7 +146,7 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
+     case "decisions": {
+       if (first !== undefined) return more.length > 0 ? MISSING : { at: "decision", name: first };
+       const subject = query.get("subject");
+-      return subject === null || subject === ""
++      return subject === null
+         ? { at: "decisions" }
+         : { at: "decisions", subject };
+     }

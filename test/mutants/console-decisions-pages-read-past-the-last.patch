@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.last-page
+# why: a list that has ended is asked for again from its first page
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index af5325fd..7deacf95 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -50,7 +50,7 @@ export async function readDecisions(
+     );
+     items.push(...page.items);
+     cursor = page.nextCursor;
+-    if (cursor === undefined || cursor === "") return { items };
++    if (cursor === "") return { items };
+   }
+   return { items, ...(cursor === undefined ? {} : { next: cursor }) };
+ }

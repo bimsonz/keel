@@ -25,6 +25,8 @@ import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import {
   ChangeLink,
   ConflictLink,
+  DecisionLink,
+  DecisionName,
   EscalationLink,
   HolderLink,
   RunLink,
@@ -36,34 +38,13 @@ import {
   EvidenceList,
   OutcomeWord,
   Panel,
+  PropositionLine,
+  RELATION_WORD,
   TierBadge,
   Unverified,
   clockTime,
   dateTime,
 } from "./parts.tsx";
-
-const RELATION_WORD: Record<string, string> = {
-  is: "is",
-  "at-most": "at most",
-  "at-least": "at least",
-  not: "is not",
-  before: "before",
-  after: "after",
-};
-
-function PropositionLine({ proposition }: { proposition: Proposition }) {
-  return (
-    <p className="text-base leading-snug text-kumo-strong">
-      <span className="a-mono text-kumo-default">{proposition.subject}</span>
-      <span className="mx-1.5 text-kumo-inactive">/</span>
-      <span className="font-semibold">
-        {proposition.predicate} {RELATION_WORD[proposition.relation] ?? proposition.relation}{" "}
-        {String(proposition.value)}
-        {proposition.unit !== undefined && ` ${proposition.unit}`}
-      </span>
-    </p>
-  );
-}
 
 /** A claim in full: what makes two declared effects the same one. A bound's unit and the scope are part of it. */
 function ClaimLine({ proposition }: { proposition: Proposition }) {
@@ -462,6 +443,16 @@ export function Change({
                     </ul>
                   </div>
                 )}
+                {state.bounce?.cites !== undefined && (
+                  // The decision is the one Keel's next action names, by its id: no sentence is read for it.
+                  <p className="mt-2 text-base text-kumo-default" data-part="cited-decision">
+                    This bounce cites{" "}
+                    <DecisionLink id={state.bounce.cites} className="a-link font-semibold">
+                      decision <DecisionName id={state.bounce.cites} />
+                    </DecisionLink>
+                    .
+                  </p>
+                )}
                 {escalation !== undefined && waiting && (
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-kumo-line pt-3">
                     <p className="min-w-0 flex-1 text-base text-kumo-default">
@@ -647,9 +638,12 @@ export function Change({
                         className="flex flex-col gap-0.5 px-3 py-2 text-base"
                       >
                         <span>
-                          <b className="font-semibold text-kumo-strong">
+                          <DecisionLink
+                            id={precedent.decisionId}
+                            className="font-semibold text-kumo-strong"
+                          >
                             {precedent.decisionLabel}
-                          </b>{" "}
+                          </DecisionLink>{" "}
                           {precedent.summary}
                         </span>
                         <span className="text-sm text-kumo-subtle">

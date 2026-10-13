@@ -16,9 +16,12 @@ import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
   AgentCard,
   AgentProfile,
+  DecisionPage,
+  DecisionView,
   EscalationPage,
   EscalationView,
   EventPage,
+  EventProposition,
   EventRecord,
   LatticeSet,
   NamespaceAgent,
@@ -42,6 +45,7 @@ import { RepoRefused } from "../../../src/source/repository.ts";
 import { LATTICES } from "../lattices.ts";
 import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
+import { generateS2 } from "./s2.ts";
 
 /**
  * Keel records no cost yet (QUESTIONS B4), so this stand-in publishes none: what a fixture prices is the
@@ -314,10 +318,34 @@ const FIXTURE_IDS: Record<NamespaceView["kind"], string> = {
   org: "org_0000000000000000000000ACME",
 };
 
+/**
+ * The propositions a ruling upheld, as Keel's `holds` reads them off the conflict's two sides and whom the
+ * ruling went against: against the change that makes the effect, the premise stood; against the change that
+ * holds the premise, the effect did; against neither or both, or where a side is not named, nothing.
+ */
+function upheldOf(
+  sides: Extract<AnyEvent, { type: "ConflictSuspected" }>["payload"],
+  against: readonly string[],
+): EventProposition[] {
+  const { premise, effect } = sides;
+  if (premise === undefined || effect === undefined) return [];
+  const holderLost = against.includes(premise.holder);
+  const authorLost = against.includes(effect.changeId);
+  if (holderLost === authorLost) return [];
+  return [authorLost ? premise.proposition : effect.proposition];
+}
+
 export function createFakeKeel(
   options: {
     seed?: number;
     pageSize?: number;
+    /** How many decisions a page of Keel's list holds where the reader names no limit: Keel's fifty, unless a test says. */
+    decisionPage?: number;
+    /**
+     * Which scripted log is the project's: scenario 1's, which ends at its question, unless a test says
+     * scenario 2's, which opens nine days after that question was ruled and bounces a change on the guard.
+     */
+    story?: "s1" | "s2";
     /** The namespace the project is in: an org called `acme`, unless a test says whose. */
     namespace?: NamespaceRef;
     /**
@@ -372,11 +400,19 @@ export function createFakeKeel(
 ): FakeKeel {
   const seed = options.seed ?? 42;
   const pageSize = options.pageSize ?? 500;
+  const decisionPage = options.decisionPage ?? 50;
   const ahead = options.ahead ?? 0;
-  let log = generateS1(seed);
+  let log = options.story === "s2" ? generateS2(seed) : generateS1(seed);
   const repository = createMockRepository(() => log);
-  const escalationId = log.gates[0]?.escalationId ?? "";
-  let ruled: { option: string; key: string } | undefined;
+  /** Every event of one kind the log holds, in its order. */
+  const of = <Type extends AnyEvent["type"]>(type: Type) =>
+    log.events.filter((event): event is Extract<AnyEvent, { type: Type }> => event.type === type);
+  // The question the story holds at; or, where history has answered it, the one history asked.
+  const escalationId =
+    log.gates[0]?.escalationId ?? of("EscalationRaised")[0]?.payload.escalationId ?? "";
+  const [given] = of("RulingGiven");
+  let ruled: { option: string; key: string } | undefined =
+    given === undefined ? undefined : { option: given.payload.option, key: "" };
   let waiters: (() => void)[] = [];
   const calls: Call[] = [];
   const created = log.events.find((event) => event.type === "ProjectCreated");
@@ -395,6 +431,70 @@ export function createFakeKeel(
     verification: "required",
   };
   const settings = (): ProjectSettings => ({ ...kept, visibility: project.visibility });
+
+  /**
+   * Keel's index of the project's decisions, as `decision-index.ts` joins it when it is read: each decision as
+   * its own events leave it, with what its conflict says of it. The subject, whom the ruling went against, what
+   * it upheld and the guard that holds it are the conflict's; until the conflict's resolution names the
+   * decision, the ruling has upheld nothing. Newest first. Written beside Keel's, and not imported.
+   */
+  const remembered = (): DecisionView[] =>
+    of("DecisionRecorded")
+      .map((recorded): DecisionView => {
+        const { decisionId, escalationId: answered, option, summary, scope } = recorded.payload;
+        const ended = [...of("DecisionSuperseded"), ...of("DecisionOverruled")].find(
+          (event) => event.payload.decisionId === decisionId,
+        );
+        // The conflict the ruling was about is the one its question was put about.
+        const about = of("EscalationRaised").find(
+          (event) => event.payload.escalationId === answered,
+        )?.payload.about;
+        const conflictId = about?.kind === "conflict" ? about.id : undefined;
+        const sides = of("ConflictSuspected").find(
+          (event) => event.payload.conflictId === conflictId,
+        )?.payload;
+        const resolved = of("ConflictResolved").find(
+          (event) =>
+            event.payload.conflictId === conflictId && event.payload.decisionId === decisionId,
+        )?.payload;
+        const guard = of("GuardAdmitted").find((event) => event.payload.conflictId === conflictId)
+          ?.payload.guardId;
+        const retired = of("GuardRetired").some((event) => event.payload.guardId === guard);
+        const upheld =
+          resolved === undefined || sides === undefined
+            ? []
+            : upheldOf(sides, resolved.against ?? []);
+        // A guard is drawn from the premise, so a ruling for the effect leaves its guard holding nothing.
+        const asserted = JSON.stringify(sides?.premise?.proposition);
+        const standing =
+          guard !== undefined &&
+          !retired &&
+          upheld.some((proposition) => JSON.stringify(proposition) === asserted);
+        return {
+          id: decisionId,
+          label: recorded.label ?? "D-0",
+          option,
+          summary,
+          ...(scope === undefined ? {} : { scope }),
+          decidedAt: recorded.at,
+          state:
+            ended === undefined
+              ? "active"
+              : ended.type === "DecisionSuperseded"
+                ? "superseded"
+                : "overruled",
+          escalationId: answered,
+          project: project.id,
+          ...(conflictId === undefined ? {} : { conflictId }),
+          ...(sides?.subjectKey === undefined ? {} : { subject: sides.subjectKey }),
+          holds: upheld,
+          ...(resolved?.against === undefined ? {} : { against: [...resolved.against] }),
+          guards: standing ? [guard] : [],
+        };
+      })
+      .toSorted(
+        (a, b) => Date.parse(b.decidedAt) - Date.parse(a.decidedAt) || b.id.localeCompare(a.id),
+      );
 
   /** The question as the log raised it: Keel's view of an escalation is that event's own fields. */
   const raised = () => log.events.find((event) => event.type === "EscalationRaised");
@@ -1302,6 +1402,51 @@ export function createFakeKeel(
         };
         project.visibility = to === "public" ? "public" : "private";
         return Response.json(settings());
+      }
+
+      // Keel's memory of the project's decisions, read by whoever reads the project, a visitor to a public
+      // one among them (`decisions.ts` among Keel's handlers). The list is of the project it names, a page at
+      // a time from after the decision its cursor names; a project this reader is not read is not there.
+      if (url.pathname === "/v1/decisions" && request.method === "GET") {
+        if (!visible || url.searchParams.get("project") !== project.id) return gone();
+        const cursor = url.searchParams.get("cursor");
+        if (cursor !== null && !cursor.startsWith("dec_")) return problem(400, "request.invalid");
+        const subject = url.searchParams.get("subject");
+        const asked = Number(url.searchParams.get("limit") ?? decisionPage);
+        const limit = Math.min(Math.max(Number.isInteger(asked) ? asked : decisionPage, 1), 100);
+        const matching = remembered().filter(
+          (view) => subject === null || view.subject === subject,
+        );
+        const rest = matching.slice(
+          cursor === null ? 0 : matching.findIndex((view) => view.id === cursor) + 1,
+        );
+        const items = rest.slice(0, limit);
+        const last = items.at(-1);
+        return Response.json({
+          items,
+          ...(rest.length > limit && last !== undefined ? { nextCursor: last.id } : {}),
+        } satisfies DecisionPage);
+      }
+      // One decision is read by whoever reads the project it was ruled in. One this reader is not read, and
+      // one Keel never recorded, are the same answer, which names only the id that was asked for.
+      const remembering = /^\/v1\/decisions\/([^/]+)$/.exec(url.pathname);
+      if (remembering !== null && request.method === "GET") {
+        const id = decodeURIComponent(remembering[1] ?? "");
+        const view = visible ? remembered().find((one) => one.id === id) : undefined;
+        return view === undefined
+          ? problem(
+              404,
+              "decision.not_found",
+              [
+                {
+                  kind: "read",
+                  title: "List the project's decisions",
+                  operationId: "Memory_listDecisions",
+                },
+              ],
+              `No decision ${id} in a project you can read.`,
+            )
+          : Response.json(view satisfies DecisionView);
       }
 
       // A person's own questions, across their projects: one whose agent names them, at once; one of a

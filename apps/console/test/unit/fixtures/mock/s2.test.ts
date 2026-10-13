@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { AnyEvent } from "../../../../src/contract/events.ts";
 import type { Player } from "../../../../src/engine/player.ts";
 import { changePageOf } from "../../../../src/engine/select.ts";
 import { World } from "../../../../src/engine/world.ts";
 import { createMockSource } from "../../../fixtures/mock/MockSource.ts";
 import { checkLog, finalStates } from "../../../fixtures/mock/conformance.ts";
-import { generateS2 } from "../../../fixtures/mock/s2.ts";
+import { S2_DECIDED, generateS2 } from "../../../fixtures/mock/s2.ts";
 import { showing } from "../../showing.ts";
 
 async function playerAt(seconds: number): Promise<Player> {
@@ -43,6 +44,7 @@ describe("scenario 2: memory", () => {
     expect(file?.change.state).toBe("landed");
     expect(file?.precedents).toEqual([
       {
+        decisionId: [...player.world.decisions.keys()][0],
         decisionLabel: "D-1",
         summary: "Cache allowed if revocation invalidates it",
         decidedAt: "2026-10-13T10:21:52.400Z",
@@ -57,20 +59,21 @@ describe("scenario 2: memory", () => {
     expect(player.world.trunk.advances).toBe(1144);
   });
 
-  it("bounces the careless change on the guard, citing the decision, and trunk stays green", async () => {
+  it("bounces the careless change on its batch's verdict, citing the decision, and trunk stays green", async () => {
     const player = await playerAt(200);
     const h = [...player.world.changes.values()].find((change) => change.label === "#1205");
-    // The verdict's event carries references. Its evidence is read from Keel's view of the verdict, when the change's page is opened.
+    const [decision] = [...player.world.decisions.values()];
+    // The verdict judged the batch the change was in, and the bounce names it: it is the change's to show.
+    // Its classed evidence is read from Keel's view of the verdict, when the change's page is opened.
     expect(changePageOf(player.world, h?.id ?? "", player)?.verdict?.evidence).toEqual([]);
     player.wantVerdict(h?.id ?? "");
     await Promise.resolve();
     await Promise.resolve();
     const file = changePageOf(player.world, h?.id ?? "", player);
     expect(file?.change.state).toBe("bounced");
-    expect(file?.verdict).toMatchObject({
-      outcome: "bounce",
-      summary: "Guard G-1 fails: the change strips the invalidation that Decision D-1 requires",
-    });
+    expect(file?.verdict).toMatchObject({ outcome: "bounce" });
+    expect(file?.bounce?.cites).toBe(decision?.id);
+    expect(player.world.citing.get(decision?.id ?? "")).toEqual([h?.id]);
     expect(file?.verdict?.evidence.map((item) => item.class)).toEqual([
       "proof",
       "ruling",
@@ -86,16 +89,42 @@ describe("scenario 2: memory", () => {
     ).toEqual(["established"]);
   });
 
-  it("records the guard's failure as a fact of the change, before any batch exists, and proves the conflict by it", () => {
+  it("[s2.as-keel-commits] tells the guard's bounce in the events Keel commits and in its words, and in no other", () => {
     const events = generateS2(42).events;
-    const failed = events.find((event) => event.type === "GuardFailed");
-    expect(failed?.entity).toEqual({ kind: "change", id: failed?.payload.changeId });
-    expect(failed?.payload).not.toHaveProperty("batchId");
-    expect(failed?.payload).not.toHaveProperty("candidateId");
-    const proven = events.findLast((event) => event.type === "ConflictProven");
-    expect(proven?.payload.evidence).toEqual({ _tag: "guard", guardId: failed?.payload.guardId });
-    expect(events.findIndex((event) => event.type === "GuardFailed")).toBeLessThan(
-      events.findLastIndex((event) => event.type === "ConflictProven"),
+    const of = <Type extends AnyEvent["type"]>(type: Type) =>
+      events.filter((event): event is Extract<AnyEvent, { type: Type }> => event.type === type);
+    // A failing guard is a line of its batch's verdict. Keel commits no event for it, opens no conflict from
+    // it, and says nothing of a tenet: history's one conflict is the only one, and its resolution the only one.
+    expect(of("GuardFailed")).toEqual([]);
+    expect(of("TenetContested")).toEqual([]);
+    expect(of("TenetReaffirmed")).toEqual([]);
+    expect(of("ConflictSuspected")).toHaveLength(1);
+    expect(of("ConflictResolved").map((event) => event.payload.move)).toEqual(["refine"]);
+    const bounce = of("ChangeBounced").at(-1)?.payload;
+    const verdict = of("VerdictIssued").find(
+      (event) => event.payload.verdictId === bounce?.verdictId,
+    )?.payload;
+    const failed = of("BatchFailed").at(-1)?.payload;
+    // The verdict judged a batch, the batch's failure blames its one member, and the bounce names that verdict.
+    expect(verdict).toMatchObject({ subject: failed?.batchId, outcome: "bounce" });
+    expect(failed).toMatchObject({ verdictId: verdict?.verdictId, attribution: bounce?.changeId });
+    expect(bounce?.reasons).toEqual(verdict?.evidence);
+    expect(bounce?.nextActions).toEqual(verdict?.nextActions);
+    // Keel's citation: the guard that failed, and the decision it holds in that decision's own summary.
+    const [guard] = of("GuardAdmitted");
+    const [decision] = of("DecisionRecorded");
+    expect(decision?.payload.summary).toBe(S2_DECIDED);
+    expect(bounce?.reasons.at(-1)).toMatch(
+      new RegExp(
+        `^guard failed: guard:${guard?.payload.guardId} \\(freshness\\): .+; it holds decision ${decision?.payload.decisionId}: ${S2_DECIDED}$`,
+      ),
+    );
+    expect(bounce?.nextActions?.map((action) => [action.operationId, action.args])).toEqual([
+      ["submit", { failingGuards: [bounce?.reasons.at(-1)?.replace("guard failed: ", "")] }],
+      ["Memory_getDecision", { decisionId: decision?.payload.decisionId }],
+    ]);
+    expect(bounce?.nextActions?.[1]?.title).toBe(
+      `Read decision ${decision?.payload.decisionId}, which the failed guard holds: ${S2_DECIDED}`,
     );
   });
 
@@ -126,13 +155,32 @@ describe("scenario 2: memory", () => {
   });
 
   it("reads the plan's guard step as failed from Keel's fact alone, with no step observation to go on", async () => {
-    // As a live Keel publishes it today: events, and nothing of the console's own beside them.
+    // As a live Keel publishes it: events, and nothing of the console's own beside them. Keel's domain has an
+    // event for a guard that failed in a change's own plan and commits none yet, so one is written here by hand.
     const bare = new World();
     const { items } = await createMockSource({ scenario: "s2", seed: 42 }).readEvents({
       limit: 500,
     });
     for (const event of items) bare.apply(event, 0);
     const h = [...bare.changes.values()].find((change) => change.label === "#1205");
+    const admitted = items.find((event) => event.type === "GuardAdmitted");
+    const last = items.at(-1);
+    if (admitted?.type !== "GuardAdmitted" || last === undefined || h === undefined)
+      throw new Error("scenario 2 admits no guard, or bounces no change");
+    bare.apply(
+      {
+        ...last,
+        type: "GuardFailed",
+        entity: { kind: "change", id: h.id },
+        payload: {
+          _tag: "GuardFailed",
+          guardId: admitted.payload.guardId,
+          changeId: h.id,
+          world: "A",
+        },
+      },
+      0,
+    );
     const steps =
       changePageOf(bare, h?.id ?? "", {
         diffs: new Map(),

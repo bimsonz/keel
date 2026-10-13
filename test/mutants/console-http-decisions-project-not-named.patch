@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.calls
+# why: the list is asked for with no project named, which Keel answers a person nothing
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 2cd0b7b6..b7dfc799 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -556,7 +556,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+     // project it was ruled in.
+     decisions: {
+       async listDecisions(asked, signal) {
+-        const input: Memory_listDecisionsInput = { project: project.id, ...asked };
++        const input: Memory_listDecisionsInput = { ...asked };
+         const response = await read(`/v1/decisions${queryOf({ ...input })}`, signal);
+         if (!response.ok) throw await refusalOf(response);
+         return answered<DecisionPage>(response);
