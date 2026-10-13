@@ -7,7 +7,7 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { CodeDiff } from "../code/CodeDiff.tsx";
+import { CodeDiff, PlanGraph } from "./later.tsx";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
 import type { ChangePageState, DiffAnnotation, IntentRow, PlanStep } from "../domain/state.ts";
 import type { ChangeTab } from "../route.ts";
@@ -15,7 +15,6 @@ import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
-import { PlanGraph } from "./PlanGraph.tsx";
 import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "./links.tsx";
 import {
   AgentTag,

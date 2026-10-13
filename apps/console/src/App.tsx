@@ -24,6 +24,7 @@ import type { ProjectView } from "./contract/keel/index.ts";
 import type { KeelDirectory } from "./source/types.ts";
 import { type Mode, applyMode } from "./theme/mode.ts";
 import { Frame, Notice, type ReaderMark } from "./views/Frame.tsx";
+import { warm } from "./views/later.tsx";
 import { NamesProvider } from "./views/links.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./views/tokens.css";
@@ -276,6 +277,8 @@ function Project({
 }) {
   const [opened, setOpened] = useState<Opened>({ is: "reading" });
   const [siblings, setSiblings] = useState<readonly ProjectView[]>([]);
+  // What this place draws is asked for at once, beside Keel's own answers and not after them.
+  useEffect(() => warm(route), [route]);
 
   useEffect(() => {
     let here = true;

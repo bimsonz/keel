@@ -8,7 +8,7 @@ import { useClock, usePlayer, useSelected } from "../engine/react.tsx";
 import { trunkStatsOf } from "../engine/select.ts";
 import { subjectDetailOf } from "../engine/subject.ts";
 import type { Mode } from "../theme/mode.ts";
-import { MissionGraph } from "../views/MissionGraph.tsx";
+import { MissionGraph } from "../views/later.tsx";
 import { SubjectPanel } from "../views/SubjectPanel.tsx";
 import { TrunkLine } from "../views/TrunkStats.tsx";
 import { CLASS_WORD } from "../views/parts.tsx";

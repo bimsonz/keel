@@ -14,7 +14,7 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { CodeDiff, CodeFile, type LineNote } from "../code/CodeDiff.tsx";
+import { CodeDiff, CodeFile, type LineNote } from "./later.tsx";
 import type {
   BrowserEntry,
   CommitRow,

@@ -1,6 +1,6 @@
 import { usePublicOnly } from "../engine/react.tsx";
 import { BellIcon, HandPalmIcon, ShieldCheckIcon, WarningDiamondIcon } from "@phosphor-icons/react";
-import { CodeFile } from "../code/CodeDiff.tsx";
+import { CodeFile } from "./later.tsx";
 import type { ConflictPageState, MatrixRow, Outcome, Party, Pending } from "../domain/state.ts";
 import type { ConflictTab } from "../route.ts";
 import { useWhere } from "../router.tsx";

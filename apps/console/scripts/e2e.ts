@@ -50,6 +50,14 @@ const statOn = async (page: Page, label: string): Promise<string> =>
   );
 const pathOf = (page: Page): string => new URL(page.url()).pathname;
 /** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
+/** Waits for Mission Control's graph to be drawn, or for five seconds: the check after it says which. */
+const graphDrawn = async (shown: Page): Promise<void> => {
+  await shown
+    .locator(".a-fn")
+    .first()
+    .waitFor({ timeout: 5_000 })
+    .catch(() => undefined);
+};
 const shot = async (shown: Page, name: string): Promise<void> => {
   const folder = process.env["SHOTS"];
   if (folder !== undefined && folder !== "")
@@ -1119,6 +1127,8 @@ await page.goto(at("/subjects/storage.gc.safety", "scenario=swarm&t=100&play=0")
   waitUntil: "networkidle",
 });
 await panel.waitFor();
+// The graph is a file of its own and is drawn a moment after the panel beside it: waited for, and read either way.
+await graphDrawn(page);
 expectEqual(
   "subject: opened cold",
   String(await page.locator('.a-fn[data-selected="true"]').count()),
@@ -1146,6 +1156,7 @@ await page.goto(at(`/subjects/${far}`, "scenario=swarm&t=100&play=0"), {
   waitUntil: "networkidle",
 });
 await page.getByRole("complementary", { name: `Subject ${far}` }).waitFor();
+await graphDrawn(page);
 expectEqual(
   "subject: one far down the list has its lane shown when it is opened",
   String(await page.locator('.a-fn[data-selected="true"]').count()),
@@ -1608,9 +1619,25 @@ await asDeployed(street, {
   hold: (path) => (path === "/v1/events" ? logHeld : Promise.resolve()),
 });
 const visitor = watch(await street.newPage(), "built, a visitor");
+// The scripts the page asks for: the code viewer and the graphs are files of their own, asked for by the pages
+// that draw them. The names are the build's, with a hash after each.
+const scripts: string[] = [];
+visitor.on("request", (request) => {
+  const file = /\/assets\/([A-Za-z]+)-[^/]+\.js$/.exec(new URL(request.url()).pathname)?.[1];
+  if (file !== undefined) scripts.push(file);
+});
+const heavy = (): string =>
+  ["CodeDiff", "MissionGraph", "PlanGraph"].filter((name) => scripts.includes(name)).join(" ") ||
+  "none";
 await visitor.goto(`${built}/`, { waitUntil: "domcontentloaded" });
 // The home lists the projects Keel names to anyone, each under its org.
 await visitor.getByRole("list", { name: "Projects" }).getByRole("link").first().waitFor();
+await visitor.waitForTimeout(300);
+expectEqual(
+  "visitor: the home is not kept waiting for the code viewer or a graph, which it does not draw",
+  heavy(),
+  "none",
+);
 expectEqual(
   "visitor: the home lists the public projects, each under its org",
   squash(await visitor.getByRole("list", { name: "Projects" }).innerText()),
@@ -1632,6 +1659,17 @@ expectEqual(
   "visitor: the code is on the page while Keel has yet to answer about the log",
   `${await filesOn(visitor)}; the log ${open.calls.some((call) => call.path === "/v1/events") ? "answered" : "not answered"}`,
   "src | package.json | README.md; the log not answered",
+);
+// A directory draws a list and no code: its page is up before the viewer is asked for, and the viewer comes a
+// moment after, so the first file opened has it. No graph is asked for at all.
+const atFirst = heavy();
+for (let waited = 0; waited < 5_000 && !scripts.includes("CodeDiff"); waited += 100)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own request
+  await new Promise((resolve) => setTimeout(resolve, 100));
+expectEqual(
+  "visitor: a project's page is up before the code viewer is asked for, which then comes for the first file, and no graph does",
+  `${atFirst} then ${heavy()}`,
+  "none then CodeDiff",
 );
 answerTheLog();
 await countedPublic(visitor);
@@ -1674,6 +1712,7 @@ expectEqual(
 );
 
 // Playback is for a fixture's log. The built console has none, and no way to move about in Keel's.
+scripts.length = 0;
 await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
 await visitor.locator("dl.a-trunk-line").waitFor();
 expectEqual(
@@ -1682,6 +1721,17 @@ expectEqual(
   "—/0",
 );
 await shot(visitor, "visitor-mission-control");
+// A new document, so what it asks for is counted from nothing: the graph, and not the code viewer.
+await visitor
+  .locator(".react-flow")
+  .first()
+  .waitFor({ timeout: 8_000 })
+  .catch(() => undefined);
+expectEqual(
+  "visitor: Mission Control asks for its graph, which is a file of its own, and for no code viewer",
+  `${heavy()} | ${await visitor.locator(".react-flow").count()} drawn`,
+  "MissionGraph | 1 drawn",
+);
 // The control is loaded apart from the page, a moment after it. So it is waited for, and must not come.
 expectEqual(
   "built: no playback",
