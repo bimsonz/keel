@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/fresh.test.ts
+# kills: account.fresh-way
+# why: a sign-in again is offered under any refusal, and with none at all, so a person is signed out or asked for a touch where signing in again answers nothing
+diff --git a/apps/console/src/account/fresh.ts b/apps/console/src/account/fresh.ts
+index cb62542..ab15ee5 100644
+--- a/apps/console/src/account/fresh.ts
++++ b/apps/console/src/account/fresh.ts
+@@ -14,6 +14,6 @@ export function wayToFresh(
+   refused: string | undefined,
+   passkeys: number | null,
+ ): "passkey" | "sign-in" | null {
+-  if (refused !== FRESH_SIGN_IN_REQUIRED || passkeys === null) return null;
++  if (passkeys === null) return null;
+   return passkeys > 0 ? "passkey" : "sign-in";
+ }

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/fresh.test.ts
+# kills: account.fresh-way
+# why: someone with no passkey is offered a touch of one to sign in afresh, which they cannot give, and no way to the sign-in they have: Keel's refusal of their first passkey is a dead end
+diff --git a/apps/console/src/account/fresh.ts b/apps/console/src/account/fresh.ts
+index cb62542..cf3242e 100644
+--- a/apps/console/src/account/fresh.ts
++++ b/apps/console/src/account/fresh.ts
+@@ -15,5 +15,5 @@ export function wayToFresh(
+   passkeys: number | null,
+ ): "passkey" | "sign-in" | null {
+   if (refused !== FRESH_SIGN_IN_REQUIRED || passkeys === null) return null;
+-  return passkeys > 0 ? "passkey" : "sign-in";
++  return "passkey";
+ }

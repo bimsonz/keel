@@ -2217,53 +2217,90 @@ expectEqual(
 );
 
 // Keel lets a session change how its account signs in only where it was signed in by a passkey in the last
-// ten minutes. Ada signed in by a code and has no passkey: Keel refuses, in its own words, and the page offers
-// her no passkey sign-in, since she has none to make it with.
+// ten minutes, and takes an account's first passkey from any sign-in of its own that new.
 const FRESH_SIGN_IN =
   "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes";
+const FIRST_PASSKEY =
+  "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes";
 const SIGN_IN_AGAIN = "Sign in again with a passkey";
 const passkeysOn = (shown: Page) => shown.getByRole("region", { name: "Passkeys" });
 /** What the passkeys part of a settings page says: Keel's refusal, whether a sign-in is offered, how many are kept. */
 const passkeysSaid = async (shown: Page): Promise<string> =>
   `${(await passkeysOn(shown).getByRole("alert").count()) === 0 ? "no refusal" : squash(await passkeysOn(shown).getByRole("alert").innerText())} | ${await passkeysOn(shown).getByRole("button", { name: SIGN_IN_AGAIN }).count()} offered | ${await shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} kept`;
 await person.getByText("You have no passkey yet.").waitFor();
-await person.getByLabel("Name for a new passkey").fill("This laptop");
-await person.getByRole("button", { name: "Add a passkey" }).click();
-await passkeysOn(person)
-  .getByRole("alert")
-  .waitFor({ timeout: 10_000 })
-  .catch(() => undefined);
-await shot(person, "settings");
-expectEqual(
-  "account: someone signed in by a code is told Keel's own refusal on adding a passkey, and is offered no passkey sign-in, having none",
-  await passkeysSaid(person),
-  `${FRESH_SIGN_IN} | 0 offered | 0 kept`,
-);
+const sessionsHeld = async (): Promise<number> =>
+  (await lobby.cookies()).filter((cookie) => cookie.name.endsWith("session_token")).length;
+/** Ada signs in by a code sent to her address, on the sign-in page she is at, and is then at her settings. */
+const signInByCode = async (): Promise<void> => {
+  const codesSent = identity.outbox.length;
+  await person.getByLabel("Email").fill("ada@example.com");
+  await person.getByRole("button", { name: "Send a code" }).click();
+  await person.getByLabel("The code sent to ada@example.com").waitFor();
+  for (let tries = 0; tries < 50 && identity.outbox.length === codesSent; tries += 1)
+    // oxlint-disable-next-line no-await-in-loop -- waiting on the code to be sent
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  await person
+    .getByLabel("The code sent to ada@example.com")
+    .fill(identity.outbox.at(-1)?.otp ?? "");
+  await person.getByRole("button", { name: "Sign in", exact: true }).click();
+  await person.getByRole("heading", { name: "Your account" }).waitFor();
+};
 
 // Sign out, then back in by a code sent to the same address.
 await person.getByRole("button", { name: "Sign out", exact: true }).click();
 await person.waitForURL(`${built}/`);
-expectEqual(
-  "account: signed out, the session cookie is gone",
-  String((await lobby.cookies()).filter((cookie) => cookie.name.endsWith("session_token")).length),
-  "0",
-);
+expectEqual("account: signed out, the session cookie is gone", String(await sessionsHeld()), "0");
 await person.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
 await shot(person, "login");
-const codesSent = identity.outbox.length;
-await person.getByLabel("Email").fill("ada@example.com");
-await person.getByRole("button", { name: "Send a code" }).click();
-await person.getByLabel("The code sent to ada@example.com").waitFor();
-for (let tries = 0; tries < 50 && identity.outbox.length === codesSent; tries += 1)
-  // oxlint-disable-next-line no-await-in-loop -- waiting on the code to be sent
-  await new Promise((resolve) => setTimeout(resolve, 100));
-await person.getByLabel("The code sent to ada@example.com").fill(identity.outbox.at(-1)?.otp ?? "");
-await person.getByRole("button", { name: "Sign in", exact: true }).click();
-await person.getByRole("heading", { name: "Your account" }).waitFor();
+await signInByCode();
 expectEqual(
   "account: signed in again by a code, as the same user",
   squash(await person.locator("header").first().innerText()),
   "Keel ada",
+);
+
+// Ada signed in by a code and has no passkey. Once that sign-in is more than ten minutes old Keel refuses her
+// one, in its own words, and the page offers the one way to a fresh sign-in she has: signing in again. A touch
+// of a passkey is not offered, since she has none to touch.
+await identity.age();
+const addAPasskey = async (): Promise<void> => {
+  await person.getByLabel("Name for a new passkey").fill("This laptop");
+  await person.getByRole("button", { name: "Add a passkey" }).click();
+  // Keel has answered when the page says a refusal or lists the passkey: what it then says is read, whichever.
+  await Promise.race([
+    passkeysOn(person).getByRole("alert").waitFor({ timeout: 10_000 }),
+    person
+      .getByRole("list", { name: "Your passkeys" })
+      .getByRole("listitem")
+      .first()
+      .waitFor({ timeout: 10_000 }),
+  ]).catch(() => undefined);
+};
+await addAPasskey();
+await shot(person, "settings");
+const signInAgain = passkeysOn(person).getByRole("button", { name: "Sign in again", exact: true });
+expectEqual(
+  "account: someone with no passkey whose sign-in is not new is told Keel's own refusal on adding one, and is offered a sign-in again and no passkey touch",
+  `${await passkeysSaid(person)} | ${await signInAgain.count()} sign in again`,
+  `${FIRST_PASSKEY} | 0 offered | 0 kept | 1 sign in again`,
+);
+// The button ends her session and takes her to sign in, to come back to her settings.
+if ((await signInAgain.count()) > 0) await signInAgain.click();
+await person
+  .waitForURL(`${built}/login?next=%2Fsettings`, { timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "account: signing in again ends the session and goes by the sign-in page back to the settings",
+  `${new URL(person.url()).pathname}${new URL(person.url()).search} | ${await sessionsHeld()} session`,
+  "/login?next=%2Fsettings | 0 session",
+);
+// With a sign-in of her own a moment old, Keel takes her first passkey.
+if (new URL(person.url()).pathname === "/login") await signInByCode();
+await addAPasskey();
+expectEqual(
+  "account: a sign-in by a code in the last ten minutes adds the account's first passkey",
+  await passkeysSaid(person),
+  "no refusal | 0 offered | 1 kept",
 );
 
 // Once signed in, an address cannot send the reader on to another site.

@@ -106,22 +106,42 @@ function signInMethod(path: string): string {
   }
 }
 
+/** Both steps of adding a passkey: all of them an account with no passkey may take. Keel's `ADDS_PASSKEY`. */
+const ADDS_PASSKEY: ReadonlySet<string> = new Set([
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+]);
+
+/** The ways a person signs in themselves, with something only they hold: Keel's `OWN_SIGN_INS`. */
+const OWN_SIGN_INS: ReadonlySet<string> = new Set(["passkey", "email-otp", "github"]);
+
 /**
  * Keel's refusal of a change to how an account signs in from a session that is not fresh: one not signed in by
  * a passkey, or signed in by one more than ten minutes ago. A request that carries no session is left alone:
- * for the passkey routes that is passkey-first sign-up.
+ * for the passkey routes that is passkey-first sign-up. An account that holds no passkey adds its first from
+ * a sign-in of its own made in the last ten minutes, and from nothing else. The three sentences are Keel's.
  */
 async function freshSignIn(ctx: Parameters<typeof getSessionFromCtx>[0]): Promise<void> {
   const carried = await getSessionFromCtx(ctx);
   if (carried === null) return;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the session's own added field
   const by = (carried.session as { signedInBy?: unknown }).signedInBy;
-  const made = new Date(carried.session.createdAt).getTime();
-  if (by === "passkey" && Date.now() - made <= FRESH_FOR_MS) return;
+  const recent = Date.now() - new Date(carried.session.createdAt).getTime() <= FRESH_FOR_MS;
+  if (by === "passkey" && recent) return;
+  const held = await ctx.context.adapter.findOne({
+    model: "passkey",
+    where: [{ field: "userId", value: carried.user.id }],
+  });
+  const none = held === null;
+  const first = none && ADDS_PASSKEY.has(ctx.path);
+  if (first && typeof by === "string" && OWN_SIGN_INS.has(by) && recent) return;
   throw new APIError("FORBIDDEN", {
     code: "FRESH_SIGN_IN_REQUIRED",
-    message:
-      "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+    message: first
+      ? "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes"
+      : none
+        ? "Add a passkey first, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes"
+        : "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
   });
 }
 

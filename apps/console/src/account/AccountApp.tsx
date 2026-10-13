@@ -28,6 +28,7 @@ import {
 } from "./account.ts";
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
+import { wayToFresh } from "./fresh.ts";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 import { Sponsor } from "./Sponsor.tsx";
@@ -341,12 +342,6 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
   );
 }
 
-/**
- * Keel's refusal of a change to how an account signs in from a session that was not signed in by a passkey in
- * the last ten minutes. What answers it is signing in again with a passkey, which the page offers.
- */
-const FRESH_SIGN_IN_REQUIRED = "FRESH_SIGN_IN_REQUIRED";
-
 function Passkeys({ account, who }: { account: Account; who: Who }) {
   const [passkeys, setPasskeys] = useState<Passkey[] | null>(null);
   const [name, setName] = useState("");
@@ -367,6 +362,14 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
       }
       await last.current?.();
     });
+  // Someone with no passkey signs in again the way they came, and comes back here: Keel takes an account's first
+  // passkey from a sign-in of its own made in the last ten minutes.
+  const afresh = (): Promise<void> =>
+    ask(async () => {
+      await account.signOut();
+      window.location.assign(hrefOf({ at: "login" }, hrefOf({ at: "settings" })));
+    });
+  const way = wayToFresh(refused?.code, passkeys === null ? null : passkeys.length);
   // Read when the page opens, and again by whatever changes them.
   const read = useCallback(async () => setPasskeys(await account.passkeys()), [account]);
   useEffect(() => {
@@ -437,11 +440,19 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
         </Button>
       </form>
       <Refusal said={refused} />
-      {/* Offered only to someone who has a passkey to sign in with: Keel's sentence stands by itself otherwise. */}
-      {refused?.code === FRESH_SIGN_IN_REQUIRED && passkeys !== null && passkeys.length > 0 && (
+      {/* Under Keel's sentence, the way this person signs in afresh: a touch of the passkey they have, or with
+          none the sign-in they came by. */}
+      {way === "passkey" && (
         <div>
           <Button variant="secondary" disabled={busy} onClick={() => void again()}>
             Sign in again with a passkey
+          </Button>
+        </div>
+      )}
+      {way === "sign-in" && (
+        <div>
+          <Button variant="secondary" disabled={busy} onClick={() => void afresh()}>
+            Sign in again
           </Button>
         </div>
       )}

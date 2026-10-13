@@ -64,21 +64,28 @@ describe("who the page is, to Keel", () => {
   });
 
   it("[account.fresh] hands a page Keel's own refusal, by its code and in its words, where a session that is not fresh would change how the account signs in", async () => {
-    // Signed in by a code: not a passkey sign-in, however new. Keel refuses before any passkey is asked for.
+    // Signed in by a code a moment ago, with no passkey: Keel takes this account's first passkey from that
+    // sign-in, so the first step of adding one is answered. Every other change waits for that passkey.
     const { identity, tab, account } = await signedUp();
-    for (const change of [
-      () => account.addPasskey("This laptop"),
-      () => account.removePasskey("any"),
-    ]) {
-      // oxlint-disable-next-line no-await-in-loop -- two calls, one after the other
-      const refused: unknown = await change().catch((error: unknown) => error);
-      expect(refused).toBeInstanceOf(Refused);
-      expect(refused).toMatchObject({
-        code: "FRESH_SIGN_IN_REQUIRED",
-        message:
-          "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
-      });
-    }
+    const firstStep = `${ORIGIN}/v1/auth/passkey/generate-register-options`;
+    expect((await tab.serve(firstStep)).status).toBe(200);
+    const removal: unknown = await account.removePasskey("any").catch((error: unknown) => error);
+    expect(removal).toBeInstanceOf(Refused);
+    expect(removal).toMatchObject({
+      code: "FRESH_SIGN_IN_REQUIRED",
+      message:
+        "Add a passkey first, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+    });
+    // Ten minutes on, the same sign-in adds no passkey: Keel says to sign in again, by any way of their own.
+    await identity.age();
+    const late: unknown = await account.addPasskey("This laptop").catch((error: unknown) => error);
+    expect(late).toBeInstanceOf(Refused);
+    expect(late).toMatchObject({
+      code: "FRESH_SIGN_IN_REQUIRED",
+      message:
+        "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes",
+    });
+    expect((await tab.serve(firstStep)).status).toBe(403);
     expect(await account.passkeys()).toEqual([]);
     // A request that carries no session is left alone: that is how someone signs up with a passkey.
     const signingUp = browser(identity);
