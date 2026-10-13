@@ -23,6 +23,15 @@ describe("the console's Worker", () => {
     expect(await response.text()).toContain('<div id="root"');
   });
 
+  it("[console.api-catalog] says at its root where Keel's catalogue of its API is, and on no other page", async () => {
+    // RFC 9727: whoever is given only the address finds the catalogue from the root's own headers.
+    const root = await SELF.fetch(`${CONSOLE}/`);
+    expect(root.headers.get("link")).toBe('</.well-known/api-catalog>; rel="api-catalog"');
+    const elsewhere = await SELF.fetch(`${CONSOLE}/signup`);
+    expect(elsewhere.status).toBe(200);
+    expect(elsewhere.headers.get("link")).toBeNull();
+  });
+
   it.each([
     "/keel/forge-lite/mission-control",
     "/keel/keel/blob/trunk/src/index.ts",

@@ -1,0 +1,3 @@
+# Headers Cloudflare puts on the built page's files, by path. The root says where Keel's catalogue of its API is (RFC 9727).
+/
+  Link: </.well-known/api-catalog>; rel="api-catalog"

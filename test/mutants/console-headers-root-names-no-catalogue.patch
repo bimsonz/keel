@@ -1,0 +1,11 @@
+# expect-red: pnpm exec vitest run --project pool:console
+# kills: console.api-catalog
+# why: the built page's root carries no link to Keel's catalogue of its API, so an agent given only the address finds none
+diff --git a/apps/console/public/_headers b/apps/console/public/_headers
+index ef7e9f06..35b59dab 100644
+--- a/apps/console/public/_headers
++++ b/apps/console/public/_headers
+@@ -1,3 +1,2 @@
+ # Headers Cloudflare puts on the built page's files, by path. The root says where Keel's catalogue of its API is (RFC 9727).
+ /
+-  Link: </.well-known/api-catalog>; rel="api-catalog"
