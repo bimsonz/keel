@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes DriftDetected with its guard gone: `from("deriving")`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..d3a5b307 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1004,7 +1004,7 @@ export const evolveChange = (
+         ? { ...change, derivationRef: event.derivationRef }
+         : illegal(change, event);
+     case "DriftDetected":
+-      return from("deriving") ? change : illegal(change, event);
++      return change;
+     case "ChangeDrifted":
+       return from("deriving") ? moveTo(change, "drifted") : illegal(change, event);
+     case "PlanCompiled":

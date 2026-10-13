@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold parks a change for a ruling from any state, where only a Verifying or Queued change is parked for one
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..290bb9b1 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1075,14 +1075,12 @@ export const evolveChange = (
+             ? { ...change, escalationId: event.escalationId }
+             : illegal(change, event);
+         // It keeps its lane and its plan: the ruling puts it back where it waited.
+-        return change.state === "verifying" || change.state === "queued"
+-          ? {
++        return {
+               ...moveTo(change, "parked"),
+               parkReason: "awaiting-ruling",
+               parkedFrom: change.state,
+               ...(event.escalationId === undefined ? {} : { escalationId: event.escalationId }),
+-            }
+-          : illegal(change, event);
++            };
+       }
+       return isAgentOwned(change.state)
+         ? {

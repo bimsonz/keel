@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes ChangeStarted with its guard gone: `from("declared")`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..71b8a6d8 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -977,13 +977,11 @@ export const evolveChange = (
+         ? { ...moveTo(change, "working"), intent: reviseIntent(change.intent, event) }
+         : illegal(change, event);
+     case "ChangeStarted":
+-      return from("declared")
+-        ? {
++      return {
+             ...moveTo(change, "working"),
+             workspaceId: event.workspaceId,
+             ...(event.baseSha === undefined ? {} : { baseSha: event.baseSha }),
+-          }
+-        : illegal(change, event);
++          };
+     case "ChangeSubmitted":
+       return from("working", "bounced")
+         ? { ...moveTo(change, "submitted"), commitSha: event.commitSha }

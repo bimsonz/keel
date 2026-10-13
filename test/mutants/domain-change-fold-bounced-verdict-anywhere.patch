@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes a bounce for a verdict in any state, a change that waits on its agent or is parked for a lapsed lease among them
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..50fd0950 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1054,10 +1054,7 @@ export const evolveChange = (
+               "laneId",
+             ])
+           : illegal(change, event);
+-      return from("deriving", "verifying", "queued") ||
+-        (event.conflictId === undefined &&
+-          (from("integrating") || (from("parked") && change.parkReason === "awaiting-ruling")))
+-        ? moveTo(change, "bounced", [
++      return from("deriving", "verifying", "queued") || (event.conflictId === undefined) ? moveTo(change, "bounced", [
+             "parkReason",
+             "escalationId",
+             "parkedFrom",

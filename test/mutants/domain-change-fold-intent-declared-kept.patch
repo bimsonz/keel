@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold passes over a second IntentDeclared where it is illegal, so a log holding two replays as if it held one.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..15d33670 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -967,7 +967,7 @@ export const evolveChange = (
+ 
+   switch (event._tag) {
+     case "IntentDeclared":
+-      return illegal(change, event);
++      return change as never;
+     case "PreflightIssued":
+       return from("declared", "working") && event.revision === change.intent.revision
+         ? change

@@ -1,0 +1,25 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes PlanCompiled with its guard gone: `from("deriving")`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..3566e59f 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1008,15 +1008,13 @@ export const evolveChange = (
+     case "ChangeDrifted":
+       return from("deriving") ? moveTo(change, "drifted") : illegal(change, event);
+     case "PlanCompiled":
+-      return from("deriving")
+-        ? {
++      return {
+             ...moveTo(change, "verifying", ["predicatePolicy"]),
+             planHash: event.planHash,
+             ...(event.predicatePolicy === undefined
+               ? {}
+               : { predicatePolicy: event.predicatePolicy }),
+-          }
+-        : illegal(change, event);
++          };
+     case "ChangeQueued":
+       return from("verifying")
+         ? { ...moveTo(change, "queued"), laneId: event.laneId }

@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes every park for a ruling at the wait: under the question the change already waits on, and under none
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..69d64124 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1071,9 +1071,7 @@ export const evolveChange = (
+       if (event.reason === "awaiting-ruling") {
+         // Already waiting, and held by another question: it waits on that one, from where it first parked.
+         if (from("parked") && change.parkReason === "awaiting-ruling")
+-          return event.escalationId !== undefined && event.escalationId !== change.escalationId
+-            ? { ...change, escalationId: event.escalationId }
+-            : illegal(change, event);
++          return { ...change, escalationId: event.escalationId };
+         // It keeps its lane and its plan: the ruling puts it back where it waited.
+         return change.state === "verifying" || change.state === "queued"
+           ? {

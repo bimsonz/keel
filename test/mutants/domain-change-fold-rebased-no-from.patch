@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes ChangeRebased without the check `event.from === change.baseSha`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..7bcf5546 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -989,8 +989,7 @@ export const evolveChange = (
+         ? { ...moveTo(change, "submitted"), commitSha: event.commitSha }
+         : illegal(change, event);
+     case "ChangeRebased":
+-      return from("working", "bounced") && event.from === change.baseSha
+-        ? { ...change, baseSha: event.to }
++      return from("working", "bounced") ? { ...change, baseSha: event.to }
+         : illegal(change, event);
+     case "PrecheckStarted":
+       // A new pass derives again: the commit may differ though the revision does not.

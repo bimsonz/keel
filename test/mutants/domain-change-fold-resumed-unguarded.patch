@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes ChangeResumed with its guard gone: `from("parked") && change.parkReason === "awaiting-ruling"`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..2af45587 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1092,13 +1092,11 @@ export const evolveChange = (
+           }
+         : illegal(change, event);
+     case "ChangeResumed":
+-      return from("parked") && change.parkReason === "awaiting-ruling"
+-        ? moveTo(change, change.parkedFrom ?? "verifying", [
++      return moveTo(change, change.parkedFrom ?? "verifying", [
+             "parkReason",
+             "escalationId",
+             "parkedFrom",
+-          ])
+-        : illegal(change, event);
++          ]);
+     case "ChangeAdopted": {
+       if (!isLapsed(change.lease, committed.at)) return illegal(change, event);
+       // The change is the adopter's run's from here, or no run's: never still the run that held it.

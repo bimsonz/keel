@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes ChangeRequeued with its guard gone: `from("integrating") && event.batchId === change.batchId`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..a7e41e48 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1026,9 +1026,7 @@ export const evolveChange = (
+         ? { ...moveTo(change, "integrating"), batchId: event.batchId }
+         : illegal(change, event);
+     case "ChangeRequeued":
+-      return from("integrating") && event.batchId === change.batchId
+-        ? moveTo(change, "queued", ["batchId"])
+-        : illegal(change, event);
++      return moveTo(change, "queued", ["batchId"]);
+     case "ChangeLanded":
+       return from("integrating")
+         ? { ...released(change, "landed"), landedCommit: event.commitSha }

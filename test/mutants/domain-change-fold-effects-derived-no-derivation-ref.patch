@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes EffectsDerived without the check `change.derivationRef === undefined`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..70cc9a34 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -998,10 +998,7 @@ export const evolveChange = (
+         ? moveTo(change, "deriving", ["derivationRef"])
+         : illegal(change, event);
+     case "EffectsDerived":
+-      return from("deriving") &&
+-        event.revision === change.intent.revision &&
+-        change.derivationRef === undefined
+-        ? { ...change, derivationRef: event.derivationRef }
++      return from("deriving") && event.revision === change.intent.revision ? { ...change, derivationRef: event.derivationRef }
+         : illegal(change, event);
+     case "DriftDetected":
+       return from("deriving") ? change : illegal(change, event);

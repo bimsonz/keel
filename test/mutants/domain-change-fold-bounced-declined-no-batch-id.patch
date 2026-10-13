@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes a bounce for a declined batch from any Integrating change, whichever batch promotion declined
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..201525d1 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1035,8 +1035,7 @@ export const evolveChange = (
+         : illegal(change, event);
+     case "ChangeBounced":
+       if (event.declined !== undefined)
+-        return from("integrating") && event.declined.batchId === change.batchId
+-          ? moveTo(change, "bounced", [
++        return from("integrating") ? moveTo(change, "bounced", [
+               "parkReason",
+               "escalationId",
+               "parkedFrom",

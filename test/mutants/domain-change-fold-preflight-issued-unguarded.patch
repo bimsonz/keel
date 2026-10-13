@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes PreflightIssued with its guard gone: `from("declared", "working") && event.revision === change.intent.revision`.
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..041d4f4b 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -969,9 +969,7 @@ export const evolveChange = (
+     case "IntentDeclared":
+       return illegal(change, event);
+     case "PreflightIssued":
+-      return from("declared", "working") && event.revision === change.intent.revision
+-        ? change
+-        : illegal(change, event);
++      return change;
+     case "IntentRevised":
+       return from("working", "drifted", "bounced") && event.revision === change.intent.revision + 1
+         ? { ...moveTo(change, "working"), intent: reviseIntent(change.intent, event) }

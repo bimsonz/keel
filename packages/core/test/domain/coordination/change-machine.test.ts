@@ -36,6 +36,7 @@ import { fc } from "../../support/fast-check.ts";
 import { assertReaching } from "../../support/reach.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { changeChart, leaseChart } from "../../charts/charts.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Fold, type Machine, memo, tour } from "../../support/machine.ts";
 
 // The lease TTL as the docs state it (state-machines.md § Lease), typed here rather than imported.
@@ -2578,5 +2579,416 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked = changeTour();
     expect(offChart(leaseChart, walked, leaseView)).toEqual([]);
     expect(uncovered(leaseChart, walked, leaseView)).toEqual([]);
+  });
+});
+
+/**
+ * A change as its fold's table reads it: where it is, who holds it and under
+ * which lease, and every field a transition sets or drops. Its intent is the
+ * revision alone: what a revision does to the goal and the premises is
+ * `reviseIntent`'s. What only its declaration sets (its id, its origin, the
+ * sketch it came from) is left out: no later event moves it.
+ */
+interface FoldedChange {
+  readonly state: Change["state"];
+  readonly agent: Change["agentId"];
+  readonly run: Change["run"];
+  readonly revision: number;
+  readonly lease: {
+    readonly id: LeaseId;
+    readonly agent: Change["agentId"];
+    readonly state: Change["lease"]["state"];
+    readonly renewed: number;
+  };
+  readonly workspace: Change["workspaceId"];
+  readonly base: Change["baseSha"];
+  readonly commit: Change["commitSha"];
+  readonly derivation: Change["derivationRef"];
+  readonly plan: Change["planHash"];
+  readonly policy: Change["predicatePolicy"];
+  readonly lane: Change["laneId"];
+  readonly batch: Change["batchId"];
+  readonly park: Change["parkReason"];
+  readonly escalation: Change["escalationId"];
+  readonly parkedFrom: Change["parkedFrom"];
+  readonly landed: Change["landedCommit"];
+}
+
+const foldedChange = (c: Change): FoldedChange => ({
+  state: c.state,
+  agent: c.agentId,
+  run: c.run,
+  revision: c.intent.revision,
+  lease: {
+    id: c.lease.id,
+    agent: c.lease.agentId,
+    state: c.lease.state,
+    renewed: c.lease.renewedAt,
+  },
+  workspace: c.workspaceId,
+  base: c.baseSha,
+  commit: c.commitSha,
+  derivation: c.derivationRef,
+  plan: c.planHash,
+  policy: c.predicatePolicy,
+  lane: c.laneId,
+  batch: c.batchId,
+  park: c.parkReason,
+  escalation: c.escalationId,
+  parkedFrom: c.parkedFrom,
+  landed: c.landedCommit,
+});
+
+/** What a change leaves behind when it leaves the platform's hands: its wait, its lane and its batch. */
+const LEFT = {
+  park: undefined,
+  escalation: undefined,
+  parkedFrom: undefined,
+  batch: undefined,
+  lane: undefined,
+} as const;
+
+/**
+ * The docs' table for the fold (state-machines.md § Change and § Lease), typed
+ * apart from `evolveChange`: where an event lands from a change, or that the
+ * fold must refuse it.
+ */
+const changeFolds = (
+  from: FoldedChange | undefined,
+  event: ChangeEvent,
+  at: Instant,
+): FoldedChange | "illegal" => {
+  if (from === undefined)
+    return event._tag === "IntentDeclared"
+      ? {
+          state: "declared",
+          agent: event.agentId,
+          run: event.run,
+          revision: event.revision,
+          lease: { id: event.leaseId, agent: event.agentId, state: "active", renewed: at },
+          workspace: undefined,
+          base: undefined,
+          commit: undefined,
+          derivation: undefined,
+          plan: undefined,
+          policy: undefined,
+          landed: undefined,
+          ...LEFT,
+        }
+      : "illegal";
+  const f = from;
+  const inState = (...states: readonly Change["state"][]): boolean => states.includes(f.state);
+  if (inState("landed", "withdrawn", "superseded")) return "illegal";
+  const awaitsRuling = inState("parked") && f.park === "awaiting-ruling";
+  const leaseLapsed =
+    f.lease.state === "lapsed" || (f.lease.state === "active" && at >= f.lease.renewed + TTL);
+  const when = (legal: boolean, lands: () => FoldedChange): FoldedChange | "illegal" =>
+    legal ? lands() : "illegal";
+  const released = { ...f.lease, state: "released" } as const;
+
+  switch (event._tag) {
+    case "IntentDeclared":
+      return "illegal";
+    case "PreflightIssued":
+      return when(inState("declared", "working") && event.revision === f.revision, () => f);
+    case "IntentRevised":
+      return when(
+        inState("working", "drifted", "bounced") && event.revision === f.revision + 1,
+        () => ({ ...f, state: "working", revision: event.revision }),
+      );
+    case "ChangeStarted":
+      return when(inState("declared"), () => ({
+        ...f,
+        state: "working",
+        workspace: event.workspaceId,
+        base: event.baseSha,
+      }));
+    case "ChangeSubmitted":
+      return when(inState("working", "bounced"), () => ({
+        ...f,
+        state: "submitted",
+        commit: event.commitSha,
+      }));
+    case "ChangeRebased":
+      return when(inState("working", "bounced") && event.from === f.base, () => ({
+        ...f,
+        base: event.to,
+      }));
+    case "PrecheckStarted":
+      return when(inState("submitted"), () => ({ ...f, state: "deriving", derivation: undefined }));
+    case "EffectsDerived":
+      return when(
+        inState("deriving") && event.revision === f.revision && f.derivation === undefined,
+        () => ({ ...f, derivation: event.derivationRef }),
+      );
+    case "DriftDetected":
+      return when(inState("deriving"), () => f);
+    case "ChangeDrifted":
+      return when(inState("deriving"), () => ({ ...f, state: "drifted" }));
+    case "PlanCompiled":
+      return when(inState("deriving"), () => ({
+        ...f,
+        state: "verifying",
+        plan: event.planHash,
+        policy: event.predicatePolicy,
+      }));
+    case "ChangeQueued":
+      return when(inState("verifying"), () => ({ ...f, state: "queued", lane: event.laneId }));
+    case "ChangeBatched":
+      return when(inState("queued"), () => ({ ...f, state: "integrating", batch: event.batchId }));
+    case "ChangeRequeued":
+      return when(inState("integrating") && event.batchId === f.batch, () => ({
+        ...f,
+        state: "queued",
+        batch: undefined,
+      }));
+    case "ChangeLanded":
+      return when(inState("integrating"), () => ({
+        ...f,
+        ...LEFT,
+        state: "landed",
+        lease: released,
+        landed: event.commitSha,
+      }));
+    case "ChangeBounced": {
+      // One cause each: a declined batch its own members, a ruling the change that waits for it,
+      // a conflict a change not yet batched, a verdict any change the platform holds.
+      const beforeBatch = inState("deriving", "verifying", "queued");
+      const taken =
+        event.declined !== undefined
+          ? inState("integrating") && event.declined.batchId === f.batch
+          : event.decisionId !== undefined
+            ? awaitsRuling
+            : event.conflictId !== undefined
+              ? beforeBatch
+              : beforeBatch || inState("integrating") || awaitsRuling;
+      return when(taken, () => ({ ...f, ...LEFT, state: "bounced" }));
+    }
+    case "ConflictNoted":
+      return f;
+    case "ChangeParked":
+      if (event.reason === "lease-lapsed")
+        return when(inState("declared", "working", "drifted", "bounced"), () => ({
+          ...f,
+          state: "parked",
+          park: "lease-lapsed",
+          lease: { ...f.lease, state: "lapsed" },
+        }));
+      // Already waiting: only another question moves it, and only the question it waits on.
+      if (awaitsRuling)
+        return when(
+          event.escalationId !== undefined && event.escalationId !== f.escalation,
+          () => ({ ...f, escalation: event.escalationId }),
+        );
+      return f.state === "verifying" || f.state === "queued"
+        ? {
+            ...f,
+            state: "parked",
+            park: "awaiting-ruling",
+            parkedFrom: f.state,
+            escalation: event.escalationId,
+          }
+        : "illegal";
+    case "ChangeResumed":
+      return awaitsRuling && f.parkedFrom !== undefined
+        ? {
+            ...f,
+            state: f.parkedFrom,
+            park: undefined,
+            escalation: undefined,
+            parkedFrom: undefined,
+          }
+        : "illegal";
+    case "ChangeAdopted": {
+      if (!leaseLapsed) return "illegal";
+      const adopted: FoldedChange = {
+        ...f,
+        agent: event.agentId,
+        run: event.run,
+        lease: { id: event.leaseId, agent: event.agentId, state: "active", renewed: at },
+      };
+      // Parked for the lapse, it goes back to work, or to wait for the workspace it never had.
+      return inState("parked") && f.park === "lease-lapsed"
+        ? { ...adopted, state: f.workspace === undefined ? "declared" : "working", park: undefined }
+        : adopted;
+    }
+    case "ChangeWithdrawn":
+      return when(!inState("integrating"), () => ({
+        ...f,
+        ...LEFT,
+        state: "withdrawn",
+        lease: released,
+      }));
+    case "ChangeSuperseded":
+      return when(!inState("integrating"), () => ({
+        ...f,
+        ...LEFT,
+        state: "superseded",
+        lease: released,
+      }));
+    case "LeaseLapsed":
+      return when(
+        f.lease.state === "active" && event.leaseId === f.lease.id && at >= f.lease.renewed + TTL,
+        () => ({ ...f, lease: { ...f.lease, state: "lapsed" } }),
+      );
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+/** A plan compiled over drift, which the tour never commits: it compiles every plan clean. */
+const driftedRun = (): readonly Fold<Change, ChangeEvent>[] => {
+  const folds: Fold<Change, ChangeEvent>[] = [];
+  let state: Change | undefined;
+  for (const command of [
+    declare,
+    start,
+    submit,
+    precheck,
+    { ...compile, drift: [{ class: "footprint", severity: "low", detail: "outside" }] },
+  ] satisfies ChangeCommand[]) {
+    const result = decideChange(state, command, { now: T0, changeId: CHANGE });
+    const walked = foldsOf(changeMachine, state, [result], T0);
+    folds.push(...walked);
+    state = walked.at(-1)?.after ?? state;
+  }
+  return folds;
+};
+
+/** A row of the fold's table: a change's place on the chart and which of its optional fields it holds. */
+const changeShape = (c: Change | undefined): string =>
+  c === undefined
+    ? "none"
+    : [
+        chartKey(c),
+        `lease ${c.lease.state}`,
+        ...(c.parkedFrom === undefined ? [] : [`from ${c.parkedFrom}`]),
+        ...(c.workspaceId === undefined ? [] : ["workspace"]),
+        ...(c.baseSha === undefined ? [] : ["base"]),
+        ...(c.derivationRef === undefined ? [] : ["derived"]),
+        ...(c.planHash === undefined ? [] : ["plan"]),
+        ...(c.predicatePolicy === undefined ? [] : ["policy"]),
+        ...(c.laneId === undefined ? [] : ["lane"]),
+        ...(c.batchId === undefined ? [] : ["batch"]),
+        ...(c.escalationId === undefined ? [] : ["question"]),
+      ].join(", ");
+
+/** A revision one behind, level and one ahead. */
+const around = (revision: number): readonly number[] => [revision - 1, revision, revision + 1];
+
+const ANOTHER_BATCH = makeId("bat", ulid(91));
+const ANOTHER_QUESTION = makeId("esc", ulid(92));
+const A_VERDICT = makeId("vrd", ulid(93));
+const A_CONFLICT = makeId("cfl", ulid(94));
+
+/**
+ * Every form of an event the fold could tell apart. What a change holds
+ * differs from row to row, so an event that names a lease, a batch, a question
+ * or a base is tried under each one a row holds and under one no row does: a
+ * revision one behind, level and one ahead; a rebase from each base; a requeue
+ * and a declined batch for each batch; a bounce for each cause; a park for the
+ * lapse, for a ruling unnamed and for each question; a lapse of each lease.
+ */
+const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
+  const rows = new Map<string, Change>();
+  for (const { before, after } of walked)
+    for (const c of [before, after])
+      if (c !== undefined && !rows.has(changeShape(c))) rows.set(changeShape(c), c);
+  const held = <T>(read: (c: Change) => T | undefined): readonly T[] => [
+    ...new Set([...rows.values()].flatMap((c) => read(c) ?? [])),
+  ];
+  const leases = [...held((c) => c.lease.id), NEVER_ISSUED];
+  const batches = [...held((c) => c.batchId), ANOTHER_BATCH];
+  const questions = [...held((c) => c.escalationId), ANOTHER_QUESTION];
+  const bases = [...held((c) => c.baseSha), NEVER_BASE];
+
+  return (event: ChangeEvent): readonly ChangeEvent[] => {
+    switch (event._tag) {
+      case "PreflightIssued":
+      case "IntentRevised":
+      case "EffectsDerived":
+        return around(event.revision).map((revision) => ({ ...event, revision }));
+      case "ChangeStarted": {
+        const { baseSha: _base, ...bare } = event;
+        return [bare, { ...bare, baseSha: BASE }];
+      }
+      case "ChangeRebased":
+        return bases.map((base) => ({ ...event, from: base }));
+      case "PlanCompiled": {
+        const { predicatePolicy: _policy, ...bare } = event;
+        return [bare, { ...bare, predicatePolicy: { freshness: "block" } }];
+      }
+      case "ChangeRequeued":
+        return batches.map((batchId) => ({ ...event, batchId }));
+      case "ChangeBounced": {
+        const {
+          verdictId: _verdict,
+          conflictId: _conflict,
+          declined: _declined,
+          decisionId: _decision,
+          ...bare
+        } = event;
+        return [
+          { ...bare, verdictId: A_VERDICT },
+          { ...bare, conflictId: A_CONFLICT },
+          { ...bare, decisionId: RULING },
+          ...batches.map((batchId) => ({
+            ...bare,
+            declined: { batchId, reason: "pack-too-large" as const },
+          })),
+        ];
+      }
+      case "ChangeParked": {
+        const { escalationId: _question, ...bare } = event;
+        return [
+          { ...bare, reason: "lease-lapsed" },
+          { ...bare, reason: "awaiting-ruling" },
+          ...questions.map((escalationId) => ({
+            ...bare,
+            reason: "awaiting-ruling" as const,
+            escalationId,
+          })),
+        ];
+      }
+      case "ChangeAdopted": {
+        const { run: _run, ...bare } = event;
+        return [event, bare];
+      }
+      case "LeaseLapsed":
+        return leases.map((leaseId) => ({ ...event, leaseId }));
+      default:
+        return [event];
+    }
+  };
+};
+
+describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[change.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const walked = [...changeTour(), ...driftedRun()];
+    // The first lease of the tour lapses a TTL after the change is declared: every event is
+    // folded long before, the instant before, at that instant and long after.
+    const lapses = (walked[0]?.after.lease.renewedAt ?? T0) + TTL;
+    const cases = foldCases<Change, ChangeEvent, FoldedChange>({
+      evolve: evolveChange,
+      walked,
+      summary: foldedChange,
+      shown: (f) => canonicalJson(asJson(f)),
+      row: changeShape,
+      // The tour mints an id for every command, so it commits hundreds of events that differ
+      // in nothing the fold reads: the first two of each kind, at each revision, are folded.
+      meets: (_, event) => ("revision" in event ? `at revision ${event.revision}` : true),
+      most: 2,
+      forms: changeForms(walked),
+      times: [T0, Instant(lapses - 1), Instant(lapses), Instant(lapses + 100 * TTL)],
+      table: changeFolds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Thirty-nine shapes of change, nothing among them, each meeting the first two events of
+    // a kind at each revision, in every form, at four instants.
+    const shape = foldShape(cases);
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9048, refused: 7452, rows: 39 });
   });
 });

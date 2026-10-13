@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes events after the change has landed, been withdrawn or been superseded, where a terminal change takes none
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..5f8025ef 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -963,7 +963,6 @@ export const evolveChange = (
+   }
+   const change = state;
+   const from = (...states: readonly ChangeState[]): boolean => states.includes(change.state);
+-  if (TERMINAL.has(change.state)) return illegal(change, event);
+ 
+   switch (event._tag) {
+     case "IntentDeclared":

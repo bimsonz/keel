@@ -1,5 +1,5 @@
 # expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
-# kills: change.ruling-bounces
+# kills: change.ruling-bounces, change.fold-table
 # why: the fold takes a bounce by a decision in any state, so a corrupt log bounces a change that waited for no ruling
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
 index 2549e49a..181abf8f 100644

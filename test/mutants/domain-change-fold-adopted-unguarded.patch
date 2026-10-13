@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: the fold takes an adoption while the lease is still held, where a change is adopted only once its lease has lapsed
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..84aa9ac5 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1100,7 +1100,6 @@ export const evolveChange = (
+           ])
+         : illegal(change, event);
+     case "ChangeAdopted": {
+-      if (!isLapsed(change.lease, committed.at)) return illegal(change, event);
+       // The change is the adopter's run's from here, or no run's: never still the run that held it.
+       const { run: _held, ...held } = change;
+       const adopted: Change = {
