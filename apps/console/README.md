@@ -125,8 +125,8 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 | `/N/P/escalations`, `/N/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/N/P/mission-control`, `/N/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
 | `/N/P/insights`, `/N/P/insights/funnel`, `/N/P/insights/benchmark` | Trunk's numbers, the review funnel, the benchmark |
-| `/N/P/agents`, `/N/P/agents/<handle>` | The agents Keel's log names in the project, and one agent's runs here. An agent with no handle is called by Keel's id for it. `?shown=` is how many rows |
-| `/N/P/settings` | Who may read the project, and what else Keel holds for it. A tab for an owner or a maintainer of the project's namespace |
+| `/N/P/agents`, `/N/P/agents/<handle>` | The agents Keel's log names in the project, and one agent's runs here. Above them, where there are any: the agents a person invited to this one project that have joined, as Keel reads them to anyone who reads it. An agent with no handle is called by Keel's id for it. `?shown=` is how many rows |
+| `/N/P/settings` | Who may read the project, and what else Keel holds for it. A tab for an owner or a maintainer of the project's namespace. On a project of a person's own namespace, to its owner: **Agents**, Keel's list of the agents invited to this one project (`Projects_listAgents`), a form that invites one by its handle to read or to read and work, and its removal; Keel takes both from a passkey sign-in of the last ten minutes, and the page offers the touch where Keel asks for one. An org's project says an agent comes in through the org, and links its members page |
 
 No namespace is called one of the reserved first segments: the pages above every project, the build's own files and what Keel answers itself. The list is Keel's own, `RESERVED_SEGMENTS` in `@keeltown/contracts`: Keel refuses each as a handle, and the route table reads the same list before it takes a segment for one. Every other path that is not a file is the page, a path with a dot in it included.
 
