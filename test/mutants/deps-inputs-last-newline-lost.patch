@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.ok, deps.build.inputs
+# why: The inputs are read back without their last newline, which a command substitution drops: the text the box hashes is not the text the digest was taken of
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index 82e4ba6c..a018ae26 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -431,8 +431,7 @@ export const depsBuildCommand = (
+   // the inputs come as one line of base64 (`depsInputsEncoded`) and are read back here, their last newline kept.
+   return [
+     "(",
+-    'KEEL_INSTALL_INPUTS=$(printf %s "${KEEL_INSTALL_INPUTS_B64:-}" | base64 -d 2>/dev/null; printf x)',
+-    "KEEL_INSTALL_INPUTS=${KEEL_INSTALL_INPUTS%x}",
++    'KEEL_INSTALL_INPUTS=$(printf %s "${KEEL_INSTALL_INPUTS_B64:-}" | base64 -d 2>/dev/null)',
+     build,
+     ")",
+   ].join("\n");

@@ -2,12 +2,12 @@
 # kills: deps.pool.install
 # why: The box's command is started with something of keel-verify's own environment beside the five values it needs
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
-index cc8e6931..a2a3e306 100644
+index 02e0ad61..587c9626 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
-@@ -377,6 +377,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+@@ -392,6 +392,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
          KEEL_INSTALL: need.install,
-         KEEL_INSTALL_INPUTS: need.inputs,
+         KEEL_INSTALL_INPUTS_B64: depsInputsEncoded(need.inputs),
          KEEL_DEPS_UPLOAD: `http://${DEPS_HOST}`,
 +        KEEL_BUNDLE_URL_PUBLIC_KEY: this.env.BUNDLE_URL_PUBLIC_KEY,
        });

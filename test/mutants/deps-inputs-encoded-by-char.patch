@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.inputs.encoded
+# why: The inputs are encoded a character at a time, not as their UTF-8 bytes: a path outside ASCII reaches the box as other bytes than the digest was taken of
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index 82e4ba6c..48bccc68 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -444,7 +444,7 @@ export const depsBuildCommand = (
+  */
+ export const depsInputsEncoded = (inputs: string): string => {
+   let bytes = "";
+-  for (const byte of new TextEncoder().encode(inputs)) bytes += String.fromCharCode(byte);
++  for (const char of inputs) bytes += String.fromCharCode(char.charCodeAt(0) % 256);
+   return btoa(bytes);
+ };
+ 

@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.session
+# why: The build runs in the session's own shell again: its first refusal ends that shell, the session reports that its shell exited, and the box answers unavailable for every candidate
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index 82e4ba6c..b31323fb 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -430,11 +430,9 @@ export const depsBuildCommand = (
+   // ends it alone. A session hands over a value of several lines with every line after the first indented, so
+   // the inputs come as one line of base64 (`depsInputsEncoded`) and are read back here, their last newline kept.
+   return [
+-    "(",
+     'KEEL_INSTALL_INPUTS=$(printf %s "${KEEL_INSTALL_INPUTS_B64:-}" | base64 -d 2>/dev/null; printf x)',
+     "KEEL_INSTALL_INPUTS=${KEEL_INSTALL_INPUTS%x}",
+     build,
+-    ")",
+   ].join("\n");
+ };
+ 
