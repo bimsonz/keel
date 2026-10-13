@@ -16,6 +16,7 @@
     "tooling:controls": "node packages/tooling/src/cli/controls.ts",
     "check": "pnpm gen && pnpm lint && pnpm format:check && pnpm typecheck && pnpm guards && pnpm test && pnpm test:pool && pnpm deploy:dry",
     "prove:red": "node scripts/prove-red.ts",
+    "deploy": "node scripts/install.ts",
     "deploy:staging": "node scripts/deploy.ts staging",
     "smoke": "node scripts/smoke.ts staging",
     "seed": "node scripts/seed.ts",

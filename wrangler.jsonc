@@ -1,0 +1,42 @@
+{
+  // What a Deploy to Cloudflare button reads, and what an install deploys as the site's door: the
+  // console's Worker, from the repository's root. It is apps/console/wrangler.jsonc with its three
+  // paths written from here and nothing else different ([install.root-config] holds the two
+  // together). `pnpm run deploy` (scripts/install.ts) deploys Keel's other two Workers before it.
+  "$schema": "apps/console/node_modules/wrangler/config-schema.json",
+  "name": "keel-console",
+  "main": "apps/console/src/worker/index.ts",
+  // One compatibility date across every Worker in the repo (rule R13).
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Never commit account_id: deploys read CLOUDFLARE_ACCOUNT_ID at runtime (rule R13).
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  // The built page (`vite build` in apps/console). See apps/console/wrangler.jsonc for each path.
+  "assets": {
+    "directory": "./apps/console/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/healthz",
+      "/*.git/info/refs",
+      "/*.git/git-upload-pack",
+      "/*.git/git-receive-pack",
+      "/v1/*",
+      "/mcp",
+      "/mcp/*",
+      "/start",
+      "/llms.txt",
+      "/.well-known/*",
+    ],
+  },
+  // Keel's Worker: on an account with no zone this Worker is the site's only door, and it hands
+  // Keel's own paths and a clone address's on as they came.
+  "services": [{ "binding": "KEEL", "service": "keel" }],
+  // No secret: the page reads Keel itself, on this host under /v1, as whoever is signed in.
+  "vars": {
+    // The public host this Worker answers on. scripts/install.ts fills it with the site's address.
+    "KEEL_HOST": "keel-console.localhost",
+  },
+}
