@@ -6,7 +6,7 @@ import {
   strongestRole,
   type Visibility,
 } from "@keeltown/core/domain/identity";
-import type { NamespaceId, OrgId, UserId } from "@keeltown/core/kernel";
+import type { AgentId, NamespaceId, OrgId, UserId } from "@keeltown/core/kernel";
 import {
   Memberships,
   type ListedProject,
@@ -67,6 +67,8 @@ export function makeBetterAuthMemory(rows: BetterAuthRows = {}) {
   const users = new Map<UserId, BetterAuthUser>();
   const orgs = new Map<OrgId, BetterAuthOrg>();
   const members: BetterAuthMember[] = [];
+  /** The agents' own namespaces, which no Better Auth row stands for: the handle each agent holds. */
+  const agents = new Map<AgentId, Handle>();
   const seed = (more: BetterAuthRows): void => {
     for (const user of more.users ?? []) users.set(user.id, user);
     for (const org of more.orgs ?? []) orgs.set(org.id, org);
@@ -83,14 +85,15 @@ export function makeBetterAuthMemory(rows: BetterAuthRows = {}) {
         return role === undefined ? [] : [{ org, role }];
       })
       .toSorted((a, b) => binary(a.org, b.org));
-  return { users, orgs, members, seed, membershipsOf };
+  return { users, orgs, members, agents, seed, membershipsOf };
 }
 
 export type BetterAuthMemory = ReturnType<typeof makeBetterAuthMemory>;
 
 /**
  * Every namespace the rows make, as the `namespaces` table holds them: one for
- * each user with a handle, by the user's id, and one for each org, by its id.
+ * each user with a handle, by the user's id, one for each org, by its id, and
+ * one for each agent that signed itself up, by the agent's id.
  */
 const namespacesOf = (rows: BetterAuthMemory, now: number): readonly NamespaceRecord[] => [
   ...[...rows.users.values()].flatMap((user): NamespaceRecord[] =>
@@ -111,6 +114,12 @@ const namespacesOf = (rows: BetterAuthMemory, now: number): readonly NamespaceRe
     kind: "org",
     suspended: org.suspended === true,
   })),
+  ...[...rows.agents].map(([agent, handle]): NamespaceRecord => ({
+    namespace: agent,
+    handle,
+    kind: "agent",
+    suspended: false,
+  })),
 ];
 
 /** Namespaces over Better Auth's rows in memory. */
@@ -126,6 +135,13 @@ export function makeNamespacesMemory(rows: BetterAuthMemory = makeBetterAuthMemo
       Namespaces.of({
         byId: (namespace) => find((record) => record.namespace === namespace),
         byHandle: (handle) => find((record) => record.handle === handle.toLowerCase()),
+        holdForAgent: (agent, handle) =>
+          Effect.map(Clock.currentTimeMillis, (now) => {
+            const held = decodeHandle(handle.toLowerCase());
+            const holder = namespacesOf(rows, now).find((record) => record.handle === held);
+            if (holder === undefined) rows.agents.set(agent, held);
+            return holder === undefined || holder.namespace === agent;
+          }),
       }),
     ),
   };

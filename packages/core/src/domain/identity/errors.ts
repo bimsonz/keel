@@ -14,9 +14,11 @@ export class AgentNotAdmitted extends Schema.TaggedError<AgentNotAdmitted>()("Ag
 }) {}
 
 /**
- * The account this id names was made by another key. An id is 128 bits of a
- * key's thumbprint, so this is a collision or a caller naming an id it did not
- * derive; either way the answer is another key.
+ * The account this id names was made by another key, or the handle the key
+ * gives it is another account's. An id is 128 bits of a key's thumbprint and
+ * the handle is made from the id, so this is a collision, a caller naming an
+ * id it did not derive, or someone who took the handle first; either way the
+ * answer is another key.
  */
 export class SignUpRefused extends Schema.TaggedError<SignUpRefused>()("SignUpRefused", {
   agentId: AgentId,

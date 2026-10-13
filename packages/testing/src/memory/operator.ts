@@ -23,6 +23,7 @@ import { Effect, Layer } from "effect";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { hashSecret, makeClockMemory } from "./identity.ts";
 import { makeLiveChangesMemory } from "./live-changes.ts";
+import { type BetterAuthMemory, makeBetterAuthMemory, makeNamespacesMemory } from "./tenancy.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -198,10 +199,11 @@ export function makeEnrolmentsMemory() {
 /**
  * `AgentSignUps` in memory: each agent has an object of its own, an outbox and
  * a store, and the object runs the real `signUp`, projecting into the
- * AgentDirectory beside it.
+ * AgentDirectory beside it and holding its handle among `rows`' namespaces.
  */
-export function makeAgentSignUpsMemory() {
+export function makeAgentSignUpsMemory(rows: BetterAuthMemory = makeBetterAuthMemory()) {
   const objects = new Map<AgentId, ReturnType<typeof makeEventOutboxMemory>>();
+  const namespaces = makeNamespacesMemory(rows).layer;
   return {
     objects,
     layer: Layer.effect(
@@ -215,6 +217,7 @@ export function makeAgentSignUpsMemory() {
             objects.set(agentId, object);
             return signUp(agentId, { handle, key, name }).pipe(
               Effect.provide(object.layer),
+              Effect.provide(namespaces),
               Effect.provideService(AgentDirectory, directory),
               Effect.provideService(Clock, clock),
             );

@@ -14,6 +14,7 @@ import {
 import { BASE, drainOutbox, worker } from "./helpers.ts";
 
 const REGISTER = `${BASE}/v1/oauth/register`;
+const AT = "2026-10-13T12:00:00.000Z";
 
 interface SignUp {
   /** The proof to send; a fresh one made by the key being registered when absent, none when null. */
@@ -86,6 +87,41 @@ describe("an agent signs itself up with a key", () => {
       await requestToken(registered.client_id, account, { runKey: await newKey() }),
     );
     expect(token.token_type).toBe("DPoP");
+    // Its handle is a namespace of its own, which anyone may look up.
+    const namespace = await worker(`${BASE}/v1/namespaces/${registered.handle}`);
+    expect([namespace.status, await namespace.json()]).toEqual([
+      200,
+      { id: agentId, handle: registered.handle, kind: "agent" },
+    ]);
+  });
+
+  it("[signup.handle-held] a key whose handle a person already holds signs nothing up: no account, no event, and the person keeps the handle", async () => {
+    const account = await newKey();
+    const agentId = agentIdOf(account.key.jkt);
+    const handle = givenHandle(agentId);
+    // The database writes the person's namespace with the row that gives them the handle (0010's trigger).
+    await env.DB.prepare(
+      `INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username) VALUES (?, ?, ?, 0, ?, ?, ?)`,
+    )
+      .bind("usr_holder", handle, "holder@users.keel.invalid", AT, AT, handle)
+      .run();
+    expect(await refusal(await signUp(account))).toEqual({
+      status: 400,
+      error: "invalid_client_metadata",
+    });
+    const rows = await env.DB.batch<{ n: number; id?: string }>([
+      env.DB.prepare("SELECT COUNT(*) AS n FROM agents WHERE id = ?").bind(agentId),
+      env.DB.prepare("SELECT COUNT(*) AS n FROM agent_keys WHERE agent_id = ?").bind(agentId),
+      env.DB.prepare("SELECT 1 AS n, id FROM namespaces WHERE handle = ?").bind(handle),
+    ]);
+    expect(rows.map((row) => row.results)).toEqual([
+      [{ n: 0 }],
+      [{ n: 0 }],
+      [{ n: 1, id: "usr_holder" }],
+    ]);
+    // The refusal left nothing in the way: with the handle free, the same key signs up.
+    await env.DB.prepare(`DELETE FROM namespaces WHERE handle = ?`).bind(handle).run();
+    expect((await signUp(account)).status).toBe(201);
   });
 
   it("[signup.one-account-per-key] the same key again is the same account, answered 200 with what the first answer said", async () => {

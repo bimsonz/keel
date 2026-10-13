@@ -12,6 +12,7 @@ import {
   type HumanGate,
   type Ids,
   type OrgUsage,
+  type Namespaces,
   type ProjectNamespaces,
   type Projects,
   type StagingWriter,
@@ -28,6 +29,7 @@ import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
@@ -63,8 +65,8 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
   return Layer.mergeAll(EntityStoreSql(storage), EventOutboxSql(storage), SystemLive);
 }
 
-/** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project. */
-export type AgentSessionServices = AgentDirectory;
+/** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project, and holds the handle of an agent that signs itself up. */
+export type AgentSessionServices = AgentDirectory | Namespaces;
 
 /**
  * The Projector repeats each agent standing it hears in the AgentDirectory,
@@ -79,7 +81,7 @@ export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
 
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
 export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
-  return AgentDirectoryD1(env.DB);
+  return Layer.mergeAll(AgentDirectoryD1(env.DB), NamespacesD1(env.DB));
 }
 
 /** The Subject DO's driven adapters beyond the backbone: what it needs to put a conflict to a person. */

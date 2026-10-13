@@ -348,10 +348,12 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
 
 function memoryAgentSignUpsHarness(): AgentSignUpsHarness {
   const directory = identity.makeAgentDirectoryMemory().layer;
+  const rows = tenancy.makeBetterAuthMemory();
   return {
-    layer: Layer.merge(
-      operator.makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
+    layer: Layer.mergeAll(
+      operator.makeAgentSignUpsMemory(rows).layer.pipe(Layer.provide(directory)),
       directory,
+      tenancy.makeNamespacesMemory(rows).layer,
     ),
   };
 }
@@ -513,7 +515,7 @@ export const PORTS = {
     memoryEnrolmentsHarness,
     describeEnrolmentsContract,
   ),
-  AgentSignUps: harnessed<AgentSignUps | AgentDirectory, AgentSignUpsHarness>(
+  AgentSignUps: harnessed<AgentSignUps | AgentDirectory | Namespaces, AgentSignUpsHarness>(
     memoryAgentSignUpsHarness,
     describeAgentSignUpsContract,
   ),

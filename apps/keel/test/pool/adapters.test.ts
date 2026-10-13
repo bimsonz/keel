@@ -30,6 +30,7 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
+import { NamespacesD1 } from "../../src/adapters/driven/d1/namespaces.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { AgentSignUpsRpc } from "../../src/adapters/driven/do-rpc/sign-ups.ts";
 import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
@@ -228,7 +229,7 @@ const drainedSignUps = Layer.effect(
 ).pipe(Layer.provide(AgentSignUpsRpc(agentSession)));
 
 PORTS.AgentSignUps.contract("AgentSession DO over RPC", () => ({
-  layer: Layer.merge(drainedSignUps, AgentDirectoryD1(env.DB)),
+  layer: Layer.mergeAll(drainedSignUps, AgentDirectoryD1(env.DB), NamespacesD1(env.DB)),
 }));
 
 /** Opening a session commits SessionOpened on the agent's AgentSession DO; each open waits for its outbox to go quiet. */

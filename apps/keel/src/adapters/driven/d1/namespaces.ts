@@ -43,11 +43,12 @@ const SELECT = `SELECT n.id, n.handle, n.kind, o.suspended, u.banned, u.banExpir
   LEFT JOIN "user" u ON n.kind = 'user' AND u.id = n.id`;
 
 /**
- * Namespaces on D1's `namespaces` table, whose rows the database writes
- * (migration 0010's triggers). A handle is stored lower-case, so one is lowered
- * and matched exactly, on its unique index. The row of an org or a person that
- * was deleted stays, so its handle is never issued twice, and answers none. A
- * row that fails to decode is a defect, not a missing namespace.
+ * Namespaces on D1's `namespaces` table, whose rows the database writes for a
+ * person and an org (migration 0010's triggers) and this adapter for an agent.
+ * A handle is stored lower-case, so one is lowered and matched exactly, on its
+ * unique index. The row of an org or a person that was deleted stays, so its
+ * handle is never issued twice, and answers none. A row that fails to decode
+ * is a defect, not a missing namespace.
  */
 export function NamespacesD1(db: D1Database) {
   const first = (where: string, value: string) =>
@@ -60,6 +61,23 @@ export function NamespacesD1(db: D1Database) {
     Namespaces.of({
       byId: (namespace) => first("n.id", namespace),
       byHandle: (handle) => first("n.handle", handle.toLowerCase()),
+      // The unique index decides who holds the handle; the read beside the write says who that is.
+      holdForAgent: (agent, handle) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis;
+          const held = handle.toLowerCase();
+          const [, holder] = yield* Effect.promise(() =>
+            db.batch<{ id: string }>([
+              db
+                .prepare(
+                  `INSERT OR IGNORE INTO namespaces (id, handle, kind, created_at) VALUES (?, ?, 'agent', ?)`,
+                )
+                .bind(agent, held, now),
+              db.prepare(`SELECT id FROM namespaces WHERE handle = ?`).bind(held),
+            ]),
+          );
+          return holder?.results[0]?.id === agent;
+        }),
     }),
   );
 }

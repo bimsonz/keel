@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Membership, ProjectAudience } from "@keeltown/core/domain/identity";
-import { type NamespaceId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { Handle, type Membership, type ProjectAudience } from "@keeltown/core/domain/identity";
+import { AgentId, type NamespaceId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { Memberships, Namespaces, ProjectNamespaces, Users } from "@keeltown/core/ports";
 import { Clock, Effect, type Layer, Option, Schema } from "effect";
 import type { BetterAuthRows } from "../memory/tenancy.ts";
@@ -20,6 +20,7 @@ const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 const orgId = () => Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`);
 const userId = () => Schema.decodeUnknownSync(UserId)(`usr_${ulid()}`);
+const agentId = () => Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`);
 const projectId = () => Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
 /** A fresh handle or org name: lower-case, as Better Auth holds both. */
 const fresh = (stem: string) => `${stem}-${ulid().slice(0, 10).toLowerCase()}`;
@@ -117,6 +118,41 @@ export function describeNamespacesContract(
             Option.some(false),
           );
           expect(Option.isNone(yield* namespaces.byId(unnamed.id))).toBe(true);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[ports.namespaces-agent] an agent holds a handle as its own namespace of kind agent, and holds it again; a handle another agent, a person or an org holds is refused and stays theirs",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const ada = { id: userId(), username: fresh("ada") };
+          const acme = { id: orgId(), slug: fresh("acme") };
+          yield* harness.seed({ users: [ada], orgs: [acme] });
+          const namespaces = yield* Namespaces;
+          const agent = agentId();
+          const other = agentId();
+          const handle = Schema.decodeUnknownSync(Handle)(fresh("agent"));
+          expect(yield* namespaces.holdForAgent(agent, handle)).toBe(true);
+          const record = { namespace: agent, handle, kind: "agent", suspended: false };
+          expect(yield* namespaces.byId(agent)).toEqual(Option.some(record));
+          expect(yield* namespaces.byHandle(handle.toUpperCase())).toEqual(Option.some(record));
+          expect(yield* namespaces.holdForAgent(agent, handle)).toBe(true);
+          for (const held of [handle, ada.username, acme.slug])
+            expect([
+              held,
+              yield* namespaces.holdForAgent(other, Schema.decodeUnknownSync(Handle)(held)),
+            ]).toEqual([held, false]);
+          const holderOf = (held: string) =>
+            Effect.map(
+              namespaces.byHandle(held),
+              Option.map((found) => found.namespace),
+            );
+          expect(yield* holderOf(handle)).toEqual(Option.some(agent));
+          expect(yield* holderOf(ada.username)).toEqual(Option.some(ada.id));
+          expect(yield* holderOf(acme.slug)).toEqual(Option.some(acme.id));
+          expect(Option.isNone(yield* namespaces.byId(other))).toBe(true);
         }).pipe(Effect.provide(harness.layer));
       },
     );

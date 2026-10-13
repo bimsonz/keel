@@ -414,7 +414,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             signUpAgent(proven, input.client_name).pipe(
               Effect.map(registeredOk),
-              // The id is another key's account: a collision in 128 bits of a thumbprint.
+              // The id is another key's account (a collision in 128 bits of a thumbprint), or its handle is held.
               Effect.catchTag("SignUpRefused", () =>
                 Effect.succeed(
                   registrationRefused(

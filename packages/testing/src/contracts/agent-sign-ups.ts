@@ -1,15 +1,16 @@
 import { describe, expect, it } from "@effect/vitest";
 import { agentIdOf, givenHandle, type PresentedKey } from "@keeltown/core/domain/identity";
-import { AgentDirectory, AgentSignUps, type SignUpInput } from "@keeltown/core/ports";
+import { AgentDirectory, AgentSignUps, Namespaces, type SignUpInput } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Option } from "effect";
 import { freshAgentKey } from "./index.ts";
 
 /**
  * The `AgentSignUps` suite reads the AgentDirectory beside the port, because a
- * sign-up is good only once the agent's key is there for the token endpoint.
+ * sign-up is good only once the agent's key is there for the token endpoint,
+ * and the Namespaces the sign-up holds the agent's handle among.
  */
 export interface AgentSignUpsHarness {
-  readonly layer: Layer.Layer<AgentSignUps | AgentDirectory>;
+  readonly layer: Layer.Layer<AgentSignUps | AgentDirectory | Namespaces>;
 }
 
 const presented = (): PresentedKey => {
@@ -47,6 +48,43 @@ export function describeAgentSignUpsContract(adapter: string, make: () => AgentS
           expect(yield* directory.findAgent(request.agentId)).toEqual(Option.some(agent));
           expect(yield* signUps.signUp(request)).toEqual(agent);
           expect(yield* directory.findAgent(request.agentId)).toEqual(Option.some(agent));
+        }).pipe(Effect.provide(make().layer)),
+    );
+    it.effect(
+      "[signup.namespace] a signed-up agent's handle is its own namespace, of kind agent under its id",
+      () =>
+        Effect.gen(function* () {
+          const namespaces = yield* Namespaces;
+          const request = signingUp(presented());
+          yield* (yield* AgentSignUps).signUp(request);
+          const record = {
+            namespace: request.agentId,
+            handle: request.handle,
+            kind: "agent",
+            suspended: false,
+          };
+          expect(yield* namespaces.byHandle(request.handle)).toEqual(Option.some(record));
+          expect(yield* namespaces.byId(request.agentId)).toEqual(Option.some(record));
+        }).pipe(Effect.provide(make().layer)),
+    );
+    it.effect(
+      "[signup.handle-held] a key whose handle another account holds signs nothing up, and the handle stays that account's",
+      () =>
+        Effect.gen(function* () {
+          const signUps = yield* AgentSignUps;
+          const directory = yield* AgentDirectory;
+          const namespaces = yield* Namespaces;
+          const request = signingUp(presented());
+          const holder = agentIdOf(presented().jkt);
+          expect(yield* namespaces.holdForAgent(holder, request.handle)).toBe(true);
+          const refused = yield* Effect.exit(signUps.signUp(request));
+          expect(Exit.isFailure(refused) && JSON.stringify(refused.cause)).toContain(
+            "SignUpRefused",
+          );
+          expect(Option.isNone(yield* directory.findAgent(request.agentId))).toBe(true);
+          expect(
+            Option.map(yield* namespaces.byHandle(request.handle), (held) => held.namespace),
+          ).toEqual(Option.some(holder));
         }).pipe(Effect.provide(make().layer)),
     );
     it.effect(
