@@ -15,6 +15,7 @@
     "@keeltown/contracts": "workspace:*"
   },
   "devDependencies": {
+    "jose": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

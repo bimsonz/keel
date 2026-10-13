@@ -502,6 +502,9 @@ importers:
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

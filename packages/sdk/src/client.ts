@@ -17,6 +17,15 @@ import type {
   TokenResponse,
   WireOutputs,
 } from "@keeltown/contracts";
+import {
+  type AgentSigner,
+  clientAssertion,
+  type Discovered,
+  discover,
+  dpopProof,
+  refusalOf,
+  runKey,
+} from "./agent-key.ts";
 import { KeelProblem, KeelTokenError } from "./problem.ts";
 import { type InputOf, ROUTES, type RoutedOperation } from "./routes.ts";
 
@@ -51,6 +60,35 @@ export interface SessionClientOptions {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
 }
 
+/**
+ * An agent that holds a key: the client asks for five-minute tokens
+ * with a request the key signs, each for one project and one run, and bound to
+ * a key the client makes for itself and never stores. Every call then carries
+ * a proof by that key, so a token copied from a log is no use without it.
+ */
+export interface KeyClientOptions {
+  readonly baseUrl: string;
+  /** The agent the key signed up as: its sign-up's `client_id`. */
+  readonly agentId: string;
+  /** The account's key. It signs requests for tokens and nothing else. */
+  readonly key: AgentSigner;
+  /** The one project the tokens are for; none for a token that stands in the agent's own namespace. */
+  readonly project?: string;
+  /** The run's label, such as `nightly-deps`: the same label is the same run across restarts. */
+  readonly run?: string;
+  /** False asks for a plain bearer with no key behind it, to hand to a tool that cannot sign. */
+  readonly bound?: boolean;
+  /** Scopes to ask for; every scope the agent holds when absent. */
+  readonly scopes?: readonly string[];
+  readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
+}
+
+type ClientOptions =
+  | KeelClientOptions
+  | KeyClientOptions
+  | PublicClientOptions
+  | SessionClientOptions;
+
 export interface CallOptions {
   readonly signal?: AbortSignal;
 }
@@ -63,18 +101,25 @@ export interface Idempotent extends CallOptions {
 /** A token is refreshed this long before it expires, so a call never carries one that lapses in flight. */
 const EXPIRY_MARGIN_MS = 30_000;
 
+const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+
 /**
- * Keel's API, typed from `@keeltown/contracts`. It exchanges the client
- * credentials for a bearer token, caches it until shortly before it expires,
- * and on a 401 exchanges once more and retries the call once, under the same
- * Idempotency-Key. A refusal throws `KeelProblem`, carrying the next actions.
+ * Keel's API, typed from `@keeltown/contracts`. It exchanges the client's
+ * credentials (a key, or a client secret) for a token, caches it until shortly
+ * before it expires, and on a 401 exchanges once more and retries the call
+ * once, under the same Idempotency-Key. A refusal throws `KeelProblem`,
+ * carrying the next actions.
  */
 export class KeelClient {
-  readonly #options: KeelClientOptions | PublicClientOptions | SessionClientOptions;
+  readonly #options: ClientOptions;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   #token: { readonly value: string; readonly expiresAt: number } | undefined;
+  /** Where Keel's own document says to ask for a token: read once. */
+  #discovered: Promise<Discovered> | undefined;
+  /** The key this client's tokens are bound to: one for the client's life, in memory only. */
+  #runKey: Promise<AgentSigner> | undefined;
 
-  constructor(options: KeelClientOptions | PublicClientOptions | SessionClientOptions) {
+  constructor(options: ClientOptions) {
     this.#options = options;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
   }
@@ -83,11 +128,60 @@ export class KeelClient {
     return `${this.#options.baseUrl.replace(/\/+$/, "")}/v1`;
   }
 
-  /** A bearer token for the client's credentials: the cached one while it is fresh. */
+  /** The key a bound token's proofs are made by, or none for a client that asked for a plain bearer. */
+  #binding(): Promise<AgentSigner> | undefined {
+    if (!("key" in this.#options) || this.#options.bound === false) return undefined;
+    this.#runKey ??= runKey();
+    return this.#runKey;
+  }
+
+  /** A token for an agent's key: asked of the endpoint Keel's document names, with a request the key signs. */
+  async #keyToken(credentials: KeyClientOptions): Promise<string> {
+    this.#discovered ??= discover(credentials.baseUrl, this.#fetch).catch((error: unknown) => {
+      // A failed read is not kept: the next call asks again.
+      this.#discovered = undefined;
+      throw error;
+    });
+    const { issuer, tokenEndpoint } = await this.#discovered;
+    const binding = await this.#binding();
+    const form = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_assertion_type: ASSERTION_TYPE,
+      client_assertion: await clientAssertion(credentials.key, {
+        agentId: credentials.agentId,
+        audience: issuer,
+      }),
+    });
+    if (credentials.project !== undefined) form.set("project", credentials.project);
+    if (credentials.run !== undefined) form.set("run", credentials.run);
+    if (credentials.scopes !== undefined) form.set("scope", credentials.scopes.join(" "));
+    const response = await this.#fetch(tokenEndpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+        ...(binding === undefined
+          ? {}
+          : { dpop: await dpopProof(binding, { method: "POST", url: tokenEndpoint }) }),
+      },
+      body: form.toString(),
+    });
+    const body: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) throw refusalOf(response.status, body);
+    if (!isTokenResponse(body)) throw new KeelTokenError("invalid_response", response.status);
+    this.#token = {
+      value: body.access_token,
+      expiresAt: Date.now() + body.expires_in * 1000 - EXPIRY_MARGIN_MS,
+    };
+    return body.access_token;
+  }
+
+  /** A token for the client's credentials: the cached one while it is fresh. */
   async token(options: { readonly fresh?: boolean } = {}): Promise<string> {
     if (options.fresh !== true && this.#token !== undefined && Date.now() < this.#token.expiresAt)
       return this.#token.value;
     const credentials = this.#options;
+    if ("key" in credentials) return this.#keyToken(credentials);
     if (!("clientId" in credentials))
       throw new KeelTokenError("invalid_client", 0, "This client has no credentials.");
     const form = new URLSearchParams({
@@ -135,17 +229,30 @@ export class KeelClient {
     options: CallOptions = {},
   ): Promise<WireOutputs[Op]> {
     const request = this.#request(operation, input);
+    const binding = this.#binding();
+    /** How the token is presented: under the DPoP scheme with a proof for this request when it is bound to a key. */
+    const presenting = async (token: string): Promise<Record<string, string>> =>
+      binding === undefined
+        ? { authorization: `Bearer ${token}` }
+        : {
+            authorization: `DPoP ${token}`,
+            dpop: await dpopProof(await binding, {
+              method: request.method,
+              url: request.url,
+              accessToken: token,
+            }),
+          };
     const send = async (token: string | undefined) =>
       this.#fetch(request.url, {
         method: request.method,
         headers:
           token === undefined
             ? request.headers
-            : { ...request.headers, authorization: `Bearer ${token}` },
+            : { ...request.headers, ...(await presenting(token)) },
         ...(request.body === undefined ? {} : { body: request.body }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
-    const credentialed = "clientId" in this.#options;
+    const credentialed = "clientId" in this.#options || "key" in this.#options;
     const session = "session" in this.#options ? this.#options.session : undefined;
     let response = await send(credentialed ? await this.token() : session);
     if (credentialed && response.status === 401)
@@ -785,8 +892,6 @@ function isTokenResponse(body: unknown): body is TokenResponse {
 
 const keyOf = (options: Idempotent) => options.idempotencyKey ?? crypto.randomUUID();
 
-export function createKeelClient(
-  options: KeelClientOptions | PublicClientOptions | SessionClientOptions,
-): KeelClient {
+export function createKeelClient(options: ClientOptions): KeelClient {
   return new KeelClient(options);
 }
