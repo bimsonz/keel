@@ -266,7 +266,8 @@ describe("CandidateBundles over gitcore", () => {
       ),
       { examples: PINNED },
     );
-  });
+    // Each run builds a repo and bundles it twice: seconds in all on a loaded machine, past the default five.
+  }, 60_000);
 
   it.effect(
     "[bundles.reuse-reads] taking from the last bundle, an unchanged tree costs one read of its commit, an edit the trees on its path and its one blob, and a moved directory its parent alone",
