@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.link
+# kills: door.link
+# why: the index answers with no Link header, so a reader that arrives at /llms.txt is not told where the catalogue is
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index 014ed364..66f66213 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -665,7 +665,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+     LLMS_PATH,
+     () =>
+       new Response(llmsText(door()), {
+-        headers: { ...CACHED, ...catalogued, "content-type": "text/plain; charset=utf-8" },
++        headers: { ...CACHED, "content-type": "text/plain; charset=utf-8" },
+       }),
+   );
+   app.get(CATALOG_PATH, () =>

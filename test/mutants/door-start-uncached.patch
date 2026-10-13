@@ -2,15 +2,15 @@
 # kills: door.found
 # why: /start says nothing of how long it may be kept, so every reader fetches it again though it changes only with a deploy
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index af1e9706..e582b714 100644
+index 014ed364..694ba0ad 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -652,7 +652,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
-   const door = (): FrontDoor => (made ??= frontDoor(openApiDocument, where));
+@@ -654,7 +654,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+   const catalogued = { link: `<${where.origin}${CATALOG_PATH}>; rel="api-catalog"` };
    app.get(START_PATH, (c) => {
      const accept = c.req.header("accept") ?? "";
--    const headers = { ...CACHED, vary: "accept" };
-+    const headers = { vary: "accept" };
+-    const headers = { ...CACHED, ...catalogued, vary: "accept" };
++    const headers = { ...catalogued, vary: "accept" };
      if (accept.includes("application/json")) return Response.json(door(), { headers });
      const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
      return new Response(startMarkdown(door()), {

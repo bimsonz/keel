@@ -2,13 +2,13 @@
 # kills: door.walk
 # why: /start answers markdown to a client that asked for JSON, so a client that reads the steps as data has nothing to read
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index af1e9706..ee259b49 100644
+index 014ed364..c9c4443b 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -653,7 +653,6 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+@@ -655,7 +655,6 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
    app.get(START_PATH, (c) => {
      const accept = c.req.header("accept") ?? "";
-     const headers = { ...CACHED, vary: "accept" };
+     const headers = { ...CACHED, ...catalogued, vary: "accept" };
 -    if (accept.includes("application/json")) return Response.json(door(), { headers });
      const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
      return new Response(startMarkdown(door()), {

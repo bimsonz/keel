@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.version
+# kills: door.version
+# why: the spec declares no version, so the published document says 0.0.0, the number given to a document that declares none, and every reader of it is told nothing of which release it describes
+# regen
+diff --git a/packages/spec/main.tsp b/packages/spec/main.tsp
+index 9e4daf8a..b4a5a8ff 100644
+--- a/packages/spec/main.tsp
++++ b/packages/spec/main.tsp
+@@ -27,6 +27,5 @@ using Http;
+  * operation id.
+  */
+ @service(#{ title: "Keel" })
+-@OpenAPI.info(#{ version: "0.2.0" })
+ @server("/v1", "Keel API, version 1")
+ namespace Keel;

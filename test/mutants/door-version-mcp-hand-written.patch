@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.version
+# kills: door.version
+# why: the MCP server names itself with a version written by hand, so a client that asks it is told another version than the document and the card give
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 295db1a3..3054c3db 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -66,7 +66,7 @@ export function makeMcpEndpoint(
+ ) {
+   const mcp = createMcpHandler((context) => {
+     // The version the published document gives: the server's card says the same one.
+-    const server = new McpServer({ name: "keel", version: openApiDocument.info.version });
++    const server = new McpServer({ name: "keel", version: "0.0.0" });
+     registerTools(server, () => handlers, toolDeps(admittedOf(context.authInfo)));
+     return server;
+   });

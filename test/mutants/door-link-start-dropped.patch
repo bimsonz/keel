@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.link
+# kills: door.link
+# why: the walk's answers carry no Link header, so a reader that looks for the catalogue in the headers of the first page it is given finds none
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index 014ed364..f0a14e2e 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -654,7 +654,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+   const catalogued = { link: `<${where.origin}${CATALOG_PATH}>; rel="api-catalog"` };
+   app.get(START_PATH, (c) => {
+     const accept = c.req.header("accept") ?? "";
+-    const headers = { ...CACHED, ...catalogued, vary: "accept" };
++    const headers = { ...CACHED, vary: "accept" };
+     if (accept.includes("application/json")) return Response.json(door(), { headers });
+     const type = accept.includes("text/markdown") ? "text/markdown" : "text/plain";
+     return new Response(startMarkdown(door()), {
