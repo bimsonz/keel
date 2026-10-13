@@ -43,7 +43,9 @@ import type {
  *   `invite`: a member, and a person: an invitation names the person who
  *   answers for the agent, so no agent makes one, wherever it governs;
  *   `inviterOrMaintain`: the member who invited the agent concerned into the
- *   org, or whoever holds `maintain` there, and a person too;
+ *   org, or whoever holds `maintain` there, and a person too; `ownAsUser`:
+ *   an owner, and a person: an org's credentials and a project's deploy
+ *   targets are never an agent's, wherever it governs;
  * - `sponsor`: the person who stands behind the agent the action is on, and
  *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
  *   the agent itself.
@@ -65,6 +67,7 @@ export type Need =
   | "inviterOrMaintain"
   | "maintain"
   | "own"
+  | "ownAsUser"
   | "sponsor"
   | "sponsorOrSelf";
 
@@ -172,12 +175,12 @@ export const SPEC_ACTIONS = {
   Operator_putSettings: rule("Project", "maintain"),
 
   // A namespace's credentials and a project's deploy targets are its owners' alone.
-  Delivery_createCredential: rule("Namespace", "own"),
-  Delivery_listCredentials: rule("Namespace", "own"),
-  Delivery_deleteCredential: rule("Namespace", "own"),
-  Delivery_putDeployTarget: rule("Project", "own"),
-  Delivery_listDeployTargets: rule("Project", "own"),
-  Delivery_deleteDeployTarget: rule("Project", "own"),
+  Delivery_createCredential: rule("Namespace", "ownAsUser"),
+  Delivery_listCredentials: rule("Namespace", "ownAsUser"),
+  Delivery_deleteCredential: rule("Namespace", "ownAsUser"),
+  Delivery_putDeployTarget: rule("Project", "ownAsUser"),
+  Delivery_listDeployTargets: rule("Project", "ownAsUser"),
+  Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
 } as const satisfies Record<string, ActionRule>;
 
 /**
@@ -618,6 +621,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "workOrMaintain":
       return rights.has("maintain") ? granted() : lacksRole("maintain", kind);
     case "own":
+    case "ownAsUser":
       return rights.has("own") ? granted() : lacksRole("own", kind);
     case "sponsorOrMaintain":
       return rights.has("maintain") ||
@@ -731,6 +735,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     // another, wherever it governs. Its own invitation it ends as itself, by another action.
     case "invite":
     case "inviterOrMaintain":
+    case "ownAsUser":
       return refused("users-only");
     default:
       return hidden();

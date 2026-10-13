@@ -259,6 +259,7 @@ const GOVERNING: ReadonlySet<Need> = new Set([
   "invite",
   "maintain",
   "own",
+  "ownAsUser",
   "sponsorOrMaintain",
   "inviterOrMaintain",
 ]);
@@ -362,12 +363,10 @@ const governs = (a: AgentPrincipal, resource: Resource): boolean =>
   (resource._tag === "Project" || resource._tag === "Namespace") &&
   !resource.personOwned;
 
-/** Whether the principal holds an owner's rights on the resource: a user who owns its org, or the agent that governs it. */
+/** Whether the principal is a person who owns the resource's org: never an agent, wherever it governs. */
 const owns = (principal: Principal, resource: ProjectResource | NamespaceResource): boolean =>
-  principal._tag === "Agent"
-    ? governs(principal, resource)
-    : principal._tag === "User" &&
-      principal.memberships.some((m) => m.org === resource.namespace && m.role === "owner");
+  principal._tag === "User" &&
+  principal.memberships.some((m) => m.org === resource.namespace && m.role === "owner");
 
 /**
  * Whether the principal is of the resource: a user with a membership in its
@@ -998,7 +997,7 @@ describe("authorize", () => {
     );
   });
 
-  it("[authz.agent-governs-its-own] where it governs and no person owns, an agent is granted whatever an owner is and its own work, on its token's project and the namespace itself", () => {
+  it("[authz.agent-governs-its-own] where it governs and no person owns, an agent is granted its own work and whatever an owner is but the namespace's credentials and the project's deploy targets, on its token's project and the namespace itself", () => {
     fc.assert(
       fc.property(
         agentWith(fc.constant(GOVERNS)),
@@ -1033,6 +1032,8 @@ describe("authorize", () => {
             return its === (agent.scopes.includes("agent:read") ? theirs : "403:scope");
           // Inviting an agent, and taking one out, are a person's even here: the record names who answers for it.
           if (PEOPLE_ONLY.has(need)) return theirs === "ok:" && its === "403:users-only";
+          // So are a namespace's credentials and a project's deploy targets: no agent holds them, wherever it governs.
+          if (need === "ownAsUser") return theirs === "ok:" && its === "403:users-only";
           return theirs === "ok:" && its === "ok:";
         },
       ),
@@ -1118,6 +1119,7 @@ describe("authorize", () => {
       sponsorOrMaintain: 2,
       inviterOrMaintain: 2,
       own: 3,
+      ownAsUser: 3,
     };
     fc.assert(
       fc.property(
@@ -1178,7 +1180,7 @@ describe("authorize", () => {
     expect(outcome(authorize(maintainer, "ManageOwners", into(ORG_1)))).toBe("403:role");
   });
 
-  it("[authz.deploy-owner-only] only an owner of the org, or the agent that governs it, sets a project's deploy targets or touches the org's credentials", () => {
+  it("[authz.deploy-owner-only] only an owner of the org, and a person, sets a project's deploy targets or touches the org's credentials; never an agent, wherever it governs", () => {
     fc.assert(
       fc.property(principalArb, projectArb, orgResArb, (principal, proj, org) => {
         const targets = TARGET_ACTIONS.some((action) =>
@@ -1216,7 +1218,7 @@ describe("authorize", () => {
       expect([
         action,
         outcome(authorize(governor, action, into(ORG_1, { personOwned: false }))),
-      ]).toEqual([action, "ok:"]);
+      ]).toEqual([action, "403:users-only"]);
     }
   });
 
@@ -1840,9 +1842,11 @@ describe("authorize: a namespace by its kind", () => {
       expect([action, outcome(decide(ANON, action, own()))]).toEqual([action, "401"]);
       expect([action, outcome(decide(ANON, action, bots))]).toEqual([action, "401"]);
     }
-    // What is not about members stays the owner's, and the agent's in its own namespace.
+    // What is not about members stays the owner's, and the agent's in its own namespace; but a
+    // namespace's credentials are a person's alone: no agent holds them, its own namespace included.
     expect(outcome(authorize(ada, "Delivery_createCredential", own()))).toBe("ok:");
-    expect(outcome(authorize(governor, "Delivery_createCredential", bots))).toBe("ok:");
+    expect(outcome(authorize(governor, "Operator_createProject", bots))).toBe("ok:");
+    expect(outcome(authorize(governor, "Delivery_createCredential", bots))).toBe("403:users-only");
   });
 
   it("[authz.no-member-right-off-org] nobody but its own account holds a member's, a maintainer's or an owner's right in a person's or an agent's own namespace, or on its projects", () => {
