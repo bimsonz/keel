@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts -t run.link-end
+# kills: run.link-end
+# why: the link's end hands its commit the actor and never the run the command names
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index e5afc824..d676abd9 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -241,7 +241,6 @@ export const endSponsorship: (
+       cause: `unsponsor:${command.idempotencyKey}`,
+       fingerprint: command.fingerprint,
+       actor: command.by,
+-      ...(command.run === undefined ? {} : { run: command.run }),
+     },
+     command.idempotencyKey,
+     { _tag: "EndSponsorship", by: command.by },

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/rebase.test.ts -t run.commands
+# kills: run.commands
+# why: a rebase commits ChangeRebased under the agent with no run, so nothing says which lane moved the change's base
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index f18a29b5..29143d0e 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1203,7 +1203,7 @@ export const rebase: (
+       entity: changeRef(changeId),
+       cause: command.idempotencyKey,
+       fingerprint,
+-      ...byAgent(command.agentId, command.run),
++      ...byAgent(command.agentId, undefined),
+       project: held.projectId,
+     },
+     (tx) =>

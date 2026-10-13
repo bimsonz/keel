@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-link-end
+# kills: run.pool-link-end
+# why: the isolate sends the link's end to the agent's object without the run, so the object commits it under none
+diff --git a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+index 9cd67dd1..595bee59 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/sponsorships.ts
+@@ -78,7 +78,6 @@ export function SponsorshipsRpc(
+             agentSession(ending.agentId).endSponsorship(
+               encodeEnd({
+                 by,
+-                ...(ending.run === undefined ? {} : { run: ending.run }),
+                 idempotencyKey: ending.idempotencyKey,
+                 fingerprint,
+               }),

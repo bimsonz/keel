@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-link-end
+# kills: run.pool-link-end
+# why: the doorway ends a link for the agent and leaves out the run its token names, so the commit through the Worker carries none
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 89b5f819..2bde797a 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -557,7 +557,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+               Sponsorships.use((links) =>
+                 links.end(linkActorOf(caller), {
+                   agentId: accountOf(caller).agentId,
+-                  ...(inRun === undefined ? {} : { run: inRun }),
+                   idempotencyKey: input["idempotency-key"],
+                 }),
+               ).pipe(

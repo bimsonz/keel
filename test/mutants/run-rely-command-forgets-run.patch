@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t run.commands
+# kills: run.commands
+# why: the Change object's rely command has no run to carry, so the run the isolate sent is dropped at the object's door
+diff --git a/apps/keel/src/rpc/change.ts b/apps/keel/src/rpc/change.ts
+index d4b52369..91599b18 100644
+--- a/apps/keel/src/rpc/change.ts
++++ b/apps/keel/src/rpc/change.ts
+@@ -105,8 +105,6 @@ export type ReviseCommand = typeof ReviseCommand.Type;
+ /** Add one premise to a change under its lease. */
+ export const RelyCommand = Schema.Struct({
+   agentId: AgentId,
+-  /** The run of the agent that asks, when its token names one. */
+-  run: Schema.optional(RunRef),
+   leaseId: LeaseId,
+   premise: Proposition,
+   idempotencyKey: Schema.String,
