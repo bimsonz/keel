@@ -11,7 +11,15 @@ import { makeId, type NamespaceId, type ProjectId, type UserId } from "@keeltown
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
+import {
+  assertionBy,
+  freshAddress,
+  granted,
+  newKey,
+  proofBy,
+  requestToken,
+  TOKEN_ENDPOINT,
+} from "./agent-keys.ts";
 import {
   BASE,
   drainAfter,
@@ -180,7 +188,7 @@ async function keyAgent() {
   const token = async (project?: ProjectId) =>
     (await granted(await requestToken(agentId, account, project === undefined ? {} : { project })))
       .access_token;
-  return { handle, token };
+  return { handle, token, agentId, account };
 }
 
 describe("a database that is away, through the real doorway", () => {
@@ -225,6 +233,42 @@ describe("a database that is away, through the real doorway", () => {
 
     app.back();
     expect(await whose(await session())).toEqual([200, person.userId]);
+  });
+
+  it("[d1.away-token] an agent asking for a token while the database is away is told to wait, whichever of the token endpoint's own statements meets it: not 401, which would have it throw a good key away, and not 500", async () => {
+    const agent = await keyAgent();
+    const app = overAuthDb();
+    const ask = async () =>
+      app.via(TOKEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "cf-connecting-ip": freshAddress(),
+        },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+          client_assertion: await assertionBy(agent.account, agent.agentId),
+          resource: BASE,
+        }),
+      });
+    expect((await ask()).status).toBe(200);
+
+    // Three of a token request's own statements, each met after others have answered: the client's read, the assertion's use written down, and the signing key's read.
+    for (const table of ["oauthClient", "oauthClientAssertion", "jwks"]) {
+      const named = (sql: string) => sql.includes(` "${table}"`);
+      app.refused.length = 0;
+      app.put(named);
+      await toldToWait(await ask());
+      expect([table, app.refused.length > 0, app.refused.every(named)]).toEqual([
+        table,
+        true,
+        true,
+      ]);
+    }
+
+    app.back();
+    expect((await ask()).status).toBe(200);
   });
 
   it("[d1.away-principal] an agent invited into an org, whose standing there cannot be read, is told to wait: not 401, which would have it throw a good token away, and not 500", async () => {
