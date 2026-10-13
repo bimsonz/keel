@@ -33,7 +33,6 @@ const ENVELOPED: Readonly<Record<EnvelopedOperation, true>> = {
   abandon: true,
   adopt: true,
   rebase: true,
-  sketch: true,
   submit: true,
   status: true,
   resolve: true,

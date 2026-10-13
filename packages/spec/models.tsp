@@ -45,7 +45,7 @@ model Lease {
 }
 
 /**
- * The throwaway repo a change or sketch is worked in, and how to push to it:
+ * The throwaway repo a change is worked in, and how to push to it:
  * clone `remote`, commit, push `HEAD:refs/heads/main`, then submit the
  * commit's sha. A push alone lands nothing.
  */

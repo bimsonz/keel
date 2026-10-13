@@ -545,6 +545,13 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Removed
 
+- **`sketch` and a workspace's release leave the API** (breaking). Each has only ever answered `503 service.not_implemented`.
+  - `POST /v1/sketches` (`sketch`) with `SketchRequest`, `SketchView` and `SketchEnvelope`: sketches are cut. Declare a change to get a workspace.
+  - `DeclareRequest.fromSketch` and the problem code `sketch.not_found`: with no way to open a sketch the field could only answer 404. A declare that still sends it is refused `400 request.invalid`, as any field the contract lacks.
+  - `POST /v1/workspaces/{workspaceId}/release` (`Workspaces_releaseWorkspace`) with `WorkspaceReleased`: a change has no state without its workspace. `abandon` ends the change and its workspace is collected.
+  - The SDK's `sketch()` and `releaseWorkspace()`, the MCP tools of both, and the policy's rows for both go with them. The paths now answer `404 resource.not_found`.
+  - Stays: the domain's Sketch machine, its events (`SketchOpened`, `SketchPromoted`, `SketchExpired`, `SketchDiscarded`, `WorkspaceReassigned`) and `SketchId` in the event catalogue; core's `DeclareIntent.fromSketch?` and the Change DO's RPC, which the HTTP adapter no longer fills.
+
 - `ProjectCreated.forkedFrom?`. Nothing wrote it: where a project started is recorded once, as `TrunkInitialized.origin`, and a project's view reads that.
 - The scope checks the policy replaced (the cutover): `satisfies` and the generated routes' scope test, the MCP tool filter, `confineBootstrap`/`BOOTSTRAP_MAY_CALL`, read-scope's `readsInstanceWide`/`projectScope`/`readScope`/`viewScope` with `TokenRequired`/`ForeignProject`/`ReadRefused`, `repoAccess`, `withdrawAuthority`'s scope test, and the inbox streams' own checks.
 - `scripts/deploy.ts` (tooling, no contract change): the console's block is gone. The console's Worker holds no credential, so the deploy no longer sets the observer's and operator's client credentials on it, nor generates `CONSOLE_CAPABILITY_KEY` and `CONSOLE_PRESENTER_KEY`, and `--rotate` is removed with them. The `console` entry of `.keel/<env>.json` is no longer read or written. `apps/console/wrangler.jsonc` loses its six `secrets.required` and its service binding to `keel`.

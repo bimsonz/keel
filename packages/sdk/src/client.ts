@@ -11,7 +11,6 @@ import type {
   ResolveRequest,
   ReviseRequest,
   RulingRequest,
-  SketchRequest,
   SubmitRequest,
   SuspendAgentRequest,
   TokenResponse,
@@ -549,11 +548,6 @@ export class KeelClient {
     );
   }
 
-  /** A sketch: a workspace for exploring, with no change declared. */
-  sketch(request: SketchRequest = {}, options: Idempotent = {}): Promise<WireOutputs["sketch"]> {
-    return this.call("sketch", { ...request, "idempotency-key": keyOf(options) }, options);
-  }
-
   /** A fresh token for a workspace the caller holds. */
   refreshWorkspaceToken(
     workspaceId: string,
@@ -561,18 +555,6 @@ export class KeelClient {
   ): Promise<WireOutputs["Workspaces_refreshWorkspaceToken"]> {
     return this.call(
       "Workspaces_refreshWorkspaceToken",
-      { workspaceId, "idempotency-key": keyOf(options) },
-      options,
-    );
-  }
-
-  /** Gives a workspace back. */
-  releaseWorkspace(
-    workspaceId: string,
-    options: Idempotent = {},
-  ): Promise<WireOutputs["Workspaces_releaseWorkspace"]> {
-    return this.call(
-      "Workspaces_releaseWorkspace",
       { workspaceId, "idempotency-key": keyOf(options) },
       options,
     );

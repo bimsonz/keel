@@ -6,7 +6,6 @@ import "./auth.tsp";
 import "./agents.tsp";
 import "./sessions.tsp";
 import "./changes.tsp";
-import "./sketches.tsp";
 import "./workspaces.tsp";
 import "./submissions.tsp";
 import "./conflicts.tsp";

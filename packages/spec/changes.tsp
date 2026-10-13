@@ -23,9 +23,6 @@ model DeclareRequest {
 
   /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
   declaredEffects?: MFP.Proposition[];
-
-  /** Promote this sketch: its workspace carries over to the new change. */
-  fromSketch?: SketchId;
 }
 
 model Declared {

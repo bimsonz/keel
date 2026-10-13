@@ -189,10 +189,6 @@ describe("the work loop over REST and MCP", () => {
       goal: "Other",
     });
     const exhausted = await declare(via, token, "declare-key-0007");
-    const sketch = await declare(via, token, "declare-key-0008", {
-      ...declareBody,
-      fromSketch: "sk_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
-    });
     const foreign = await submit(via, token, declared.lease.id, "submit-key-0006", {
       changeId: declared.change.id,
       commitSha: "d".repeat(40),
@@ -201,14 +197,13 @@ describe("the work loop over REST and MCP", () => {
     const unknown = await rest(via, token, "/changes/chg_01JZ8PT2C4E6G8J0M2N4Q6S8V9/submission");
     const malformed = await rest(via, token, "/changes/not-a-change/submission");
     expect(
-      [conflict, exhausted, sketch, foreign, unsubmitted, unknown, malformed].map((r) => [
+      [conflict, exhausted, foreign, unsubmitted, unknown, malformed].map((r) => [
         r.status,
         r.body.code,
       ]),
     ).toEqual([
       [409, "request.idempotency_conflict"],
       [503, "workspace.pool_exhausted"],
-      [404, "sketch.not_found"],
       [409, "change.commit_not_in_workspace"],
       [404, "resource.not_found"],
       [404, "change.not_found"],
@@ -216,8 +211,35 @@ describe("the work loop over REST and MCP", () => {
     ]);
     expect(exhausted.headers.get("retry-after")).toBe("5");
     expect(exhausted.body.retryAfterMs).toBe(5_000);
-    for (const r of [conflict, exhausted, sketch, foreign, unsubmitted, unknown])
+    for (const r of [conflict, exhausted, foreign, unsubmitted, unknown])
       expect(r.body.nextActions.length).toBeGreaterThan(0);
+  });
+
+  it("[spec.removed] a sketch and a workspace's release are no operations: each path answers 404 as any unknown path does", async () => {
+    const { via } = loop({ capacity: 1 });
+    const token = await tokenFor(await seedAgent());
+    const post = (path: string) =>
+      rest(via, token, path, {
+        method: "POST",
+        headers: { ...json, "idempotency-key": "removed-key-0001" },
+        body: "{}",
+      });
+    const answers = [
+      await post("/sketches"),
+      await post("/workspaces/wsp_01JZ8PT2C4E6G8J0M2N4Q6S8V0/release"),
+      await post("/no-such-operation"),
+    ];
+    expect(answers.map((r) => [r.status, r.body.code])).toEqual([
+      [404, "resource.not_found"],
+      [404, "resource.not_found"],
+      [404, "resource.not_found"],
+    ]);
+    // A declare that still names a sketch is refused as any request with a field the contract lacks.
+    const declared = await declare(via, token, "removed-key-0002", {
+      ...declareBody,
+      fromSketch: "sk_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+    });
+    expect([declared.status, declared.body.code]).toEqual([400, "request.invalid"]);
   });
 
   it("[a11.invariant] answers 500 with an incident id when an authenticated agent's AgentSession does not know it", async () => {

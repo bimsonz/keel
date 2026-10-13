@@ -30,7 +30,6 @@ import {
   Move,
   Proposition,
   type RevisionMismatch,
-  type SketchNotFound,
 } from "@keeltown/core/domain/coordination";
 import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import type { ConflictNotFound, MoveRefused } from "@keeltown/core/domain/verification";
@@ -42,7 +41,6 @@ import {
   CommitSha,
   ConflictId,
   LeaseId,
-  SketchId,
 } from "@keeltown/core/kernel";
 import type { ConflictView, PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
@@ -176,7 +174,6 @@ const DeclareFields = Schema.Struct({
   footprint: Schema.Array(FootprintEntry),
   premises: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
-  fromSketch: Schema.optional(SketchId),
 });
 
 export function declareInput(input: Input<"declare">): Result.Result<DeclareInput, Issues> {
@@ -187,14 +184,12 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
     ...(input.declaredEffects === undefined
       ? {}
       : { declaredEffects: input.declaredEffects.map(propositionInput) }),
-    ...(input.fromSketch === undefined ? {} : { fromSketch: input.fromSketch }),
   };
   return Result.map(decodeWith(DeclareFields, wire), (fields) => ({
     goal: fields.goal,
     footprint: fields.footprint,
     premises: fields.premises,
     ...(fields.declaredEffects === undefined ? {} : { declaredEffects: fields.declaredEffects }),
-    ...(fields.fromSketch === undefined ? {} : { fromSketch: fields.fromSketch }),
     idempotencyKey: input["idempotency-key"],
   }));
 }
@@ -334,7 +329,7 @@ export function declareOk(declared: Declared): DeclareResult {
 
 export function declareError(
   caller: Caller,
-  error: PoolExhausted | SketchNotFound | IdempotencyConflict,
+  error: PoolExhausted | IdempotencyConflict,
 ): DeclareResult {
   switch (error._tag) {
     case "PoolExhausted":
@@ -350,16 +345,6 @@ export function declareError(
               title: "Declare again with the same Idempotency-Key after retryAfterMs",
               operationId: "declare",
             },
-          ],
-        }),
-      };
-    case "SketchNotFound":
-      return {
-        status: 404,
-        body: problem(404, "sketch.not_found", caller.requestId, {
-          detail: `No sketch ${error.sketchId}.`,
-          nextActions: [
-            { kind: "call", title: "Declare without fromSketch", operationId: "declare" },
           ],
         }),
       };

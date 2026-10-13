@@ -211,7 +211,6 @@ union ProblemCode {
   workspacePoolExhausted: "workspace.pool_exhausted",
   workspaceBusy: "workspace.busy",
   workspacePackTooLarge: "workspace.pack_too_large",
-  sketchNotFound: "sketch.not_found",
   repoRefNotFound: "repo.ref_not_found",
   repoPathNotFound: "repo.path_not_found",
   agentStateRefused: "agent.state_refused",

@@ -130,10 +130,8 @@ export const SPEC_ACTIONS = {
   rebase: rule("Project", "work"),
   revise: rule("Project", "work"),
   submit: rule("Project", "work"),
-  sketch: rule("Project", "work"),
   resolve: rule("Project", "work"),
   Sessions_openSession: rule("Project", "work"),
-  Workspaces_releaseWorkspace: rule("Project", "work"),
   Workspaces_refreshWorkspaceToken: rule("Project", "work"),
   abandon: rule("Project", "workOrMaintain"),
 

@@ -345,10 +345,8 @@ export const RESOLVERS: Resolvers = {
   rebase: ownProject,
   revise: ownProject,
   submit: ownProject,
-  sketch: ownProject,
   resolve: ownProject,
   Sessions_openSession: ownProject,
-  Workspaces_releaseWorkspace: ownProject,
   Workspaces_refreshWorkspaceToken: ownProject,
 };
 

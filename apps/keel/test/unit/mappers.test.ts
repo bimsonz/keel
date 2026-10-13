@@ -112,9 +112,7 @@ describe("mappers", () => {
  * policy grants them. Shrinks, visibly, as lanes land each one.
  */
 const STUBBED = [
-  "sketch",
   "Workspaces_refreshWorkspaceToken",
-  "Workspaces_releaseWorkspace",
   "why",
   "Memory_listDecisions",
   "Memory_getDecision",

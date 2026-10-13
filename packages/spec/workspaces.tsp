@@ -10,11 +10,6 @@ model WorkspacePath {
   @path workspaceId: WorkspaceId;
 }
 
-model WorkspaceReleased {
-  id: WorkspaceId;
-  releasedAt: utcDateTime;
-}
-
 @tag("Workspaces")
 @route("/workspaces")
 interface Workspaces {
@@ -24,11 +19,4 @@ interface Workspaces {
   @route("/{workspaceId}/token")
   @post
   refreshWorkspaceToken(...WorkspacePath, ...IdempotencyKey): Workspace | NotFound | StandardErrors;
-
-  /** Give the workspace back before its change ends. */
-  @summary("Release a workspace")
-  @useAuth(AgentWork)
-  @route("/{workspaceId}/release")
-  @post
-  releaseWorkspace(...WorkspacePath, ...IdempotencyKey): WorkspaceReleased | NotFound | StandardErrors;
 }

@@ -114,15 +114,9 @@ export const ROUTES = {
     path: "/changes/{changeId}/rebase",
     headers: ["keel-lease", "idempotency-key"],
   },
-  sketch: { method: "POST", path: "/sketches", headers: ["idempotency-key"] },
   Workspaces_refreshWorkspaceToken: {
     method: "POST",
     path: "/workspaces/{workspaceId}/token",
-    headers: ["idempotency-key"],
-  },
-  Workspaces_releaseWorkspace: {
-    method: "POST",
-    path: "/workspaces/{workspaceId}/release",
     headers: ["idempotency-key"],
   },
   Conflicts_listConflicts: {
