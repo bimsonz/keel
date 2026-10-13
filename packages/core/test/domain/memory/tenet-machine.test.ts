@@ -21,6 +21,7 @@ import {
 import { tenetChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { failureTag, type Fold, type Machine, memo, play, tour } from "../../support/machine.ts";
 
 /** Each property plays hundreds of seeded runs; on a busy runner one can pass vitest's 5 s default. */
@@ -606,6 +607,91 @@ const tenetTour = (): readonly Fold<Tenet, TenetEvent>[] => {
   });
   return walkedTour;
 };
+
+/** What the fold's table is about: whose the tenet is, its state, the conflict contesting it and what ended it. */
+interface Folded {
+  readonly id: Tenet["id"];
+  readonly state: Tenet["state"];
+  readonly conflictId?: Tenet["conflictId"];
+  readonly endedBy?: Tenet["endedBy"];
+}
+
+/** The fold's from-table (state-machines.md § Tenet), typed apart from `evolveTenet`. */
+const folds = (from: Folded | undefined, event: TenetEvent): Folded | "illegal" => {
+  if (from === undefined)
+    return event._tag === "TenetEstablished" && event.guardIds.length > 0
+      ? { id: event.tenetId, state: "established" }
+      : "illegal";
+  if (event.tenetId !== from.id) return "illegal";
+  const contesting =
+    from.state === "contested" && "conflictId" in event && event.conflictId === from.conflictId;
+  switch (event._tag) {
+    case "TenetEstablished":
+      return "illegal";
+    case "TenetContested":
+      return from.state === "established"
+        ? { id: from.id, state: "contested", conflictId: event.conflictId }
+        : "illegal";
+    case "TenetReaffirmed":
+      return contesting ? { id: from.id, state: "established" } : "illegal";
+    case "TenetRetracted":
+      return contesting ? { ...from, state: "retracted", endedBy: event.changeId } : "illegal";
+    case "TenetSuperseded":
+      return from.state === "established"
+        ? { id: from.id, state: "superseded", endedBy: event.by }
+        : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+describe("the Tenet fold", () => {
+  it("[tenet.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Tenet, TenetEvent, Folded>({
+      evolve: evolveTenet,
+      walked: tenetTour(),
+      summary: (t) => ({
+        id: t.id,
+        state: t.state,
+        ...(t.conflictId === undefined ? {} : { conflictId: t.conflictId }),
+        ...(t.endedBy === undefined ? {} : { endedBy: t.endedBy }),
+      }),
+      shown: (f) =>
+        [
+          `${f.id} ${f.state}`,
+          ...(f.conflictId === undefined ? [] : [`over ${f.conflictId}`]),
+          ...(f.endedBy === undefined ? [] : [`by ${f.endedBy}`]),
+        ].join(" "),
+      // Each event as committed and as another tenet's; one that names a conflict, for
+      // another conflict too; and a tenet established with no guard.
+      forms: (event) => [
+        event,
+        { ...event, tenetId: NEXT },
+        ...("conflictId" in event ? [{ ...event, conflictId: OTHER }] : []),
+        ...(event._tag === "TenetEstablished" ? [{ ...event, guardIds: [] }] : []),
+      ],
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Five rows by fourteen forms: the five events, each also as another tenet's, the three
+    // that name a conflict also for another one, and an establishing with no guard.
+    expect(foldShape(cases)).toEqual({
+      folds: 70,
+      refused: 63,
+      rows: [
+        "none",
+        `${TENET} established`,
+        `${TENET} contested over ${CONFLICT}`,
+        `${TENET} superseded by ${NEXT}`,
+        `${TENET} retracted over ${CONFLICT} by ${CHALLENGER}`,
+      ],
+    });
+  });
+});
 
 describe("the Tenet chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[tenet.chart] every state change a run makes is an edge of the Tenet chart, and a tour of the machine exercises every edge", () => {

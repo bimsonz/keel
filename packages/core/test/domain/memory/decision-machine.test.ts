@@ -21,6 +21,7 @@ import {
 import { decisionChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { failureTag, type Fold, type Machine, memo, play, tour } from "../../support/machine.ts";
 
 /** Each property plays hundreds of seeded runs; on a busy runner one can pass vitest's 5 s default. */
@@ -372,6 +373,60 @@ const decisionTour = (): readonly Fold<Decision, DecisionEvent>[] => {
   });
   return walkedTour;
 };
+
+/** What the fold's table is about: whose the decision is, its state, and what ended it. */
+interface Folded {
+  readonly id: Decision["id"];
+  readonly state: Decision["state"];
+  readonly endedBy?: Decision["endedBy"];
+}
+
+/** The fold's from-table (state-machines.md § Decision), typed apart from `evolveDecision`. */
+const folds = (from: Folded | undefined, event: DecisionEvent): Folded | "illegal" => {
+  if (from === undefined)
+    return event._tag === "DecisionRecorded"
+      ? { id: event.decisionId, state: "active" }
+      : "illegal";
+  if (event.decisionId !== from.id || event._tag === "DecisionRecorded") return "illegal";
+  if (from.state !== "active") return "illegal";
+  return {
+    id: from.id,
+    state: event._tag === "DecisionSuperseded" ? "superseded" : "overruled",
+    endedBy: event.by,
+  };
+};
+
+describe("the Decision fold", () => {
+  it("[decision.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Decision, DecisionEvent, Folded>({
+      evolve: evolveDecision,
+      walked: decisionTour(),
+      summary: (d) => ({
+        id: d.id,
+        state: d.state,
+        ...(d.endedBy === undefined ? {} : { endedBy: d.endedBy }),
+      }),
+      shown: (f) => `${f.id} ${f.state}${f.endedBy === undefined ? "" : ` by ${f.endedBy}`}`,
+      // Each event as committed, and as another decision's.
+      forms: (event) => [event, { ...event, decisionId: LATER }],
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Four rows by three events, each as this decision's and as another's.
+    expect(foldShape(cases)).toEqual({
+      folds: 24,
+      refused: 20,
+      rows: [
+        "none",
+        `${DECISION} active`,
+        `${DECISION} superseded by ${LATER}`,
+        `${DECISION} overruled by ${LATER}`,
+      ],
+    });
+  });
+});
 
 describe("the Decision chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[decision.chart] every state change a run makes is an edge of the Decision chart, and a tour of the machine exercises every edge", () => {

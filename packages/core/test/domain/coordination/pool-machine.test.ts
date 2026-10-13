@@ -26,6 +26,7 @@ import {
 import { sketchChart, workspaceChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import {
   eventsOf,
   failureTag,
@@ -611,6 +612,149 @@ const sketchTour = (): readonly Fold<Sketch, SketchEvent>[] => {
   });
   return sketchWalk;
 };
+
+const OTHER_WORKSPACE = makeId("wsp", ulid(2));
+
+/** What the Workspace fold's table is about: whose it is, its state and who holds it. */
+interface FoldedWorkspace {
+  readonly id: Workspace["id"];
+  readonly state: Workspace["state"];
+  readonly holder?: Workspace["holder"];
+}
+
+/** The fold's from-table (state-machines.md § Workspace), typed apart from `evolveWorkspace`. */
+const workspaceFolds = (
+  from: FoldedWorkspace | undefined,
+  event: WorkspaceEvent,
+): FoldedWorkspace | "illegal" => {
+  if (from === undefined)
+    return event._tag === "WorkspaceForked" ? { id: event.workspaceId, state: "ready" } : "illegal";
+  if (event.workspaceId !== from.id) return "illegal";
+  switch (event._tag) {
+    case "WorkspaceForked":
+      return "illegal";
+    case "WorkspaceGranted":
+      return from.state === "ready"
+        ? { ...from, state: "granted", holder: event.holder }
+        : "illegal";
+    case "WorkspaceReassigned":
+      return from.state === "granted" && from.holder === event.sketchId
+        ? { ...from, holder: event.changeId }
+        : "illegal";
+    case "WorkspacePushed":
+      return from.state === "granted" ? from : "illegal";
+    case "WorkspaceCollected":
+      return from.state === "ready" || from.state === "granted"
+        ? { ...from, state: "collected" }
+        : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+/** What the Sketch fold's table is about: whose it is, its state and when it expires. */
+interface FoldedSketch {
+  readonly id: Sketch["id"];
+  readonly state: Sketch["state"];
+  readonly expiresAt: Instant;
+}
+
+/** The fold's from-table (state-machines.md § Sketch), typed apart from `evolveSketch`. */
+const sketchFolds = (
+  from: FoldedSketch | undefined,
+  event: SketchEvent,
+  at: Instant,
+): FoldedSketch | "illegal" => {
+  if (from === undefined)
+    return event._tag === "SketchOpened"
+      ? { id: event.sketchId, state: "open", expiresAt: event.expiresAt }
+      : "illegal";
+  if (event.sketchId !== from.id || from.state !== "open") return "illegal";
+  const lapsed = at >= from.expiresAt;
+  switch (event._tag) {
+    case "SketchOpened":
+      return "illegal";
+    case "SketchPromoted":
+      return lapsed ? "illegal" : { ...from, state: "promoted" };
+    case "SketchDiscarded":
+      return lapsed ? "illegal" : { ...from, state: "discarded" };
+    case "SketchExpired":
+      return lapsed ? { ...from, state: "expired" } : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+describe("the Workspace and Sketch folds", () => {
+  it("[workspace.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Workspace, WorkspaceEvent, FoldedWorkspace>({
+      evolve: evolveWorkspace,
+      walked: workspaceTour(),
+      summary: (w) => ({
+        id: w.id,
+        state: w.state,
+        ...(w.holder === undefined ? {} : { holder: w.holder }),
+      }),
+      shown: (f) => `${f.id} ${f.state}${f.holder === undefined ? "" : ` held by ${f.holder}`}`,
+      // Each event as committed and as another workspace's.
+      forms: (event) => [event, { ...event, workspaceId: OTHER_WORKSPACE }],
+      times: [T0],
+      table: workspaceFolds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Nine rows by twenty forms: every event the tour committed, for each holder, as this
+    // workspace's and as another's.
+    expect(foldShape(cases)).toEqual({
+      folds: 180,
+      refused: 158,
+      rows: [
+        "none",
+        `${WORKSPACE} ready`,
+        `${WORKSPACE} granted held by ${CHANGE_A}`,
+        `${WORKSPACE} granted held by ${SKETCH}`,
+        `${WORKSPACE} granted held by ${CHANGE_B}`,
+        `${WORKSPACE} collected`,
+        `${WORKSPACE} collected held by ${CHANGE_A}`,
+        `${WORKSPACE} collected held by ${SKETCH}`,
+        `${WORKSPACE} collected held by ${CHANGE_B}`,
+      ],
+    });
+  });
+
+  it("[sketch.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Sketch, SketchEvent, FoldedSketch>({
+      evolve: evolveSketch,
+      walked: sketchTour(),
+      summary: (sk) => ({ id: sk.id, state: sk.state, expiresAt: sk.expiresAt }),
+      shown: (f) => `${f.id} ${f.state}, expiring ${f.expiresAt - T0} after the start`,
+      // Each event as committed and as another sketch's.
+      forms: (event) => [event, { ...event, sketchId: OTHER_SKETCH }],
+      // Before either sketch expires, the instant before and the instant the first does, and after both.
+      times: [T0 + 2, T0 + TTL, T0 + TTL + 1, T0 + 2 * TTL + 2].map((t) => Instant(t)),
+      table: sketchFolds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Six rows by ten forms at four instants.
+    expect(foldShape(cases)).toEqual({
+      folds: 240,
+      refused: 211,
+      rows: [
+        "none",
+        `${SKETCH} open, expiring ${TTL + 1} after the start`,
+        `${SKETCH} open, expiring ${2 * TTL + 1} after the start`,
+        `${SKETCH} promoted, expiring ${TTL + 1} after the start`,
+        `${SKETCH} discarded, expiring ${TTL + 1} after the start`,
+        `${SKETCH} expired, expiring ${TTL + 1} after the start`,
+      ],
+    });
+  });
+});
 
 describe("the Workspace and Sketch charts", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[workspace.chart] every state change a run makes is an edge of the Workspace chart, and a tour of the machine exercises every edge", () => {

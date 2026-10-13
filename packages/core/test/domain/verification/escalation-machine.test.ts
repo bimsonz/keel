@@ -21,6 +21,7 @@ import {
 import { escalationChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import {
   eventsOf,
   failureTag,
@@ -364,6 +365,80 @@ const escalationTour = (): readonly Fold<Escalation, EscalationEvent>[] => {
   });
   return walkedTour;
 };
+
+const ANOTHER = makeId("esc", `${"0".repeat(25)}1`);
+
+/** What the fold's table is about: whose the escalation is, its state, the options it offers and how it ended. */
+interface Folded {
+  readonly id: Escalation["id"];
+  readonly state: Escalation["state"];
+  readonly options: readonly string[];
+  readonly ended?: string;
+}
+
+/** The fold's from-table (state-machines.md § Escalation), typed apart from `evolveEscalation`. */
+const folds = (from: Folded | undefined, event: EscalationEvent): Folded | "illegal" => {
+  if (from === undefined)
+    return event._tag === "EscalationRaised"
+      ? { id: event.escalationId, state: "open", options: event.options.map((o) => o.id) }
+      : "illegal";
+  if (event.escalationId !== from.id || from.state !== "open") return "illegal";
+  switch (event._tag) {
+    case "EscalationRaised":
+      return "illegal";
+    case "RulingGiven":
+      return from.options.includes(event.option)
+        ? { ...from, state: "ruled", ended: event.option }
+        : "illegal";
+    case "EscalationWithdrawn":
+      return { ...from, state: "withdrawn", ended: event.reason };
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+describe("the Escalation fold", () => {
+  it("[escalation.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Escalation, EscalationEvent, Folded>({
+      evolve: evolveEscalation,
+      walked: escalationTour(),
+      summary: (e) => ({
+        id: e.id,
+        state: e.state,
+        options: e.options.map((o) => o.id),
+        ...(e.ruling === undefined ? {} : { ended: e.ruling.option }),
+        ...(e.withdrawnReason === undefined ? {} : { ended: e.withdrawnReason }),
+      }),
+      shown: (f) =>
+        `${f.id} ${f.state} of ${f.options.join("/")}${f.ended === undefined ? "" : `, ${f.ended}`}`,
+      // Each event as committed and as another escalation's, and a ruling for an option never offered.
+      forms: (event) => [
+        event,
+        { ...event, escalationId: ANOTHER },
+        ...(event._tag === "RulingGiven" ? [{ ...event, option: UNKNOWN }] : []),
+      ],
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Five rows by eleven forms: four raises, a ruling and a withdrawal, each as this
+    // escalation's and as another's, and the ruling for an option never offered.
+    expect(foldShape(cases)).toEqual({
+      folds: 55,
+      refused: 45,
+      rows: [
+        "none",
+        `${ESCALATION} open of keep/revert`,
+        `${ESCALATION} open of keep/revert/overrule`,
+        `${ESCALATION} ruled of keep/revert, keep`,
+        `${ESCALATION} withdrawn of keep/revert, the conflict was dismissed`,
+      ],
+    });
+  });
+});
 
 describe("the Escalation chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[escalation.chart] every state change a run makes is an edge of the Escalation chart, and a tour of the machine exercises every edge", () => {
