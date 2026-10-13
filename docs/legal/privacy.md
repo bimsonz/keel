@@ -1,6 +1,6 @@
 # Privacy Notice
 
-Last updated: 12 October 2026
+Last updated: 13 October 2026
 
 This notice explains what personal data keel.town collects, why, and what your rights are. It covers keel.town only. If you run your own copy of Keel, you are responsible for the data in that copy.
 

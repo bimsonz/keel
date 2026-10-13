@@ -11,8 +11,8 @@ import { LEGAL, type Legal, legalOf } from "../../src/legal/legal.ts";
  * beside it to the day the new text is published.
  */
 const PUBLISHED: Record<Legal, { updated: string; digest: string }> = {
-  terms: { updated: "12 October 2026", digest: "192cf837eac7b9e1" },
-  privacy: { updated: "12 October 2026", digest: "24d31de58c50139f" },
+  terms: { updated: "13 October 2026", digest: "e047ebcdd3bf4dd0" },
+  privacy: { updated: "13 October 2026", digest: "2ec2f31aff0b4c43" },
 };
 
 const DATED = /^Last updated: (.+)$/m;
