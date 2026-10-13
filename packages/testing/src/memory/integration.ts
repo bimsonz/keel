@@ -5,6 +5,7 @@ import {
   type TrunkOrigin,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
+import type { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
   type ChangeId,
   CommitSha,
@@ -17,10 +18,12 @@ import {
   BatchVerification,
   BundleRefused,
   CandidateBundles,
+  type ImportTooLarge,
   CandidateComposer,
   type CandidateRequest,
   Lanes,
   PackTooLarge,
+  RELAY_PACK_CAP_BYTES,
   type RepoRef,
   StagingWriter,
   type SyncOutcome,
@@ -87,8 +90,8 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
 
 const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 
-/** The most one relayed pack may weigh, as GitCore's relay caps it. */
-const RECEIVE_PACK_CAP_BYTES = 60 * 1024 * 1024;
+/** The most one relayed pack may weigh, as the port says it. */
+const RECEIVE_PACK_CAP_BYTES = RELAY_PACK_CAP_BYTES;
 
 /** A pack of no objects: its 12-byte header and 20-byte trailer. A candidate nobody weighed adds nothing to trunk. */
 const EMPTY_PACK_BYTES = 32;
@@ -260,6 +263,7 @@ export function makeTrunksMemory(
 ) {
   const heads = new Map<ProjectId, CommitSha>();
   const origins = new Map<ProjectId, TrunkOrigin>();
+  const refusals = new Map<ProjectId, QuotaExceeded | ImportTooLarge>();
   const adopted = new Map<ProjectId, CommitSha>();
   const seeded = new Map<ProjectId, { readonly name: string; readonly at: Instant }>();
   const syncs = new Map<ProjectId, number>();
@@ -269,6 +273,10 @@ export function makeTrunksMemory(
     heads,
     /** Where each project's trunk started, as its first `initialize` said. */
     origins,
+    /** The project's trunk refuses its `initialize` with `refusal` from here on, and gets no head. */
+    refuse: (projectId: ProjectId, refusal: QuotaExceeded | ImportTooLarge) => {
+      refusals.set(projectId, refusal);
+    },
     /** The commit each project's main was made at with `adopt`. */
     adopted,
     /** What each project's first commit was asked to be made of with `seed`; each answered `MEMORY_SEED`. */
@@ -279,23 +287,27 @@ export function makeTrunksMemory(
       Trunks,
       Trunks.of({
         initialize: (projectId, head, _by, origin) =>
-          Effect.suspend(() => {
-            const held = heads.get(projectId);
-            if (held !== undefined && held !== head)
-              return Effect.fail(
-                new PromotionStateRefused({ projectId, phase: "idle", command: "Initialize" }),
-              );
-            if (origin.kind !== "empty" && origin.commit !== head)
-              return Effect.die(
-                new Error(
-                  `trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`,
-                ),
-              );
-            if (held === undefined) origins.set(projectId, origin);
-            heads.set(projectId, head);
-            options.journal?.push(`initialize ${projectId}`);
-            return Effect.void;
-          }),
+          Effect.suspend(
+            (): Effect.Effect<void, PromotionStateRefused | QuotaExceeded | ImportTooLarge> => {
+              const held = heads.get(projectId);
+              if (held !== undefined && held !== head)
+                return Effect.fail(
+                  new PromotionStateRefused({ projectId, phase: "idle", command: "Initialize" }),
+                );
+              if (origin.kind !== "empty" && origin.commit !== head)
+                return Effect.die(
+                  new Error(
+                    `trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`,
+                  ),
+                );
+              const refusal = refusals.get(projectId);
+              if (held === undefined && refusal !== undefined) return Effect.fail(refusal);
+              if (held === undefined) origins.set(projectId, origin);
+              heads.set(projectId, head);
+              options.journal?.push(`initialize ${projectId}`);
+              return Effect.void;
+            },
+          ),
         adopt: (projectId, commit) =>
           Effect.suspend(() => {
             if (heads.has(projectId)) return afterItsHead(projectId, "adopt");

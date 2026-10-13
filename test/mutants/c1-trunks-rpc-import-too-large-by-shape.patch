@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts
+# kills: trunk.do.import-refused
+# why: The port answers the wire's shape of ImportTooLarge, not its own error, so a caller matching the port's class misses it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+index 3734aae1..019c8791 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+@@ -31,7 +31,6 @@ export function TrunksRpc(
+           trunk(projectId).initialize(head, by, encodeOrigin(origin)),
+         ).pipe(
+           Effect.asVoid,
+-          Effect.catchTag("ImportTooLarge", (large) => Effect.fail(new ImportTooLarge(large))),
+         ),
+       origin: (projectId) =>
+         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(

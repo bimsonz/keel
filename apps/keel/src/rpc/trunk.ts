@@ -3,6 +3,7 @@ import {
   PromotionStateRefused,
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
+import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import { CommitSha, type InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -34,10 +35,20 @@ export const PackTooLarge = Schema.TaggedStruct("PackTooLarge", {
   limit: Schema.Number,
 });
 
+/** The Trunks port's ImportTooLarge, by shape (rule R15): an imported history over what one relay carries. */
+export const ImportTooLarge = Schema.TaggedStruct("ImportTooLarge", {
+  projectId: Schema.String,
+  bytes: Schema.Number,
+  limit: Schema.Number,
+});
+
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
   resume: exitCodec(TrunkStatus, Schema.Never),
-  initialize: exitCodec(TrunkStatus, PromotionStateRefused),
+  initialize: exitCodec(
+    TrunkStatus,
+    Schema.Union([PromotionStateRefused, QuotaExceeded, ImportTooLarge]),
+  ),
   adopt: exitCodec(Schema.Void, Schema.Never),
   seed: exitCodec(CommitSha, Schema.Never),
   sync: exitCodec(TrunkSync, Schema.Union([RepoNotFound, PackTooLarge])),
@@ -53,7 +64,9 @@ export interface TrunkRpc {
    * Names trunk's first head and where it came from (the Project DO's
    * createProject, once it has created trunk). A retry with the same head
    * answers the trunk; another head, or any head once trunk has one, is
-   * PromotionStateRefused. An origin naming another commit is a defect.
+   * PromotionStateRefused. An origin naming another commit is a defect. An
+   * imported history over its namespace's repo bytes is QuotaExceeded, and
+   * one over what a relay carries ImportTooLarge: trunk then has no head.
    */
   initialize(
     head: typeof CommitSha.Encoded,

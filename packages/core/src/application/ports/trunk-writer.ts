@@ -14,6 +14,14 @@ export class PackTooLarge extends Schema.TaggedError<PackTooLarge>()("PackTooLar
   limit: Schema.Number,
 }) {}
 
+/**
+ * The most one relayed pack may weigh: what the code host's receive-pack
+ * takes in a request, with room to spare. The relay holds every pack to it,
+ * and a project's whole history crosses in one pack when its staging and
+ * mirror are first brought to trunk's head.
+ */
+export const RELAY_PACK_CAP_BYTES = 60 * 1024 * 1024;
+
 /** What one sync did to a target: it already held trunk's head, or its main moved there. */
 export type SyncOutcome = "unchanged" | "advanced";
 

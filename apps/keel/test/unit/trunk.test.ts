@@ -33,7 +33,14 @@ import {
 } from "@keeltown/core/kernel";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
 import type { TrunkOrigin } from "@keeltown/core/domain/integration";
-import { CodeHost, EntityStore, EventOutbox, OrgUsage, TrunkWriter } from "@keeltown/core/ports";
+import {
+  CodeHost,
+  EntityStore,
+  EventOutbox,
+  OrgUsage,
+  RELAY_PACK_CAP_BYTES,
+  TrunkWriter,
+} from "@keeltown/core/ports";
 import {
   makeClockMemory,
   makeCodeHostMemory,
@@ -187,6 +194,102 @@ describe("the Trunk's origin", () => {
         }).pipe(Effect.provide(w.layer));
       },
     );
+});
+
+/** ORG's repo bytes are `limit` from here on. */
+const allow = (limit: number) =>
+  Effect.flatMap(OrgUsage, (usage) =>
+    usage.configure(ORG, { overrides: { "repo-bytes": limit }, halted: false }),
+  );
+
+describe("the Trunk's admission of an import", () => {
+  const IMPORTED: TrunkOrigin = {
+    kind: "imported",
+    url: "https://git.example/team/app",
+    ref: "refs/heads/master",
+    commit: sha("a"),
+  };
+  it.effect(
+    "[trunk.import-admitted] an imported history that fits what its namespace has left is admitted and counted once, however often trunk is initialized",
+    () => {
+      const w = ports();
+      w.writer.holds(sha("a"), 4_000);
+      return Effect.gen(function* () {
+        yield* allow(4_000);
+        const first = yield* initializeTrunk(PROJECT, sha("a"), "seed", IMPORTED);
+        expect(first.origin).toEqual(IMPORTED);
+        expect(yield* counted).toBe(4_000);
+        expect(yield* initializeTrunk(PROJECT, sha("a"), "seed", IMPORTED)).toEqual(first);
+        expect(yield* counted).toBe(4_000);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.import-over-quota] an imported history over what its namespace has left is QuotaExceeded: trunk gets no head, no event is committed and nothing is counted",
+    () => {
+      const w = ports();
+      w.writer.holds(sha("a"), 4_000);
+      return Effect.gen(function* () {
+        yield* allow(3_999);
+        const refused = yield* Effect.flip(initializeTrunk(PROJECT, sha("a"), "seed", IMPORTED));
+        expect(refused).toMatchObject({
+          _tag: "QuotaExceeded",
+          kind: "repo-bytes",
+          limit: 3_999,
+          used: 0,
+          requested: 4_000,
+        });
+        expect(trunkOf(yield* EntityStore, PROJECT)).toBeUndefined();
+        expect(yield* logOf(PROJECT)).toEqual([]);
+        expect(yield* counted).toBe(0);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.start-counted] a start that is not an import is counted and never refused: a template's history over what its namespace has left still gives trunk its head",
+    () => {
+      const w = ports();
+      w.writer.holds(sha("a"), 4_000);
+      return Effect.gen(function* () {
+        yield* allow(3_999);
+        const trunk = yield* initializeTrunk(PROJECT, sha("a"), "seed", {
+          kind: "template",
+          name: "starter",
+          commit: sha("a"),
+        });
+        expect(trunk).toMatchObject({ phase: "idle", head: sha("a") });
+        yield* allow(10_000);
+        expect(yield* counted).toBe(4_000);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.import-over-cap] an imported history one byte over what a relay carries is ImportTooLarge, with its size and the limit: trunk gets no head and nothing is counted; one of exactly the limit is admitted",
+    () => {
+      const w = ports();
+      return Effect.gen(function* () {
+        yield* allow(2 * RELAY_PACK_CAP_BYTES);
+        w.writer.holds(sha("a"), RELAY_PACK_CAP_BYTES + 1);
+        const refused = yield* Effect.flip(initializeTrunk(PROJECT, sha("a"), "seed", IMPORTED));
+        expect(refused).toMatchObject({
+          _tag: "ImportTooLarge",
+          projectId: PROJECT,
+          bytes: RELAY_PACK_CAP_BYTES + 1,
+          limit: RELAY_PACK_CAP_BYTES,
+        });
+        expect(trunkOf(yield* EntityStore, PROJECT)).toBeUndefined();
+        expect(yield* logOf(PROJECT)).toEqual([]);
+        expect(yield* counted).toBe(0);
+
+        w.writer.holds(sha("a"), RELAY_PACK_CAP_BYTES);
+        yield* initializeTrunk(PROJECT, sha("a"), "seed", IMPORTED);
+        expect(yield* counted).toBe(RELAY_PACK_CAP_BYTES);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
 });
 
 describe("the Trunk's first write", () => {

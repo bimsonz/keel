@@ -4,9 +4,16 @@
 // ([trunkwriter.live]); this proves what the adapter asks it to compare.
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, Instant } from "@keeltown/core/kernel";
-import { CodeHost, type RepoRef, StagingWriter, TrunkWriter } from "@keeltown/core/ports";
+import {
+  CodeHost,
+  RELAY_PACK_CAP_BYTES,
+  type RepoRef,
+  StagingWriter,
+  TrunkWriter,
+} from "@keeltown/core/ports";
 import {
   importSshSigningKey,
+  MAX_RELAY_PACK_BYTES,
   rootCommit,
   sshSignature,
   writePack,
@@ -72,6 +79,12 @@ const pushing = (replies: Reply[], pack?: Uint8Array) => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("the relay's cap", () => {
+  it("[trunkwriter.cap] what the port says one relayed pack may weigh is what the relay holds every pack to", () => {
+    expect(RELAY_PACK_CAP_BYTES).toBe(MAX_RELAY_PACK_BYTES);
+  });
 });
 
 describe("TrunkWriter.push", () => {

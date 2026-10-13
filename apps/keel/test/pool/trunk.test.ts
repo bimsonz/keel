@@ -14,7 +14,16 @@ import {
   type NamespaceId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { Changes, CodeHost, EventOutbox, OrgUsage, Trunks } from "@keeltown/core/ports";
+import { QuotaExceeded } from "@keeltown/core/domain/identity";
+import {
+  Changes,
+  CodeHost,
+  EventOutbox,
+  ImportTooLarge,
+  OrgUsage,
+  RELAY_PACK_CAP_BYTES,
+  Trunks,
+} from "@keeltown/core/ports";
 import {
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
@@ -60,6 +69,8 @@ async function placedTrunk(head: string) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const writer = makeTrunkWriterMemory(Schema.decodeUnknownSync(CommitSha)(head));
+  const org = freshOrg();
+  const usage = makeOrgUsageMemory();
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
       instance,
@@ -69,13 +80,13 @@ async function placedTrunk(head: string) {
           backbone(state.storage),
           makeCodeHostMemory().layer,
           writer.layer,
-          placedIn(projectId, freshOrg()).layer,
-          makeOrgUsageMemory().layer,
+          placedIn(projectId, org).layer,
+          usage.layer,
         ),
       ),
     );
   });
-  return { projectId, stub, writer };
+  return { projectId, stub, writer, org, usage };
 }
 
 /** What a call that failed said, or "done" for one that did not. */
@@ -193,6 +204,48 @@ describe("the Trunk DO", () => {
     expect(
       await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.origin(older.projectId))),
     ).toEqual(Exit.succeed(Option.none()));
+  });
+
+  it("[trunk.do.import-refused] through the real object and the port, an import over its namespace's repo bytes is QuotaExceeded and one over what a relay carries is the port's ImportTooLarge: neither trunk has a head", async () => {
+    const head = Schema.decodeUnknownSync(CommitSha)("a".repeat(40));
+    const origin = {
+      kind: "imported",
+      url: "https://git.example/team/app",
+      ref: "refs/heads/master",
+      commit: head,
+    } as const;
+    const refusal = async (t: Awaited<ReturnType<typeof placedTrunk>>) => {
+      const exit = await viaTrunks(
+        Effect.flatMap(Trunks, (trunks) =>
+          Effect.flip(trunks.initialize(t.projectId, head, "seed", origin)),
+        ),
+      );
+      const status = decodeExit(TrunkCodecs.status, await t.stub.status());
+      return { refused: Exit.isSuccess(exit) ? exit.value : undefined, status: said(status) };
+    };
+
+    const full = await placedTrunk(head);
+    full.writer.holds(head, 4_000);
+    await Effect.runPromise(
+      Effect.flatMap(OrgUsage, (usage) =>
+        usage.configure(full.org, { overrides: { "repo-bytes": 3_999 }, halted: false }),
+      ).pipe(Effect.provide(full.usage.layer)),
+    );
+    const overQuota = await refusal(full);
+    expect(overQuota.refused).toBeInstanceOf(QuotaExceeded);
+    expect(overQuota.refused).toMatchObject({ kind: "repo-bytes", limit: 3_999, requested: 4_000 });
+    expect(overQuota.status).toContain("is not initialized");
+
+    const large = await placedTrunk(head);
+    large.writer.holds(head, RELAY_PACK_CAP_BYTES + 1);
+    const overCap = await refusal(large);
+    expect(overCap.refused).toBeInstanceOf(ImportTooLarge);
+    expect(overCap.refused).toMatchObject({
+      projectId: large.projectId,
+      bytes: RELAY_PACK_CAP_BYTES + 1,
+      limit: RELAY_PACK_CAP_BYTES,
+    });
+    expect(overCap.status).toContain("is not initialized");
   });
 
   it("[trunk.do.no-org] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {

@@ -1,6 +1,18 @@
-import { Context, type Effect, type Option } from "effect";
+import { Context, type Effect, type Option, Schema } from "effect";
+import type { QuotaExceeded } from "../../domain/identity/index.ts";
 import type { PromotionStateRefused, TrunkOrigin } from "../../domain/integration/index.ts";
 import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
+
+/**
+ * An imported history too large to become a project: its one pack is over
+ * what a relay carries (`limit`), so staging and the mirror could never be
+ * brought to trunk's head. Trunk was given no head.
+ */
+export class ImportTooLarge extends Schema.TaggedError<ImportTooLarge>()("ImportTooLarge", {
+  projectId: Schema.String,
+  bytes: Schema.Number,
+  limit: Schema.Number,
+}) {}
 
 /** Where a sync left the project's repos: trunk's head, and staging and the mirror brought to it. */
 export interface TrunkSynced {
@@ -17,14 +29,18 @@ export class Trunks extends Context.Service<
      * Names trunk's first head, and where it came from: `origin` is recorded
      * on TrunkInitialized as given, and one naming another commit than `head`
      * is a defect. A retry with the same head answers as before; another
-     * head, or any once trunk has one, is PromotionStateRefused.
+     * head, or any once trunk has one, is PromotionStateRefused. An imported
+     * history is weighed first and admitted against its namespace's repo
+     * bytes: over what is left it is QuotaExceeded, over what one relay
+     * carries ImportTooLarge, and either way trunk is given no head and
+     * nothing is counted. Any other start is counted and never refused.
      */
     readonly initialize: (
       projectId: ProjectId,
       head: CommitSha,
       by: string,
       origin: TrunkOrigin,
-    ) => Effect.Effect<void, PromotionStateRefused>;
+    ) => Effect.Effect<void, PromotionStateRefused | QuotaExceeded | ImportTooLarge>;
     /**
      * Where trunk started, as its TrunkInitialized recorded it: none for a
      * trunk initialized before origins were kept. Dies for a trunk not yet

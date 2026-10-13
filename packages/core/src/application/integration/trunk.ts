@@ -29,7 +29,9 @@ import {
   commit,
   EntityStore,
   type EventDraft,
+  ImportTooLarge,
   OrgUsage,
+  RELAY_PACK_CAP_BYTES,
   type Transaction,
   TrunkWriter,
 } from "../ports/index.ts";
@@ -184,9 +186,14 @@ export const promote = Effect.fn("integration/promote")(function* (
  * Names trunk's first head; before it nothing is queued or promoted. A retry
  * with the same head answers the trunk; another head is refused, as is any
  * initialize once trunk has a head. The repo's whole history at that head is
- * then counted into its org's repo bytes, once per project and never refused
- * (the project already exists). A project is placed before its trunk is
- * initialized: one with no place is a defect, and is given no trunk.
+ * counted into its namespace's repo bytes once per project. An imported
+ * history is someone else's, of any size, so it is weighed before trunk has a
+ * head and admitted: over what the namespace has left it is QuotaExceeded,
+ * and over what one relay carries ImportTooLarge (staging and the mirror
+ * take the whole history in one pack), and either way trunk gets no head and
+ * nothing is counted. Any other start is counted after, and never refused. A
+ * project is placed before its trunk is initialized: one with no place is a
+ * defect, and is given no trunk.
  * `origin` says where the head came from and is kept on TrunkInitialized as
  * given; an origin that names another commit than the head is a defect, and
  * names no trunk.
@@ -202,12 +209,21 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
     return yield* Effect.die(
       new Error(`trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`),
     );
+  const writer = yield* TrunkWriter;
+  const usage = yield* OrgUsage;
+  if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
+    const bytes = yield* writer.historyBytes(head);
+    if (bytes > RELAY_PACK_CAP_BYTES)
+      return yield* new ImportTooLarge({ projectId, bytes, limit: RELAY_PACK_CAP_BYTES });
+    yield* usage.admit(org, REPO_BYTES, bytes, `create:${projectId}`);
+  }
+  // Initialize is refused only by a trunk that has its head; the machine's other refusals are not its to give.
   const committed = yield* promote(
     projectId,
     { _tag: "Initialize", head, by, origin },
     "initialize",
     head,
-  );
+  ).pipe(Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }));
   const trunk = trunkOf(yield* EntityStore, projectId);
   if (trunk === undefined)
     return yield* Effect.die(
@@ -219,8 +235,9 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
       phase: trunk.phase,
       command: "Initialize",
     });
-  const bytes = yield* (yield* TrunkWriter).historyBytes(head);
-  yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
+  // An import was admitted before trunk had its head; counting it here too would count it twice.
+  if (trunk.origin?.kind !== "imported")
+    yield* usage.record(org, REPO_BYTES, yield* writer.historyBytes(head), `create:${projectId}`);
   return trunk;
 });
 

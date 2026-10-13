@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.start-counted
+# why: Every start is put to the quota, so a template or a fork over what is left is refused a trunk its repo already has
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cee77cfe..317cc37e 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -211,7 +211,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+     );
+   const writer = yield* TrunkWriter;
+   const usage = yield* OrgUsage;
+-  if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
++  if (trunkOf(yield* EntityStore, projectId) === undefined) {
+     const bytes = yield* writer.historyBytes(head);
+     if (bytes > RELAY_PACK_CAP_BYTES)
+       return yield* new ImportTooLarge({ projectId, bytes, limit: RELAY_PACK_CAP_BYTES });

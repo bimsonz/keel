@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.import-over-cap
+# why: An import of exactly what a relay carries is refused as too large
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cee77cfe..5e30ff1c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -213,7 +213,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+   const usage = yield* OrgUsage;
+   if (origin.kind === "imported" && trunkOf(yield* EntityStore, projectId) === undefined) {
+     const bytes = yield* writer.historyBytes(head);
+-    if (bytes > RELAY_PACK_CAP_BYTES)
++    if (bytes >= RELAY_PACK_CAP_BYTES)
+       return yield* new ImportTooLarge({ projectId, bytes, limit: RELAY_PACK_CAP_BYTES });
+     yield* usage.admit(org, REPO_BYTES, bytes, `create:${projectId}`);
+   }
