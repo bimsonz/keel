@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "create.fork-relays"
+# kills: create.fork-relays
+# why: a fork's trunk is a fork of its source's repo again, which the code host serves at several times the source's size: over the relay's cap from about 10.7 MB, so the project cannot start
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6d980808..0682c4ae 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -141,7 +141,9 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+   }
+   if (source._tag === "Project") {
+     if (!made)
+-      yield* host.create(repos.trunk).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
++      yield* host
++        .fork(projectRepos(source.projectId).trunk, repos.trunk)
++        .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+     const main = branchOf(yield* Effect.orDie(host.branches(repos.trunk)), MAIN);
+     const head =
+       main?.commit ??

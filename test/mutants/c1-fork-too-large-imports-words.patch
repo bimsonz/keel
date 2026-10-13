@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t "projects.fork-too-large-http"
+# kills: projects.fork-too-large-http
+# why: a fork over the cap is told its history is a number of bytes that is only where the read stopped, and to import a smaller repository or a branch, neither of which a fork can do
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 921c54fa..cbae6675 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -278,7 +278,7 @@ export function createProjectError(
+           403,
+           "project.import_too_large",
+           caller.requestId,
+-          start === "Project"
++          start === "Template"
+             ? {
+                 detail: `The project's history is over ${error.limit} bytes, the most Keel forks in one piece. Nothing was kept, and no project was made.`,
+                 nextActions: [],

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.take"
+# kills: trunk.do.take
+# why: the Trunk object takes the history of its own project's trunk whatever source it is asked for
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index c527aa95..6da22bc3 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -162,7 +162,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+   async take(source: string) {
+     const projectId = this.projectId;
+     const program = Effect.sync(() => decodeProject(source)).pipe(
+-      Effect.flatMap((from) => takeTrunk(projectId, from)),
++      Effect.flatMap(() => takeTrunk(projectId, projectId)),
+     );
+     return this.answer(TrunkCodecs.take, program);
+   }

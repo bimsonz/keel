@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts -t "project.fork-too-large"
+# kills: project.fork-too-large
+# why: the doorway tells the refusal's mapper every start is an import, so a fork over the cap is answered in an import's words
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index a1034ff5..0fd794d3 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -1078,7 +1078,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 ),
+                 Effect.catch((error) =>
+                   Effect.succeed(
+-                    createProjectError(caller, input.namespace.toLowerCase(), error, source._tag),
++                    createProjectError(caller, input.namespace.toLowerCase(), error, "Import"),
+                   ),
+                 ),
+               );

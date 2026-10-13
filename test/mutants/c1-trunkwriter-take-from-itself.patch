@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.take"
+# kills: trunkwriter.take
+# why: the pack is asked of trunk's own repo and not of the source's, so a fork takes nothing
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 8d31a33f..9cc5b8af 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -170,7 +170,7 @@ export const TrunkWriterGitCore = (
+             const tip = yield* host
+               .head(source, MAIN)
+               .pipe(Effect.catchTag("RefNotFound", Effect.die));
+-            const from = yield* remoteOf(source, "read");
++            const from = yield* remoteOf(trunk, "read");
+             const target = yield* remoteOf(trunk, "write").pipe(
+               Effect.catchTag("RepoNotFound", Effect.die),
+             );

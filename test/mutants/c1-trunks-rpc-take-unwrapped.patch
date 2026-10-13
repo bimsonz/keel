@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.take"
+# kills: trunk.do.take
+# why: a take's refusals cross the RPC by shape and are handed on as they came, so the Project object's own answer cannot carry them as the port's errors
+diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+index 43bab2bf..0b2cc363 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+@@ -43,13 +43,7 @@ export function TrunksRpc(
+       seed: (projectId, name, at) =>
+         callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
+       take: (projectId, source) =>
+-        callObject(TrunkCodecs.take, () => trunk(projectId).take(source)).pipe(
+-          // The RPC carries both by shape (rule R15); the port's are its classes.
+-          Effect.catchTags({
+-            RepoNotFound: (missing) => Effect.fail(new RepoNotFound({ repo: missing.repo })),
+-            ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
+-          }),
+-        ),
++        callObject(TrunkCodecs.take, () => trunk(projectId).take(source)),
+       head: (projectId) =>
+         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+           Effect.map((status) => status.head),

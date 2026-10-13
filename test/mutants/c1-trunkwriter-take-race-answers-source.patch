@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.take-keeps-main"
+# kills: trunkwriter.take-keeps-main
+# why: a push refused because another attempt made main first answers the source's head and not what trunk holds, so trunk would be initialized at a commit its main is not at
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 8d31a33f..dfe652ab 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -178,12 +178,7 @@ export const TrunkWriterGitCore = (
+               try: () => relay(from, target, { ref: MAIN, from: null, to: tip }),
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(source)));
+-            if (outcome.kind !== "rejected") return tip;
+-            // A racing attempt of the same bootstrap made main first: what trunk holds is the answer.
+-            const raced = yield* ownHead;
+-            if (raced === null)
+-              return yield* Effect.die(new Error("trunk refused its source's history"));
+-            return raced;
++            return tip;
+           }),
+         push: (from, to, admit) =>
+           Effect.gen(function* () {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.take-refused"
+# kills: trunkwriter.take-refused
+# why: a source that is gone is a defect and not RepoNotFound, so a fork of a project deleted meanwhile answers 500 and leaves its empty trunk
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 8d31a33f..80e2e56f 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -169,7 +169,7 @@ export const TrunkWriterGitCore = (
+             if (held !== null) return held;
+             const tip = yield* host
+               .head(source, MAIN)
+-              .pipe(Effect.catchTag("RefNotFound", Effect.die));
++              .pipe(Effect.orDie);
+             const from = yield* remoteOf(source, "read");
+             const target = yield* remoteOf(trunk, "write").pipe(
+               Effect.catchTag("RepoNotFound", Effect.die),

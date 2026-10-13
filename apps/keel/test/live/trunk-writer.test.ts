@@ -232,3 +232,82 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
   expect(report.whole).toBe(report.firstBytes + report.secondBytes - 32);
   expect(report.landed).toBe(report.second);
 });
+
+it("[take.live] brings an empty repo its source's whole history in one fetch and one push, keeping commit ids; a retry, and one after the source moved on, asks nothing and answers the main it has; a source that is gone is RepoNotFound", async () => {
+  const source = fixture.fixture.scratch();
+  const trunk = fixture.fixture.scratch();
+  const missing = fixture.fixture.scratch();
+  const run = <A, E>(program: Effect.Effect<A, E, CodeHost | CodeHostFixture | TrunkWriter>) =>
+    Effect.runPromise(
+      program.pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED).pipe(Layer.provide(host)),
+            host,
+            fixture.layer,
+          ),
+        ),
+      ),
+    );
+  // Every git request from here on, by its service; each goes out untouched.
+  const asked: string[] = [];
+  const real = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const service = /\/git-(upload|receive)-pack$/.exec(url)?.[1];
+    if (service !== undefined) asked.push(service);
+    return real(input, init);
+  });
+
+  const report = await run(
+    Effect.gen(function* () {
+      const codeHost = yield* CodeHost;
+      const writer = yield* TrunkWriter;
+      const commit = (yield* CodeHostFixture).commit;
+      yield* codeHost.create(source);
+      yield* codeHost.create(trunk);
+      const root = yield* commit(source, MAIN, { "README.md": "one\n" });
+      const first = yield* commit(source, MAIN, { "README.md": "two\n", "src/a.ts": "a\n" });
+      asked.length = 0;
+      const gone = yield* Effect.flip(writer.take(missing));
+      const beforeTake = [...asked];
+      const taken = yield* writer.take(source);
+      const forTake = [...asked];
+      const main = yield* codeHost.head(trunk, MAIN);
+      const parents = (yield* codeHost.readCommit(trunk, main)).parents;
+      const again = yield* writer.take(source);
+      const later = yield* commit(source, MAIN, { "README.md": "three\n" });
+      const afterMove = yield* writer.take(source);
+      const still = yield* codeHost.head(trunk, MAIN);
+      return {
+        root,
+        first,
+        gone,
+        beforeTake,
+        taken,
+        forTake,
+        main,
+        parents,
+        again,
+        later,
+        afterMove,
+        still,
+        asked: [...asked],
+      };
+    }),
+  );
+  console.log(
+    `LIVE take: gone ${report.gone._tag} (asked ${JSON.stringify(report.beforeTake)}); took ${report.taken === report.first ? "the source's head" : "another commit"} with ${JSON.stringify(report.forTake)}, its parent ${report.parents[0] === report.root ? "==" : "!="} the source's root; again ${report.again === report.first ? "the same" : "moved"}; after the source moved on ${report.afterMove === report.first ? "the same" : "moved"}, main ${report.still === report.first ? "unmoved" : "moved"}; git requests in all ${JSON.stringify(report.asked)}`,
+  );
+  expect(report.gone).toMatchObject({ _tag: "RepoNotFound" });
+  expect(report.beforeTake).toEqual([]);
+  expect(report.taken).toBe(report.first);
+  expect(report.forTake).toEqual(["upload", "receive"]);
+  expect(report.main).toBe(report.first);
+  expect(report.parents).toEqual([report.root]);
+  expect(report.later).not.toBe(report.first);
+  expect(report.again).toBe(report.first);
+  expect(report.afterMove).toBe(report.first);
+  expect(report.still).toBe(report.first);
+  expect(report.asked).toEqual(["upload", "receive"]);
+});

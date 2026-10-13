@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.take-keeps-main"
+# kills: trunkwriter.take-keeps-main
+# why: a trunk that has its main is taken into again: a retry after the source moved on fetches the source's whole history a second time and tries to move main
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 8d31a33f..195f6146 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -165,8 +165,6 @@ export const TrunkWriterGitCore = (
+         take: (source) =>
+           Effect.gen(function* () {
+             // A main that exists is never moved: a retry answers it, whatever the source holds now.
+-            const held = yield* ownHead;
+-            if (held !== null) return held;
+             const tip = yield* host
+               .head(source, MAIN)
+               .pipe(Effect.catchTag("RefNotFound", Effect.die));

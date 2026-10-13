@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "create.fork-retry"
+# kills: create.fork-retry
+# why: a retry that finds trunk's repo made takes it for a trunk that has its history, so a bootstrap that crashed between the create and the relay can never finish
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6d980808..e41ad0fe 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -145,6 +145,7 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+     const main = branchOf(yield* Effect.orDie(host.branches(repos.trunk)), MAIN);
+     const head =
+       main?.commit ??
++      (made ? yield* Effect.orDie(host.head(repos.trunk, MAIN)) : undefined) ??
+       (yield* (yield* Trunks)
+         .take(projectId, source.projectId)
+         // Nothing was taken: the empty repo goes, so a refused fork leaves none.

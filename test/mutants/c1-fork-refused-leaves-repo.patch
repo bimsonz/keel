@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "create.fork-refused"
+# kills: create.fork-refused
+# why: a fork that is refused leaves its empty trunk in the code host: a repo of no project, which nothing deletes
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 6d980808..eab5fbd1 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -146,9 +146,7 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
+     const head =
+       main?.commit ??
+       (yield* (yield* Trunks)
+-        .take(projectId, source.projectId)
+-        // Nothing was taken: the empty repo goes, so a refused fork leaves none.
+-        .pipe(Effect.tapError(() => host.delete(repos.trunk))));
++        .take(projectId, source.projectId));
+     const forked: TrunkOrigin = { kind: "forked", project: source.projectId, commit: head };
+     return { head, origin: forked };
+   }

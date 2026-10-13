@@ -2,7 +2,7 @@
 # kills: trunk.do.first-write
 # why: The port answers an adopt without asking the Trunk DO, so an import under another branch never gets a main
 diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
-index 3734aae1..1150f1fc 100644
+index 43bab2bf..20664834 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 @@ -39,7 +39,7 @@ export function TrunksRpc(
@@ -13,4 +13,4 @@ index 3734aae1..1150f1fc 100644
 +        Effect.void,
        seed: (projectId, name, at) =>
          callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
-       head: (projectId) =>
+       take: (projectId, source) =>
