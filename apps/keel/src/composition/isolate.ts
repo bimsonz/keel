@@ -40,12 +40,14 @@ import {
   type OtpSender,
   signInMethods,
 } from "../adapters/driven/better-auth/auth.ts";
+import { reaching } from "../adapters/driven/better-auth/database.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
 import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
+import { isD1Unavailable } from "../adapters/driven/d1/unavailable.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
@@ -246,7 +248,11 @@ export interface AuthOverrides {
   readonly made?: () => void;
 }
 
-/** Better Auth's config over the Worker's D1, with GitHub only once both of its secrets are set. */
+/**
+ * Better Auth's config over the Worker's D1, with GitHub only once both of its
+ * secrets are set. The database is handed over as `reaching` wraps it, so a
+ * query D1 was away for leaves Better Auth as an error the doorway can read.
+ */
 function identity(
   env: Env,
   overrides: AuthOverrides,
@@ -258,7 +264,7 @@ function identity(
     readonly GITHUB_CLIENT_SECRET?: string;
   };
   return {
-    db: env.DB,
+    db: reaching(env.DB),
     secret: env.BETTER_AUTH_SECRET,
     host: env.KEEL_HOST,
     agents,
@@ -320,7 +326,7 @@ export function makeIsolate(
   );
   const origin = `https://${env.KEEL_HOST}`;
   const handlers = makeHandlers(
-    makeRunner(runtime),
+    makeRunner(runtime, isD1Unavailable),
     signInMethods(authConfig),
     doorwayOf(env.KEEL_HOST),
   );
@@ -374,6 +380,7 @@ export function makeIsolate(
     },
     signers: () => signersFile({ host: env.KEEL_HOST, signers: env.KEEL_COMMIT_SIGNERS }),
     rethrowContractDrift: env.KEEL_ENV === "test",
+    databaseAway: isD1Unavailable,
   });
   return { runtime, app };
 }

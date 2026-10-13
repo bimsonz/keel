@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
 import { SESSION_COOKIE } from "./gate.ts";
-import { problemResponse } from "./problems.ts";
+import { DATABASE_AWAY, problemResponse, unavailable } from "./problems.ts";
 
 /** Better Auth's mount: outside the TypeSpec document and problem+json, like the token endpoint. */
 export interface AuthMount {
@@ -82,7 +82,11 @@ export function oneCredential(request: Request): Request {
   return new Request(request, { headers });
 }
 
-/** Mounts Better Auth under its base path, each IP limited on everything but reads. */
+/**
+ * Mounts Better Auth under its base path, each IP limited on everything but
+ * reads. A 503 of Better Auth's is answered as Keel's own, as its 429 is: a
+ * problem that says when to send the request again.
+ */
 export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
   app.all(`${mount.basePath}/*`, async (c) => {
     const request = c.req.raw;
@@ -103,6 +107,9 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
           detail: "Too many sign-in requests from this address; wait a minute.",
         });
     }
-    return withoutSessionTokens(path, await mount.handler(oneCredential(request)));
+    const answer = await mount.handler(oneCredential(request));
+    // Of what Keel mounts, Better Auth answers 503 for one thing: its database was away.
+    if (answer.status === 503) return unavailable(c.get("requestId"), DATABASE_AWAY);
+    return withoutSessionTokens(path, answer);
   });
 }

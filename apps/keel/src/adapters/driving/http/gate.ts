@@ -9,7 +9,7 @@ import type {
 import type { AgentClaims } from "@keeltown/core/domain/identity";
 import type { UserId } from "@keeltown/core/kernel";
 import { presentedToken } from "./caller.ts";
-import { arrival, problemResponse } from "./problems.ts";
+import { arrival, problemResponse, unavailable } from "./problems.ts";
 
 /** The session cookie Better Auth sets for Keel (`__Secure-` and the `keel` prefix). */
 export const SESSION_COOKIE = "__Secure-keel.session_token";
@@ -110,21 +110,15 @@ function challenged(response: Response, challenge: string): Response {
   return response;
 }
 
-/** How long a client is told to wait before it sends again a request whose token could not be checked. */
-const RECHECK_SECONDS = 2;
-
 /**
  * The answer to a token that could not be checked: the fault is Keel's, so it
  * is never a 401, which would tell the agent to throw a good token away.
  */
 function notChecked(requestId: string): Response {
-  const response = problemResponse(503, "service.unavailable", requestId, {
-    detail: "Keel could not check this token just now. Nothing says the token is bad.",
-    retryAfterMs: RECHECK_SECONDS * 1000,
-    nextActions: [{ kind: "wait", title: "Send the request again after retryAfterMs" }],
-  });
-  response.headers.set("retry-after", String(RECHECK_SECONDS));
-  return response;
+  return unavailable(
+    requestId,
+    "Keel could not check this token just now. Nothing says the token is bad.",
+  );
 }
 
 function refusal(answer: GateRefusal, requestId: string): Response {

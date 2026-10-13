@@ -102,6 +102,50 @@ export function problemResponse(
   });
 }
 
+/** How long a client is told to wait before it sends again a request Keel could not serve just now. */
+const RETRY_SECONDS = 2;
+
+/** What a request that met the database while it was away is told. */
+export const DATABASE_AWAY =
+  "Keel's database did not answer just now. Send the request again after retryAfterMs, with the same Idempotency-Key if it carried one.";
+
+/**
+ * What Keel answers when it could not serve a request just now and nothing is
+ * wrong with what was sent: a 503 that says how long to wait three ways, in
+ * the header an HTTP client reads, in `retryAfterMs` and as its one next
+ * action. This is a handler's result; `unavailable` is the same as a Response.
+ */
+export function unavailableResult(
+  requestId: string,
+  detail: string,
+): {
+  readonly status: 503;
+  readonly body: ProblemBody;
+  readonly headers: { readonly "retry-after": number };
+} {
+  return {
+    status: 503,
+    body: problem(503, "service.unavailable", requestId, {
+      detail,
+      retryAfterMs: RETRY_SECONDS * 1000,
+      nextActions: [{ kind: "wait", title: "Send the request again after retryAfterMs" }],
+    }),
+    headers: { "retry-after": RETRY_SECONDS },
+  };
+}
+
+/** `unavailableResult` as a raw Response, for middleware that answers before any route does. */
+export function unavailable(requestId: string, detail: string): Response {
+  const { status, body, headers } = unavailableResult(requestId, detail);
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/problem+json",
+      "retry-after": String(headers["retry-after"]),
+    },
+  });
+}
+
 /** The declared 503 every operation answers with until its lane implements it. */
 export function notImplemented(requestId: string): {
   readonly status: 503;

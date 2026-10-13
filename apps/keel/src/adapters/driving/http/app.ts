@@ -11,7 +11,7 @@ import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
-import { answerUnhandled } from "./run.ts";
+import { answerUnhandled, type DatabaseAway } from "./run.ts";
 import { registerSigners } from "./signers.ts";
 import { registerWellKnown, type WellKnown } from "./well-known.ts";
 import { registerFrontDoor } from "./front-door.ts";
@@ -35,6 +35,8 @@ export interface AppOptions {
   readonly git: GitClone;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
   readonly rethrowContractDrift: boolean;
+  /** Whether what a request died of is the database being away for a moment: answered 503 with a wait, never 500. */
+  readonly databaseAway: DatabaseAway;
 }
 
 /** The OpenAPI document, under /v1 so keel.town routes it to Keel ahead of the console. */
@@ -93,7 +95,12 @@ export function makeApp(options: AppOptions) {
 
   app.notFound((c) => problemResponse(404, "resource.not_found", c.get("requestId")));
   app.onError((error, c) =>
-    answerUnhandled(error, c.get("requestId") ?? crypto.randomUUID(), options.rethrowContractDrift),
+    answerUnhandled(
+      error,
+      c.get("requestId") ?? crypto.randomUUID(),
+      options.rethrowContractDrift,
+      options.databaseAway,
+    ),
   );
 
   const routed = registerRoutes(app, () => options.handlers, deps);
