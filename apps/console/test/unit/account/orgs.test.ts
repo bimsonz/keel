@@ -23,31 +23,53 @@ async function lovelace() {
 }
 
 describe("an org, to its members", () => {
-  it("[orgs.personal] gives a user an org of their own when they choose a handle, named by it, and theirs", async () => {
+  it("[orgs.personal] gives a user no org when they choose a handle: the handle is their account, and no org is kept for it", async () => {
     const identity = createIdentity(ORIGIN);
     const ada = await signedUp("ada@example.com", identity);
     expect(await ada.account.orgs()).toEqual([]);
     await ada.account.chooseHandle("ada");
     const who = await ada.account.who();
-    const [own] = await ada.account.orgs();
-    expect(own).toMatchObject({ name: "ada", handle: "ada" });
     if (who === null) throw new Error("nobody is signed in");
-    expect(await ada.account.org("ada", who)).toMatchObject({
-      role: "owner",
-      members: [{ role: "owner", handle: "ada", you: true }],
-    });
+    expect(who.handle).toBe("ada");
+    expect(await ada.account.orgs()).toEqual([]);
+    expect(await ada.account.org("ada", who)).toBeNull();
   });
 
   it("[orgs.create] makes an org with the reader as its owner, and a handle in use is not free", async () => {
     const { ada, grace, org } = await lovelace();
     expect(org).toEqual({ id: org.id, name: "Lovelace", handle: "lovelace" });
-    expect((await ada.account.orgs()).map((held) => held.handle).toSorted()).toEqual([
-      "ada",
-      "lovelace",
-    ]);
+    expect((await ada.account.orgs()).map((held) => held.handle)).toEqual(["lovelace"]);
     expect(await ada.account.orgHandleIsFree("lovelace")).toBe(false);
     expect(await ada.account.orgHandleIsFree("babbage")).toBe(true);
-    await expect(grace.account.createOrg("Mine too", "lovelace")).rejects.toThrow(Refused);
+    // An org's handle is as taken as a person's, and Keel says so in the same code and sentence.
+    await expect(grace.account.createOrg("Mine too", "lovelace")).rejects.toMatchObject({
+      code: "NAME_TAKEN",
+      message: `"lovelace" is taken: a handle is one person's, one agent's or one org's`,
+    });
+    // A handle is one namespace's: an org is made with none a person has, their own included. Keel's check of a
+    // slug knows only orgs, so it is Keel's refusal when the org is made that says so, in Keel's sentence.
+    expect(await ada.account.orgHandleIsFree("grace")).toBe(true);
+    for (const handle of ["grace", "ada", "Grace"]) {
+      // oxlint-disable-next-line no-await-in-loop -- one refusal after another, each read on its own
+      const refused: unknown = await ada.account
+        .createOrg("Hers", handle)
+        .catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(Refused);
+      expect(refused).toMatchObject({
+        code: "NAME_TAKEN",
+        message: `"${handle.toLowerCase()}" is taken: a handle is one person's, one agent's or one org's`,
+        next: [],
+      });
+    }
+    // Nor with a first segment Keel serves itself, in any case.
+    const reserved: unknown = await ada.account
+      .createOrg("Sign in", "Login")
+      .catch((error: unknown) => error);
+    expect(reserved).toMatchObject({
+      code: "NAME_REFUSED",
+      message: '"Login" is reserved',
+    });
+    expect((await ada.account.orgs()).map((held) => held.handle)).toEqual(["lovelace"]);
     // To someone who is not in it, an org that is there and one that is not look the same.
     expect(await grace.account.org("lovelace", grace.who)).toBeNull();
     expect(await grace.account.org("no-such-org", grace.who)).toBeNull();
@@ -55,13 +77,12 @@ describe("an org, to its members", () => {
 
   it("[orgs.address] acts on the org a call names, whichever org the session holds as active", async () => {
     const { ada, org } = await lovelace();
-    const own = (await ada.account.orgs()).find((held) => held.handle === "ada");
-    if (own === undefined) throw new Error("no org of her own");
-    // Better Auth keeps an active organisation for a session. Here it is her own org, and the page is Lovelace's.
+    const other = await ada.account.createOrg("Analytical Engines", "engines");
+    // Better Auth keeps an active organisation for a session. Here it is her other org, and the page is Lovelace's.
     const set = await ada.tab.serve(`${ORIGIN}/v1/auth/organization/set-active`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ organizationId: own.id }),
+      body: JSON.stringify({ organizationId: other.id }),
     });
     expect(set.status).toBe(200);
     await ada.account.invite(org, { email: "new@example.com" }, "member");
@@ -69,8 +90,8 @@ describe("an org, to its members", () => {
     const there = await ada.account.org("lovelace", ada.who);
     expect(there?.org.name).toBe("Lovelace & Co");
     expect(there?.invitations.map((invitation) => invitation.to)).toEqual(["new@example.com"]);
-    expect(await ada.account.org("ada", ada.who)).toMatchObject({
-      org: { name: "ada" },
+    expect(await ada.account.org("engines", ada.who)).toMatchObject({
+      org: { name: "Analytical Engines" },
       invitations: [],
     });
   });
@@ -259,12 +280,11 @@ describe("an org, to its members", () => {
 describe("what a role is offered", () => {
   const org: Pick<Org, "handle"> = { handle: "lovelace" };
 
-  it("[roles.delete] offers deleting to an owner who has typed the org's handle, and never for a user's own org", () => {
-    expect(mayDelete(org, { role: "owner", handle: "ada" }, "lovelace")).toBe(true);
-    expect(mayDelete(org, { role: "owner", handle: "ada" }, "")).toBe(false);
-    expect(mayDelete(org, { role: "owner", handle: "ada" }, "Lovelace")).toBe(false);
-    expect(mayDelete(org, { role: "maintainer", handle: "grace" }, "lovelace")).toBe(false);
-    expect(mayDelete({ handle: "ada" }, { role: "owner", handle: "ada" }, "ada")).toBe(false);
+  it("[roles.delete] offers deleting to an owner who has typed the org's handle, and to nobody else", () => {
+    expect(mayDelete(org, { role: "owner" }, "lovelace")).toBe(true);
+    expect(mayDelete(org, { role: "owner" }, "")).toBe(false);
+    expect(mayDelete(org, { role: "owner" }, "Lovelace")).toBe(false);
+    expect(mayDelete(org, { role: "maintainer" }, "lovelace")).toBe(false);
   });
 
   it("[roles.offered] offers the members' controls to an owner and a maintainer, and an owner's role only to an owner", () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.whose
+# why: a handle nobody has is taken for Keel failing to answer, so its page says Keel would not say where it should say nobody has it
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index b5a71f9..a4196a6 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -140,8 +140,6 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+   return {
+     async findNamespace(handle, signal) {
+       const response = await read(`/v1/namespaces/${encodeURIComponent(handle)}`, signal);
+-      // A handle nobody has.
+-      if (response.status === 404) return null;
+       if (!response.ok) throw await refusalOf(response);
+       return answered<NamespaceView>(response);
+     },

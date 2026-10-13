@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { RESERVED, type Route, carriedOf, href, parse } from "../../src/route.ts";
+import { RESERVED_SEGMENTS } from "../../src/contract/keel/index.ts";
+import { type Route, carriedOf, href, parse } from "../../src/route.ts";
 
 /** Every kind of address the console has, with the route it names. Each is read, and written back the same. */
 const ADDRESSES: [string, Route][] = [
@@ -60,25 +61,25 @@ describe("the console's addresses", () => {
   it.each(ADDRESSES)(
     "%s names one place, and that place writes back the same address",
     (address, route) => {
-      expect(read(address)).toEqual({ org: "acme", project: "demo", route });
+      expect(read(address)).toEqual({ namespace: "acme", project: "demo", route });
       expect(href("acme", "demo", route)).toBe(address);
     },
   );
 
-  it("[route.home] reads the bare address as the home, and one segment as an org's own, each naming no project", () => {
+  it("[route.home] reads the bare address as the home, and one segment as a namespace's own, each naming no project", () => {
     const top = { at: "code", kind: "tree", ref: "trunk", path: "" };
-    expect(read("/")).toEqual({ org: null, project: null, route: top });
-    expect(read("")).toEqual({ org: null, project: null, route: top });
-    expect(read("/acme")).toEqual({ org: "acme", project: null, route: top });
-    expect(read("/acme/")).toEqual({ org: "acme", project: null, route: top });
+    expect(read("/")).toEqual({ namespace: null, project: null, route: top });
+    expect(read("")).toEqual({ namespace: null, project: null, route: top });
+    expect(read("/acme")).toEqual({ namespace: "acme", project: null, route: top });
+    expect(read("/acme/")).toEqual({ namespace: "acme", project: null, route: top });
   });
 
-  it("[route.org] reads the org before the project, so one org's project is never taken for another's of the same name", () => {
-    expect(read("/acme/demo/changes/7")).toMatchObject({ org: "acme", project: "demo" });
-    expect(read("/other/demo/changes/7")).toMatchObject({ org: "other", project: "demo" });
+  it("[route.namespace] reads the namespace before the project, so one's project is never taken for another's of the same name", () => {
+    expect(read("/acme/demo/changes/7")).toMatchObject({ namespace: "acme", project: "demo" });
+    expect(read("/other/demo/changes/7")).toMatchObject({ namespace: "other", project: "demo" });
     // A project named as a place is a project all the same: the place comes third.
     expect(read("/acme/changes")).toEqual({
-      org: "acme",
+      namespace: "acme",
       project: "changes",
       route: { at: "code", kind: "tree", ref: "trunk", path: "" },
     });
@@ -87,37 +88,14 @@ describe("the console's addresses", () => {
     );
   });
 
-  it("[route.reserved] takes no project, and no org, to be named by a reserved first segment", () => {
-    // The list agreed with Keel, which refuses each of these as a handle: what Keel or the Worker answers itself,
-    // the build's own files, and the pages above every org.
-    expect([...RESERVED].toSorted()).toEqual(
-      [
-        ".well-known",
-        "admin",
-        "api",
-        "assets",
-        "device",
-        "favicon.ico",
-        "healthz",
-        "install",
-        "invite",
-        "llms.txt",
-        "login",
-        "logout",
-        "mcp",
-        "new",
-        "orgs",
-        "privacy",
-        "robots.txt",
-        "settings",
-        "signup",
-        "start",
-        "terms",
-        "v1",
-      ].toSorted(),
+  it("[route.reserved] takes no project, and no namespace, to be named by a reserved first segment", () => {
+    // The list is Keel's own, which refuses each of these as a handle: what Keel or the Worker answers itself,
+    // the build's own files, and the pages above every namespace. A page the console adds is in it before it ships.
+    expect(RESERVED_SEGMENTS).toEqual(
+      expect.arrayContaining(["v1", "assets", "healthz", "login", "orgs"]),
     );
-    for (const segment of RESERVED) {
-      const nowhere = { org: null, project: null, route: { at: "missing" } };
+    for (const segment of RESERVED_SEGMENTS) {
+      const nowhere = { namespace: null, project: null, route: { at: "missing" } };
       expect(read(`/${segment}`)).toEqual(nowhere);
       expect(read(`/${segment}/anything/changes`)).toEqual(nowhere);
     }
@@ -125,14 +103,14 @@ describe("the console's addresses", () => {
 
   it("[route.settings] gives a project's settings an address of their own, with nothing under it", () => {
     expect(parse("/acme/demo/settings", "")).toEqual({
-      org: "acme",
+      namespace: "acme",
       project: "demo",
       route: { at: "settings" },
     });
     expect(href("acme", "demo", { at: "settings" })).toBe("/acme/demo/settings");
     expect(parse("/acme/demo/settings/members", "").route).toEqual({ at: "missing" });
-    // The first segment of that name is the reader's own settings, and no org's.
-    expect(parse("/settings", "")).toMatchObject({ org: null, project: null });
+    // The first segment of that name is the reader's own settings, and nobody's handle.
+    expect(parse("/settings", "")).toMatchObject({ namespace: null, project: null });
   });
 
   it("says an address names nothing rather than guess at it", () => {

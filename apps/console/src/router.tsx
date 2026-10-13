@@ -13,6 +13,7 @@ import {
   useMemo,
   useSyncExternalStore,
 } from "react";
+import type { NamespaceKind } from "./contract/keel/index.ts";
 import { type Address, type Route, carriedOf, href, parse } from "./route.ts";
 
 const listeners = new Set<() => void>();
@@ -70,8 +71,10 @@ export function useAddress(): Address {
 }
 
 export interface Where {
-  /** The org the project is in. */
-  org: string;
+  /** The handle of the namespace the project is in. */
+  namespace: string;
+  /** Whose that namespace is, as Keel said when it found the project. Absent above every project. */
+  kind?: NamespaceKind;
   project: string;
   route: Route;
   /** The address of a place in this project. */
@@ -81,24 +84,27 @@ export interface Where {
 const WhereContext = createContext<Where | null>(null);
 
 export function WhereProvider({
-  org,
+  namespace,
+  kind,
   project,
   route,
   children,
 }: {
-  org: string;
+  namespace: string;
+  kind?: NamespaceKind;
   project: string;
   route: Route;
   children: ReactNode;
 }) {
   const where = useMemo(
     (): Where => ({
-      org,
+      namespace,
+      ...(kind === undefined ? {} : { kind }),
       project,
       route,
-      to: (next) => href(org, project, next, carriedParams()),
+      to: (next) => href(namespace, project, next, carriedParams()),
     }),
-    [org, project, route],
+    [namespace, kind, project, route],
   );
   return <WhereContext.Provider value={where}>{children}</WhereContext.Provider>;
 }

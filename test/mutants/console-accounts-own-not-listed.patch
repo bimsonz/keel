@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/accounts.test.ts
+# kills: accounts.first
+# why: the frame's dropdown lists a person's orgs and not their own account, which Keel keeps no org for
+diff --git a/apps/console/src/account/accounts.ts b/apps/console/src/account/accounts.ts
+index 629daa0..7636b82 100644
+--- a/apps/console/src/account/accounts.ts
++++ b/apps/console/src/account/accounts.ts
+@@ -39,7 +39,6 @@ export function accountsOf(
+           },
+         ];
+   return [
+-    ...own,
+     ...orgs.map((org) => ({
+       name: org.handle,
+       href: hrefOf({ at: "namespace", handle: org.handle }),

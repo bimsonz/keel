@@ -15,8 +15,8 @@ if (root === null) throw new Error("missing #root");
 // the user's own, and reads nothing of Keel's log; everything else is the console.
 const legal = legalOf(window.location.pathname);
 const place = placeOf(window.location.pathname, window.location.search);
-// An org's home was once at `/orgs/<org>`. It is at `/<org>`, and an address of the old kind is corrected.
-if (place?.at === "org" && place.tab === "home" && window.location.pathname !== hrefOf(place))
+// An org's home was once at `/orgs/<org>`. It is at its handle, and an address of the old kind is corrected.
+if (place?.at === "namespace" && window.location.pathname !== hrefOf(place))
   window.history.replaceState(null, "", `${hrefOf(place)}${window.location.search}`);
 
 createRoot(root).render(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.whose
+# why: whose a handle is, is asked about another handle than the one the address names
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index b5a71f9..8b7442e 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -139,7 +139,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+   const read = reader(options);
+   return {
+     async findNamespace(handle, signal) {
+-      const response = await read(`/v1/namespaces/${encodeURIComponent(handle)}`, signal);
++      const response = await read(`/v1/namespaces/acme`, signal);
+       // A handle nobody has.
+       if (response.status === 404) return null;
+       if (!response.ok) throw await refusalOf(response);

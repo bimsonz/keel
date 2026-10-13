@@ -1,12 +1,19 @@
-// An org's pages: its home, its members and its settings, making one, and an invitation to one. As on a code
-// host, the address names the org, and each page asks Keel about that org and no other.
+// A namespace's own page, and an org's: its home, its members and its settings, making one, and an invitation
+// to one. As on a code host, the address names a handle, and each page asks Keel about that handle and no
+// other. Whose the handle is (a person's, an agent's or an org's) is Keel's to say, and the page is worded
+// from its answer.
 
 import { isOwn } from "./accounts.ts";
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { type OrgTab, hrefOf } from "../places.ts";
 import { TRUNK, href } from "../route.ts";
-import type { ProjectView } from "../contract/keel/index.ts";
+import type {
+  NamespaceKind,
+  NamespaceRef,
+  NamespaceView,
+  ProjectView,
+} from "../contract/keel/index.ts";
 import type { KeelDirectory } from "../source/types.ts";
 import {
   type Account,
@@ -21,6 +28,22 @@ import {
 } from "./account.ts";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
+
+/** What a page calls a namespace that is not a person's. */
+const KIND: Record<Exclude<NamespaceKind, "user">, string> = { agent: "Agent", org: "Org" };
+
+/** What a namespace's page says where Keel names this reader no project of it. */
+function none(namespace: NamespaceRef, signedIn: boolean): string {
+  const whose = namespace.kind === "org" ? "This org" : namespace.handle;
+  return signedIn ? `${whose} has no project you may see.` : `${whose} has no public project.`;
+}
+
+/** The address of one of an org's tabs: its home is its namespace's page. */
+function tabHref(handle: string, tab: OrgTab): string {
+  return tab === "home"
+    ? hrefOf({ at: "namespace", handle })
+    : hrefOf({ at: "org", org: handle, tab });
+}
 
 /** An org as Keel reads it to this reader: undefined while it is asked for, null where there is none for them. */
 function useOrg(
@@ -120,7 +143,7 @@ function OrgFrame({ page, tab, children }: { page: OrgPage; tab: OrgTab; childre
         {tabs.map((held) => (
           <a
             key={held.id}
-            href={hrefOf({ at: "org", org: org.handle, tab: held.id })}
+            href={tabHref(org.handle, held.id)}
             aria-current={held.id === tab ? "page" : undefined}
           >
             {held.label}
@@ -133,8 +156,11 @@ function OrgFrame({ page, tab, children }: { page: OrgPage; tab: OrgTab; childre
   );
 }
 
-/** The projects of an org that Keel names to this reader: undefined until it has answered. */
-function useProjects(directory: KeelDirectory, org: string): readonly ProjectView[] | undefined {
+/** The projects of a namespace that Keel names to this reader: undefined until it has answered. */
+function useProjects(
+  directory: KeelDirectory,
+  namespace: string,
+): readonly ProjectView[] | undefined {
   const [projects, setProjects] = useState<readonly ProjectView[]>();
   useEffect(() => {
     let here = true;
@@ -142,15 +168,45 @@ function useProjects(directory: KeelDirectory, org: string): readonly ProjectVie
     const read = async (): Promise<void> => {
       // A list Keel would not give is no list: the page says there is nothing to show.
       const listed = await directory.listProjects(stop.signal).catch(() => []);
-      if (here) setProjects(listed.filter((project) => project.namespace.handle === org));
+      if (here) setProjects(listed.filter((project) => project.namespace.handle === namespace));
     };
     void read();
     return () => {
       here = false;
       stop.abort();
     };
-  }, [directory, org]);
+  }, [directory, namespace]);
   return projects;
+}
+
+/**
+ * Whose a handle is, as Keel answers anyone who asks: undefined until it has, null where nobody has the handle,
+ * and Keel's own words where it would not say.
+ */
+function useNamespace(
+  directory: KeelDirectory,
+  handle: string,
+): NamespaceView | { failed: string } | null | undefined {
+  const [namespace, setNamespace] = useState<NamespaceView | { failed: string } | null>();
+  useEffect(() => {
+    let here = true;
+    const stop = new AbortController();
+    const read = async (): Promise<void> => {
+      try {
+        const found = await directory.findNamespace(handle, stop.signal);
+        if (here) setNamespace(found);
+      } catch (error) {
+        if (here)
+          setNamespace({ failed: error instanceof Error ? error.message : "Keel did not answer" });
+      }
+    };
+    void read();
+    return () => {
+      here = false;
+      stop.abort();
+    };
+  }, [directory, handle]);
+  return namespace;
 }
 
 function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
@@ -425,12 +481,10 @@ function Members({
 function OrgSettings({
   account,
   page,
-  who,
   read,
 }: {
   account: Account;
   page: OrgPage;
-  who: Who;
   read: () => Promise<void>;
 }) {
   const { org } = page;
@@ -482,7 +536,7 @@ function OrgSettings({
             className="flex items-end gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!mayDelete(org, { role: page.role, handle: who.handle }, typed)) return;
+              if (!mayDelete(org, { role: page.role }, typed)) return;
               void ask(async () => {
                 await account.deleteOrg(org);
                 go(hrefOf({ at: "settings" }));
@@ -500,7 +554,7 @@ function OrgSettings({
             <Button
               type="submit"
               variant="secondary"
-              disabled={busy || !mayDelete(org, { role: page.role, handle: who.handle }, typed)}
+              disabled={busy || !mayDelete(org, { role: page.role }, typed)}
             >
               Delete this org
             </Button>
@@ -515,10 +569,11 @@ function OrgSettings({
 }
 
 /**
- * An org as anyone may see it: its handle, and the projects of it that Keel names to this reader. For a visitor
- * those are its public ones. An org with none to show is, to this reader, an org that is not there.
+ * A namespace as anyone may see it: its handle, whose Keel says it is, and the projects of it that Keel names
+ * to this reader. For a visitor those are its public ones. That a handle is someone's is no secret, so one with
+ * no project to show is still there, and a page says so; a handle nobody has is told as that.
  */
-export function OrgPublic({
+export function NamespacePublic({
   directory,
   handle,
   signedIn,
@@ -527,40 +582,65 @@ export function OrgPublic({
   handle: string;
   signedIn: boolean;
 }) {
+  const namespace = useNamespace(directory, handle);
   const projects = useProjects(directory, handle);
-  if (projects === undefined) return null;
-  if (projects.length === 0)
+  if (namespace === undefined || projects === undefined) return null;
+  if (namespace === null)
     return (
       <Card
         title={`There is no ${handle} here`}
-        lede={
-          signedIn
-            ? `Either nobody and no org is called ${handle} on this Keel, or it has no project you may see.`
-            : `Either nobody and no org is called ${handle} on this Keel, or it has no public project. Whoever may see the rest signs in.`
-        }
+        lede={`Nobody and no org is called ${handle} on this Keel.`}
       >
-        <a className="a-link" href={signedIn ? hrefOf({ at: "new-org" }) : hrefOf({ at: "login" })}>
-          {signedIn ? "Make an org" : "Sign in"}
+        <a className="a-link" href="/">
+          See the projects Keel has
+        </a>
+      </Card>
+    );
+  if ("failed" in namespace)
+    return (
+      <Card title={`Keel did not say whose ${handle} is`} lede={`${namespace.failed}.`}>
+        <a className="a-link" href="/">
+          See the projects Keel has
         </a>
       </Card>
     );
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5 px-6 py-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-semibold text-kumo-strong">{handle}</h1>
+      <header className="flex flex-wrap items-center gap-2.5">
+        <h1 className="text-[22px] font-semibold text-kumo-strong">{namespace.handle}</h1>
+        {/* A person's handle is their account and needs no label; an agent's and an org's are named as that. */}
+        {namespace.kind !== "user" && (
+          <span className="a-chip" data-tone="quiet">
+            {KIND[namespace.kind]}
+          </span>
+        )}
       </header>
       <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
         <h2 className="a-h">Projects</h2>
-        <ProjectList projects={projects} />
+        {projects.length === 0 ? (
+          <p className="text-sm text-kumo-subtle">
+            {none(namespace, signedIn)}
+            {!signedIn && (
+              <>
+                {" "}
+                <a className="a-link" href={hrefOf({ at: "login" }, `/${namespace.handle}`)}>
+                  Sign in
+                </a>{" "}
+                to see what you may.
+              </>
+            )}
+          </p>
+        ) : (
+          <ProjectList projects={projects} />
+        )}
       </section>
     </div>
   );
 }
 
 /**
- * A person's own namespace, to that person: their projects, under their handle. Keel keeps it as an org named
- * by the handle, and that is how it is stored and no more: it has no members to manage and no settings of an
- * org's, and the page never calls it one.
+ * A person's own namespace, to that person: their projects, under their handle. It is their account and no org:
+ * it has no members to manage and no settings of an org's, and the page never calls it one.
  */
 function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab: OrgTab }) {
   const handle = who.handle ?? "";
@@ -571,7 +651,7 @@ function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab:
         title="This is your own account"
         lede={`${handle} is yours alone: it has no members and is not an org. An org is for projects you work on with other people.`}
       >
-        <a className="a-link" href={hrefOf({ at: "org", org: handle, tab: "home" })}>
+        <a className="a-link" href={hrefOf({ at: "namespace", handle })}>
           Your projects
         </a>
         <a className="a-link" href={hrefOf({ at: "new-org" })}>
@@ -598,10 +678,11 @@ function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab:
 }
 
 /**
- * An org's pages, by the handle in the address. To a reader who is not a member, its home is what anyone may
- * see of it, and its members' pages are told as an org that is not there.
+ * The pages at a handle, to someone signed in. Their own handle is their account. Another's is what anyone may
+ * see of that namespace, unless it is an org they are a member of: then it is the org's home, and its members
+ * and settings beside it. To anyone else an org's members' pages are told as an org that is not there.
  */
-export function OrgPages({
+export function NamespacePages({
   account,
   directory,
   who,
@@ -619,7 +700,7 @@ export function OrgPages({
   if (isOwn({ handle }, who)) return <Own directory={directory} who={who} tab={tab} />;
   if (held === undefined) return null;
   if (held === null && tab === "home")
-    return <OrgPublic directory={directory} handle={handle} signedIn />;
+    return <NamespacePublic directory={directory} handle={handle} signedIn />;
   if (held === null)
     return (
       <Card
@@ -637,7 +718,7 @@ export function OrgPages({
       {tab === "members" && <Members account={account} page={held} who={who} read={read} />}
       {tab === "settings" && (
         // The name typed starts from the org's own, whichever org the address goes on to name.
-        <OrgSettings key={held.org.id} account={account} page={held} who={who} read={read} />
+        <OrgSettings key={held.org.id} account={account} page={held} read={read} />
       )}
     </OrgFrame>
   );
@@ -657,7 +738,7 @@ export function NewOrg({ account }: { account: Account }) {
         return;
       }
       const org: Org = await account.createOrg(name.trim(), handle);
-      go(hrefOf({ at: "org", org: org.handle, tab: "home" }));
+      go(hrefOf({ at: "namespace", handle: org.handle }));
     });
   };
   return (
@@ -766,7 +847,7 @@ export function Invite({ account, who, id }: { account: Account; who: Who; id: s
           onClick={() =>
             void ask(async () => {
               await account.acceptInvitation(invited.id);
-              go(hrefOf({ at: "org", org: invited.org.handle, tab: "home" }));
+              go(hrefOf({ at: "namespace", handle: invited.org.handle }));
             })
           }
         >

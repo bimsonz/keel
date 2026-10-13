@@ -39,14 +39,7 @@ export function givable(role: Role): Role[] {
   return role === "maintainer" ? ["maintainer", "member"] : [];
 }
 
-/**
- * Whether deleting an org is offered: to its owner, once they have typed its handle, and never for a user's own
- * org, which is theirs for as long as their handle is.
- */
-export function mayDelete(
-  org: { handle: string },
-  reader: { role: Role; handle?: string | undefined },
-  typed: string,
-): boolean {
-  return reader.role === "owner" && org.handle !== reader.handle && typed === org.handle;
+/** Whether deleting an org is offered: to its owner, once they have typed its handle. */
+export function mayDelete(org: { handle: string }, reader: { role: Role }, typed: string): boolean {
+  return reader.role === "owner" && typed === org.handle;
 }

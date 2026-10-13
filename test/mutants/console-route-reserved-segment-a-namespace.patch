@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts apps/console/test/unit/places.test.ts
+# kills: route.reserved, places.reserved
+# why: a first segment Keel serves itself is read as a namespace's handle, so a page above every project, or one of Keel's own addresses, is taken for a project's
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index a7f5852..f2203a0 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -178,8 +178,6 @@ export function parse(pathname: string, search: string): Address {
+   const [namespace, project, place, ...rest] = segments;
+   if (namespace === undefined) return { namespace: null, project: null, route: HOME };
+   // A first segment Keel serves itself is no handle: Keel refuses each as one, and the list is its own.
+-  if (among(RESERVED_SEGMENTS, namespace) !== undefined)
+-    return { namespace: null, project: null, route: MISSING };
+   if (project === undefined) return { namespace, project: null, route: HOME };
+   return { namespace, project, route: routeOf(place, rest, new URLSearchParams(search)) };
+ }

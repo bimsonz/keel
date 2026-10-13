@@ -203,7 +203,7 @@ function Console({
   seed,
 }: {
   found: ProjectView;
-  /** The other projects of the org that Keel names to this reader. */
+  /** The other projects of the namespace that Keel names to this reader. */
   siblings: readonly ProjectView[];
   reader: ReaderMark | undefined;
   route: Route;
@@ -224,7 +224,12 @@ function Console({
   // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
   const waiting = !player.loaded && !UNLOGGED.has(route.at) && route.at !== "missing";
   return (
-    <WhereProvider org={found.namespace.handle} project={found.name} route={route}>
+    <WhereProvider
+      namespace={found.namespace.handle}
+      kind={found.namespace.kind}
+      project={found.name}
+      route={route}
+    >
       <NamesProvider>
         <Frame
           source={source}
@@ -255,11 +260,11 @@ type Opened =
   | { is: "failed"; said: string }
   | { is: "open"; found: ProjectView; player: Player };
 
-/** One project, found by its org and its name, and read from there. */
+/** One project, found by its namespace's handle and its name, and read from there. */
 function Project({
   reading,
   reader,
-  org,
+  namespace,
   name,
   route,
   mode,
@@ -268,7 +273,7 @@ function Project({
 }: {
   reading: Reading;
   reader: ReaderMark | undefined;
-  org: string;
+  namespace: string;
   name: string;
   route: Route;
   mode: Mode;
@@ -284,7 +289,7 @@ function Project({
     let here = true;
     const stop = new AbortController();
     const start = async (): Promise<void> => {
-      const found = await reading.directory.findProject(org, name, stop.signal);
+      const found = await reading.directory.findProject(namespace, name, stop.signal);
       if (!here) return;
       if (found === null) {
         setOpened({ is: "missing" });
@@ -317,26 +322,26 @@ function Project({
           said: error instanceof Error ? error.message : "Keel could not be read",
         });
     });
-    // The org's other projects, for the frame's switcher. The page does not wait for them.
+    // The namespace's other projects, for the frame's switcher. The page does not wait for them.
     const others = async (): Promise<void> => {
       const listed = await reading.directory.listProjects(stop.signal).catch(() => []);
-      if (here) setSiblings(listed.filter((project) => project.namespace.handle === org));
+      if (here) setSiblings(listed.filter((project) => project.namespace.handle === namespace));
     };
     void others();
     return () => {
       here = false;
       stop.abort();
     };
-  }, [reading, org, name, params]);
+  }, [reading, namespace, name, params]);
 
   if (opened.is === "reading") return null;
   if (opened.is === "failed") return <Unreachable said={opened.said} />;
   if (opened.is === "missing") {
     // A project Keel does not show this reader and one that is not there are the same answer, and the same page.
     return (
-      <WhereProvider org="" project="" route={{ at: "missing" }}>
+      <WhereProvider namespace="" project="" route={{ at: "missing" }}>
         <Frame source={{ mode: reading.mode, seed }} {...(reader === undefined ? {} : { reader })}>
-          <Notice title={`There is no project ${org}/${name} here`}>
+          <Notice title={`There is no project ${namespace}/${name} here`}>
             <a href="/" className="a-link">
               See the projects Keel has
             </a>
@@ -377,7 +382,7 @@ export function App() {
   const seed = Number(params.get("seed") ?? "42") || 42;
   const [reading, setReading] = useState<Reading | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const { org, project, route } = useAddress();
+  const { namespace, project, route } = useAddress();
   const reader = useReader(reading?.mode === "live");
 
   useEffect(() => {
@@ -402,14 +407,14 @@ export function App() {
 
   if (failure !== null) return <Unreachable said={failure} />;
   if (reading === null) return null;
-  if (org !== null && project !== null) {
+  if (namespace !== null && project !== null) {
     // Another project is another log and another playhead: nothing of the last one is carried over.
     return (
       <Project
-        key={`${org}/${project}`}
+        key={`${namespace}/${project}`}
         reading={reading}
         reader={reader?.mark}
-        org={org}
+        namespace={namespace}
         name={project}
         route={route}
         mode={mode}
@@ -418,14 +423,14 @@ export function App() {
       />
     );
   }
-  // The bare address is the home: the projects Keel names to this reader, by org.
+  // The bare address is the home: the projects Keel names to this reader, by namespace.
   return (
-    <WhereProvider org="" project="" route={route.at === "missing" ? route : HOME}>
+    <WhereProvider namespace="" project="" route={route.at === "missing" ? route : HOME}>
       <Frame
         source={{ mode: reading.mode, seed }}
         {...(reader === undefined ? {} : { reader: reader.mark })}
       >
-        {route.at === "missing" || org !== null ? (
+        {route.at === "missing" || namespace !== null ? (
           <Missing />
         ) : (
           <HomePage

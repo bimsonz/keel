@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.members
+# why: a person's namespace, and an agent's, is said to have members as an org has, so a page names members nobody can be
+diff --git a/apps/console/src/engine/audience.ts b/apps/console/src/engine/audience.ts
+index c72a36c..755cc85 100644
+--- a/apps/console/src/engine/audience.ts
++++ b/apps/console/src/engine/audience.ts
+@@ -26,7 +26,7 @@ export function publicOnly(descriptor: SourceDescriptor): boolean {
+  */
+ export function membersOf(namespace: { handle: string; kind?: NamespaceKind }): string {
+   if (namespace.kind === undefined) return "this project's members";
+-  return namespace.kind === "org" ? `the members of ${namespace.handle}` : namespace.handle;
++  return `the members of ${namespace.handle}`;
+ }
+ 
+ /**

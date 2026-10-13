@@ -3,3 +3,6 @@
 // Everything in this console that names a wire type imports it from here.
 
 export type * from "@keeltown/contracts";
+
+// The first segments Keel serves itself and refuses as a handle: one list, Keel's, which the route table reads.
+export { RESERVED_SEGMENTS } from "@keeltown/contracts";

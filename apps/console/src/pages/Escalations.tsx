@@ -1,6 +1,7 @@
 // The questions Keel has put to a person, listed.
 
 import { HandPalmIcon } from "@phosphor-icons/react";
+import { membersOf } from "../engine/audience.ts";
 import { type EscalationFilter, PAGE, escalationsOf } from "../engine/lists.ts";
 import { usePublicOnly, useSelected } from "../engine/react.tsx";
 import { useWhere } from "../router.tsx";
@@ -30,12 +31,15 @@ const EMPTY: Record<EscalationFilter, [string, string]> = {
  * read, never that there are none.
  */
 export function ForMembers({ what }: { what: "list" | "question" }) {
-  const { org } = useWhere();
+  const { namespace, kind } = useWhere();
+  const members = membersOf({ handle: namespace, ...(kind === undefined ? {} : { kind }) });
+  // An org has members to sign in as. A person's namespace, or an agent's, is its owner's alone.
+  const way = kind === "org" ? ` Sign in as a member of ${namespace} to ` : null;
   return (
     <Nothing title={`Keel shows a project's questions to its members`}>
       {what === "list"
-        ? `A question put to a person, its options and the answer given are read by the members of ${org} and by nobody else, so this page cannot say whether one is waiting. Sign in as a member of ${org} to read them and to answer.`
-        : `A question, its options and the answer given are read by the members of ${org} and by nobody else. Sign in as a member of ${org} to read this one and to answer it.`}
+        ? `A question put to a person, its options and the answer given are read by ${members} and by nobody else, so this page cannot say whether one is waiting.${way === null ? "" : `${way}read them and to answer.`}`
+        : `A question, its options and the answer given are read by ${members} and by nobody else.${way === null ? "" : `${way}read this one and to answer it.`}`}
     </Nothing>
   );
 }

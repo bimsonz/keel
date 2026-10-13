@@ -1,23 +1,24 @@
 // A project's settings: who may read it, and what else Keel holds for it.
-// Keel reads them to a member of the project's org and lets a maintainer or
+// Keel reads them to a member of the project's namespace and lets a maintainer or
 // an owner replace them. The page shows what Keel answered, offers the change
 // to whoever Keel named a maintainer, and says Keel's refusal in its words.
 
 import { Button, Input } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import { Refusal, type Said, saidOf, useAsking } from "../account/parts.tsx";
-import type { ProjectSettings, ProjectView } from "../contract/keel/index.ts";
+import type { NamespaceRef, ProjectSettings, ProjectView } from "../contract/keel/index.ts";
 import { usePlayer } from "../engine/react.tsx";
 import type { Visibility } from "../engine/projects.ts";
 import { maintains, mayPublish, readBy } from "../engine/settings.ts";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
 
-/** Who reads a project of each kind, in a sentence. */
-function readers(visibility: Visibility, org: string): string {
-  return visibility === "public"
-    ? "Anyone reads its code and its log, signed in or not."
-    : `Only members of ${org} read it.`;
+/** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
+function readers(visibility: Visibility, namespace: NamespaceRef): string {
+  if (visibility === "public") return "Anyone reads its code and its log, signed in or not.";
+  return namespace.kind === "org"
+    ? `Only members of ${namespace.handle} read it.`
+    : `Only ${namespace.handle} reads it.`;
 }
 
 /** The rest of what Keel holds for the project, as it answered: shown, and changed nowhere on this page. */
@@ -102,8 +103,9 @@ export function SettingsPage({ project }: { project: ProjectView }) {
         <section className="a-panel flex flex-col gap-3 p-4" aria-label="Settings">
           <Refusal said={unread} />
           <p className="text-sm text-kumo-subtle">
-            Keel reads a project's settings to the members of {project.namespace.handle}, and an
-            owner or a maintainer changes them.
+            {project.namespace.kind === "org"
+              ? `Keel reads a project's settings to the members of ${project.namespace.handle}, and an owner or a maintainer changes them.`
+              : `Keel reads a project's settings to ${project.namespace.handle}, whose project it is.`}
           </p>
         </section>
       </Column>
@@ -131,11 +133,13 @@ export function SettingsPage({ project }: { project: ProjectView }) {
           <span className="a-chip" data-tone="quiet">
             {visibility}
           </span>
-          {readers(visibility, project.namespace.handle)}
+          {readers(visibility, project.namespace)}
         </p>
         {!maintains(project) ? (
           <p className="text-sm text-kumo-subtle">
-            An owner or a maintainer of {project.namespace.handle} changes this.
+            {project.namespace.kind === "org"
+              ? `An owner or a maintainer of ${project.namespace.handle} changes this.`
+              : `${project.namespace.handle} changes this.`}
           </p>
         ) : visibility === "public" ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -148,7 +152,7 @@ export function SettingsPage({ project }: { project: ProjectView }) {
               Make private
             </Button>
             <span className="text-sm text-kumo-subtle">
-              {readers("private", project.namespace.handle)}
+              {readers("private", project.namespace)}
             </span>
           </div>
         ) : (

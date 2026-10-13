@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { RESERVED_SEGMENTS } from "../../src/contract/keel/index.ts";
 import { markdown } from "../../src/engine/markdown.ts";
 import { TEXT } from "../../src/legal/documents.ts";
 import { LEGAL, type Legal, legalOf } from "../../src/legal/legal.ts";
-import { RESERVED } from "../../src/route.ts";
 
 /**
  * Each document as it was last published: the date under its title, and a digest of everything else in it.
@@ -31,7 +31,7 @@ describe("the terms and the privacy notice", () => {
       ["/terms", "/privacy/", "/terms/more", "/orgs/terms", "/", "/demo"].map(legalOf),
     ).toEqual(["terms", "privacy", null, null, null, null]);
     expect(Object.values(LEGAL).map((document) => document.href)).toEqual(["/terms", "/privacy"]);
-    for (const which of BOTH) expect(RESERVED).toContain(which);
+    for (const which of BOTH) expect(RESERVED_SEGMENTS).toContain(which);
   });
 
   it.each(BOTH)(

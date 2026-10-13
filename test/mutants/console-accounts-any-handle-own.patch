@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/accounts.test.ts
+# kills: accounts.own
+# why: every handle is taken for the reader's own, so an org's page is drawn as their account, with no members and no settings
+diff --git a/apps/console/src/account/accounts.ts b/apps/console/src/account/accounts.ts
+index 629daa0..4606748 100644
+--- a/apps/console/src/account/accounts.ts
++++ b/apps/console/src/account/accounts.ts
+@@ -19,7 +19,7 @@ export function isOwn(
+   namespace: { handle: string },
+   who: { handle?: string | undefined },
+ ): boolean {
+-  return who.handle !== undefined && namespace.handle === who.handle;
++  return who.handle !== undefined;
+ }
+ 
+ /** What the frame's dropdown lists: the person's own handle first, marked as theirs, then their orgs. */

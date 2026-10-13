@@ -3,7 +3,7 @@
 // console draws a conflict's page from its fold of the log; Keel answers the
 // same conflict from its own fold of the same events. They are to agree.
 //
-//   node scripts/level.ts <origin> <org> <project>
+//   node scripts/level.ts <origin> <namespace> <project>
 //
 // It reads only, as a visitor: the project must be public. Exit 1 where a
 // conflict differs, or where Keel names one the fold does not hold.
@@ -13,9 +13,9 @@ import { conflictDetailOf } from "../src/engine/conflict.ts";
 import { World } from "../src/engine/world.ts";
 import { createHttpDirectory, createHttpSource } from "../src/source/http.ts";
 
-const [origin = "", org = "", name = ""] = process.argv.slice(2);
-if (origin === "" || org === "" || name === "") {
-  console.error("usage: node scripts/level.ts <origin> <org> <project>");
+const [origin = "", namespace = "", name = ""] = process.argv.slice(2);
+if (origin === "" || namespace === "" || name === "") {
+  console.error("usage: node scripts/level.ts <origin> <namespace> <project>");
   process.exit(2);
 }
 
@@ -36,9 +36,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-const project = await createHttpDirectory({ origin }).findProject(org, name);
+const project = await createHttpDirectory({ origin }).findProject(namespace, name);
 if (project === null) {
-  console.error(`Keel shows a visitor no project ${org}/${name}`);
+  console.error(`Keel shows a visitor no project ${namespace}/${name}`);
   process.exit(1);
 }
 const source = createHttpSource(project, { origin });
@@ -61,7 +61,7 @@ for (;;) {
   cursor = page.nextCursor;
 }
 console.log(
-  `${org}/${name} (${project.id}): ${read} events folded, ${world.conflicts.size} conflicts`,
+  `${namespace}/${name} (${project.id}): ${read} events folded, ${world.conflicts.size} conflicts`,
 );
 
 const get = async <Body>(path: string): Promise<Body> => {

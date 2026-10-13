@@ -1,7 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { type Plugin, defineConfig } from "vite";
-import { RESERVED } from "./src/route.ts";
+import { RESERVED_SEGMENTS } from "./src/contract/keel/index.ts";
 
 /**
  * The code viewer and the graph are files of their own, asked for by the pages that draw them
@@ -30,7 +30,7 @@ function early(): Plugin {
         };
         const hint = `(() => {
   const [first, project, place = ""] = location.pathname.split("/").filter((part) => part !== "");
-  if (project === undefined || ${JSON.stringify(RESERVED)}.includes(first)) return;
+  if (project === undefined || ${JSON.stringify(RESERVED_SEGMENTS)}.includes(first)) return;
   const files = ["mission-control", "subjects"].includes(place)
     ? ${JSON.stringify(filesOf("MissionGraph"))}
     : ["blob", "commit", "conflicts"].includes(place)

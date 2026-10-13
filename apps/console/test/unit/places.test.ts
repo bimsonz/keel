@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hrefOf, nextOf, placeOf, sentFrom } from "../../src/places.ts";
-import { RESERVED, parse } from "../../src/route.ts";
+import { RESERVED_SEGMENTS } from "../../src/contract/keel/index.ts";
+import { parse } from "../../src/route.ts";
 
 /** An address as the browser gives it. */
 const at = (pathname: string, search = "") => ({ pathname, search });
@@ -21,7 +22,7 @@ describe("the pages above every project", () => {
     expect(hrefOf({ at: "login" }, "/")).toBe("/login");
   });
 
-  it("[places.reserved] has every page but an org's home at a reserved first segment, so none is a project's address or an org's", () => {
+  it("[places.reserved] has every page but a namespace's own at a reserved first segment, so none is a project's address or a handle", () => {
     for (const address of [
       "/login",
       "/signup",
@@ -33,8 +34,8 @@ describe("the pages above every project", () => {
       "/invite/inv_1",
     ]) {
       const segment = address.split("/").find((part) => part !== "") ?? "";
-      expect(RESERVED).toContain(segment);
-      expect(parse(address, "")).toMatchObject({ org: null, project: null });
+      expect(RESERVED_SEGMENTS).toContain(segment);
+      expect(parse(address, "")).toMatchObject({ namespace: null, project: null });
     }
     // And nothing else is one of them: the home, a project's own pages, and a path under a page.
     for (const address of [
@@ -53,25 +54,25 @@ describe("the pages above every project", () => {
       expect(placeOf(address)).toBeNull();
   });
 
-  it("[places.org-home] has an org's home at its handle, where a code host has an owner's, and no reserved word is one", () => {
-    expect(placeOf("/lovelace")).toEqual({ at: "org", org: "lovelace", tab: "home" });
-    expect(placeOf("/lovelace/")).toEqual({ at: "org", org: "lovelace", tab: "home" });
-    expect(hrefOf({ at: "org", org: "lovelace", tab: "home" })).toBe("/lovelace");
-    // The address it had before still reads as the same place, and is written the new way.
+  it("[places.namespace] has a namespace's own page at its handle, where a code host has an owner's, and no reserved word is one", () => {
+    expect(placeOf("/lovelace")).toEqual({ at: "namespace", handle: "lovelace" });
+    expect(placeOf("/lovelace/")).toEqual({ at: "namespace", handle: "lovelace" });
+    expect(hrefOf({ at: "namespace", handle: "lovelace" })).toBe("/lovelace");
+    // The address an org's home had before still reads as the same place, and is written the new way.
     expect(hrefOf(placeOf("/orgs/lovelace") ?? { at: "login" })).toBe("/lovelace");
-    // The route table agrees: one segment names an org and no project.
-    expect(parse("/lovelace", "")).toMatchObject({ org: "lovelace", project: null });
-    for (const word of RESERVED) expect(placeOf(`/${word}`)?.at).not.toBe("org");
-    // Anyone may open it: Keel shows a visitor an org's public projects. Its members' pages are a member's.
+    // The route table agrees: one segment names a namespace and no project.
+    expect(parse("/lovelace", "")).toMatchObject({ namespace: "lovelace", project: null });
+    for (const word of RESERVED_SEGMENTS) expect(placeOf(`/${word}`)?.at).not.toBe("namespace");
+    // Anyone may open it: Keel shows a visitor a namespace's public projects. An org's members' pages are a member's.
     const visitor = { is: "visitor" } as const;
-    expect(
-      sentFrom({ at: "org", org: "lovelace", tab: "home" }, visitor, at("/lovelace")),
-    ).toBeNull();
+    expect(sentFrom({ at: "namespace", handle: "lovelace" }, visitor, at("/lovelace"))).toBeNull();
   });
 
   it("[places.orgs] gives an org's pages, making one and an invitation each an address of its own", () => {
     expect(placeOf("/new/org")).toEqual({ at: "new-org" });
-    expect(placeOf("/orgs/lovelace")).toEqual({ at: "org", org: "lovelace", tab: "home" });
+    expect(placeOf("/orgs/lovelace")).toEqual({ at: "namespace", handle: "lovelace" });
+    // Nothing else is under an org's handle there: an org has members and settings, and no page of another name.
+    expect(placeOf("/orgs/lovelace/home")).toBeNull();
     expect(placeOf("/orgs/lovelace/members")).toEqual({
       at: "org",
       org: "lovelace",

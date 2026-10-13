@@ -1,8 +1,9 @@
 // A stand-in for Keel's API, for tests. It serves scenario 1's one project the
 // way Keel does: a reader is whoever the session cookie says, or a visitor;
-// a project is found by its org and name; its events are read by cursor with
-// the cursor always given, a verdict's evidence by its id, and a member of the
-// project's org may answer its question, once. A member reads the project's
+// whose a handle is, it answers anyone; a project is found by its namespace's
+// handle and its name; its events are read by cursor with the cursor always
+// given, a verdict's evidence by its id, and a member of the project's
+// namespace may answer its question, once. A member reads the project's
 // settings, and a maintainer or an owner replaces them, which is how the
 // project is made public or private. What a reader may not see is answered as
 // what is not there. Its answers are typed by Keel's own generated
@@ -18,6 +19,8 @@ import type {
   EventPage,
   EventRecord,
   LatticeSet,
+  NamespaceRef,
+  NamespaceView,
   NextAction,
   ProbeSource,
   ProjectSettings,
@@ -51,7 +54,7 @@ export type Role = NonNullable<ProjectView["viewer"]>["role"];
 
 /**
  * Who a request is from, as Keel's gate reads it: a user, by their session, with the role they have in the
- * project's org where they are a member of it; or null, a visitor. `sponsor` says they are the person the
+ * project's namespace where they are a member of it; or null, a visitor. `sponsor` says they are the person the
  * question's agent names: the one Keel asks first.
  */
 export type Reader = { role?: Role; sponsor?: boolean } | null;
@@ -118,7 +121,7 @@ export interface FakeKeel {
   calls: Call[];
   /** The log as it stands. */
   events(): readonly AnyEvent[];
-  /** The project it holds, as it names it to a reader who is not a member of its org. */
+  /** The project it holds, as it names it to a reader who is not a member of its namespace. */
   project: ProjectView;
 }
 
@@ -190,15 +193,30 @@ const noQuestion = (id: string): Response =>
     `No escalation ${id}.`,
   );
 
+/** A namespace's id and kind: its account's, as Keel answers them beside the handle that was asked for. */
+export type Whose = Pick<NamespaceView, "id" | "kind">;
+
+/** The id the project's own namespace is answered under where no identity is asked: one of its kind's shape. */
+const FIXTURE_IDS: Record<NamespaceView["kind"], string> = {
+  user: "usr_0000000000000000000000ACME",
+  agent: "agt_0000000000000000000000ACME",
+  org: "org_0000000000000000000000ACME",
+};
+
 export function createFakeKeel(
   options: {
     seed?: number;
     pageSize?: number;
-    /** The handle of the org the project is in. */
-    org?: string;
+    /** The namespace the project is in: an org called `acme`, unless a test says whose. */
+    namespace?: NamespaceRef;
+    /**
+     * Whose a handle is and the id of its account, for a test that has an identity to ask. Left out, the project's
+     * own namespace is the only one, under an id of the fixture's.
+     */
+    whose?: (handle: string) => Whose | undefined | Promise<Whose | undefined>;
     /** Who may read the project with no session. Keel creates a project private. */
     visibility?: "public" | "private";
-    /** Sessions, by the value of their cookie: the role each one's user has in the project's org, or none. */
+    /** Sessions, by the value of their cookie: the role each one's user has in the project's namespace, or none. */
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
@@ -233,7 +251,7 @@ export function createFakeKeel(
   if (created === undefined) throw new Error("scenario 1 creates no project");
   const project: ProjectView = {
     id: created.payload.projectId,
-    namespace: { handle: options.org ?? "acme", kind: "org" },
+    namespace: options.namespace ?? { handle: "acme", kind: "org" },
     name: created.payload.name,
     visibility: options.visibility ?? "private",
     createdAt: created.at,
@@ -296,14 +314,27 @@ export function createFakeKeel(
 
       const reader = await readerOf(request);
       const member = reader?.role !== undefined;
-      /** The project is shown to its org's members, and to anyone where it is public. To the rest it is not there. */
+      /** The project is shown to its namespace's members, and to anyone where it is public. To the rest it is not there. */
       const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
 
+      // Whose a handle is, Keel answers anyone: that a handle is someone's is no secret, and what it holds is.
+      const whose = /^\/v1\/namespaces\/([^/]+)$/.exec(url.pathname);
+      if (whose !== null && request.method === "GET") {
+        const handle = decodeURIComponent(whose[1] ?? "");
+        const known = await options.whose?.(handle);
+        if (known !== undefined) return Response.json({ handle, ...known } satisfies NamespaceView);
+        if (handle !== project.namespace.handle) return gone();
+        return Response.json({
+          id: FIXTURE_IDS[project.namespace.kind],
+          ...project.namespace,
+        } satisfies NamespaceView);
+      }
+
       const named = /^\/v1\/namespaces\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
       if (named !== null && request.method === "GET") {
-        const [, org = "", name = ""] = named.map((part) => decodeURIComponent(part));
-        if (!visible || org !== project.namespace.handle || name !== project.name) return gone();
+        const [, handle = "", name = ""] = named.map((part) => decodeURIComponent(part));
+        if (!visible || handle !== project.namespace.handle || name !== project.name) return gone();
         return Response.json({
           ...project,
           ...(reader?.role === undefined ? {} : { viewer: { role: reader.role } }),
@@ -440,7 +471,7 @@ export function createFakeKeel(
           : Response.json(view satisfies VerdictView);
       }
 
-      // A project's settings are read by a member of its org and replaced, whole, by a maintainer or an owner.
+      // A project's settings are read by a member of its namespace and replaced, whole, by a maintainer or an owner.
       // Someone with no session is asked for one before anything is said of the project.
       const ofSettings = /^\/v1\/projects\/([^/]+)\/settings$/.exec(url.pathname);
       if (ofSettings !== null && (request.method === "GET" || request.method === "PUT")) {
@@ -497,7 +528,7 @@ export function createFakeKeel(
       const ruling = /^\/v1\/escalations\/([^/]+)\/ruling$/.exec(url.pathname);
       if (ruling !== null && request.method === "POST") {
         // A question is answered by a person: one who is signed in, on a page of Keel's own site, and a member
-        // of the project's org. Whoever the project is not shown to is told there is no such question.
+        // of the project's namespace. Whoever the project is not shown to is told there is no such question.
         const asking = decodeURIComponent(ruling[1] ?? "");
         if (!visible) return noQuestion(asking);
         if (reader === null) return problem(401, "auth.required");

@@ -1,10 +1,10 @@
-// Beside a name in the frame, the others of its kind: the frame is a code host's, `Keel / <org> / <project>`,
+// Beside a name in the frame, the others of its kind: the frame is a code host's, `Keel / <namespace> / <project>`,
 // where each name is a link and has a dropdown beside it.
 
 import { DropdownMenu } from "@cloudflare/kumo";
 import { CaretUpDownIcon } from "@phosphor-icons/react";
 
-/** Something the reader could be in instead of where they are: another project of this org, or another org. */
+/** Something the reader could be in instead of where they are: another project of this namespace, or another account. */
 export interface Sibling {
   name: string;
   href: string;

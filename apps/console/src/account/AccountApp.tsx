@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
+import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
 import { createHttpDirectory } from "../source/http.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
@@ -28,7 +28,7 @@ import {
 } from "./account.ts";
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
-import { Invite, NewOrg, OrgPages, OrgPublic } from "./OrgPages.tsx";
+import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
@@ -637,13 +637,13 @@ function useMethods(account: Account, wanted: boolean): Methods {
 
 function Shell({
   reader,
-  org,
+  handle,
   orgs,
   children,
 }: {
   reader: Reader;
-  /** The org the address names, where it names one. */
-  org?: string | undefined;
+  /** The handle the address names, where it names one: a namespace's own page, or an org's. */
+  handle?: string | undefined;
   /** Null until Keel has listed them: a dropdown opened before that would be a menu without the reader's orgs. */
   orgs: Org[] | null;
   children: ReactNode;
@@ -659,19 +659,19 @@ function Shell({
               </svg>
               <span className="text-base text-kumo-default">Keel</span>
             </a>
-            {org !== undefined && (reader.is === "user" || reader.is === "visitor") && (
+            {handle !== undefined && (reader.is === "user" || reader.is === "visitor") && (
               <>
                 <span className="text-kumo-inactive">/</span>
                 <a
-                  href={hrefOf({ at: "org", org, tab: "home" })}
+                  href={hrefOf({ at: "namespace", handle })}
                   className="text-base font-semibold text-kumo-strong hover:underline"
                 >
-                  {org}
+                  {handle}
                 </a>
                 {orgs !== null && (
                   <Switch
                     what="account"
-                    here={org}
+                    here={handle}
                     others={accountsOf(orgs, reader.is === "user" ? reader.who : {})}
                     all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
                   />
@@ -687,8 +687,8 @@ function Shell({
               {nameOf(reader.who)}
             </a>
           )}
-          {/* A visitor at an org's home is offered the way in, and comes back to where they were. */}
-          {reader.is === "visitor" && org !== undefined && (
+          {/* A visitor at a namespace's page is offered the way in, and comes back to where they were. */}
+          {reader.is === "visitor" && handle !== undefined && (
             <a
               href={hrefOf({ at: "login" }, `${window.location.pathname}${window.location.search}`)}
               className="text-sm text-kumo-default hover:underline"
@@ -706,7 +706,7 @@ function Shell({
 
 export function AccountApp({ place }: { place: Place }) {
   const account = useMemo(() => createAccount({ origin: window.location.origin }), []);
-  // An org's projects are Keel's own to list, to whoever is reading: the same read the home makes.
+  // A namespace's projects are Keel's own to list, to whoever is reading: the same read the home makes.
   const directory = useMemo(() => createHttpDirectory(), []);
   const reader = useReader(account);
   useEffect(() => {
@@ -725,7 +725,11 @@ export function AccountApp({ place }: { place: Place }) {
     if (sent !== null) go(sent);
   }, [sent]);
   const named = reader.is === "user" && reader.who.handle !== undefined;
-  const orgs = useOrgs(account, named && place.at === "org");
+  // The handle the address names, and which of its pages: a namespace's own is its home.
+  const handle =
+    place.at === "namespace" ? place.handle : place.at === "org" ? place.org : undefined;
+  const tab: OrgTab = place.at === "org" ? place.tab : "home";
+  const orgs = useOrgs(account, named && handle !== undefined);
   const signingIn = reader.is === "visitor" && (place.at === "login" || place.at === "signup");
   const methods = useMethods(account, signingIn);
 
@@ -751,22 +755,22 @@ export function AccountApp({ place }: { place: Place }) {
   else if (reader.is === "user" && place.at === "device")
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
-  else if (reader.is === "user" && place.at === "org")
+  else if (reader.is === "user" && handle !== undefined)
     page = (
-      <OrgPages
+      <NamespacePages
         account={account}
         directory={directory}
         who={reader.who}
-        handle={place.org}
-        tab={place.tab}
+        handle={handle}
+        tab={tab}
       />
     );
-  else if (reader.is === "visitor" && place.at === "org" && place.tab === "home")
-    page = <OrgPublic directory={directory} handle={place.org} signedIn={false} />;
+  else if (reader.is === "visitor" && place.at === "namespace")
+    page = <NamespacePublic directory={directory} handle={place.handle} signedIn={false} />;
   else if (reader.is === "user" && place.at === "invite")
     page = <Invite account={account} who={reader.who} id={place.id} />;
   return (
-    <Shell reader={reader} org={place.at === "org" ? place.org : undefined} orgs={orgs}>
+    <Shell reader={reader} handle={handle} orgs={orgs}>
       {page}
     </Shell>
   );

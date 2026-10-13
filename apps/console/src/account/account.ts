@@ -387,7 +387,10 @@ export function createAccount(options: AccountOptions) {
       };
     },
 
-    /** Whether a handle is free for a new org. Keel refuses the reserved words and every handle in use. */
+    /**
+     * Whether no org has a handle. A handle a person or an agent has, and a first segment Keel serves itself,
+     * read as free here: Keel refuses those when the org is made, in its own sentence.
+     */
     async orgHandleIsFree(handle: string): Promise<boolean> {
       const answer = await client.organization.checkSlug({ slug: handle });
       if (answer.error?.code === "ORGANIZATION_SLUG_ALREADY_TAKEN") return false;

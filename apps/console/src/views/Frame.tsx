@@ -187,7 +187,7 @@ export function Frame({
   settings?: boolean;
   children: ReactNode;
 }) {
-  const { org, project, route } = useWhere();
+  const { namespace, project, route } = useWhere();
   const active = tabOf(route);
   return (
     <div className="a-root flex h-screen w-screen flex-col overflow-hidden bg-kumo-canvas text-base text-kumo-default">
@@ -204,17 +204,17 @@ export function Frame({
             {project !== "" && (
               <>
                 <span className="text-kumo-inactive">/</span>
-                {/* The org's own pages are above every project: a plain link, which loads them. */}
+                {/* The namespace's own page is above every project: a plain link, which loads it. */}
                 <a
-                  href={`/${encodeURIComponent(org)}`}
+                  href={hrefOf({ at: "namespace", handle: namespace })}
                   className="text-base text-kumo-default hover:underline"
                 >
-                  {org}
+                  {namespace}
                 </a>
                 {reader?.orgs !== undefined && reader.orgs.length > 0 && (
                   <Switch
                     what="account"
-                    here={org}
+                    here={namespace}
                     others={reader.orgs}
                     all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
                   />
@@ -231,7 +231,10 @@ export function Frame({
                     what="project"
                     here={project}
                     others={projects}
-                    all={{ label: `All projects of ${org}`, href: `/${encodeURIComponent(org)}` }}
+                    all={{
+                      label: `All projects of ${namespace}`,
+                      href: hrefOf({ at: "namespace", handle: namespace }),
+                    }}
                   />
                 )}
               </>

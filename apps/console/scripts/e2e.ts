@@ -1477,8 +1477,8 @@ const served = await preview({
 });
 
 const identity = createIdentity(built);
-/** The org the stand-in's project is in: Ada's own, once she has signed up below. */
-const ORG = "ada";
+/** The namespace the stand-in's project is in: Ada's own, a person's, once she has signed up below. */
+const NAMESPACE = { handle: "ada", kind: "user" } as const;
 
 /** Who a request is from, as Keel's gate reads it: asked of its identity by the session the browser sent. */
 const readerOf = async (request: Request): Promise<Reader> => {
@@ -1496,16 +1496,30 @@ const readerOf = async (request: Request): Promise<Reader> => {
   });
   const who = await asThem.who().catch(() => null);
   if (who === null) return null;
-  const org = await asThem.org(ORG, who).catch(() => null);
-  return org === null ? {} : { role: org.role };
+  // A person's own namespace has nobody in it but them: Keel reads them as its owner, and anyone else as no member.
+  return who.handle === NAMESPACE.handle ? { role: "owner" } : {};
 };
 
 // Two Keels, alike but for who may read the project: on one its org has made it public, on the other it has not.
 // On each, 1,200 entries of other projects lie ahead of this one's in the instance's log, as they do for every
 // project of a Keel but its first: a stretch of them is an empty page whose cursor has moved on.
 const AHEAD = 1200;
-const open = createFakeKeel({ org: ORG, visibility: "public", readerOf, ahead: AHEAD });
-const shut = createFakeKeel({ org: ORG, visibility: "private", readerOf, ahead: AHEAD });
+/** Whose a handle is: the identity knows who signed up and which orgs were made. */
+const whoseHandle = (handle: string) => identity.whose(handle);
+const open = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  readerOf,
+  whose: whoseHandle,
+  ahead: AHEAD,
+});
+const shut = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "private",
+  readerOf,
+  whose: whoseHandle,
+  ahead: AHEAD,
+});
 
 /** What the page sent to /v1, as the browser sent it. */
 interface Sent {
@@ -1599,16 +1613,16 @@ const countedPublic = (shown: Page): Promise<void> =>
     .getByText("1 open")
     .waitFor({ timeout: 10_000 })
     .catch(() => undefined);
-const toldAt = async (shown: Page, org: string, name: string): Promise<string> => {
-  await shown.goto(`${built}/${org}/${name}`, { waitUntil: "domcontentloaded" });
+const toldAt = async (shown: Page, namespace: string, name: string): Promise<string> => {
+  await shown.goto(`${built}/${namespace}/${name}`, { waitUntil: "domcontentloaded" });
   await shown.getByRole("heading").first().waitFor();
   await shown.waitForTimeout(400);
   // A page that could not read Keel at all has no frame. What it says is still read, so that a check can say so.
   const said =
     (await shown.getByRole("main").count()) > 0 ? shown.getByRole("main") : shown.locator("body");
-  return `${squash(await said.innerText()).replaceAll(`${org}/${name}`, "<org>/<name>")} | ${await tabsOf(shown).count()} tabs`;
+  return `${squash(await said.innerText()).replaceAll(`${namespace}/${name}`, "<namespace>/<name>")} | ${await tabsOf(shown).count()} tabs`;
 };
-const NO_PROJECT = "There is no project <org>/<name> here";
+const NO_PROJECT = "There is no project <namespace>/<name> here";
 
 // ── A visitor, on a project its org has made public ──
 // Public is live: anyone reads its code, its log and what is folded from it. Nothing can be answered.
@@ -1962,6 +1976,43 @@ expectEqual(
   "/login /ada/demo/escalations/E-1",
 );
 
+// A handle's own page. Whose a handle is, Keel says to anyone who asks, and the page is worded from that: a
+// person's is their handle and the projects of theirs this reader may see, with no word of an org; an org's
+// says it is one; and a handle nobody has is said to be nobody's.
+const handlePage = async (shown: Page): Promise<string> => {
+  const said = async (part: string): Promise<string> =>
+    squash(
+      await shown
+        .locator(part)
+        .innerText({ timeout: 3_000 })
+        .catch(() => "nothing"),
+    );
+  return `${await said("main header")} | ${await said('main section[aria-label="Projects"]')}`;
+};
+await visitor.goto(`${built}/ada/demo/escalations`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").last().waitFor();
+const whose = squash(await visitor.getByRole("main").innerText());
+expectEqual(
+  "visitor: a person's project keeps its questions for that person, and no members are named to sign in as",
+  `${whose.includes("are read by ada and by nobody else")} ${whose.includes("member of ada")}`,
+  "true false",
+);
+await visitor.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").first().waitFor();
+expectEqual(
+  "visitor: a person's page is their handle and their public projects, and is not called an org",
+  await handlePage(visitor),
+  "ada | Projects demo public",
+);
+await shot(visitor, "visitor-handle");
+await visitor.goto(`${built}/nobody`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").first().waitFor();
+expectEqual(
+  "visitor: a handle nobody has is said to be nobody's",
+  squash(await visitor.getByRole("main").getByRole("heading").first().innerText()),
+  "There is no nobody here",
+);
+
 // A project Keel does not have, and a project of that name under another org, are told alike, and lead to the
 // projects Keel has.
 const told = {
@@ -1995,13 +2046,14 @@ expectEqual(
             /\/v1\/namespaces\/[^/]+\/projects\/[^/]+$/,
             "/v1/namespaces/{handle}/projects/{name}",
           )
+          .replace(/\/v1\/namespaces\/[^/]+$/, "/v1/namespaces/{handle}")
           .replace(/\/v1\/projects\/[^/]+\//, "/v1/projects/{id}/"),
       ),
     ),
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(
@@ -2038,6 +2090,14 @@ for (const place of ["/mission-control", "/changes", "/escalations/E-1", "/blob/
     "There is no project ada/demo here | 0 tabs | 0",
   );
 }
+// That the handle is someone's is no secret, though: the person is there, with nothing of theirs to show.
+await outsider.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
+await outsider.getByRole("main").getByRole("heading").first().waitFor();
+expectEqual(
+  "visitor: a person with no public project is still there, and their page says only that",
+  await handlePage(outsider),
+  "ada | Projects ada has no public project. Sign in to see what you may.",
+);
 await lane.close();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2277,12 +2337,26 @@ for (const tab of ["members", "settings"]) {
   );
 }
 
-// Making one. A handle in use is refused, and said.
+// Making one. A handle a person has is not an org's to take, her own included: Keel refuses it when the org is
+// made, and the form says Keel's sentence.
 await person.goto(`${built}/new/org`, { waitUntil: "domcontentloaded" });
 await person.getByLabel("Name").fill("Lovelace");
 await person.getByLabel("Handle").fill("ada");
-await person.getByRole("button", { name: "Make the org" }).click();
-await person.getByText("That handle is taken.").waitFor();
+await Promise.all([
+  person.waitForResponse((answer) => answer.url().endsWith("/organization/create")),
+  person.getByRole("button", { name: "Make the org" }).click(),
+]);
+// Keel has answered. What the form then says is read, whatever it is: a wait for the refusal alone would stop
+// the run where there is none.
+await person
+  .getByRole("alert")
+  .waitFor({ timeout: 5000 })
+  .catch(() => undefined);
+expectEqual(
+  "account: an org made with a handle a person has is refused in Keel's own sentence",
+  `${new URL(person.url()).pathname} ${(await person.getByRole("alert").count()) === 0 ? "no refusal" : squash(await person.getByRole("alert").innerText())}`,
+  `/new/org "ada" is taken: a handle is one person's, one agent's or one org's`,
+);
 await person.getByLabel("Handle").fill("lovelace");
 await shot(person, "new-org");
 await person.getByRole("button", { name: "Make the org" }).click();
@@ -2434,11 +2508,11 @@ await person.waitForFunction(
   () => document.querySelectorAll('ul[aria-label="Members of this org"] > li').length === 1,
 );
 await grace.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
-await grace.getByRole("heading", { name: "There is no lovelace here" }).waitFor();
+await grace.getByRole("main").getByRole("heading").first().waitFor();
 expectEqual(
-  "orgs: removed, the org is to her as one that is not there",
-  String(await grace.getByRole("navigation", { name: "Org" }).count()),
-  "0",
+  "orgs: removed, the org is to her what it is to anyone: an org of that handle, with no project she may see",
+  `${await handlePage(grace)} | ${await grace.getByRole("navigation", { name: "Org" }).count()}`,
+  "lovelace Org | Projects This org has no project you may see. | 0",
 );
 
 // Ada invites her again, as an owner, and nobody answers in time. Keel says it has lapsed, and so does the page.
@@ -2786,7 +2860,7 @@ const frameSaid = async (): Promise<string> =>
 expectEqual(
   "settings: the page says who may read the project, as Keel holds it, under its own tab",
   `${pathOf(person)} | ${await readersSaid()} | ${squash(await person.getByRole("navigation", { name: "Project" }).locator('[aria-current="page"]').innerText())}`,
-  "/ada/demo/settings | private Only members of ada read it. | Settings",
+  "/ada/demo/settings | private Only ada reads it. | Settings",
 );
 expectEqual(
   "settings: and the rest of what Keel holds for it",
@@ -2864,7 +2938,7 @@ await publishing.waitFor();
 expectEqual(
   "settings: one click makes it private again",
   `${await readersSaid()} | ${await frameSaid()} | ${shut.calls.filter((call) => call.method === "PUT").length}`,
-  "private Only members of ada read it. | Keel / ada / demo private Live ada | 2",
+  "private Only ada reads it. | Keel / ada / demo private Live ada | 2",
 );
 expectEqual(
   "settings: and a visitor is told of it what they are told of a project that is not there",

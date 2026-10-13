@@ -25,7 +25,7 @@ export function EscalationPage({ name }: { name: string }) {
   const escalation = useSelected((world) => escalationNamed(world, name), [name]);
   // The entry is changed in place as it is ruled, so what is read of it is read again with the world.
   const state = useSelected(() => escalation?.state, [escalation]);
-  const { org, to } = useWhere();
+  const { namespace, kind, to } = useWhere();
   const hidden = usePublicOnly();
   // Keel takes an answer from whoever it put the question to, which a member's role does not say: it is asked.
   useEffect(() => player.wantAsked(), [player]);
@@ -52,7 +52,9 @@ export function EscalationPage({ name }: { name: string }) {
       answerable={player.canRule(escalation.id)}
       readOnly={
         player.live
-          ? `Keel takes this answer from the person it put the question to first, or from a maintainer of ${org}.`
+          ? kind === "org"
+            ? `Keel takes this answer from the person it put the question to first, or from a maintainer of ${namespace}.`
+            : `Keel takes this answer from the person it put the question to first, or from ${namespace}.`
           : "This fixture's own operator answers this one, a few seconds after it is asked."
       }
       {...(phoneUrl === undefined ? {} : { phoneUrl })}

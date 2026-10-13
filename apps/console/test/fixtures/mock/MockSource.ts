@@ -4,7 +4,7 @@
 // continuation to the log.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
-import type { ProbeSource, ProjectView } from "../../../src/contract/keel/index.ts";
+import type { NamespaceRef, ProbeSource, ProjectView } from "../../../src/contract/keel/index.ts";
 import type { Observation } from "../../../src/contract/observations.ts";
 import { Projects } from "../../../src/engine/projects.ts";
 import type {
@@ -57,11 +57,12 @@ export interface MockSource extends KeelEventSource, KeelResources, KeelReposito
 }
 
 /** The org every fixture's projects are in: the first segment of a fixture's addresses. */
-export const FIXTURE_ORG = "acme";
+/** The namespace every fixture's project is in: an org, which the fixture's reader owns. */
+export const FIXTURE_NAMESPACE: NamespaceRef = { handle: "acme", kind: "org" };
 
 /**
- * A fixture's projects, named as Keel names its own: by org and name. They are the ones the fixture's log
- * creates, all in one org, and the fixture's reader is a member of it.
+ * A fixture's projects, named as Keel names its own: by namespace and name. They are the ones the fixture's
+ * log creates, all in one org, and the fixture's reader is a member of it.
  */
 export async function fixtureDirectory(source: MockSource): Promise<KeelDirectory> {
   const named = new Projects();
@@ -80,16 +81,24 @@ export async function fixtureDirectory(source: MockSource): Promise<KeelDirector
   const listed = (): ProjectView[] =>
     named.list.map((project) => ({
       id: project.id,
-      namespace: { handle: FIXTURE_ORG, kind: "org" },
+      namespace: FIXTURE_NAMESPACE,
       name: project.name,
       visibility: project.visibility,
       createdAt: createdAt.get(project.id) ?? "",
       viewer: { role: "owner" },
     }));
   return {
-    findProject: (org, name) =>
+    findNamespace: (handle) =>
       Promise.resolve(
-        org === FIXTURE_ORG ? (listed().find((project) => project.name === name) ?? null) : null,
+        handle === FIXTURE_NAMESPACE.handle
+          ? { id: "org_0000000000000000000000ACME", ...FIXTURE_NAMESPACE }
+          : null,
+      ),
+    findProject: (namespace, name) =>
+      Promise.resolve(
+        namespace === FIXTURE_NAMESPACE.handle
+          ? (listed().find((project) => project.name === name) ?? null)
+          : null,
       ),
     listProjects: () => Promise.resolve(listed()),
     // A fixture has nobody signed in: no question is listed to anyone, and no feed is anyone's own.

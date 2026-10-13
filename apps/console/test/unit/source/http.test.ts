@@ -213,12 +213,12 @@ describe("who the page reads as", () => {
     const shut = reading("visitor");
     expect(await shut.directory.findProject("acme", "demo")).toBeNull();
     expect(await shut.directory.listProjects()).toEqual([]);
-    // No such project, and a project in another org of the same name, are the same answer.
+    // No such project, and a project in another namespace of the same name, are the same answer.
     expect(await shut.directory.findProject("acme", "no-such")).toBeNull();
 
     const open = await opened("visitor", "public");
     expect(open.found).toMatchObject({
-      namespace: { handle: "acme" },
+      namespace: { handle: "acme", kind: "org" },
       name: "demo",
       visibility: "public",
     });
@@ -259,10 +259,30 @@ describe("who the page reads as", () => {
     expect(stranger.player.world.escalations.size).toBe(0);
   });
 
-  it("[http.org] finds a project under its own org and under no other", async () => {
+  it("[http.namespace] finds a project under its own namespace and under no other", async () => {
     const r = reading("owner");
     expect(await r.directory.findProject("acme", "demo")).toMatchObject({ name: "demo" });
     expect(await r.directory.findProject("other", "demo")).toBeNull();
+    // It is asked for at the namespace's handle, and at no address of an org's.
+    expect(r.keel.calls.map((call) => call.path)).toEqual([
+      "/v1/namespaces/acme/projects/demo",
+      "/v1/namespaces/other/projects/demo",
+    ]);
+  });
+
+  it("[http.whose] asks Keel whose a handle is, as anyone may, and reads a handle nobody has as none", async () => {
+    // A visitor is answered about a private project's namespace too: that a handle is someone's is no secret.
+    const r = reading("visitor");
+    expect(await r.directory.findNamespace("acme")).toEqual({
+      id: "org_0000000000000000000000ACME",
+      handle: "acme",
+      kind: "org",
+    });
+    expect(await r.directory.findNamespace("nobody")).toBeNull();
+    expect(r.keel.calls.map((call) => `${call.path} ${call.authorization}`)).toEqual([
+      "/v1/namespaces/acme ",
+      "/v1/namespaces/nobody ",
+    ]);
   });
 
   it("[http.member] reads a private project as a member of its org, with the role Keel says they have", async () => {
@@ -274,7 +294,7 @@ describe("who the page reads as", () => {
     expect(player.projects.list.map((project) => project.name)).toEqual(["demo"]);
     expect(player.world.conflicts.size).toBe(1);
     expect(source.canRule?.(question)).toBe(true);
-    // Someone signed in who is in no org of the project's is shown nothing of it.
+    // Someone signed in who is no member of the project's namespace is shown nothing of it.
     expect(await reading("stranger").directory.findProject("acme", "demo")).toBeNull();
   });
 

@@ -31,15 +31,25 @@ export interface Page<Item> {
 }
 
 /**
- * Keel's projects, as it names them to whoever asks: its answer to `GET /v1/namespaces/{handle}/projects/{name}` and
- * each entry of `GET /v1/projects`, in Keel's own model. A reader with no session is named the public ones.
+ * Keel's namespaces and projects, as it names them to whoever asks: its answers to `GET /v1/namespaces/{handle}`
+ * and `GET /v1/namespaces/{handle}/projects/{name}`, and each entry of `GET /v1/projects`, in Keel's own models.
+ * A reader with no session is named the public projects.
  */
 export interface KeelDirectory {
+  /**
+   * Whose a handle is: a person's, an agent's or an org's. Null where nobody has it. Keel answers anyone, so
+   * that a handle exists is no secret; what it holds is.
+   */
+  findNamespace(handle: string, signal?: AbortSignal): Promise<Keel.NamespaceView | null>;
   /**
    * The project an address names, or null where Keel shows this reader none of that name. A private project
    * and one that is not there are the same answer, and the console tells neither apart.
    */
-  findProject(org: string, name: string, signal?: AbortSignal): Promise<Keel.ProjectView | null>;
+  findProject(
+    namespace: string,
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<Keel.ProjectView | null>;
   /** Every project Keel lists to this reader. */
   listProjects(signal?: AbortSignal): Promise<Keel.ProjectView[]>;
   /**
@@ -118,7 +128,7 @@ export interface RulingCommand {
 
 /**
  * A project's settings as Keel holds them, and replacing them. Keel reads them to a member of the project's
- * org and lets a maintainer or an owner replace them; whoever else asks is given its refusal. Keel replaces
+ * namespace and lets a maintainer or an owner replace them; whoever else asks is given its refusal. Keel replaces
  * the settings whole, so what is sent is everything it answered with what the reader changed.
  */
 export interface KeelSettings {

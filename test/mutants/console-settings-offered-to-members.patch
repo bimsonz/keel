@@ -1,13 +1,13 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/settings.test.ts
 # kills: settings.maintainers
-# why: a project's settings are offered to every member of its org, where Keel lets a maintainer or an owner change them
+# why: a project's settings are offered to every member of its namespace, where Keel lets a maintainer or an owner change them
 diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
-index ed0fdc9..242b833 100644
+index f4ceaba..d5908f7 100644
 --- a/apps/console/src/engine/settings.ts
 +++ b/apps/console/src/engine/settings.ts
 @@ -8,7 +8,7 @@ import type { Visibility } from "./projects.ts";
  
- /** Whether this reader is offered the project's settings: an owner or a maintainer of its org, as Keel named them. */
+ /** Whether this reader is offered the project's settings: an owner or a maintainer of its namespace, as Keel named them. */
  export function maintains(project: Pick<ProjectView, "viewer">): boolean {
 -  return project.viewer?.role === "owner" || project.viewer?.role === "maintainer";
 +  return project.viewer !== undefined;

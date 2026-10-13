@@ -1,7 +1,8 @@
-// Where in the console an address is. An org's handle is the first segment of
-// the path and a project's name the second, as an owner and a repository are
-// on a code host. `/` is the home, `/O` an org's own, and everything a project
-// has is under `/O/P`, written P below:
+// Where in the console an address is. A namespace's handle is the first segment
+// of the path and a project's name the second, as an owner and a repository
+// are on a code host. A namespace is a person's, an agent's or an org's. `/` is
+// the home, `/N` a namespace's own, and everything a project has is under
+// `/N/P`, written P below:
 //
 //   P                              the code at trunk's head
 //   P/tree/<ref>/<path>            a directory        P/blob/<ref>/<path>   a file
@@ -16,6 +17,7 @@
 // `ref` is a commit, or `trunk` for wherever trunk's head is. Nothing here
 // touches the browser: `parse` reads an address and `href` writes one.
 
+import { RESERVED_SEGMENTS } from "./contract/keel/index.ts";
 import {
   CHANGE_FILTERS,
   CONFLICT_FILTERS,
@@ -48,36 +50,6 @@ export type Route =
 
 /** The moving head of trunk, as an address says it. */
 export const TRUNK = "trunk";
-
-/**
- * First segments that are never an org's handle: Keel answers them (`v1`, `mcp`), the console's Worker does,
- * they are the build's own files, or they are a page above every org (places.ts). Keel refuses each as a
- * handle, so the list is kept the same there.
- */
-export const RESERVED = [
-  "api",
-  "v1",
-  "mcp",
-  "assets",
-  "healthz",
-  "login",
-  "signup",
-  "logout",
-  "device",
-  "invite",
-  "settings",
-  "new",
-  "orgs",
-  "install",
-  "admin",
-  "terms",
-  "privacy",
-  "start",
-  "llms.txt",
-  ".well-known",
-  "robots.txt",
-  "favicon.ico",
-] as const;
 
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 const MISSING: Route = { at: "missing" };
@@ -180,11 +152,11 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
   }
 }
 
-/** An address, read: the org and the project it names, and the place in that project. */
+/** An address, read: the namespace and the project it names, and the place in that project. */
 export interface Address {
-  /** Null at the bare `/`, and at a reserved first segment, which is no org's. */
-  org: string | null;
-  /** Null where the address names no project: the home, or an org's own. */
+  /** The namespace's handle. Null at the bare `/`, and at a reserved first segment, which is nobody's. */
+  namespace: string | null;
+  /** Null where the address names no project: the home, or a namespace's own. */
   project: string | null;
   route: Route;
 }
@@ -198,14 +170,18 @@ export function parse(pathname: string, search: string): Address {
       .map((segment) => decodeURIComponent(segment));
   } catch {
     // Not an address anyone was given: a percent sign that encodes nothing.
-    const [org = null, project = null] = pathname.split("/").filter((segment) => segment !== "");
-    return { org, project, route: MISSING };
+    const [namespace = null, project = null] = pathname
+      .split("/")
+      .filter((segment) => segment !== "");
+    return { namespace, project, route: MISSING };
   }
-  const [org, project, place, ...rest] = segments;
-  if (org === undefined) return { org: null, project: null, route: HOME };
-  if (among(RESERVED, org) !== undefined) return { org: null, project: null, route: MISSING };
-  if (project === undefined) return { org, project: null, route: HOME };
-  return { org, project, route: routeOf(place, rest, new URLSearchParams(search)) };
+  const [namespace, project, place, ...rest] = segments;
+  if (namespace === undefined) return { namespace: null, project: null, route: HOME };
+  // A first segment Keel serves itself is no handle: Keel refuses each as one, and the list is its own.
+  if (among(RESERVED_SEGMENTS, namespace) !== undefined)
+    return { namespace: null, project: null, route: MISSING };
+  if (project === undefined) return { namespace, project: null, route: HOME };
+  return { namespace, project, route: routeOf(place, rest, new URLSearchParams(search)) };
 }
 
 function pathOf(route: Route): string[] {
@@ -252,9 +228,12 @@ function queryOf(route: Route): string {
   return query.toString();
 }
 
-/** Writes the address of a place in an org's project. `carried` is what every link takes with it: see `carriedOf`. */
-export function href(org: string, project: string, route: Route, carried = ""): string {
-  const path = [org, project, ...pathOf(route)]
+/**
+ * Writes the address of a place in a namespace's project. `carried` is what every link takes with it: see
+ * `carriedOf`.
+ */
+export function href(namespace: string, project: string, route: Route, carried = ""): string {
+  const path = [namespace, project, ...pathOf(route)]
     .map((segment) => encodeURIComponent(segment))
     .join("/");
   const query = [queryOf(route), carried].filter((part) => part !== "").join("&");

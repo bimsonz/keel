@@ -1,7 +1,7 @@
 // The repository, as the console reads it from Keel: a project's tree, a file,
 // trunk's history, and a commit with what it changed. Every shape is Keel's
 // own, generated from its spec. A read names a project by Keel's id for it,
-// and Keel answers whoever it shows the project to: its org's members, and
+// and Keel answers whoever it shows the project to: its namespace's members, and
 // anyone where it is public.
 //
 // One thing the code's page can show is not Keel's to give yet, and only a

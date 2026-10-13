@@ -20,6 +20,7 @@ import {
   username,
 } from "better-auth/plugins";
 import { ac, roles } from "../../../src/account/roles.ts";
+import { RESERVED_SEGMENTS } from "../../../src/contract/keel/index.ts";
 
 /** A code "sent" by email, read back by the test as its person would read their email. */
 export interface Sent {
@@ -39,6 +40,8 @@ export interface Identity {
   lapse(invitationId: string): Promise<void>;
   /** Puts every session made so far more than ten minutes behind it, as time would: none of them is fresh now. */
   age(): Promise<void>;
+  /** Whose a handle is here, as Keel says it of a namespace: a person's or an org's, by its account's id, or nobody's. */
+  whose(handle: string): Promise<{ id: string; kind: "user" | "org" } | undefined>;
 }
 
 /** The tables Better Auth keeps with these plugins: the ones spike 27 saw it create. The adapter copies the whole store, so it is a plain object. */
@@ -125,6 +128,34 @@ const refuse = (code: string, message: string): APIError =>
   new APIError("BAD_REQUEST", { code, message });
 
 type Hooked = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
+
+/**
+ * A handle names one namespace on a Keel, a person's, an agent's or an org's, so an org is made with none Keel
+ * serves itself and none that is held, by a person or by an org. Refused as Keel's `claimable` refuses, in its
+ * codes and its sentences, and where Keel does: when the org is made, before the plugin's own read of org
+ * slugs. The plugin's own `check-slug` knows only orgs, there as here.
+ */
+async function claimable(ctx: Hooked) {
+  const slug: unknown = ctx.body?.["slug"];
+  if (typeof slug !== "string") return undefined;
+  const lowered = slug.toLowerCase();
+  if (RESERVED_SEGMENTS.some((segment) => segment === lowered))
+    throw refuse("NAME_REFUSED", `"${slug}" is reserved`);
+  const person = await ctx.context.adapter.findOne({
+    model: "user",
+    where: [{ field: "username", value: lowered }],
+  });
+  const org = await ctx.context.adapter.findOne({
+    model: "organization",
+    where: [{ field: "slug", value: lowered }],
+  });
+  if (person !== null || org !== null)
+    throw refuse(
+      "NAME_TAKEN",
+      `"${lowered}" is taken: a handle is one person's, one agent's or one org's`,
+    );
+  return undefined;
+}
 
 interface InvitationRow {
   email: string;
@@ -233,6 +264,8 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
       before: createAuthMiddleware(async (ctx) => {
         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
         switch (ctx.path) {
+          case "/organization/create":
+            return claimable(ctx);
           case "/organization/invite-member":
             return inviteTarget(ctx);
           case "/organization/get-invitation":
@@ -271,12 +304,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
       }),
     },
     databaseHooks: {
-      user: {
-        // Keel makes a user's own org when their handle is first set, and names it by the handle: when the user
-        // is made, for one who signs up with a passkey, and when they choose it, for one who signed up by a code.
-        create: { after: (user) => personalOrg(user) },
-        update: { after: (user) => personalOrg(user) },
-      },
       // The endpoint making a session says how it was signed in.
       session: {
         create: {
@@ -358,18 +385,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
       username(),
     ],
   });
-  const personalOrg = async (user: { id: string }): Promise<void> => {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the username plugin's field
-    const handle = (user as { username?: string | null }).username;
-    if (typeof handle !== "string" || handle === "") return;
-    const context = await auth.$context;
-    const held = await context.adapter.findOne({
-      model: "organization",
-      where: [{ field: "slug", value: handle }],
-    });
-    if (held !== null) return;
-    await auth.api.createOrganization({ body: { name: handle, slug: handle, userId: user.id } });
-  };
   return {
     outbox,
     requests,
@@ -397,6 +412,21 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
           update: { createdAt: made },
         });
       }
+    },
+    async whose(handle) {
+      const context = await auth.$context;
+      const named = handle.toLowerCase();
+      // A person's handle is a namespace of their own, and no org is kept for it.
+      const person = await context.adapter.findOne<{ id: string }>({
+        model: "user",
+        where: [{ field: "username", value: named }],
+      });
+      if (person !== null) return { id: person.id, kind: "user" };
+      const org = await context.adapter.findOne<{ id: string }>({
+        model: "organization",
+        where: [{ field: "slug", value: named }],
+      });
+      return org === null ? undefined : { id: org.id, kind: "org" };
     },
   };
 }

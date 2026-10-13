@@ -1,7 +1,6 @@
 import { BookBookmarkIcon, UsersThreeIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type { Org } from "../account/account.ts";
-import { orgsOf } from "../account/accounts.ts";
 import { followTurns, waitingRows } from "../engine/waiting.ts";
 import { hrefOf } from "../places.ts";
 import { TRUNK, href } from "../route.ts";
@@ -24,7 +23,7 @@ function ProjectRows({ label, projects }: { label: string; projects: readonly Pr
           title={
             <span className="flex items-baseline gap-1.5">
               <a
-                href={`/${encodeURIComponent(project.namespace.handle)}`}
+                href={hrefOf({ at: "namespace", handle: project.namespace.handle })}
                 className="hover:underline"
               >
                 {project.namespace.handle}
@@ -148,8 +147,9 @@ function Waiting({ directory }: { directory: KeelDirectory }) {
 }
 
 /**
- * The home: the projects Keel names to this reader, each under the org it is in, as a code host lists
- * repositories under their owners. A visitor is named the public ones, and someone signed in their orgs' too.
+ * The home: the projects Keel names to this reader, each under the namespace it is in, as a code host lists
+ * repositories under their owners. A visitor is named the public ones, and someone signed in their own and
+ * their orgs' too.
  */
 export function HomePage({
   directory,
@@ -157,7 +157,7 @@ export function HomePage({
   handle,
 }: {
   directory: KeelDirectory;
-  /** What Keel lists as the reader's orgs, where someone is signed in: their own namespace is one of them. */
+  /** What Keel lists as the reader's orgs, where someone is signed in. Their own namespace is not one of them. */
   orgs: readonly Org[];
   /** The reader's own handle, where they have one: their projects are listed first, as theirs. */
   handle?: string;
@@ -199,14 +199,14 @@ export function HomePage({
   if (projects === undefined) return null;
   if ("failed" in projects)
     return <Notice title="Keel did not list its projects">{projects.failed}.</Notice>;
-  // A person needs no org: their own namespace is theirs, and only what they made or joined is listed as an org.
-  const joined = orgsOf(orgs, { handle });
+  // A person needs no org: their own namespace is theirs, and what Keel lists as their orgs they made or joined.
+  const joined = orgs;
   const mine = projects.filter((project) => project.namespace.handle === handle);
   const rest = projects.filter((project) => project.namespace.handle !== handle);
   if (handle === undefined && projects.length === 0 && orgs.length === 0) {
     return (
       <Notice title="Keel has no project to show you yet">
-        A visitor is shown the public projects, and someone signed in the projects of their orgs as
+        A visitor is shown the public projects, and someone signed in their own and their orgs' as
         well.{" "}
         <a href="/login" className="a-link">
           Sign in
@@ -238,7 +238,7 @@ export function HomePage({
                 mark={<UsersThreeIcon size={18} aria-hidden />}
                 title={
                   <a
-                    href={hrefOf({ at: "org", org: org.handle, tab: "home" })}
+                    href={hrefOf({ at: "namespace", handle: org.handle })}
                     className="hover:underline"
                   >
                     {org.handle}

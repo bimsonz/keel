@@ -1,8 +1,9 @@
-// The addresses above every project: the pages a user has whatever project they are in, and an org's own.
-// An org's home is at its handle, `/<org>`, as an owner's is on a code host. Every other one is at a reserved
-// first segment (route.ts), so none can be taken for an org.
+// The addresses above every project: the pages a user has whatever project they are in, a namespace's own
+// page, and an org's. A namespace's page is at its handle, `/<handle>`, as an owner's is on a code host: a
+// person's projects, an agent's, or an org's home. Every other one is at a first segment Keel reserves, in
+// its own list, so none can be taken for a handle.
 
-import { RESERVED } from "./route.ts";
+import { RESERVED_SEGMENTS } from "./contract/keel/index.ts";
 
 export type OrgTab = "home" | "members" | "settings";
 
@@ -14,12 +15,14 @@ export type Place =
   /** Where `keeltown login` sends a person, with the code their terminal is showing. */
   | { at: "device"; userCode: string }
   | { at: "new-org" }
-  /** An org's own pages: its home at `/<org>`, its members and settings under `/orgs/<org>/…`. */
-  | { at: "org"; org: string; tab: OrgTab }
+  /** A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. */
+  | { at: "namespace"; handle: string }
+  /** An org's members and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
+  | { at: "org"; org: string; tab: Exclude<OrgTab, "home"> }
   /** An invitation to an org, as the person it was made to opens it. */
   | { at: "invite"; id: string };
 
-const ORG_TABS: readonly OrgTab[] = ["home", "members", "settings"];
+const UNDER_ORGS: readonly Exclude<OrgTab, "home">[] = ["members", "settings"];
 
 /** The place an address names, or null where it names none of them. */
 export function placeOf(pathname: string, search = ""): Place | null {
@@ -34,15 +37,22 @@ export function placeOf(pathname: string, search = ""): Place | null {
   }
   const [segment, second, third, ...more] = segments;
   if (more.length > 0) return null;
-  // One segment that is no reserved word is an org's handle, and the address is that org's home.
-  if (segment !== undefined && second === undefined && !RESERVED.some((word) => word === segment))
-    return { at: "org", org: segment, tab: "home" };
+  // One segment that is no reserved word is a handle, and the address is that namespace's own page.
+  if (
+    segment !== undefined &&
+    second === undefined &&
+    !RESERVED_SEGMENTS.some((word) => word === segment)
+  )
+    return { at: "namespace", handle: segment };
   switch (segment) {
     case "new":
       return second === "org" && third === undefined ? { at: "new-org" } : null;
     case "orgs": {
-      const tab = third === undefined ? "home" : ORG_TABS.slice(1).find((held) => held === third);
-      return second === undefined || tab === undefined ? null : { at: "org", org: second, tab };
+      if (second === undefined) return null;
+      // An org's home was once here. It is at its handle, and main.tsx corrects the address.
+      if (third === undefined) return { at: "namespace", handle: second };
+      const tab = UNDER_ORGS.find((held) => held === third);
+      return tab === undefined ? null : { at: "org", org: second, tab };
     }
     case "invite":
       return second === undefined || third !== undefined ? null : { at: "invite", id: second };
@@ -67,8 +77,10 @@ function pathOf(place: Place): string[] {
   switch (place.at) {
     case "new-org":
       return ["new", "org"];
+    case "namespace":
+      return [place.handle];
     case "org":
-      return place.tab === "home" ? [place.org] : ["orgs", place.org, place.tab];
+      return ["orgs", place.org, place.tab];
     case "invite":
       return ["invite", place.id];
     default:
@@ -115,13 +127,16 @@ export function sentFrom(
   here: { pathname: string; search: string },
 ): string | null {
   const asked = `${here.pathname}${here.search}`;
-  // An org's home is anyone's to open: Keel shows a visitor the org's public projects, and nothing else of it.
-  const open =
-    place.at === "login" || place.at === "signup" || (place.at === "org" && place.tab === "home");
+  // A namespace's page is anyone's to open: Keel shows a visitor its public projects, and nothing else of it.
+  const open = place.at === "login" || place.at === "signup" || place.at === "namespace";
   if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
   if (place.at === "login") return nextOf(here.search);
   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);
-  // An org's pages are for a user with a name on this Keel: Keel refuses them to one who has not chosen it.
-  const above = place.at === "new-org" || place.at === "org" || place.at === "invite";
+  // These pages are for a user with a name on this Keel: Keel refuses them to one who has not chosen it.
+  const above =
+    place.at === "new-org" ||
+    place.at === "namespace" ||
+    place.at === "org" ||
+    place.at === "invite";
   return above && reader.handle === undefined ? hrefOf({ at: "signup" }, asked) : null;
 }

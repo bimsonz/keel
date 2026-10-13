@@ -4,8 +4,9 @@
 // puts no credential of its own on anything. A reader with no session is a
 // visitor, and Keel reads a visitor what is public.
 //
-// A project is found by its org and its name (`GET /v1/namespaces/{handle}/projects/
-// {name}`), and everything after is read by the id Keel answered: its log by
+// A project is found by its namespace's handle and its name (`GET /v1/
+// namespaces/{handle}/projects/{name}`), and everything after is read by the
+// id Keel answered: its log by
 // cursor, long-polling at the tail, its repository, a verdict's evidence. A
 // ruling is Keel's own operation, and Keel decides whether this reader may
 // give it.
@@ -23,6 +24,7 @@ import type {
   EventRecord,
   Inbox_listEventsInput,
   LatticeSet,
+  NamespaceView,
   Operator_giveRulingInput,
   Operator_listEscalationsInput,
   Operator_putSettingsInput,
@@ -139,9 +141,16 @@ function reader(options: HttpOptions): (path: string, signal?: AbortSignal) => P
 export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
   const read = reader(options);
   return {
-    async findProject(org, name, signal) {
+    async findNamespace(handle, signal) {
+      const response = await read(`/v1/namespaces/${encodeURIComponent(handle)}`, signal);
+      // A handle nobody has.
+      if (response.status === 404) return null;
+      if (!response.ok) throw await refusalOf(response);
+      return answered<NamespaceView>(response);
+    },
+    async findProject(namespace, name, signal) {
       const response = await read(
-        `/v1/namespaces/${encodeURIComponent(org)}/projects/${encodeURIComponent(name)}`,
+        `/v1/namespaces/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
         signal,
       );
       // Keel answers a project it does not show this reader as it answers one that is not there.

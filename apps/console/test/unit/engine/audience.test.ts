@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectView } from "../../../src/contract/keel/index.ts";
-import { publicOnly, shownAgent } from "../../../src/engine/audience.ts";
+import { membersOf, publicOnly, shownAgent } from "../../../src/engine/audience.ts";
 import { funnelOf } from "../../../src/engine/funnel.ts";
 import { World } from "../../../src/engine/world.ts";
 
@@ -22,6 +22,14 @@ describe("who Keel reads a project's log to", () => {
       expect(publicOnly({ mode: "live", project: { ...project, viewer: { role } } })).toBe(false);
     // A test fixture's log is whole.
     expect(publicOnly({ mode: "fixture", project })).toBe(false);
+  });
+
+  it("[audience.members] names who is read the rest by whose the namespace is: an org's members, or the one a person's or an agent's is", () => {
+    expect(membersOf({ handle: "acme", kind: "org" })).toBe("the members of acme");
+    expect(membersOf({ handle: "ada", kind: "user" })).toBe("ada");
+    expect(membersOf({ handle: "claude-ada", kind: "agent" })).toBe("claude-ada");
+    // Where Keel has not said whose it is, no more is claimed than that the project has members.
+    expect(membersOf({ handle: "acme" })).toBe("this project's members");
   });
 
   it("[audience.agent] shows an agent Keel has not named to this reader as unnamed, and never as a kind nobody said it was", () => {

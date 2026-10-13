@@ -6,7 +6,7 @@
 import type { ProjectSettings, ProjectView } from "../contract/keel/index.ts";
 import type { Visibility } from "./projects.ts";
 
-/** Whether this reader is offered the project's settings: an owner or a maintainer of its org, as Keel named them. */
+/** Whether this reader is offered the project's settings: an owner or a maintainer of its namespace, as Keel named them. */
 export function maintains(project: Pick<ProjectView, "viewer">): boolean {
   return project.viewer?.role === "owner" || project.viewer?.role === "maintainer";
 }
