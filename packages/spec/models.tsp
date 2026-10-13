@@ -44,14 +44,22 @@ model Lease {
   lapsesAt: utcDateTime;
 }
 
-/** The throwaway repo a change or sketch is worked in, and how to push to it. */
+/**
+ * The throwaway repo a change or sketch is worked in, and how to push to it:
+ * clone `remote`, commit, push `HEAD:refs/heads/main`, then submit the
+ * commit's sha. A push alone lands nothing.
+ */
 model Workspace {
   id: WorkspaceId;
 
-  /** The git remote to push to. */
+  /** The git remote to clone and push to, over HTTPS. */
   remote: string;
 
-  /** A write token for this workspace only. Shown once. */
+  /**
+   * A write token for this workspace only. Shown once. Git presents it as a
+   * bearer, for the clone and the push alike:
+   * `git -c http.extraHeader="Authorization: Bearer <token>" clone <remote>`.
+   */
   token?: string;
 
   expiresAt: utcDateTime;

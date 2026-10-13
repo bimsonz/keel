@@ -126,12 +126,13 @@ scalar SubjectKey extends string;
 // ─── Authentication ─────────────────────────────────────────────────────────
 
 /**
- * OAuth2 client credentials. A client exchanges its id and secret at the token
- * endpoint for a short-lived Ed25519-signed JWT carrying its scopes.
+ * OAuth2 client credentials. An agent asks the token endpoint for a
+ * short-lived signed token carrying its scopes, with a request its key signs
+ * (`AgentTokenRequest`).
  */
 model KeelClientCredentials {
   type: OAuth2FlowType.clientCredentials;
-  tokenUrl: "/v1/oauth/token";
+  tokenUrl: "/v1/auth/oauth2/token";
 
   // No `scopes` here: a flow's scopes override the per-operation scopes the
   // aliases below pass as OAuth2Auth's second argument, and every operation

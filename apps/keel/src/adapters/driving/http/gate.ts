@@ -9,7 +9,7 @@ import type {
 import type { AgentClaims } from "@keeltown/core/domain/identity";
 import type { UserId } from "@keeltown/core/kernel";
 import { presentedToken } from "./caller.ts";
-import { problemResponse } from "./problems.ts";
+import { arrival, problemResponse } from "./problems.ts";
 
 /** The session cookie Better Auth sets for Keel (`__Secure-` and the `keel` prefix). */
 export const SESSION_COOKIE = "__Secure-keel.session_token";
@@ -152,15 +152,7 @@ function refusal(answer: GateRefusal, requestId: string): Response {
         ],
       });
     case "invalid":
-      return problemResponse(401, "auth.invalid_token", requestId, {
-        nextActions: [
-          {
-            kind: "call",
-            title: "Exchange your client credentials for a token",
-            operationId: "Auth_exchangeToken",
-          },
-        ],
-      });
+      return problemResponse(401, "auth.invalid_token", requestId, { nextActions: arrival() });
     default: {
       const unmapped: never = answer;
       return unmapped;

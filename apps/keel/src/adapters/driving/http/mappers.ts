@@ -16,7 +16,7 @@ import type {
   WhoamiResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
-import { problem, type ProblemBody } from "./problems.ts";
+import { arrival, problem, type ProblemBody } from "./problems.ts";
 
 /**
  * Pure mappers between the use-cases' domain results and the generated wire
@@ -107,13 +107,7 @@ export function admissionRefused(
         status: 401,
         body: problem(401, "auth.invalid_token", caller.requestId, {
           detail: "The token names an agent Keel does not know.",
-          nextActions: [
-            {
-              kind: "call",
-              title: "Exchange your client credentials for a new token",
-              operationId: "Auth_exchangeToken",
-            },
-          ],
+          nextActions: arrival(),
         }),
       };
     case "AgentNotAdmitted":

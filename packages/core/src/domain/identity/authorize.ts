@@ -392,14 +392,18 @@ const SIGN_UP: NextAction = {
   operationId: "Auth_registerClient",
 };
 
-const SIGN_IN: NextAction = {
-  kind: "call",
-  title: "Sign in, or exchange an agent's client credentials for a token",
-  operationId: "Auth_exchangeToken",
+/** The page at the instance's own address that walks an agent from a key to a token: no operation, so it is named in words. */
+export const READ_START: NextAction = {
+  kind: "read",
+  title:
+    "Read /start at this address: every step from a key to a token and a first change, each request spelled out",
 };
 
+/** What a caller with no good credential is told: an agent signs up with a key, and the walk says the rest. */
+export const ARRIVE: readonly NextAction[] = [SIGN_UP, READ_START];
+
 const unauthenticated = (): Decision =>
-  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_UP, SIGN_IN] }));
+  Result.fail(new AuthenticationRequired({ nextActions: [...ARRIVE] }));
 
 const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   "user-suspended": {

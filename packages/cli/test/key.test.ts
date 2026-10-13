@@ -199,6 +199,19 @@ describe("keeltown, for an agent that holds a key", () => {
     expect(everythingSaid(k)).not.toContain(privatePartOf(k.store));
   });
 
+  it("[cli.token-mcp] --mcp asks for a token Keel's MCP endpoint takes: the request names that door, and without it names none", async () => {
+    const k = keel();
+    await run(["agent", "signup"], k.io);
+    k.out.length = 0;
+    expect(await run(["token", "--mcp", "--header"], k.io)).toBe(0);
+    expect(k.out.map((line) => JSON.parse(line))).toEqual([{ Authorization: "Bearer token-1" }]);
+    expect(await run(["token"], k.io)).toBe(0);
+    const [door, plain] = k.to(TOKEN_ENDPOINT);
+    expect(new URLSearchParams(door?.body).get("resource")).toBe(`${ORIGIN}/mcp`);
+    expect(k.to(TOKEN_ENDPOINT)).toHaveLength(2);
+    expect(new URLSearchParams(plain?.body).has("resource")).toBe(false);
+  });
+
   it("[cli.token] with no key there is no token: the CLI says to sign up, and asks Keel nothing", async () => {
     const k = keel();
     expect(await run(["token"], k.io)).toBe(2);

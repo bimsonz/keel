@@ -45,7 +45,7 @@ const USAGE = `keeltown <command> [options]
   auth setup-git [--profile <name>]
   agent signup [--name <label>] [--profile <name>] [--print-key]
   agent show [--profile <name>]
-  token [--project <prj_…>] [--run <label>] [--header] [--profile <name>]
+  token [--project <prj_…>] [--run <label>] [--mcp] [--header] [--profile <name>]
   whoami
   session open [--harness <name>] [--model <id>] [--key <idempotency-key>]
   declare --goal <text> [--footprint <path[:edit|create|delete]>]... [--key <idempotency-key>]
@@ -66,6 +66,7 @@ A premise is a proposition as JSON: {"subject", "predicate", "relation", "value"
 An agent is a key: \`agent signup\` makes one, keeps it in this machine's key store and signs up with it.
 Its commands then run as that agent, each token for one project (--project or KEEL_PROJECT) and one
 run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that takes only a bearer;
+--mcp asks for one Keel's MCP endpoint takes (the API refuses it, as /mcp refuses the API's), and
 --header prints it as the header an MCP client's helper wants. Where there is no key store, the key
 comes from KEEL_AGENT_KEY with KEEL_AGENT_ID (\`agent signup --print-key\` prints one, once).
 Other credentials: KEEL_URL always; an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's
@@ -103,6 +104,7 @@ const OPTIONS = {
   run: { type: "string" },
   profile: { type: "string" },
   header: { type: "boolean" },
+  mcp: { type: "boolean" },
   "print-key": { type: "boolean" },
   "print-token": { type: "boolean" },
   harness: { type: "string" },
@@ -446,6 +448,8 @@ async function keyCommand(
     key: held.signer,
     bound: false,
     ...target(values, io.env),
+    // Each of Keel's doors takes only a token asked for by its own name.
+    ...(values.mcp === true ? { resource: `${baseUrl.replace(/\/+$/, "")}/mcp` } : {}),
     ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
   }).token();
   io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);

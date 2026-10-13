@@ -44,5 +44,5 @@ interface Sessions {
   ): {
     @statusCode statusCode: 201;
     @body body: Session;
-  } | Conflict | StandardErrors;
+  } | NotFound | Conflict | StandardErrors;
 }

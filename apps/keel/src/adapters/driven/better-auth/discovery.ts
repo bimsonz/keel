@@ -25,13 +25,14 @@ function metadataApi(api: object): MetadataApi {
 /**
  * The authorization server's document (RFC 8414): the provider's own, with its
  * issuer, token endpoint, key location and what a token request may be signed
- * with. Two things are Keel's: a field naming a route Keel does not serve is
- * left out, and `registration_endpoint`, which the provider always points at
- * its own closed route, names where an agent signs up with its key.
+ * with. Three things are Keel's: a field naming a route Keel does not serve is
+ * left out; `registration_endpoint`, which the provider always points at its
+ * own closed route, names where an agent signs up with its key; and
+ * `service_documentation` names the page that walks an arriving agent in.
  */
 export async function authorizationServerDocument(
   auth: KeelAuth,
-  where: { readonly origin: string; readonly signUpUrl: string },
+  where: { readonly origin: string; readonly signUpUrl: string; readonly startUrl: string },
   request: Request,
 ): Promise<Response> {
   const answer = await oauthProviderAuthServerMetadata({ api: metadataApi(auth.api) })(request);
@@ -45,7 +46,7 @@ export async function authorizationServerDocument(
     ),
   );
   return Response.json(
-    { ...served, registration_endpoint: where.signUpUrl },
+    { ...served, registration_endpoint: where.signUpUrl, service_documentation: where.startUrl },
     { status: answer.status, headers: CACHED },
   );
 }
@@ -55,13 +56,16 @@ const CACHED = { "cache-control": "public, max-age=300" };
 
 /**
  * A protected resource's document (RFC 9728): which resource this is, the
- * server that issues its tokens, and how a token is presented to it.
+ * server that issues its tokens, how a token is presented to it, and, as
+ * `resource_documentation`, the page that walks an arriving agent in. A 401's
+ * challenge names this document, so that page is two reads from any refusal.
  */
 export async function protectedResourceDocument(
   auth: KeelAuth,
-  origin: string,
+  where: { readonly origin: string; readonly startUrl: string },
   resource: string,
 ): Promise<Response> {
+  const { origin } = where;
   const provided = await oauthProviderResourceClient(auth)
     .getActions()
     .getProtectedResourceMetadata({
@@ -71,5 +75,8 @@ export async function protectedResourceDocument(
       bearer_methods_supported: ["header"],
       dpop_signing_alg_values_supported: [...KEY_ALGORITHMS],
     });
-  return Response.json(provided, { headers: CACHED });
+  return Response.json(
+    { ...provided, resource_documentation: where.startUrl },
+    { headers: CACHED },
+  );
 }

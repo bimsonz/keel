@@ -97,6 +97,7 @@ async function keyAgent() {
   };
   return {
     agentId,
+    account,
     projectId,
     a: await lane("run-a"),
     b: await lane("run-b"),
@@ -284,6 +285,14 @@ const told = (...changes: ChangeUnderTest[]) => new Set(changes.map((c) => `chan
 async function openSession(token: string, key: string): Promise<string> {
   return (await openedSession(token, key)).id;
 }
+
+/** Opening a session, whatever it answers. */
+const opening = (token: string) =>
+  asAgent(token, "/v1/sessions", {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": `opening-${ulid()}` },
+    body: "{}",
+  });
 
 /** The session as opening it answers. */
 async function openedSession(token: string, key: string) {
@@ -561,6 +570,25 @@ describe("an agent's two runs, each with its own token", () => {
       { actor: agentActor(agent.agentId), run: agent.a.run },
       { actor: agentActor(agent.agentId), run: undefined },
     ]);
+  });
+
+  it("[run.pool-session-hidden] a session opened with a token that names another agent's private project answers 404, as the spec declares for it: the project is not there for this agent", async () => {
+    const [agent, other] = [await keyAgent(), await keyAgent()];
+    // A token request never says whether a project exists: the token is granted, and the gate decides on each request.
+    const strangers = (
+      await granted(
+        await requestToken(agent.agentId, agent.account, {
+          project: other.projectId,
+          run: "run-a",
+        }),
+      )
+    ).access_token;
+    const hidden = await opening(strangers);
+    expect(hidden.status).toBe(404);
+    expect(hidden.headers.get("content-type")).toBe("application/problem+json");
+    expect(await hidden.json()).toMatchObject({ status: 404, code: "resource.not_found" });
+    // The same request with a token for its own project opens one.
+    expect((await opening(agent.a.token)).status).toBe(201);
   });
 
   it("[run.pool-settings] an agent replaces the settings of a project in its own namespace as itself, in its token's run and under none with a token that names none; its other project and another agent's refuse it", async () => {

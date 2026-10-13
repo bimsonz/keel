@@ -72,6 +72,7 @@ import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
 import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
 import { RUN_HEADER } from "../rpc/index.ts";
+import { START_PATH } from "../adapters/driving/http/front-door.ts";
 import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
@@ -353,10 +354,11 @@ export function makeIsolate(
       authorizationServer: (request) =>
         authorizationServerDocument(
           auth(),
-          { origin, signUpUrl: `${origin}${REGISTER_PATH}` },
+          { origin, signUpUrl: `${origin}${REGISTER_PATH}`, startUrl: `${origin}${START_PATH}` },
           request,
         ),
-      protectedResource: (resource) => protectedResourceDocument(auth(), origin, resource),
+      protectedResource: (resource) =>
+        protectedResourceDocument(auth(), { origin, startUrl: `${origin}${START_PATH}` }, resource),
     },
     streams: inboxStreams(env, runtime),
     git: {

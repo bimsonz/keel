@@ -8,6 +8,7 @@ import {
   OAuthErrorCode,
   originValidationResponse,
 } from "@modelcontextprotocol/server";
+import { openApiDocument } from "@keeltown/contracts";
 import type { Admitted } from "@keeltown/core/application/identity";
 import type { ToolDeps } from "../../../generated/mcp/mcp-runtime.gen.ts";
 import { registerTools } from "../../../generated/mcp/mcp.gen.ts";
@@ -64,7 +65,8 @@ export function makeMcpEndpoint(
   allowedHosts: readonly string[],
 ) {
   const mcp = createMcpHandler((context) => {
-    const server = new McpServer({ name: "keel", version: "0.0.0" });
+    // The version the published document gives: the server's card says the same one.
+    const server = new McpServer({ name: "keel", version: openApiDocument.info.version });
     registerTools(server, () => handlers, toolDeps(admittedOf(context.authInfo)));
     return server;
   });

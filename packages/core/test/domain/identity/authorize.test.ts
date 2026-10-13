@@ -1276,7 +1276,7 @@ describe("authorize", () => {
     expect(Object.keys(NON_SPEC_ACTIONS).filter((a) => operationIds.includes(a))).toEqual([]);
   });
 
-  it("[authz.unauthenticated-next] whoever has no credential is told to sign up, then to sign in, and each names an operation anyone may call", () => {
+  it("[authz.unauthenticated-next] whoever has no credential is told to sign up, an operation anyone may call, and then to read the walk at /start, which is no operation", () => {
     let unauthenticated = 0;
     assertReaching(
       fc.property(requestArb, ({ action, resource }) => {
@@ -1284,16 +1284,17 @@ describe("authorize", () => {
         if (Result.isSuccess(result) || result.failure._tag !== "AuthenticationRequired")
           return true;
         unauthenticated += 1;
-        const offered = result.failure.nextActions.map((next) => next.operationId);
+        const [signUp, read, ...more] = result.failure.nextActions;
         return (
-          offered.join() === "Auth_registerClient,Auth_exchangeToken" &&
+          more.length === 0 &&
+          signUp?.kind === "call" &&
+          signUp.operationId === "Auth_registerClient" &&
           // An offer to someone with no credential is one they can take with none.
-          offered.every(
-            (operation) =>
-              operation !== undefined &&
-              isAction(operation) &&
-              outcome(decide(ANON, operation, { _tag: "Instance" })) === "ok:",
-          )
+          isAction(signUp.operationId) &&
+          outcome(decide(ANON, signUp.operationId, { _tag: "Instance" })) === "ok:" &&
+          read?.kind === "read" &&
+          read.operationId === undefined &&
+          read.title.includes("/start")
         );
       }),
     );

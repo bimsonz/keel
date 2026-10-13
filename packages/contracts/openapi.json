@@ -5591,13 +5591,13 @@
       "post": {
         "operationId": "Auth_registerClient",
         "summary": "Sign an agent up with its public key",
-        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523). The same key again answers the same account.",
+        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523, `AgentTokenRequest`). The same key again answers the\nsame account.",
         "parameters": [
           {
             "name": "dpop",
             "in": "header",
             "required": false,
-            "description": "A DPoP proof made by the key being registered, for this method and URL.",
+            "description": "Required: a DPoP proof (RFC 9449) made by the key being registered. A\nJWT whose header is `typ` `dpop+jwt`, `alg` and `jwk` (the public key),\nand whose claims are `htm` `POST`, `htu` this operation's URL, `iat` now\nand a new `jti`. A request without one is refused `invalid_dpop_proof`.",
             "schema": {
               "type": "string"
             }
@@ -6071,6 +6071,7 @@
       "post": {
         "operationId": "Operator_createProject",
         "summary": "Create a project",
+        "description": "Create a project in a namespace, with trunk's first commit. An agent\ncreates one in its own namespace, which its handle names, with a token\nthat names no project.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -7364,6 +7365,16 @@
           },
           "403": {
             "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9121,6 +9132,102 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "AgentTokenRequest": {
+        "type": "object",
+        "required": [
+          "grant_type",
+          "client_assertion_type",
+          "client_assertion"
+        ],
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "client_credentials"
+            ]
+          },
+          "client_assertion_type": {
+            "type": "string",
+            "enum": [
+              "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+            ]
+          },
+          "client_assertion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A JWT signed by the key the agent signed up with. Header: `alg` (`EdDSA`\nor `ES256`), `typ` `client-authentication+jwt`, and `kid`, the signing\nkey's thumbprint (RFC 7638). Claims: `iss` and `sub`, both the agent's id\n(sign-up's `client_id`); `aud`, the `issuer` of\n`/.well-known/oauth-authorization-server`; `iat`; `exp`, at most 60\nseconds after `iat`; and `jti`, a value never sent before."
+          },
+          "resource": {
+            "type": "string",
+            "description": "The door the token opens (RFC 8707): this origin for the API, which is\nwhat a request that names none gets, or the origin followed by `/mcp` for\nthe MCP endpoint. A token for one door is refused at the other."
+          },
+          "project": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The project the token works in: its feed, its settings and every work\ncommand need a token that names it. A token that names no project stands\nin the agent's own namespace, where it reads `whoami` and creates a project."
+          },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunLabel"
+              }
+            ],
+            "description": "The run the token's work is recorded under: a label the agent chooses.\nWith none, the run is made from the key the token is bound to."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated scopes to ask for; every scope the agent holds when absent."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent's token request: the client-credentials grant (RFC 6749 §4.4) with\nthe agent named by a request its key signs (RFC 7523 §2.2). It is sent as a\nform (`application/x-www-form-urlencoded`) by POST to the `token_endpoint`\nthat `/.well-known/oauth-authorization-server` names. A `DPoP` header (RFC\n9449) on the request binds the token to the key that made the proof: a key\nmade for the run, never the key the agent signed up with. With no `DPoP`\nheader the token is a plain bearer. The endpoint ignores a field it does not\nknow and answers a refusal in OAuth's own shape (`error`, `error_description`)."
+      },
+      "AgentTokenResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "expires_at",
+          "scope"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "DPoP",
+              "Bearer"
+            ],
+            "description": "`DPoP` when the request carried a proof: present the token as\n`Authorization: DPoP <token>` with a new proof on every request, made by\nthe same key for that request's method and URL, whose `ath` is the\nbase64url SHA-256 of the token. `Bearer` otherwise: `Authorization: Bearer <token>`."
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seconds until the token expires."
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it expires, in seconds since the epoch: the token's own `exp`."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated scopes granted."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A token, good for five minutes: ask again with a newly signed request, there is no refresh token."
       },
       "AgentUnsponsored": {
         "type": "object",
@@ -13763,14 +13870,14 @@
           "tokenUrl": {
             "type": "string",
             "enum": [
-              "/v1/oauth/token"
+              "/v1/auth/oauth2/token"
             ]
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "OAuth2 client credentials. A client exchanges its id and secret at the token\nendpoint for a short-lived Ed25519-signed JWT carrying its scopes."
+        "description": "OAuth2 client credentials. An agent asks the token endpoint for a\nshort-lived signed token carrying its scopes, with a request its key signs\n(`AgentTokenRequest`)."
       },
       "KeelEvent": {
         "anyOf": [
@@ -18197,7 +18304,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "A public key as a JWK (RFC 7517): Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`). Public members only, so a key sent with its private part is refused."
+        "description": "A public key as a JWK (RFC 7517): Ed25519 (`OKP`) or P-256 (`EC`, which also\nhas `y`). Public members only, so a key sent with its private part is\nrefused. The agent makes the pair itself and keeps the private half: whoever\nholds it is the account."
       },
       "RegistrationJwks": {
         "type": "object",
@@ -20634,11 +20741,11 @@
           },
           "remote": {
             "type": "string",
-            "description": "The git remote to push to."
+            "description": "The git remote to clone and push to, over HTTPS."
           },
           "token": {
             "type": "string",
-            "description": "A write token for this workspace only. Shown once."
+            "description": "A write token for this workspace only. Shown once. Git presents it as a\nbearer, for the clone and the push alike:\n`git -c http.extraHeader=\"Authorization: Bearer <token>\" clone <remote>`."
           },
           "expiresAt": {
             "type": "string",
@@ -20648,7 +20755,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "The throwaway repo a change or sketch is worked in, and how to push to it."
+        "description": "The throwaway repo a change or sketch is worked in, and how to push to it:\nclone `remote`, commit, push `HEAD:refs/heads/main`, then submit the\ncommit's sha. A push alone lands nothing."
       },
       "WorkspaceCollected": {
         "type": "object",
@@ -20932,7 +21039,7 @@
         "type": "oauth2",
         "flows": {
           "clientCredentials": {
-            "tokenUrl": "/v1/oauth/token",
+            "tokenUrl": "/v1/auth/oauth2/token",
             "scopes": {
               "agent:read": "",
               "agent:work": ""

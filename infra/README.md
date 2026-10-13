@@ -22,7 +22,7 @@ pnpm smoke                           # whoami over REST and MCP, live
 
 ## The site
 
-`routing.tf` serves everything from one host, `var.host` (`keel.town`), so a session cookie is first-party everywhere. The console is the apex origin through a Workers Custom Domain, which keeps its DNS record and certificate; Workers routes put Keel in front of it for `/v1/*` and `/mcp*` (the agent front door's paths join them as they are built). A route allows only a trailing wildcard, so the clone route `/<org>/<project>.git/...` reaches Keel through the console, which forwards only `info/refs` and `git-upload-pack` over its service binding. There is one environment: whatever is deployed here is production.
+`routing.tf` serves everything from one host, `var.host` (`keel.town`), so a session cookie is first-party everywhere. The console is the apex origin through a Workers Custom Domain, which keeps its DNS record and certificate; Workers routes put Keel in front of it for `/v1/*`, `/.well-known/*`, `/mcp` and `/mcp/*` (two patterns: a wildcard on the bare word would take any handle that begins with it), and for the agent front door's two exact paths, `/start` and `/llms.txt`. A route allows only a trailing wildcard, so the clone route `/<org>/<project>.git/...` reaches Keel through the console, which forwards only `info/refs` and `git-upload-pack` over its service binding. There is one environment: whatever is deployed here is production.
 
 ## State
 

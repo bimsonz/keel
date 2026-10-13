@@ -130,6 +130,17 @@ afterEach(() => {
 });
 
 describe("the Keel client for an agent that holds a key", () => {
+  it("[sdk.key-resource] a client made for one of Keel's doors asks for that door's token by name, and a client made for none names none", async () => {
+    const door = await keyKeel({ resource: `${ORIGIN}/mcp` });
+    await door.client.token();
+    const [asked] = door.tokenRequests();
+    expect(new URLSearchParams(asked?.body).get("resource")).toBe(`${ORIGIN}/mcp`);
+    const api = await keyKeel();
+    await api.client.token();
+    expect(api.tokenRequests()).toHaveLength(1);
+    expect(new URLSearchParams(api.tokenRequests()[0]?.body).has("resource")).toBe(false);
+  });
+
   it("[sdk.key-token] asks the discovered endpoint with a request the account key signed, for one project and one run, bound to a run key that is never the account key", async () => {
     const keel = await keyKeel({ project: "prj_0123456789ABCDEFGHJKMNPQRS", run: "run-c" });
     await keel.client.whoami();

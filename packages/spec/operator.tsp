@@ -196,6 +196,11 @@ interface Operator {
   @get
   listProjects(...PageQuery): ProjectPage | StandardErrors;
 
+  /**
+   * Create a project in a namespace, with trunk's first commit. An agent
+   * creates one in its own namespace, which its handle names, with a token
+   * that names no project.
+   */
   @summary("Create a project")
   @useAuth(SessionAuth)
   @route("/projects")

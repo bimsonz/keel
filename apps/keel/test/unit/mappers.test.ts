@@ -72,7 +72,14 @@ describe("mappers", () => {
     const unknown = whoamiError(caller, new AgentNotKnown({ agentId }));
     const stale = whoamiError(caller, new AgentNotAdmitted({ agentId, reason: "stale-epoch" }));
     expect([unknown.status, stale.status]).toEqual([401, 401]);
-    expect(unknown.body).toMatchObject({ code: "auth.invalid_token", requestId: "req-1" });
+    expect(unknown.body).toMatchObject({
+      code: "auth.invalid_token",
+      requestId: "req-1",
+      nextActions: [
+        { kind: "call", operationId: "Auth_registerClient" },
+        { kind: "read", title: expect.stringContaining("/start") },
+      ],
+    });
     expect(stale.body).toMatchObject({
       code: "auth.revoked",
       nextActions: [{ kind: "call", operationId: "Auth_exchangeToken" }],

@@ -30,13 +30,20 @@ describe("the gate", () => {
       }),
     );
     expect(unsigned).toEqual(paths.map((path) => [path, 401, challenge]));
-    const bare = await call("/v1/agents/me");
-    const body = await bare.json<{ code: string; nextActions: { operationId?: string }[] }>();
-    expect(body.code).toBe("auth.required");
-    expect(body.nextActions.map((action) => action.operationId)).toEqual([
-      "Auth_registerClient",
-      "Auth_exchangeToken",
-    ]);
+    // Neither is sent to the exchange of a secret: an agent signs up with a key, and the walk at /start says the rest.
+    const arrival = [
+      { kind: "call", operationId: "Auth_registerClient" },
+      { kind: "read", title: expect.stringContaining("/start") },
+    ];
+    const told = async (answered: Response) => {
+      const body = await answered.json<{ code: string; nextActions: Record<string, unknown>[] }>();
+      expect(body.nextActions).toMatchObject(arrival);
+      expect(body.nextActions).toHaveLength(arrival.length);
+      expect(body.nextActions[1]).not.toHaveProperty("operationId");
+      return body.code;
+    };
+    expect(await told(await call("/v1/agents/me"))).toBe("auth.required");
+    expect(await told(bad)).toBe("auth.invalid_token");
 
     // A refusal that is not a 401 asks for no credential, and neither does an answer.
     const user = await seedUser("gate-unchallenged");

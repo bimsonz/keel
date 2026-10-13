@@ -37,7 +37,83 @@ model OAuthError {
   error_description?: string;
 }
 
-/** A public key as a JWK (RFC 7517): Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`). Public members only, so a key sent with its private part is refused. */
+/**
+ * An agent's token request: the client-credentials grant (RFC 6749 §4.4) with
+ * the agent named by a request its key signs (RFC 7523 §2.2). It is sent as a
+ * form (`application/x-www-form-urlencoded`) by POST to the `token_endpoint`
+ * that `/.well-known/oauth-authorization-server` names. A `DPoP` header (RFC
+ * 9449) on the request binds the token to the key that made the proof: a key
+ * made for the run, never the key the agent signed up with. With no `DPoP`
+ * header the token is a plain bearer. The endpoint ignores a field it does not
+ * know and answers a refusal in OAuth's own shape (`error`, `error_description`).
+ */
+model AgentTokenRequest {
+  grant_type: "client_credentials";
+  client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+
+  /**
+   * A JWT signed by the key the agent signed up with. Header: `alg` (`EdDSA`
+   * or `ES256`), `typ` `client-authentication+jwt`, and `kid`, the signing
+   * key's thumbprint (RFC 7638). Claims: `iss` and `sub`, both the agent's id
+   * (sign-up's `client_id`); `aud`, the `issuer` of
+   * `/.well-known/oauth-authorization-server`; `iat`; `exp`, at most 60
+   * seconds after `iat`; and `jti`, a value never sent before.
+   */
+  @minLength(1)
+  client_assertion: string;
+
+  /**
+   * The door the token opens (RFC 8707): this origin for the API, which is
+   * what a request that names none gets, or the origin followed by `/mcp` for
+   * the MCP endpoint. A token for one door is refused at the other.
+   */
+  resource?: string;
+
+  /**
+   * The project the token works in: its feed, its settings and every work
+   * command need a token that names it. A token that names no project stands
+   * in the agent's own namespace, where it reads `whoami` and creates a project.
+   */
+  project?: ProjectId;
+
+  /**
+   * The run the token's work is recorded under: a label the agent chooses.
+   * With none, the run is made from the key the token is bound to.
+   */
+  run?: RunLabel;
+
+  /** Space-separated scopes to ask for; every scope the agent holds when absent. */
+  scope?: string;
+}
+
+/** A token, good for five minutes: ask again with a newly signed request, there is no refresh token. */
+model AgentTokenResponse {
+  access_token: string;
+
+  /**
+   * `DPoP` when the request carried a proof: present the token as
+   * `Authorization: DPoP <token>` with a new proof on every request, made by
+   * the same key for that request's method and URL, whose `ath` is the
+   * base64url SHA-256 of the token. `Bearer` otherwise: `Authorization: Bearer <token>`.
+   */
+  token_type: "DPoP" | "Bearer";
+
+  /** Seconds until the token expires. */
+  expires_in: int32;
+
+  /** When it expires, in seconds since the epoch: the token's own `exp`. */
+  expires_at: int64;
+
+  /** Space-separated scopes granted. */
+  scope: string;
+}
+
+/**
+ * A public key as a JWK (RFC 7517): Ed25519 (`OKP`) or P-256 (`EC`, which also
+ * has `y`). Public members only, so a key sent with its private part is
+ * refused. The agent makes the pair itself and keeps the private half: whoever
+ * holds it is the account.
+ */
 model RegistrationJwk {
   kty: "OKP" | "EC";
   crv: "Ed25519" | "P-256";
@@ -121,14 +197,20 @@ interface Auth {
    * request, so nobody registers a key they do not hold. The answer's
    * `client_id` is the agent; it then asks the token endpoint named in
    * `/.well-known/oauth-authorization-server` for a token with a request signed
-   * by the key (RFC 7523). The same key again answers the same account.
+   * by the key (RFC 7523, `AgentTokenRequest`). The same key again answers the
+   * same account.
    */
   @summary("Sign an agent up with its public key")
   @useAuth(NoAuth)
   @route("/register")
   @post
   registerClient(
-    /** A DPoP proof made by the key being registered, for this method and URL. */
+    /**
+     * Required: a DPoP proof (RFC 9449) made by the key being registered. A
+     * JWT whose header is `typ` `dpop+jwt`, `alg` and `jwk` (the public key),
+     * and whose claims are `htm` `POST`, `htu` this operation's URL, `iat` now
+     * and a new `jti`. A request without one is refused `invalid_dpop_proof`.
+     */
     @header dpop?: string,
 
     @body body: ClientRegistrationRequest,

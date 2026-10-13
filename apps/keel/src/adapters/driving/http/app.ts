@@ -14,6 +14,7 @@ import { type BoundGate, routeDeps } from "./route-deps.ts";
 import { answerUnhandled } from "./run.ts";
 import { registerSigners } from "./signers.ts";
 import { registerWellKnown, type WellKnown } from "./well-known.ts";
+import { registerFrontDoor } from "./front-door.ts";
 
 export interface AppOptions {
   readonly handlers: Handlers;
@@ -42,7 +43,7 @@ export const DOCUMENT_PATH = "/v1/openapi.json";
 /** The spec's `Auth_exchangeToken`: open to anyone, so each address is limited ahead of it. */
 const TOKEN_PATH = "/v1/oauth/token";
 
-/** The HTTP doorway: middleware, the clone URL, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
+/** The HTTP doorway: middleware, the clone URL, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document, the signers file and the front door. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
 
@@ -86,6 +87,7 @@ export function makeApp(options: AppOptions) {
   registerSigners(app, options.signers);
   app.all("/mcp", (c) => options.mcp(c.req.raw));
   registerWellKnown(app, options.wellKnown);
+  registerFrontDoor(app, options.wellKnown);
   const deps = routeDeps(options.gate);
   registerInboxStreams(app, deps, options.streams);
 

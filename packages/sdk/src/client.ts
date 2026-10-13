@@ -76,6 +76,12 @@ export interface KeyClientOptions {
   readonly project?: string;
   /** The run's label, such as `nightly-deps`: the same label is the same run across restarts. */
   readonly run?: string;
+  /**
+   * The door the tokens open: Keel's API when absent, or `<baseUrl>/mcp` for
+   * its MCP endpoint. Each door refuses the other's token, so a client made
+   * for the MCP door is for handing its token to an MCP client.
+   */
+  readonly resource?: string;
   /** False asks for a plain bearer with no key behind it, to hand to a tool that cannot sign. */
   readonly bound?: boolean;
   /** Scopes to ask for; every scope the agent holds when absent. */
@@ -152,6 +158,7 @@ export class KeelClient {
         audience: issuer,
       }),
     });
+    if (credentials.resource !== undefined) form.set("resource", credentials.resource);
     if (credentials.project !== undefined) form.set("project", credentials.project);
     if (credentials.run !== undefined) form.set("run", credentials.run);
     if (credentials.scopes !== undefined) form.set("scope", credentials.scopes.join(" "));

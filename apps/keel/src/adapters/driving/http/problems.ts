@@ -1,3 +1,4 @@
+import { ARRIVE } from "@keeltown/core/domain/identity";
 import type { WhoamiResult } from "../../../generated/http/app.gen.ts";
 
 /**
@@ -8,6 +9,17 @@ import type { WhoamiResult } from "../../../generated/http/app.gen.ts";
 export type ProblemBody = Extract<WhoamiResult, { status: 503 }>["body"];
 export type ProblemCode = ProblemBody["code"];
 export type NextAction = ProblemBody["nextActions"][number];
+
+/**
+ * What a token Keel cannot take is answered with, as the policy answers no
+ * credential at all: an agent signs up with a key, and the walk says the rest.
+ */
+export const arrival = (): NextAction[] =>
+  ARRIVE.map(({ kind, title, operationId }) => ({
+    kind,
+    title,
+    ...(operationId === undefined ? {} : { operationId }),
+  }));
 
 const TITLES: Record<ProblemCode, string> = {
   "auth.invalid_token": "The bearer token is missing, malformed, expired or unknown",

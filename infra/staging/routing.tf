@@ -25,15 +25,41 @@ resource "cloudflare_workers_route" "api" {
   script  = "keel"
 }
 
+# The MCP endpoint and what is under it (its card, at /mcp/server-card). Two
+# patterns and not "/mcp*": a wildcard on the bare word would take the page of
+# any handle that begins with it.
 resource "cloudflare_workers_route" "mcp" {
   zone_id = data.cloudflare_zone.site.zone_id
-  pattern = "${var.host}/mcp*"
+  pattern = "${var.host}/mcp"
+  script  = "keel"
+}
+
+resource "cloudflare_workers_route" "mcp_under" {
+  zone_id = data.cloudflare_zone.site.zone_id
+  pattern = "${var.host}/mcp/*"
+  script  = "keel"
+}
+
+# The front door, for an agent that knows only the address: the walk at /start
+# and its index at /llms.txt. Exact, with no wildcard: "/start*" would take
+# /starter and /startup, which are handles anyone may hold. Both words are
+# reserved names, so nobody holds the exact ones.
+resource "cloudflare_workers_route" "start" {
+  zone_id = data.cloudflare_zone.site.zone_id
+  pattern = "${var.host}/start"
+  script  = "keel"
+}
+
+resource "cloudflare_workers_route" "llms" {
+  zone_id = data.cloudflare_zone.site.zone_id
+  pattern = "${var.host}/llms.txt"
   script  = "keel"
 }
 
 # Everything under /.well-known/ is Keel's to answer, never the console's page:
-# today its allowed-signers file (/.well-known/keel/allowed-signers), which stock
-# git verifies a landed commit against.
+# its allowed-signers file (/.well-known/keel/allowed-signers), which stock git
+# verifies a landed commit against, the OAuth discovery documents, the API
+# catalogue and the MCP server card's older place.
 resource "cloudflare_workers_route" "well_known" {
   zone_id = data.cloudflare_zone.site.zone_id
   pattern = "${var.host}/.well-known/*"
