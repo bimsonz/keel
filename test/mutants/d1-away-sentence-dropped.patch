@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/d1-unavailable.test.ts
+# kills: d1.unavailable-list
+# why: one of the sentences D1 says when it is overloaded is not in the list, so a request that meets it is answered 500
+diff --git a/apps/keel/src/adapters/driven/d1/unavailable.ts b/apps/keel/src/adapters/driven/d1/unavailable.ts
+index 5f944359..6ee4696b 100644
+--- a/apps/keel/src/adapters/driven/d1/unavailable.ts
++++ b/apps/keel/src/adapters/driven/d1/unavailable.ts
+@@ -13,7 +13,6 @@ export const D1_AWAY = [
+   "Can't read from request stream because client disconnected.",
+   "D1 DB storage operation exceeded timeout which caused object to be reset.",
+   "D1 DB is overloaded. Requests queued for too long.",
+-  "D1 DB is overloaded. Too many requests queued.",
+   "D1 DB's isolate exceeded its memory limit and was reset.",
+   "D1 DB exceeded its CPU time limit and was reset.",
+ ] as const;

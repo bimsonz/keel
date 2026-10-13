@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
+# kills: d1.away-session, d1.away-mount
+# why: D1's error reaches Better Auth as it came, so the session's read swallows it into "Failed to get session" and a person whose session could not be read for a moment is answered 500
+diff --git a/apps/keel/src/adapters/driven/better-auth/database.ts b/apps/keel/src/adapters/driven/better-auth/database.ts
+index a4421cf5..18f3b641 100644
+--- a/apps/keel/src/adapters/driven/better-auth/database.ts
++++ b/apps/keel/src/adapters/driven/better-auth/database.ts
+@@ -18,7 +18,7 @@ async function reached<A>(query: () => Promise<A>): Promise<A> {
+   try {
+     return await query();
+   } catch (error) {
+-    throw read(error);
++    throw error;
+   }
+ }
+ 

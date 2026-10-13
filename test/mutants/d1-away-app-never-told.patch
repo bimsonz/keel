@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
+# kills: d1.away-session, d1.away-principal
+# why: the app is told nothing is ever the database being away, so every throw in the gate is a defect
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 13a63d5c..78958a8f 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -380,7 +380,7 @@ export function makeIsolate(
+     },
+     signers: () => signersFile({ host: env.KEEL_HOST, signers: env.KEEL_COMMIT_SIGNERS }),
+     rethrowContractDrift: env.KEEL_ENV === "test",
+-    databaseAway: isD1Unavailable,
++    databaseAway: () => false,
+   });
+   return { runtime, app };
+ }

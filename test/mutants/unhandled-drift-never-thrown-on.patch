@@ -2,11 +2,11 @@
 # kills: http.unhandled-line
 # why: the tests ask for contract drift to be thrown on and it is answered 500 instead, so drift passes them
 diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
-index 6de0fa72..7dce57e5 100644
+index 2ebfabed..72747cc2 100644
 --- a/apps/keel/src/adapters/driving/http/run.ts
 +++ b/apps/keel/src/adapters/driving/http/run.ts
-@@ -75,7 +75,6 @@ export function logDefect(ops: "defect" | "contract-drift", requestId: string, d
- export function answerUnhandled(error: unknown, requestId: string, rethrowContractDrift: boolean) {
+@@ -119,7 +119,6 @@ export function answerUnhandled(
+   }
    const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
    logDefect(drift ? "contract-drift" : "defect", requestId, error);
 -  if (drift && rethrowContractDrift) throw error;

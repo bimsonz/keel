@@ -2,14 +2,15 @@
 # kills: ba.one-credential, ba.one-credential-fresh
 # why: a bearer's request reaches Better Auth with another session's cookie beside it, and its handlers act for the cookie while Keel's answer names the bearer
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index cb536a8b..605b2a24 100644
+index ae697c0d..dd7c6e9f 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
-@@ -103,6 +103,6 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+@@ -107,7 +107,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
            detail: "Too many sign-in requests from this address; wait a minute.",
          });
      }
--    return withoutSessionTokens(path, await mount.handler(oneCredential(request)));
-+    return withoutSessionTokens(path, await mount.handler(request));
-   });
- }
+-    const answer = await mount.handler(oneCredential(request));
++    const answer = await mount.handler(request);
+     // Of what Keel mounts, Better Auth answers 503 for one thing: its database was away.
+     if (answer.status === 503) return unavailable(c.get("requestId"), DATABASE_AWAY);
+     return withoutSessionTokens(path, answer);

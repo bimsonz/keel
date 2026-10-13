@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
+# kills: d1.away-session, d1.away-mount
+# why: Better Auth is handed the Worker's database as it is, so nothing rethrows D1 being away in a class its session read lets through
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 13a63d5c..a01e9c91 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -264,7 +264,7 @@ function identity(
+     readonly GITHUB_CLIENT_SECRET?: string;
+   };
+   return {
+-    db: reaching(env.DB),
++    db: env.DB,
+     secret: env.BETTER_AUTH_SECRET,
+     host: env.KEEL_HOST,
+     agents,

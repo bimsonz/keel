@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
+# kills: d1.away-mount
+# why: Better Auth's own 503 is passed on as it is, a body that is no problem and names no wait
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index ae697c0d..e960dc82 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -109,7 +109,6 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+     }
+     const answer = await mount.handler(oneCredential(request));
+     // Of what Keel mounts, Better Auth answers 503 for one thing: its database was away.
+-    if (answer.status === 503) return unavailable(c.get("requestId"), DATABASE_AWAY);
+     return withoutSessionTokens(path, answer);
+   });
+ }

@@ -2,12 +2,12 @@
 # kills: http.unhandled-line
 # why: a response that broke its contract reads in the log as any other defect
 diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
-index 6de0fa72..514aaa23 100644
+index 2ebfabed..1b2aa7e9 100644
 --- a/apps/keel/src/adapters/driving/http/run.ts
 +++ b/apps/keel/src/adapters/driving/http/run.ts
-@@ -74,7 +74,7 @@ export function logDefect(ops: "defect" | "contract-drift", requestId: string, d
-  */
- export function answerUnhandled(error: unknown, requestId: string, rethrowContractDrift: boolean) {
+@@ -118,7 +118,7 @@ export function answerUnhandled(
+     return unavailable(requestId, DATABASE_AWAY);
+   }
    const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
 -  logDefect(drift ? "contract-drift" : "defect", requestId, error);
 +  logDefect("defect", requestId, error);

@@ -2,13 +2,13 @@
 # kills: http.defect-line
 # why: an Error inside a logged object prints as {} in the tail, so the line of a defect names nothing of it
 diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
-index 6de0fa72..494b8243 100644
+index 2ebfabed..ce07f3f6 100644
 --- a/apps/keel/src/adapters/driving/http/run.ts
 +++ b/apps/keel/src/adapters/driving/http/run.ts
-@@ -64,7 +64,7 @@ export type IsolateServices =
-  * name, message, stack and cause as strings, and the platform's marks on it.
-  */
- export function logDefect(ops: "defect" | "contract-drift", requestId: string, defect: unknown) {
+@@ -96,7 +96,7 @@ export function logDefect(
+   requestId: string,
+   defect: unknown,
+ ) {
 -  console.error(JSON.stringify({ ops, requestId, ...describeDefect(defect) }));
 +  console.error(ops, { requestId, defect });
  }

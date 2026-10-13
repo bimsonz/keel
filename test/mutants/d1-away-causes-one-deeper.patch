@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/d1-unavailable.test.ts
+# kills: d1.unavailable-causes
+# why: a cause is read five deep where the rule says four
+diff --git a/apps/keel/src/adapters/driven/d1/unavailable.ts b/apps/keel/src/adapters/driven/d1/unavailable.ts
+index 5f944359..dc9ddd99 100644
+--- a/apps/keel/src/adapters/driven/d1/unavailable.ts
++++ b/apps/keel/src/adapters/driven/d1/unavailable.ts
+@@ -28,7 +28,7 @@ const CAUSES = 4;
+  */
+ export function isD1Unavailable(error: unknown): boolean {
+   let at = error;
+-  for (let depth = 0; depth <= CAUSES && at instanceof Error; depth += 1) {
++  for (let depth = 0; depth <= CAUSES + 1 && at instanceof Error; depth += 1) {
+     const { message } = at;
+     if (D1_AWAY.some((sentence) => message.includes(sentence))) return true;
+     at = at.cause;

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
+# kills: d1.away-directory, d1.away-quota
+# why: a handler's defect is never asked whether the database was away, so a list or a create that met it answers 500 with an incident
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index 2ebfabed..209b13b8 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -162,10 +162,6 @@ export function makeRunner(
+         }),
+       };
+     }
+-    if (away(defect)) {
+-      logDefect("d1-unavailable", caller.requestId, defect);
+-      return unavailableResult(caller.requestId, DATABASE_AWAY);
+-    }
+     logDefect("defect", caller.requestId, defect);
+     return {
+       status: 500,
