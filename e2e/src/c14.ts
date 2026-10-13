@@ -31,11 +31,20 @@
 //       with what the pushed commit said of its author kept as a trailer.
 // It ends with each promotion's wall time by trunk's own clock. No remote URL
 // or credential is printed.
-import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "@keeltown/sdk";
 import { cloneWorkspace, commitAndPush, git } from "./lib/git.ts";
+import {
+  type Declared,
+  type EventRecord,
+  declareWhenPooled,
+  holdsCommit,
+  keelSigners,
+  line,
+  projectEvents,
+  tagged,
+} from "./lib/live.ts";
 
 const run = process.argv[2];
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
@@ -53,10 +62,9 @@ const session = needed("KEEL_SESSION");
 const ORG = needed("KEEL_NAMESPACE");
 const FIXTURE = "fixture-forge-lite";
 const PROJECT = "c14-rebase";
-const SETTLE_MS = 15 * 60_000;
 const key = (what: string) => `c14:${what}`;
-/** git's setting that names the signers file a commit is verified against. */
-const trusting = (file: string) => ["-c", `gpg.ssh.allowedSignersFile=${file}`];
+/** Every change of this scenario edits the fixture's package.json. */
+const footprint = () => [{ path: "package.json", op: "edit" as const }];
 
 let failures = 0;
 const check = (ok: boolean, what: string) => {
@@ -64,51 +72,8 @@ const check = (ok: boolean, what: string) => {
   if (!ok) failures += 1;
 };
 
-type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
-type Declared = Awaited<ReturnType<KeelClient["declare"]>>["result"];
-
-/** The project's events after `cursor`, read until `done` holds or the deadline passes. */
-async function projectEvents(
-  reader: KeelClient,
-  cursor: string,
-  projectId: string,
-  done: (events: readonly EventRecord[]) => boolean,
-): Promise<EventRecord[]> {
-  const seen: EventRecord[] = [];
-  const deadline = Date.now() + SETTLE_MS;
-  let at = cursor;
-  while (Date.now() < deadline) {
-    const page = await reader.events({ cursor: at, limit: 500 });
-    at = page.nextCursor;
-    seen.push(...page.items.filter((e) => e.project === projectId));
-    if (done(seen)) break;
-    if (page.items.length === 0) await new Promise((r) => setTimeout(r, 3_000));
-  }
-  return seen;
-}
-
-const tagged = (events: readonly EventRecord[], tag: string, changeId?: string) =>
-  events.filter(
-    (e) =>
-      e.payload._tag === tag &&
-      (changeId === undefined || Reflect.get(e.payload, "changeId") === changeId),
-  );
-
-/** One line per event, ids and shas short, as e2e:chain prints them. */
-function line(e: EventRecord): string {
-  const keep = ["changeId", "workspaceId", "ref", "sha", "commitSha", "base", "from", "to", "head"];
-  const parts = keep.flatMap((k) => {
-    const v = Reflect.get(e.payload, k);
-    if (typeof v !== "string") return [];
-    return [`${k}=${/^[0-9a-f]{40}$/.test(v) ? v.slice(0, 12) : v}`];
-  });
-  const landings: unknown = Reflect.get(e.payload, "landings");
-  if (Array.isArray(landings))
-    parts.push(
-      `landings=[${landings.map((l) => `${String(Reflect.get(Object(l), "changeId"))}@${String(Reflect.get(Object(l), "commitSha")).slice(0, 12)}`).join(", ")}]`,
-    );
-  return `${e.at}  ${e.payload._tag.padEnd(22)} ${parts.join(" ")}`;
-}
+/** The time from one event to another, by the clock that wrote them. */
+const ms = (from: EventRecord, to: EventRecord) => Date.parse(to.at) - Date.parse(from.at);
 
 /**
  * Each promotion's wall time by trunk's own clock, one line per group: from
@@ -121,7 +86,6 @@ function promotionTimes(events: readonly EventRecord[]): string[] {
   const lines: string[] = [];
   let started: EventRecord | undefined;
   let composed: EventRecord | undefined;
-  const ms = (from: EventRecord, to: EventRecord) => Date.parse(to.at) - Date.parse(from.at);
   for (const e of events) {
     const tag = e.payload._tag;
     if (tag === "PromotionStarted") [started, composed] = [e, undefined];
@@ -137,29 +101,6 @@ function promotionTimes(events: readonly EventRecord[]): string[] {
 
 /** The repo name at the end of a workspace's remote; the host, which carries the account id, is dropped. */
 const repoName = (remote: string) => (remote.split("/").pop() ?? "").replace(/\.git$/, "");
-
-async function declareWhenPooled(client: KeelClient, goal: string, idempotencyKey: string) {
-  const deadline = Date.now() + SETTLE_MS;
-  for (;;) {
-    try {
-      return (
-        await client.declare(
-          { goal, footprint: [{ path: "package.json", op: "edit" }], premises: [] },
-          { idempotencyKey },
-        )
-      ).result;
-    } catch (error) {
-      if (
-        !(error instanceof KeelProblem) ||
-        error.code !== "workspace.pool_exhausted" ||
-        Date.now() > deadline
-      )
-        throw error;
-      console.log(`     pool still forking; retrying in ${error.retryAfterMs ?? 5_000} ms`);
-      await new Promise((r) => setTimeout(r, error.retryAfterMs ?? 5_000));
-    }
-  }
-}
 
 /** Rewrites package.json's description, as S-0's same-line case does. */
 function describeAs(dir: string, text: string): void {
@@ -208,8 +149,16 @@ try {
   const { cursor } = await first.snapshot({ project: project.id });
   console.log(`     feed cursor ${cursor}`);
 
-  const a: Declared = await declareWhenPooled(first, `C1.4 ${run}: first`, `c14:${run}:a`);
-  const b: Declared = await declareWhenPooled(second, `C1.4 ${run}: second`, `c14:${run}:b`);
+  const a: Declared = await declareWhenPooled(
+    first,
+    { goal: `rebase ${run}: first`, footprint: footprint() },
+    `c14:${run}:a`,
+  );
+  const b: Declared = await declareWhenPooled(
+    second,
+    { goal: `rebase ${run}: second`, footprint: footprint() },
+    `c14:${run}:b`,
+  );
   for (const [who, d] of [
     ["first", a],
     ["second", b],
@@ -406,7 +355,11 @@ try {
   const declaredHunks: Declared[] = [];
   const hunkShas: string[] = [];
   for (const [i, h] of hunks.entries()) {
-    const d = await declareWhenPooled(h.client, `C1.5 ${run}: ${i}`, `c14:${run}:hunk${i}`);
+    const d = await declareWhenPooled(
+      h.client,
+      { goal: `hunks ${run}: ${i}`, footprint: footprint() },
+      `c14:${run}:hunk${i}`,
+    );
     if (d.workspace.token === undefined) throw new Error("declare answered no workspace token");
     const dir = cloneWorkspace(d.workspace.remote, d.workspace.token);
     dirs.push(dir);
@@ -464,43 +417,23 @@ try {
 
   // (i) Keel signs what it lands. A workspace granted now is forked from trunk, so its clone
   // holds what the run landed; it is abandoned once read.
-  const reader = await declareWhenPooled(first, `C1.4 ${run}: read trunk`, `c14:${run}:reader`);
+  const reader = await declareWhenPooled(
+    first,
+    { goal: `rebase ${run}: read trunk`, footprint: footprint() },
+    `c14:${run}:reader`,
+  );
   if (reader.workspace.token === undefined) throw new Error("declare answered no workspace token");
   const dirR = cloneWorkspace(reader.workspace.remote, reader.workspace.token);
   dirs.push(dirR);
   const landed = (await first.commits(project.id, { limit: 4 })).items.map((c) => c.sha);
-  const holds = (sha: string) => {
-    try {
-      git(dirR, ["cat-file", "-e", `${sha}^{commit}`]);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  const held = landed.filter(holds);
-  const principal = `keel@${new URL(keelUrl).host}`;
-  const published = join(dirR, ".git", "keel-allowed-signers");
-  writeFileSync(published, await first.allowedSigners());
-  // Another key under Keel's own name: a signature is good only by a key the file holds.
-  const strangerKey = join(dirR, ".git", "stranger");
-  execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-C", "", "-f", strangerKey]);
-  const stranger = join(dirR, ".git", "stranger-allowed-signers");
-  writeFileSync(
-    stranger,
-    `${principal} namespaces="git" ${readFileSync(`${strangerKey}.pub`, "utf8").trim()}\n`,
+  const held = landed.filter((sha) => holdsCommit(dirR, sha));
+  const { principal, published, stranger, verifies, show } = await keelSigners(
+    dirR,
+    first,
+    keelUrl,
   );
-  const verifies = (file: string, sha: string) => {
-    try {
-      git(dirR, [...trusting(file), "verify-commit", sha]);
-      return true;
-    } catch {
-      return false;
-    }
-  };
   for (const sha of held)
-    console.log(
-      `     ${git(dirR, [...trusting(published), "log", "-1", "--format=%h %G? signed by %GS, committed by %cn <%ce> %cI", sha])}`,
-    );
+    console.log(`     ${show(sha, "%h %G? signed by %GS, committed by %cn <%ce> %cI")}`);
   check(
     held.length >= 2,
     `(i) the reader's workspace holds ${held.length} of the 4 landed commits`,
