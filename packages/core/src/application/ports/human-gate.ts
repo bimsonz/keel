@@ -1,5 +1,11 @@
 import { Context, type Effect } from "effect";
-import type { EscalationId, NamespaceId, ProjectId, UserId } from "../../domain/kernel/index.ts";
+import type {
+  AgentId,
+  EscalationId,
+  NamespaceId,
+  ProjectId,
+  UserId,
+} from "../../domain/kernel/index.ts";
 import type { EscalationCommand, InvalidEscalation } from "../../domain/verification/index.ts";
 import type { EscalationRecord } from "./escalations.ts";
 
@@ -14,6 +20,12 @@ export interface RaiseRequest {
   readonly project: ProjectId;
   /** The user asked first. Absent when nobody vouches for the agent concerned: the namespace's maintainers are asked at once. */
   readonly sponsor?: UserId | undefined;
+  /**
+   * The agent the question concerns. Where a member invited it into the
+   * namespace, that member answers for it there and is the one asked first,
+   * whoever `sponsor` names.
+   */
+  readonly agent?: AgentId | undefined;
   /** The object told when a person has ruled: it hears the escalation's DecisionRecorded. */
   readonly raisedBy: string;
   readonly ask: EscalationAsk;

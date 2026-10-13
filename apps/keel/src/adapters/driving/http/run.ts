@@ -22,6 +22,8 @@ import type {
   RepoServer,
   Sessions,
   Sponsorships,
+  Invitations,
+  NamespaceAgents,
   Standings,
   TokenIssuer,
   Trunks,
@@ -56,6 +58,8 @@ export type IsolateServices =
   | CodeHost
   | Sessions
   | Sponsorships
+  | Invitations
+  | NamespaceAgents
   | Standings
   | Users
   | Memberships

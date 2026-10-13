@@ -111,6 +111,7 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
       escalationId,
       project: at.projectId,
       sponsor: agent?.sponsor,
+      agent: agentId,
       raisedBy: subjectAddress(at.projectId, at.key),
       ask: askAbout(view, "unprovable"),
     })
@@ -200,6 +201,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
       escalationId,
       project: at.projectId,
       sponsor: command.sponsor,
+      agent: command.agentId,
       raisedBy: subjectAddress(at.projectId, at.key),
       ask: askAbout(view, "human-class", command.note),
     })

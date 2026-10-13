@@ -360,6 +360,78 @@ export class KeelClient {
     );
   }
 
+  /**
+   * The signed-in member invites an agent into an org, by the agent's handle. The agent gets
+   * nothing until it accepts; then it reads and works there, and the member answers for it. Keel
+   * wants a fresh sign-in for it: a passkey sign-in from the last ten minutes.
+   */
+  inviteAgent(
+    namespace: string,
+    agent: string,
+    options: Idempotent & { readonly scopes?: readonly ("agent:read" | "agent:work")[] } = {},
+  ): Promise<WireOutputs["Namespaces_inviteAgent"]> {
+    return this.call(
+      "Namespaces_inviteAgent",
+      {
+        handle: namespace,
+        agent,
+        ...(options.scopes === undefined ? {} : { scopes: [...options.scopes] }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
+  /** The agents in an org: those that joined, and for its members the invitations not yet answered and who made each. */
+  namespaceAgents(
+    namespace: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Namespaces_listAgents"]> {
+    return this.call("Namespaces_listAgents", { handle: namespace }, options);
+  }
+
+  /** Takes an agent out of an org, or withdraws its invitation: the member who invited it or a maintainer, on a fresh sign-in. */
+  removeAgent(
+    namespace: string,
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Namespaces_removeAgent"]> {
+    return this.call(
+      "Namespaces_removeAgent",
+      { handle: namespace, agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The namespaces the calling agent was invited into: the ones it joined and the ones still asking. */
+  invitations(options?: CallOptions): Promise<WireOutputs["Agents_listNamespaces"]> {
+    return this.call("Agents_listNamespaces", {}, options);
+  }
+
+  /** The calling agent accepts an invitation into a namespace, named by its handle or its id. */
+  acceptInvitation(
+    namespace: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_acceptInvitation"]> {
+    return this.call(
+      "Agents_acceptInvitation",
+      { namespace, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The calling agent declines an invitation it has not accepted, or leaves a namespace it joined. */
+  leaveNamespace(
+    namespace: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_leaveNamespace"]> {
+    return this.call(
+      "Agents_leaveNamespace",
+      { namespace, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
   /** The sign-in methods this instance offers besides a passkey. */
   signInMethods(options?: CallOptions): Promise<WireOutputs["SignIn_methods"]> {
     return this.call("SignIn_methods", {}, options);

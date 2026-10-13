@@ -42,6 +42,7 @@ import {
 } from "../adapters/driven/better-auth/auth.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
+import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
@@ -51,6 +52,7 @@ import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { AgentSignUpsRpc } from "../adapters/driven/do-rpc/sign-ups.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
+import { InvitationsRpc } from "../adapters/driven/do-rpc/invitations.ts";
 import { SponsorshipsRpc } from "../adapters/driven/do-rpc/sponsorships.ts";
 import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
@@ -112,6 +114,8 @@ export function isolateLayer(
     overrides.sessions ?? SessionsRpc(agentSession),
     overrides.standings ?? StandingsRpc(agentSession),
     overrides.sponsorships ?? SponsorshipsRpc(agentSession),
+    InvitationsRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+    NamespaceAgentsD1(env.DB),
     directory,
     UsersD1(env.DB),
     MembershipsD1(env.DB),

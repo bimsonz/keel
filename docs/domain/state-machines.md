@@ -517,6 +517,26 @@ stateDiagram-v2
 
 ---
 
+## Invitation
+
+Owner: the namespace's own object (`ns:<id>`), one row an agent, on the namespace's entity `org:<namespaceId>`. An agent is invited into an org by a member and stands there once it accepts (`read` and `work`, never more). A person's own namespace and an agent's own take no invitation: the policy asks it of an org alone.
+
+| From | Command | Event | To |
+|---|---|---|---|
+| none, Ended | `Invite {by, scopes}` | `AgentInvited` | Invited |
+| Invited | `Accept` | `AgentJoinedNamespace` | Joined |
+| Invited | `End` by the agent | `AgentLeftNamespace {reason: declined}` | Ended |
+| Invited | `End` by the member who invited it | `AgentLeftNamespace {reason: withdrawn}` | Ended |
+| Invited | `End` by another person | `AgentLeftNamespace {reason: removed}` | Ended |
+| Joined | `End` by the agent | `AgentLeftNamespace {reason: left}` | Ended |
+| Joined | `End` by a person | `AgentLeftNamespace {reason: removed}` | Ended |
+
+**One member answers for an agent in a namespace.** While an invitation stands, pending or accepted, the same member inviting again for the same scopes commits nothing, and anything else is refused (`already-invited`) until it has ended. Only an invited agent accepts (`not-invited` otherwise), and accepting again commits nothing. Another agent is no party to an invitation (`not-a-party`). Whether a person may invite or end is the policy's to decide before the machine: any member invites; the member who invited the agent, a maintainer or an owner ends.
+
+**Only an accepted invitation gives standing.** The request gate reads the invitation's row in D1 (`namespace_agents`) on every request of an agent in a namespace that is not its own: `joined` makes it `Invited` by the standing its inviter holds now, with its token's scopes cut to the invitation's. So an inviter who leaves the org takes the agent's rights with them at once, with no write, and the row stays as it is. An ended invitation keeps its row as `ended`, and the agent may be invited again.
+
+**Who is asked first.** A question about the work of an agent that has joined a namespace goes first to the member who invited it there, whoever sponsors the agent. The namespace's object reads its own row when it raises the escalation.
+
 ## Sketch
 
 Owner: WorkspacePool DO.

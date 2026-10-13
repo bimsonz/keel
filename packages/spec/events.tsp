@@ -763,6 +763,44 @@ model AgentUnsponsored {
   by: string;
 }
 
+/**
+ * A member invited the agent into the namespace, and answers for it there once
+ * it accepts. Until then it gives the agent nothing.
+ */
+model AgentInvited {
+  _tag: "AgentInvited";
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+  by: UserId;
+
+  /** What the invitation gives: `agent:read`, or that and `agent:work`. Never more. */
+  scopes: Scope[];
+}
+
+/** The agent accepted: it stands in the namespace. It names no person. */
+model AgentJoinedNamespace {
+  _tag: "AgentJoinedNamespace";
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+}
+
+/** How an invitation ended: the agent declined it or left, the member who made it withdrew it before it was accepted, or a person removed the agent. */
+union InvitationEnd {
+  declined: "declined",
+  left: "left",
+  withdrawn: "withdrawn",
+  removed: "removed",
+}
+
+/** The invitation ended. `by` is whoever ended it. */
+model AgentLeftNamespace {
+  _tag: "AgentLeftNamespace";
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+  by: string;
+  reason: InvitationEnd;
+}
+
 // Tenancy. Better Auth's tables in D1 are identity's source of truth;
 // its after-hooks commit these for the feed and the audit, one per row-state
 // change, keyed `user:<userId>` or `org:<orgId>`. No event carries an email.
@@ -1666,6 +1704,9 @@ union KeelEvent {
   AgentRevoked,
   AgentSponsored,
   AgentUnsponsored,
+  AgentInvited,
+  AgentJoinedNamespace,
+  AgentLeftNamespace,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

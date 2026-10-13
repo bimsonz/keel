@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts -t b12.event-audience
+# kills: b12.event-audience
+# why: an invitation's event is served to anyone, and it names the member who invited the agent
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 7e1781d9..9744a98e 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -39,7 +39,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   AgentSponsored: "members",
+   AgentUnsponsored: "members",
+   // An invitation and its end name the member or whoever ended it; that an agent joined names no person.
+-  AgentInvited: "members",
++  AgentInvited: "public",
+   AgentJoinedNamespace: "public",
+   AgentLeftNamespace: "members",
+   UserSignedUp: "members",

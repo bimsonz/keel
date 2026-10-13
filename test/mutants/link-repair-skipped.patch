@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.repair
+# kills: link.repair
+# why: the Projector never repeats an invitation's moves, so a missed inline write leaves an agent that accepted with no standing for ever
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 600469a8..cb6de6f1 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -85,7 +85,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+   protected override async received(): Promise<void> {
+     await this.runtime.runPromise(repairStandings);
+     await this.runtime.runPromise(repairVisibility);
+-    await this.runtime.runPromise(repairInvitations);
+   }
+ 
+   async read(request: typeof ProjectorRead.Encoded) {

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, NamespaceId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
-import { AgentKind, Scope } from "./agent.ts";
+import { AgentKind, GrantableScope, Scope } from "./agent.ts";
 import { PresentedKey } from "./agent-key.ts";
 import { Handle, Role } from "./tenancy.ts";
 
@@ -54,6 +54,54 @@ export const AgentUnsponsored = Schema.TaggedStruct("AgentUnsponsored", {
   sponsor: UserId,
   by: Schema.String,
 });
+
+/**
+ * What an invitation gives the agent in the namespace: read, or read and work
+ * (an invited agent never holds more).
+ */
+export const InvitationScopes = Schema.Array(GrantableScope).check(
+  Schema.makeFilter(
+    (scopes) =>
+      (scopes.includes("agent:read") && new Set(scopes).size === scopes.length) ||
+      "an invitation gives read, or read and work",
+  ),
+);
+export type InvitationScopes = typeof InvitationScopes.Type;
+
+/**
+ * A member invited the agent into the namespace, and answers for it there
+ * once it accepts. Until then it gives the agent nothing.
+ */
+export const AgentInvited = Schema.TaggedStruct("AgentInvited", {
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: UserId,
+  scopes: InvitationScopes,
+});
+/** The agent accepted: it stands in the namespace. Names no person, so anyone may read it. */
+export const AgentJoinedNamespace = Schema.TaggedStruct("AgentJoinedNamespace", {
+  namespace: NamespaceId,
+  agentId: AgentId,
+});
+/**
+ * The invitation ended. `by` is whoever ended it and `reason` how: the agent
+ * `declined` it or `left`; the member who made it had it `withdrawn` before it
+ * was accepted; or a person `removed` the agent.
+ */
+export const AgentLeftNamespace = Schema.TaggedStruct("AgentLeftNamespace", {
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: Schema.String,
+  reason: Schema.Literals(["declined", "left", "withdrawn", "removed"]),
+});
+
+/** The events of an agent's place in a namespace, which the namespace's own object commits. */
+export const NamespaceAgentEvent = Schema.Union([
+  AgentInvited,
+  AgentJoinedNamespace,
+  AgentLeftNamespace,
+]);
+export type NamespaceAgentEvent = typeof NamespaceAgentEvent.Type;
 
 /** The events of one agent, which the AgentSession DO commits. */
 export const AgentEvent = Schema.Union([
@@ -136,6 +184,9 @@ export const IdentityEvent = Schema.Union([
   AgentRevoked,
   AgentSponsored,
   AgentUnsponsored,
+  AgentInvited,
+  AgentJoinedNamespace,
+  AgentLeftNamespace,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

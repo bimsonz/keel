@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.invited
+# kills: gate.invited
+# why: the gate reads the rows of invitations for an agent in its own namespace too, a D1 read on every request that can decide nothing
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 75dc530c..25bb71c8 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -208,7 +208,7 @@ export const principalOf: (
+       const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
+       const governs = projectId === undefined || (Option.isSome(place) && org === own);
+       const invited =
+-        governs || Option.isNone(place)
++        Option.isNone(place)
+           ? Option.none()
+           : yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org));
+       const standing: AgentStanding = governs

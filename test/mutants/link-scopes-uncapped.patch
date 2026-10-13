@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.invited
+# kills: gate.invited
+# why: an invited agent keeps every scope its token names, so an invitation to read lets it work
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 75dc530c..78b2ce59 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -230,7 +230,7 @@ export const principalOf: (
+           // An invitation gives read, or read and work: the token holds no more than it does.
+           scopes: Option.match(invited, {
+             onNone: () => claims.scopes,
+-            onSome: (held) => scopesUnder(held.scopes, claims.scopes),
++            onSome: () => claims.scopes,
+           }),
+           paused: agent.state === "suspended",
+           standing,

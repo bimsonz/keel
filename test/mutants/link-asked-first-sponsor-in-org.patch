@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.asked-first
+# kills: link.asked-first
+# why: a question about an invited agent's work goes to its sponsor, who may be no member of the org, and not to the member who answers for it there
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 6078181d..8bc19172 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -283,9 +283,7 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
+       escalation = evolveEscalation(escalation, { at: tx.at, payload });
+     if (escalation === undefined) return Result.succeed({ drafts: [], value: undefined });
+     // In a namespace a member invited the agent into, that member answers for it and is asked first.
+-    const first =
+-      (request.agent === undefined ? undefined : invitedBy(tx.store, request.agent)) ??
+-      request.sponsor;
++    const first = request.sponsor;
+     const row: Row = {
+       escalation,
+       namespace: request.namespace,

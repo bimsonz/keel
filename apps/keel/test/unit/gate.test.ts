@@ -7,13 +7,14 @@ import {
 } from "@keeltown/core/application/identity";
 import type { Agent, AgentClaims } from "@keeltown/core/domain/identity";
 import { Instant, makeId } from "@keeltown/core/kernel";
-import { TokenIssuer } from "@keeltown/core/ports";
+import { NamespaceAgents, TokenIssuer } from "@keeltown/core/ports";
 import {
   hashSecret,
   makeAgentDirectoryMemory,
   makeBetterAuthMemory,
   makeClockMemory,
   makeMembershipsMemory,
+  makeNamespaceAgentsMemory,
   makeProjectNamespacesMemory,
   makeTokenIssuerMemory,
   makeUsersMemory,
@@ -127,6 +128,7 @@ function layers(override: Partial<Agent> = {}) {
     makeUsersMemory(rows).layer,
     makeMembershipsMemory(rows).layer,
     makeProjectNamespacesMemory().layer,
+    makeNamespaceAgentsMemory().layer,
     clock,
   );
 }
@@ -153,14 +155,26 @@ const claims = (over: Partial<AgentClaims> = {}): Credential => ({
   claims: { agentId: KEYED, scopes: ["agent:work", "agent:read"], revocationEpoch: 1, ...over },
 });
 
-/** The ports with the keyed agent as `override` has it, one project in its own namespace and one in an org. */
-function keyedLayers(override: Partial<Agent> = {}) {
+/**
+ * The ports with the keyed agent as `override` has it, one project in its own
+ * namespace and one in an org Ann is a member of. `invitations` are the rows
+ * of the org's agents, and `reads` counts each read of them.
+ */
+function keyedLayers(
+  override: Partial<Agent> = {},
+  invitations: ReturnType<typeof makeNamespaceAgentsMemory> = makeNamespaceAgentsMemory(),
+  reads: { count: number } = { count: 0 },
+) {
   const directory = makeAgentDirectoryMemory();
   directory.agents.set(KEYED, { ...keyed, ...override });
   const places = makeProjectNamespacesMemory();
   places.places.set(OWN, { projectId: OWN, namespace: KEYED, name: "mine" });
   places.places.set(ELSEWHERE, { projectId: ELSEWHERE, namespace: sampleOrgId, name: "theirs" });
-  const rows = makeBetterAuthMemory();
+  const rows = makeBetterAuthMemory({
+    users: [{ id: ANN, username: "ann" }],
+    orgs: [{ id: sampleOrgId, slug: "sample" }],
+    members: [{ organizationId: sampleOrgId, userId: ANN, role: "member" }],
+  });
   const clock = makeClockMemory().layer;
   return Layer.mergeAll(
     directory.layer,
@@ -168,7 +182,39 @@ function keyedLayers(override: Partial<Agent> = {}) {
     makeUsersMemory(rows).layer,
     makeMembershipsMemory(rows).layer,
     places.layer,
+    Layer.succeed(
+      NamespaceAgents,
+      NamespaceAgents.of({
+        ...invitations.service,
+        standing: (agentId, namespace) =>
+          Effect.suspend(() => {
+            reads.count += 1;
+            return invitations.service.standing(agentId, namespace);
+          }),
+      }),
+    ),
     clock,
+  );
+}
+
+/** The org's rows with the keyed agent invited by `by`, and accepted or ended as asked. */
+function invitedBy(
+  by: typeof ANN,
+  scopes: readonly ("agent:read" | "agent:work")[],
+  then: readonly ("Joined" | "Left")[],
+) {
+  const invitations = makeNamespaceAgentsMemory();
+  const at = { namespace: sampleOrgId, agentId: KEYED };
+  const moves = [
+    { _tag: "Invited" as const, ...at, by, scopes, at: Instant(1_760_000_000_000) },
+    ...then.map((tag) =>
+      tag === "Joined"
+        ? { _tag: tag, ...at, at: Instant(1_760_000_000_001) }
+        : { _tag: tag, ...at },
+    ),
+  ];
+  return Effect.forEach(moves, (move, index) => invitations.service.apply(move, index + 1)).pipe(
+    Effect.as(invitations),
   );
 }
 
@@ -438,6 +484,89 @@ describe("the request gate", () => {
           standing: { _tag: "None" },
         });
       }).pipe(Effect.provide(keyedLayers())),
+  );
+
+  it.effect(
+    "[gate.invited] in an org a member invited it into and it accepted, it stands Invited by that member's standing now, with its token's scopes cut to the invitation's",
+    () =>
+      Effect.gen(function* () {
+        const both = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined"]);
+        const working = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(keyedLayers({}, both)),
+        );
+        expect(working.principal).toMatchObject({
+          namespace: sampleOrgId,
+          projectId: ELSEWHERE,
+          scopes: ["agent:work", "agent:read"],
+          standing: { _tag: "Invited", by: { userId: ANN, role: "member", suspended: false } },
+        });
+        // The token itself is handed on as it was presented.
+        expect(working.token?.scopes).toEqual(["agent:work", "agent:read"]);
+
+        const readOnly = yield* invitedBy(ANN, ["agent:read"], ["Joined"]);
+        const reading = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(keyedLayers({}, readOnly)),
+        );
+        expect(reading.principal).toMatchObject({
+          scopes: ["agent:read"],
+          standing: { _tag: "Invited", by: { userId: ANN } },
+        });
+        // A token that asked for less holds no more for the invitation giving more.
+        const narrow = yield* principalOf(
+          claims({ projectId: ELSEWHERE, scopes: ["agent:read"] }),
+        ).pipe(Effect.provide(keyedLayers({}, both)));
+        expect(narrow.principal).toMatchObject({ scopes: ["agent:read"] });
+
+        // Invited by someone who is no member of the org: the policy reads a standing with no role.
+        const stranger = yield* invitedBy(BOB, ["agent:read", "agent:work"], ["Joined"]);
+        const orphaned = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(keyedLayers({}, stranger)),
+        );
+        expect(orphaned.principal).toMatchObject({
+          standing: { _tag: "Invited", by: { userId: BOB, suspended: false } },
+        });
+        if (orphaned.principal._tag !== "Agent" || orphaned.principal.standing._tag !== "Invited")
+          throw new Error("the agent was not admitted as invited");
+        expect(orphaned.principal.standing.by.role).toBeUndefined();
+      }),
+  );
+
+  it.effect(
+    "[gate.invited] an invitation not yet accepted and one that ended give no standing and cut nothing; its own namespace is governed without a read of the org's rows",
+    () =>
+      Effect.gen(function* () {
+        const pending = yield* invitedBy(ANN, ["agent:read"], []);
+        const waiting = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(keyedLayers({}, pending)),
+        );
+        expect(waiting.principal).toMatchObject({
+          namespace: sampleOrgId,
+          scopes: ["agent:work", "agent:read"],
+          standing: { _tag: "None" },
+        });
+
+        const ended = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined", "Left"]);
+        const gone = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(keyedLayers({}, ended)),
+        );
+        expect(gone.principal).toMatchObject({ standing: { _tag: "None" } });
+
+        // Where it governs, and where the project has no place, the rows are never read.
+        const both = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined"]);
+        const reads = { count: 0 };
+        const layer = keyedLayers({}, both, reads);
+        const own = yield* principalOf(claims({ projectId: OWN })).pipe(Effect.provide(layer));
+        const account = yield* principalOf(claims()).pipe(Effect.provide(layer));
+        const nowhere = yield* principalOf(claims({ projectId: NOWHERE })).pipe(
+          Effect.provide(layer),
+        );
+        expect(own.principal).toMatchObject({ standing: { _tag: "Governs" } });
+        expect(account.principal).toMatchObject({ standing: { _tag: "Governs" } });
+        expect(nowhere.principal).toMatchObject({ standing: { _tag: "None" } });
+        expect(reads.count).toBe(0);
+        yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(Effect.provide(layer));
+        expect(reads.count).toBe(1);
+      }),
   );
 
   it.effect(

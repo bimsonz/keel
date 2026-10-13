@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t nsagents.contract
+# kills: nsagents.contract
+# why: an acceptance that arrives again after the invitation ended is written over the end, so an agent taken out has its standing back
+diff --git a/apps/keel/src/adapters/driven/d1/namespace-agents.ts b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+index 3b324a4d..82a619e2 100644
+--- a/apps/keel/src/adapters/driven/d1/namespace-agents.ts
++++ b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+@@ -80,7 +80,7 @@ export function NamespaceAgentsD1(db: D1Database) {
+               await db
+                 .prepare(
+                   `UPDATE namespace_agents SET state = 'joined', joined_at = ?, seq = ?
+-                   WHERE namespace_id = ? AND agent_id = ? AND seq < ?`,
++                   WHERE namespace_id = ? AND agent_id = ? AND ? > 0`,
+                 )
+                 .bind(move.at, seq, move.namespace, move.agentId, seq)
+                 .run();

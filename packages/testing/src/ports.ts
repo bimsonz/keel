@@ -59,6 +59,11 @@ import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeOrgUsageMemory } from "./memory/org-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
 import { makeSponsorshipsMemory } from "./memory/sponsorships.ts";
+import { makeInvitationsMemory, makeNamespaceAgentsMemory } from "./memory/invitations.ts";
+import {
+  describeInvitationsContract,
+  describeNamespaceAgentsContract,
+} from "./contracts/invitations.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
   describeProjectViewsContract,
@@ -539,6 +544,11 @@ export const PORTS = {
     Sponsorships | Standings | Enrolments | AgentDirectory,
     SponsorshipsHarness
   >(memorySponsorshipsHarness, describeSponsorshipsContract),
+  NamespaceAgents: port(() => makeNamespaceAgentsMemory().layer, describeNamespaceAgentsContract),
+  Invitations: port(
+    () => makeInvitationsMemory().layer.pipe(Layer.provideMerge(makeNamespaceAgentsMemory().layer)),
+    describeInvitationsContract,
+  ),
   Namespaces: harnessed<Namespaces, TenancyHarness<Namespaces>>(
     memoryTenancyHarness(tenancy.makeNamespacesMemory),
     describeNamespacesContract,

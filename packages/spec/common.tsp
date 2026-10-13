@@ -214,6 +214,7 @@ union ProblemCode {
   repoRefNotFound: "repo.ref_not_found",
   repoPathNotFound: "repo.path_not_found",
   agentStateRefused: "agent.state_refused",
+  invitationStateRefused: "invitation.state_refused",
   projectNameTaken: "project.name_taken",
   projectImportRefused: "project.import_refused",
   projectImportTooLarge: "project.import_too_large",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.standing
+# kills: link.standing
+# why: an invited agent hears every invitation of its namespace, another agent's and the member who made it among them
+diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
+index d55cddba..22ed7a30 100644
+--- a/packages/core/src/application/identity/invitations.ts
++++ b/packages/core/src/application/identity/invitations.ts
+@@ -188,7 +188,7 @@ const moveInvitation = Effect.fn("identity/moveInvitation")(function* (
+         throw new IllegalTransition(`${command._tag} left ${agentId} no place in ${namespace}`);
+       tx.store.put(NAMESPACE_AGENT, agentId, asStored(encodeInvitation(invitation)));
+       if (decided.success.some((event) => event._tag === "AgentInvited"))
+-        tx.outbox.subscribe(`agent:${agentId}`, INVITATION_TELLS, { kind: "agent", id: agentId });
++        tx.outbox.subscribe(`agent:${agentId}`, INVITATION_TELLS);
+       return Result.succeed({ value: invitation, drafts });
+     },
+   );

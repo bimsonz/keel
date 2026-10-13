@@ -26,6 +26,7 @@ import {
   AgentDirectory,
   Changes,
   Escalations,
+  NamespaceAgents,
   Namespaces,
   ProjectNamespaces,
   Projects,
@@ -59,7 +60,8 @@ type ResolverServices =
   | Projects
   | Changes
   | AgentDirectory
-  | Escalations;
+  | Escalations
+  | NamespaceAgents;
 
 /** How an operation finds the resource it is decided on, from its input and its caller. */
 export type Resolver<A extends Operation> = (
@@ -228,6 +230,27 @@ const namespaceNamed = (handle: string) =>
     ),
   );
 
+/**
+ * A namespace by its handle, with the member who invited an agent into it:
+ * what taking that agent out again is decided on. With no invitation standing
+ * there it names no inviter, and only a maintainer is let through to be told so.
+ */
+const namespaceAgent = (handle: string, id: unknown) =>
+  namespaceNamed(handle).pipe(
+    Effect.flatMap((resource) => {
+      const agentId = decodeAgentId(id);
+      if (resource._tag !== "Namespace" || Option.isNone(agentId)) return Effect.succeed(resource);
+      return NamespaceAgents.use((agents) => agents.find(agentId.value, resource.namespace)).pipe(
+        Effect.map(
+          Option.match({
+            onNone: () => resource,
+            onSome: (invitation) => ({ ...resource, inviter: invitation.by }),
+          }),
+        ),
+      );
+    }),
+  );
+
 /** A project by its namespace's handle and its own name, as `/<namespace>/<project>` names it. */
 export const projectByName = (handle: string, name: string) =>
   Namespaces.use((namespaces) => namespaces.byHandle(handle)).pipe(
@@ -269,11 +292,17 @@ export const RESOLVERS: Resolvers = {
   Agents_listSponsored: self,
   Agents_endSponsorship: (input) => agentAccount(input.agentId),
   Agents_getAgent: (input) => agentAccount(input.agentId),
+  Agents_listNamespaces: self,
+  Agents_acceptInvitation: self,
+  Agents_leaveNamespace: self,
 
   Operator_listProjects: perItem,
   Operator_createProject: (input) => namespaceNamed(input.namespace),
   Namespaces_getNamespace: (input) => namespaceNamed(input.handle),
   Namespaces_getProject: (input) => projectByName(input.handle, input.name),
+  Namespaces_listAgents: (input) => namespaceNamed(input.handle),
+  Namespaces_inviteAgent: (input) => namespaceNamed(input.handle),
+  Namespaces_removeAgent: (input) => namespaceAgent(input.handle, input.agentId),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),

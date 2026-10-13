@@ -154,6 +154,7 @@ import {
   noSuchRequest,
   sponsoredOk,
 } from "./sponsorship.ts";
+import { invitationHandlers } from "./invitations.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -628,6 +629,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               );
             }),
           ),
+        ...invitationHandlers(run, touched),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
             caller,

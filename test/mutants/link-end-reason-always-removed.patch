@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: every end is recorded as a removal, so the record cannot tell an agent that declined or left from one a person took out
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..28f28b17 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -116,13 +116,7 @@ export const decideInvitation = (
+       const itself = command.by === agentActor(agentId);
+       if (!itself && command.by.startsWith("agent:")) return refuse("not-a-party");
+       const pending = invitation.state === "invited";
+-      const reason = itself
+-        ? pending
+-          ? "declined"
+-          : "left"
+-        : pending && command.by === userActor(invitation.by)
+-          ? "withdrawn"
+-          : "removed";
++      const reason = "removed";
+       return Result.succeed([
+         AgentLeftNamespace.make({ namespace, agentId, by: command.by, reason }),
+       ]);

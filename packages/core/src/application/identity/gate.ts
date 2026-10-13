@@ -6,12 +6,14 @@ import {
   AgentNotKnown,
   type AgentStanding,
   type Principal,
+  scopesUnder,
   TokenRejected,
 } from "../../domain/identity/index.ts";
 import { AgentId, type NamespaceId, UserId } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   Memberships,
+  NamespaceAgents,
   ProjectNamespaces,
   TokenIssuer,
   Users,
@@ -144,17 +146,20 @@ export type GateRefusal =
  * An agent that signed itself up presents its own token, which names one
  * project or none. It stands in that project's namespace, read from the
  * project's place on every request, or in its own when the token names none.
- * It governs its own namespace and nowhere else: in another's it has no
- * standing until a person invites it there. A token for a project that has no
- * place stands as one for a project the agent has no standing in, so a token
- * never tells whether a project exists.
+ * It governs its own namespace and nowhere else. In another's it stands where
+ * a member invited it and it accepted (`NamespaceAgents`, read on every
+ * request): `Invited` by that member's standing now, with its token's scopes
+ * cut to what the invitation gives. A pending invitation, an ended one and
+ * none at all give it no standing. A token for a project that has no place
+ * stands as one for a project the agent has no standing in, so a token never
+ * tells whether a project exists.
  */
 export const principalOf: (
   credential: Credential,
 ) => Effect.Effect<
   Admitted,
   GateRefusal,
-  TokenIssuer | AgentDirectory | Users | Memberships | ProjectNamespaces
+  TokenIssuer | AgentDirectory | Users | Memberships | ProjectNamespaces | NamespaceAgents
 > = Effect.fn("identity/principalOf")(function* (credential: Credential) {
   switch (credential._tag) {
     case "None":
@@ -202,15 +207,33 @@ export const principalOf: (
           : yield* ProjectNamespaces.use((places) => places.byId(projectId));
       const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
       const governs = projectId === undefined || (Option.isSome(place) && org === own);
+      const invited =
+        governs || Option.isNone(place)
+          ? Option.none()
+          : yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org));
+      const standing: AgentStanding = governs
+        ? { _tag: "Governs" }
+        : Option.isNone(invited)
+          ? { _tag: "None" }
+          : {
+              _tag: "Invited",
+              by: yield* Memberships.use((memberships) =>
+                memberships.standing(invited.value.by, org),
+              ),
+            };
       return {
         principal: {
           _tag: "Agent",
           agentId: agent.id,
           namespace: org,
           ...(projectId === undefined ? {} : { projectId }),
-          scopes: claims.scopes,
+          // An invitation gives read, or read and work: the token holds no more than it does.
+          scopes: Option.match(invited, {
+            onNone: () => claims.scopes,
+            onSome: (held) => scopesUnder(held.scopes, claims.scopes),
+          }),
           paused: agent.state === "suspended",
-          standing: governs ? { _tag: "Governs" } : { _tag: "None" },
+          standing,
         },
         token: claims,
       };

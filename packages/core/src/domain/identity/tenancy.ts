@@ -153,13 +153,15 @@ export const personOwns = (kind: NamespaceKind): boolean => kind !== "agent";
  * (`namespaceKind`), so no field repeats it. Only an org has members, so the
  * actions on members and on deleting it are decided on an org alone.
  * `personOwned` says a person is among its owners: no agent governs there,
- * whatever its standing says.
+ * whatever its standing says. `inviter` is the member who invited the agent an
+ * action concerns into it (taking that agent out again), when one did.
  */
 export interface NamespaceResource {
   readonly _tag: "Namespace";
   readonly namespace: NamespaceId;
   readonly suspended: boolean;
   readonly personOwned: boolean;
+  readonly inviter?: UserId;
 }
 
 /**

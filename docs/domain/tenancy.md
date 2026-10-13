@@ -28,6 +28,7 @@ An agent is tied to no project, but each token is for one run, in one namespace 
 - **Scopes cap `read` and `work` only.** Governing asks no scope beyond the standing.
 - **A paused agent has no rights anywhere** and is refused everything, `anyone` included. `paused` is the Agent machine's `suspended` state.
 - Everywhere else an agent reads what is public, and an invitation whose inviter left or is suspended leaves exactly that.
+- **An invitation is a record of the namespace's own** ([state-machines.md § Invitation](state-machines.md#invitation)). A member invites an agent into an org and the agent accepts; the gate reads the row on every request, and only an accepted one makes the agent `Invited`. A token's scopes are cut to what the invitation gives: `agent:read`, or that and `agent:work`.
 
 ## Resources and needs
 

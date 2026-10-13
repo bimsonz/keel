@@ -6,16 +6,21 @@ import {
   wideningsOwed,
   widenEscalation,
 } from "@keeltown/core/application/coordination";
+import { acceptInvitation, endInvitation, inviteAgent } from "@keeltown/core/application/identity";
 import { EscalationId } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
+import { type NamespaceServices, namespaceServices } from "../../../composition/do.ts";
 import {
+  AcceptInvitationCommand,
+  EndInvitationCommand,
+  InviteAgentCommand,
   NamespaceCodecs,
   type NamespaceRpc,
   RaiseCommand,
   RuleCommand,
 } from "../../../rpc/index.ts";
 import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
-import { KeelObject } from "./keel-object.ts";
+import { KeelObjectWith } from "./keel-object.ts";
 
 const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
   Effect.orDie(Schema.decodeUnknownEffect(schema)(input));
@@ -30,9 +35,46 @@ const wideningDeadline = (escalationId: EscalationId) => `escalation ${escalatio
  * namespace's projects through the domain's escalation machine, and records
  * the decision each ruling makes in the ruling's own transaction. Each event
  * carries the project its question is about, so the feed serves it there. It
- * extends KeelObject, which builds its runtime and the event backbone.
+ * holds the agents its members invited into it, one row an agent, and writes
+ * the row the request gate reads after each move. It extends KeelObjectWith,
+ * which builds its runtime and the event backbone.
  */
-export class NamespaceDO extends KeelObject implements NamespaceRpc {
+export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements NamespaceRpc {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, namespaceServices(env));
+  }
+
+  async inviteAgent(command: typeof InviteAgentCommand.Encoded) {
+    // The address says whose invitation it is; no caller picks a namespace.
+    const namespace = namespaceAt(this.ctx.id.name);
+    return this.answer(
+      NamespaceCodecs.inviteAgent,
+      decoded(InviteAgentCommand, command).pipe(
+        Effect.flatMap((inviting) => inviteAgent(namespace, inviting)),
+      ),
+    );
+  }
+
+  async acceptInvitation(command: typeof AcceptInvitationCommand.Encoded) {
+    const namespace = namespaceAt(this.ctx.id.name);
+    return this.answer(
+      NamespaceCodecs.acceptInvitation,
+      decoded(AcceptInvitationCommand, command).pipe(
+        Effect.flatMap((accepting) => acceptInvitation(namespace, accepting)),
+      ),
+    );
+  }
+
+  async endInvitation(command: typeof EndInvitationCommand.Encoded) {
+    const namespace = namespaceAt(this.ctx.id.name);
+    return this.answer(
+      NamespaceCodecs.endInvitation,
+      decoded(EndInvitationCommand, command).pipe(
+        Effect.flatMap((ending) => endInvitation(namespace, ending)),
+      ),
+    );
+  }
+
   async raise(command: typeof RaiseCommand.Encoded) {
     // The address says whose escalation it is; no caller picks a namespace.
     const namespace = namespaceAt(this.ctx.id.name);

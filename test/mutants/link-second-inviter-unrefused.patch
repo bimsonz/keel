@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: another member's invitation of an agent already invited is answered as if nothing were in the way, so two members believe they answer for it
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..acd8e0c6 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -103,9 +103,7 @@ export const decideInvitation = (
+         return Result.succeed([
+           AgentInvited.make({ namespace, agentId, by: command.by, scopes: command.scopes }),
+         ]);
+-      return invitation.by === command.by && sameScopes(invitation.scopes, command.scopes)
+-        ? Result.succeed([])
+-        : refuse("already-invited");
++      return Result.succeed([]);
+     case "Accept":
+       if (!standing(invitation)) return refuse("not-invited");
+       return invitation.state === "joined"

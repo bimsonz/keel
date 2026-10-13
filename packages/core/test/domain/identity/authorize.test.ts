@@ -253,7 +253,13 @@ const inside = (p: Principal, org: NamespaceId): boolean =>
   (p._tag === "Agent" && p.namespace === org && p.standing._tag !== "None");
 
 const READS: ReadonlySet<Need> = new Set(["read", "readMembers"]);
-const GOVERNING: ReadonlySet<Need> = new Set(["member", "maintain", "own", "sponsorOrMaintain"]);
+const GOVERNING: ReadonlySet<Need> = new Set([
+  "member",
+  "maintain",
+  "own",
+  "sponsorOrMaintain",
+  "inviterOrMaintain",
+]);
 const PEOPLES: readonly Right[] = ["member", "maintain", "own"];
 const UNSCOPED: ReadonlySet<Need> = new Set(["anyone", "self", "account", "user", "handle"]);
 
@@ -474,6 +480,10 @@ const GOVERNING_ACTIONS = [...actionsOn("Project"), ...actionsOn("Namespace")].f
   GOVERNING.has(needOf(a)),
 );
 
+/** What taking an agent out of an org answers the principal, on the org as its resolver gives it. */
+const remove = (principal: Principal, resource: NamespaceResource) =>
+  outcome(authorize(principal, "Namespaces_removeAgent", resource));
+
 describe("authorize", () => {
   it("[authz.org-isolation] no principal reads a private project of an org it is not in", () => {
     fc.assert(
@@ -541,6 +551,51 @@ describe("authorize", () => {
     expect(outcome(authorize(ANON, "Repo_getTree", project(PRJ_1, "public")))).toBe("ok:public");
     expect(outcome(authorize(ANON, "Repo_getTree", project(PRJ_1, "private")))).toBe("404");
     expect(outcome(authorize(ANON, "declare", project(PRJ_1, "public")))).toBe("401");
+  });
+
+  it("[authz.inviter-or-maintain] any member invites an agent into an org; the member who invited it, a maintainer or an owner takes it out again, and no other member does", () => {
+    const [ada, ben] = [USERS[0] ?? INVITER, INVITER];
+    const as = (userId: typeof INVITER, role?: Role) =>
+      user({ userId, memberships: role === undefined ? [] : [{ org: ORG_1, role }] });
+    const invite = (principal: Principal, resource: NamespaceResource = into(ORG_1)) =>
+      outcome(authorize(principal, "Namespaces_inviteAgent", resource));
+    const invitedByBen = into(ORG_1, { inviter: ben });
+
+    // Inviting is any member's, and nobody else's.
+    expect(invite(as(ada, "member"))).toBe("ok:");
+    expect(invite(as(ada, "maintainer"))).toBe("ok:");
+    expect(invite(as(ada, "owner"))).toBe("ok:");
+    expect(invite(as(ada))).toBe("403:role");
+    expect(invite(user({ userId: ada, memberships: [{ org: ORG_2, role: "owner" }] }))).toBe(
+      "403:role",
+    );
+    expect(invite(ANON)).toBe("401");
+
+    // Taking an agent out: the member who invited it, whatever else they are; a maintainer; an owner.
+    expect(remove(as(ben, "member"), invitedByBen)).toBe("ok:");
+    expect(remove(as(ada, "member"), invitedByBen)).toBe("403:role");
+    expect(remove(as(ada, "maintainer"), invitedByBen)).toBe("ok:");
+    expect(remove(as(ada, "owner"), invitedByBen)).toBe("ok:");
+    // The inviter who has left the org is no member: the invitation gives them nothing.
+    expect(remove(as(ben), invitedByBen)).toBe("403:role");
+    expect(remove(user({ userId: ben, suspended: true }), invitedByBen)).toBe("403:user-suspended");
+    // With no invitation standing the resource names no inviter: only a maintainer is let through.
+    expect(remove(as(ben, "member"), into(ORG_1))).toBe("403:role");
+    expect(remove(as(ben, "maintainer"), into(ORG_1))).toBe("ok:");
+    expect(remove(ANON, invitedByBen)).toBe("401");
+
+    // An agent a member invited works there and never governs: it invites and removes no one, itself among them.
+    const invited = agentIn(ORG_1, { standing: invitedBy({ userId: ben }) });
+    expect(invite(invited)).toBe("403:users-only");
+    expect(remove(invited, invitedByBen)).toBe("403:users-only");
+    expect(invite(agentIn(ORG_1, { paused: true }))).toBe("403:agent-paused");
+
+    // An agent is invited into an org: a person's own namespace and an agent's own take none.
+    const own = into(ada, { inviter: ada });
+    expect(invite(as(ada), into(ada))).toBe("404");
+    expect(remove(as(ada), own)).toBe("404");
+    const agentsOwn = makeId("agt", ulid(7));
+    expect(invite(as(ada, "owner"), into(agentsOwn, { personOwned: false }))).toBe("404");
   });
 
   it("[authz.agent-invited-read-work] an invited agent reads and works on its token's project while its inviter answers for it, and never holds more than that member", () => {
@@ -890,6 +945,7 @@ describe("authorize", () => {
       maintain: 2,
       workOrMaintain: 2,
       sponsorOrMaintain: 2,
+      inviterOrMaintain: 2,
       own: 3,
     };
     fc.assert(
@@ -1488,7 +1544,13 @@ describe("authorize: a namespace by its kind", () => {
 
   it("[authz.org-rows] inviting, removing, making an owner and deleting are an org's own: of a person's or an agent's own namespace they are not there, for its owner as for anyone", () => {
     // Typed apart from the table: the rows that are asked of an org alone.
-    const ORG_ROWS = ["DeleteOrg", "ManageMembers", "ManageOwners"];
+    const ORG_ROWS = [
+      "DeleteOrg",
+      "ManageMembers",
+      "ManageOwners",
+      "Namespaces_inviteAgent",
+      "Namespaces_removeAgent",
+    ];
     expect(ACTION_NAMES.filter((a) => kindOf(a) === "Org").toSorted()).toEqual(ORG_ROWS);
     fc.assert(
       fc.property(askedArb, fc.constantFrom(...ORG_ROWS.filter(isAction)), (asked, action) => {

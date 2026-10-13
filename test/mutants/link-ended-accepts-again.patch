@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: an agent whose invitation ended accepts it again, so being taken out of a namespace does not last
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..b9949772 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -107,7 +107,7 @@ export const decideInvitation = (
+         ? Result.succeed([])
+         : refuse("already-invited");
+     case "Accept":
+-      if (!standing(invitation)) return refuse("not-invited");
++      if (invitation === undefined) return refuse("not-invited");
+       return invitation.state === "joined"
+         ? Result.succeed([])
+         : Result.succeed([AgentJoinedNamespace.make({ namespace, agentId })]);

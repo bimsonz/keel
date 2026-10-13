@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.standing
+# kills: link.standing
+# why: anyone who reads an org reads the invitations its agents have not answered
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 2f51b7e5..742f2818 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -249,7 +249,7 @@ export function invitationHandlers(
+           const directory = yield* AgentDirectory;
+           // A pending invitation is its members' to see: anyone else reads who has joined.
+           const items = yield* Effect.forEach(
+-            rows.filter((row) => audience === "members" || row.state === "joined"),
++            rows.filter((row) => audience !== undefined || row.state === "joined"),
+             (row) =>
+               directory
+                 .findAgent(row.agentId)

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: an invitation nobody accepted already answers for the agent, so a member puts an agent into a namespace without its agreement
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..b511576c 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -200,4 +200,6 @@ export const replayInvitation = (
+ export const answersFor = (
+   invitation: Invitation | undefined,
+ ): { readonly by: UserId; readonly scopes: InvitationScopes } | undefined =>
+-  invitation?.state === "joined" ? { by: invitation.by, scopes: invitation.scopes } : undefined;
++  invitation !== undefined && invitation.state !== "ended"
++    ? { by: invitation.by, scopes: invitation.scopes }
++    : undefined;

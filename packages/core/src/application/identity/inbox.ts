@@ -1,6 +1,9 @@
 import { Effect, Option, Schema } from "effect";
 import {
+  AgentInvited,
+  AgentLeftNamespace,
   type AgentNotice,
+  givesWork,
   type InboxEntry,
   InboxEntry as InboxEntrySchema,
   type InboxPage,
@@ -66,6 +69,8 @@ export const inboxDepth = (store: Store, run?: RunId): number => {
 };
 
 /** The next actions an event's payload names, when it names any. */
+const decodeInvited = Schema.decodeUnknownOption(AgentInvited);
+const decodeLeft = Schema.decodeUnknownOption(AgentLeftNamespace);
 const decodeActionable = Schema.decodeUnknownOption(
   Schema.Struct({ nextActions: Schema.optional(Schema.Array(NextAction)) }),
 );
@@ -128,6 +133,20 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onSome: (p) =>
           p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
       });
+    case "AgentInvited":
+      return Option.match(decodeInvited(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `a member invited you into ${p.namespace}: accept, and a token that names one of its projects ${givesWork(p.scopes) ? "reads and works" : "reads"} there`,
+      });
+    case "AgentLeftNamespace":
+      return Option.match(decodeLeft(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          p.reason === "withdrawn"
+            ? `the invitation into ${p.namespace} was withdrawn`
+            : `you were taken out of ${p.namespace}: you have no standing there now`,
+      });
     case "AgentSponsored":
       return "a person now stands behind you: your questions go to them, and they may pause you";
     case "AgentUnsponsored":
@@ -155,6 +174,32 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
   if (event.type === "AgentSponsored" || event.type === "AgentUnsponsored")
     return [
       { kind: "read", title: "Read who you are and who stands behind you", operationId: "whoami" },
+    ];
+  if (event.type === "AgentInvited")
+    return Option.match(decodeInvited(event.payload), {
+      onNone: () => undefined,
+      onSome: (p) => [
+        {
+          kind: "call",
+          title: "Accept the invitation",
+          operationId: "Agents_acceptInvitation",
+          args: { namespace: p.namespace },
+        },
+        {
+          kind: "call",
+          title: "Decline it",
+          operationId: "Agents_leaveNamespace",
+          args: { namespace: p.namespace },
+        },
+      ],
+    });
+  if (event.type === "AgentLeftNamespace")
+    return [
+      {
+        kind: "read",
+        title: "Read the namespaces you stand in",
+        operationId: "Agents_listNamespaces",
+      },
     ];
   const conflictId = Option.getOrUndefined(decodeEscalation(event.payload))?.conflictId;
   if (conflictId === undefined) return undefined;

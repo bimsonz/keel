@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.asked-first
+# kills: link.asked-first
+# why: a member is asked first about an agent that never accepted their invitation, or that they took out
+diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
+index d55cddba..1facf415 100644
+--- a/packages/core/src/application/identity/invitations.ts
++++ b/packages/core/src/application/identity/invitations.ts
+@@ -65,7 +65,7 @@ const invitationOf = (store: Store, agentId: AgentId): Invitation | undefined =>
+  * raises a question about the agent's work here asks that member first.
+  */
+ export const invitedBy = (store: Store, agentId: AgentId): UserId | undefined =>
+-  answersFor(invitationOf(store, agentId))?.by;
++  invitationOf(store, agentId)?.by;
+ 
+ /** A member's invitation, as the isolate sends it. */
+ export interface InviteAgent {

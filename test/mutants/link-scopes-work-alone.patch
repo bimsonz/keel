@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: an invitation may give work without read, which the policy never grants and no agent could use
+diff --git a/packages/core/src/domain/identity/events.ts b/packages/core/src/domain/identity/events.ts
+index 41c597a4..de220c45 100644
+--- a/packages/core/src/domain/identity/events.ts
++++ b/packages/core/src/domain/identity/events.ts
+@@ -62,7 +62,7 @@ export const AgentUnsponsored = Schema.TaggedStruct("AgentUnsponsored", {
+ export const InvitationScopes = Schema.Array(GrantableScope).check(
+   Schema.makeFilter(
+     (scopes) =>
+-      (scopes.includes("agent:read") && new Set(scopes).size === scopes.length) ||
++      new Set(scopes).size === scopes.length ||
+       "an invitation gives read, or read and work",
+   ),
+ );

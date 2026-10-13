@@ -68,6 +68,22 @@ export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
 ) {}
 
 /**
+ * The command is not valid for the agent's place in the namespace: an
+ * invitation already stands there (`already-invited`), none does
+ * (`not-invited`), or another agent asked to end it (`not-a-party`).
+ */
+export class InvitationRefused extends Schema.TaggedError<InvitationRefused>()(
+  "InvitationRefused",
+  {
+    namespace: NamespaceId,
+    agentId: AgentId,
+    state: Schema.optional(Schema.Literals(["invited", "joined", "ended"])),
+    command: Schema.String,
+    reason: Schema.Literals(["already-invited", "not-invited", "not-a-party"]),
+  },
+) {}
+
+/**
  * The agent has no live request for a sponsor that this approval answers: it
  * never asked, or the code is wrong, used or expired. One answer for all of
  * them, so a guess learns nothing.

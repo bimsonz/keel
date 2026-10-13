@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t nsagents.contract
+# kills: nsagents.contract
+# why: an ended invitation is still found, so a member who invited an agent long gone may still be named its inviter
+diff --git a/apps/keel/src/adapters/driven/d1/namespace-agents.ts b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+index 3b324a4d..da4feea4 100644
+--- a/apps/keel/src/adapters/driven/d1/namespace-agents.ts
++++ b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+@@ -120,7 +120,7 @@ export function NamespaceAgentsD1(db: D1Database) {
+           db
+             .prepare(
+               `SELECT ${COLUMNS} FROM namespace_agents
+-               WHERE namespace_id = ? AND agent_id = ? AND state <> 'ended'`,
++               WHERE namespace_id = ? AND agent_id = ?`,
+             )
+             .bind(namespace, agentId)
+             .first(),

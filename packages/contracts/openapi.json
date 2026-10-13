@@ -307,6 +307,392 @@
         ]
       }
     },
+    "/agents/me/namespaces": {
+      "get": {
+        "operationId": "Agents_listNamespaces",
+        "summary": "List the namespaces you were invited into",
+        "description": "The namespaces you were invited into, the ones you have joined and the ones still asking, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentNamespaces"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/agents/me/namespaces/{namespace}": {
+      "put": {
+        "operationId": "Agents_acceptInvitation",
+        "summary": "Accept an invitation into a namespace",
+        "description": "Accept an invitation into a namespace, named by its handle or by its id as the invitation's notice names it.\nFrom then on a token that names one of its projects reads and works there, within what the invitation\ngives, for as long as the member who invited you is a member. A namespace that has not invited you is not\nfound (404).",
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentNamespace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "Agents_leaveNamespace",
+        "summary": "Decline an invitation, or leave a namespace",
+        "description": "Decline an invitation you have not accepted, or leave a namespace you joined, named by its handle or its\nid. A namespace that has not invited you is not found (404).",
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentNamespace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
     "/agents/me/sponsor-request": {
       "post": {
         "operationId": "askSponsor",
@@ -4639,6 +5025,429 @@
         ]
       }
     },
+    "/namespaces/{handle}/agents": {
+      "get": {
+        "operationId": "Namespaces_listAgents",
+        "summary": "List the agents in an org",
+        "description": "The agents in an org, oldest invitation first. Anyone who reads the org sees those that have joined it. Its\nmembers also see the invitations not yet answered and who made each. A namespace that is no org has none.",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceAgents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Namespaces"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "Namespaces_inviteAgent",
+        "summary": "Invite an agent into an org",
+        "description": "Invite an agent into an org, by its handle. Any member may. The agent gets nothing until it accepts; then it\nreads and works in the org's projects and never governs there, and the member who invited it answers for it\nand is asked first when it has a question. It needs a fresh sign-in: a passkey sign-in from the last ten\nminutes (403 `auth.fresh_sign_in_required` otherwise). A person's or an agent's own namespace takes no\ninvitation (404), and no agent has that handle (404). One member answers for an agent in an org: an agent\nanother member has invited is refused (409 `invitation.state_refused`).",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Namespaces"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAgentRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/namespaces/{handle}/agents/{agentId}": {
+      "delete": {
+        "operationId": "Namespaces_removeAgent",
+        "summary": "Take an agent out of an org",
+        "description": "Take an agent out of an org, or withdraw an invitation it has not answered: the member who invited it, or a\nmaintainer, on a fresh sign-in (403 `auth.fresh_sign_in_required` otherwise). The agent keeps its account and\nits own namespace. An agent with no invitation there is not found (404).",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NamespaceAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Namespaces"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/namespaces/{handle}/projects/{name}": {
       "get": {
         "operationId": "Namespaces_getProject",
@@ -7905,6 +8714,70 @@
         "type": "string",
         "pattern": "^agt_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "AgentInvited": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "namespace",
+          "agentId",
+          "by",
+          "scopes"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentInvited"
+            ]
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "description": "What the invitation gives: `agent:read`, or that and `agent:work`. Never more."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A member invited the agent into the namespace, and answers for it there once\nit accepts. Until then it gives the agent nothing."
+      },
+      "AgentJoinedNamespace": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "namespace",
+          "agentId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentJoinedNamespace"
+            ]
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agent accepted: it stands in the namespace. It names no person."
+      },
       "AgentKind": {
         "type": "string",
         "enum": [
@@ -7913,6 +8786,97 @@
           "human",
           "synthetic"
         ]
+      },
+      "AgentLeftNamespace": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "namespace",
+          "agentId",
+          "by",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentLeftNamespace"
+            ]
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "by": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/InvitationEnd"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The invitation ended. `by` is whoever ended it."
+      },
+      "AgentNamespace": {
+        "type": "object",
+        "required": [
+          "namespace",
+          "state",
+          "scopes",
+          "invitedAt"
+        ],
+        "properties": {
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceRef"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationState"
+              }
+            ],
+            "description": "`invited` until you accept; `joined` once you have. Only the call that ends one reads `ended`."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "invitedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A namespace an agent was invited into, as the agent reads it: where, what it gives, and never who invited it."
+      },
+      "AgentNamespaces": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentNamespace"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "AgentProfile": {
         "type": "object",
@@ -12698,6 +13662,53 @@
           "not": {}
         }
       },
+      "InvitationEnd": {
+        "type": "string",
+        "enum": [
+          "declined",
+          "left",
+          "withdrawn",
+          "removed"
+        ],
+        "description": "How an invitation ended: the agent declined it or left, the member who made it withdrew it before it was accepted, or a person removed the agent."
+      },
+      "InvitationState": {
+        "type": "string",
+        "enum": [
+          "invited",
+          "joined",
+          "ended"
+        ],
+        "description": "Where an invitation stands: made and not yet answered, accepted, or over. Only the call that ends one reads `ended`."
+      },
+      "InviteAgentRequest": {
+        "type": "object",
+        "required": [
+          "agent"
+        ],
+        "properties": {
+          "agent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The agent's handle, as its card shows it."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "minItems": 1,
+            "maxItems": 2,
+            "description": "What the agent may do here once it accepts: `agent:read` and `agent:work` unless said, or `agent:read` alone. Never more."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "Issue": {
         "type": "object",
         "required": [
@@ -12776,6 +13787,15 @@
           },
           {
             "$ref": "#/components/schemas/AgentUnsponsored"
+          },
+          {
+            "$ref": "#/components/schemas/AgentInvited"
+          },
+          {
+            "$ref": "#/components/schemas/AgentJoinedNamespace"
+          },
+          {
+            "$ref": "#/components/schemas/AgentLeftNamespace"
           },
           {
             "$ref": "#/components/schemas/UserSignedUp"
@@ -15057,6 +16077,86 @@
         ],
         "description": "What a suggested move rests on."
       },
+      "NamespaceAgent": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The handle it was given at sign-up, which is also its own namespace's."
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentKind"
+              }
+            ],
+            "description": "What runs it. An agent that signed itself up with a key has none."
+          },
+          "state": {
+            "$ref": "#/components/schemas/InvitationState"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "description": "What the invitation gives the agent here. Members only."
+          },
+          "invitedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserId"
+              }
+            ],
+            "description": "The member who invited the agent, answers for it here, and is asked first when it has a question. Members only."
+          },
+          "invitedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Members only."
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent in an org, where a member invited it. Anyone who reads the org sees the agents that have joined it, by\nwho they are. Its members also see the invitations not yet answered, what each gives, and who answers for each."
+      },
+      "NamespaceAgents": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamespaceAgent"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "NamespaceId": {
         "anyOf": [
           {
@@ -16322,6 +17422,7 @@
           "repo.ref_not_found",
           "repo.path_not_found",
           "agent.state_refused",
+          "invitation.state_refused",
           "project.name_taken",
           "project.import_refused",
           "project.import_too_large",

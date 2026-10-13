@@ -38,6 +38,8 @@ import type {
  * - `member`, `maintain`, `own`: that role or above in the resource's org, or
  *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
  *   sponsor of the agent concerned, or whoever holds `maintain`;
+ *   `inviterOrMaintain`: the member who invited the agent concerned into the
+ *   org, or whoever holds `maintain` there;
  * - `sponsor`: the person who stands behind the agent the action is on, and
  *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
  *   the agent itself.
@@ -54,6 +56,7 @@ export type Need =
   | "workOrMaintain"
   | "member"
   | "sponsorOrMaintain"
+  | "inviterOrMaintain"
   | "maintain"
   | "own"
   | "sponsor"
@@ -91,6 +94,10 @@ export const SPEC_ACTIONS = {
   Operator_createProject: rule("Namespace", "member"),
   Namespaces_getNamespace: rule("Namespace", "read"),
   Namespaces_getProject: rule("Project", "read"),
+  Namespaces_listAgents: rule("Namespace", "read"),
+  // An agent is invited into an org, never into a person's own namespace.
+  Namespaces_inviteAgent: rule("Org", "member"),
+  Namespaces_removeAgent: rule("Org", "inviterOrMaintain"),
 
   Changes_listChanges: rule("Project", "read"),
   change: rule("Project", "read"),
@@ -137,6 +144,9 @@ export const SPEC_ACTIONS = {
   Operator_suspendAgent: rule("Agent", "sponsor"),
   Operator_reinstateAgent: rule("Agent", "sponsor"),
   Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
+  Agents_listNamespaces: rule("Self", "self"),
+  Agents_acceptInvitation: rule("Self", "self"),
+  Agents_leaveNamespace: rule("Self", "self"),
   Operator_putSettings: rule("Project", "maintain"),
 } as const satisfies Record<string, ActionRule>;
 
@@ -574,6 +584,14 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
           resource.sponsor === principal.userId)
         ? granted()
         : lacksRole("maintain", kind);
+    // The member who invited an agent may take it out again; so may whoever maintains the org.
+    case "inviterOrMaintain":
+      return rights.has("maintain") ||
+        (rights.has("member") &&
+          resource._tag === "Namespace" &&
+          resource.inviter === principal.userId)
+        ? granted()
+        : lacksRole("maintain", kind);
     default:
       return hidden();
   }
@@ -665,6 +683,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     case "own":
       return rights.has(need) ? granted() : refused(whyNoRule(principal, resource));
     case "sponsorOrMaintain":
+    case "inviterOrMaintain":
       return rights.has("maintain") ? granted() : refused(whyNoRule(principal, resource));
     default:
       return hidden();

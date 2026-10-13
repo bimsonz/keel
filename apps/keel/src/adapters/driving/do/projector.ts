@@ -11,7 +11,12 @@ import {
   recordFeed,
   viewSnapshot,
 } from "@keeltown/core/application/memory";
-import { noteStanding, repairStandings } from "@keeltown/core/application/identity";
+import {
+  noteInvitation,
+  noteStanding,
+  repairInvitations,
+  repairStandings,
+} from "@keeltown/core/application/identity";
 import { noteVisibility, repairVisibility } from "@keeltown/core/application/integration";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
@@ -72,6 +77,7 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
     noteStanding(tx.store, event);
     noteVisibility(tx.store, event);
+    noteInvitation(tx.store, event);
     return { drafts: [] };
   }
 
@@ -79,6 +85,7 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
   protected override async received(): Promise<void> {
     await this.runtime.runPromise(repairStandings);
     await this.runtime.runPromise(repairVisibility);
+    await this.runtime.runPromise(repairInvitations);
   }
 
   async read(request: typeof ProjectorRead.Encoded) {

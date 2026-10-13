@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.standing
+# kills: link.standing
+# why: anyone who reads an org reads who invited each of its agents and what each may do
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 2f51b7e5..0fab18e0 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -255,7 +255,7 @@ export function invitationHandlers(
+                 .findAgent(row.agentId)
+                 .pipe(
+                   Effect.map((agent) =>
+-                    namespaceAgent(row, Option.getOrUndefined(agent), audience),
++                    namespaceAgent(row, Option.getOrUndefined(agent), "members"),
+                   ),
+                 ),
+           );

@@ -35,6 +35,7 @@ describe("who a use-case's commit names", () => {
     expect(sites).toEqual({
       "coordination/change.ts": 7,
       "coordination/conflict-moves.ts": 1,
+      "identity/invitations.ts": 1,
       "identity/session.ts": 1,
       "identity/sign-up.ts": 1,
     });

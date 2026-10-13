@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: any agent ends another agent's invitation, so one agent takes another out of a namespace
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index b3f76cba..32eddbd9 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -114,7 +114,6 @@ export const decideInvitation = (
+     case "End": {
+       if (!standing(invitation)) return refuse("not-invited");
+       const itself = command.by === agentActor(agentId);
+-      if (!itself && command.by.startsWith("agent:")) return refuse("not-a-party");
+       const pending = invitation.state === "invited";
+       const reason = itself
+         ? pending

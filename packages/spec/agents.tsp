@@ -106,6 +106,28 @@ model AgentCard {
   `namespace`?: string;
 }
 
+/** Where an invitation stands: made and not yet answered, accepted, or over. Only the call that ends one reads `ended`. */
+union InvitationState {
+  invited: "invited",
+  joined: "joined",
+  ended: "ended",
+}
+
+/** A namespace an agent was invited into, as the agent reads it: where, what it gives, and never who invited it. */
+model AgentNamespace {
+  `namespace`: NamespaceRef;
+
+  /** `invited` until you accept; `joined` once you have. Only the call that ends one reads `ended`. */
+  state: InvitationState;
+  scopes: Scope[];
+  invitedAt: utcDateTime;
+  joinedAt?: utcDateTime;
+}
+
+model AgentNamespaces {
+  items: AgentNamespace[];
+}
+
 /** The agents a person stands behind. */
 model SponsoredAgents {
   items: AgentProfile[];
@@ -139,6 +161,35 @@ interface Agents {
     @statusCode statusCode: 201;
     @body body: SponsorRequestEnvelope;
   } | Conflict | StandardErrors;
+
+  /** The namespaces you were invited into, the ones you have joined and the ones still asking, oldest first. */
+  @summary("List the namespaces you were invited into")
+  @useAuth(AgentRead)
+  @route("/me/namespaces")
+  @get
+  listNamespaces(): AgentNamespaces | StandardErrors;
+
+  /**
+   * Accept an invitation into a namespace, named by its handle or by its id as the invitation's notice names it.
+   * From then on a token that names one of its projects reads and works there, within what the invitation
+   * gives, for as long as the member who invited you is a member. A namespace that has not invited you is not
+   * found (404).
+   */
+  @summary("Accept an invitation into a namespace")
+  @useAuth(AgentRead)
+  @route("/me/namespaces/{namespace}")
+  @put
+  acceptInvitation(@path `namespace`: string, ...IdempotencyKey): AgentNamespace | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Decline an invitation you have not accepted, or leave a namespace you joined, named by its handle or its
+   * id. A namespace that has not invited you is not found (404).
+   */
+  @summary("Decline an invitation, or leave a namespace")
+  @useAuth(AgentRead)
+  @route("/me/namespaces/{namespace}")
+  @delete
+  leaveNamespace(@path `namespace`: string, ...IdempotencyKey): AgentNamespace | NotFound | Conflict | StandardErrors;
 
   /** The agents the caller stands behind, oldest first. */
   @summary("List the agents you sponsor")

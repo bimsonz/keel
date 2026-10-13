@@ -40,6 +40,28 @@ export const ROUTES = {
     headers: ["idempotency-key"],
   },
   Agents_getAgent: { method: "GET", path: "/agents/{agentId}" },
+  Agents_listNamespaces: { method: "GET", path: "/agents/me/namespaces" },
+  Agents_acceptInvitation: {
+    method: "PUT",
+    path: "/agents/me/namespaces/{namespace}",
+    headers: ["idempotency-key"],
+  },
+  Agents_leaveNamespace: {
+    method: "DELETE",
+    path: "/agents/me/namespaces/{namespace}",
+    headers: ["idempotency-key"],
+  },
+  Namespaces_listAgents: { method: "GET", path: "/namespaces/{handle}/agents" },
+  Namespaces_inviteAgent: {
+    method: "POST",
+    path: "/namespaces/{handle}/agents",
+    headers: ["idempotency-key"],
+  },
+  Namespaces_removeAgent: {
+    method: "DELETE",
+    path: "/namespaces/{handle}/agents/{agentId}",
+    headers: ["idempotency-key"],
+  },
   SignIn_methods: { method: "GET", path: "/auth/methods" },
   declare: { method: "POST", path: "/changes", headers: ["idempotency-key"] },
   change: { method: "GET", path: "/changes/{changeId}" },

@@ -26,6 +26,7 @@ import {
   evolveEscalation,
   type InvalidEscalation,
 } from "../../domain/verification/index.ts";
+import { invitedBy } from "../identity/index.ts";
 import { MAINTAINERS_AFTER_MS } from "../memory/index.ts";
 import { commit, type Transaction, type Transition } from "../ports/commit.ts";
 import type { EventDraft } from "../ports/event-outbox.ts";
@@ -281,11 +282,15 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
     for (const payload of decided.success)
       escalation = evolveEscalation(escalation, { at: tx.at, payload });
     if (escalation === undefined) return Result.succeed({ drafts: [], value: undefined });
+    // In a namespace a member invited the agent into, that member answers for it and is asked first.
+    const first =
+      (request.agent === undefined ? undefined : invitedBy(tx.store, request.agent)) ??
+      request.sponsor;
     const row: Row = {
       escalation,
       namespace: request.namespace,
       project: request.project,
-      ...(request.sponsor === undefined ? {} : { sponsor: request.sponsor }),
+      ...(first === undefined ? {} : { sponsor: first }),
       raisedBy: request.raisedBy,
     };
     tx.store.put(ESCALATION, request.escalationId, asStored(encodeRow(row)));
