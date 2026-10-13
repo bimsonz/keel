@@ -405,6 +405,7 @@ const DISCARD_WORD: Record<string, string> = {
   "non-discriminating": "it gave the same answer in every world",
   unstable: "its runs in one world did not agree",
   "draft-failed": "none of its drafts could be kept",
+  "run-failed": "its run ended before every world had answered",
 };
 
 const none = (words: string): ReactNode => (

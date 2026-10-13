@@ -160,9 +160,9 @@ model MatrixWorld {
   checks: MatrixCheck[];
 }
 
-/** Why a probe was discarded, in ProbeDiscarded's words; `detail` says why its drafts failed. */
+/** Why a probe was discarded, in ProbeDiscarded's words; `detail` says why its drafts failed. `run-failed`: its run ended before the matrix was complete. */
 model ProbeDiscard {
-  reason: "non-discriminating" | "unstable" | "draft-failed";
+  reason: "non-discriminating" | "unstable" | "draft-failed" | "run-failed";
   detail?:
     | "schema"
     | "truncated"

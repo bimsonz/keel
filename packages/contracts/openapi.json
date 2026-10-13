@@ -16054,7 +16054,8 @@
             "enum": [
               "non-discriminating",
               "unstable",
-              "draft-failed"
+              "draft-failed",
+              "run-failed"
             ]
           },
           "detail": {
@@ -16075,7 +16076,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "Why a probe was discarded, in ProbeDiscarded's words; `detail` says why its drafts failed."
+        "description": "Why a probe was discarded, in ProbeDiscarded's words; `detail` says why its drafts failed. `run-failed`: its run ended before the matrix was complete."
       },
       "ProbeDiscarded": {
         "type": "object",
