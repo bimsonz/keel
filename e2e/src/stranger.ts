@@ -14,6 +14,10 @@
 //   (3) the neighbour and a visitor with no account cannot list, find or
 //       read that project, nor can git clone it; once the stranger makes it
 //       public they can, and once it is private again they cannot;
+//   (3b) the stranger signs in from a terminal, `keeltown login`, approving
+//       it with the session they hold, and has git ask keeltown for the
+//       credential: stock git then clones their private project with nothing
+//       pasted, and is refused once they sign out;
 //   (4) the stranger's namespace holds ten projects and is refused an
 //       eleventh, with the way on: the same project, asked for in an org the
 //       stranger makes, `walk-<run>-o`, is made;
@@ -26,8 +30,14 @@
 // Each run needs a run of its own, since a handle is taken for good. It
 // leaves behind the stranger's account with ten private projects, their org
 // with one, the agent, whose key is gone with the run, and the neighbour's
-// handle. No session, passkey, code, secret or key is printed.
+// handle. No session, passkey, code, secret or key is printed. Step (3b) keeps
+// the terminal's sign-in in this machine's key store, under a profile of the
+// run's own, until it signs out; git's config for it is a file of the run's.
+import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { generateAgentKey, KeelClient, KeelProblem, signUp as signUpByKey } from "@keeltown/sdk";
 import { type Account, AccountRefused, signIn, signUp } from "../../scripts/lib/account.ts";
 import { git } from "./lib/git.ts";
@@ -45,6 +55,9 @@ const ORG = `walk-${run}-o`;
 const ROOM = 10;
 const PROJECT = "walk";
 const key = (what: string) => `stranger:${run}:${what}`;
+/** The CLI as it is in this repository, and the profile the run's sign-in is kept under. */
+const CLI = fileURLToPath(new URL("../../packages/cli/src/bin.ts", import.meta.url));
+const PROFILE = `walk-${run}`;
 
 let failures = 0;
 const check = (ok: boolean, what: string) => {
@@ -136,6 +149,61 @@ async function asks(path: string, session: string, body: unknown) {
   const code: unknown =
     typeof answer === "object" && answer !== null ? Reflect.get(answer, "code") : undefined;
   return { status: response.status, code: typeof code === "string" ? code : undefined };
+}
+
+/**
+ * A program run to its end with `env` over this process's: its exit code and
+ * what it wrote. `heard` is given each line of its stderr as it is written.
+ */
+function runs(
+  file: string,
+  args: readonly string[],
+  env: Record<string, string>,
+  heard?: (line: string) => void,
+): Promise<{ readonly code: number; readonly stdout: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, [...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...env },
+    });
+    let stdout = "";
+    let pending = "";
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => {
+      const lines = (pending + chunk.toString("utf8")).split("\n");
+      pending = lines.pop() ?? "";
+      for (const line of lines) heard?.(line);
+    });
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout }));
+  });
+}
+
+/** `keeltown`, as a person at a terminal runs it against this Keel, under the run's profile. */
+const keeltown = (
+  args: readonly string[],
+  env: Record<string, string> = {},
+  heard?: (line: string) => void,
+) =>
+  runs(
+    process.execPath,
+    [CLI, ...args, "--profile", PROFILE],
+    { KEEL_URL: keelUrl, ...env },
+    heard,
+  );
+
+/** How many of a person's sessions were signed in from a terminal, by Keel's own list of them. */
+async function terminalSessions(session: string): Promise<number | undefined> {
+  const response = await fetch(`${keelUrl}/v1/auth/sessions`, {
+    headers: { authorization: `Bearer ${session}` },
+  });
+  const listed: unknown = await response.json().catch(() => undefined);
+  const sessions: unknown = Array.isArray(listed)
+    ? listed
+    : Reflect.get(Object(listed), "sessions");
+  return Array.isArray(sessions)
+    ? sessions.filter((one: unknown) => Reflect.get(Object(one), "signedInBy") === "device").length
+    : undefined;
 }
 
 const visitor = new KeelClient({ baseUrl: keelUrl });
@@ -309,6 +377,84 @@ async function keepsAndShows(): Promise<void> {
   await seenAs("private again", false);
 }
 
+/** (3b) the stranger signs in from a terminal, and stock git clones their private project with nothing pasted. */
+async function clonesFromATerminal(): Promise<void> {
+  if (stranger === undefined || projectId === undefined)
+    throw new Error("(3b) needs the stranger and their project");
+  const session = stranger.account.session.token;
+  const remote = `${keelUrl}/${STRANGER}/${PROJECT}.git`;
+  const dir = await mkdtemp(join(tmpdir(), "keel-walk-"));
+  const config = join(dir, "gitconfig");
+  /** Stock git with prompts off, its global config the file given: the run's own, or none. */
+  const clones = (into: string, global: string) =>
+    runs("git", ["clone", "--quiet", remote, join(dir, into)], {
+      GIT_CONFIG_GLOBAL: global,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_TERMINAL_PROMPT: "0",
+    });
+  try {
+    // The page and its code are for the person at the terminal: read here, never printed.
+    let approved: Promise<{ claimed: number; approved: number }> | undefined;
+    const signedIn = await keeltown(["login"], {}, (line) => {
+      const page = /https?:\/\/\S+/.exec(line)?.[0];
+      const userCode = page === undefined ? null : new URL(page).searchParams.get("user_code");
+      if (userCode === null || approved !== undefined) return;
+      approved = (async () => {
+        const claim = await fetch(
+          `${keelUrl}/v1/auth/device?user_code=${encodeURIComponent(userCode)}`,
+          { headers: { authorization: `Bearer ${session}` } },
+        );
+        await claim.body?.cancel();
+        return {
+          claimed: claim.status,
+          approved: (await asks("/device/approve", session, { userCode })).status,
+        };
+      })();
+    });
+    const page = await approved;
+    check(
+      page?.claimed === 200 && page.approved === 200,
+      `(3b) the stranger approves the terminal's code with the session they hold: ${page?.claimed} ${page?.approved}`,
+    );
+    check(
+      signedIn.code === 0 && signedIn.stdout.includes(`Signed in as ${STRANGER}.`),
+      `(3b) keeltown login exits ${signedIn.code}, signed in as the stranger`,
+    );
+    check(
+      (await terminalSessions(session)) === 1,
+      "(3b) the stranger's list of sessions names one signed in from a terminal",
+    );
+    const set = await keeltown(["auth", "setup-git"], { GIT_CONFIG_GLOBAL: config });
+    check(set.code === 0, `(3b) keeltown auth setup-git exits ${set.code}`);
+
+    const bare = await clones("bare", "/dev/null");
+    check(
+      bare.code !== 0,
+      `(3b) private: git with no helper is refused the clone: exit ${bare.code}`,
+    );
+    const helped = await clones("helped", config);
+    const head = helped.code === 0 ? git(join(dir, "helped"), ["rev-parse", "HEAD"]) : "no clone";
+    const trunk = (await stranger.client.trunk(projectId)).head;
+    check(
+      helped.code === 0 && head === trunk,
+      `(3b) private: git, asking keeltown, clones it with nothing pasted, at trunk's head: exit ${helped.code}, ${head === trunk ? "the same commit" : "another commit"}`,
+    );
+
+    const out = await keeltown(["logout"]);
+    check(out.code === 0, `(3b) keeltown logout exits ${out.code}`);
+    check(
+      (await terminalSessions(session)) === 0,
+      "(3b) signed out: the stranger's list of sessions names none from a terminal",
+    );
+    const after = await clones("after", config);
+    check(after.code !== 0, `(3b) signed out: the same clone is refused: exit ${after.code}`);
+  } finally {
+    // Whatever stopped the step, the run's sign-in does not stay on this machine.
+    await keeltown(["logout"]).catch(() => undefined);
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 /** (4) a namespace holds ten projects: the eleventh is refused with the way on, and the stranger takes it. */
 async function fills(): Promise<void> {
   if (stranger === undefined || projectId === undefined)
@@ -410,7 +556,7 @@ async function leaves(): Promise<void> {
 }
 
 // Each part by itself, and the leaving always: a part that stops must not leave the neighbour behind.
-for (const part of [arrives, standsBehind, keepsAndShows, fills, leaves]) {
+for (const part of [arrives, standsBehind, keepsAndShows, clonesFromATerminal, fills, leaves]) {
   try {
     await part();
   } catch (error) {
