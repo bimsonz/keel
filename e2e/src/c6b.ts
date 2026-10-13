@@ -64,6 +64,18 @@ const check = (ok: boolean, what: string) => {
 };
 
 /** Whether `ancestor` is `sha` or behind it, in the clone at `dir`. */
+/** Clones a workspace, and says how long the clone took and what it downloaded: git's own count of its packs, in KiB. */
+function timedClone(what: string, remote: string, token: string): string {
+  const began = Date.now();
+  const dir = cloneWorkspace(remote, token);
+  const took = Date.now() - began;
+  const packs = git(dir, ["count-objects", "-v"])
+    .split("\n")
+    .find((counted) => counted.startsWith("size-pack:"));
+  console.log(`     ${what}: cloned in ${took} ms, ${packs ?? "size-pack: unknown"} KiB`);
+  return dir;
+}
+
 function reaches(dir: string, ancestor: string, sha: string): boolean {
   try {
     git(dir, ["merge-base", "--is-ancestor", ancestor, sha]);
@@ -158,7 +170,7 @@ async function importAndLand(): Promise<void> {
   if (declared.workspace.token === undefined)
     throw new Error("declare answered no workspace token");
   const token = declared.workspace.token;
-  const dir = cloneWorkspace(declared.workspace.remote, token);
+  const dir = timedClone("the change's workspace", declared.workspace.remote, token);
   dirs.push(dir);
   console.log(
     `     ${declared.change.id}: its clone checks out ${git(dir, ["rev-parse", "--abbrev-ref", "HEAD"])}`,
@@ -223,7 +235,7 @@ async function importAndLand(): Promise<void> {
   );
   if (reader.workspace.token === undefined) throw new Error("declare answered no workspace token");
   const tokenR = reader.workspace.token;
-  const dirR = cloneWorkspace(reader.workspace.remote, tokenR);
+  const dirR = timedClone("the reader's workspace", reader.workspace.remote, tokenR);
   dirs.push(dirR);
   check(
     git(dirR, ["rev-parse", "HEAD"]) === landed,

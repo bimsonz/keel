@@ -275,9 +275,14 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
       const forTake = [...asked];
       const main = yield* codeHost.head(trunk, MAIN);
       const parents = (yield* codeHost.readCommit(trunk, main)).parents;
+      asked.length = 0;
       const again = yield* writer.take(source);
+      const forAgain = [...asked];
+      // The fixture's own push moves the source on: counted apart from what the take asks.
       const later = yield* commit(source, MAIN, { "README.md": "three\n" });
+      asked.length = 0;
       const afterMove = yield* writer.take(source);
+      const forAfterMove = [...asked];
       const still = yield* codeHost.head(trunk, MAIN);
       return {
         root,
@@ -289,15 +294,16 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
         main,
         parents,
         again,
+        forAgain,
         later,
         afterMove,
+        forAfterMove,
         still,
-        asked: [...asked],
       };
     }),
   );
   console.log(
-    `LIVE take: gone ${report.gone._tag} (asked ${JSON.stringify(report.beforeTake)}); took ${report.taken === report.first ? "the source's head" : "another commit"} with ${JSON.stringify(report.forTake)}, its parent ${report.parents[0] === report.root ? "==" : "!="} the source's root; again ${report.again === report.first ? "the same" : "moved"}; after the source moved on ${report.afterMove === report.first ? "the same" : "moved"}, main ${report.still === report.first ? "unmoved" : "moved"}; git requests in all ${JSON.stringify(report.asked)}`,
+    `LIVE take: gone ${report.gone._tag} (asked ${JSON.stringify(report.beforeTake)}); took ${report.taken === report.first ? "the source's head" : "another commit"} with ${JSON.stringify(report.forTake)}, its parent ${report.parents[0] === report.root ? "==" : "!="} the source's root; again ${report.again === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAgain)}; after the source moved on ${report.afterMove === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAfterMove)}, main ${report.still === report.first ? "unmoved" : "moved"}`,
   );
   expect(report.gone).toMatchObject({ _tag: "RepoNotFound" });
   expect(report.beforeTake).toEqual([]);
@@ -307,7 +313,8 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
   expect(report.parents).toEqual([report.root]);
   expect(report.later).not.toBe(report.first);
   expect(report.again).toBe(report.first);
+  expect(report.forAgain).toEqual([]);
   expect(report.afterMove).toBe(report.first);
+  expect(report.forAfterMove).toEqual([]);
   expect(report.still).toBe(report.first);
-  expect(report.asked).toEqual(["upload", "receive"]);
 });

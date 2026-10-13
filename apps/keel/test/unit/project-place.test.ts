@@ -75,7 +75,9 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
           }),
       });
     }),
-  ).pipe(Layer.provide([makeTrunksMemory({ journal, ...options }).layer, places.layer]));
+  ).pipe(
+    Layer.provide([makeTrunksMemory({ journal, host: code, ...options }).layer, places.layer]),
+  );
   const projectObject = Layer.effect(
     Projects,
     Effect.gen(function* () {
