@@ -43,8 +43,8 @@ export class Trunks extends Context.Service<
     ) => Effect.Effect<void, PromotionStateRefused | QuotaExceeded | ImportTooLarge>;
     /**
      * Where trunk started, as its TrunkInitialized recorded it: none for a
-     * trunk initialized before origins were kept. Dies for a trunk not yet
-     * initialized.
+     * trunk initialized before origins were kept, and for one with no head
+     * yet.
      */
     readonly origin: (projectId: ProjectId) => Effect.Effect<Option.Option<TrunkOrigin>>;
     /**

@@ -2,7 +2,7 @@
 # kills: trunk.do.import-refused
 # why: The port answers the wire's shape of ImportTooLarge, not its own error, so a caller matching the port's class misses it
 diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
-index 3734aae1..019c8791 100644
+index e981dab5..6bb2f1cf 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 @@ -31,7 +31,6 @@ export function TrunksRpc(
@@ -12,4 +12,4 @@ index 3734aae1..019c8791 100644
 -          Effect.catchTag("ImportTooLarge", (large) => Effect.fail(new ImportTooLarge(large))),
          ),
        origin: (projectId) =>
-         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+         callObject(TrunkCodecs.origin, () => trunk(projectId).origin()).pipe(

@@ -18,6 +18,9 @@ export const TrunkStatus = Schema.Struct({
   origin: Schema.optional(TrunkOrigin),
 });
 
+/** Where trunk started: no origin for a trunk with no head yet, or one initialized before origins were kept. */
+export const TrunkStart = Schema.Struct({ origin: Schema.optional(TrunkOrigin) });
+
 /** What one sync did to a repo: it already held trunk's head, or its main moved there. */
 export const SyncOutcome = Schema.Literals(["unchanged", "advanced"]);
 
@@ -37,6 +40,7 @@ export const PackTooLarge = Schema.TaggedStruct("PackTooLarge", {
 
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
+  origin: exitCodec(TrunkStart, Schema.Never),
   resume: exitCodec(TrunkStatus, Schema.Never),
   initialize: exitCodec(
     TrunkStatus,
@@ -51,6 +55,8 @@ export const TrunkCodecs = {
 /** The Trunk DO (`trunk:<project>`): the one writer of trunk. Promotion is driven by `BatchVerified`, not by RPC. */
 export interface TrunkRpc {
   status(): Promise<ExitJson>;
+  /** Where trunk started, for a reader of the project: answers a trunk with no head yet too, with no origin. */
+  origin(): Promise<ExitJson>;
   /** Releases a frozen promotion. Operator only. */
   resume(by: string): Promise<ExitJson>;
   /**

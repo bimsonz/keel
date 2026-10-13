@@ -19,6 +19,7 @@ import {
   makeSponsorshipsMemory,
   makeStandingsMemory,
   makeTokenIssuerMemory,
+  makeTrunksMemory,
   makeUsersMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
@@ -32,6 +33,7 @@ const runtime = ManagedRuntime.make(
   Layer.mergeAll(
     directory,
     makeProjectsMemory().layer,
+    makeTrunksMemory().layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
     makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
     makeSessionsMemory().layer.pipe(Layer.provide(directory)),

@@ -47,12 +47,16 @@ const projectOfName = (name: string | undefined): ProjectId => {
   return decodeProject(name.slice("trunk:".length));
 };
 
+/** Where a trunk started, as it is answered: nothing for one with no head yet, or one that kept no origin. */
+const startOf = (trunk: Trunk | undefined) =>
+  trunk?.origin === undefined ? {} : { origin: trunk.origin };
+
 /** What the RPC answers for a trunk. No Auditor runs before L4, so nothing is red yet. */
 const statusOf = (trunk: Trunk) => ({
   head: trunk.head,
   promotion: trunk.phase,
   redCount: 0,
-  ...(trunk.origin === undefined ? {} : { origin: trunk.origin }),
+  ...startOf(trunk),
 });
 
 /**
@@ -93,6 +97,14 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
         : Effect.succeed(statusOf(trunk));
     });
     return this.answer(TrunkCodecs.status, program);
+  }
+
+  async origin() {
+    const projectId = this.projectId;
+    return this.answer(
+      TrunkCodecs.origin,
+      Effect.map(EntityStore, (store) => startOf(trunkOf(store, projectId))),
+    );
   }
 
   async resume(by: string) {

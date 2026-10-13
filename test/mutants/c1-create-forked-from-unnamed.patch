@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts -t "project.forked-from-public"
+# kills: project.forked-from-public
+# why: a fork is answered on creation without the project it was taken from
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index b09da38f..8ca7ed3b 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -980,8 +980,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                     decided.failure,
+                   );
+               }
+-              const forkedFrom =
+-                source._tag === "Project" ? yield* sourceOf(caller, source.projectId) : undefined;
++              const forkedFrom = undefined;
+               return yield* createProject(actor, {
+                 namespace: target.namespace,
+                 name: input.name,

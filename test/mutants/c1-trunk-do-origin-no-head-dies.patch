@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.origin"
+# kills: trunk.do.origin
+# why: the Trunk DO answers where it started only once it has a head, so reading a project whose trunk is not made yet is a defect
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index ae9f8415..f4ba8a76 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -103,7 +103,12 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+     const projectId = this.projectId;
+     return this.answer(
+       TrunkCodecs.origin,
+-      Effect.map(EntityStore, (store) => startOf(trunkOf(store, projectId))),
++      Effect.flatMap(EntityStore, (store) => {
++        const trunk = trunkOf(store, projectId);
++        return trunk === undefined
++          ? Effect.die(new Error(`trunk ${projectId} is not initialized`))
++          : Effect.succeed(startOf(trunk));
++      }),
+     );
+   }
+ 

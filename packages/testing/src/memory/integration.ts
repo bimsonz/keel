@@ -322,12 +322,7 @@ export function makeTrunksMemory(
             options.journal?.push(`seed ${projectId}`);
             return Effect.succeed(MEMORY_SEED);
           }),
-        origin: (projectId) =>
-          Effect.suspend(() =>
-            heads.has(projectId)
-              ? Effect.succeed(Option.fromUndefinedOr(origins.get(projectId)))
-              : Effect.die(new Error(`${projectId} has no trunk yet`)),
-          ),
+        origin: (projectId) => Effect.sync(() => Option.fromUndefinedOr(origins.get(projectId))),
         head: (projectId) =>
           Effect.suspend(() => {
             const head = heads.get(projectId);

@@ -24,6 +24,12 @@ model ProjectView {
 
   /** The reader's role in the project's namespace: its owner's in their own, a member's in an org; absent for anyone else. */
   viewer?: Viewer;
+
+  /**
+   * The project this one was forked from, where the reader may read that project: a fork of a private project
+   * names it to nobody outside it. Answered on creation and on a read of one project, not in a list.
+   */
+  forkedFrom?: ProjectRef;
 }
 
 model CreateProjectRequest {

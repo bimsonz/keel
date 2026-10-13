@@ -169,7 +169,7 @@ describe("the Trunk DO", () => {
     expect([writer.adopted(), writer.seeds()]).toEqual([[came], [{ name: "keel", at }]]);
   });
 
-  it("[trunk.do.origin] the Trunks port hands the origin to the object, which records it on TrunkInitialized, and reads it back; a trunk that kept none reads as none, and one with no head yet is a defect", async () => {
+  it("[trunk.do.origin] the Trunks port hands the origin to the object, which records it on TrunkInitialized, and reads it back; a trunk that kept none reads as none, and so does one with no head yet", async () => {
     const head = Schema.decodeUnknownSync(CommitSha)("a".repeat(40));
     const origin = {
       kind: "imported",
@@ -180,7 +180,7 @@ describe("the Trunk DO", () => {
     const { projectId, stub } = await placedTrunk(head);
     const read = () => viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.origin(projectId)));
 
-    expect(said(await read())).toContain("is not initialized");
+    expect(await read()).toEqual(Exit.succeed(Option.none()));
     expect(
       await viaTrunks(
         Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed", origin)),

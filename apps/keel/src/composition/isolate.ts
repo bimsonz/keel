@@ -13,6 +13,7 @@ import {
   type Notifier,
   PROJECTOR,
   type Projects,
+  type Trunks,
 } from "@keeltown/core/ports";
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
@@ -55,6 +56,7 @@ import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
+import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
@@ -67,6 +69,7 @@ import { RUN_HEADER } from "../rpc/index.ts";
 import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
+import { artifactsLocationHint } from "./do.ts";
 import { doorwayOf } from "./doorway.ts";
 
 /**
@@ -96,6 +99,8 @@ export function isolateLayer(
     ProbeStoreR2(env.BUNDLES),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
+    // A project's view names what it was forked from, which its trunk keeps.
+    overrides.trunks ?? TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     AgentSignUpsRpc(agentSession),
     overrides.sessions ?? SessionsRpc(agentSession),
@@ -123,6 +128,8 @@ export interface IsolateOverrides {
   /** The piggyback; pass it with `inbox` when both read one memory. */
   readonly notifier?: Layer.Layer<Notifier>;
   readonly projects?: Layer.Layer<Projects>;
+  /** Pass the trunks the projects' own objects write, when those are in memory. */
+  readonly trunks?: Layer.Layer<Trunks>;
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;

@@ -1,3 +1,4 @@
+import type { ProjectRef } from "@keeltown/core/application/coordination";
 import type { EnrolAgentInput } from "@keeltown/core/application/identity";
 import { PROJECT_TEMPLATES, type RefusedSource } from "@keeltown/core/application/integration";
 import type {
@@ -149,11 +150,16 @@ export function putSettingsError(
   }
 }
 
-/** A new project as its creator reads it: private until its settings say otherwise, in the namespace named. */
+/**
+ * A new project as its creator reads it: private until its settings say
+ * otherwise, in the namespace named, and a fork with the project it was
+ * taken from where its creator may read that one.
+ */
 export function createProjectOk(
   project: ProjectRecord,
   namespace: { readonly handle: string; readonly kind: "user" | "agent" | "org" },
   role: "owner" | "maintainer" | "member" | undefined,
+  forkedFrom?: ProjectRef,
 ): Operator_createProjectResult {
   return {
     status: 201,
@@ -164,6 +170,7 @@ export function createProjectOk(
       visibility: "private",
       createdAt: iso(project.createdAt),
       ...(role === undefined ? {} : { viewer: { role } }),
+      ...(forkedFrom === undefined ? {} : { forkedFrom }),
     },
   };
 }

@@ -22,6 +22,7 @@ import type {
   Sponsorships,
   Standings,
   TokenIssuer,
+  Trunks,
   Users,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
@@ -57,7 +58,8 @@ export type IsolateServices =
   | Users
   | Memberships
   | Namespaces
-  | ProjectNamespaces;
+  | ProjectNamespaces
+  | Trunks;
 
 /**
  * One line a request that hit a defect, found by its request id: the defect's

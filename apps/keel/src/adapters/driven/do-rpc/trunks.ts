@@ -34,8 +34,8 @@ export function TrunksRpc(
           Effect.catchTag("ImportTooLarge", (large) => Effect.fail(new ImportTooLarge(large))),
         ),
       origin: (projectId) =>
-        callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
-          Effect.map((status) => Option.fromUndefinedOr(status.origin)),
+        callObject(TrunkCodecs.origin, () => trunk(projectId).origin()).pipe(
+          Effect.map((start) => Option.fromUndefinedOr(start.origin)),
           Effect.orDie,
         ),
       adopt: (projectId, commit) =>

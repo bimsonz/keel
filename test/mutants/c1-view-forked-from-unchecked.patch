@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts -t "project.forked-from-private"
+# kills: project.forked-from-private
+# why: a fork names the project it was taken from to every reader of the fork, whether or not the policy lets them read that project
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index b09da38f..a62892e5 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -332,9 +332,7 @@ const placeOf = (project: ProjectId) =>
+ const sourceOf = (caller: Caller, source: ProjectId) =>
+   Effect.gen(function* () {
+     const resource = yield* projectResource(source);
+-    return Result.isSuccess(decideEach(caller.principal, resource))
+-      ? yield* placeOf(source)
+-      : undefined;
++    return yield* placeOf(source);
+   });
+ 
+ /**

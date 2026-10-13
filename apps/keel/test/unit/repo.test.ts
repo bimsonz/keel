@@ -27,6 +27,7 @@ import {
   makeProbeStoreMemory,
   makeProjectViewsMemory,
   makeTokenIssuerMemory,
+  makeTrunksMemory,
   makeUsersMemory,
   sampleOrgId,
   sampleSponsorId,
@@ -62,6 +63,7 @@ const runtime = ManagedRuntime.make(
   Layer.mergeAll(
     directory,
     projects.layer,
+    makeTrunksMemory().layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
     makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
     makeSessionsMemory().layer.pipe(Layer.provide(directory)),

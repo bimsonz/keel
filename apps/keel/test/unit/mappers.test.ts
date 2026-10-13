@@ -31,6 +31,7 @@ import {
   makeSponsorshipsMemory,
   makeStandingsMemory,
   makeTokenIssuerMemory,
+  makeTrunksMemory,
   makeUsersMemory,
   sampleOrgId,
   sampleProjectId,
@@ -139,6 +140,7 @@ function grantedSurface() {
     Layer.mergeAll(
       directory,
       projects.layer,
+      makeTrunksMemory().layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
       makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory)),

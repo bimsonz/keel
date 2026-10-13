@@ -68,6 +68,7 @@ import {
   ProjectNamespaces,
   type Projects,
   Sponsorships,
+  Trunks,
 } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
@@ -300,12 +301,18 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
     const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(resource.namespace));
     if (Option.isNone(namespace)) return undefined;
     const role = roleIn(caller.principal, resource.namespace);
+    const origin = yield* Trunks.use((trunks) => trunks.origin(projectId));
+    const forkedFrom =
+      Option.isSome(origin) && origin.value.kind === "forked"
+        ? yield* sourceOf(caller, origin.value.project)
+        : undefined;
     return {
       id: projectId,
       namespace: { handle: namespace.value.handle, kind: namespace.value.kind },
       name,
       visibility: resource.visibility,
       ...(role === undefined ? {} : { viewer: { role } }),
+      ...(forkedFrom === undefined ? {} : { forkedFrom }),
     } satisfies ProjectViewBody;
   });
 
@@ -323,6 +330,19 @@ const placeOf = (project: ProjectId) =>
       }),
       name: place.value.name,
     } satisfies ProjectRef;
+  });
+
+/**
+ * The project a fork was taken from, as the caller is shown it: its place,
+ * and only where the policy lets the caller read that project, so a private
+ * project is named to nobody outside it. Nothing for a source that is gone.
+ */
+const sourceOf = (caller: Caller, source: ProjectId) =>
+  Effect.gen(function* () {
+    const resource = yield* projectResource(source);
+    return Result.isSuccess(decideEach(caller.principal, resource))
+      ? yield* placeOf(source)
+      : undefined;
   });
 
 /**
@@ -966,6 +986,8 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                     decided.failure,
                   );
               }
+              const forkedFrom =
+                source._tag === "Project" ? yield* sourceOf(caller, source.projectId) : undefined;
               return yield* createProject(actor, {
                 namespace: target.namespace,
                 name: input.name,
@@ -981,6 +1003,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                       kind: namespaceKind(target.namespace),
                     },
                     roleIn(caller.principal, target.namespace),
+                    forkedFrom,
                   ),
                 ),
                 Effect.catch((error) =>

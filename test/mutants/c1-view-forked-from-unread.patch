@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts -t "project.forked-from-public"
+# kills: project.forked-from-public
+# why: a project read by its place never names what it was forked from, whatever its trunk says of where it started
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index b09da38f..bab88b81 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -294,10 +294,7 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
+     if (Option.isNone(namespace)) return undefined;
+     const role = roleIn(caller.principal, resource.namespace);
+     const origin = yield* Trunks.use((trunks) => trunks.origin(projectId));
+-    const forkedFrom =
+-      Option.isSome(origin) && origin.value.kind === "forked"
+-        ? yield* sourceOf(caller, origin.value.project)
+-        : undefined;
++    const forkedFrom = undefined;
+     return {
+       id: projectId,
+       namespace: { handle: namespace.value.handle, kind: namespace.value.kind },

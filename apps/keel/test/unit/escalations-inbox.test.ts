@@ -36,6 +36,7 @@ import {
   makeSponsorshipsMemory,
   makeStandingsMemory,
   makeTokenIssuerMemory,
+  makeTrunksMemory,
   makeUsersMemory,
 } from "@keeltown/testing";
 import { Layer, ManagedRuntime } from "effect";
@@ -101,6 +102,7 @@ function world() {
     Layer.mergeAll(
       directory,
       projects.layer,
+      makeTrunksMemory().layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
       makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory)),

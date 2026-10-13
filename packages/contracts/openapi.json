@@ -16668,6 +16668,14 @@
               }
             ],
             "description": "The reader's role in the project's namespace: its owner's in their own, a member's in an org; absent for anyone else."
+          },
+          "forkedFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectRef"
+              }
+            ],
+            "description": "The project this one was forked from, where the reader may read that project: a fork of a private project\nnames it to nobody outside it. Answered on creation and on a read of one project, not in a list."
           }
         },
         "additionalProperties": {

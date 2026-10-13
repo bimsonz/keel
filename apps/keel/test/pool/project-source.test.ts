@@ -55,6 +55,7 @@ interface Made {
   readonly name: string;
   readonly visibility: string;
   readonly viewer?: { readonly role: string };
+  readonly forkedFrom?: { readonly id: string; readonly namespace: string; readonly name: string };
 }
 interface Creating {
   readonly namespace: string;
@@ -148,11 +149,13 @@ const logOf = (projectId: ProjectId) =>
   );
 
 /**
- * The app over real Project DOs that share one in-memory code host. The host
- * holds the template unless `template` is false.
+ * The app over real Project DOs that share one in-memory code host, and one
+ * set of in-memory trunks that the app reads too. The host holds the template
+ * unless `template` is false.
  */
 function sourceApp(options: { readonly template?: boolean } = {}) {
   const code = makeCodeHostMemory();
+  const trunks = makeTrunksMemory();
   const onHost = <A, E>(effect: Effect.Effect<A, E, CodeHost>) =>
     Effect.runPromise(effect.pipe(Effect.provide(code.layer)));
   /** Puts a repo on the host with one commit of its own, and answers that commit. */
@@ -185,7 +188,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
                 Layer.mergeAll(
                   backbone(state.storage),
                   code.layer,
-                  makeTrunksMemory().layer,
+                  trunks.layer,
                   makeWorkspacePoolMemory().layer,
                   ProjectNamespacesD1(env.DB),
                 ),
@@ -203,7 +206,10 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
       liveAnchors: async () => (await onMemory(), stub.liveAnchors()),
     };
   };
-  const { app } = makeIsolate(env, isolateLayer(env, { projects: ProjectsRpc(project) }));
+  const { app } = makeIsolate(
+    env,
+    isolateLayer(env, { projects: ProjectsRpc(project), trunks: trunks.layer }),
+  );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
 
   const call = async <B>(token: string, method: string, path: string, body: object, k?: string) => {
@@ -221,6 +227,13 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
   /** `POST /v1/projects`, under a fresh Idempotency-Key unless one is given. */
   const create = (token: string, creating: Creating, idempotencyKey = key()) =>
     call<Made & Problem>(token, "POST", "/projects", creating, idempotencyKey);
+  /** A project as `token` reads it by its place, or as a visitor does with none. */
+  const read = async (token: string | undefined, handle: string, name: string) => {
+    const response = await via(`${BASE}/v1/namespaces/${handle}/projects/${name}`, {
+      headers: token === undefined ? {} : { authorization: `Bearer ${token}` },
+    });
+    return { status: response.status, body: await response.json<Made & Problem>() };
+  };
   /** Whether the host holds the repo. */
   const holds = (repo: RepoRef) =>
     onHost(
@@ -236,6 +249,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
   return {
     templateHead,
     create,
+    read,
     hold,
     holds,
     head,
@@ -260,7 +274,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
       expect(made.status).toBe(201);
       const { trunk } = projectRepos(made.body.id);
       const moved = await onHost(code.fixture.commit(trunk, MAIN, { "PLAN.md": "ours alone" }));
-      return { id: made.body.id, trunk: trunk.name, head: moved };
+      return { id: made.body.id, name: made.body.name, trunk: trunk.name, head: moved };
     },
     /** A maintainer makes the project public through the settings route. */
     open: async (token: string, projectId: ProjectId) => {
@@ -375,6 +389,71 @@ describe("a new project's source", () => {
       forked.body.visibility,
     ]).toEqual([201, anyone.handle, "theirs", "private"]);
     expect(await world.head(forked.body.id)).toBe(source.head);
+  });
+
+  it("[project.forked-from-public] a fork of a public project names it by its place, to its creator as it is made and to a visitor who reads the fork; a project that is no fork names none", async () => {
+    const world = sourceApp();
+    const owner = await maintainer();
+    const source = await world.source(owner.token);
+    await world.open(owner.token, source.id);
+    const from = { id: source.id, namespace: "pool", name: source.name };
+
+    const anyone = await world.signUp("anyone");
+    const forked = await world.create(anyone.token, {
+      namespace: anyone.handle,
+      name: "theirs",
+      source: forkOf(source.id),
+    });
+    expect([forked.status, forked.body.forkedFrom]).toEqual([201, from]);
+
+    await world.open(anyone.token, forked.body.id);
+    const seen = await world.read(undefined, anyone.handle, "theirs");
+    expect([seen.status, seen.body.id, seen.body.forkedFrom]).toEqual([200, forked.body.id, from]);
+
+    const plain = await world.read(undefined, "pool", source.name);
+    expect([plain.status, plain.body.id, "forkedFrom" in plain.body]).toEqual([
+      200,
+      source.id,
+      false,
+    ]);
+  });
+
+  it("[project.forked-from-private] a fork of a private project names it to whoever reads that project, and to nobody else who reads the fork: not a visitor, and not someone signed in from outside its namespace, until the source is public", async () => {
+    const world = sourceApp();
+    const owner = await maintainer();
+    const secret = await world.source(owner.token);
+    const from = { id: secret.id, namespace: "pool", name: secret.name };
+
+    const name = uniqueHandle("fork");
+    const forked = await world.create(owner.token, {
+      namespace: "pool",
+      name,
+      source: forkOf(secret.id),
+    });
+    expect([forked.status, forked.body.forkedFrom]).toEqual([201, from]);
+    // The fork is opened to everyone; what it was taken from stays private.
+    await world.open(owner.token, forked.body.id);
+
+    const member = await seedUser(uniqueHandle("member"));
+    const within = await world.read(member.token, "pool", name);
+    expect([within.status, within.body.forkedFrom]).toEqual([200, from]);
+
+    const visitor = await world.read(undefined, "pool", name);
+    expect([visitor.status, visitor.body.id, "forkedFrom" in visitor.body]).toEqual([
+      200,
+      forked.body.id,
+      false,
+    ]);
+    const stranger = await world.signUp("stranger");
+    const outside = await world.read(stranger.token, "pool", name);
+    expect([outside.status, outside.body.id, "forkedFrom" in outside.body]).toEqual([
+      200,
+      forked.body.id,
+      false,
+    ]);
+
+    await world.open(owner.token, secret.id);
+    expect((await world.read(undefined, "pool", name)).body.forkedFrom).toEqual(from);
   });
 
   it("[project.source-unknown] a name that is no template is no source, whatever the core namespace holds by it", async () => {
