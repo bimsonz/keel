@@ -120,7 +120,7 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 | `/N` | The namespace's own page: its projects |
 | `/N/P`, `/N/P/tree/<ref>/<path>`, `/N/P/blob/<ref>/<path>` | The code. `ref` is a commit, or `trunk` for wherever trunk's head is |
 | `/N/P/commits`, `/N/P/commit/<sha>` | Trunk's history, and one commit's diff |
-| `/N/P/changes`, `/N/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked A verdict is said by Keel's own outcome, and with it that no plan ran where Keel says so; the evidence its event recorded is listed as Keel wrote it where Keel serves no view of the verdict; and what Keel derived names the commit it derived from, or says that none was pushed |
+| `/N/P/changes`, `/N/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked A verdict is said by Keel's own outcome, and with it that no plan ran where Keel says so; the evidence its event recorded is listed as Keel wrote it where Keel serves no view of the verdict; and what Keel derived names the commit it derived from, or says that none was pushed. A landed change names the commit it landed as on trunk, linked to that commit's page, and its Files tab offers the way there where Keel serves no diff of the change itself |
 | `/N/P/conflicts`, `/N/P/conflicts/<C-n>`, `…/probe`, `…/evidence` | The conflicts, and one conflict. `?state=` is `open` or `settled` |
 | `/N/P/escalations`, `/N/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/N/P/mission-control`, `/N/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
@@ -145,7 +145,7 @@ route  →  pages  →  views  →  engine (playhead, world, projections)  →  
 - `src/worker/` is the Worker: `/healthz`, and the page for everything else. `handler.ts` needs nothing of the Workers runtime but fetch, so it is tested as it is, in Node; `index.ts` is its entry.
 - `test/fixtures/` holds the scripted logs, held to Keel's catalogue and state machines, a stand-in for Keel's API that knows a reader by their session and reads a non-member the public part of the log alone, as Keel's read scope does, and the real Better Auth standing in for Keel's identity. They are test code. The page reaches a scripted log only in development, through a dynamic import that is not in the build.
 
-`wrangler.jsonc` serves `dist` as static assets with `not_found_handling: "single-page-application"` and runs the Worker first only for `/healthz`. It has no binding but those files, and no secret.
+`wrangler.jsonc` serves `dist` as static assets with `not_found_handling: "single-page-application"` and runs the Worker first only for `/healthz` and a clone address's three git paths. `public/_headers`, which the build copies into `dist`, puts `Link: </.well-known/api-catalog>; rel="api-catalog"` on `/` and on nothing else: Cloudflare applies it to the assets it answers, and the Worker never sees a request for the page. It has no binding but those files, and no secret.
 
 ## Run it
 
