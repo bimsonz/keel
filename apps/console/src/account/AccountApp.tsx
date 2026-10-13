@@ -3,7 +3,15 @@
 
 import { accountsOf } from "./accounts.ts";
 import { Button, Input } from "@cloudflare/kumo";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
 import { createHttpDirectory } from "../source/http.ts";
 import { applyMode } from "../theme/mode.ts";
@@ -327,10 +335,32 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
   );
 }
 
-function Passkeys({ account }: { account: Account }) {
+/**
+ * Keel's refusal of a change to how an account signs in from a session that was not signed in by a passkey in
+ * the last ten minutes. What answers it is signing in again with a passkey, which the page offers.
+ */
+const FRESH_SIGN_IN_REQUIRED = "FRESH_SIGN_IN_REQUIRED";
+
+function Passkeys({ account, who }: { account: Account; who: Who }) {
   const [passkeys, setPasskeys] = useState<Passkey[] | null>(null);
   const [name, setName] = useState("");
   const { busy, refused, ask } = useAsking();
+  /** What was last asked of Keel here: asked again, as it was, once the reader has signed in afresh. */
+  const last = useRef<(() => Promise<void>) | null>(null);
+  const asking = (what: () => Promise<void>): Promise<void> => {
+    last.current = what;
+    return ask(what);
+  };
+  const again = (): Promise<void> =>
+    ask(async () => {
+      const signedIn = await account.signInWithPasskey();
+      // A passkey of another account signs that account in: the page is read again as whoever it is now.
+      if (signedIn.id !== who.id) {
+        window.location.assign(hrefOf({ at: "settings" }));
+        return;
+      }
+      await last.current?.();
+    });
   // Read when the page opens, and again by whatever changes them.
   const read = useCallback(async () => setPasskeys(await account.passkeys()), [account]);
   useEffect(() => {
@@ -365,7 +395,7 @@ function Passkeys({ account }: { account: Account }) {
               className="a-link"
               disabled={busy}
               onClick={() =>
-                void ask(async () => {
+                void asking(async () => {
                   await account.removePasskey(passkey.id);
                   await read();
                 })
@@ -380,8 +410,9 @@ function Passkeys({ account }: { account: Account }) {
         className="flex items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          void ask(async () => {
-            await account.addPasskey(name.trim());
+          const naming = name.trim();
+          void asking(async () => {
+            await account.addPasskey(naming);
             setName("");
             await read();
           });
@@ -400,6 +431,14 @@ function Passkeys({ account }: { account: Account }) {
         </Button>
       </form>
       <Refusal said={refused} />
+      {/* Offered only to someone who has a passkey to sign in with: Keel's sentence stands by itself otherwise. */}
+      {refused?.code === FRESH_SIGN_IN_REQUIRED && passkeys !== null && passkeys.length > 0 && (
+        <div>
+          <Button variant="secondary" disabled={busy} onClick={() => void again()}>
+            Sign in again with a passkey
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -415,7 +454,7 @@ function Settings({ account, who }: { account: Account; who: Who }) {
           {[who.handle, who.email].filter((part) => part !== undefined).join(" · ")}
         </p>
       </header>
-      <Passkeys account={account} />
+      <Passkeys account={account} who={who} />
       <section className="a-panel flex flex-col gap-3 p-4" aria-label="Sessions">
         <h2 className="a-h">Sessions</h2>
         <p className="text-sm text-kumo-subtle">

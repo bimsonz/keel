@@ -37,6 +37,8 @@ export interface Identity {
   requests: Request[];
   /** Puts an invitation's last day behind it, as time would: nobody has answered it, and nobody can now. */
   lapse(invitationId: string): Promise<void>;
+  /** Puts every session made so far more than ten minutes behind it, as time would: none of them is fresh now. */
+  age(): Promise<void>;
 }
 
 /** The tables Better Auth keeps with these plugins: the ones spike 27 saw it create. The adapter copies the whole store, so it is a plain object. */
@@ -60,6 +62,59 @@ export interface IdentityOptions {
    * by passkey alone, and says nothing of which ways in it offers: keel.town as it first served identity.
    */
   emailCodes?: boolean;
+}
+
+/**
+ * How long after its passkey sign-in a session may change how its account signs in, and Better Auth's routes
+ * that do: Keel's `fresh.ts` and `CHANGES_SIGN_IN` in its `auth.ts`. Written beside Keel's and not imported, so
+ * when either changes there this is brought level with it.
+ */
+export const FRESH_FOR_MS = 600_000;
+const CHANGES_SIGN_IN: ReadonlySet<string> = new Set([
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+  "/passkey/delete-passkey",
+  "/link-social",
+  "/unlink-account",
+  "/change-email",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+]);
+
+/** How a session is signed in, by the endpoint that makes it: Keel's `signInMethod`. */
+function signInMethod(path: string): string {
+  switch (path) {
+    case "/passkey/verify-authentication":
+    case "/passkey/verify-registration":
+      return "passkey";
+    case "/sign-in/email-otp":
+      return "email-otp";
+    case "/callback/:id":
+      return "github";
+    case "/device/token":
+      return "device";
+    default:
+      return "other";
+  }
+}
+
+/**
+ * Keel's refusal of a change to how an account signs in from a session that is not fresh: one not signed in by
+ * a passkey, or signed in by one more than ten minutes ago. A request that carries no session is left alone:
+ * for the passkey routes that is passkey-first sign-up.
+ */
+async function freshSignIn(ctx: Parameters<typeof getSessionFromCtx>[0]): Promise<void> {
+  const carried = await getSessionFromCtx(ctx);
+  if (carried === null) return;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the session's own added field
+  const by = (carried.session as { signedInBy?: unknown }).signedInBy;
+  const made = new Date(carried.session.createdAt).getTime();
+  if (by === "passkey" && Date.now() - made <= FRESH_FOR_MS) return;
+  throw new APIError("FORBIDDEN", {
+    code: "FRESH_SIGN_IN_REQUIRED",
+    message:
+      "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+  });
 }
 
 /** A passkey-first user has no address, so Better Auth is given one that can never receive mail (RFC 6761). */
@@ -170,8 +225,13 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
     trustedOrigins: [origin],
     // Better Auth leaves its origin check off when it finds itself under a test runner. Keel runs with it on.
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
+    // How each session was signed in, written as the session is made and by nothing a request sends.
+    session: {
+      additionalFields: { signedInBy: { type: "string", required: false, input: false } },
+    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
         switch (ctx.path) {
           case "/organization/invite-member":
             return inviteTarget(ctx);
@@ -216,6 +276,15 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
         // is made, for one who signs up with a passkey, and when they choose it, for one who signed up by a code.
         create: { after: (user) => personalOrg(user) },
         update: { after: (user) => personalOrg(user) },
+      },
+      // The endpoint making a session says how it was signed in.
+      session: {
+        create: {
+          // oxlint-disable-next-line typescript/require-await -- the library's own signature
+          before: async (session, context) => ({
+            data: { ...session, signedInBy: signInMethod(context?.path ?? "") },
+          }),
+        },
       },
     },
     plugins: [
@@ -315,6 +384,19 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
         where: [{ field: "id", value: invitationId }],
         update: { expiresAt: new Date("2000-01-01T00:00:00.000Z") },
       });
+    },
+    async age() {
+      const context = await auth.$context;
+      const made = new Date(Date.now() - FRESH_FOR_MS - 1_000);
+      const sessions = await context.adapter.findMany<{ id: string }>({ model: "session" });
+      for (const session of sessions) {
+        // oxlint-disable-next-line no-await-in-loop -- a handful, in a test
+        await context.adapter.update({
+          model: "session",
+          where: [{ field: "id", value: session.id }],
+          update: { createdAt: made },
+        });
+      }
     },
   };
 }

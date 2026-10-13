@@ -11,11 +11,14 @@ export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
 export interface Said {
   words: string;
   next: readonly string[];
+  /** Keel's own code for the refusal, where it gave one. */
+  code: string;
 }
 
 export const saidOf = (error: unknown): Said => ({
   words: error instanceof Error ? error.message : "Keel could not be reached",
   next: error instanceof Refused || error instanceof KeelRefused ? error.next : [],
+  code: error instanceof Refused || error instanceof KeelRefused ? error.code : "",
 });
 
 /** Runs one thing the reader asked for, and says so if Keel refuses it. */

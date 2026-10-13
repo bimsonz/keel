@@ -2153,19 +2153,31 @@ expectEqual(
   '["",[],[]]',
 );
 
-// A passkey, made on this device and kept by Keel under the name given.
+// Keel lets a session change how its account signs in only where it was signed in by a passkey in the last
+// ten minutes. Ada signed in by a code and has no passkey: Keel refuses, in its own words, and the page offers
+// her no passkey sign-in, since she has none to make it with.
+const FRESH_SIGN_IN =
+  "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes";
+const SIGN_IN_AGAIN = "Sign in again with a passkey";
+const passkeysOn = (shown: Page) => shown.getByRole("region", { name: "Passkeys" });
+/** What the passkeys part of a settings page says: Keel's refusal, whether a sign-in is offered, how many are kept. */
+const passkeysSaid = async (shown: Page): Promise<string> =>
+  `${(await passkeysOn(shown).getByRole("alert").count()) === 0 ? "no refusal" : squash(await passkeysOn(shown).getByRole("alert").innerText())} | ${await passkeysOn(shown).getByRole("button", { name: SIGN_IN_AGAIN }).count()} offered | ${await shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} kept`;
 await person.getByText("You have no passkey yet.").waitFor();
 await person.getByLabel("Name for a new passkey").fill("This laptop");
 await person.getByRole("button", { name: "Add a passkey" }).click();
-await person.getByRole("list", { name: "Your passkeys" }).getByText("This laptop").waitFor();
+await passkeysOn(person)
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 await shot(person, "settings");
 expectEqual(
-  "account: the passkey is listed",
-  String(await person.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()),
-  "1",
+  "account: someone signed in by a code is told Keel's own refusal on adding a passkey, and is offered no passkey sign-in, having none",
+  await passkeysSaid(person),
+  `${FRESH_SIGN_IN} | 0 offered | 0 kept`,
 );
 
-// Sign out, then back in with the passkey alone: no address and no code.
+// Sign out, then back in by a code sent to the same address.
 await person.getByRole("button", { name: "Sign out", exact: true }).click();
 await person.waitForURL(`${built}/`);
 expectEqual(
@@ -2175,10 +2187,18 @@ expectEqual(
 );
 await person.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
 await shot(person, "login");
-await person.getByRole("button", { name: "Sign in with a passkey" }).click();
+const codesSent = identity.outbox.length;
+await person.getByLabel("Email").fill("ada@example.com");
+await person.getByRole("button", { name: "Send a code" }).click();
+await person.getByLabel("The code sent to ada@example.com").waitFor();
+for (let tries = 0; tries < 50 && identity.outbox.length === codesSent; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the code to be sent
+  await new Promise((resolve) => setTimeout(resolve, 100));
+await person.getByLabel("The code sent to ada@example.com").fill(identity.outbox.at(-1)?.otp ?? "");
+await person.getByRole("button", { name: "Sign in", exact: true }).click();
 await person.getByRole("heading", { name: "Your account" }).waitFor();
 expectEqual(
-  "account: signed in with the passkey, as the same user",
+  "account: signed in again by a code, as the same user",
   squash(await person.locator("header").first().innerText()),
   "Keel ada",
 );
@@ -2878,16 +2898,19 @@ await asDeployed(door, { keel: open, identity: passkeysAlone, sent: sentAtTheDoo
 const newcomer = watch(await door.newPage(), "account, on a Keel with passkeys alone");
 const authenticator = await door.newCDPSession(newcomer);
 await authenticator.send("WebAuthn.enable");
-await authenticator.send("WebAuthn.addVirtualAuthenticator", {
-  options: {
-    protocol: "ctap2",
-    transport: "internal",
-    hasResidentKey: true,
-    hasUserVerification: true,
-    isUserVerified: true,
-    automaticPresenceSimulation: true,
-  },
-});
+/** A device that makes and keeps passkeys, and answers for its person at once. */
+const DEVICE = {
+  protocol: "ctap2",
+  transport: "internal",
+  hasResidentKey: true,
+  hasUserVerification: true,
+  isUserVerified: true,
+  automaticPresenceSimulation: true,
+} as const;
+const { authenticatorId: firstDevice } = await authenticator.send(
+  "WebAuthn.addVirtualAuthenticator",
+  { options: DEVICE },
+);
 await newcomer.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
 await newcomer.getByLabel("Handle").waitFor();
 // The page has asked Keel which ways in it offers, and Keel has not said: so a passkey, and no other.
@@ -2932,6 +2955,11 @@ expectEqual(
 );
 await newcomer.goto(`${built}/turing`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("heading", { level: 1 }).first().waitFor();
+// The heading is up before Keel has listed the account's projects: the line under it is waited for, and read either way.
+await newcomer
+  .getByText("You have no project yet.")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
   "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
   squash(await newcomer.getByRole("main").innerText()),
@@ -2947,6 +2975,54 @@ expectEqual(
   "passkey sign-up: signed back in with the same passkey",
   squash(await newcomer.locator("header").first().innerText()),
   "Keel turing",
+);
+// A second device takes the first one's place at the browser: a device keeps one passkey for an account.
+// Signed in by a passkey a moment ago, the session is fresh, and Keel takes the second device's passkey from it.
+await authenticator.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId: firstDevice });
+await authenticator.send("WebAuthn.addVirtualAuthenticator", { options: DEVICE });
+const keptBy = (shown: Page) =>
+  shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem");
+await keptBy(newcomer).first().waitFor();
+await newcomer.getByLabel("Name for a new passkey").fill("A second device");
+await newcomer.getByRole("button", { name: "Add a passkey" }).click();
+await keptBy(newcomer)
+  .filter({ hasText: "A second device" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fresh sign-in: a session signed in by a passkey in the last ten minutes adds another",
+  await passkeysSaid(newcomer),
+  "no refusal | 0 offered | 2 kept",
+);
+// Ten minutes on, the same session may not change how the account signs in: here, removing the passkey of the
+// device that is gone. Keel says so, and the page offers the one thing that answers it: signing in again with a
+// passkey.
+await passkeysAlone.age();
+await keptBy(newcomer)
+  .filter({ hasNotText: "A second device" })
+  .getByRole("button", { name: "Remove" })
+  .click();
+await passkeysOn(newcomer)
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await shot(newcomer, "settings-sign-in-again");
+expectEqual(
+  "fresh sign-in: ten minutes on, removing a passkey is refused in Keel's words, the passkey is kept, and a passkey sign-in is offered",
+  await passkeysSaid(newcomer),
+  `${FRESH_SIGN_IN} | 1 offered | 2 kept`,
+);
+// One tap. The browser's passkey signs them in afresh, and what Keel refused is asked again as it was.
+// Tapped only where it is offered: where it is not, the check under this says so by name.
+if ((await newcomer.getByRole("button", { name: SIGN_IN_AGAIN }).count()) > 0)
+  await newcomer.getByRole("button", { name: SIGN_IN_AGAIN }).click();
+for (let tries = 0; tries < 100 && (await keptBy(newcomer).count()) !== 1; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page
+  await new Promise((resolve) => setTimeout(resolve, 100));
+expectEqual(
+  "fresh sign-in: signed in again with the passkey, what Keel refused is done with nothing more asked, as the same user",
+  `${await passkeysSaid(newcomer)} | ${await keptBy(newcomer).filter({ hasText: "A second device" }).count()} of the second device | ${squash(await newcomer.locator("header").first().innerText())}`,
+  "no refusal | 0 offered | 1 kept | 1 of the second device | Keel turing",
 );
 expectEqual(
   "passkey sign-up: the page sent Keel no Authorization",

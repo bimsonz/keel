@@ -2,15 +2,15 @@
 # kills: account.cross-site, orgs.cross-site
 # why: the stand-in for Keel's identity runs with its origin check off, as Better Auth leaves it under a test runner, so a cross-site call is taken
 diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
-index 969934e..3d00e48 100644
+index 0899e9f..3ac5648 100644
 --- a/apps/console/test/fixtures/identity/standIn.ts
 +++ b/apps/console/test/fixtures/identity/standIn.ts
-@@ -169,7 +169,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+@@ -224,7 +224,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
      basePath: "/v1/auth",
      trustedOrigins: [origin],
      // Better Auth leaves its origin check off when it finds itself under a test runner. Keel runs with it on.
 -    advanced: { disableOriginCheck: false, disableCSRFCheck: false },
 +    advanced: { disableOriginCheck: true, disableCSRFCheck: true },
-     hooks: {
-       before: createAuthMiddleware(async (ctx) => {
-         switch (ctx.path) {
+     // How each session was signed in, written as the session is made and by nothing a request sends.
+     session: {
+       additionalFields: { signedInBy: { type: "string", required: false, input: false } },

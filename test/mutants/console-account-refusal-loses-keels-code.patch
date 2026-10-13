@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
+# kills: account.fresh
+# why: a page is handed Keel's refusal without its code, so the settings page cannot tell that signing in again answers it and offers nothing
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 2712110..d5386f5 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -143,7 +143,7 @@ function nextOf(given: unknown): string[] {
+ 
+ function refusal(error: Failure): Error {
+   if (error.status === 404) return new NotOpen();
+-  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
++  return new Refused("", error.message ?? UNSAID, nextOf(error.nextActions));
+ }
+ 
+ /** A result of Better Auth's client, opened: its data, or the refusal thrown. */

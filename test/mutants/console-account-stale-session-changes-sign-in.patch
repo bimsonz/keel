@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
+# kills: account.fresh
+# why: the stand-in for Keel's identity takes a change to how an account signs in from any session, where Keel refuses one not signed in by a passkey in the last ten minutes: the page's handling of that refusal would be tested against nothing
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 0899e9f..0db6c7a 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -231,7 +231,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+     },
+     hooks: {
+       before: createAuthMiddleware(async (ctx) => {
+-        if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
+         switch (ctx.path) {
+           case "/organization/invite-member":
+             return inviteTarget(ctx);

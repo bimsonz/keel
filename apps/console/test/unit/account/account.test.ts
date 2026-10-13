@@ -63,6 +63,33 @@ describe("who the page is, to Keel", () => {
     expect([...tab.jar.keys()].filter((name) => name.endsWith("session_token"))).toEqual([]);
   });
 
+  it("[account.fresh] hands a page Keel's own refusal, by its code and in its words, where a session that is not fresh would change how the account signs in", async () => {
+    // Signed in by a code: not a passkey sign-in, however new. Keel refuses before any passkey is asked for.
+    const { identity, tab, account } = await signedUp();
+    for (const change of [
+      () => account.addPasskey("This laptop"),
+      () => account.removePasskey("any"),
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- two calls, one after the other
+      const refused: unknown = await change().catch((error: unknown) => error);
+      expect(refused).toBeInstanceOf(Refused);
+      expect(refused).toMatchObject({
+        code: "FRESH_SIGN_IN_REQUIRED",
+        message:
+          "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+      });
+    }
+    expect(await account.passkeys()).toEqual([]);
+    // A request that carries no session is left alone: that is how someone signs up with a passkey.
+    const signingUp = browser(identity);
+    const options = await signingUp.serve(
+      `${ORIGIN}/v1/auth/passkey/generate-register-options?context=grace`,
+    );
+    expect(options.status).toBe(200);
+    // And what a session may read is not held to a fresh sign-in.
+    expect((await tab.serve(`${ORIGIN}/v1/auth/passkey/list-user-passkeys`)).status).toBe(200);
+  });
+
   it("[account.cross-site] is refused when another site's page makes the same call with the user's cookies", async () => {
     const { identity, tab, account } = await signedUp();
     // The same cookies, sent by a browser on behalf of a page somewhere else.
