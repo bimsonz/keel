@@ -493,13 +493,18 @@ stateDiagram-v2
   [*] --> Active: AgentEnrolled
   Active --> Suspended: AgentSuspended
   Active --> Revoked: AgentRevoked
+  Active --> Active: AgentSponsored
+  Active --> Active: AgentUnsponsored
   Suspended --> Active: AgentReinstated
   Suspended --> Revoked: AgentRevoked
+  Suspended --> Suspended: AgentSponsored
   Revoked --> [*]
 ```
 <!-- /chart:agent -->
 
 **Terminal:** Revoked. Revocation bumps the agent's revocation epoch by exactly one (an agent enrols at epoch 0), so every token minted before it fails verification. A suspended agent's tokens fail too, until it is reinstated.
+
+**The sponsor link.** A person stands behind an agent: `Sponsor` commits `AgentSponsored`, and `EndSponsorship` (the sponsor, or the agent itself) commits `AgentUnsponsored`. An agent has at most one sponsor: the same person sponsoring again commits nothing, and another is refused until the first has switched the link off. The link carries no rights. A sponsor's pause ends with the link: ending it while the agent is suspended commits `AgentReinstated` first, since nobody else could reinstate it. A revoked agent takes neither command and keeps the record of who stood behind it.
 
 **Invariant:** declaration fidelity routes review; it never judges the agent.
 

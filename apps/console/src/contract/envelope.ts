@@ -14,6 +14,8 @@ export const EVENT_TYPES = [
   "AgentSuspended",
   "AgentReinstated",
   "AgentRevoked",
+  "AgentSponsored",
+  "AgentUnsponsored",
   "UserSignedUp",
   "OrgCreated",
   "MembershipChanged",

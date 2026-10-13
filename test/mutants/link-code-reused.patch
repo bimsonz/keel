@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t sponsorships.contract
+# kills: sponsorships.contract
+# why: the approval that commits does not spend the request, so its code is still live for whoever presents it next
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index a1432471..c8f6f5e9 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -198,7 +198,7 @@ export const approveSponsor: (
+         : new SponsorRequestRefused({ agentId });
+     },
+     (tx, events) => {
+-      if (events.length > 0) tx.store.remove(SPONSOR_ASK, agentId);
++      if (events.length > 0) tx.store.get(SPONSOR_ASK, agentId);
+     },
+   );
+ 

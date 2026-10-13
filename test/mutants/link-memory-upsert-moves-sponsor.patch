@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t link.sponsor-directory
+# kills: link.sponsor-directory
+# why: the in-memory directory lets a replayed enrolment put back the sponsor the link's own event had moved, where D1 keeps the link's
+diff --git a/packages/testing/src/memory/identity.ts b/packages/testing/src/memory/identity.ts
+index e0de9aa6..2a55c79c 100644
+--- a/packages/testing/src/memory/identity.ts
++++ b/packages/testing/src/memory/identity.ts
+@@ -73,7 +73,7 @@ export function makeAgentDirectoryMemory() {
+   /** Once a link event has written an agent's sponsor, an upsert leaves it as the row holds it. */
+   const seed = (agent: Agent, credential: StoredCredential): void => {
+     const held = agents.get(agent.id);
+-    if (held === undefined || !sponsorSeqs.has(agent.id)) agents.set(agent.id, agent);
++    if (held === undefined || sponsorSeqs.has(agent.id)) agents.set(agent.id, agent);
+     else {
+       const { sponsor: _sponsor, ...rest } = agent;
+       agents.set(agent.id, held.sponsor === undefined ? rest : { ...rest, sponsor: held.sponsor });

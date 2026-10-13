@@ -20,6 +20,7 @@ export * from "./code-host.ts";
 export * from "./decision-model.ts";
 export * from "./deployer.ts";
 export * from "./enrolments.ts";
+export * from "./sponsorships.ts";
 export * from "./escalations.ts";
 export * from "./entity-store.ts";
 export * from "./event-feed.ts";

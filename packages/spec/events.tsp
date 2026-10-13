@@ -687,6 +687,24 @@ model AgentRevoked {
   by: string;
 }
 
+/**
+ * A person stands behind the agent: a link that carries no rights and needs
+ * no org. The agent asked for it and the person approved it.
+ */
+model AgentSponsored {
+  _tag: "AgentSponsored";
+  agentId: AgentId;
+  sponsor: UserId;
+}
+
+/** The link ended. `by` is whoever ended it: the sponsor, or the agent itself. */
+model AgentUnsponsored {
+  _tag: "AgentUnsponsored";
+  agentId: AgentId;
+  sponsor: UserId;
+  by: string;
+}
+
 // Tenancy. Better Auth's tables in D1 are identity's source of truth;
 // its after-hooks commit these for the feed and the audit, one per row-state
 // change, keyed `user:<userId>` or `org:<orgId>`. No event carries an email.
@@ -1532,6 +1550,8 @@ union KeelEvent {
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
+  AgentSponsored,
+  AgentUnsponsored,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

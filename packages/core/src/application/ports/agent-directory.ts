@@ -1,6 +1,6 @@
 import { Context, type Effect, type Option } from "effect";
 import type { Agent, AgentState } from "../../domain/identity/index.ts";
-import type { AgentId } from "../../domain/kernel/index.ts";
+import type { AgentId, UserId } from "../../domain/kernel/index.ts";
 
 /** A client credential as stored: never the secret itself, only its hash. */
 export interface StoredCredential {
@@ -50,5 +50,17 @@ export class AgentDirectory extends Context.Service<
       standing: AgentStanding,
       seq: number,
     ) => Effect.Effect<void>;
+    /**
+     * Writes who sponsors an agent, or that nobody does (`null`), as the event
+     * at `seq` on its entity left it, guarded as `standing` is. Once written,
+     * `upsert` no longer touches the row's sponsor.
+     */
+    readonly sponsor: (
+      agentId: AgentId,
+      sponsor: UserId | null,
+      seq: number,
+    ) => Effect.Effect<void>;
+    /** The agents a person sponsors, oldest first: what the person's own page lists. */
+    readonly sponsoredBy: (userId: UserId) => Effect.Effect<readonly Agent[]>;
   }
 >()("keel/AgentDirectory") {}

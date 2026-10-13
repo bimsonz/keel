@@ -1,5 +1,8 @@
 import {
+  approveSponsor,
+  askSponsor,
   changeStanding,
+  endSponsorship,
   enrol,
   hearEvent,
   INBOX_PAGE,
@@ -16,6 +19,9 @@ import { Effect, Schema } from "effect";
 import {
   AgentSessionCodecs,
   type AgentSessionRpc,
+  ApproveSponsorCommand,
+  AskSponsorCommand,
+  EndSponsorCommand,
   EnrolCommand,
   InboxRead,
   OpenSession,
@@ -197,6 +203,38 @@ export class AgentSessionDO
       Effect.flatMap((moving) => changeStanding(agentId, move, moving)),
     );
     return this.answer(AgentSessionCodecs[move], program);
+  }
+
+  async askSponsor(command: typeof AskSponsorCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(AskSponsorCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((asking) => askSponsor(agentId, asking.codeHash)),
+    );
+    return this.answer(AgentSessionCodecs.askSponsor, program);
+  }
+
+  /** The agent is told in its own inbox, so an open socket is sent the notice once the commit is durable. */
+  async approveSponsor(command: typeof ApproveSponsorCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(ApproveSponsorCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((approving) => approveSponsor(agentId, approving)),
+    );
+    const answer = await this.answer(AgentSessionCodecs.approveSponsor, program);
+    await this.received();
+    return answer;
+  }
+
+  async endSponsorship(command: typeof EndSponsorCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(EndSponsorCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((ending) => endSponsorship(agentId, ending)),
+    );
+    const answer = await this.answer(AgentSessionCodecs.endSponsorship, program);
+    await this.received();
+    return answer;
   }
 
   async enrol(command: typeof EnrolCommand.Encoded) {

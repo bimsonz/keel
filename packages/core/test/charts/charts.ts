@@ -252,8 +252,21 @@ export const agentChart: Chart = {
   initial: "active",
   meta: { createdBy: "AgentEnrolled", section: "Agent" },
   states: {
-    active: { on: { AgentSuspended: a("suspended"), AgentRevoked: a("revoked") } },
-    suspended: { on: { AgentReinstated: a("active"), AgentRevoked: a("revoked") } },
+    active: {
+      on: {
+        AgentSuspended: a("suspended"),
+        AgentRevoked: a("revoked"),
+        AgentSponsored: a("active"),
+        AgentUnsponsored: a("active"),
+      },
+    },
+    suspended: {
+      on: {
+        AgentReinstated: a("active"),
+        AgentRevoked: a("revoked"),
+        AgentSponsored: a("suspended"),
+      },
+    },
     revoked: { type: "final" },
   },
 };

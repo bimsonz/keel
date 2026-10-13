@@ -2,14 +2,17 @@
 # kills: tenancy.directory-org-kept
 # why: an enrolment replayed by its key writes the agent's row without its org and sponsor, so a placed agent is unplaced and refused
 diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index 0b80ca6c..d1e5b100 100644
 --- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
 +++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-@@ -115,7 +115,7 @@
+@@ -132,8 +132,8 @@ export function AgentDirectoryD1(db: D1Database) {
                .prepare(
                  `INSERT INTO agents (id, project_id, name, kind, scopes, org_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                   ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
--                   org_id = COALESCE(excluded.org_id, agents.org_id), sponsor_user = COALESCE(excluded.sponsor_user, agents.sponsor_user), state = excluded.state,
-+                   org_id = excluded.org_id, sponsor_user = excluded.sponsor_user, state = excluded.state,
+-                   org_id = COALESCE(excluded.org_id, agents.org_id),
+-                   sponsor_user = CASE WHEN agents.sponsor_seq > 0 THEN agents.sponsor_user ELSE COALESCE(excluded.sponsor_user, agents.sponsor_user) END,
++                   org_id = excluded.org_id,
++                   sponsor_user = excluded.sponsor_user,
+                    state = excluded.state,
                     revocation_epoch = excluded.revocation_epoch`,
                )
-               .bind(

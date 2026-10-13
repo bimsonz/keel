@@ -74,6 +74,8 @@ export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
   "AgentSuspended",
   "AgentReinstated",
   "AgentRevoked",
+  "AgentSponsored",
+  "AgentUnsponsored",
   "UserSignedUp",
   "OrgCreated",
   "MembershipChanged",

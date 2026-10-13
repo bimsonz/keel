@@ -109,6 +109,10 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onSome: (p) =>
           p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
       });
+    case "AgentSponsored":
+      return "a person now stands behind you: your questions go to them, and they may pause you";
+    case "AgentUnsponsored":
+      return "nobody stands behind you now";
     default:
       return undefined;
   }
@@ -129,6 +133,10 @@ const readConflict = (conflictId: string, title: string): NextAction => ({
 export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefined {
   const named = Option.getOrUndefined(decodeActionable(event.payload))?.nextActions;
   if (named !== undefined) return named;
+  if (event.type === "AgentSponsored" || event.type === "AgentUnsponsored")
+    return [
+      { kind: "read", title: "Read who you are and who stands behind you", operationId: "whoami" },
+    ];
   const conflictId = Option.getOrUndefined(decodeEscalation(event.payload))?.conflictId;
   if (conflictId === undefined) return undefined;
   switch (event.type) {

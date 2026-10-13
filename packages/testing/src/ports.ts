@@ -16,6 +16,10 @@ import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
 import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
+import {
+  describeSponsorshipsContract,
+  type SponsorshipsHarness,
+} from "./contracts/sponsorships.ts";
 import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
 import {
   describeProbeChangesContract,
@@ -50,6 +54,7 @@ import { makeSyntaxSourceMemory } from "./memory/syntax-source.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeOrgUsageMemory } from "./memory/org-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
+import { makeSponsorshipsMemory } from "./memory/sponsorships.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
   describeProjectViewsContract,
@@ -139,6 +144,7 @@ import type {
   WorkspaceRebaser,
   WorkspaceRefresher,
   Sessions,
+  Sponsorships,
   Standings,
   SyntaxSource,
   Users,
@@ -404,6 +410,20 @@ function memoryOrgUsageHarness(): OrgUsageHarness {
   };
 }
 
+/** In-memory Sponsorships link the agents that in-memory Enrolments write, and in-memory Standings pause, in one in-memory AgentDirectory. */
+function memorySponsorshipsHarness(): SponsorshipsHarness {
+  const directory = identity.makeAgentDirectoryMemory();
+  const sponsorships = makeSponsorshipsMemory();
+  return {
+    layer: Layer.mergeAll(
+      sponsorships.layer,
+      makeStandingsMemory().layer,
+      operator.makeEnrolmentsMemory().layer,
+    ).pipe(Layer.provideMerge(directory.layer)),
+    expire: sponsorships.expire,
+  };
+}
+
 /** In-memory Standings move the agents that in-memory Enrolments write into one in-memory AgentDirectory. */
 function memoryStandingsHarness(): StandingsHarness {
   const directory = identity.makeAgentDirectoryMemory();
@@ -493,6 +513,10 @@ export const PORTS = {
     memoryStandingsHarness,
     describeStandingsContract,
   ),
+  Sponsorships: harnessed<
+    Sponsorships | Standings | Enrolments | AgentDirectory,
+    SponsorshipsHarness
+  >(memorySponsorshipsHarness, describeSponsorshipsContract),
   Orgs: harnessed<Orgs, TenancyHarness<Orgs>>(
     memoryTenancyHarness(tenancy.makeOrgsMemory),
     describeOrgsContract,

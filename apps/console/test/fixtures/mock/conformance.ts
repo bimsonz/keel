@@ -59,6 +59,8 @@ const RULES: Record<EventType, Rule[]> = {
   AgentRevoked: [
     { kind: "agent", idField: "agentId", from: ["active", "suspended"], to: "revoked" },
   ],
+  AgentSponsored: [{ kind: "agent", idField: "agentId", from: ["active", "suspended"] }],
+  AgentUnsponsored: [{ kind: "agent", idField: "agentId", from: ["active"] }],
   UserSignedUp: [{ kind: "user", idField: "userId", from: null, to: "active" }],
   UserSuspended: [{ kind: "user", idField: "userId", from: ["active"], to: "suspended" }],
   UserReinstated: [{ kind: "user", idField: "userId", from: ["suspended"], to: "active" }],

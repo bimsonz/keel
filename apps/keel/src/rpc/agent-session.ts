@@ -8,9 +8,18 @@ import {
   IdempotencyConflict,
   InboxPage,
   Scope,
+  SponsorRequestRefused,
 } from "@keeltown/core/domain/identity";
 import { Session } from "@keeltown/core/domain/memory";
-import { AgentId, ChangeId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import {
+  Actor,
+  AgentId,
+  ChangeId,
+  InstantSchema,
+  OrgId,
+  ProjectId,
+  UserId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -94,6 +103,31 @@ export const StandingCommand = Schema.Struct({
 
 const StandingRefusal = Schema.Union([AgentNotKnown, AgentStateRefused, IdempotencyConflict]);
 
+/** The agent asks for a sponsor: the hash of the code the isolate minted, which is all the object keeps. */
+export const AskSponsorCommand = Schema.Struct({ codeHash: Schema.NonEmptyString });
+
+/**
+ * A person approves the agent's ask and becomes its sponsor. `codeHash` is the
+ * hash of the code presented, absent only from the OAuth provider's consent
+ * flow. The commit's cause is `sponsor:<idempotencyKey>`.
+ */
+export const ApproveSponsorCommand = Schema.Struct({
+  by: UserId,
+  codeHash: Schema.optional(Schema.NonEmptyString),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/**
+ * The sponsor link ends: `by` is the sponsor or the agent itself, the events'
+ * `by` and the commit's actor. The commit's cause is `unsponsor:<idempotencyKey>`.
+ */
+export const EndSponsorCommand = Schema.Struct({
+  by: Actor,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
 export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
   openSession: exitCodec(
@@ -107,6 +141,12 @@ export const AgentSessionCodecs = {
   suspend: exitCodec(Agent, StandingRefusal),
   reinstate: exitCodec(Agent, StandingRefusal),
   revoke: exitCodec(Agent, StandingRefusal),
+  askSponsor: exitCodec(InstantSchema, Schema.Union([AgentNotKnown, AgentStateRefused])),
+  approveSponsor: exitCodec(
+    Agent,
+    Schema.Union([AgentNotKnown, AgentStateRefused, SponsorRequestRefused, IdempotencyConflict]),
+  ),
+  endSponsorship: exitCodec(Agent, StandingRefusal),
 };
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
@@ -147,4 +187,17 @@ export interface AgentSessionRpc extends EventReceiverRpc {
   suspend(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
   reinstate(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
   revoke(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
+  /**
+   * The agent's own request for a sponsor, answering when it stops being
+   * good. One live request an agent; it commits no event.
+   */
+  askSponsor(command: typeof AskSponsorCommand.Encoded): Promise<ExitJson>;
+  /**
+   * A person becomes the agent's sponsor, through the domain's Agent machine.
+   * The directory row is written before answering, and the agent is told in
+   * its inbox.
+   */
+  approveSponsor(command: typeof ApproveSponsorCommand.Encoded): Promise<ExitJson>;
+  /** Ends the sponsor link, reinstating a paused agent in the same commit. */
+  endSponsorship(command: typeof EndSponsorCommand.Encoded): Promise<ExitJson>;
 }

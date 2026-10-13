@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t sponsorships.contract
+# kills: sponsorships.contract
+# why: a new request does not replace the last, so the code the agent was just given is refused and the one it meant to withdraw still works
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index a1432471..dc370f6a 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -73,7 +73,8 @@ export const askSponsor: (
+       reason: "sponsor-held",
+     });
+   const expiresAt = Instant(now + SPONSOR_ASK_MS);
+-  store.put(SPONSOR_ASK, agentId, asStored({ codeHash, expiresAt }));
++  if (store.get(SPONSOR_ASK, agentId) === undefined)
++    store.put(SPONSOR_ASK, agentId, asStored({ codeHash, expiresAt }));
+   return expiresAt;
+ });
+ 

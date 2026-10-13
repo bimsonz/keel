@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/standing.test.ts -t link.sponsor-repair
+# kills: link.sponsor-repair
+# why: the Projector never notes a sponsor link's event, so a crash between the commit and the inline write leaves the directory's sponsor wrong for good
+diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
+index cb331eca..66b8ad23 100644
+--- a/packages/core/src/application/identity/standing.ts
++++ b/packages/core/src/application/identity/standing.ts
+@@ -221,7 +221,7 @@ export function noteStanding(store: (typeof EntityStore)["Service"], event: Even
+   const linked = sponsorOf(event);
+   if (linked !== undefined) {
+     const noted = store.get(SPONSOR_PENDING, linked.agentId);
+-    if (noted === undefined || decodePendingSponsor(noted).seq < linked.seq)
++    if (noted !== undefined && decodePendingSponsor(noted).seq < linked.seq)
+       store.put(
+         SPONSOR_PENDING,
+         linked.agentId,

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts -t link.sponsor-machine
+# kills: link.sponsor-machine
+# why: ending the link no longer reinstates a paused agent, so an agent paused by a sponsor who then walks away stays paused with nobody able to reinstate it
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index 8bdabf2a..99d90e9b 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -127,9 +127,7 @@ export const decideAgent = (
+         by: command.by,
+       });
+       return Result.succeed(
+-        agent.state === "suspended"
+-          ? [AgentReinstated.make({ agentId: agent.id, by: command.by }), ended]
+-          : [ended],
++        [ended],
+       );
+     }
+     default: {

@@ -28,6 +28,20 @@ export const AgentRevoked = Schema.TaggedStruct("AgentRevoked", {
   revocationEpoch: Schema.Int,
   by: Schema.String,
 });
+/**
+ * A person stands behind the agent: a link that carries no rights and needs
+ * no org. The agent asked for it and the person approved it.
+ */
+export const AgentSponsored = Schema.TaggedStruct("AgentSponsored", {
+  agentId: AgentId,
+  sponsor: UserId,
+});
+/** The link ended. `by` is whoever ended it: the sponsor, or the agent itself. */
+export const AgentUnsponsored = Schema.TaggedStruct("AgentUnsponsored", {
+  agentId: AgentId,
+  sponsor: UserId,
+  by: Schema.String,
+});
 
 /** The events of one agent, which the AgentSession DO commits. */
 export const AgentEvent = Schema.Union([
@@ -35,6 +49,8 @@ export const AgentEvent = Schema.Union([
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
+  AgentSponsored,
+  AgentUnsponsored,
 ]);
 export type AgentEvent = typeof AgentEvent.Type;
 
@@ -101,6 +117,8 @@ export const IdentityEvent = Schema.Union([
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
+  AgentSponsored,
+  AgentUnsponsored,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

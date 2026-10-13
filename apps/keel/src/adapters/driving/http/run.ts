@@ -18,6 +18,7 @@ import type {
   Projects,
   ProjectViews,
   Sessions,
+  Sponsorships,
   Standings,
   TokenIssuer,
   Users,
@@ -44,6 +45,7 @@ export type IsolateServices =
   | Enrolments
   | CodeHost
   | Sessions
+  | Sponsorships
   | Standings
   | Users
   | Memberships

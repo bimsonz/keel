@@ -34,6 +34,8 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AgentSuspended: "members",
   AgentReinstated: "members",
   AgentRevoked: "members",
+  AgentSponsored: "members",
+  AgentUnsponsored: "members",
   UserSignedUp: "members",
   OrgCreated: "members",
   MembershipChanged: "members",

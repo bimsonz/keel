@@ -7102,6 +7102,32 @@
           "not": {}
         }
       },
+      "AgentSponsored": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "sponsor"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentSponsored"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "sponsor": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A person stands behind the agent: a link that carries no rights and needs\nno org. The agent asked for it and the person approved it."
+      },
       "AgentState": {
         "type": "string",
         "enum": [
@@ -7139,6 +7165,36 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "AgentUnsponsored": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "sponsor",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentUnsponsored"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "sponsor": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The link ended. `by` is whoever ended it: the sponsor, or the agent itself."
       },
       "AlternativeDeclared": {
         "type": "object",
@@ -11426,6 +11482,12 @@
           },
           {
             "$ref": "#/components/schemas/AgentRevoked"
+          },
+          {
+            "$ref": "#/components/schemas/AgentSponsored"
+          },
+          {
+            "$ref": "#/components/schemas/AgentUnsponsored"
           },
           {
             "$ref": "#/components/schemas/UserSignedUp"

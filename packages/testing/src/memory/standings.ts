@@ -6,11 +6,23 @@ import {
   evolveAgent,
   IdempotencyConflict,
 } from "@keeltown/core/domain/identity";
-import { type AgentId, Instant } from "@keeltown/core/kernel";
+import { Instant } from "@keeltown/core/kernel";
 import { AgentDirectory, type StandingInput, Standings } from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option, Result } from "effect";
 
 type Move = "suspend" | "reinstate" | "revoke";
+
+let agentSeq = 1;
+
+/**
+ * The next seq for a directory write, as an agent's entity would give its
+ * next event: one counter for every in-memory adapter that moves an agent, so
+ * their guarded writes stay in the order they were made.
+ */
+export const nextAgentSeq = (): number => {
+  agentSeq += 1;
+  return agentSeq;
+};
 
 /**
  * Standings over an AgentDirectory, with the AgentSession DO's rules: the
@@ -20,7 +32,6 @@ type Move = "suspend" | "reinstate" | "revoke";
  */
 export function makeStandingsMemory() {
   const byKey = new Map<string, string>();
-  const seqs = new Map<AgentId, number>();
   return {
     layer: Layer.effect(
       Standings,
@@ -51,12 +62,10 @@ export function makeStandingsMemory() {
             if (Result.isFailure(decided)) return yield* decided.failure;
             let agent: Agent = found.value;
             for (const payload of decided.success) agent = evolveAgent(agent, { at: now, payload });
-            const seq = (seqs.get(input.agentId) ?? 1) + 1;
-            seqs.set(input.agentId, seq);
             yield* directory.standing(
               input.agentId,
               { state: agent.state, revocationEpoch: agent.revocationEpoch },
-              seq,
+              nextAgentSeq(),
             );
             byKey.set(key, body);
             return agent;

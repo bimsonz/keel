@@ -43,6 +43,8 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 | `AgentSuspended` | AgentSession DO (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
 | `AgentReinstated` | AgentSession DO (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
 | `AgentRevoked` | AgentSession DO (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |
+| `AgentSponsored` | AgentSession DO (a person's approval of the agent's own ask) | `agentId, sponsor: UserId` | the user | the agent's AgentSession DO, Projector | The person stands behind the agent: its questions go to them, and they may pause it. No right changes |
+| `AgentUnsponsored` | AgentSession DO (the sponsor, or the agent itself) | `agentId, sponsor: UserId, by` | the user | the agent's AgentSession DO, Projector | Nobody stands behind the agent. Ending the link while the agent is paused commits `AgentReinstated` first |
 
 Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identity's source of truth; its after-hooks commit these through a Queue, one per row-state change, idempotent by the envelope's key, keyed `user:<userId>` or `org:<orgId>`. They are for the feed and the audit: `authorize` never reads them. None carries an email address.
 

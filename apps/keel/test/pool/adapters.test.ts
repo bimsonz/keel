@@ -5,11 +5,14 @@ import type { AgentId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentNotice,
   Enrolments,
+  EntityStore,
   EventOutbox,
   PROJECTOR,
   Sessions,
+  Sponsorships,
   Standings,
 } from "@keeltown/core/ports";
+import { SPONSOR_ASK } from "@keeltown/core/application/identity";
 import {
   namespaceAddress,
   subjectAddress,
@@ -35,7 +38,9 @@ import { ProbeLedgerRpc } from "../../src/adapters/driven/do-rpc/probe-ledger.ts
 import type { NamespaceDO } from "../../src/adapters/driving/do/namespace.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
+import { SponsorshipsRpc } from "../../src/adapters/driven/do-rpc/sponsorships.ts";
 import { StandingsRpc } from "../../src/adapters/driven/do-rpc/standings.ts";
+import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../../src/adapters/driven/do-rpc/notifier.ts";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
@@ -244,6 +249,47 @@ const drainedStandings = Layer.effect(
 
 PORTS.Standings.contract("AgentSession DO over RPC", () => ({
   layer: Layer.mergeAll(drainedStandings, drainedEnrolments, AgentDirectoryD1(env.DB)),
+}));
+
+/** Waits for an agent's AgentSession DO to deliver what it owes. */
+const drain = (agentId: AgentId) => Effect.promise(() => drainOutbox(agentSession(agentId)));
+
+/** A move on an agent's sponsor link commits on its AgentSession DO; each waits for its outbox to go quiet. */
+const drainedSponsorships = Layer.effect(
+  Sponsorships,
+  Effect.gen(function* () {
+    const links = yield* Sponsorships;
+    return Sponsorships.of({
+      ask: links.ask,
+      approve: (approval) => links.approve(approval).pipe(Effect.ensuring(drain(approval.agentId))),
+      end: (actor, ending) => links.end(actor, ending).pipe(Effect.ensuring(drain(ending.agentId))),
+    });
+  }),
+).pipe(Layer.provide(SponsorshipsRpc(agentSession)));
+
+PORTS.Sponsorships.contract("AgentSession DO over RPC", () => ({
+  layer: Layer.mergeAll(
+    drainedSponsorships,
+    drainedStandings,
+    drainedEnrolments,
+    AgentDirectoryD1(env.DB),
+  ),
+  // The request's own row on the agent's object, rewritten as already run out.
+  expire: (agentId) =>
+    Effect.promise(() =>
+      runInDurableObject(agentSession(agentId), (instance: AgentSessionDO) =>
+        instance["runtime"].runPromise(
+          Effect.map(EntityStore, (store) => {
+            const ask = store.get(SPONSOR_ASK, agentId);
+            if (ask === undefined) return;
+            const { codeHash } = Schema.decodeUnknownSync(
+              Schema.Struct({ codeHash: Schema.String }),
+            )(ask);
+            store.put(SPONSOR_ASK, agentId, { codeHash, expiresAt: 0 });
+          }),
+        ),
+      ),
+    ),
 }));
 
 const suiteMaintainer = { _tag: "User" as const, userId: makeId("usr", ulid()) };

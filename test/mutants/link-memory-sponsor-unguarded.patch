@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t link.sponsor-directory
+# kills: link.sponsor-directory
+# why: the in-memory directory takes any sponsor written to it, so memory-backed tests pass where D1 would refuse a late write
+diff --git a/packages/testing/src/memory/identity.ts b/packages/testing/src/memory/identity.ts
+index e0de9aa6..0c35a506 100644
+--- a/packages/testing/src/memory/identity.ts
++++ b/packages/testing/src/memory/identity.ts
+@@ -105,7 +105,7 @@ export function makeAgentDirectoryMemory() {
+         sponsor: (agentId, sponsor, seq) =>
+           Effect.sync(() => {
+             const agent = agents.get(agentId);
+-            if (agent === undefined || (sponsorSeqs.get(agentId) ?? 0) >= seq) return;
++            if (agent === undefined) return;
+             const { sponsor: _sponsor, ...alone } = agent;
+             agents.set(agentId, sponsor === null ? alone : { ...alone, sponsor });
+             sponsorSeqs.set(agentId, seq);

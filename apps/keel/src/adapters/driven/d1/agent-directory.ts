@@ -106,8 +106,25 @@ export function AgentDirectoryD1(db: D1Database) {
             .bind(standing.state, standing.revocationEpoch ?? null, seq, agentId, seq)
             .run(),
         ).pipe(Effect.asVoid),
+      sponsor: (agentId, sponsor, seq) =>
+        Effect.promise(() =>
+          db
+            .prepare(
+              "UPDATE agents SET sponsor_user = ?, sponsor_seq = ? WHERE id = ? AND sponsor_seq < ?",
+            )
+            .bind(sponsor, seq, agentId, seq)
+            .run(),
+        ).pipe(Effect.asVoid),
+      sponsoredBy: (userId) =>
+        Effect.promise(() =>
+          db
+            .prepare("SELECT * FROM agents WHERE sponsor_user = ? ORDER BY created_at, id")
+            .bind(userId)
+            .all(),
+        ).pipe(Effect.map(({ results }) => results.map(toAgent))),
       // An agent's org and sponsor, once placed (at enrolment or by the cutover's move), are never
       // cleared by a later write of a record that lacks them, such as an enrolment replayed by its key.
+      // Once a sponsor link's event has written the sponsor (`sponsor_seq` > 0), only such an event moves it.
       upsert: (agent, credential) =>
         Effect.promise(() =>
           db.batch([
@@ -115,7 +132,9 @@ export function AgentDirectoryD1(db: D1Database) {
               .prepare(
                 `INSERT INTO agents (id, project_id, name, kind, scopes, org_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
-                   org_id = COALESCE(excluded.org_id, agents.org_id), sponsor_user = COALESCE(excluded.sponsor_user, agents.sponsor_user), state = excluded.state,
+                   org_id = COALESCE(excluded.org_id, agents.org_id),
+                   sponsor_user = CASE WHEN agents.sponsor_seq > 0 THEN agents.sponsor_user ELSE COALESCE(excluded.sponsor_user, agents.sponsor_user) END,
+                   state = excluded.state,
                    revocation_epoch = excluded.revocation_epoch`,
               )
               .bind(

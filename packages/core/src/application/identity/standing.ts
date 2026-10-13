@@ -5,13 +5,15 @@ import {
   type AgentNotKnown,
   AgentReinstated,
   AgentRevoked,
+  AgentSponsored,
   type AgentStateRefused,
   AgentSuspended,
+  AgentUnsponsored,
   decideAgent,
   evolveAgent,
   IdempotencyConflict,
 } from "../../domain/identity/index.ts";
-import { AgentId, type EventEnvelope } from "../../domain/kernel/index.ts";
+import { AgentId, type EventEnvelope, UserId } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   type AgentStanding,
@@ -45,6 +47,8 @@ const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded
 const decodeSuspended = Schema.decodeUnknownOption(AgentSuspended);
 const decodeReinstated = Schema.decodeUnknownOption(AgentReinstated);
 const decodeRevoked = Schema.decodeUnknownOption(AgentRevoked);
+const decodeSponsored = Schema.decodeUnknownOption(AgentSponsored);
+const decodeUnsponsored = Schema.decodeUnknownOption(AgentUnsponsored);
 
 /** The events that move an agent's standing. */
 export const STANDING_EVENTS = ["AgentSuspended", "AgentReinstated", "AgentRevoked"] as const;
@@ -83,6 +87,36 @@ export function standingOf(
             standing: { state: "revoked", revocationEpoch: revoked.value.revocationEpoch },
             seq,
           }
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Who sponsors an agent as one of its events leaves it (`null`: nobody), with
+ * the agent and the event's seq: what the directory's guarded write takes.
+ * None for any other event.
+ */
+export function sponsorOf(
+  event: EventEnvelope,
+):
+  | { readonly agentId: AgentId; readonly sponsor: UserId | null; readonly seq: number }
+  | undefined {
+  if (event.entity.kind !== "agent") return undefined;
+  const seq = event.seq;
+  switch (event.type) {
+    case "AgentSponsored": {
+      const sponsored = decodeSponsored(event.payload);
+      return sponsored._tag === "Some"
+        ? { agentId: sponsored.value.agentId, sponsor: sponsored.value.sponsor, seq }
+        : undefined;
+    }
+    case "AgentUnsponsored": {
+      const ended = decodeUnsponsored(event.payload);
+      return ended._tag === "Some"
+        ? { agentId: ended.value.agentId, sponsor: null, seq }
         : undefined;
     }
     default:
@@ -173,8 +207,27 @@ const Pending = Schema.Struct({
 });
 const decodePending = Schema.decodeUnknownSync(Pending);
 
-/** Notes the standing an agent's event leaves it in, for `repairStandings`; any other event is ignored. */
+/** The same repair for who sponsors an agent: the newest link event per agent. */
+export const SPONSOR_PENDING = "sponsor-pending";
+
+const PendingSponsor = Schema.Struct({ sponsor: Schema.NullOr(UserId), seq: Schema.Int });
+const decodePendingSponsor = Schema.decodeUnknownSync(PendingSponsor);
+
+/**
+ * Notes the standing, or the sponsor, an agent's event leaves it with, for
+ * `repairStandings`; any other event is ignored.
+ */
 export function noteStanding(store: (typeof EntityStore)["Service"], event: EventEnvelope): void {
+  const linked = sponsorOf(event);
+  if (linked !== undefined) {
+    const noted = store.get(SPONSOR_PENDING, linked.agentId);
+    if (noted === undefined || decodePendingSponsor(noted).seq < linked.seq)
+      store.put(
+        SPONSOR_PENDING,
+        linked.agentId,
+        asStored({ sponsor: linked.sponsor, seq: linked.seq }),
+      );
+  }
   const moved = standingOf(event);
   if (moved === undefined) return;
   const held = store.get(STANDING_PENDING, moved.agentId);
@@ -193,8 +246,8 @@ export function noteStanding(store: (typeof EntityStore)["Service"], event: Even
 }
 
 /**
- * Writes every noted standing to the directory, and forgets each once
- * written. A write that fails stays noted for the next delivery's repair.
+ * Writes every noted standing and sponsor to the directory, and forgets each
+ * once written. A write that fails stays noted for the next delivery's repair.
  */
 export const repairStandings: Effect.Effect<void, never, EntityStore | AgentDirectory> = Effect.gen(
   function* () {
@@ -216,6 +269,18 @@ export const repairStandings: Effect.Effect<void, never, EntityStore | AgentDire
         const now = store.get(STANDING_PENDING, id);
         if (now !== undefined && decodePending(now).seq === pending.seq)
           store.remove(STANDING_PENDING, id);
+      });
+    }
+    for (const { id, value } of store.list(SPONSOR_PENDING)) {
+      const pending = decodePendingSponsor(value);
+      const written = yield* Effect.exit(
+        directory.sponsor(Schema.decodeUnknownSync(AgentId)(id), pending.sponsor, pending.seq),
+      );
+      if (written._tag === "Failure") continue;
+      store.transaction(() => {
+        const now = store.get(SPONSOR_PENDING, id);
+        if (now !== undefined && decodePendingSponsor(now).seq === pending.seq)
+          store.remove(SPONSOR_PENDING, id);
       });
     }
   },

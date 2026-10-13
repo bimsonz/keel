@@ -15,7 +15,9 @@ import {
   type AgentEvent,
   AgentReinstated,
   AgentRevoked,
+  AgentSponsored,
   AgentSuspended,
+  AgentUnsponsored,
 } from "./events.ts";
 
 /** An operator's command on an agent; the doorway checks the `operator` scope. */
@@ -32,7 +34,11 @@ export type AgentCommand =
     }
   | { readonly _tag: "Suspend"; readonly reason: string; readonly by: string }
   | { readonly _tag: "Reinstate"; readonly by: string }
-  | { readonly _tag: "Revoke"; readonly by: string };
+  | { readonly _tag: "Revoke"; readonly by: string }
+  /** A person stands behind the agent. The agent asked first: the caller holds that proof. */
+  | { readonly _tag: "Sponsor"; readonly by: UserId }
+  /** The sponsor switches the link off, or the agent leaves it. */
+  | { readonly _tag: "EndSponsorship"; readonly by: string };
 
 /** Facts from I/O: the time, and the agent this decision is about (the AgentSession DO's key). */
 export interface AgentFacts {
@@ -48,6 +54,11 @@ type Decision = Result.Result<readonly AgentEvent[], AgentRejection>;
  * Decides a command on an agent (docs/domain/state-machines.md § Agent).
  * Revocation bumps the revocation epoch by one, so every token minted before
  * it fails `admits`; it is terminal.
+ *
+ * An agent has at most one sponsor. The same person sponsoring again commits
+ * nothing, and another is refused until the first has switched the link off.
+ * A sponsor's pause ends with the link: ending it while the agent is suspended
+ * reinstates the agent first, since nobody else could.
  */
 export const decideAgent = (
   state: Agent | undefined,
@@ -70,9 +81,14 @@ export const decideAgent = (
       : Result.fail(new AgentNotKnown({ agentId: facts.agentId }));
   }
   const agent = state;
-  const refuse = (): Decision =>
+  const refuse = (reason?: AgentStateRefused["reason"]): Decision =>
     Result.fail(
-      new AgentStateRefused({ agentId: agent.id, state: agent.state, command: command._tag }),
+      new AgentStateRefused({
+        agentId: agent.id,
+        state: agent.state,
+        command: command._tag,
+        ...(reason === undefined ? {} : { reason }),
+      }),
     );
   switch (command._tag) {
     case "Enroll":
@@ -97,6 +113,25 @@ export const decideAgent = (
               by: command.by,
             }),
           ]);
+    case "Sponsor":
+      if (agent.state === "revoked") return refuse();
+      if (agent.sponsor === undefined)
+        return Result.succeed([AgentSponsored.make({ agentId: agent.id, sponsor: command.by })]);
+      return agent.sponsor === command.by ? Result.succeed([]) : refuse("sponsor-held");
+    case "EndSponsorship": {
+      if (agent.state === "revoked") return refuse();
+      if (agent.sponsor === undefined) return refuse("not-sponsored");
+      const ended = AgentUnsponsored.make({
+        agentId: agent.id,
+        sponsor: agent.sponsor,
+        by: command.by,
+      });
+      return Result.succeed(
+        agent.state === "suspended"
+          ? [AgentReinstated.make({ agentId: agent.id, by: command.by }), ended]
+          : [ended],
+      );
+    }
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -142,6 +177,15 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
       return agent.state !== "revoked" && event.revocationEpoch === agent.revocationEpoch + 1
         ? { ...agent, state: "revoked", revocationEpoch: event.revocationEpoch }
         : illegal(agent, event);
+    case "AgentSponsored":
+      return agent.state !== "revoked" && agent.sponsor === undefined
+        ? { ...agent, sponsor: event.sponsor }
+        : illegal(agent, event);
+    case "AgentUnsponsored": {
+      if (agent.state !== "active" || agent.sponsor !== event.sponsor) return illegal(agent, event);
+      const { sponsor: _sponsor, ...alone } = agent;
+      return alone;
+    }
     default: {
       const unreachable: never = event;
       return unreachable;

@@ -68,8 +68,16 @@ export function makeAgentDirectoryMemory() {
   const credentials = new Map<string, StoredCredential>();
   /** The seq of the standing event each agent's row last took. */
   const standingSeqs = new Map<AgentId, number>();
+  /** The seq of the sponsor link's event each agent's row last took. */
+  const sponsorSeqs = new Map<AgentId, number>();
+  /** Once a link event has written an agent's sponsor, an upsert leaves it as the row holds it. */
   const seed = (agent: Agent, credential: StoredCredential): void => {
-    agents.set(agent.id, agent);
+    const held = agents.get(agent.id);
+    if (held === undefined || !sponsorSeqs.has(agent.id)) agents.set(agent.id, agent);
+    else {
+      const { sponsor: _sponsor, ...rest } = agent;
+      agents.set(agent.id, held.sponsor === undefined ? rest : { ...rest, sponsor: held.sponsor });
+    }
     credentials.set(credential.clientId, credential);
   };
   return {
@@ -94,6 +102,20 @@ export function makeAgentDirectoryMemory() {
             });
             standingSeqs.set(agentId, seq);
           }),
+        sponsor: (agentId, sponsor, seq) =>
+          Effect.sync(() => {
+            const agent = agents.get(agentId);
+            if (agent === undefined || (sponsorSeqs.get(agentId) ?? 0) >= seq) return;
+            const { sponsor: _sponsor, ...alone } = agent;
+            agents.set(agentId, sponsor === null ? alone : { ...alone, sponsor });
+            sponsorSeqs.set(agentId, seq);
+          }),
+        sponsoredBy: (userId) =>
+          Effect.sync(() =>
+            [...agents.values()]
+              .filter((agent) => agent.sponsor === userId)
+              .toSorted((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+          ),
         verifyCredential: (clientId, secret) =>
           Effect.promise(async () => {
             const credential = credentials.get(clientId);

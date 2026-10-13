@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t sponsorships.contract
+# kills: sponsorships.contract
+# why: an approval with a code is admitted when the agent has no live request, so a person sponsors an agent that never asked
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index a1432471..c7629b37 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -193,7 +193,7 @@ export const approveSponsor: (
+       if (command.codeHash === undefined) return undefined;
+       const stored = tx.store.get(SPONSOR_ASK, agentId);
+       const ask = stored === undefined ? undefined : decodeAsk(stored);
+-      return ask !== undefined && ask.codeHash === command.codeHash && ask.expiresAt > tx.at
++      return ask === undefined || (ask.codeHash === command.codeHash && ask.expiresAt > tx.at)
+         ? undefined
+         : new SponsorRequestRefused({ agentId });
+     },

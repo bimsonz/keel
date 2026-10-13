@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts -t b12.event-audience
+# kills: b12.event-audience
+# why: AgentSponsored is served to the public, so anyone reading a public project's feed learns which person stands behind an agent
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index fd33a2fd..f44b29d8 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -34,7 +34,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   AgentSuspended: "members",
+   AgentReinstated: "members",
+   AgentRevoked: "members",
+-  AgentSponsored: "members",
++  AgentSponsored: "public",
+   AgentUnsponsored: "members",
+   UserSignedUp: "members",
+   OrgCreated: "members",

@@ -36,6 +36,8 @@ describe("[b12.event-audience] who an event on a public project's feed is for", 
         "AgentSuspended",
         "AgentReinstated",
         "AgentRevoked",
+        "AgentSponsored",
+        "AgentUnsponsored",
         "ProjectSettingsChanged",
         "EscalationRaised",
         "EscalationWithdrawn",
@@ -66,9 +68,11 @@ describe("[b12.event-audience] who an event on a public project's feed is for", 
 
   it("[b12.event-audience] serves no sponsor publicly: only members-only events carry a sponsor", () => {
     const sponsored = events.filter((event) => event.fields.includes("sponsor"));
-    // The check can see a sponsor: enrolment and sessions carry one.
+    // The check can see a sponsor: enrolment, the sponsor link's two events and sessions carry one.
     expect(sponsored.map((event) => event.type).toSorted()).toEqual([
       "AgentEnrolled",
+      "AgentSponsored",
+      "AgentUnsponsored",
       "SessionOpened",
     ]);
     expect(sponsored.every((event) => audienceOf(event.type) === "members")).toBe(true);

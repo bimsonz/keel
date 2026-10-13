@@ -41,14 +41,23 @@ const PROPERTY_TIMEOUT = 60_000;
 const T0 = Instant(1_760_000_000_000);
 const AGENT = makeId("agt", "0".repeat(26));
 const PROJECT = makeId("prj", "0".repeat(26));
+const SPONSOR = makeId("usr", "1".repeat(26));
+const OTHER = makeId("usr", "2".repeat(26));
 
 type Kind = AgentCommand["_tag"];
 type Key = "none" | Agent["state"];
-const KINDS: readonly Kind[] = ["Enroll", "Suspend", "Reinstate", "Revoke"];
+const KINDS: readonly Kind[] = [
+  "Enroll",
+  "Suspend",
+  "Reinstate",
+  "Revoke",
+  "Sponsor",
+  "EndSponsorship",
+];
 const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Enroll"],
-  active: ["Suspend", "Suspend", "Revoke"],
-  suspended: ["Reinstate", "Reinstate", "Revoke"],
+  active: ["Suspend", "Suspend", "Revoke", "Sponsor", "EndSponsorship"],
+  suspended: ["Reinstate", "Reinstate", "Revoke", "Sponsor", "EndSponsorship"],
   revoked: KINDS,
 };
 
@@ -81,6 +90,10 @@ const build = (kind: Kind): AgentCommand => {
       return { _tag: "Reinstate", by: "operator:zb" };
     case "Revoke":
       return { _tag: "Revoke", by: "operator:zb" };
+    case "Sponsor":
+      return { _tag: "Sponsor", by: SPONSOR };
+    case "EndSponsorship":
+      return { _tag: "EndSponsorship", by: `user:${SPONSOR}` };
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -124,12 +137,60 @@ const oracle = (before: Agent | undefined, command: AgentCommand): Key | "refuse
       return before.state === "suspended" ? "active" : "refused";
     case "Revoke":
       return before.state === "revoked" ? "refused" : "revoked";
+    case "Sponsor":
+      return before.state === "revoked" ||
+        (before.sponsor !== undefined && before.sponsor !== command.by)
+        ? "refused"
+        : before.state;
+    case "EndSponsorship":
+      return before.state === "revoked" || before.sponsor === undefined ? "refused" : "active";
     default: {
       const unreachable: never = command;
       return unreachable;
     }
   }
 };
+
+/** An agent's state and who stands behind it: what the sponsor link's rule is about. */
+interface Linked {
+  readonly state: Agent["state"];
+  readonly sponsor?: typeof SPONSOR;
+}
+
+/** The sponsor link's rule (state-machines.md § Agent), typed independently of `decideAgent`. */
+const linked = (model: Linked, command: AgentCommand): Linked | "refused" => {
+  if (model.state === "revoked") return "refused";
+  switch (command._tag) {
+    case "Enroll":
+      return "refused";
+    case "Suspend":
+      return model.state === "active" ? { ...model, state: "suspended" } : "refused";
+    case "Reinstate":
+      return model.state === "suspended" ? { ...model, state: "active" } : "refused";
+    case "Revoke":
+      return { ...model, state: "revoked" };
+    case "Sponsor":
+      return model.sponsor === undefined || model.sponsor === command.by
+        ? { ...model, sponsor: command.by }
+        : "refused";
+    case "EndSponsorship":
+      return model.sponsor === undefined ? "refused" : { state: "active" };
+    default: {
+      const unreachable: never = command;
+      return unreachable;
+    }
+  }
+};
+
+const linkArb: fc.Arbitrary<AgentCommand> = fc.oneof(
+  fc.constantFrom<AgentCommand>(
+    { _tag: "Suspend", reason: "runaway retries", by: `user:${SPONSOR}` },
+    { _tag: "Reinstate", by: `user:${SPONSOR}` },
+    { _tag: "Revoke", by: `user:${SPONSOR}` },
+    { _tag: "EndSponsorship", by: `user:${SPONSOR}` },
+  ),
+  fc.constantFrom(SPONSOR, OTHER).map((by): AgentCommand => ({ _tag: "Sponsor", by })),
+);
 
 const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 const comparable = (a: Agent | undefined): string =>
@@ -161,6 +222,15 @@ const drive = (commands: readonly AgentCommand[]) => {
   }
   return { state, results };
 };
+
+/** The event types a decision committed, in order. */
+const tags = (result: ReturnType<typeof decideAgent> | undefined) =>
+  result === undefined ? undefined : eventsOf(result).map((event) => event._tag);
+/** Why a decision was refused: the refusal's own reason, or `state` when the agent's state alone says it. */
+const reason = (result: ReturnType<typeof decideAgent> | undefined) =>
+  result !== undefined && Result.isFailure(result) && result.failure._tag === "AgentStateRefused"
+    ? (result.failure.reason ?? "state")
+    : undefined;
 
 describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[agent.transitions] in every state a run reaches, every command lands where the docs' table says, or is refused", () => {
@@ -282,6 +352,56 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     );
     expect(named).toBeGreaterThan(0);
   });
+
+  it("[link.sponsor-machine] an agent has one sponsor at most, only by that person's Sponsor, and ending the link reinstates a paused agent", () => {
+    fc.assert(
+      fc.property(fc.array(linkArb, { maxLength: 16, size: "max" }), (commands) => {
+        let agent = drive([build("Enroll")]).state;
+        let model: Linked = { state: "active" };
+        for (const command of commands) {
+          const expected = linked(model, command);
+          const result = decideAgent(agent, command, { now: T0, agentId: AGENT });
+          if (expected === "refused") {
+            if (!Result.isFailure(result)) return false;
+            continue;
+          }
+          if (!Result.isSuccess(result)) return false;
+          for (const payload of result.success) agent = evolveAgent(agent, { at: T0, payload });
+          model = expected;
+          if (agent?.state !== model.state || agent.sponsor !== model.sponsor) return false;
+        }
+        return true;
+      }),
+    );
+
+    const sponsor: AgentCommand = { _tag: "Sponsor", by: SPONSOR };
+    const another: AgentCommand = { _tag: "Sponsor", by: OTHER };
+    const end = build("EndSponsorship");
+    // One sponsor: the same person again commits nothing, another is refused and changes nothing.
+    const held = drive([build("Enroll"), sponsor, sponsor, another]);
+    expect(tags(held.results[1])).toEqual(["AgentSponsored"]);
+    expect(held.results[2]).toEqual(Result.succeed([]));
+    expect(reason(held.results[3])).toBe("sponsor-held");
+    expect(held.state?.sponsor).toBe(SPONSOR);
+
+    // Ending the link while the agent is paused reinstates it, then ends the link.
+    const paused = drive([build("Enroll"), sponsor, build("Suspend"), end]);
+    expect(tags(paused.results[3])).toEqual(["AgentReinstated", "AgentUnsponsored"]);
+    expect(paused.state?.state).toBe("active");
+    expect(paused.state !== undefined && "sponsor" in paused.state).toBe(false);
+
+    // Ended, the link is free for another person; with none, there is nothing to end.
+    const again = drive([build("Enroll"), end, sponsor, end, another]);
+    expect(reason(again.results[1])).toBe("not-sponsored");
+    expect(tags(again.results[3])).toEqual(["AgentUnsponsored"]);
+    expect(again.state?.sponsor).toBe(OTHER);
+
+    // A revoked agent keeps the record of who stood behind it, and takes neither command.
+    const revoked = drive([build("Enroll"), sponsor, build("Revoke"), end, another]);
+    expect(reason(revoked.results[3])).toBe("state");
+    expect(reason(revoked.results[4])).toBe("state");
+    expect(revoked.state?.sponsor).toBe(SPONSOR);
+  });
 });
 
 // The chart checks the machine; it never drives it.
@@ -298,7 +418,8 @@ const agentTour = (): readonly Fold<Agent, AgentEvent>[] => {
     start: T0,
     facts: (now) => ({ now, agentId: AGENT }),
     moves: () => KINDS.map((kind) => ({ command: build(kind), dt: 1 })),
-    signature: (a) => a?.state ?? "none",
+    signature: (a) =>
+      a === undefined ? "none" : `${a.state}/${a.sponsor === undefined ? "alone" : "sponsored"}`,
   });
   return walkedTour;
 };

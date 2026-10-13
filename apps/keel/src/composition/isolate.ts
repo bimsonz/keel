@@ -6,6 +6,7 @@ import {
   type CodeHost,
   type Enrolments,
   type Sessions,
+  type Sponsorships,
   type Standings,
   type EventFeed,
   Inbox,
@@ -33,6 +34,7 @@ import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
 import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
+import { SponsorshipsRpc } from "../adapters/driven/do-rpc/sponsorships.ts";
 import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
@@ -80,6 +82,7 @@ export function isolateLayer(
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     overrides.sessions ?? SessionsRpc(agentSession),
     overrides.standings ?? StandingsRpc(agentSession),
+    overrides.sponsorships ?? SponsorshipsRpc(agentSession),
     directory,
     UsersD1(env.DB),
     MembershipsD1(env.DB),
@@ -107,6 +110,7 @@ export interface IsolateOverrides {
   readonly codeHost?: Layer.Layer<CodeHost>;
   readonly sessions?: Layer.Layer<Sessions>;
   readonly standings?: Layer.Layer<Standings>;
+  readonly sponsorships?: Layer.Layer<Sponsorships>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;

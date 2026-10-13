@@ -38,6 +38,13 @@ function freshAgentId(): AgentId {
   );
 }
 
+function freshUserId(): UserId {
+  const bytes = crypto.getRandomValues(new Uint8Array(26));
+  return Schema.decodeUnknownSync(UserId)(
+    `usr_${[...bytes].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`,
+  );
+}
+
 const agentId = freshAgentId();
 
 export function describeClockContract(adapter: string, make: LayerFactory<Clock>) {
@@ -206,6 +213,50 @@ export function describeAgentDirectoryContract(
           expect(yield* standing()).toEqual(Option.some(["revoked", 1]));
           const unknown = freshAgentId();
           yield* directory.standing(unknown, { state: "suspended" }, 1);
+          expect(Option.isNone(yield* directory.findAgent(unknown))).toBe(true);
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[link.sponsor-directory] takes a sponsor only from a later seq than the row's, clears it on null, and an upsert no longer moves it",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const id = freshAgentId();
+          const first = freshUserId();
+          const second = freshUserId();
+          const credential = {
+            clientId: `client-${id}`,
+            agentId: id,
+            secretHash: `sha256:${"a".repeat(64)}`,
+          };
+          const enrolled = { ...sampleAgent, id, org: sampleOrgId, sponsor: sampleSponsorId };
+          yield* directory.upsert(enrolled, credential);
+          const sponsor = () =>
+            Effect.map(directory.findAgent(id), (found) =>
+              Option.map(found, (agent) => agent.sponsor ?? null),
+            );
+          const sponsored = (userId: UserId) =>
+            Effect.map(directory.sponsoredBy(userId), (agents) => agents.map((agent) => agent.id));
+          expect(yield* sponsored(sampleSponsorId)).toContain(id);
+          yield* directory.sponsor(id, null, 3);
+          expect(yield* sponsor()).toEqual(Option.some(null));
+          expect(yield* sponsored(sampleSponsorId)).not.toContain(id);
+          yield* directory.sponsor(id, first, 5);
+          expect(yield* sponsor()).toEqual(Option.some(first));
+          expect(yield* sponsored(first)).toEqual([id]);
+          // The end of the link before it arrives late, and a repeat of the same seq: neither moves the row.
+          yield* directory.sponsor(id, null, 4);
+          yield* directory.sponsor(id, second, 5);
+          expect(yield* sponsor()).toEqual(Option.some(first));
+          expect(yield* sponsored(second)).toEqual([]);
+          // An enrolment replayed by its key carries the sponsor it first had: the row keeps the link's.
+          yield* directory.upsert(enrolled, credential);
+          expect(yield* sponsor()).toEqual(Option.some(first));
+          yield* directory.sponsor(id, null, 6);
+          yield* directory.upsert(enrolled, credential);
+          expect(yield* sponsor()).toEqual(Option.some(null));
+          const unknown = freshAgentId();
+          yield* directory.sponsor(unknown, first, 1);
           expect(Option.isNone(yield* directory.findAgent(unknown))).toBe(true);
         }).pipe(Effect.provide(make())),
     );

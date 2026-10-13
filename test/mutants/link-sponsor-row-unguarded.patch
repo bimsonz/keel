@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t link.sponsor-directory
+# kills: link.sponsor-directory
+# why: the D1 row takes any sponsor written to it, so the Projector's late repeat of an older link event puts back a sponsor who has left
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index 0b80ca6c..50f2da7f 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -110,7 +110,7 @@ export function AgentDirectoryD1(db: D1Database) {
+         Effect.promise(() =>
+           db
+             .prepare(
+-              "UPDATE agents SET sponsor_user = ?, sponsor_seq = ? WHERE id = ? AND sponsor_seq < ?",
++              "UPDATE agents SET sponsor_user = ?, sponsor_seq = ? WHERE id = ? AND ? > 0",
+             )
+             .bind(sponsor, seq, agentId, seq)
+             .run(),

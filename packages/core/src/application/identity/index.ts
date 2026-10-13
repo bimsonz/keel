@@ -164,4 +164,5 @@ export * from "./inbox.ts";
 export * from "./org-usage.ts";
 export * from "./reservations.ts";
 export * from "./session.ts";
+export * from "./sponsorship.ts";
 export * from "./standing.ts";

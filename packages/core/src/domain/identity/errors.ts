@@ -37,14 +37,29 @@ export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>
   },
 ) {}
 
-/** The command is not valid in the agent's current state. */
+/**
+ * The command is not valid in the agent's current state. `reason` says why
+ * when the state's name does not: another person already sponsors the agent,
+ * or nobody does.
+ */
 export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
   "AgentStateRefused",
   {
     agentId: AgentId,
     state: Schema.optional(AgentState),
     command: Schema.String,
+    reason: Schema.optional(Schema.Literals(["sponsor-held", "not-sponsored"])),
   },
+) {}
+
+/**
+ * The agent has no live request for a sponsor that this approval answers: it
+ * never asked, or the code is wrong, used or expired. One answer for all of
+ * them, so a guess learns nothing.
+ */
+export class SponsorRequestRefused extends Schema.TaggedError<SponsorRequestRefused>()(
+  "SponsorRequestRefused",
+  { agentId: AgentId },
 ) {}
 
 /** 401: an anonymous caller asked for something only a signed-in user or an agent may do. */

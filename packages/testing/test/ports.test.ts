@@ -54,6 +54,7 @@ const CONTRACT_PORTS = [
   "SessionStore",
   "Sessions",
   "Standings",
+  "Sponsorships",
   "Orgs",
   "ProjectOrgs",
   "Users",

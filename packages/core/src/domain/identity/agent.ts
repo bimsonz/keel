@@ -38,7 +38,10 @@ export const Agent = Schema.Struct({
   scopes: Schema.Array(Scope),
   /** The agent's org. Optional only for agents enrolled before tenancy. */
   org: Schema.optional(OrgId),
-  /** The user who minted its credential: an agent never exceeds this user's rights. */
+  /**
+   * The person who stands behind the agent: the member who enrolled it, or
+   * whoever approved its ask. At most one, and the link carries no rights.
+   */
   sponsor: Schema.optional(UserId),
   state: AgentState,
   /** Bumped on revocation: a token minted under an earlier epoch is refused. */

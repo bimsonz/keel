@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts -t link.sponsor-machine
+# kills: link.sponsor-machine
+# why: a second person's Sponsor is accepted while another stands behind the agent, so an approval can be claimed by someone the agent's sponsor never made way for
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index 8bdabf2a..a8703166 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -117,7 +117,7 @@ export const decideAgent = (
+       if (agent.state === "revoked") return refuse();
+       if (agent.sponsor === undefined)
+         return Result.succeed([AgentSponsored.make({ agentId: agent.id, sponsor: command.by })]);
+-      return agent.sponsor === command.by ? Result.succeed([]) : refuse("sponsor-held");
++      return Result.succeed([]);
+     case "EndSponsorship": {
+       if (agent.state === "revoked") return refuse();
+       if (agent.sponsor === undefined) return refuse("not-sponsored");

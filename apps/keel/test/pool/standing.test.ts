@@ -4,10 +4,11 @@
 // wrote before answering. The Projector's repair is fed an event directly.
 import { env, exports } from "cloudflare:workers";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { PROJECTOR } from "@keeltown/core/ports";
-import { Schema } from "effect";
+import { AgentDirectory, PROJECTOR } from "@keeltown/core/ports";
+import { Effect, Option, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import {
   BASE,
   drainAfter,
@@ -156,6 +157,42 @@ describe("[b11.standing-repair] the Projector repeats a standing in the director
       ),
     ]);
     await vi.waitFor(async () => expect(await gate(token)).toBe(401), {
+      timeout: 5_000,
+      interval: 50,
+    });
+  });
+});
+
+describe("[link.sponsor-repair] the Projector repeats a sponsor link in the directory", () => {
+  it("[link.sponsor-repair] an AgentSponsored the Projector receives writes the agent's sponsor, even if the inline write never happened", async () => {
+    const seeded = await seedAgent();
+    const agentId = seeded.agent.id;
+    const sponsor = makeId("usr", ulid());
+    const row = () =>
+      Effect.runPromise(
+        AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+          Effect.map((found) => Option.getOrUndefined(found)?.sponsor),
+          Effect.provide(AgentDirectoryD1(env.DB)),
+        ),
+      );
+    expect(await row()).not.toBe(sponsor);
+    const projector = env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
+    await projector.receive([
+      Schema.encodeSync(EventEnvelope)(
+        Schema.decodeUnknownSync(EventEnvelope)({
+          eventId: makeId("evt", ulid()),
+          type: "AgentSponsored",
+          entity: { kind: "agent", id: agentId },
+          seq: 2,
+          at: Date.now(),
+          dedupeKey: `agent:${agentId}/sponsor:repair-0001/AgentSponsored#2`,
+          affected: [],
+          notified: [],
+          payload: { _tag: "AgentSponsored", agentId, sponsor },
+        }),
+      ),
+    ]);
+    await vi.waitFor(async () => expect(await row()).toBe(sponsor), {
       timeout: 5_000,
       interval: 50,
     });
