@@ -17,8 +17,8 @@ import {
 import type { ReactNode } from "react";
 import { PAGE } from "../engine/lists.ts";
 import { hrefOf } from "../places.ts";
-import { type Route, TRUNK } from "../route.ts";
-import { Link, useWhere } from "../router.tsx";
+import { type Route, TRUNK, href } from "../route.ts";
+import { Link, carriedParams, useWhere } from "../router.tsx";
 import { Footer } from "./Footer.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
 
@@ -173,6 +173,7 @@ function ReaderLink({ reader }: { reader: ReaderMark }) {
 
 export function Frame({
   visibility,
+  forkedFrom,
   source,
   counts,
   projects,
@@ -186,6 +187,8 @@ export function Frame({
   reader?: ReaderMark;
   /** Whether anyone may read the project, where Keel has said. */
   visibility?: string;
+  /** The project this one was forked from, where Keel names it to this reader: it names none they may not read. */
+  forkedFrom?: { namespace: string; name: string };
   source: SourceMark;
   /** How many of each are still open. Absent where there is no project to count in. */
   counts?: OpenCounts;
@@ -248,6 +251,17 @@ export function Frame({
             {visibility !== undefined && (
               <span className="a-chip" data-tone="quiet">
                 {visibility}
+              </span>
+            )}
+            {forkedFrom !== undefined && (
+              <span className="text-sm text-kumo-subtle" data-part="forked-from">
+                forked from {/* Another project's page: a plain link, which loads it. */}
+                <a
+                  href={href(forkedFrom.namespace, forkedFrom.name, HOME, carriedParams())}
+                  className="a-link"
+                >
+                  {forkedFrom.namespace}/{forkedFrom.name}
+                </a>
               </span>
             )}
           </div>

@@ -385,7 +385,8 @@ export function createFakeKeel(
    * The projects made here, by the key each was made under, with what was asked: Keel's `createProject`. A
    * made project is its maker's to read, and holds a trunk and no entry yet.
    */
-  const made = new Map<string, { asked: string; by: string; view: ProjectView }>();
+  /** Each project made here, under the key it was asked with. `from` is the project a fork was taken from, by its id. */
+  const made = new Map<string, { asked: string; by: string; view: ProjectView; from?: string }>();
   const madeAt = (handle: string, name: string) =>
     [...made.values()].find(
       (one) => one.view.namespace.handle === handle && one.view.name === name.toLowerCase(),
@@ -446,6 +447,24 @@ export function createFakeKeel(
       /** The project is shown to its namespace's members, and to anyone where it is public. To the rest it is not there. */
       const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
+      // A fork names its source to a reader who is read that source, and to no other, as Keel's `sourceOf`
+      // does on the answer to its making and on a read of the one project. A list names none.
+      const shown = (one: { view: ProjectView; from?: string }): ProjectView => {
+        const source =
+          one.from === project.id
+            ? visible
+              ? project
+              : undefined
+            : [...made.values()].find(
+                (other) => other.view.id === one.from && other.by === reader?.id,
+              )?.view;
+        return source === undefined
+          ? one.view
+          : {
+              ...one.view,
+              forkedFrom: { id: source.id, namespace: source.namespace.handle, name: source.name },
+            };
+      };
 
       // The agents a person stands behind, Keel lists to that person and to nobody else: `listSponsored`.
       if (url.pathname === "/v1/agents/sponsored" && request.method === "GET") {
@@ -556,7 +575,7 @@ export function createFakeKeel(
         const [, handle = "", name = ""] = named.map((part) => decodeURIComponent(part));
         const mine = madeAt(handle, name);
         if (mine !== undefined)
-          return mine.by === reader?.id ? Response.json(mine.view satisfies ProjectView) : gone();
+          return mine.by === reader?.id ? Response.json(shown(mine) satisfies ProjectView) : gone();
         if (!visible || handle !== project.namespace.handle || name !== project.name) return gone();
         return Response.json({
           ...project,
@@ -641,7 +660,7 @@ export function createFakeKeel(
         const held = made.get(key);
         if (held !== undefined)
           return held.asked === sent
-            ? Response.json(held.view, { status: 201 })
+            ? Response.json(shown(held), { status: 201 })
             : problem(
                 409,
                 "request.idempotency_conflict",
@@ -675,8 +694,14 @@ export function createFakeKeel(
           createdAt: new Date(now()).toISOString(),
           viewer: { role: reader.role ?? "owner" },
         };
-        made.set(key, { asked: sent, by: reader.id ?? "", view });
-        return Response.json(view, { status: 201 });
+        const one = {
+          asked: sent,
+          by: reader.id ?? "",
+          view,
+          ...(kind === "fork" && typeof forked === "string" ? { from: forked } : {}),
+        };
+        made.set(key, one);
+        return Response.json(shown(one), { status: 201 });
       }
 
       // A project's repository is read by whoever the project is shown to.

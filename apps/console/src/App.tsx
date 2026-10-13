@@ -242,6 +242,7 @@ function Console({
           source={source}
           projects={projects}
           visibility={visibility}
+          {...(found.forkedFrom === undefined ? {} : { forkedFrom: found.forkedFrom })}
           // Keel holds a project's settings, so a test fixture, which is not Keel, has none to offer.
           settings={maintains(found) && player.source.getSettings !== undefined}
           {...(reader === undefined ? {} : { reader })}

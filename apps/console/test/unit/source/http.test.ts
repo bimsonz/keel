@@ -525,6 +525,53 @@ describe("who the page reads as", () => {
     expect(await r.directory.findProject("acme", "demo")).toMatchObject({ id: source?.id });
   });
 
+  it("[fork.source-named] names a fork's source on the answer to its making and on its own read, to a reader Keel reads the source, and in no list", async () => {
+    const r = reading("stranger", "public");
+    const source = await r.directory.findProject("acme", "demo");
+    const from = { id: source?.id, namespace: "acme", name: "demo" };
+    const made = await r.directory.createProject(
+      { namespace: "stranger", name: "mine", source: { kind: "fork", project: source?.id ?? "" } },
+      "console:new:fork-named",
+    );
+    expect(made.forkedFrom).toEqual(from);
+    expect((await r.directory.findProject("stranger", "mine"))?.forkedFrom).toEqual(from);
+    // A fork of the fork names the fork, which is its maker's to read, and not the project that one came from.
+    const again = await r.directory.createProject(
+      { namespace: "stranger", name: "again", source: { kind: "fork", project: made.id } },
+      "console:new:fork-again",
+    );
+    expect(again.forkedFrom).toEqual({ id: made.id, namespace: "stranger", name: "mine" });
+    // The list names no source, and a project that is no fork has none anywhere.
+    for (const listed of await r.directory.listProjects())
+      expect(listed).not.toHaveProperty("forkedFrom");
+    expect(source).not.toHaveProperty("forkedFrom");
+    const plain = await r.directory.createProject(
+      { namespace: "stranger", name: "plain", source: { kind: "empty" } },
+      "console:new:plain",
+    );
+    expect(plain).not.toHaveProperty("forkedFrom");
+    // Its source is made private: the fork is still its maker's, and names no project they are not read.
+    const kept = `${ORIGIN}/v1/projects/${source?.id}/settings`;
+    const asOwner = { cookie: `${SESSION_COOKIE}=owner`, origin: ORIGIN };
+    const whole: unknown = await (
+      await r.keel.fetch(new Request(kept, { headers: asOwner }))
+    ).json();
+    if (typeof whole !== "object" || whole === null)
+      throw new Error("the stand-in read no settings");
+    const settings = await r.keel.fetch(
+      new Request(kept, {
+        method: "PUT",
+        headers: { ...asOwner, "content-type": "application/json" },
+        body: JSON.stringify({ ...whole, visibility: "private" }),
+      }),
+    );
+    expect(settings.status).toBe(200);
+    expect(await r.directory.findProject("acme", "demo")).toBeNull();
+    const after = await r.directory.findProject("stranger", "mine");
+    expect(after).toMatchObject({ name: "mine" });
+    expect(after).not.toHaveProperty("forkedFrom");
+  });
+
   it("[fork.private] forks a private project only into its own namespace, and says Keel's rule with its way forward anywhere else", async () => {
     const r = reading("member");
     const source = await r.directory.findProject("acme", "demo");

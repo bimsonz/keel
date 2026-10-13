@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.source-named
+# why: the stand-in for Keel names a fork's source when the fork is made and not when it is read
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index ae40ca62..2d351699 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -575,7 +575,7 @@ export function createFakeKeel(
+         const [, handle = "", name = ""] = named.map((part) => decodeURIComponent(part));
+         const mine = madeAt(handle, name);
+         if (mine !== undefined)
+-          return mine.by === reader?.id ? Response.json(shown(mine) satisfies ProjectView) : gone();
++          return mine.by === reader?.id ? Response.json(mine.view satisfies ProjectView) : gone();
+         if (!visible || handle !== project.namespace.handle || name !== project.name) return gone();
+         return Response.json({
+           ...project,

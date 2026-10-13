@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.source-named
+# why: the stand-in for Keel says a project started from nothing was forked from the project it serves
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index ae40ca62..e62da608 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -698,7 +698,7 @@ export function createFakeKeel(
+           asked: sent,
+           by: reader.id ?? "",
+           view,
+-          ...(kind === "fork" && typeof forked === "string" ? { from: forked } : {}),
++          from: project.id,
+         };
+         made.set(key, one);
+         return Response.json(shown(one), { status: 201 });

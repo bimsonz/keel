@@ -3388,6 +3388,22 @@ expectEqual(
   `${ownerOfFork} | ${pathOf(guest)} | ${(forksOfOpen().at(-1)?.body ?? "nothing sent").replace(publicId, "{the source's id}")} | ${forksOfOpen().length - forksBefore} asked | ${await guest.getByText("private", { exact: true }).count()} private`,
   'grace | /grace/demo | {"namespace":"grace","name":"demo","source":{"kind":"fork","project":"{the source\'s id}"}} | 1 asked | 1 private',
 );
+expectEqual(
+  "fork: its own page says which project it was forked from, linked to that project",
+  (
+    await guest
+      .locator('[data-part="forked-from"]')
+      .evaluateAll((all) =>
+        all.map(
+          (one) =>
+            `${one.textContent ?? ""} | ${new URL(one.querySelector("a")?.href ?? "about:blank").pathname}`,
+        ),
+      )
+  )
+    .map(squash)
+    .join(" || "),
+  "forked from ada/demo | /ada/demo",
+);
 await visiting.close();
 await second.close();
 
@@ -3720,6 +3736,19 @@ expectEqual(
   "fork: Keel is asked for a fork of the project by its own id, under a key made for the attempt, and the reader lands on the fork",
   `${pathOf(person)} | ${(creates().at(-1)?.body ?? "nothing sent").replace(/prj_[0-9A-Z]{26}/, "{id}")} | ${creates().length - beforeFork} asked | ${/^console:new:[0-9a-f-]{36}$/.test(creates().at(-1)?.idempotencyKey ?? "")} | ${creates().at(-1)?.authorization === ""}`,
   '/ada/demo-fork | {"namespace":"ada","name":"demo-fork","source":{"kind":"fork","project":"{id}"}} | 2 asked | true | true',
+);
+const forkedFrom = squash(
+  (await person.locator('[data-part="forked-from"]').allInnerTexts()).join(" || "),
+);
+await person.goto(`${built}/ada/demo`, { waitUntil: "domcontentloaded" });
+await person
+  .getByRole("navigation", { name: "Project" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fork: a fork of a private project names its source to the member who made it, and a project that is no fork names none",
+  `${forkedFrom} | ${await person.locator('[data-part="forked-from"]').count()} on its source`,
+  "forked from ada/demo | 0 on its source",
 );
 // A project Keel does not read this person has no fork to offer: it is told as no project, as it is anywhere.
 await person.goto(`${built}/ada/none/fork`, { waitUntil: "domcontentloaded" });

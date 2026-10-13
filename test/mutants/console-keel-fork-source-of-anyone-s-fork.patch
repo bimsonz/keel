@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.source-named
+# why: the stand-in for Keel names some other project of the reader's as the source of a fork of a fork
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index ae40ca62..af105f56 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -456,7 +456,7 @@ export function createFakeKeel(
+               ? project
+               : undefined
+             : [...made.values()].find(
+-                (other) => other.view.id === one.from && other.by === reader?.id,
++                (other) => other.view.id !== one.from && other.by === reader?.id,
+               )?.view;
+         return source === undefined
+           ? one.view

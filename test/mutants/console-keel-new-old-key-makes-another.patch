@@ -2,15 +2,15 @@
 # kills: new.again
 # why: the stand-in for Keel answers another request under an old key with the first project, where Keel refuses the key
 diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
-index a36474ad..15994f0f 100644
+index ae40ca62..b47d8202 100644
 --- a/apps/console/test/fixtures/mock/fakeKeel.ts
 +++ b/apps/console/test/fixtures/mock/fakeKeel.ts
-@@ -612,7 +612,7 @@ export function createFakeKeel(
+@@ -659,7 +659,7 @@ export function createFakeKeel(
            );
          const held = made.get(key);
          if (held !== undefined)
 -          return held.asked === sent
 +          return held.asked !== ""
-             ? Response.json(held.view, { status: 201 })
+             ? Response.json(shown(held), { status: 201 })
              : problem(
                  409,
