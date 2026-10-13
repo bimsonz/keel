@@ -3,7 +3,8 @@
 // histories.
 
 import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { generateKeyPairSync } from "node:crypto";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MissingObject, type TreeReader } from "../src/diff.ts";
@@ -317,5 +318,83 @@ export function gitMergeTree(
     outcome: r.status === 1 ? "conflicted" : "clean",
     tree: output.split("\n")[0] ?? "",
     output,
+  };
+}
+
+// ------------------------------------------------------------ ssh signing
+
+/** ssh-keygen under the same timeout and kill as every git child; answers what it wrote, or throws with what it said. */
+export function sshKeygen(args: string[], input?: Uint8Array): Buffer {
+  const run = spawnSync("ssh-keygen", args, {
+    input,
+    maxBuffer: 1 << 24,
+    timeout: GIT_TIMEOUT_MS,
+    killSignal: "SIGKILL",
+  });
+  if (run.error !== undefined) throw run.error;
+  if (run.status !== 0)
+    throw new Error(
+      `ssh-keygen ${args[0] ?? ""} ${args[1] ?? ""} failed (${run.status ?? run.signal}): ${run.stderr.toString()}`,
+    );
+  return run.stdout;
+}
+
+const sshString = (bytes: Uint8Array | string) => {
+  const body = Buffer.from(bytes);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(body.length);
+  return Buffer.concat([length, body]);
+};
+
+const fromBase64Url = (text: string | undefined) => Buffer.from(text ?? "", "base64url");
+
+/**
+ * A fresh Ed25519 key in the two forms a signing test needs: PKCS#8 PEM, as
+ * GitCore imports it, and an unencrypted OpenSSH key file in `dir`, as
+ * ssh-keygen reads it (PROTOCOL.key: `openssh-key-v1`, cipher and KDF `none`).
+ * `publicKey` is ssh-keygen's own reading of that file.
+ */
+export function sshKeyPair(
+  dir: string,
+  name: string,
+): { readonly pkcs8Pem: string; readonly keyFile: string; readonly publicKey: string } {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  const jwk = privateKey.export({ format: "jwk" });
+  const seed = fromBase64Url(jwk.d);
+  const pub = fromBase64Url(jwk.x);
+  const blob = Buffer.concat([sshString("ssh-ed25519"), sshString(pub)]);
+  const check = Buffer.from([1, 2, 3, 4]);
+  const secret = Buffer.concat([
+    check,
+    check,
+    sshString("ssh-ed25519"),
+    sshString(pub),
+    sshString(Buffer.concat([seed, pub])),
+    sshString(""),
+  ]);
+  const padding = Buffer.from(
+    Array.from({ length: (8 - (secret.length % 8)) % 8 }, (_, i) => i + 1),
+  );
+  const body = Buffer.concat([
+    Buffer.from("openssh-key-v1\0"),
+    sshString("none"),
+    sshString("none"),
+    sshString(""),
+    Buffer.from([0, 0, 0, 1]),
+    sshString(blob),
+    sshString(Buffer.concat([secret, padding])),
+  ]);
+  const lines = body.toString("base64").match(/.{1,70}/g) ?? [];
+  const keyFile = join(dir, name);
+  writeFileSync(
+    keyFile,
+    `-----BEGIN OPENSSH PRIVATE KEY-----\n${lines.join("\n")}\n-----END OPENSSH PRIVATE KEY-----\n`,
+  );
+  chmodSync(keyFile, 0o600);
+  const [type = "", key = ""] = sshKeygen(["-y", "-f", keyFile]).toString().trim().split(" ");
+  return {
+    pkcs8Pem: privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
+    keyFile,
+    publicKey: `${type} ${key}`,
   };
 }

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.key-unvouched
+# why: Only the hour after the commit is checked against the key's window, so a commit dated before its key's window opens is signed
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 6da24da..d4ab1d9 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -97,7 +97,6 @@ export function commitSigner(config: CommitSigningConfig): (time: number) => Pro
+     const vouched = decodeSigners(config.signers).some(
+       (signer) =>
+         signer.publicKey === publicKey &&
+-        signsAt(signer, time) &&
+         signsAt(signer, time + VERIFIER_SKEW_SECONDS),
+     );
+     if (!vouched)

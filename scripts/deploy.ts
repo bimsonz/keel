@@ -170,6 +170,13 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
       requireOutput(outputs, "bundle_url_public_key", "the bundle URL public key"),
     );
 
+  // The keys Keel's commits verify against: its signers file, and what its composer checks its own key by.
+  if (isObject(vars) && "KEEL_COMMIT_SIGNERS" in vars)
+    set(
+      ["vars", "KEEL_COMMIT_SIGNERS"],
+      requireOutput(outputs, "commit_signers", "the keys Keel signs commits with"),
+    );
+
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const pins = pinProblems(rendered);
   if (pins.length > 0)
@@ -228,6 +235,7 @@ async function signingKey(): Promise<string> {
 const FROM_TERRAFORM: Readonly<Record<string, string>> = {
   BETTER_AUTH_SECRET: "better_auth_secret",
   BUNDLE_URL_SIGNING_KEY: "bundle_url_signing_key",
+  KEEL_COMMIT_SIGNING_KEY: "commit_signing_key",
 };
 
 /** The secrets a config's `secrets.required` names. */
@@ -238,7 +246,7 @@ function requiredSecrets(config: Json): string[] {
 
 /**
  * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID,
- * BETTER_AUTH_SECRET and BUNDLE_URL_SIGNING_KEY (Terraform's outputs, so
+ * BETTER_AUTH_SECRET, BUNDLE_URL_SIGNING_KEY and KEEL_COMMIT_SIGNING_KEY (Terraform's outputs, so
  * replacing one there rotates it here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
  * one, because a new key invalidates every token already issued. The console
  * requires none: it holds no credential.

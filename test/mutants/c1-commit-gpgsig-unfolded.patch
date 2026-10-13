@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: commit.gpgsig, sshsig.git-verifies
+# why: A signature's later lines are written without their leading space, so git reads them as headers of their own and finds no signature
+diff --git a/packages/gitcore/src/objects.ts b/packages/gitcore/src/objects.ts
+index 906cf4b..0537bef 100644
+--- a/packages/gitcore/src/objects.ts
++++ b/packages/gitcore/src/objects.ts
+@@ -149,7 +149,7 @@ function sig(s: Signature): string {
+ function gpgsig(armored: string): string {
+   const lines = armored.replace(/\n$/, "").split("\n");
+   if (lines.some((line) => line === "" || line.startsWith(" "))) throw new Error("bad signature");
+-  return `gpgsig ${lines.join("\n ")}`;
++  return `gpgsig ${lines.join("\n")}`;
+ }
+ 
+ /**

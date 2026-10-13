@@ -97,3 +97,29 @@ resource "random_password" "better_auth" {
 resource "tls_private_key" "bundle_url" {
   algorithm = "ED25519"
 }
+
+# The key that signs every commit Keel composes, apart from every other key
+# Keel holds. scripts/deploy.ts sets its private half as keel's
+# KEEL_COMMIT_SIGNING_KEY secret; its public half is the first entry of
+# local.commit_signers. Never replace it without first writing its public half
+# and window into that list by hand: the commits it signed stay on trunk for
+# good, and they verify only while the list holds it.
+resource "tls_private_key" "commit_signing" {
+  algorithm = "ED25519"
+}
+
+locals {
+  # Every key Keel signs or has signed commits with, and when: keel's
+  # KEEL_COMMIT_SIGNERS var, which it serves as its allowed-signers file at
+  # /.well-known/keel/allowed-signers. Times are ISO 8601 in UTC, both ends
+  # included. Keel refuses to compose while this list does not hold its key
+  # for the commit's time and the hour after (a verifier on daylight time
+  # reads a commit an hour late), so a retired key's validBefore is set more
+  # than an hour ahead, and the next key's entry is added before that time.
+  commit_signers = [
+    {
+      publicKey  = trimspace(tls_private_key.commit_signing.public_key_openssh)
+      validAfter = "2026-10-13T00:00:00Z"
+    },
+  ]
+}

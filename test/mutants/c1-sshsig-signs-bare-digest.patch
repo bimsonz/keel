@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.differential, sshsig.git-verifies
+# why: The key signs the payload's bare hash, without the SSHSIG preamble, namespace and hash name it is bound to
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..022656b 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -88,7 +88,7 @@ export async function sshSignature(
+   const digest = new Uint8Array(await crypto.subtle.digest(HASH.algorithm, concat([payload])));
+   const signed = concat([MAGIC, text(namespace), text(""), text(HASH.label), string(digest)]);
+   const signature = new Uint8Array(
+-    await crypto.subtle.sign({ name: "Ed25519" }, key.privateKey, signed),
++    await crypto.subtle.sign({ name: "Ed25519" }, key.privateKey, digest),
+   );
+   const blob = concat([
+     MAGIC,

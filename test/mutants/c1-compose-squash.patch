@@ -2,11 +2,11 @@
 # kills: composer.one-commit-per-member
 # why: The batch lands as one commit on the base with the whole fold's tree, so a change can no longer be bisected or reverted alone
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index d176ed8..2fb1e6a 100644
+index af42ca2..3a8b479 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -108,8 +108,8 @@ export async function restack(
-     });
+@@ -130,8 +130,8 @@ export async function restack(
+         : encodeCommit({ ...spec, gpgsig: await options.sign(unsigned) });
      const oid = await hashObject("commit", body);
      objects.set(oid, { type: "commit", body });
 -    commits.push({ oid, tree: merged.tree });

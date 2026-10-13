@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.key-import
+# why: A refused signing key is repeated in the error, which is logged
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..5f99109 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -62,7 +62,8 @@ const PKCS8_PEM = /^-----BEGIN PRIVATE KEY-----([A-Za-z0-9+/=\s]+)-----END PRIVA
+  */
+ export async function importSshSigningKey(pkcs8Pem: string): Promise<SshSigningKey> {
+   const body = PKCS8_PEM.exec(pkcs8Pem.trim())?.[1];
+-  if (body === undefined) throw new Error("the signing key is not a PKCS#8 PEM private key");
++  if (body === undefined)
++    throw new Error(`the signing key is not a PKCS#8 PEM private key: ${pkcs8Pem}`);
+   const der = fromBase64(body.replace(/\s+/g, ""));
+   const algorithm = { name: "Ed25519" };
+   const exportable = await crypto.subtle.importKey("pkcs8", der, algorithm, true, ["sign"]);

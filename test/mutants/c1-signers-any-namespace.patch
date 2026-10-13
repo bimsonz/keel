@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: signers.format
+# why: A signer's line names no namespace, so Keel's commit key would also vouch for files and anything else signed with it
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..e9df69f 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -142,10 +142,10 @@ export function allowedSigners(principal: string, keys: readonly SignerKey[]): s
+     .map((key) => {
+       if (!/^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$/.test(key.publicKey))
+         throw new Error("bad signer key");
+-      const options = [`namespaces="${GIT_NAMESPACE}"`];
++      const options: string[] = [];
+       if (key.validAfter !== undefined) options.push(`valid-after="${utc(key.validAfter)}"`);
+       if (key.validBefore !== undefined) options.push(`valid-before="${utc(key.validBefore)}"`);
+-      return `${principal} ${options.join(",")} ${key.publicKey}\n`;
++      return `${[principal, ...(options.length > 0 ? [options.join(",")] : []), key.publicKey].join(" ")}\n`;
+     })
+     .join("");
+ }

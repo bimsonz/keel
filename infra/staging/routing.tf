@@ -30,3 +30,11 @@ resource "cloudflare_workers_route" "mcp" {
   pattern = "${var.host}/mcp*"
   script  = "keel"
 }
+
+# Keel's allowed-signers file (/.well-known/keel/allowed-signers), which stock
+# git verifies a landed commit against.
+resource "cloudflare_workers_route" "well_known" {
+  zone_id = data.cloudflare_zone.site.zone_id
+  pattern = "${var.host}/.well-known/keel/*"
+  script  = "keel"
+}

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.key-unvouched
+# why: Any key in the signers setting vouches for the signing key, so a setting that lists only another key lets unverifiable commits land
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 6da24da..a1188dd 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -96,7 +96,6 @@ export function commitSigner(config: CommitSigningConfig): (time: number) => Pro
+     const publicKey = sshPublicKey(key.publicKey);
+     const vouched = decodeSigners(config.signers).some(
+       (signer) =>
+-        signer.publicKey === publicKey &&
+         signsAt(signer, time) &&
+         signsAt(signer, time + VERIFIER_SKEW_SECONDS),
+     );

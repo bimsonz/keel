@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/signers.test.ts
+# kills: signers.route-get-only
+# why: The signers file's address answers every method, a write among them, as if it had been taken
+diff --git a/apps/keel/src/adapters/driving/http/signers.ts b/apps/keel/src/adapters/driving/http/signers.ts
+index f8ea771..6eeab9c 100644
+--- a/apps/keel/src/adapters/driving/http/signers.ts
++++ b/apps/keel/src/adapters/driving/http/signers.ts
+@@ -13,7 +13,7 @@ export const SIGNERS_PATH = "/.well-known/keel/allowed-signers";
+ const MAX_AGE_SECONDS = 300;
+ 
+ export function registerSigners(app: Hono<AppEnv>, signers: () => string): void {
+-  app.get(SIGNERS_PATH, (c) =>
++  app.all(SIGNERS_PATH, (c) =>
+     c.text(signers(), 200, { "cache-control": `public, max-age=${MAX_AGE_SECONDS}` }),
+   );
+ }

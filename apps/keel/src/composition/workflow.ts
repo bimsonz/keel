@@ -62,7 +62,7 @@ import {
   PlatformFunctionWorkersAI,
   type StreamingAi,
 } from "../adapters/driven/workers-ai/platform-function.ts";
-import { artifactsLocationHint, artifactsObjects, codeHostLayer } from "./do.ts";
+import { artifactsLocationHint, artifactsObjects, codeHostLayer, commitSigning } from "./do.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
@@ -244,7 +244,7 @@ export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServi
       ).pipe(Layer.provide(code)),
       TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
       AdmittedGuardsCodeHost().pipe(Layer.provide(code)),
-      CandidateComposerGitCore(objects).pipe(Layer.provide(code)),
+      CandidateComposerGitCore(objects, commitSigning(env)).pipe(Layer.provide(code)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(bundles)),
       ProbeSourcesCodeHost.pipe(Layer.provide(code)),
       NoopWorldsBundles.pipe(Layer.provide(bundles)),

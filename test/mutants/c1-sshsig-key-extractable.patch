@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.public-key
+# why: The private key kept for signing can be exported again
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..689d89f 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -70,7 +70,7 @@ export async function importSshSigningKey(pkcs8Pem: string): Promise<SshSigningK
+   const x = "x" in jwk ? jwk.x : undefined;
+   if (x === undefined) throw new Error("the signing key has no public half");
+   return {
+-    privateKey: await crypto.subtle.importKey("pkcs8", der, algorithm, false, ["sign"]),
++    privateKey: exportable,
+     publicKey: fromBase64(x.replaceAll("-", "+").replaceAll("_", "/")),
+   };
+ }

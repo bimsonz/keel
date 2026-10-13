@@ -14,6 +14,7 @@ import type { Handlers } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
+import { registerSigners } from "./signers.ts";
 
 export interface AppOptions {
   readonly handlers: Handlers;
@@ -26,6 +27,8 @@ export interface AppOptions {
   readonly tokens: { readonly admit: (key: string) => Promise<boolean> };
   /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
   readonly streams: InboxStreams;
+  /** Keel's allowed-signers file, as it reads now: the keys its commits verify against. */
+  readonly signers: () => string;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
   readonly rethrowContractDrift: boolean;
 }
@@ -39,7 +42,7 @@ const TOKEN_PATH = "/v1/oauth/token";
 /** The limiter's window (`TOKEN_LIMIT`'s period in wrangler.jsonc): the longest a refused address waits. */
 const TOKEN_WINDOW_SECONDS = 60;
 
-/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth and the document. */
+/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
 
@@ -68,6 +71,7 @@ export function makeApp(options: AppOptions) {
 
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));
+  registerSigners(app, options.signers);
   app.all("/mcp", (c) => options.mcp(c.req.raw));
   const deps = routeDeps(options.gate);
   registerInboxStreams(app, deps, options.streams);

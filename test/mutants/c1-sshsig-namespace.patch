@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.differential, sshsig.git-verifies
+# why: Signatures are made under another namespace than git's, so git, which verifies under `git`, refuses every commit
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..f4e34b1 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -11,7 +11,7 @@ const KEY_TYPE = "ssh-ed25519";
+ /** The hash taken of the payload, and the name the signature gives it. */
+ const HASH = { label: "sha512", algorithm: "SHA-512" } as const;
+ /** The namespace git signs and verifies its objects under. */
+-export const GIT_NAMESPACE = "git";
++export const GIT_NAMESPACE = "file";
+ /** ssh-keygen breaks the armor's base64 at this width. */
+ const ARMOR_WIDTH = 70;
+ 

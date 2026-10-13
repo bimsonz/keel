@@ -26,6 +26,16 @@ output "bundle_url_public_key" {
   value = tls_private_key.bundle_url.public_key_pem
 }
 
+output "commit_signing_key" {
+  value     = tls_private_key.commit_signing.private_key_pem_pkcs8
+  sensitive = true
+}
+
+# Public: the keys a commit Keel signed verifies against.
+output "commit_signers" {
+  value = jsonencode(local.commit_signers)
+}
+
 # The host every Worker names as Keel's own (KEEL_HOST, and the console's KEEL_API_HOST).
 output "keel_host" {
   value = var.host

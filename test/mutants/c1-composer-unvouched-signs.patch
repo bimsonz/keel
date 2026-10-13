@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.key-unvouched
+# why: A key the signers setting does not hold still signs, so Keel lands commits that fail against its own published file for good
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 6da24da..fcde7c8 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -100,7 +100,7 @@ export function commitSigner(config: CommitSigningConfig): (time: number) => Pro
+         signsAt(signer, time) &&
+         signsAt(signer, time + VERIFIER_SKEW_SECONDS),
+     );
+-    if (!vouched)
++    if (!vouched && config.signers === "")
+       throw new Error(
+         `KEEL_COMMIT_SIGNERS does not hold the signing key for ${new Date(time * 1000).toISOString()}: a commit signed now would not verify against Keel's signers file`,
+       );

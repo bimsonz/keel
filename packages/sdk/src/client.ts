@@ -182,6 +182,25 @@ export class KeelClient {
     };
   }
 
+  /**
+   * Keel's allowed-signers file, as stock git reads one: every key Keel signs
+   * or has signed commits with. Save it, name it as git's
+   * `gpg.ssh.allowedSignersFile`, and `git verify-commit` checks any commit
+   * Keel landed. Open to anyone, so it is asked for with no credential.
+   */
+  async allowedSigners(options: CallOptions = {}): Promise<string> {
+    const response = await this.#fetch(
+      `${this.#options.baseUrl.replace(/\/+$/, "")}/.well-known/keel/allowed-signers`,
+      {
+        method: "GET",
+        headers: { accept: "text/plain" },
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      },
+    );
+    if (!response.ok) throw await KeelProblem.from(response);
+    return response.text();
+  }
+
   whoami(options?: CallOptions): Promise<WireOutputs["whoami"]> {
     return this.call("whoami", {}, options);
   }

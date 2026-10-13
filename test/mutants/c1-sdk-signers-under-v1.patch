@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/sdk/test/methods.test.ts
+# kills: sdk.allowed-signers
+# why: The client asks for the signers file under /v1, where nothing serves it
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 99487c8..47380a3 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -190,7 +190,7 @@ export class KeelClient {
+    */
+   async allowedSigners(options: CallOptions = {}): Promise<string> {
+     const response = await this.#fetch(
+-      `${this.#options.baseUrl.replace(/\/+$/, "")}/.well-known/keel/allowed-signers`,
++      `${this.#api}/.well-known/keel/allowed-signers`,
+       {
+         method: "GET",
+         headers: { accept: "text/plain" },

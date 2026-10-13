@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: composer.signs, composer.keeps-author
+# why: The composer has a signer and never hands it to restack, so every commit Keel lands is unsigned
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index f1be556..b7c6403 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -82,7 +82,7 @@ const restacked = (
+     Effect.promise(() => Promise.all([...repos.values()].map(open))),
+     (readers) =>
+       Effect.tryPromise({
+-        try: () => restack(new FallbackReader(readers), request.base, members, committer, { sign }),
++        try: () => restack(new FallbackReader(readers), request.base, members, committer),
+         catch: (cause) => cause,
+       }).pipe(
+         Effect.catch((cause) =>

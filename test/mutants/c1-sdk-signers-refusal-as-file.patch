@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/sdk/test/methods.test.ts
+# kills: sdk.allowed-signers
+# why: A refusal's body is handed back as if it were the signers file, and git then trusts nobody or fails to read it
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 99487c8..9811ab5 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -197,7 +197,6 @@ export class KeelClient {
+         ...(options.signal === undefined ? {} : { signal: options.signal }),
+       },
+     );
+-    if (!response.ok) throw await KeelProblem.from(response);
+     return response.text();
+   }
+ 

@@ -36,6 +36,7 @@ import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
 import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-composer.ts";
+import type { CommitSigningConfig } from "../adapters/driven/gitcore/commit-signing.ts";
 import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-rebaser.ts";
@@ -207,7 +208,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       ChangesRpc({ change, agentSession }),
       ProjectsRpc(project),
       ProjectOrgsD1(env.DB),
-      CandidateComposerGitCore(objects).pipe(Layer.provide(host)),
+      CandidateComposerGitCore(objects, commitSigning(env)).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW),
       StagingWriterGitCore({ trunk: repos.trunk, staging: repos.staging }).pipe(
@@ -228,6 +229,15 @@ const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [
   "afr",
   "me",
 ];
+
+/** What this deployment says of the commits Keel composes: its host, its commit-signing key and the signers it publishes. */
+export const commitSigning = (
+  env: Pick<Env, "KEEL_HOST" | "KEEL_COMMIT_SIGNING_KEY" | "KEEL_COMMIT_SIGNERS">,
+): CommitSigningConfig => ({
+  host: env.KEEL_HOST,
+  signingKey: env.KEEL_COMMIT_SIGNING_KEY,
+  signers: env.KEEL_COMMIT_SIGNERS,
+});
 
 /**
  * Where the deployment's Artifacts namespaces live (`vars.ARTIFACTS_LOCATION_HINT`,

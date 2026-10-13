@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bundle-url-keys": "./src/bundle-url-keys.ts",
+    "./commit-signing-keys": "./src/commit-signing-keys.ts",
     "./passkey": "./src/passkey.ts"
   },
   "scripts": {

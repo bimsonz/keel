@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: signers.refuses
+# why: Any text is written as the principal, so a host holding a space, a comma or a glob changes who the file vouches for
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..08565ab 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -136,8 +136,6 @@ function utc(seconds: number): string {
+  */
+ export function allowedSigners(principal: string, keys: readonly SignerKey[]): string {
+   // A principal is a pattern list to ssh-keygen: nothing that separates, quotes, negates or globs.
+-  if (!/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+$/.test(principal))
+-    throw new Error(`bad principal ${JSON.stringify(principal)}`);
+   return keys
+     .map((key) => {
+       if (!/^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$/.test(key.publicKey))

@@ -2,11 +2,11 @@
 # kills: restack.keeps-author, composer.keeps-author
 # why: Every restacked commit is authored by Keel, so the submitted commit's author and date are lost
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index 364d132..e461e9c 100644
+index af42ca2..cd9ccfb 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -102,7 +102,7 @@ export async function restack(
-     const body = encodeCommit({
+@@ -118,7 +118,7 @@ export async function restack(
+     const spec: CommitSpec = {
        tree: merged.tree,
        parents: [parent],
 -      author: to.author,

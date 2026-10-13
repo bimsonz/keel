@@ -11,7 +11,13 @@ import {
   OverlayReader,
   Refusal,
 } from "./merge.ts";
-import { encodeCommit, type GitObject, hashObject, type Signature } from "./objects.ts";
+import {
+  type CommitSpec,
+  encodeCommit,
+  type GitObject,
+  hashObject,
+  type Signature,
+} from "./objects.ts";
 import { objectsBetween } from "./transfer.ts";
 
 /** One change in a batch: its own base and head, and the commit it becomes. */
@@ -29,6 +35,15 @@ export interface Restacked {
   readonly commits: readonly { readonly oid: string; readonly tree: string }[];
   /** Everything a repo holding the base lacks for the last commit: the changed trees and blobs, and the commits. */
   readonly objects: readonly GitObject[];
+}
+
+export interface RestackOptions extends MergeOptions {
+  /**
+   * Signs every commit: handed the commit as it reads unsigned, it answers the
+   * armored signature for its `gpgsig` header. A signer that answers the same
+   * for the same bytes keeps a recompose on the same SHAs.
+   */
+  readonly sign?: ((unsigned: Uint8Array) => Promise<string>) | undefined;
 }
 
 /** GitCore will not compose this batch: `member` (its index) is where the fold refused. */
@@ -73,16 +88,17 @@ export class FallbackReader implements ObjectReader {
  * Folds each member onto `base` in order, merging its change against its own
  * base (`mergeTrees(tree(m.base), acc, tree(m.head))`), and commits each step
  * on top of the one before, by `committer` and with the submitted head's own
- * author (name, email, date and offset), as `git rebase` keeps it. Throws
- * `MemberRefused` at the first member GitCore will not merge, and
- * `MissingObject` for an object no reader holds.
+ * author (name, email, date and offset), as `git rebase` keeps it. With
+ * `options.sign` each commit is signed and its id is that of the signed
+ * commit. Throws `MemberRefused` at the first member GitCore will not merge,
+ * and `MissingObject` for an object no reader holds.
  */
 export async function restack(
   reader: ObjectReader,
   base: string,
   members: readonly RestackMember[],
   committer: Signature,
-  options: MergeOptions = {},
+  options: RestackOptions = {},
 ): Promise<Restacked> {
   if (members.length === 0) throw new Error("a batch has at least one member");
   const written = new Map<string, GitObject>();
@@ -99,14 +115,19 @@ export async function restack(
     for (const [oid, o] of merged.newObjects) written.set(oid, o);
     for (const o of await objectsBetween(r, acc, merged.tree))
       objects.set(await hashObject(o.type, o.body), o);
-    const body = encodeCommit({
+    const spec: CommitSpec = {
       tree: merged.tree,
       parents: [parent],
       author: to.author,
       committer,
       message: m.message,
       trailers: m.trailers,
-    });
+    };
+    const unsigned = encodeCommit(spec);
+    const body =
+      options.sign === undefined
+        ? unsigned
+        : encodeCommit({ ...spec, gpgsig: await options.sign(unsigned) });
     const oid = await hashObject("commit", body);
     objects.set(oid, { type: "commit", body });
     commits.push({ oid, tree: merged.tree });

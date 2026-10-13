@@ -21,6 +21,11 @@
     "ARTIFACTS_LOCATION_HINT": "wnam",
     // How many ready workspaces a new project's pool keeps forked ahead of declares.
     "POOL_TARGET": "4",
+    // Every key Keel signs or has signed commits with, as JSON: [{ publicKey, validAfter?, validBefore? }],
+    // each key as `ssh-ed25519 <base64>` and each time ISO 8601. Served as the allowed-signers file at
+    // /.well-known/keel/allowed-signers. scripts/deploy.ts fills it from Terraform; a compose is a defect
+    // while it does not hold KEEL_COMMIT_SIGNING_KEY's public half for the commit's time.
+    "KEEL_COMMIT_SIGNERS": "[]",
     // Each PlatformFunction's model, by exact id: never cloudflare/auto.
     "PLATFORM_FUNCTION_PINS": { "keel.probe.freshness": "@cf/moonshotai/kimi-k2.7-code" },
   },
@@ -32,12 +37,15 @@
     // BETTER_AUTH_SECRET: signs and encrypts Better Auth's cookies and tokens. From Terraform.
     // BUNDLE_URL_SIGNING_KEY: the Ed25519 private key (PKCS#8) that signs each bundle URL a sandbox is
     // handed; keel-verify's bundle host verifies with the public half and holds no secret. From Terraform.
+    // KEEL_COMMIT_SIGNING_KEY: the Ed25519 private key (PKCS#8) that signs every commit Keel composes, apart
+    // from every other key; its public half is in KEEL_COMMIT_SIGNERS. From Terraform.
     // GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET are optional: GitHub sign-in is offered only when both are set.
     "required": [
       "KEEL_SIGNING_KEY",
       "CLOUDFLARE_ACCOUNT_ID",
       "BETTER_AUTH_SECRET",
       "BUNDLE_URL_SIGNING_KEY",
+      "KEEL_COMMIT_SIGNING_KEY",
     ],
   },
   // Workers Rate Limiting, each keyed by IP: writes to /v1/auth/* (sign-in, codes, sign-up),

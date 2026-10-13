@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { makeBundleUrlKeys } from "@keeltown/testing/bundle-url-keys";
+import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
 import { defineProject } from "vitest/config";
 
 /** A fresh Ed25519 signing key per test run, in the JWK form the KEEL_SIGNING_KEY secret holds. */
@@ -19,45 +20,51 @@ const fakeArtifacts = stripTypeScriptTypes(
 
 export default defineProject({
   plugins: [
-    cloudflareTest(async () => ({
-      wrangler: { configPath: "./wrangler.jsonc" },
-      remoteBindings: false,
-      miniflare: {
-        bindings: {
-          KEEL_ENV: "test",
-          KEEL_SIGNING_KEY: await testSigningKey(),
-          BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
-          BUNDLE_URL_SIGNING_KEY: (await makeBundleUrlKeys()).signingKey,
-          TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
-          // prove:red pins fast-check's seed; workerd sees it only as a binding.
-          ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),
+    cloudflareTest(async () => {
+      // A fresh commit-signing key per run, with the signers setting that vouches for it.
+      const commitSigning = await makeCommitSigningKeys();
+      return {
+        wrangler: { configPath: "./wrangler.jsonc" },
+        remoteBindings: false,
+        miniflare: {
+          bindings: {
+            KEEL_ENV: "test",
+            KEEL_SIGNING_KEY: await testSigningKey(),
+            BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
+            BUNDLE_URL_SIGNING_KEY: (await makeBundleUrlKeys()).signingKey,
+            KEEL_COMMIT_SIGNING_KEY: commitSigning.signingKey,
+            KEEL_COMMIT_SIGNERS: commitSigning.signers,
+            TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
+            // prove:red pins fast-check's seed; workerd sees it only as a binding.
+            ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),
+          },
+          // Artifacts has no local simulator, and miniflare binds WORKSPACES to the remote proxy
+          // whatever is set here. Composition serves keel-ws-00 from TEST_ARTIFACTS when it is
+          // bound, so the real CodeHost adapter runs inside the WorkspacePool DO against a fake.
+          serviceBindings: { TEST_ARTIFACTS: "fake-artifacts" },
+          // keel-verify is another deployable; tests bind VERIFIER to a fake of it.
+          workers: [
+            {
+              name: "fake-artifacts",
+              modules: true,
+              compatibilityDate: "2026-10-01",
+              script: fakeArtifacts,
+            },
+            {
+              name: "keel-verify",
+              modules: true,
+              compatibilityDate: "2026-10-01",
+              script: [
+                `import { DurableObject } from "cloudflare:workers";`,
+                `export class KeelSandbox extends DurableObject {}`,
+                `export default { fetch() { return Response.json({ fake: "keel-verify" }); } };`,
+              ].join("\n"),
+              durableObjects: { SANDBOX: { className: "KeelSandbox", useSQLite: true } },
+            },
+          ],
         },
-        // Artifacts has no local simulator, and miniflare binds WORKSPACES to the remote proxy
-        // whatever is set here. Composition serves keel-ws-00 from TEST_ARTIFACTS when it is
-        // bound, so the real CodeHost adapter runs inside the WorkspacePool DO against a fake.
-        serviceBindings: { TEST_ARTIFACTS: "fake-artifacts" },
-        // keel-verify is another deployable; tests bind VERIFIER to a fake of it.
-        workers: [
-          {
-            name: "fake-artifacts",
-            modules: true,
-            compatibilityDate: "2026-10-01",
-            script: fakeArtifacts,
-          },
-          {
-            name: "keel-verify",
-            modules: true,
-            compatibilityDate: "2026-10-01",
-            script: [
-              `import { DurableObject } from "cloudflare:workers";`,
-              `export class KeelSandbox extends DurableObject {}`,
-              `export default { fetch() { return Response.json({ fake: "keel-verify" }); } };`,
-            ].join("\n"),
-            durableObjects: { SANDBOX: { className: "KeelSandbox", useSQLite: true } },
-          },
-        ],
-      },
-    })),
+      };
+    }),
   ],
   test: {
     name: "pool:keel",

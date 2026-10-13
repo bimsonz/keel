@@ -19,6 +19,12 @@ import {
   ZERO_OID,
 } from "@keeltown/gitcore";
 import { Effect, Layer, Schema } from "effect";
+import {
+  type CommitSigner,
+  type CommitSigningConfig,
+  commitSigner,
+  keelCommitter,
+} from "./commit-signing.ts";
 
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
 
@@ -34,21 +40,23 @@ const TIER_REASON = "GitCore: a path-level three-way merge per member, one commi
 export type OpenObjects = (repo: RepoRef) => Promise<ObjectReader & Disposable>;
 
 /**
- * What gitcore restacks for a request: Keel as committer at BatchFormed's
- * time, the intent's title as the message and the change's `Change-Id`
- * trailer. Each commit keeps its submitted commit's author, which gitcore
- * reads from the head. Everything comes from the request and its commits, so
- * a recompose gives the same SHAs.
+ * What gitcore restacks for a request: Keel at `host` as committer at
+ * BatchFormed's time, the intent's title as the message and the change's
+ * `Change-Id` trailer. Each commit keeps its submitted commit's author, which
+ * gitcore reads from the head. Everything comes from the request and its
+ * commits, so a recompose gives the same SHAs.
  */
-export function restackSpec(request: CandidateRequest): {
+export function restackSpec(
+  request: CandidateRequest,
+  host: string,
+): {
   readonly ref: string;
   readonly committer: Signature;
   readonly members: readonly RestackMember[];
 } {
-  const time = Math.floor(request.at / 1000);
   return {
     ref: request.ref ?? `refs/heads/cand/${request.candidateId}`,
-    committer: { name: "Keel", email: "keel@keel.invalid", time },
+    committer: keelCommitter(host, request.at),
     members: request.members.map((m) => ({
       base: m.base,
       head: m.head,
@@ -66,6 +74,7 @@ const restacked = (
   request: CandidateRequest,
   members: readonly RestackMember[],
   committer: Signature,
+  sign: CommitSigner,
 ) => {
   const repos = new Map<string, RepoRef>([[key(request.staging), request.staging]]);
   for (const m of request.members) repos.set(key(m.repo), m.repo);
@@ -73,7 +82,7 @@ const restacked = (
     Effect.promise(() => Promise.all([...repos.values()].map(open))),
     (readers) =>
       Effect.tryPromise({
-        try: () => restack(new FallbackReader(readers), request.base, members, committer),
+        try: () => restack(new FallbackReader(readers), request.base, members, committer, { sign }),
         catch: (cause) => cause,
       }).pipe(
         Effect.catch((cause) =>
@@ -96,18 +105,22 @@ const restacked = (
 
 /**
  * CandidateComposer at Tier 0: gitcore restacks the batch, reading staging
- * first and then each member's workspace, and pushes the candidate's ref to
- * staging as a new ref (the request's `ref`, else the candidate's own). A
+ * first and then each member's workspace, signs every commit as Keel with the
+ * deployment's key, and pushes the candidate's ref to staging as a new ref
+ * (the request's `ref`, else the candidate's own). A deployment with no
+ * signing key, or one its signers file does not vouch for, is a defect before
+ * anything is read: Keel never composes an unsigned commit. A
  * ref already at the composed commit is a retry and is left alone; one at any
  * other commit is a defect, since a candidate composes to one SHA. A merge gitcore refuses is CompositionRefused, which MergeBox
  * takes. The token is minted per push and the remote, which carries the
  * account id, is never put in an error or a log.
  */
-export const CandidateComposerGitCore = (open: OpenObjects) =>
+export const CandidateComposerGitCore = (open: OpenObjects, signing: CommitSigningConfig) =>
   Layer.effect(
     CandidateComposer,
     Effect.gen(function* () {
       const host = yield* CodeHost;
+      const signerAt = commitSigner(signing);
 
       const heldBy = (staging: RepoRef, ref: string) =>
         host.head(staging, ref).pipe(
@@ -149,8 +162,9 @@ export const CandidateComposerGitCore = (open: OpenObjects) =>
       return CandidateComposer.of({
         compose: (request) =>
           Effect.gen(function* () {
-            const spec = restackSpec(request);
-            const out = yield* restacked(open, request, spec.members, spec.committer);
+            const spec = restackSpec(request, signing.host);
+            const sign = yield* Effect.promise(() => signerAt(spec.committer.time));
+            const out = yield* restacked(open, request, spec.members, spec.committer, sign);
             const tip = out.commits.at(-1);
             if (tip === undefined) return yield* Effect.die(new Error("a batch has no members"));
             yield* pushed(request.staging, spec.ref, tip.oid, out.objects);

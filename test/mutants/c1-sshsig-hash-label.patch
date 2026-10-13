@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.differential, sshsig.git-verifies
+# why: The payload is hashed with SHA-256 while the signature still says sha512, so a verifier hashes otherwise and the signature never matches
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..ca650cd 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -9,7 +9,7 @@ const MAGIC = enc.encode("SSHSIG");
+ const SIG_VERSION = 1;
+ const KEY_TYPE = "ssh-ed25519";
+ /** The hash taken of the payload, and the name the signature gives it. */
+-const HASH = { label: "sha512", algorithm: "SHA-512" } as const;
++const HASH = { label: "sha512", algorithm: "SHA-256" } as const;
+ /** The namespace git signs and verifies its objects under. */
+ export const GIT_NAMESPACE = "git";
+ /** ssh-keygen breaks the armor's base64 at this width. */

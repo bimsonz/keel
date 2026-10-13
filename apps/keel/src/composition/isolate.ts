@@ -41,6 +41,7 @@ import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
+import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
@@ -231,6 +232,7 @@ export function makeIsolate(
     },
     tokens: { admit: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success },
     streams: inboxStreams(env, runtime),
+    signers: () => signersFile({ host: env.KEEL_HOST, signers: env.KEEL_COMMIT_SIGNERS }),
     rethrowContractDrift: env.KEEL_ENV === "test",
   });
   return { runtime, app };

@@ -136,6 +136,8 @@ export interface CommitSpec {
   committer: Signature;
   message: string;
   trailers?: ReadonlyArray<readonly [string, string]>;
+  /** An armored signature over this commit as it reads without it: the `gpgsig` header. */
+  gpgsig?: string | undefined;
 }
 
 function sig(s: Signature): string {
@@ -143,11 +145,22 @@ function sig(s: Signature): string {
   return `${s.name} <${s.email}> ${Math.floor(s.time)} ${s.tz ?? "+0000"}`;
 }
 
-/** Serialise a commit body. Trailers are appended as a final paragraph. */
+/** A header whose value runs over several lines: each line after the first is led by a space. */
+function gpgsig(armored: string): string {
+  const lines = armored.replace(/\n$/, "").split("\n");
+  if (lines.some((line) => line === "" || line.startsWith(" "))) throw new Error("bad signature");
+  return `gpgsig ${lines.join("\n ")}`;
+}
+
+/**
+ * Serialise a commit body. Trailers are appended as a final paragraph. A
+ * signature is the last header, where git puts one and looks for one.
+ */
 export function encodeCommit(c: CommitSpec): Uint8Array {
   const lines = [`tree ${c.tree}`];
   for (const p of c.parents) lines.push(`parent ${p}`);
   lines.push(`author ${sig(c.author)}`, `committer ${sig(c.committer)}`);
+  if (c.gpgsig !== undefined) lines.push(gpgsig(c.gpgsig));
   let msg = c.message.replace(/\n+$/, "");
   if (c.trailers && c.trailers.length > 0) {
     for (const [k, v] of c.trailers) {

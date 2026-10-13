@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/signers.test.ts
+# kills: signers.route
+# why: The signers file is served at another address than the one Keel publishes, and the published one answers 404
+diff --git a/apps/keel/src/adapters/driving/http/signers.ts b/apps/keel/src/adapters/driving/http/signers.ts
+index f8ea771..e7fc955 100644
+--- a/apps/keel/src/adapters/driving/http/signers.ts
++++ b/apps/keel/src/adapters/driving/http/signers.ts
+@@ -7,7 +7,7 @@ import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
+  * reader saves it, names it as git's `gpg.ssh.allowedSignersFile`, and
+  * `git verify-commit` then checks any commit Keel landed.
+  */
+-export const SIGNERS_PATH = "/.well-known/keel/allowed-signers";
++export const SIGNERS_PATH = "/.well-known/keel/signers";
+ 
+ /** How long a copy may be reused: a rotation adds a key before it signs, so a short-lived copy is never wrong. */
+ const MAX_AGE_SECONDS = 300;

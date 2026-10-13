@@ -1,0 +1,22 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: commit.gpgsig, sshsig.git-verifies, restack.signed-deterministic
+# why: The signature is written at the end of the message, where git looks for none, so every commit reads as unsigned
+diff --git a/packages/gitcore/src/objects.ts b/packages/gitcore/src/objects.ts
+index 906cf4b..b98f829 100644
+--- a/packages/gitcore/src/objects.ts
++++ b/packages/gitcore/src/objects.ts
+@@ -160,7 +160,6 @@ export function encodeCommit(c: CommitSpec): Uint8Array {
+   const lines = [`tree ${c.tree}`];
+   for (const p of c.parents) lines.push(`parent ${p}`);
+   lines.push(`author ${sig(c.author)}`, `committer ${sig(c.committer)}`);
+-  if (c.gpgsig !== undefined) lines.push(gpgsig(c.gpgsig));
+   let msg = c.message.replace(/\n+$/, "");
+   if (c.trailers && c.trailers.length > 0) {
+     for (const [k, v] of c.trailers) {
+@@ -168,5 +167,6 @@ export function encodeCommit(c: CommitSpec): Uint8Array {
+     }
+     msg += `\n\n${c.trailers.map(([k, v]) => `${k}: ${v}`).join("\n")}`;
+   }
++  if (c.gpgsig !== undefined) msg += `\n\n${gpgsig(c.gpgsig)}`;
+   return enc.encode(`${lines.join("\n")}\n\n${msg}\n`);
+ }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: signers.decode
+# why: A window's time is read in milliseconds where the file and the check count seconds, so every window lies tens of thousands of years off
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 6da24da..8fb042e 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -50,7 +50,7 @@ export const keelCommitter = (host: string, at: number): Signature => ({
+ 
+ function seconds(iso: string | undefined): number | undefined {
+   if (iso === undefined) return undefined;
+-  const at = Date.parse(iso) / 1000;
++  const at = Date.parse(iso);
+   if (!Number.isInteger(at))
+     throw new Error("KEEL_COMMIT_SIGNERS holds a time that is not ISO 8601 to the second");
+   return at;

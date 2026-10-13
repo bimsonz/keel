@@ -2,14 +2,14 @@
 # kills: composer.keeps-author
 # why: The composer stamps an identity of its own (the change's, at the batch's time) as each commit's author, as it stamped the agent before 11 Oct
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index d23b7c5..adddb1a 100644
+index f1be556..d3eec20 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -73,7 +73,22 @@ const restacked = (
+@@ -82,7 +82,22 @@ const restacked = (
      Effect.promise(() => Promise.all([...repos.values()].map(open))),
      (readers) =>
        Effect.tryPromise({
--        try: () => restack(new FallbackReader(readers), request.base, members, committer),
+-        try: () => restack(new FallbackReader(readers), request.base, members, committer, { sign }),
 +        try: () => {
 +          const fallback = new FallbackReader(readers);
 +          const heads = new Map(request.members.map((m) => [String(m.head), String(m.changeId)]));
@@ -24,7 +24,7 @@ index d23b7c5..adddb1a 100644
 +                : { ...c, author: { name: own, email: `${own}@agents.keel.invalid`, time: committer.time } };
 +            },
 +          };
-+          return restack(stamped, request.base, members, committer);
++          return restack(stamped, request.base, members, committer, { sign });
 +        },
          catch: (cause) => cause,
        }).pipe(

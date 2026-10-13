@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: sshsig.differential
+# why: The armor breaks its base64 at 76 columns, so the signature is no longer the bytes ssh-keygen writes
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..c04189c 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -13,7 +13,7 @@ const HASH = { label: "sha512", algorithm: "SHA-512" } as const;
+ /** The namespace git signs and verifies its objects under. */
+ export const GIT_NAMESPACE = "git";
+ /** ssh-keygen breaks the armor's base64 at this width. */
+-const ARMOR_WIDTH = 70;
++const ARMOR_WIDTH = 76;
+ 
+ /** An Ed25519 key that signs as SSH does. */
+ export interface SshSigningKey {

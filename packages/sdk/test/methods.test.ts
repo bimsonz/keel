@@ -169,6 +169,19 @@ describe("the client's methods", () => {
     },
   );
 
+  it("[sdk.allowed-signers] reads the signers file as text from the site's root, with no credential", async () => {
+    const file = 'keel@keel.test namespaces="git" ssh-ed25519 AAAA\n';
+    const keel = fakeKeel(() => new Response(file));
+    expect(await keel.client.allowedSigners()).toBe(file);
+    expect(keel.sent.map((s) => [s.method, s.url, s.headers["authorization"]])).toEqual([
+      ["GET", "https://keel.test/.well-known/keel/allowed-signers", undefined],
+    ]);
+    const down = fakeKeel(() =>
+      Response.json({ code: "internal.defect", title: "Defect", status: 500 }, { status: 500 }),
+    );
+    await expect(down.client.allowedSigners()).rejects.toMatchObject({ status: 500 });
+  });
+
   it("[sdk.rebase] rebases under the lease and key given, with nothing in the body", async () => {
     const keel = fakeKeel(() => Response.json({}));
     await keel.client.rebase("chg_1", { lease: "lse_9", idempotencyKey: "key-rebase" });

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: signers.window, signers.format
+# why: A key's window is left out of the signers file, so a retired key vouches for commits dated after it was retired
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..2d70eb2 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -143,8 +143,6 @@ export function allowedSigners(principal: string, keys: readonly SignerKey[]): s
+       if (!/^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$/.test(key.publicKey))
+         throw new Error("bad signer key");
+       const options = [`namespaces="${GIT_NAMESPACE}"`];
+-      if (key.validAfter !== undefined) options.push(`valid-after="${utc(key.validAfter)}"`);
+-      if (key.validBefore !== undefined) options.push(`valid-before="${utc(key.validBefore)}"`);
+       return `${principal} ${options.join(",")} ${key.publicKey}\n`;
+     })
+     .join("");

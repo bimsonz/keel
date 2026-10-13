@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: signers.window, signers.format
+# why: A window's times are written without the Z, so each verifier reads them in its own time zone and the window moves with it
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..b00bc24 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -126,7 +126,7 @@ export function signsAt(key: SignerKey, time: number): boolean {
+ /** `YYYYMMDDHHMMSSZ`. Without the `Z` ssh-keygen reads a time in the verifier's own zone. */
+ function utc(seconds: number): string {
+   if (!Number.isInteger(seconds)) throw new Error("bad signer window");
+-  return `${new Date(seconds * 1000).toISOString().replaceAll(/[-:T]/g, "").slice(0, 14)}Z`;
++  return `${new Date(seconds * 1000).toISOString().replaceAll(/[-:T]/g, "").slice(0, 14)}`;
+ }
+ 
+ /**

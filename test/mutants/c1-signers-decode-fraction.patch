@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts
+# kills: signers.decode-refuses
+# why: A window's time that is no whole second, or no time at all, is taken, and the signers file then cannot be written
+diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+index 6da24da..f818e5c 100644
+--- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
++++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
+@@ -51,8 +51,6 @@ export const keelCommitter = (host: string, at: number): Signature => ({
+ function seconds(iso: string | undefined): number | undefined {
+   if (iso === undefined) return undefined;
+   const at = Date.parse(iso) / 1000;
+-  if (!Number.isInteger(at))
+-    throw new Error("KEEL_COMMIT_SIGNERS holds a time that is not ISO 8601 to the second");
+   return at;
+ }
+ 

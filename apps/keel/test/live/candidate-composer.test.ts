@@ -6,6 +6,7 @@ import { type CommitSha, Instant, makeId } from "@keeltown/core/kernel";
 import { CandidateComposer, CodeHost, type RepoRef } from "@keeltown/core/ports";
 import { Budget, DIFF_BUDGET, mergeText } from "@keeltown/gitcore";
 import { CodeHostFixture } from "@keeltown/testing";
+import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
 import { env } from "cloudflare:workers";
 import { Effect, Layer } from "effect";
 import { afterAll, expect, it } from "vitest";
@@ -17,7 +18,10 @@ import { artifactsFixture } from "./fixture.ts";
 const NAMESPACE = "keel-ws-00";
 const host = CodeHostArtifacts({ [NAMESPACE]: env.WORKSPACES });
 const fixture = artifactsFixture(NAMESPACE, env.WORKSPACES);
-const composer = CandidateComposerGitCore(ArtifactsObjects({ [NAMESPACE]: env.WORKSPACES }));
+const composer = CandidateComposerGitCore(ArtifactsObjects({ [NAMESPACE]: env.WORKSPACES }), {
+  host: "keel.test",
+  ...(await makeCommitSigningKeys()),
+});
 const MAIN = "refs/heads/main";
 const AT = Instant(Date.UTC(2026, 9, 11, 9, 0, 0));
 
@@ -142,7 +146,7 @@ it("[composer.live] composes a three-change candidate through the binding and pu
     [0, 1, 2].map((i) => ({
       parents: expect.any(Array),
       author: submitted[i]?.author,
-      committer: `Keel <keel@keel.invalid> ${seconds}`,
+      committer: `Keel <keel@keel.test> ${seconds}`,
       changeId: changeId(i),
       title: `change ${i}`,
     })),

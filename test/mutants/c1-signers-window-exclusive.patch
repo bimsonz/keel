@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/sshsig.test.ts
+# kills: signers.window
+# why: signsAt leaves out a window's first second, which ssh-keygen includes, so Keel's own check and git's disagree at the edge
+diff --git a/packages/gitcore/src/sshsig.ts b/packages/gitcore/src/sshsig.ts
+index 10efadd..8416926 100644
+--- a/packages/gitcore/src/sshsig.ts
++++ b/packages/gitcore/src/sshsig.ts
+@@ -118,7 +118,7 @@ export interface SignerKey {
+ /** Whether `key` signs what is dated `time` (Unix seconds): inside its window, as ssh-keygen reads one. */
+ export function signsAt(key: SignerKey, time: number): boolean {
+   return (
+-    (key.validAfter === undefined || time >= key.validAfter) &&
++    (key.validAfter === undefined || time > key.validAfter) &&
+     (key.validBefore === undefined || time <= key.validBefore)
+   );
+ }

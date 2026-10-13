@@ -22,9 +22,14 @@
 //   (h) the pool keeps its ready workspaces on trunk: both agents' workspaces
 //       were granted on trunk's head (after an earlier run's landings, that is
 //       the pool's refresh), and no push of Keel's own shows as a
-//       WorkspacePushed anywhere in the run.
+//       WorkspacePushed anywhere in the run;
+//   (i) Keel signs what it lands: one more workspace, taken only to read trunk,
+//       holds the run's landed commits, and stock git verifies each against
+//       the signers file Keel publishes, and none against a file that names
+//       another key. Each names Keel at this host as its committer.
 // It ends with each promotion's wall time by trunk's own clock. No remote URL
 // or credential is printed.
+import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "@keeltown/sdk";
@@ -48,6 +53,8 @@ const FIXTURE = "fixture-forge-lite";
 const PROJECT = "c14-rebase";
 const SETTLE_MS = 15 * 60_000;
 const key = (what: string) => `c14:${what}`;
+/** git's setting that names the signers file a commit is verified against. */
+const trusting = (file: string) => ["-c", `gpg.ssh.allowedSignersFile=${file}`];
 
 let failures = 0;
 const check = (ok: boolean, what: string) => {
@@ -446,6 +453,69 @@ try {
   );
   for (const e of notAgents) console.log(`     not an agent's: ${line(e)}`);
   check(notAgents.length === 0, "(h) every WorkspacePushed in the run is an agent's push");
+
+  // (i) Keel signs what it lands. A workspace granted now is forked from trunk, so its clone
+  // holds what the run landed; it is abandoned once read.
+  const reader = await declareWhenPooled(first, `C1.4 ${run}: read trunk`, `c14:${run}:reader`);
+  if (reader.workspace.token === undefined) throw new Error("declare answered no workspace token");
+  const dirR = cloneWorkspace(reader.workspace.remote, reader.workspace.token);
+  dirs.push(dirR);
+  const landed = (await first.commits(project.id, { limit: 4 })).items.map((c) => c.sha);
+  const holds = (sha: string) => {
+    try {
+      git(dirR, ["cat-file", "-e", `${sha}^{commit}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const held = landed.filter(holds);
+  const principal = `keel@${new URL(keelUrl).host}`;
+  const published = join(dirR, ".git", "keel-allowed-signers");
+  writeFileSync(published, await first.allowedSigners());
+  // Another key under Keel's own name: a signature is good only by a key the file holds.
+  const strangerKey = join(dirR, ".git", "stranger");
+  execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-C", "", "-f", strangerKey]);
+  const stranger = join(dirR, ".git", "stranger-allowed-signers");
+  writeFileSync(
+    stranger,
+    `${principal} namespaces="git" ${readFileSync(`${strangerKey}.pub`, "utf8").trim()}\n`,
+  );
+  const verifies = (file: string, sha: string) => {
+    try {
+      git(dirR, [...trusting(file), "verify-commit", sha]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  for (const sha of held)
+    console.log(
+      `     ${git(dirR, [...trusting(published), "log", "-1", "--format=%h %G? signed by %GS, committed by %cn <%ce> %cI", sha])}`,
+    );
+  check(
+    held.length >= 2,
+    `(i) the reader's workspace holds ${held.length} of the 4 landed commits`,
+  );
+  check(
+    held.every((sha) => verifies(published, sha)),
+    "(i) git verifies every landed commit against Keel's published signers file",
+  );
+  check(
+    held.every((sha) => !verifies(stranger, sha)),
+    "(i) against a signers file that names another key, git verifies none of them",
+  );
+  check(
+    held.every(
+      (sha) => git(dirR, ["log", "-1", "--format=%cn <%ce>", sha]) === `Keel <${principal}>`,
+    ),
+    `(i) each names Keel <${principal}> as its committer`,
+  );
+  await first.abandon(
+    reader.change.id,
+    {},
+    { lease: reader.lease.id, idempotencyKey: `c14:${run}:reader:abandon` },
+  );
 
   console.log("\n     chain:");
   for (const e of events) console.log(`     ${line(e)}`);
