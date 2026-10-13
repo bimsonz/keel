@@ -2,10 +2,10 @@
 # kills: project.create-heals
 # why: the Project DO is made before the project's place is taken, so trunk is initialized with no place and a taken name is found only once a second project exists
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index c7b4a4de..7980b361 100644
+index 495f8db0..dfc6b5a2 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
-@@ -70,20 +70,15 @@ export const createProject: (
+@@ -80,6 +80,13 @@ export const createProject: (
    const placed = yield* places.byId(projectId);
    if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
      return yield* new IdempotencyConflict({ idempotencyKey });
@@ -16,7 +16,13 @@ index c7b4a4de..7980b361 100644
 +    ...(input.run === undefined ? {} : { run: input.run }),
 +    idempotencyKey,
 +  });
-   yield* places.assign({ projectId, namespace, name });
+   const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+   const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
+   yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
+@@ -102,19 +109,7 @@ export const createProject: (
+       }),
+     ),
+   );
 -  return yield* (yield* Projects)
 -    .create(actor, {
 -      projectId,

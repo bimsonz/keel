@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-room-repeat
+# why: a placed project's own place is not read as a repeat once room is asked for, so a retry of a create in a full namespace is refused though its project is already there
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index 3c1bfaab..0e40a2ea 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -131,7 +131,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+           );
+           if (inserted.meta.changes === 1) return;
+           const held = yield* byId(place.projectId);
+-          if (Option.isSome(held)) {
++          if (Option.isSome(held) && room === undefined) {
+             if (held.value.namespace !== place.namespace || held.value.name !== name)
+               yield* new ProjectNameTaken({ namespace: place.namespace, name });
+             return;

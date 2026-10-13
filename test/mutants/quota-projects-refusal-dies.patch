@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: projects.quota-real
+# why: the refusal is worded from a count of none, which the domain admits, so a full namespace's next create dies as a defect and answers 500 with no next action
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+index 495f8db0..e1b5281b 100644
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -89,7 +89,7 @@ export const createProject: (
+         const decided = admitQuota({
+           kind: "projects",
+           amount: 1,
+-          used: Math.max(full.held, atMost),
++          used: 0,
+           now,
+           overrides,
+           halted,

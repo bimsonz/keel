@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts
+# kills: projects.quota-http
+# why: a namespace at its limit of projects is told its repository's history is one byte too large, and to import a smaller one
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 507de069..be2a168a 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -270,7 +270,7 @@ export function createProjectError(
+       };
+     case "QuotaExceeded":
+       // A namespace's count of projects is no size: its refusal names the count, and the one way on.
+-      if (error.kind === "projects")
++      if (error.kind === "agents")
+         return {
+           status: 403,
+           body: problem(403, "quota.exceeded", caller.requestId, {

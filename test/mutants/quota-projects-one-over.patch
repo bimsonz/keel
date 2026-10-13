@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-room
+# why: a namespace that holds exactly its room is given one more, so every limit is one higher than it says
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index 3c1bfaab..72ab6bbb 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -123,7 +123,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+                   .prepare(
+                     `INSERT INTO projects (id, namespace_id, name, created_at)
+                      SELECT ?1, ?2, ?3, ?4
+-                     WHERE (SELECT COUNT(*) FROM projects WHERE namespace_id = ?2) < ?5
++                     WHERE (SELECT COUNT(*) FROM projects WHERE namespace_id = ?2) <= ?5
+                      ON CONFLICT DO NOTHING`,
+                   )
+                   .bind(place.projectId, place.namespace, name, at, room.atMost)

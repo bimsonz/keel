@@ -2,11 +2,11 @@
 # kills: ports.project-namespaces-release
 # why: A released place stays in the table, so the name of a project that was never made is taken for good
 diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
-index 8a1f849e..8f00a57a 100644
+index 3c1bfaab..592a9b91 100644
 --- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
 +++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
-@@ -118,9 +118,7 @@ export function ProjectNamespacesD1(db: D1Database) {
-           if (!repeated) yield* new ProjectNameTaken({ namespace: place.namespace, name });
+@@ -149,9 +149,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+           else yield* new NamespaceFull({ namespace: place.namespace, held: there?.held ?? 0 });
          }),
        release: (projectId) =>
 -        Effect.promise(() =>

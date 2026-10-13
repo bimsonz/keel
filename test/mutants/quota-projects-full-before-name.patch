@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-room-name-first
+# why: a taken name in a full namespace reads as a full namespace, so someone told to make room does, and is then told the name was never free
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index 3c1bfaab..9b5e0c4d 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -144,7 +144,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+               .bind(place.namespace, name)
+               .first<{ held: number; named: number | null }>(),
+           );
+-          if (room === undefined || (there?.named ?? 0) > 0)
++          if (room === undefined)
+             yield* new ProjectNameTaken({ namespace: place.namespace, name });
+           else yield* new NamespaceFull({ namespace: place.namespace, held: there?.held ?? 0 });
+         }),

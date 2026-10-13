@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-room
+# why: the in-memory directory never finds a namespace full, so every unit test of a limit passes on a twin that has none
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 79862156..62290335 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -226,7 +226,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+               return held.namespace === place.namespace && held.name === name ? Effect.void : taken;
+             if (byName(place.namespace, name) !== undefined) return taken;
+             const there = [...places.values()].filter((p) => p.namespace === place.namespace);
+-            if (room !== undefined && there.length >= room.atMost)
++            if (room !== undefined && there.length < 0)
+               return Effect.fail(
+                 new NamespaceFull({ namespace: place.namespace, held: there.length }),
+               );

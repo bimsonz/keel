@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-place.test.ts
+# kills: projects.quota
+# why: a project's place is asked for with no room named, so a namespace takes an eleventh project and any number after it
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+index 495f8db0..510b5d6b 100644
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -82,7 +82,7 @@ export const createProject: (
+     return yield* new IdempotencyConflict({ idempotencyKey });
+   const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+   const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
+-  yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
++  yield* places.assign({ projectId, namespace, name }).pipe(
+     Effect.catchTag("NamespaceFull", (full) =>
+       Effect.gen(function* () {
+         const now = yield* (yield* Clock).now;
