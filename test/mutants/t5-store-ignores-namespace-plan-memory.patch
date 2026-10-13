@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t5.plan-store.namespaces-apart
+# why: The memory plan store keeps every namespace's plan under one fixed namespace
+diff --git a/packages/testing/src/memory/storage.ts b/packages/testing/src/memory/storage.ts
+index ca607737..957d2ec1 100644
+--- a/packages/testing/src/memory/storage.ts
++++ b/packages/testing/src/memory/storage.ts
+@@ -111,7 +111,7 @@ const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+   namespaceKey(namespace, "evidence", hexOf(hash));
+ const planKeyOf = (namespace: OrgId, hash: ContentHash) =>
+-  namespaceKey(namespace, "plans", hexOf(hash));
++  namespaceKey("org_00000000000000000000000000", "plans", hexOf(hash));
+ 
+ /** Bundles in a Map, under the key the R2 adapter keeps them at: a namespace's bundles, by hash. */
+ export function makeBundleStoreMemory() {

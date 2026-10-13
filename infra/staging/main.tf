@@ -87,3 +87,13 @@ resource "random_password" "better_auth" {
   length  = 64
   special = false
 }
+
+# The key pair that signs bundle URLs. keel signs every URL a sandbox is handed
+# with the private key, which scripts/deploy.ts sets as its
+# BUNDLE_URL_SIGNING_KEY secret. keel-verify's bundle host verifies with the
+# public key, a plain var, so keel-verify still holds no secret. Replacing the
+# pair refuses every URL signed before it: only a verification then in flight
+# holds one, and it parks.
+resource "tls_private_key" "bundle_url" {
+  algorithm = "ED25519"
+}

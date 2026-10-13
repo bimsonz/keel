@@ -18,6 +18,7 @@ import {
   ContentHash,
   contentHashOf,
   type Json,
+  OrgId,
 } from "../../../src/domain/kernel/index.ts";
 import {
   coerce,
@@ -31,6 +32,9 @@ const hash = (n: number) =>
   Schema.decodeUnknownSync(ContentHash)(`sha256:${String(n).padStart(64, "0")}`);
 const CANDIDATE = hash(7);
 const PINNED = hash(42);
+
+/** The namespace every call names, and the only one the stores below keep anything for. */
+const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The js-ts pack's plan for a change: its one step, the suite. */
 const SUITE_PLAN = Result.getOrThrow(
@@ -84,18 +88,18 @@ function guarded(answer: (r: ProbeRunRequest) => ProbeRun | "unavailable") {
         }),
     }),
   );
-  const stored = new Map<ContentHash, Json>();
+  const stored = new Map<string, Json>();
   const evidence = Layer.succeed(
     EvidenceStore,
     EvidenceStore.of({
-      put: (document) =>
+      put: (namespace, document) =>
         Effect.sync(() => {
           const ref = contentHashOf(document);
-          stored.set(ref, document);
+          stored.set(`${namespace} ${ref}`, document);
           return ref;
         }),
-      get: (ref) => {
-        const document = stored.get(ref);
+      get: (namespace, ref) => {
+        const document = stored.get(`${namespace} ${ref}`);
         return document === undefined
           ? Effect.fail(new EvidenceMissing({ hash: ref }))
           : Effect.succeed(document);
@@ -104,9 +108,11 @@ function guarded(answer: (r: ProbeRunRequest) => ProbeRun | "unavailable") {
   );
   const run = (step: PlanStep) =>
     Effect.runPromise(
-      withGuards(CANDIDATE, otherwise(asked))(step, undefined).pipe(
-        Effect.provide(Layer.mergeAll(layer, evidence)),
-      ),
+      withGuards(
+        NAMESPACE,
+        CANDIDATE,
+        otherwise(asked),
+      )(step, undefined).pipe(Effect.provide(Layer.mergeAll(layer, evidence))),
     );
   return { requests, asked, run, stored };
 }
@@ -122,7 +128,15 @@ describe("a guard step runs the probe its plan pins", () => {
   it("[guard.pinned-probe] runs exactly the pinned probe against the candidate, and nothing else", async () => {
     const g = guarded(() => ran("pass"));
     const report = await g.run(GUARD);
-    expect(g.requests).toEqual([{ probe: PINNED, world: "AB", worldBundle: CANDIDATE, run: 1 }]);
+    expect(g.requests).toEqual([
+      {
+        namespace: "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+        probe: PINNED,
+        world: "AB",
+        worldBundle: CANDIDATE,
+        run: 1,
+      },
+    ]);
     expect(report).toMatchObject({ stepId: GUARD.id, outcome: "pass", tier: { tier: 1 } });
     expect(g.asked).toEqual([]);
   });
@@ -131,7 +145,7 @@ describe("a guard step runs the probe its plan pins", () => {
     const g = guarded(() => ran("fail"));
     const report = await g.run(GUARD);
     const ref = Schema.decodeUnknownSync(ContentHash)(report.resultRef);
-    expect(g.stored.get(ref)).toEqual({
+    expect(g.stored.get(`org_01JZ8PT2C4E6G8J0M2N4Q6S8V0 ${ref}`)).toEqual({
       stepId: GUARD.id,
       outcome: "fail",
       guard: { predicate: "freshness", probe: PINNED },

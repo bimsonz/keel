@@ -18,7 +18,7 @@ import {
 } from "../../src/rpc/index.ts";
 import { suiteStdout } from "../support-suite-stdout.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { forgetOwed } from "./helpers.ts";
+import { forgetOwed, OTHER_ORG, POOL_ORG } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 import {
   admitted,
@@ -39,7 +39,7 @@ const SUITE_STEP = "js-ts.suite";
 const stored = async () => {
   await Effect.runPromise(
     Effect.gen(function* () {
-      return yield* (yield* PlanStore).put(SUITE);
+      return yield* (yield* PlanStore).put(POOL_ORG, SUITE);
     }).pipe(Effect.provide(PlanStoreR2(env.ARCHIVE))),
   );
   return SUITE.planHash;
@@ -58,6 +58,7 @@ const jobOf = (
   world: FlowWorld,
   checks: WorldCheckJob["checks"],
 ): WorldCheckJob => ({
+  namespace: POOL_ORG,
   projectId: s.projectId,
   key: LEAF,
   conflictId: s.conflictId,
@@ -154,6 +155,33 @@ describe("KeelWorldCheck", () => {
       { world: "AB", check: `suite:${s.A}`, run: 1, outcome: "pass" },
       { world: "AB", check: `suite:${s.B}`, run: 1, outcome: "pass" },
     ]);
+  });
+
+  it("[t5.pool.job-namespace] a world check that names a namespace its project is not in runs nothing and records nothing: the instance ends at its namespace step", async () => {
+    const s = await suspected();
+    await drafted(s.projectId, s.conflictId);
+    const planHash = await stored();
+    const job = {
+      ...jobOf(s, "AB", [{ check: `suite:${s.A}`, plan: { _tag: "Planned", planHash } }]),
+      namespace: OTHER_ORG,
+    } satisfies WorldCheckJob;
+    const id = `world-${job.conflictId}-${job.world}`;
+    await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
+    // Were the job's namespace taken on trust, the mocked runner would let the check run and be recorded.
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(await suiteStdout(1, 0)));
+    });
+    await env.WORLD_CHECK.create({ id, params: worldCheckParams(job) });
+    const handle = await env.WORLD_CHECK.get(id);
+    await vi.waitFor(
+      async () => expect((await handle.status()).status).toMatch(/^(errored|complete)$/),
+      { timeout: 15_000, interval: 50 },
+    );
+    expect(await handle.status()).toMatchObject({
+      status: "errored",
+      error: { message: expect.stringContaining("NonRetryableError") },
+    });
+    expect(await recorded(s)).toEqual([]);
   });
 
   it("[d22.pool.world-check-red] a red suite in a world records its check as a fail, saying which step", async () => {

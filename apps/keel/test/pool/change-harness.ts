@@ -23,7 +23,7 @@ import { ulid } from "ulid";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import { backbone, type ChangeServices, liveChangesLayer } from "../../src/composition/do.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { drainAfter } from "./helpers.ts";
+import { drainAfter, placeProject } from "./helpers.ts";
 
 export const changeStub = (changeId = makeId("chg", ulid())) =>
   drainAfter(env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)));
@@ -84,14 +84,19 @@ export const unrenewed = (change: Change | undefined) =>
  * A Change DO under test, reached over real RPC: an in-memory pool and code
  * host, and a clock that starts now and moves only when told, so a lease can
  * lapse without waiting and no deadline it arms is in the past. It belongs to
- * `projectId` (the sample project unless given), whose lane it queues on.
+ * `projectId` (the sample project unless given), whose lane it queues on, and
+ * which is placed in org `pool` unless it already has a place, or `placed` is
+ * false: a project made before every project had one.
  * Its preflight reads an empty in-memory index unless `live` is "project":
  * then it reads the project's real Project DO, as in production.
  */
 export async function changeUnderTest(
   projectId: ProjectId = sampleProjectId,
   live: "memory" | "project" = "memory",
+  placed = true,
 ) {
+  // Its Workflows read the project's namespace before anything else, and stop where it has none.
+  if (placed) await placeProject(projectId);
   const changeId: ChangeId = makeId("chg", ulid());
   const agentId = makeId("agt", ulid());
   const stub = changeStub(changeId);

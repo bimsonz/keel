@@ -2,12 +2,12 @@
 # kills: d22.pool.world-check-waits
 # why: The waiting check names an instance that does not exist as its subscriber, so the change's PlanCompiled never reaches it and the party's suite is n/a at the deadline
 diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
-index ab20297..e27cccf 100644
+index 3b5b6fc4..fe64a546 100644
 --- a/apps/keel/src/adapters/driving/workflow/world-check.ts
 +++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
-@@ -71,7 +71,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
-     });
-     try {
+@@ -80,7 +80,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+         job.namespace,
+       );
        const checks = await runtime.runPromise(
 -        resolveCheckPlans(job.checks, event.instanceId, workflowSteps(step)),
 +        resolveCheckPlans(job.checks, job.conflictId, workflowSteps(step)),

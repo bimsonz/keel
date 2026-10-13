@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/namespace-keys.test.ts
+# kills: t5.namespace-keys
+# why: The family comes before the namespace, so one namespace's objects no longer sit under one prefix
+diff --git a/packages/core/src/application/verification/namespace-keys.ts b/packages/core/src/application/verification/namespace-keys.ts
+index 35791314..0bfee024 100644
+--- a/packages/core/src/application/verification/namespace-keys.ts
++++ b/packages/core/src/application/verification/namespace-keys.ts
+@@ -11,4 +11,4 @@ export type KeyFamily = "bundles" | "deps" | "evidence" | "plans";
+  * any other way can read across namespaces (guard: r2-namespace-keys).
+  */
+ export const namespaceKey = (namespace: OrgId, family: KeyFamily, hex: string): string =>
+-  `ns/${namespace}/${family}/${hex}`;
++  `ns/${family}/${namespace}/${hex}`;

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts
+# kills: t5.pool.job-namespace
+# why: KeelVerify never compares the namespace its payload names with its project's own: its runners were already pointed at the payload's
+diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+index 65a42520..c1994132 100644
+--- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
++++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+@@ -71,7 +71,6 @@ export class KeelVerify extends CIWorkflow<Env> {
+         step,
+         (effect) => runtime.runPromise(effect),
+         payload.value.projectId,
+-        payload.value.namespace,
+       );
+       const planned = await step.do("plan", async () => {
+         const resolved = await runtime.runPromise(resolvePlan(namespace, payload.value.planHash));

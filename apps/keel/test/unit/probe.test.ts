@@ -50,6 +50,7 @@ import {
   makeProbeLedgerMemory,
   makeTrunksMemory,
   makeWorldChecksMemory,
+  sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
@@ -182,6 +183,9 @@ function probeWorld(options: Options = {}) {
   const clock = makeManualClock();
   const composed: CandidateRequest[] = [];
   const noops: ContentHash[] = [];
+  /** The namespace each store call and probe run named, by what was called. */
+  const named: { readonly call: string; readonly namespace: string }[] = [];
+  const evidence = makeEvidenceStoreMemory();
   const runs: { readonly world: World; readonly bundle: ContentHash }[] = [];
   const bundles = makeCandidateBundlesMemory();
   const worldChecks = makeWorldChecksMemory();
@@ -198,7 +202,7 @@ function probeWorld(options: Options = {}) {
     guards.layer,
     clock.layer,
     makeIdsMemory().layer,
-    makeEvidenceStoreMemory().layer,
+    evidence.layer,
     bundles.layer,
     ProbeSourcesCodeHost.pipe(Layer.provide(host.layer)),
     FlowSpecSourceCodeHost.pipe(Layer.provide(host.layer)),
@@ -220,9 +224,10 @@ function probeWorld(options: Options = {}) {
     Layer.succeed(
       NoopWorlds,
       NoopWorlds.of({
-        build: (world) =>
+        build: (namespace, world) =>
           Effect.sync(() => {
             noops.push(world);
+            named.push({ call: "noop", namespace });
             return A_NOOP;
           }),
       }),
@@ -231,7 +236,11 @@ function probeWorld(options: Options = {}) {
     Layer.succeed(
       ProbeStore,
       ProbeStore.of({
-        put: () => Effect.succeed(hash(7)),
+        put: (namespace) =>
+          Effect.sync(() => {
+            named.push({ call: "probe", namespace });
+            return hash(7);
+          }),
         get: () => Effect.die("the Probe never reads a probe's source back"),
       }),
     ),
@@ -241,6 +250,7 @@ function probeWorld(options: Options = {}) {
         run: (request) =>
           Effect.sync(() => {
             runs.push({ world: request.world, bundle: request.worldBundle });
+            named.push({ call: "run", namespace: request.namespace });
             return ran(matrix[request.world]);
           }),
       }),
@@ -291,7 +301,7 @@ function probeWorld(options: Options = {}) {
     yield* changes.declare(B);
     return { T, headA, headB };
   }).pipe(Effect.provide(host.layer), Effect.orDie);
-  const call = { projectId, key, conflictId, instanceId, staging };
+  const call = { namespace: sampleNamespace, projectId, key, conflictId, instanceId, staging };
   return {
     host,
     projectId,
@@ -312,6 +322,10 @@ function probeWorld(options: Options = {}) {
     composed,
     noops,
     runs,
+    named,
+    bundledFor: bundles.namespaces,
+    evidenceKeys: () => [...evidence.documents.keys()],
+    planKeys: () => [...plans.plans.keys()],
     bundled: bundles.bundled,
     worldChecks: worldChecks.started,
     layer,
@@ -369,6 +383,24 @@ describe("probeConflict", () => {
         expect(new Set(w.runs.filter((r) => r.world === "A-noop").map((r) => r.bundle))).toEqual(
           new Set([A_NOOP]),
         );
+        // [t5.probe.namespace] Everything the Probe keeps or runs names the namespace its call carries:
+        // the four world bundles, A-noop, the probe, all fifteen runs, each cell's evidence and trunk's plan.
+        const NAMESPACE = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
+        expect(w.bundledFor).toEqual([NAMESPACE, NAMESPACE, NAMESPACE, NAMESPACE]);
+        expect(w.named.filter((n) => n.call === "run")).toHaveLength(15);
+        expect(w.named.map((n) => n.call)).toContain("noop");
+        expect(w.named.map((n) => n.call)).toContain("probe");
+        expect(new Set(w.named.map((n) => n.namespace))).toEqual(new Set([NAMESPACE]));
+        expect(w.evidenceKeys()).toHaveLength(15);
+        expect(w.evidenceKeys().every((k) => k.startsWith(`ns/${NAMESPACE}/evidence/`))).toBe(true);
+        expect(w.planKeys()).toHaveLength(1);
+        expect(w.planKeys().every((k) => k.startsWith(`ns/${NAMESPACE}/plans/`))).toBe(true);
+        expect([...w.worldChecks.values()].map((job) => job.namespace)).toEqual([
+          NAMESPACE,
+          NAMESPACE,
+          NAMESPACE,
+          NAMESPACE,
+        ]);
         // B's cells are recorded before the cells that decide.
         const ranCells = s.ran.filter((n) => n.startsWith("cell "));
         expect(ranCells).toHaveLength(15);

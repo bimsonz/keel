@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts
+# kills: bundles.candidate
+# why: A candidate's bundle is stored outside the namespace it was bundled for
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 1a5581c9..c4fa0bef 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -65,7 +65,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
+                       ? Effect.fail(new BundleRefused({ reason: cause.message }))
+                       : Effect.die(cause),
+                 ),
+-                Effect.flatMap((bytes) => store.put(namespace, bytes)),
++                Effect.flatMap((bytes) => store.put("org_00000000000000000000000000", bytes)),
+               ),
+             (reader) => Effect.sync(() => reader[Symbol.dispose]()),
+           ),

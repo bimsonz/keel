@@ -1,25 +1,47 @@
 import { env } from "cloudflare:workers";
 import type { ContentHash } from "@keeltown/core/kernel";
-import { sha256Hex, writeBundle } from "@keeltown/runner-protocol";
+import { sha256Hex, signedBundleUrl, writeBundle } from "@keeltown/runner-protocol";
 
 const enc = new TextEncoder();
 
-/** Stores files as a content-addressed bundle at `bundles/<hex>`, as keel's BundleStore does. */
-export async function putBundle(files: Record<string, string>): Promise<ContentHash> {
+/** The namespace the pool's bundles are kept for unless a case names another, by id. */
+export const NAMESPACE = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
+
+/**
+ * The URL keel hands a sandbox for a namespace's bundle (its sha256 hex),
+ * signed with the pool's key and good for `ttl` seconds from now.
+ */
+export const signedUrl = (hex: string, namespace: string = NAMESPACE, ttl = 600): Promise<string> =>
+  signedBundleUrl(
+    env.TEST_BUNDLE_URL_SIGNING_KEY,
+    namespace,
+    `sha256:${hex}`,
+    Math.floor(Date.now() / 1000) + ttl,
+  );
+
+/** Stores files as a content-addressed bundle among a namespace's bundles, at the key keel's BundleStore writes. */
+export async function putBundle(
+  files: Record<string, string>,
+  namespace: string = NAMESPACE,
+): Promise<ContentHash> {
   const bytes = await writeBundle(
     Object.entries(files).map(([path, text]) => ({ path, bytes: enc.encode(text) })),
   );
   const hex = await sha256Hex(bytes);
-  await env.BUNDLES.put(`bundles/${hex}`, bytes);
+  await env.BUNDLES.put(`ns/${namespace}/bundles/${hex}`, bytes);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- sha256Hex returns 64 lowercase hex characters
   return `sha256:${hex}` as ContentHash;
 }
 
-/** Points `deps/<lockfile sha256>` at a deps bundle, as the deps-bundle script does. */
-export async function putDeps(lockfile: string, files: Record<string, string>): Promise<void> {
-  const bundle = await putBundle({ ...files, "pnpm-lock.yaml": lockfile });
+/** Points a namespace's `deps/<lockfile sha256>` at a deps bundle of that namespace, as the deps-bundle script does. */
+export async function putDeps(
+  lockfile: string,
+  files: Record<string, string>,
+  namespace: string = NAMESPACE,
+): Promise<void> {
+  const bundle = await putBundle({ ...files, "pnpm-lock.yaml": lockfile }, namespace);
   await env.BUNDLES.put(
-    `deps/${await sha256Hex(enc.encode(lockfile))}`,
+    `ns/${namespace}/deps/${await sha256Hex(enc.encode(lockfile))}`,
     bundle.slice("sha256:".length),
   );
 }

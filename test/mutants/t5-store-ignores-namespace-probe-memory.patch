@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t5.probe-store.namespaces-apart
+# why: The memory probe store keeps every namespace's probe under one fixed namespace
+diff --git a/packages/testing/src/memory/verification.ts b/packages/testing/src/memory/verification.ts
+index 2e4391eb..3bdd0bdc 100644
+--- a/packages/testing/src/memory/verification.ts
++++ b/packages/testing/src/memory/verification.ts
+@@ -490,7 +490,7 @@ export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
+ 
+ /** Where the memory ProbeStore keeps a namespace's probe: the key the R2 adapter keeps its bundle at. */
+ const probeKeyOf = (namespace: OrgId, hash: ContentHash) =>
+-  namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
++  namespaceKey("org_00000000000000000000000000", "bundles", hash.slice("sha256:".length));
+ 
+ /**
+  * Probes kept as files, under the sha256 of their canonical JSON (the files

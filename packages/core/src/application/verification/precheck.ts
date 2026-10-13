@@ -5,6 +5,8 @@ import {
   type CommitSha,
   ContentHash,
   NextAction,
+  type OrgId,
+  type ProjectId,
   type VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -403,6 +405,29 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => 
   };
 };
 
+/**
+ * The refusal for a submission to a project with no place. It belongs to no
+ * namespace, so there is nowhere to keep its derivation, its plan or its
+ * evidence, and there is no namespace to fall back on. A project is placed
+ * when it is created and never after, so the next action is a person's.
+ */
+export const refuseUnplaced = (
+  projectId: ProjectId,
+): Extract<PrecheckDecision, { _tag: "Refuse" }> => ({
+  _tag: "Refuse",
+  reasons: [
+    `precheck:project-unplaced:project ${projectId} belongs to no namespace, so nothing of this change can be kept or verified`,
+  ],
+  nextActions: [
+    {
+      kind: "escalate",
+      title:
+        "Ask the project's owner to create a project in a namespace and submit this change there: this project has no place in one",
+      args: { projectId },
+    },
+  ],
+});
+
 /** Refuses the submission: a ruling-class bounce verdict, and ChangeBounced naming it. */
 export const refuseSubmission = Effect.fn("verification/refuseSubmission")(function* (
   submission: PrecheckSubmission,
@@ -422,12 +447,13 @@ export const refuseSubmission = Effect.fn("verification/refuseSubmission")(funct
  * content-addressed, so a replay stores the same plan again.
  */
 export const recordPlan = Effect.fn("verification/recordPlan")(function* (
+  namespace: OrgId,
   submission: PrecheckSubmission,
   decision: Extract<PrecheckDecision, { _tag: "Compile" }>,
 ) {
   const plan = readStoredPlan(decision.planHash, decision.plan);
   if (Result.isFailure(plan)) return yield* Effect.die(new Error(plan.failure));
-  yield* (yield* PlanStore).put(plan.success);
+  yield* (yield* PlanStore).put(namespace, plan.success);
   return yield* (yield* ChangePrecheck).compiled(submission.changeId, {
     ...call(submission),
     planHash: decision.planHash,

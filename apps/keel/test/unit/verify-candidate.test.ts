@@ -18,6 +18,7 @@ import {
   makeBatchVerdictsMemory,
   makeEvidenceStoreMemory,
   makeIdsMemory,
+  sampleNamespace,
   suitePlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
@@ -51,7 +52,7 @@ const scriptedRuntime = (outcome: "pass" | "fail" | "unavailable") =>
           outcome === "unavailable"
             ? Effect.fail(new VerifierUnavailable({ reason: "the engine gave up" }))
             : Effect.gen(function* () {
-                const resultRef = yield* evidence.put({
+                const resultRef = yield* evidence.put(sampleNamespace, {
                   stepId: step.id,
                   outcome,
                   failing:
@@ -99,8 +100,8 @@ const verify = (
     scriptedRuntime(outcome).pipe(Layer.provide(evidence)),
   );
   return Effect.gen(function* () {
-    const results = yield* runJob(job);
-    const settled = yield* settleVerdict(SUITE, results);
+    const results = yield* runJob(sampleNamespace, job);
+    const settled = yield* settleVerdict(sampleNamespace, SUITE, results);
     yield* recordBatchVerdict({
       laneId: "lane:prj:default",
       instanceId,
@@ -301,7 +302,11 @@ describe("a worker app's verdict", () => {
                   outcome === "fail" ? [{ file: "test/sessions.test.ts", test: "expire" }] : [],
               }
             : { errors: outcome === "fail" ? ERRORS : [] };
-        const resultRef = yield* evidence.put({ stepId: s.id, outcome, ...stored });
+        const resultRef = yield* evidence.put(sampleNamespace, {
+          stepId: s.id,
+          outcome,
+          ...stored,
+        });
         reports.push({
           stepId: s.id,
           outcome,
@@ -311,7 +316,7 @@ describe("a worker app's verdict", () => {
           resultRef,
         });
       }
-      return yield* settleVerdict(plan, reports);
+      return yield* settleVerdict(sampleNamespace, plan, reports);
     }).pipe(Effect.provide(Layer.merge(store.layer, makeIdsMemory().layer)));
   };
 

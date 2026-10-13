@@ -6,10 +6,24 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { OrgId } from "@keeltown/core/kernel";
 import { type BundleFile, sha256Hex, writeBundle } from "@keeltown/runner-protocol";
+import { Schema } from "effect";
 
 const REPO = join(import.meta.dirname, "../../../..");
 const FIXTURE = "fixtures/forge-lite";
+
+/**
+ * The namespace a harness keeps its bundles, deps and plans for, by id, from
+ * KEEL_NAMESPACE_ID: an R2 key holds a namespace's id (`org_…`), never its
+ * handle, and a run in one namespace reads nothing kept for another.
+ */
+export const harnessNamespace = (): OrgId => {
+  const id = Schema.decodeUnknownOption(OrgId)(process.env["KEEL_NAMESPACE_ID"]);
+  if (id._tag === "None")
+    throw new Error("set KEEL_NAMESPACE_ID to the id of the namespace the run's project is in");
+  return id.value;
+};
 
 /** A token-shaped string no real credential will ever equal: the grep's can-fail arm. */
 export const CANARY_TOKEN = "art_v1_KEELCANARYd1d1d1d1d1d1d1d1d1d1?expires=1760140800";

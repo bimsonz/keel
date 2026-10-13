@@ -281,11 +281,99 @@ export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
 /** The virtual host a sandbox fetches bundles from; KeelSandbox's outbound handler answers it from R2. */
 export const BUNDLE_HOST = "bundles.keel.internal";
 
-/** Where a sandbox fetches the bundle `sha256:<hex>`: no public URL and no token, ever. */
-export const bundleUrl = (hash: string): string => {
+/**
+ * Where a sandbox fetches a namespace's bundle `sha256:<hex>`:
+ * `<namespace id>/<hex>` on the bundle host, the hex last, since a hydration
+ * checks what it fetched against the URL's last segment. No public URL and no
+ * token, ever.
+ */
+const bundleUrl = (namespace: string, hash: string): string => {
+  if (!/^[A-Za-z0-9_]+$/.test(namespace))
+    throw new BundleRefused(`not a namespace id: ${namespace}`);
   const digest = /^sha256:([0-9a-f]{64})$/.exec(hash)?.[1];
   if (digest === undefined) throw new BundleRefused(`not a bundle hash: ${hash}`);
-  return `https://${BUNDLE_HOST}/${digest}`;
+  return `https://${BUNDLE_HOST}/${namespace}/${digest}`;
+};
+
+/**
+ * How long a signed bundle URL is good for. A Tier 2 step runs five minutes
+ * and is retried once on the URL it was first given, so thirty covers a
+ * step's whole life with room.
+ */
+export const BUNDLE_URL_TTL_SECONDS = 30 * 60;
+
+const fromBase64 = (text: string): Uint8Array<ArrayBuffer> =>
+  Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+
+/** A key as Terraform gives it: PEM, or the bare base64 of its DER. */
+const derOf = (key: string): Uint8Array<ArrayBuffer> =>
+  fromBase64(key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, ""));
+
+/** What a bundle URL's signature covers: whose bundle, which bundle, and when the URL stops being good. */
+const signedText = (namespace: string, sha256: string, expires: number): Uint8Array<ArrayBuffer> =>
+  new TextEncoder().encode(`${namespace}|${sha256}|${expires}`).slice();
+
+/**
+ * Where a sandbox fetches a namespace's bundle, signed by Keel: `bundleUrl`
+ * with `?exp=<unix seconds>&sig=<Ed25519 over "<namespace>|<sha256>|<exp>">`.
+ * Only keel holds the signing key (PKCS#8), so only a job keel started for a
+ * namespace is ever handed a URL the bundle host answers: knowing another
+ * namespace's id and a bundle's hash fetches nothing.
+ */
+export const signedBundleUrl = async (
+  signingKey: string,
+  namespace: string,
+  hash: string,
+  expires: number,
+): Promise<string> => {
+  const url = bundleUrl(namespace, hash);
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    derOf(signingKey),
+    { name: "Ed25519" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "Ed25519",
+    key,
+    signedText(namespace, url.slice(url.lastIndexOf("/") + 1), expires),
+  );
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `${url}?exp=${expires}&sig=${sig}`;
+};
+
+/**
+ * Whether a bundle URL's query carries Keel's signature for this namespace's
+ * bundle, still in date at `now` (unix seconds). The bundle host asks before
+ * it reads anything: no signature, one past its `exp`, or one made for
+ * another namespace, bundle or expiry is refused alike. It needs only the
+ * public key (SPKI), which signs nothing.
+ */
+export const bundleUrlSigned = async (
+  publicKey: string,
+  namespace: string,
+  sha256: string,
+  query: URLSearchParams,
+  now: number,
+): Promise<boolean> => {
+  const [exp, sig] = [query.get("exp"), query.get("sig")];
+  if (exp === null || !/^[0-9]{1,12}$/.test(exp)) return false;
+  if (sig === null || !/^[A-Za-z0-9_-]{86}$/.test(sig)) return false;
+  const expires = Number(exp);
+  if (expires < now) return false;
+  const key = await crypto.subtle.importKey("spki", derOf(publicKey), { name: "Ed25519" }, false, [
+    "verify",
+  ]);
+  return crypto.subtle.verify(
+    "Ed25519",
+    key,
+    fromBase64(sig.replace(/-/g, "+").replace(/_/g, "/")),
+    signedText(namespace, sha256, expires),
+  );
 };
 
 /**
@@ -340,9 +428,11 @@ export const DIAGNOSE_BUNDLE_SH = [
   '  else echo "no manifest"; fi',
   `  echo "workspace files $(find . -type f | wc -l | tr -d ' ') bytes $(find . -type f -exec cat {} + 2>/dev/null | wc -c | tr -d ' ')"`,
   '  [ -n "$url" ] || { echo "refetch skipped: no url"; return 0; }',
+  // The content address is the path's last segment: a signed URL's query is no part of it, and is never printed.
+  "  addr=${url%%\\?*}",
   "  r=$s/refetch; rm -rf $r; mkdir -p $r/tree",
   `  http=$(curl --connect-timeout 10 --max-time 60 --silent --show-error -o $r/bundle.tgz -w '%{http_code}' "$url" 2>$r/curl.err); rc=$?`,
-  `  echo "refetch curl $rc http $http bytes $(wc -c < $r/bundle.tgz 2>/dev/null | tr -d ' ') sha256 $(sha256sum $r/bundle.tgz 2>/dev/null | cut -c1-64) want \${url##*/}"`,
+  `  echo "refetch curl $rc http $http bytes $(wc -c < $r/bundle.tgz 2>/dev/null | tr -d ' ') sha256 $(sha256sum $r/bundle.tgz 2>/dev/null | cut -c1-64) want \${addr##*/}"`,
   `  if [ -s $r/curl.err ]; then echo "refetch curl says $(head -c 300 $r/curl.err | tr '\\n' ' ')"; fi`,
   '  if gzip -t $r/bundle.tgz 2>/dev/null; then echo "refetch gzip ok"; else echo "refetch gzip bad"; fi',
   `  if tar -xzf $r/bundle.tgz --strip-components=1 -C $r/tree 2>$r/tar.err; then echo "refetch tar ok"; else echo "refetch tar failed $(head -c 300 $r/tar.err | tr '\\n' ' ')"; fi`,
@@ -354,7 +444,8 @@ export const DIAGNOSE_BUNDLE_SH = [
 /**
  * A POSIX sh function, `keel_rehydrate_bundle <scratch> <url> <dir>`: one
  * verified refetch. It downloads the bundle from `url` into `<scratch>`, and
- * only if the archive's sha256 is the hash the URL names (its content address)
+ * only if the archive's sha256 is the hash the URL names (its content address:
+ * the last segment of its path, whatever signature its query carries)
  * does it clear `dir` and extract into it. Otherwise it leaves `dir` alone,
  * prints one reason (`no-url`, `fetch-failed`, `archive-hash-mismatch`,
  * `clear-failed` or `extract-failed`) and returns 1.
@@ -365,7 +456,8 @@ export const REHYDRATE_BUNDLE_SH = [
   "  rm -rf $r; mkdir -p $r",
   '  [ -n "$url" ] || { echo no-url; return 1; }',
   '  curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o $r/bundle.tgz "$url" 2>/dev/null || { echo fetch-failed; return 1; }',
-  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${url##*/}" ] || { echo archive-hash-mismatch; return 1; }',
+  "  addr=${url%%\\?*}",
+  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${addr##*/}" ] || { echo archive-hash-mismatch; return 1; }',
   '  find "$dir" -mindepth 1 -delete || { echo clear-failed; return 1; }',
   '  tar -xzf $r/bundle.tgz --strip-components=1 -C "$dir" || { echo extract-failed; return 1; }',
   "}",

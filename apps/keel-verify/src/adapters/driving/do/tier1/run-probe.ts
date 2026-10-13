@@ -1,5 +1,5 @@
-import { type ProbeRun, readProbeRun } from "@keeltown/core/application/verification";
-import type { ContentHash } from "@keeltown/core/kernel";
+import { namespaceKey, type ProbeRun, readProbeRun } from "@keeltown/core/application/verification";
+import type { ContentHash, OrgId } from "@keeltown/core/kernel";
 import {
   BundleUnreadable,
   type BundleFile,
@@ -32,8 +32,9 @@ export interface Tier1 {
   readonly deadlineMs: number;
 }
 
-/** One run: the probe's bundle against one world's bundle. */
+/** One run: a namespace's probe bundle against one of its world bundles. */
 export interface Tier1Request {
+  readonly namespace: OrgId;
   readonly probe: ContentHash;
   readonly worldBundle: ContentHash;
 }
@@ -64,9 +65,14 @@ class HarnessError extends Error {}
 
 const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
 
-/** A bundle from the store, checked against the hash it is keyed by. */
-async function fetchVerified(env: Tier1Env, hex: string, what: string): Promise<BundleFile[]> {
-  const key = `bundles/${hex}`;
+/** A namespace's bundle from the store, checked against the hash it is keyed by. */
+async function fetchVerified(
+  env: Tier1Env,
+  namespace: OrgId,
+  hex: string,
+  what: string,
+): Promise<BundleFile[]> {
+  const key = namespaceKey(namespace, "bundles", hex);
   const object = await env.BUNDLES.get(key);
   if (object === null) throw new Unavailable(`${what} ${key} is not in the bundle store`);
   const bytes = new Uint8Array(await object.arrayBuffer());
@@ -82,24 +88,26 @@ async function fetchVerified(env: Tier1Env, hex: string, what: string): Promise<
 }
 
 /**
- * The world's deps bundle: `deps/<lockfile sha256>` names a bundle by its
- * hash, and that bundle carries the very lockfile it was installed from.
- * None for a world with no runtime dependencies.
+ * The world's deps bundle: the namespace's `deps/<lockfile sha256>` names a
+ * bundle of that namespace by its hash, and that bundle carries the very
+ * lockfile it was installed from. None for a world with no runtime
+ * dependencies.
  */
 async function depsFor(
   env: Tier1Env,
+  namespace: OrgId,
   world: readonly BundleFile[],
 ): Promise<BundleFile[] | undefined> {
   const need = await depsNeed(world);
   if (need._tag === "none") return undefined;
   if (need._tag === "unkeyed") throw new Unavailable(`lockfile-diverged: ${need.reason}`);
-  const pointer = await env.BUNDLES.get(`deps/${need.sha256}`);
+  const pointerKey = namespaceKey(namespace, "deps", need.sha256);
+  const pointer = await env.BUNDLES.get(pointerKey);
   if (pointer === null)
     throw new Unavailable(`lockfile-diverged: no deps bundle for ${LOCKFILE} ${need.sha256}`);
   const hex = (await pointer.text()).trim();
-  if (!/^[0-9a-f]{64}$/.test(hex))
-    throw new Unavailable(`deps/${need.sha256} does not name a bundle`);
-  const deps = await fetchVerified(env, hex, "deps bundle");
+  if (!/^[0-9a-f]{64}$/.test(hex)) throw new Unavailable(`${pointerKey} does not name a bundle`);
+  const deps = await fetchVerified(env, namespace, hex, "deps bundle");
   const lockfile = deps.find((file) => file.path === LOCKFILE);
   if (lockfile === undefined || (await sha256Hex(lockfile.bytes)) !== need.sha256)
     throw new Unavailable(
@@ -110,10 +118,10 @@ async function depsFor(
 
 async function build(env: Tier1Env, request: Tier1Request): Promise<BundledProbe> {
   const [probe, world] = await Promise.all([
-    fetchVerified(env, hexOf(request.probe), "probe bundle"),
-    fetchVerified(env, hexOf(request.worldBundle), "world bundle"),
+    fetchVerified(env, request.namespace, hexOf(request.probe), "probe bundle"),
+    fetchVerified(env, request.namespace, hexOf(request.worldBundle), "world bundle"),
   ]);
-  const deps = await depsFor(env, world);
+  const deps = await depsFor(env, request.namespace, world);
   try {
     return await bundleProbe(probeWorkerFiles(world, probe, deps));
   } catch (error) {
@@ -209,8 +217,9 @@ const harnessError = (error: HarnessError, queued: boolean): Tier1Answer => ({
 });
 
 /**
- * Runs a probe against one world in Tier 1: the bundles verified by their
- * hashes, the world's deps from the deps bundle its lockfile names, bundled
+ * Runs a probe against one world in Tier 1: the namespace's bundles verified
+ * by their hashes, the world's deps from the deps bundle its lockfile names
+ * in that namespace, bundled
  * once per (probe, world), then run on a fresh isolate with no network
  * inside one of the DO's slots, under a deadline, with the isolate checked
  * after. What the probe reported is read by `readProbeRun`.
@@ -220,7 +229,7 @@ export async function runProbe(
   cache: BundleCache,
   request: Tier1Request,
 ): Promise<Tier1Answer> {
-  const key = `${request.probe}:${request.worldBundle}`;
+  const key = `${request.namespace}:${request.probe}:${request.worldBundle}`;
   let bundled: BundledProbe;
   try {
     let pending = cache.get(key);

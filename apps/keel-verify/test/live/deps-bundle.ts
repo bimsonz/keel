@@ -1,12 +1,14 @@
 // A world's deps bundle, where the Tier 1 runner looks for it: a hoisted,
 // production-only install from the world's own pnpm lockfile, written as an
 // ordinary content-addressed bundle of node_modules plus that lockfile, and
-// named by the lockfile's sha256 (`deps/<sha256>` holds the bundle's hex).
+// named by the lockfile's sha256 (the namespace's `deps/<sha256>` holds the
+// bundle's hex). A deps bundle is one namespace's: a world of another
+// namespace with the same lockfile does not find it.
 // Probe isolates never install from npm; this script is where npm is read.
 //
 //   node apps/keel-verify/test/live/deps-bundle.ts <dir>             build, check and describe it
-//   CLOUDFLARE_ACCOUNT_ID=… node apps/keel-verify/test/live/deps-bundle.ts <dir> --upload
-//                                                                    also put bundles/<hex> and deps/<sha256> in R2
+//   CLOUDFLARE_ACCOUNT_ID=… KEEL_NAMESPACE_ID=<namespace id> node apps/keel-verify/test/live/deps-bundle.ts <dir> --upload
+//                                                                    also put the bundle and its pointer under the namespace's keys in R2
 //
 // <dir> holds the world's package.json and pnpm-lock.yaml (for S-1's worlds,
 // fixtures/forge-lite: its patches never touch either).
@@ -22,6 +24,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
+import { namespaceKey } from "@keeltown/core/application/verification";
 import {
   type BundleFile,
   depsNeed,
@@ -30,6 +33,8 @@ import {
   sha256Hex,
   writeBundle,
 } from "@keeltown/runner-protocol";
+
+import { harnessNamespace } from "./bundles.ts";
 
 const KEEL = join(import.meta.dirname, "../../../keel");
 const BUCKET = "keel-staging-bundles";
@@ -150,7 +155,12 @@ if (upload) {
   writeFileSync(join(out, "bundle.tgz"), bytes);
   writeFileSync(join(out, "pointer"), hex);
   // The bundle first, so a pointer never names a bundle that is not there yet.
-  put(`bundles/${hex}`, join(out, "bundle.tgz"), "application/gzip");
-  put(`deps/${need.sha256}`, join(out, "pointer"), "text/plain");
-  console.log(JSON.stringify({ uploaded: [`bundles/${hex}`, `deps/${need.sha256}`] }));
+  const namespace = harnessNamespace();
+  const [bundleKey, pointerKey] = [
+    namespaceKey(namespace, "bundles", hex),
+    namespaceKey(namespace, "deps", need.sha256),
+  ];
+  put(bundleKey, join(out, "bundle.tgz"), "application/gzip");
+  put(pointerKey, join(out, "pointer"), "text/plain");
+  console.log(JSON.stringify({ uploaded: [bundleKey, pointerKey] }));
 }

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t r2-namespace-keys
+# why: The guard reads only template literals, so a key built by string concatenation passes
+diff --git a/packages/tooling/src/guards/r2-namespace-keys.ts b/packages/tooling/src/guards/r2-namespace-keys.ts
+index 5f1e4a4f..225c7186 100644
+--- a/packages/tooling/src/guards/r2-namespace-keys.ts
++++ b/packages/tooling/src/guards/r2-namespace-keys.ts
+@@ -22,7 +22,7 @@ function familiesOf(node: AstNode): string[] {
+ 
+ /** What a string literal holds, or a template holds before its first substitution. */
+ function opening(node: AstNode): string | null {
+-  if (node.type === "Literal") return typeof node["value"] === "string" ? node["value"] : null;
++  if (node.type === "Literal") return null;
+   if (node.type !== "TemplateLiteral") return null;
+   const cooked: unknown = Reflect.get(Object(children(node, "quasis")[0]?.["value"]), "cooked");
+   return typeof cooked === "string" ? cooked : null;

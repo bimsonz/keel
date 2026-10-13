@@ -20,6 +20,7 @@ import type {
   ProbeRunner,
   ProbeSources,
   ProbeStore,
+  ProjectOrgs,
   Projects,
   SyntaxSource,
   Trunks,
@@ -38,6 +39,7 @@ import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guar
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
 import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.ts";
 import { SYNTAX_WASM } from "../adapters/driven/syntax/wasm.ts";
+import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
@@ -87,7 +89,14 @@ export function keelVerifyRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
 ): ManagedRuntime.ManagedRuntime<
-  Clock | Ids | EvidenceStore | BatchVerdicts | VerifierRuntime | PlanStore | ProbeRunner,
+  | Clock
+  | Ids
+  | EvidenceStore
+  | BatchVerdicts
+  | VerifierRuntime
+  | PlanStore
+  | ProbeRunner
+  | ProjectOrgs,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -106,12 +115,14 @@ export function keelVerifyRuntime(
       evidence,
       BatchVerdictsRpc(lanes),
       PlanStoreR2(env.ARCHIVE),
+      ProjectOrgsD1(env.DB),
       ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
         // A required secret on every deployed Worker; absent only in tests.
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
+        signingKey: env.BUNDLE_URL_SIGNING_KEY,
       }).pipe(Layer.provide(evidence)),
     ),
   );
@@ -146,7 +157,8 @@ export function precheckRuntime(
   | AdmittedGuards
   | SyntaxSource
   | PlanStore
-  | EvidenceStore,
+  | EvidenceStore
+  | ProjectOrgs,
   never
 > {
   const project = (projectId: string) =>
@@ -164,6 +176,7 @@ export function precheckRuntime(
       ).pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
       EvidenceStoreR2(env.ARCHIVE),
+      ProjectOrgsD1(env.DB),
     ),
   );
 }
@@ -206,7 +219,8 @@ export type ProbeServices =
   | ProbeRunner
   | FlowSpecSource
   | PlanStore
-  | WorldChecks;
+  | WorldChecks
+  | ProjectOrgs;
 
 /**
  * The Probe Workflow's composition root, per run: the conflict's ledger on
@@ -239,6 +253,7 @@ export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServi
       FlowSpecSourceCodeHost.pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
       WorldChecksWorkflow(env.WORLD_CHECK),
+      ProjectOrgsD1(env.DB),
     ),
   );
 }
@@ -253,7 +268,14 @@ export function worldCheckRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
 ): ManagedRuntime.ManagedRuntime<
-  Clock | Ids | EvidenceStore | VerifierRuntime | PlanStore | ProbeLedger | ProbeChanges,
+  | Clock
+  | Ids
+  | EvidenceStore
+  | VerifierRuntime
+  | PlanStore
+  | ProbeLedger
+  | ProbeChanges
+  | ProjectOrgs,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -266,6 +288,7 @@ export function worldCheckRuntime(
       SystemLive,
       evidence,
       PlanStoreR2(env.ARCHIVE),
+      ProjectOrgsD1(env.DB),
       ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
       ProbeChangesRpc((changeId) =>
         env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)),
@@ -274,6 +297,7 @@ export function worldCheckRuntime(
         runner: engine.runner,
         durable,
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
+        signingKey: env.BUNDLE_URL_SIGNING_KEY,
       }).pipe(Layer.provide(evidence)),
     ),
   );

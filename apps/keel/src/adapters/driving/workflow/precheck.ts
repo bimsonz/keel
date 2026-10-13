@@ -13,11 +13,13 @@ import {
   precheckReads,
   recordPlan,
   refuseSubmission,
+  refuseUnplaced,
   startPrecheck,
 } from "@keeltown/core/application/verification";
 import { ChangeId, CommitSha } from "@keeltown/core/kernel";
 import { Cause, type Effect, Exit, type ManagedRuntime, Option, Schema } from "effect";
 import { precheckRuntime } from "../../../composition/workflow.ts";
+import { placedStep } from "./steps.ts";
 
 /**
  * What the outbox starts Precheck with: `ChangeSubmitted`'s payload, plus the
@@ -79,7 +81,9 @@ const done = <A>(settled: Settled<A>): A => {
  * base's flow and the project's admitted guards, and compile the Verification
  * Plan under them for the subjects the change declared and those its code
  * was derived to affect, refusing any step KeelVerify cannot run. Steps:
- * `start`, `ancestry`, then for a commit on its base `diff`, `policy`, `flow`,
+ * `start`, `namespace` (the namespace the project belongs to, under which the
+ * derivation and the plan are kept; a project with no place is refused there,
+ * through `refuse`, since nothing of it can be kept), `ancestry`, then for a commit on its base `diff`, `policy`, `flow`,
  * `guards`, `derive` (which keeps the derivation record and answers only its
  * hash and subjects) and `derived` (which commits what was kept), `decide`,
  * then `refuse` or `compile` (which stores the plan before recording it).
@@ -107,6 +111,22 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       if (started._tag === "Stale")
         return { outcome: "stale", step: "start", reason: started.reason };
       const workspace = started.value;
+      const refuse = async (
+        decision: Extract<PrecheckDecision, { readonly _tag: "Refuse" }>,
+      ): Promise<PrecheckOutcome> => {
+        const refused = await step.do("refuse", () =>
+          settle(runtime, refuseSubmission(submission, decision)),
+        );
+        return refused._tag === "Stale"
+          ? { outcome: "stale", step: "refuse", reason: refused.reason }
+          : { outcome: "refused", verdictId: refused.value, reasons: decision.reasons };
+      };
+      const namespace = await placedStep(
+        step,
+        (effect) => runtime.runPromise(effect),
+        workspace.projectId,
+      );
+      if (namespace === undefined) return await refuse(refuseUnplaced(workspace.projectId));
       const ancestry = done(
         await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
       );
@@ -132,11 +152,11 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
         const paths = read.touched.paths;
         const kept = done(
           await step.do("derive", () =>
-            settle(runtime, deriveSubmission(workspace, submission, on.base, paths)),
+            settle(runtime, deriveSubmission(namespace, workspace, submission, on.base, paths)),
           ),
         );
         const derived = await step.do("derived", () =>
-          settle(runtime, commitDerivation(submission, kept.derivationRef)),
+          settle(runtime, commitDerivation(namespace, submission, kept.derivationRef)),
         );
         if (derived._tag === "Stale") return derived;
         return {
@@ -159,16 +179,9 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
           ),
         ),
       );
-      if (decision._tag === "Refuse") {
-        const refused = await step.do("refuse", () =>
-          settle(runtime, refuseSubmission(submission, decision)),
-        );
-        return refused._tag === "Stale"
-          ? { outcome: "stale", step: "refuse", reason: refused.reason }
-          : { outcome: "refused", verdictId: refused.value, reasons: decision.reasons };
-      }
+      if (decision._tag === "Refuse") return await refuse(decision);
       const compiled = await step.do("compile", () =>
-        settle(runtime, recordPlan(submission, decision)),
+        settle(runtime, recordPlan(namespace, submission, decision)),
       );
       return compiled._tag === "Stale"
         ? { outcome: "stale", step: "compile", reason: compiled.reason }

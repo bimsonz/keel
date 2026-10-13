@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/plan-store.test.ts
+# kills: t5.plan-store.namespaces-apart
+# why: The R2 plan store files every namespace's plan under one fixed namespace
+diff --git a/apps/keel/src/adapters/driven/r2/plan-store.ts b/apps/keel/src/adapters/driven/r2/plan-store.ts
+index 617392f1..6896039c 100644
+--- a/apps/keel/src/adapters/driven/r2/plan-store.ts
++++ b/apps/keel/src/adapters/driven/r2/plan-store.ts
+@@ -10,7 +10,7 @@ import { Effect, Layer, Result } from "effect";
+ 
+ /** Where a namespace's plan lives in the bucket, by its planHash. */
+ export const planKey = (namespace: OrgId, hash: ContentHash): string =>
+-  namespaceKey(namespace, "plans", hash.slice("sha256:".length));
++  namespaceKey("org_00000000000000000000000000", "plans", hash.slice("sha256:".length));
+ 
+ /**
+  * Compiled plans in the ARCHIVE bucket, which keel-verify has no binding to,

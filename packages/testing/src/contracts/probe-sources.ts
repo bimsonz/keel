@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { addedLines } from "@keeltown/core/application/verification";
-import { CommitSha, type ContentHash } from "@keeltown/core/kernel";
+import { CommitSha, type ContentHash, type OrgId } from "@keeltown/core/kernel";
 import { NoopWorlds, ProbeSources, type RepoRef } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer } from "effect";
+import { otherNamespace, sampleNamespace } from "../namespaces.ts";
 
 /** A commit's whole tree: text, or bytes that are not UTF-8. */
 export type ContractTree = Readonly<Record<string, string | Uint8Array>>;
@@ -15,10 +16,10 @@ interface TreeHarness<S> {
   ) => Effect.Effect<{ readonly repo: RepoRef; readonly sha: CommitSha }>;
 }
 export type ProbeSourcesHarness = TreeHarness<ProbeSources>;
-/** NoopWorlds, and a way to store a whole tree as a world bundle, as the Probe's worlds step builds A's. */
+/** NoopWorlds, and a way to store a whole tree as a namespace's world bundle, as the Probe's worlds step builds A's. */
 export interface NoopWorldsHarness {
   readonly layer: Layer.Layer<NoopWorlds>;
-  readonly world: (files: ContractTree) => Effect.Effect<ContentHash>;
+  readonly world: (namespace: OrgId, files: ContractTree) => Effect.Effect<ContentHash>;
 }
 
 const NOT_UTF8 = new Uint8Array([0xff, 0xfe, 0x00, 0x80]);
@@ -119,12 +120,36 @@ export function describeNoopWorldsContract(adapter: string, make: () => NoopWorl
       () => {
         const harness = make();
         return Effect.gen(function* () {
-          const a = yield* harness.world(files);
+          const a = yield* harness.world(sampleNamespace, files);
           const worlds = yield* NoopWorlds;
-          const first: ContentHash = yield* worlds.build(a, recipe);
-          expect(yield* worlds.build(a, recipe)).toBe(first);
+          const first: ContentHash = yield* worlds.build(sampleNamespace, a, recipe);
+          expect(yield* worlds.build(sampleNamespace, a, recipe)).toBe(first);
           expect(first).not.toBe(a);
-          expect(yield* worlds.build(a, { ...recipe, replacement: "/* other */" })).not.toBe(first);
+          expect(
+            yield* worlds.build(sampleNamespace, a, { ...recipe, replacement: "/* other */" }),
+          ).not.toBe(first);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[t5.noop-worlds.namespaces-apart] A's world is read from, and A-noop's kept for, the namespace named: neither is there for another",
+      () => {
+        const harness = make();
+        const next = { path: "src/store.ts", anchor: "export const store = {};", replacement: "" };
+        return Effect.gen(function* () {
+          const a = yield* harness.world(sampleNamespace, files);
+          const worlds = yield* NoopWorlds;
+          // A's world is not the other namespace's to read: a defect, as for any bundle not in the store.
+          expect(Exit.hasDies(yield* Effect.exit(worlds.build(otherNamespace, a, recipe)))).toBe(
+            true,
+          );
+          const noop = yield* worlds.build(sampleNamespace, a, recipe);
+          // A-noop's world is a world of its namespace, and only of it.
+          expect(yield* worlds.build(sampleNamespace, noop, next)).not.toBe(noop);
+          expect(Exit.hasDies(yield* Effect.exit(worlds.build(otherNamespace, noop, next)))).toBe(
+            true,
+          );
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -134,13 +159,13 @@ export function describeNoopWorldsContract(adapter: string, make: () => NoopWorl
       () => {
         const harness = make();
         return Effect.gen(function* () {
-          const a = yield* harness.world({
+          const a = yield* harness.world(sampleNamespace, {
             ...files,
             "src/twice.ts": "f();\nf();\n",
             "src/logo.bin": NOT_UTF8,
           });
           const worlds = yield* NoopWorlds;
-          const refused = (r: typeof recipe) => Effect.flip(worlds.build(a, r));
+          const refused = (r: typeof recipe) => Effect.flip(worlds.build(sampleNamespace, a, r));
           expect(yield* refused({ ...recipe, path: "src/absent.ts" })).toMatchObject({
             reason: "file-absent",
             path: "src/absent.ts",

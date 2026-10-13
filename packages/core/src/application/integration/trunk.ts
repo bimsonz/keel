@@ -1,4 +1,4 @@
-import { Effect, Exit, Option, Result, Schema } from "effect";
+import { Effect, Exit, Result, Schema } from "effect";
 import type { PushRefusedReason } from "../../domain/coordination/index.ts";
 import {
   BatchVerified,
@@ -19,7 +19,6 @@ import type {
   CommitSha,
   EntityRef,
   EventEnvelope,
-  OrgId,
   ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -29,10 +28,10 @@ import {
   EntityStore,
   type EventDraft,
   OrgUsage,
-  ProjectOrgs,
   type Transaction,
   TrunkWriter,
 } from "../ports/index.ts";
+import { projectNamespace } from "../verification/index.ts";
 import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kind holding a trunk's folded state, keyed by its project. */
@@ -107,17 +106,16 @@ export const PACK_OVERHEAD_BYTES = 32;
  * The org a project's trunk counts against. Every project is placed in an org
  * when it is created, before its trunk exists, so a project with no place is
  * a defect, named here: its trunk is never weighed or counted against a
- * guess, and never pushed unweighed.
+ * guess, and never pushed unweighed. The place is read by `projectNamespace`,
+ * the one read of it the Lane, the Trunk and the Workflows share.
  */
 const orgOf = (projectId: ProjectId) =>
-  Effect.flatMap(
-    Effect.flatMap(ProjectOrgs, (places) => places.byId(projectId)),
-    (place): Effect.Effect<OrgId> =>
-      Option.isSome(place)
-        ? Effect.succeed(place.value.org)
-        : Effect.die(
-            new Error(`project ${projectId} has no place: its trunk has no org to count against`),
-          ),
+  projectNamespace(projectId).pipe(
+    Effect.catchTag("ProjectUnplaced", () =>
+      Effect.die(
+        new Error(`project ${projectId} has no place: its trunk has no org to count against`),
+      ),
+    ),
   );
 
 /**

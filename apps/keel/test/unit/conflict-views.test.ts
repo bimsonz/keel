@@ -27,9 +27,13 @@ import {
 } from "@keeltown/core/ports";
 import {
   makeProbeLedgerMemory,
+  makePlacedProject,
+  makeProjectOrgsMemory,
   makeProbeStoreMemory,
   makeProjectViewsMemory,
+  otherNamespace,
   projectEvents,
+  sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import * as fc from "fast-check";
@@ -640,7 +644,9 @@ describe("[b23.probe-source] a probe's source, from the bundle its draft was kep
       const store = makeProbeStoreMemory();
       const mine = projectEvents();
       const theirs = projectEvents();
-      const [probeId, lost, undrafted, unknown] = [
+      const places = makePlacedProject(mine.project);
+      const [probeId, lost, undrafted, unknown, elsewhere] = [
+        ProbeId.make(fresh("prb")),
         ProbeId.make(fresh("prb")),
         ProbeId.make(fresh("prb")),
         ProbeId.make(fresh("prb")),
@@ -659,8 +665,13 @@ describe("[b23.probe-source] a probe's source, from the bundle its draft was kep
         );
       };
       return Effect.gen(function* () {
-        const kept = yield* (yield* ProbeStore).put(files.toReversed());
+        const kept = yield* (yield* ProbeStore).put(sampleNamespace, files.toReversed());
         yield* opened((conflictId) => mine.probeDrafted(conflictId, probeId, kept));
+        // A bundle kept for another namespace only: not this project's to read.
+        const theirBundle = yield* (yield* ProbeStore).put(otherNamespace, [
+          { path: ".keel/other.test.ts", text: "test('another namespace', () => {});\n" },
+        ]);
+        yield* opened((conflictId) => mine.probeDrafted(conflictId, elsewhere, theirBundle));
         yield* opened((conflictId) => mine.probeDrafted(conflictId, lost));
         yield* opened((conflictId) => mine.probeDraftFailed(conflictId, undrafted));
 
@@ -672,6 +683,11 @@ describe("[b23.probe-source] a probe's source, from the bundle its draft was kep
         const gone = yield* readProbeSource(scope, lost);
         expect(gone).toEqual({ probeId: lost, bundleHash: gone.bundleHash, files: [] });
         expect(gone.bundleHash).toMatch(/^sha256:a{64}$/);
+        expect(yield* readProbeSource(scope, elsewhere)).toEqual({
+          probeId: elsewhere,
+          bundleHash: theirBundle,
+          files: [],
+        });
         expect(yield* readProbeSource(scope, undrafted)).toEqual({ probeId: undrafted, files: [] });
         expect(yield* Effect.flip(readProbeSource(scope, unknown))).toMatchObject({
           _tag: "ProbeNotFound",
@@ -680,7 +696,33 @@ describe("[b23.probe-source] a probe's source, from the bundle its draft was kep
         expect(
           yield* Effect.flip(readProbeSource({ ...scope, project: theirs.project }, probeId)),
         ).toMatchObject({ _tag: "ProbeNotFound", probeId });
-      }).pipe(Effect.provide(Layer.mergeAll(views.layer, store.layer)));
+      }).pipe(Effect.provide(Layer.mergeAll(views.layer, store.layer, places.layer)));
+    },
+  );
+});
+
+describe("[t5.probe-source.unplaced] a probe's source, for a project with no place", () => {
+  it.effect(
+    "[t5.probe-source.unplaced] a probe of a project with no place answers its bundle's hash and no files",
+    () => {
+      const views = makeProjectViewsMemory();
+      const store = makeProbeStoreMemory();
+      const mine = projectEvents();
+      const probeId = ProbeId.make(fresh("prb"));
+      const conflictId = fresh("cfl");
+      return Effect.gen(function* () {
+        // Kept for a namespace, but the project belongs to none: there is no namespace to read it under.
+        const kept = yield* (yield* ProbeStore).put(sampleNamespace, [
+          { path: ".keel/freshness.test.ts", text: "test('freshness', () => {});\n" },
+        ]);
+        yield* views.arrive(mine.suspected(conflictId, fresh("chg"), fresh("chg")));
+        yield* views.arrive(mine.probeDrafted(conflictId, probeId, kept));
+        expect(
+          yield* readProbeSource({ project: mine.project, audience: "public" }, probeId),
+        ).toEqual({ probeId, bundleHash: kept, files: [] });
+      }).pipe(
+        Effect.provide(Layer.mergeAll(views.layer, store.layer, makeProjectOrgsMemory().layer)),
+      );
     },
   );
 });

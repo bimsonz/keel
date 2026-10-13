@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import type { OrgId } from "@keeltown/core/kernel";
 import type { RepoRef } from "@keeltown/core/ports";
 import { BundleStore, CodeHost, NoopWorlds } from "@keeltown/core/ports";
 import { readBundle, writeBundle } from "@keeltown/runner-protocol";
@@ -8,6 +9,7 @@ import {
   describeProbeSourcesContract,
   makeBundleStoreMemory,
   makeCodeHostMemory,
+  sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import {
@@ -43,7 +45,7 @@ const noops = () => {
   return {
     bundles,
     layer: NoopWorldsBundles.pipe(Layer.provide(bundles.layer)),
-    world: (files: ContractTree) =>
+    world: (namespace: OrgId, files: ContractTree) =>
       Effect.gen(function* () {
         const bytes = yield* Effect.promise(() =>
           writeBundle(
@@ -56,7 +58,7 @@ const noops = () => {
         );
         return yield* Effect.provide(
           Effect.gen(function* () {
-            return yield* (yield* BundleStore).put(bytes);
+            return yield* (yield* BundleStore).put(namespace, bytes);
           }),
           bundles.layer,
         );
@@ -107,18 +109,20 @@ describe("NoopWorldsBundles", () => {
     () => {
       const h = noops();
       return Effect.gen(function* () {
-        const world = yield* h.world({
+        const world = yield* h.world(sampleNamespace, {
           "src/routes.ts": "remove();\nstore.removeCollaborator(a, b);\n",
           "src/store.ts": "export const store = {};\n",
           "package.json": "{}",
           "scripts/run.sh": "#!/bin/sh\n",
         });
-        const hash = yield* (yield* NoopWorlds).build(world, {
+        const hash = yield* (yield* NoopWorlds).build(sampleNamespace, world, {
           path: "src/routes.ts",
           anchor: "store.removeCollaborator(a, b);",
           replacement: "/* noop */",
         });
-        const bytes = h.bundles.objects.get(hash);
+        const bytes = h.bundles.objects.get(
+          `ns/org_01JZ8PT2C4E6G8J0M2N4Q6S8V0/bundles/${hash.slice("sha256:".length)}`,
+        );
         if (bytes === undefined) throw new Error("A-noop's bundle is not in the store");
         const files = yield* Effect.promise(() => readBundle(bytes));
         const decoder = new TextDecoder();

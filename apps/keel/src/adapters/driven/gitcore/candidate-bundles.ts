@@ -40,8 +40,8 @@ async function filesOf(reader: ObjectReader, tree: string, prefix: string): Prom
 /**
  * CandidateBundles over gitcore's reads: the candidate commit's tree is read
  * from staging through the binding, written with the runner protocol's
- * bundle writer (the one implementation; never a second) and stored by its
- * sha256. Anything the writer or the walk refuses is BundleRefused.
+ * bundle writer (the one implementation; never a second) and stored for the
+ * namespace by its sha256. Anything the writer or the walk refuses is BundleRefused.
  */
 export const CandidateBundlesGitCore = (open: OpenObjects) =>
   Layer.effect(
@@ -49,7 +49,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
     Effect.gen(function* () {
       const store = yield* BundleStore;
       return CandidateBundles.of({
-        bundle: (staging, commit) =>
+        bundle: (namespace, staging, commit) =>
           Effect.acquireUseRelease(
             Effect.promise(() => open(staging)),
             (reader) =>
@@ -65,7 +65,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
                       ? Effect.fail(new BundleRefused({ reason: cause.message }))
                       : Effect.die(cause),
                 ),
-                Effect.flatMap(store.put),
+                Effect.flatMap((bytes) => store.put(namespace, bytes)),
               ),
             (reader) => Effect.sync(() => reader[Symbol.dispose]()),
           ),

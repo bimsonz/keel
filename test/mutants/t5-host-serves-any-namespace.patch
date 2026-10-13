@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: t5.pool.bundle-other-namespace
+# why: The bundle host serves a hash whichever namespace keeps it, so a sandbox reads another namespace's bundle under its own id
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index ebbbb3a9..7c6745ea 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -139,7 +139,8 @@ export async function serveBundle(
+   );
+   if (!signed) return new Response("not a bundle URL Keel signed", { status: 403 });
+   const started = Date.now();
+-  const object = await env.BUNDLES.get(namespaceKey(namespace, "bundles", sha256));
++  const found = (await env.BUNDLES.list()).objects.find((o) => o.key.endsWith(`/bundles/${sha256}`));
++  const object = found === undefined ? null : await env.BUNDLES.get(found.key);
+   if (object === null) return new Response("no such bundle", { status: 404 });
+   const body =
+     request.method === "HEAD"

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle.test.ts
+# kills: t5.bundle-url.rehydrate
+# why: The refetch compares the archive's hash with the URL's last segment, query and all, so a signed URL never verifies and no tree is ever repaired
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 46850588..0869b729 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -457,7 +457,7 @@ export const REHYDRATE_BUNDLE_SH = [
+   '  [ -n "$url" ] || { echo no-url; return 1; }',
+   '  curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o $r/bundle.tgz "$url" 2>/dev/null || { echo fetch-failed; return 1; }',
+   "  addr=${url%%\\?*}",
+-  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${addr##*/}" ] || { echo archive-hash-mismatch; return 1; }',
++  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${url##*/}" ] || { echo archive-hash-mismatch; return 1; }',
+   '  find "$dir" -mindepth 1 -delete || { echo clear-failed; return 1; }',
+   '  tar -xzf $r/bundle.tgz --strip-components=1 -C "$dir" || { echo extract-failed; return 1; }',
+   "}",

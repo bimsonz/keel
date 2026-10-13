@@ -23,7 +23,7 @@ import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { FanOutRpc } from "../../src/adapters/driven/do-rpc/fan-out.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
-import { drainAfter } from "./helpers.ts";
+import { drainAfter, placeProject } from "./helpers.ts";
 
 export const key = Schema.decodeUnknownSync(SubjectKey);
 export const LEAF = key("authz.permission-evaluation");
@@ -47,9 +47,9 @@ const premise = (value: string, relation: "at-most" | "is") => ({
 
 /**
  * A semantic conflict on the subject's real Subject DO, as its fallout
- * opens one: A's premise against B's effect (or no effect, when asked). The
- * ConflictSuspected it committed is answered, to be delivered as the outbox
- * would.
+ * opens one: A's premise against B's effect (or no effect, when asked), in a
+ * fresh project placed in org `pool`. The ConflictSuspected it committed is
+ * answered, to be delivered as the outbox would.
  */
 export async function suspected(
   options: {
@@ -60,6 +60,7 @@ export async function suspected(
   } = {},
 ) {
   const projectId = makeId("prj", ulid());
+  await placeProject(projectId);
   const conflictId = makeId("cfl", ulid());
   const [A, B] = [options.A ?? makeId("chg", ulid()), makeId("chg", ulid())];
   const command: Extract<ConflictCommand, { _tag: "Suspect" }> = {

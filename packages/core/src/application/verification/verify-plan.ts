@@ -1,5 +1,5 @@
 import { Effect, Result, Schema } from "effect";
-import type { ContentHash, NextAction } from "../../domain/kernel/index.ts";
+import type { ContentHash, NextAction, OrgId } from "../../domain/kernel/index.ts";
 import {
   type FlowWorld,
   type PlanStep,
@@ -26,8 +26,11 @@ export const ResolvedPlan = Schema.Union([
 export type ResolvedPlan = typeof ResolvedPlan.Type;
 
 /** The plan stored under the job's hash, or why it is not there: missing, or not the plan it names. */
-export const resolvePlan = Effect.fn("verification/resolvePlan")(function* (planHash: ContentHash) {
-  return yield* (yield* PlanStore).get(planHash).pipe(
+export const resolvePlan = Effect.fn("verification/resolvePlan")(function* (
+  namespace: OrgId,
+  planHash: ContentHash,
+) {
+  return yield* (yield* PlanStore).get(namespace, planHash).pipe(
     Effect.map((plan): ResolvedPlan => {
       const text = storedPlanText(plan);
       return Result.isSuccess(text)
@@ -119,13 +122,14 @@ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport 
  */
 export const candidateRunner =
   (
+    namespace: OrgId,
     job: Omit<VerificationJob, "steps">,
     durable: DurableReport,
   ): StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> =>
   (step, world) => {
     if (world !== undefined) return Effect.succeed(abstainUnrun(step, world));
     const asJob: StepRunner<VerifierRuntime> = (s) =>
-      runJob({ ...job, steps: [s] }).pipe(
+      runJob(namespace, { ...job, steps: [s] }).pipe(
         Effect.map((reports): StepReport => reports[0] ?? abstainUnrun(s, undefined)),
       );
     if (step.guards === undefined) return asJob(step, undefined);
@@ -135,7 +139,11 @@ export const candidateRunner =
       const evidence = yield* EvidenceStore;
       return yield* durable(
         `guard ${step.id}`,
-        withGuards(job.bundle, asJob)(step, undefined).pipe(
+        withGuards(
+          namespace,
+          job.bundle,
+          asJob,
+        )(step, undefined).pipe(
           Effect.provideService(ProbeRunner, probes),
           Effect.provideService(VerifierRuntime, runtime),
           Effect.provideService(EvidenceStore, evidence),

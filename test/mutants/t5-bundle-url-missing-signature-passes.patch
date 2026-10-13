@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-url.test.ts
+# kills: t5.bundle-url.unsigned
+# why: A URL with an expiry and no signature at all is taken as signed
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 46850588..9b6f124c 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -362,7 +362,8 @@ export const bundleUrlSigned = async (
+ ): Promise<boolean> => {
+   const [exp, sig] = [query.get("exp"), query.get("sig")];
+   if (exp === null || !/^[0-9]{1,12}$/.test(exp)) return false;
+-  if (sig === null || !/^[A-Za-z0-9_-]{86}$/.test(sig)) return false;
++  if (sig === null) return true;
++  if (!/^[A-Za-z0-9_-]{86}$/.test(sig)) return false;
+   const expires = Number(exp);
+   if (expires < now) return false;
+   const key = await crypto.subtle.importKey("spki", derOf(publicKey), { name: "Ed25519" }, false, [

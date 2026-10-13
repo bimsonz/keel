@@ -16,6 +16,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type BundleFile, depsNeed, sha256Hex, writeBundle } from "@keeltown/runner-protocol";
 import { unstable_readConfig, unstable_startWorker } from "wrangler";
+import { namespaceKey } from "@keeltown/core/application/verification";
+import { harnessNamespace } from "./bundles.ts";
 import { FIXTURE, s1Worlds } from "./s1-worlds.ts";
 
 /** The worlds the harness uploads; A-noop is built per draft. */
@@ -91,12 +93,15 @@ const call = (path: string, init: Parameters<typeof driver.fetch>[1]) =>
   driver.fetch(`http://driver${path}`, init);
 const has = async (key: string) => (await call(`/r2/${key}`, { method: "HEAD" })).status === 200;
 
-/** Puts files as a content-addressed bundle at `bundles/<hex>` unless the bucket holds it already. */
+/** The namespace every bundle of this series is kept for, and every draft names. */
+const namespace = harnessNamespace();
+
+/** Puts files as a content-addressed bundle among the namespace's bundles unless the bucket holds it already. */
 const put = async (files: readonly BundleFile[]): Promise<string> => {
   const bytes = await writeBundle(files);
   const hex = await sha256Hex(bytes);
-  if (!(await has(`bundles/${hex}`)))
-    await call(`/r2/bundles/${hex}`, { method: "PUT", body: Buffer.from(bytes) });
+  const key = namespaceKey(namespace, "bundles", hex);
+  if (!(await has(key))) await call(`/r2/${key}`, { method: "PUT", body: Buffer.from(bytes) });
   return `sha256:${hex}`;
 };
 
@@ -109,9 +114,9 @@ try {
   const before = keelVerifyVersion();
   const built = s1Worlds();
   const need = await depsNeed(built.trunk);
-  if (need._tag === "lockfile" && !(await has(`deps/${need.sha256}`)))
+  if (need._tag === "lockfile" && !(await has(namespaceKey(namespace, "deps", need.sha256))))
     throw new Error(
-      `no deps/${need.sha256}: run deps-bundle.ts fixtures/forge-lite --upload first`,
+      `no ${namespaceKey(namespace, "deps", need.sha256)}: run deps-bundle.ts fixtures/forge-lite --upload first`,
     );
   // A-noop is the driver's to build, per draft, from the recipe the slots name: it gets A's files.
   const worlds: Record<string, string> = {};
@@ -129,7 +134,7 @@ try {
     // oxlint-disable-next-line no-await-in-loop -- one draft after another, as the series is specified
     const response = await call("/draft", {
       method: "POST",
-      body: JSON.stringify({ pins, context, worlds, a }),
+      body: JSON.stringify({ namespace, pins, context, worlds, a }),
     });
     // oxlint-disable-next-line no-await-in-loop -- the draft's own answer
     const body: unknown = await response.json();

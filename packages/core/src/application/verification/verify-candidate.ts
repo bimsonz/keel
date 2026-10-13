@@ -1,5 +1,11 @@
 import { Effect, Option, Result, Schema } from "effect";
-import { type CandidateId, ContentHash, NextAction, VerdictId } from "../../domain/kernel/index.ts";
+import {
+  type CandidateId,
+  ContentHash,
+  NextAction,
+  type OrgId,
+  VerdictId,
+} from "../../domain/kernel/index.ts";
 import {
   coerce,
   type FlowPlan,
@@ -26,9 +32,12 @@ import { citeDiagnostic } from "./typecheck.ts";
  */
 
 /** The results of every step in the job. An unavailable verifier abstains every step; it never passes one. */
-export const runJob = Effect.fn("verification/runJob")(function* (job: VerificationJob) {
+export const runJob = Effect.fn("verification/runJob")(function* (
+  namespace: OrgId,
+  job: VerificationJob,
+) {
   const runtime = yield* VerifierRuntime;
-  return yield* runtime.run(job).pipe(
+  return yield* runtime.run(namespace, job).pipe(
     Effect.catchTag("VerifierUnavailable", () =>
       Effect.succeed(
         job.steps.map((step): StepReport => ({
@@ -142,6 +151,7 @@ const describe = (r: StepResult): string =>
  * and an ops error is logged, so a lost document never wedges the lane.
  */
 export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+  namespace: OrgId,
   plan: FlowPlan,
   reports: readonly StepReport[],
 ) {
@@ -154,7 +164,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
   for (const r of decided.success.evidence) {
     const ref = Schema.decodeUnknownOption(ContentHash)(r.resultRef);
     if (r.outcome !== "fail" || Option.isNone(ref)) continue;
-    const document = yield* store.get(ref.value).pipe(
+    const document = yield* store.get(namespace, ref.value).pipe(
       Effect.map(Option.some),
       Effect.catchTag("EvidenceMissing", () => Effect.succeed(Option.none())),
     );

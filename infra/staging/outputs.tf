@@ -16,6 +16,16 @@ output "better_auth_secret" {
   sensitive = true
 }
 
+output "bundle_url_signing_key" {
+  value     = tls_private_key.bundle_url.private_key_pem_pkcs8
+  sensitive = true
+}
+
+# Public: it verifies a bundle URL's signature and signs nothing.
+output "bundle_url_public_key" {
+  value = tls_private_key.bundle_url.public_key_pem
+}
+
 # The host every Worker names as Keel's own (KEEL_HOST, and the console's KEEL_API_HOST).
 output "keel_host" {
   value = var.host

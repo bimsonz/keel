@@ -16,6 +16,7 @@ import { durableReport, keelVerifyRuntime } from "../../../composition/workflow.
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
+import { namespaceStep } from "./steps.ts";
 
 const RECORD_RETRIES = {
   retries: { limit: 3, delay: "2 seconds", backoff: "constant" },
@@ -29,8 +30,10 @@ const RECORD_RETRIES = {
  * `ci.runner`s on keel-verify's KeelSandbox, hydrated from the candidate's
  * bundle through `getProvider()`, never from git and never with a token.
  *
- * Steps: `plan` (the payload, and the plan Precheck compiled and stored
- * under the job's `planHash`), then the plan's own steps as `runPlan`
+ * Steps: `namespace` (the project's namespace, which must be the one the
+ * payload names: the bundle, the plan and the evidence are all kept under
+ * it), `plan` (the payload, and the plan Precheck compiled and stored under
+ * the job's `planHash`), then the plan's own steps as `runPlan`
  * reaches them: a Tier 2 step is its runner's step (which persists its raw
  * logs, so a runner may hold nothing secret) and `<step>:evidence`, a guard
  * step is `guard <step>`; then `verdict` and `record`. A plan the store does
@@ -61,12 +64,19 @@ export class KeelVerify extends CIWorkflow<Env> {
       step,
     });
     try {
+      const payload = Schema.decodeUnknownOption(KeelVerifyJob)(event.payload);
+      if (Option.isNone(payload)) throw new NonRetryableError("not a KeelVerify job");
+      // The runners fetch the candidate from the namespace the payload names: it must be the project's own.
+      const namespace = await namespaceStep(
+        step,
+        (effect) => runtime.runPromise(effect),
+        payload.value.projectId,
+        payload.value.namespace,
+      );
       const planned = await step.do("plan", async () => {
-        const job = Schema.decodeUnknownOption(KeelVerifyJob)(event.payload);
-        if (Option.isNone(job)) throw new NonRetryableError("not a KeelVerify job");
-        const resolved = await runtime.runPromise(resolvePlan(job.value.planHash));
+        const resolved = await runtime.runPromise(resolvePlan(namespace, payload.value.planHash));
         return {
-          job: Schema.encodeSync(KeelVerifyJob)(job.value),
+          job: Schema.encodeSync(KeelVerifyJob)(payload.value),
           plan: Schema.encodeSync(ResolvedPlan)(resolved),
         };
       });
@@ -82,6 +92,7 @@ export class KeelVerify extends CIWorkflow<Env> {
             runPlan(
               plan.success,
               candidateRunner(
+                namespace,
                 { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
                 durableReport(step),
               ),
@@ -96,7 +107,7 @@ export class KeelVerify extends CIWorkflow<Env> {
               Schema.encodeSync(SettledVerdict)(
                 await runtime.runPromise(
                   Result.isSuccess(plan)
-                    ? settleVerdict(plan.success, reports)
+                    ? settleVerdict(namespace, plan.success, reports)
                     : settleUnresolved(job.planHash, plan.failure),
                 ),
               ),

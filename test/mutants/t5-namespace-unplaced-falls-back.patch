@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/project-namespace.test.ts
+# kills: t5.project-namespace, t5.job-namespace
+# why: A project with no place is given a namespace to fall back on
+diff --git a/packages/core/src/application/verification/project-namespace.ts b/packages/core/src/application/verification/project-namespace.ts
+index ea0d604c..0f8e1270 100644
+--- a/packages/core/src/application/verification/project-namespace.ts
++++ b/packages/core/src/application/verification/project-namespace.ts
+@@ -22,7 +22,7 @@ export const projectNamespace = Effect.fn("verification/projectNamespace")(funct
+   projectId: ProjectId,
+ ) {
+   const place = yield* (yield* ProjectOrgs).byId(projectId);
+-  if (Option.isNone(place)) return yield* new ProjectUnplaced({ projectId });
++  if (Option.isNone(place)) return OrgId.make("org_00000000000000000000000000");
+   return place.value.org;
+ });
+ 

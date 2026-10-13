@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: t5.bundle-url.checkout
+# why: A checkout is built for provider data whose namespace is not a namespace's id
+diff --git a/apps/keel/src/adapters/driving/workflow/bundle-source.ts b/apps/keel/src/adapters/driving/workflow/bundle-source.ts
+index c57a4ff8..8472b8ef 100644
+--- a/apps/keel/src/adapters/driving/workflow/bundle-source.ts
++++ b/apps/keel/src/adapters/driving/workflow/bundle-source.ts
+@@ -9,7 +9,7 @@ import type {
+   SourceControlSource,
+ } from "./ci.js";
+ 
+-const ProviderData = Schema.Struct({ namespace: OrgId, bundle: ContentHash });
++const ProviderData = Schema.Struct({ namespace: Schema.String, bundle: ContentHash });
+ 
+ /** The one secret a checkout needs from keel's env: the key bundle URLs are signed with. */
+ const SigningEnv = Schema.Struct({ BUNDLE_URL_SIGNING_KEY: Schema.NonEmptyString });

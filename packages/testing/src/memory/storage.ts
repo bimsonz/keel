@@ -1,7 +1,11 @@
-import { readStoredPlan, storedPlanText } from "@keeltown/core/application/verification";
+import {
+  namespaceKey,
+  readStoredPlan,
+  storedPlanText,
+} from "@keeltown/core/application/verification";
 import { BundleMissing } from "@keeltown/core/domain/verification";
 import { SecretMissing } from "@keeltown/core/domain/delivery";
-import type { ContentHash, EventEnvelope, SessionId } from "@keeltown/core/kernel";
+import type { ContentHash, EventEnvelope, OrgId, SessionId } from "@keeltown/core/kernel";
 import {
   canonicalJson,
   ContentHash as ContentHashSchema,
@@ -98,23 +102,35 @@ export function makeWorkQueueMemory() {
 const hex = (bytes: ArrayBuffer): string =>
   [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
+/** The hex of a content hash: what a namespace's key ends with. */
+const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
+
+/** Where each memory store keeps a namespace's object: the key its R2 adapter builds. */
+const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
+  namespaceKey(namespace, "bundles", hexOf(hash));
+const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+  namespaceKey(namespace, "evidence", hexOf(hash));
+const planKeyOf = (namespace: OrgId, hash: ContentHash) =>
+  namespaceKey(namespace, "plans", hexOf(hash));
+
+/** Bundles in a Map, under the key the R2 adapter keeps them at: a namespace's bundles, by hash. */
 export function makeBundleStoreMemory() {
-  const objects = new Map<ContentHash, Uint8Array>();
+  const objects = new Map<string, Uint8Array>();
   return {
     objects,
     layer: Layer.succeed(
       BundleStore,
       BundleStore.of({
-        put: (bytes) =>
+        put: (namespace, bytes) =>
           Effect.promise(async () => {
             const hash = Schema.decodeUnknownSync(ContentHashSchema)(
               `sha256:${hex(await crypto.subtle.digest("SHA-256", bytes.slice()))}`,
             );
-            objects.set(hash, bytes.slice());
+            objects.set(bundleKeyOf(namespace, hash), bytes.slice());
             return hash;
           }),
-        get: (hash) => {
-          const bytes = objects.get(hash);
+        get: (namespace, hash) => {
+          const bytes = objects.get(bundleKeyOf(namespace, hash));
           return bytes === undefined
             ? Effect.fail(new BundleMissing({ hash }))
             : Effect.succeed(bytes.slice());
@@ -205,22 +221,26 @@ export function makeSecretsProviderMemory(secrets: Readonly<Record<string, strin
   };
 }
 
-/** Evidence documents in a Map, keyed by the hash of their canonical JSON; each read is a fresh copy. */
+/**
+ * Evidence documents in a Map, under the key the R2 adapter keeps them at: a
+ * namespace's evidence, by the hash of the document's canonical JSON. Each
+ * read is a fresh copy.
+ */
 export function makeEvidenceStoreMemory() {
-  const documents = new Map<ContentHash, string>();
+  const documents = new Map<string, string>();
   return {
     documents,
     layer: Layer.succeed(
       EvidenceStore,
       EvidenceStore.of({
-        put: (document) =>
+        put: (namespace, document) =>
           Effect.sync(() => {
             const hash = contentHashOf(document);
-            documents.set(hash, canonicalJson(document));
+            documents.set(evidenceKeyOf(namespace, hash), canonicalJson(document));
             return hash;
           }),
-        get: (hash) => {
-          const stored = documents.get(hash);
+        get: (namespace, hash) => {
+          const stored = documents.get(evidenceKeyOf(namespace, hash));
           return stored === undefined
             ? Effect.fail(new EvidenceMissing({ hash }))
             : Effect.sync((): Json => JSON.parse(stored));
@@ -231,27 +251,29 @@ export function makeEvidenceStoreMemory() {
 }
 
 /**
- * Plans in a Map, as the text a store keeps, so a test can plant what storage
- * at rest might hold. Every read is verified exactly as the R2 adapter's is.
+ * Plans in a Map, as the text a store keeps under a namespace's key, so a
+ * test can plant what storage at rest might hold. Every read is verified
+ * exactly as the R2 adapter's is.
  */
 export function makePlanStoreMemory() {
-  const plans = new Map<ContentHash, string>();
+  const plans = new Map<string, string>();
   return {
     plans,
-    plant: (hash: ContentHash, text: string) => Effect.sync(() => void plans.set(hash, text)),
+    plant: (namespace: OrgId, hash: ContentHash, text: string) =>
+      Effect.sync(() => void plans.set(planKeyOf(namespace, hash), text)),
     layer: Layer.succeed(
       PlanStore,
       PlanStore.of({
-        put: (plan) => {
+        put: (namespace, plan) => {
           const text = storedPlanText(plan);
           if (Result.isFailure(text)) return Effect.die(new Error(text.failure));
           return Effect.sync(() => {
-            plans.set(plan.planHash, text.success);
+            plans.set(planKeyOf(namespace, plan.planHash), text.success);
             return plan.planHash;
           });
         },
-        get: (hash) => {
-          const stored = plans.get(hash);
+        get: (namespace, hash) => {
+          const stored = plans.get(planKeyOf(namespace, hash));
           if (stored === undefined) return Effect.fail(new PlanMissing({ hash }));
           const read = readStoredPlan(hash, stored);
           return Result.isFailure(read)

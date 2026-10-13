@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/precheck-unplaced.test.ts
+# kills: t5.precheck.unplaced
+# why: The refusal does not say which project has no place
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 0eb08212..c195290f 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -416,7 +416,7 @@ export const refuseUnplaced = (
+ ): Extract<PrecheckDecision, { _tag: "Refuse" }> => ({
+   _tag: "Refuse",
+   reasons: [
+-    `precheck:project-unplaced:project ${projectId} belongs to no namespace, so nothing of this change can be kept or verified`,
++    `precheck:project-unplaced:the project belongs to no namespace, so nothing of this change can be kept or verified`,
+   ],
+   nextActions: [
+     {

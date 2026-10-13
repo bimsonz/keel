@@ -8,6 +8,7 @@ import type {
   ContentHash,
   GuardId,
   Instant,
+  OrgId,
   ProbeId,
   ProjectId,
 } from "../../domain/kernel/index.ts";
@@ -58,6 +59,8 @@ import { trunkCheckPlan, worldCheckInstanceId, worldCheckJobs } from "./world-ch
 
 /** The conflict a Probe instance is drafting for, and where it reports. */
 export interface ProbeCall {
+  /** The namespace the project belongs to, as the instance's `namespace` step read it: every bundle, probe, plan and evidence document of this conflict is kept under it. */
+  readonly namespace: OrgId;
   readonly projectId: ProjectId;
   /** The subject whose Subject DO hosts the conflict. */
   readonly key: SubjectKey;
@@ -216,7 +219,7 @@ export const readProbeWorlds = (
         ),
       );
     const bundle = (world: World, at: RepoCommit) =>
-      bundles.bundle(at.repo, at.commit).pipe(
+      bundles.bundle(call.namespace, at.repo, at.commit).pipe(
         Effect.mapError((e): Unread => ({
           ...unread(world, at.repo, at.commit)(e),
           reason: e.reason,
@@ -271,6 +274,7 @@ export type DraftAnswer = { readonly _tag: "Drafted"; readonly outcome: DraftOut
  * never be complete, so the draft is incomplete.
  */
 export const draftConflict = (
+  namespace: OrgId,
   parties: ProbeParties,
   plan: ProbeWorldPlan,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,
@@ -293,10 +297,11 @@ export const draftConflict = (
       .pipe(Effect.mapError(unread("trunk", plan.source.repo, plan.source.commit)));
     const noop = yield* NoopWorlds;
     const outcome = yield* draftProbe(
+      namespace,
       FRESHNESS_TEMPLATE,
       draftContextOf(parties, source, hunks),
       worlds,
-      (recipe) => noop.build(worlds.A, recipe),
+      (recipe) => noop.build(namespace, worlds.A, recipe),
     );
     return { _tag: "Drafted", outcome } satisfies DraftAnswer;
   }).pipe(
@@ -476,7 +481,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
     if (Result.isFailure(worlds)) return yield* failDraft(worlds.failure, 0);
     const drafted = yield* steps.step(
       "draft",
-      draftConflict(parties, planned.plan, worlds.success, planned.hunks),
+      draftConflict(call.namespace, parties, planned.plan, worlds.success, planned.hunks),
       "draft",
     );
     if (drafted._tag === "Unread")
@@ -515,10 +520,15 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
     // They are evidence for people, not for admission, so the cells never wait for them.
     const trunkPlan = yield* steps.step(
       "trunk plan",
-      trunkCheckPlan(call.staging, planned.plan.trunk.commit),
+      trunkCheckPlan(call.namespace, call.staging, planned.plan.trunk.commit),
     );
     const jobs = worldCheckJobs(
-      { projectId: call.projectId, key: call.key, conflictId: call.conflictId },
+      {
+        namespace: call.namespace,
+        projectId: call.projectId,
+        key: call.key,
+        conflictId: call.conflictId,
+      },
       parties,
       worlds.success,
       trunkPlan,
@@ -536,7 +546,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
       const name = `cell ${cell.world}@${cell.run}`;
       const ran = yield* steps.step(
         name,
-        storeCell(cell).pipe(
+        storeCell(call.namespace, cell).pipe(
           Effect.flatMap((resultRef) =>
             answer(
               ledger.probeCellRan(at, {

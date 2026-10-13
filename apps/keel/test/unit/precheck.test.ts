@@ -36,6 +36,7 @@ import {
   makeCodeHostMemory,
   makePlanStoreMemory,
   makeProjectsMemory,
+  sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer, Result, Schema } from "effect";
 import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
@@ -142,9 +143,9 @@ function precheckWorld(
         const store = yield* PlanStore;
         return PlanStore.of({
           ...store,
-          put: (plan) =>
+          put: (namespace, plan) =>
             store
-              .put(plan)
+              .put(namespace, plan)
               .pipe(
                 Effect.tap(() => Effect.sync(() => void recorded.push(`put ${plan.planHash}`))),
               ),
@@ -244,13 +245,20 @@ function precheckWorld(
           : { ancestry };
       const decision = decidePrecheck(findings);
       if (decision._tag === "Refuse") yield* refuseSubmission(submission, decision);
-      else yield* recordPlan(submission, decision);
+      else yield* recordPlan(sampleNamespace, submission, decision);
       return decision;
     }).pipe(Effect.provide(layer));
 
   /** The plan the store holds under `hash`, read back and verified. */
   const storedPlan = (hash: Parameters<typeof readStoredPlan>[0]) =>
-    Result.getOrThrow(readStoredPlan(hash, plans.plans.get(hash) ?? ""));
+    Result.getOrThrow(
+      readStoredPlan(
+        hash,
+        plans.plans.get(
+          `ns/org_01JZ8PT2C4E6G8J0M2N4Q6S8V0/plans/${hash.slice("sha256:".length)}`,
+        ) ?? "",
+      ),
+    );
 
   return {
     code,

@@ -4,7 +4,7 @@ import {
   noopTree,
   type TextCodec,
 } from "@keeltown/core/application/verification";
-import type { ContentHash } from "@keeltown/core/kernel";
+import type { ContentHash, OrgId } from "@keeltown/core/kernel";
 import { BundleStore, NoopWorlds } from "@keeltown/core/ports";
 import { type BundleFile, readBundle, writeBundle } from "@keeltown/runner-protocol";
 import { Effect, Layer, Result } from "effect";
@@ -28,23 +28,24 @@ export const BUNDLE_TEXT: TextCodec<BundleFile> = {
 /**
  * A-noop's world from A's files: the recipe applied to the one file it names
  * (its anchor exactly once), bundled with the runner protocol's one writer and
- * stored by its hash where the VerifierDO reads world bundles. A recipe that
+ * stored by its hash where the VerifierDO reads the namespace's world
+ * bundles. A recipe that
  * cannot apply is NoNoop, for the draft to repair; A's own files always bundle,
  * so a refusal of them is a defect.
  */
 export const noopWorld =
-  (a: readonly BundleFile[]) =>
+  (namespace: OrgId, a: readonly BundleFile[]) =>
   (recipe: NoopRecipe): Effect.Effect<ContentHash, NoNoop, BundleStore> =>
     Effect.gen(function* () {
       const tree = noopTree(a, recipe, BUNDLE_TEXT);
       if (Result.isFailure(tree)) return yield* Effect.fail(tree.failure);
       const bytes = yield* Effect.promise(() => writeBundle(tree.success));
-      return yield* (yield* BundleStore).put(bytes);
+      return yield* (yield* BundleStore).put(namespace, bytes);
     });
 
 /**
  * NoopWorlds over BundleStore: A's world bundle, as the Probe's worlds step
- * built it, read back whole, then noopWorld applies the recipe, bundles it
+ * built it for the namespace, read back whole, then noopWorld applies the recipe, bundles it
  * and stores it. It never reads A's workspace, which landing collects while
  * a draft may still be repairing. A world bundle not in the store is a
  * defect: it was built for this draft.
@@ -54,11 +55,11 @@ export const NoopWorldsBundles = Layer.effect(
   Effect.gen(function* () {
     const store = yield* BundleStore;
     return NoopWorlds.of({
-      build: (world, recipe) =>
-        store.get(world).pipe(
+      build: (namespace, world, recipe) =>
+        store.get(namespace, world).pipe(
           Effect.orDie,
           Effect.flatMap((bytes) => Effect.promise(() => readBundle(bytes))),
-          Effect.flatMap((files) => noopWorld(files)(recipe)),
+          Effect.flatMap((files) => noopWorld(namespace, files)(recipe)),
           Effect.provideService(BundleStore, store),
         ),
     });

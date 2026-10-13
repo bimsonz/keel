@@ -2,10 +2,10 @@
 # kills: world-matrix.noop-cell
 # why: The matrix skips A-noop, so no run is ever complete and a probe that never tests A's call can never be told apart from one that does
 diff --git a/packages/core/src/application/verification/run-matrix.ts b/packages/core/src/application/verification/run-matrix.ts
-index 0d77344..2f3a660 100644
+index da277e2c..0aad8c51 100644
 --- a/packages/core/src/application/verification/run-matrix.ts
 +++ b/packages/core/src/application/verification/run-matrix.ts
-@@ -28,7 +28,7 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
+@@ -55,7 +55,7 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
    const harnessErrors: MatrixHarnessError[] = [];
    for (let run = 1; run <= runs; run++) {
      const answers = yield* Effect.forEach(
@@ -13,4 +13,4 @@ index 0d77344..2f3a660 100644
 +      MATRIX_WORLDS.filter((w) => w !== "A-noop"),
        (world) =>
          runner
-           .run({ probe, world, worldBundle: worlds[world], run })
+           .run({ namespace, probe, world, worldBundle: worlds[world], run })

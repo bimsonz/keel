@@ -54,6 +54,7 @@ import {
   Inbox,
   type LabelledEscalation,
   ProbeStore,
+  type ProjectOrgs,
   ProjectViews,
   type RulingCommand,
   type RulingRefusal,
@@ -62,6 +63,7 @@ import {
 } from "../ports/index.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
 import type { PackTooLarge } from "../ports/index.ts";
+import { projectNamespace } from "../verification/index.ts";
 import type { RebasedChange, Withdrawal } from "./change.ts";
 import type {
   AbandonCall,
@@ -407,23 +409,31 @@ const NO_FILES: ProbeSource["files"] = [];
  * The Projector says which conflict the probe belongs to, and so the bundle
  * its draft was kept under; the files come from the store the Probe Workflow
  * wrote them to. A probe none of whose drafts compiled has no bundle and no
- * files. A bundle the store no longer keeps leaves its hash and no files: the
- * probe is there, its source is not. ProbeNotFound for a probe the project
+ * files. The store keeps it for the project's namespace. A bundle the store
+ * no longer keeps leaves its hash and no files: the probe is there, its
+ * source is not. ProbeNotFound for a probe the project
  * does not have, which is also a probe of another project.
  */
 export const readProbeSource: (
   scope: ProjectScope,
   probeId: ProbeId,
-) => Effect.Effect<ProbeSource, ProbeNotFound, ProjectViews | ProbeStore> = (scope, probeId) =>
+) => Effect.Effect<ProbeSource, ProbeNotFound, ProjectViews | ProbeStore | ProjectOrgs> = (
+  scope,
+  probeId,
+) =>
   Effect.gen(function* () {
     const views = yield* ProjectViews;
     const { probe } = yield* views.probeConflict(scope.project, probeId);
     const bundleHash = probe?.bundleHash;
     if (bundleHash === undefined) return { probeId, files: NO_FILES };
     const store = yield* ProbeStore;
-    const files = yield* store
-      .get(bundleHash)
-      .pipe(Effect.catchTag("BundleMissing", () => Effect.succeed(NO_FILES)));
+    const files = yield* projectNamespace(scope.project).pipe(
+      Effect.flatMap((namespace) => store.get(namespace, bundleHash)),
+      Effect.catchTags({
+        BundleMissing: () => Effect.succeed(NO_FILES),
+        ProjectUnplaced: () => Effect.succeed(NO_FILES),
+      }),
+    );
     return { probeId, bundleHash, files };
   });
 

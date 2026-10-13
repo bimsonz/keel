@@ -17,7 +17,7 @@ import { worldCheckRuntime } from "../../../composition/workflow.ts";
 import { WorldCheckJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
-import { workflowSteps } from "./steps.ts";
+import { namespaceStep, workflowSteps } from "./steps.ts";
 
 const RECORD_RETRIES = {
   retries: { limit: 3, delay: "2 seconds", backoff: "constant" },
@@ -33,7 +33,9 @@ const RECORD_RETRIES = {
  * `ci.runner`s on keel-verify's KeelSandbox, hydrated from the world's
  * bundle, never from git and never with a token.
  *
- * Steps: a party's check first reads its change's plan (core's
+ * Steps: `namespace` (the project's namespace, which must be the one the job
+ * names: the world's bundle, the plans and the evidence are kept under it);
+ * then a party's check reads its change's plan (core's
  * `resolveCheckPlans`): the Probe starts these the moment a party submits, so
  * a plan its Precheck has not compiled yet is waited for by event, up to five
  * minutes, never polled. Then `plan <check>` for each check with a plan,
@@ -70,6 +72,13 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
       step,
     });
     try {
+      // The runners fetch the world's bundle from the namespace the job names: it must be the project's own.
+      const namespace = await namespaceStep(
+        step,
+        (effect) => runtime.runPromise(effect),
+        job.projectId,
+        job.namespace,
+      );
       const checks = await runtime.runPromise(
         resolveCheckPlans(job.checks, event.instanceId, workflowSteps(step)),
       );
@@ -81,7 +90,9 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
         }
         const resolved = Schema.decodeSync(ResolvedPlan)(
           await step.do(`plan ${check}`, async () =>
-            Schema.encodeSync(ResolvedPlan)(await runtime.runPromise(resolvePlan(plan.planHash))),
+            Schema.encodeSync(ResolvedPlan)(
+              await runtime.runPromise(resolvePlan(namespace, plan.planHash)),
+            ),
           ),
         );
         // Read back and verified against the check's hash on every replay, not only the first run.
@@ -99,7 +110,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
         steps.length === 0
           ? []
           : await runtime.runPromise(
-              runJob({
+              runJob(namespace, {
                 jobId: event.instanceId,
                 bundle: job.bundle,
                 fence: { batchId: event.instanceId, attempt: 1, chainEpoch: 0 },

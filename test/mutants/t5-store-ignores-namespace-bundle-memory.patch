@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t5.bundle-store.namespaces-apart
+# why: The memory BundleStore keeps every namespace's bundles under one namespace's key, so the fake no longer behaves as the R2 adapter must
+diff --git a/packages/testing/src/memory/storage.ts b/packages/testing/src/memory/storage.ts
+index ca607737..c6f31922 100644
+--- a/packages/testing/src/memory/storage.ts
++++ b/packages/testing/src/memory/storage.ts
+@@ -34,6 +34,7 @@ import {
+ } from "@keeltown/core/ports";
+ import { SessionNotFound } from "@keeltown/core/domain/memory";
+ import { Effect, Layer, Result, Schema } from "effect";
++import { sampleNamespace } from "../namespaces.ts";
+ 
+ /**
+  * A Durable Object's storage, in a Map. `transaction` snapshots the map and
+@@ -107,7 +108,7 @@ const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
+ 
+ /** Where each memory store keeps a namespace's object: the key its R2 adapter builds. */
+ const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
+-  namespaceKey(namespace, "bundles", hexOf(hash));
++  namespaceKey(sampleNamespace, "bundles", hexOf(hash));
+ const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+   namespaceKey(namespace, "evidence", hexOf(hash));
+ const planKeyOf = (namespace: OrgId, hash: ContentHash) =>

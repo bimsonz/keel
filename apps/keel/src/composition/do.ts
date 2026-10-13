@@ -180,13 +180,15 @@ export type LaneServices =
   | CandidateBundles
   | BatchVerification
   | StagingWriter
-  | Projects;
+  | Projects
+  | ProjectOrgs;
 
 /**
  * The Lane DO reads its members from their Change DOs and its project's
  * settings from the Project DO (verification may be off), composes and bundles
  * candidates through GitCore over the Artifacts bindings (one handle per repo
- * per compose), stores bundles in R2, starts KeelVerify, and moves staging's
+ * per compose), stores bundles in R2 for the namespace D1's `projects` table
+ * places its project in, starts KeelVerify, and moves staging's
  * main after trunk. It never holds a trunk write token. `projectId` is read
  * lazily, on first use, from the object's name.
  */
@@ -204,6 +206,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       host,
       ChangesRpc({ change, agentSession }),
       ProjectsRpc(project),
+      ProjectOrgsD1(env.DB),
       CandidateComposerGitCore(objects).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW),

@@ -1,6 +1,6 @@
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { FlowWorld, WorldCheck } from "@keeltown/core/domain/verification";
-import { ChangeId, ConflictId, ContentHash, ProjectId } from "@keeltown/core/kernel";
+import { ChangeId, ConflictId, ContentHash, OrgId, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { KEEL_BUNDLE_PROVIDER } from "./keel-verify.ts";
 
@@ -18,6 +18,7 @@ export const CheckPlan = Schema.Union([
  * `world-<conflictId>-<world>`.
  */
 export const WorldCheckJob = Schema.Struct({
+  namespace: OrgId,
   projectId: ProjectId,
   key: SubjectKey,
   conflictId: ConflictId,
@@ -29,13 +30,15 @@ export type WorldCheckJob = typeof WorldCheckJob.Type;
 
 /**
  * The full payload to create a KeelWorldCheck instance with: the job, plus
- * the fields @cloudflare/ci's engine reads before `pipeline()`. `ref` is the
- * engine's cache scope, so it names the conflict's world.
+ * the fields @cloudflare/ci's engine reads before `pipeline()`, the namespace
+ * its runners fetch the world's bundle from among them (the instance's
+ * `namespace` step refuses a project of another). `ref` is the engine's cache
+ * scope, so it names the conflict's world.
  */
 export const worldCheckParams = (job: WorldCheckJob) => ({
   ...Schema.encodeSync(WorldCheckJob)(job),
   provider: KEEL_BUNDLE_PROVIDER,
-  providerData: { bundle: job.bundle },
+  providerData: { namespace: job.namespace, bundle: job.bundle },
   event: { type: "world-check" },
   owner: "keel",
   repo: job.conflictId,

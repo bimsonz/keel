@@ -1,5 +1,5 @@
 import { ProbeOutcome, VerifierUnavailable, World } from "@keeltown/core/domain/verification";
-import { ContentHash } from "@keeltown/core/kernel";
+import { ContentHash, OrgId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
@@ -10,8 +10,9 @@ export const JobReport = Schema.Struct({
   steps: Schema.Array(Schema.Unknown),
 });
 
-/** One Tier 1 probe run (the ProbeRunner port's request): the probe's bundle against one world's bundle. */
+/** One Tier 1 probe run (the ProbeRunner port's request): a namespace's probe bundle against one of its world bundles. */
 export const ProbeRunRequest = Schema.Struct({
+  namespace: OrgId,
   probe: ContentHash,
   world: World,
   worldBundle: ContentHash,
@@ -47,12 +48,16 @@ export const VerifierCodecs = {
   runProbe: exitCodec(ProbeRunReply, VerifierUnavailable),
 };
 
-/** The VerifierDO for a run: one per (probe, world), so a matrix's worlds fan out across DOs, one CPU each. */
+/**
+ * The VerifierDO for a run: one per (namespace, probe, world), so a matrix's
+ * worlds fan out across DOs, one CPU each, and no two namespaces ever share
+ * one, whatever hashes they hold.
+ */
 export const verifierName = (request: ProbeRunRequest): string =>
-  `probe:${request.probe.slice("sha256:".length)}:${request.worldBundle.slice("sha256:".length)}`;
+  `probe:${request.namespace}:${request.probe.slice("sha256:".length)}:${request.worldBundle.slice("sha256:".length)}`;
 
 /**
- * A VerifierDO in keel-verify: one per (probe, world), running throwaway
+ * A VerifierDO in keel-verify: one per (namespace, probe, world), running throwaway
  * isolates with no outbound network. keel-verify holds no credentials, so
  * nothing it runs can reach any.
  *

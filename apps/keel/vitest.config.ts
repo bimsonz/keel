@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
+import { makeBundleUrlKeys } from "@keeltown/testing/bundle-url-keys";
 import { defineProject } from "vitest/config";
 
 /** A fresh Ed25519 signing key per test run, in the JWK form the KEEL_SIGNING_KEY secret holds. */
@@ -26,6 +27,7 @@ export default defineProject({
           KEEL_ENV: "test",
           KEEL_SIGNING_KEY: await testSigningKey(),
           BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
+          BUNDLE_URL_SIGNING_KEY: (await makeBundleUrlKeys()).signingKey,
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
           // prove:red pins fast-check's seed; workerd sees it only as a binding.
           ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),

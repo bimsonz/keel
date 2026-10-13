@@ -15,6 +15,7 @@ import {
   CommitSha,
   type ContentHash,
   type Json,
+  type OrgId,
 } from "../../domain/kernel/index.ts";
 import {
   ChangePrecheck,
@@ -162,6 +163,7 @@ const recorded = (reading: Reading): RecordedReading =>
  * defect, and the step retries.
  */
 export const deriveSubmission = Effect.fn("verification/deriveSubmission")(function* (
+  namespace: OrgId,
   workspace: PrecheckWorkspace,
   submission: PrecheckSubmission,
   base: CommitSha,
@@ -191,6 +193,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
           intent: workspace.intent,
         });
   const derivationRef = yield* (yield* EvidenceStore).put(
+    namespace,
     recordJson({
       kind: DERIVATION_KIND,
       changeId: submission.changeId,
@@ -218,10 +221,11 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
  * answered the hash.
  */
 export const commitDerivation = Effect.fn("verification/commitDerivation")(function* (
+  namespace: OrgId,
   submission: PrecheckSubmission,
   derivationRef: ContentHash,
 ) {
-  const stored = yield* (yield* EvidenceStore).get(derivationRef).pipe(Effect.orDie);
+  const stored = yield* (yield* EvidenceStore).get(namespace, derivationRef).pipe(Effect.orDie);
   const record = Schema.decodeUnknownResult(DerivationRecord)(stored);
   if (Result.isFailure(record))
     return yield* Effect.die(new Error(`${derivationRef} is not a derivation record`));

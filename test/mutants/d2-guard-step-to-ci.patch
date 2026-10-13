@@ -2,11 +2,11 @@
 # kills: d21.runs-stored-plan, d21.guard-step
 # why: A guard step goes to the Tier 2 runtime like any other step, so its pinned probe never runs and the step abstains
 diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
-index 85eedff..fa6d223 100644
+index 4ca9b652..d8e91572 100644
 --- a/packages/core/src/application/verification/verify-plan.ts
 +++ b/packages/core/src/application/verification/verify-plan.ts
-@@ -128,7 +128,7 @@ export const candidateRunner =
-       runJob({ ...job, steps: [s] }).pipe(
+@@ -132,7 +132,7 @@ export const candidateRunner =
+       runJob(namespace, { ...job, steps: [s] }).pipe(
          Effect.map((reports): StepReport => reports[0] ?? abstainUnrun(s, undefined)),
        );
 -    if (step.guards === undefined) return asJob(step, undefined);

@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { ProbeRunner, ProbeRunnerUnavailable } from "@keeltown/core/ports";
-import { ContentHash } from "@keeltown/core/kernel";
+import { ContentHash, OrgId } from "@keeltown/core/kernel";
 import { probeWorkerFiles, Semaphore } from "@keeltown/runner-protocol";
 import { describeProbeRunnerContract } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
@@ -11,7 +11,7 @@ import {
   runProbe,
   type Tier1,
 } from "../../src/adapters/driving/do/tier1/run-probe.ts";
-import { decodeExit, ProbeRunRequest, VerifierCodecs } from "../../src/rpc/index.ts";
+import { decodeExit, ProbeRunRequest, VerifierCodecs, verifierName } from "../../src/rpc/index.ts";
 import {
   egress,
   FLAG_WORLD,
@@ -39,12 +39,22 @@ const viaEntrypoint = async (request: ProbeRunRequest) => {
   );
 };
 
-const request = (probe: ContentHash, worldBundle: ContentHash, run = 1): ProbeRunRequest => ({
+const request = (
+  probe: ContentHash,
+  worldBundle: ContentHash,
+  run = 1,
+  namespace: OrgId = NAMESPACE,
+): ProbeRunRequest => ({
+  namespace,
   probe,
   world: "A",
   worldBundle,
   run,
 });
+
+/** The namespace the bundles below are kept for, and another that holds none of them. */
+const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const OTHER = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 
 const answered = async (r: ProbeRunRequest) => {
   const exit = await viaEntrypoint(r);
@@ -157,9 +167,9 @@ describe("the Tier 1 probe runner", () => {
   });
 
   it("[tier1.bundle-verified] is unavailable for a probe bundle that does not hash to its key", async () => {
-    const real = await env.BUNDLES.get(`bundles/${probes("pass").slice(7)}`);
+    const real = await env.BUNDLES.get(`ns/${NAMESPACE}/bundles/${probes("pass").slice(7)}`);
     const forged = Schema.decodeUnknownSync(ContentHash)(`sha256:${"0".repeat(63)}1`);
-    await env.BUNDLES.put(`bundles/${forged.slice(7)}`, await real!.arrayBuffer());
+    await env.BUNDLES.put(`ns/${NAMESPACE}/bundles/${forged.slice(7)}`, await real!.arrayBuffer());
     expect(await reasonOf(request(forged, world))).toContain("does not hash to its key");
   });
 
@@ -174,12 +184,51 @@ describe("the Tier 1 probe runner", () => {
     const installed = await putBundle({ ...TINY_DEPS, "pnpm-lock.yaml": TINY_LOCK });
     const { sha256Hex } = await import("@keeltown/runner-protocol");
     await env.BUNDLES.put(
-      `deps/${await sha256Hex(new TextEncoder().encode(otherLock))}`,
+      `ns/${NAMESPACE}/deps/${await sha256Hex(new TextEncoder().encode(otherLock))}`,
       installed.slice(7),
     );
     expect(await reasonOf(request(tinyProbe, unkeyed))).toContain(
       "was not installed from pnpm-lock.yaml",
     );
+  });
+
+  it("[t5.pool.verifier-other-namespace] is unavailable for a probe and world kept for another namespace, and for a deps bundle another namespace installed", async () => {
+    // The pass probe and its world are NAMESPACE's: a run that names OTHER finds neither.
+    expect(await reasonOf(request(probes("pass"), world, 1, OTHER))).toContain(
+      `bundle ns/org_01JZ8PT2C4E6G8J0M2N4Q6S8V1/bundles/`,
+    );
+    expect((await answered(request(probes("pass"), world, 1))).run).toMatchObject({
+      _tag: "ran",
+      outcome: "pass",
+    });
+    // OTHER's own world and probe, with dependencies only NAMESPACE has a deps bundle for.
+    await putDeps(TINY_LOCK, TINY_DEPS);
+    const theirWorld = await putBundle(TINY_WORLD, OTHER);
+    const theirProbe = await putBundle(TINY_PROBE, OTHER);
+    expect(await reasonOf(request(theirProbe, theirWorld, 1, OTHER))).toContain(
+      "lockfile-diverged: no deps bundle",
+    );
+    await putDeps(TINY_LOCK, TINY_DEPS, OTHER);
+    expect((await answered(request(theirProbe, theirWorld, 1, OTHER))).run).toMatchObject({
+      _tag: "ran",
+      outcome: "pass",
+    });
+  });
+
+  it("[t5.pool.verifier-per-namespace] gives each namespace its own VerifierDO: three runs each of one probe and world, at once, and none waits for a slot", async () => {
+    // The same bytes kept for both namespaces: the same hashes, so only the namespace tells the DOs apart.
+    await putBundle(FLAG_WORLD, OTHER);
+    await putBundle(PROBES.naps, OTHER);
+    const answers = await Promise.all(
+      [NAMESPACE, OTHER].flatMap((namespace) =>
+        [1, 2, 3].map((run) => answered(request(probes("naps"), world, run, namespace))),
+      ),
+    );
+    expect(answers.map((a) => a.run)).toEqual(
+      answers.map(() => expect.objectContaining({ _tag: "ran", outcome: "pass" })),
+    );
+    // One DO runs four at once and queues the rest: six runs on a shared DO would queue two.
+    expect(answers.filter((a) => a.queued)).toHaveLength(0);
   });
 
   it("[tier1.harness-errors] answers a probe that will not mount or bundle as a harness error, with why", async () => {
@@ -195,6 +244,7 @@ describe("the Tier 1 probe runner", () => {
   it("[tier1.deadline] makes a probe that runs past its deadline a harness error", async () => {
     const tier1: Tier1 = { env, slots: new Semaphore(4), deadlineMs: 500 };
     const answer = await runProbe(tier1, new Map(), {
+      namespace: NAMESPACE,
       probe: probes("sleeps"),
       worldBundle: world,
     });
@@ -203,6 +253,21 @@ describe("the Tier 1 probe runner", () => {
       run: { _tag: "harness-error", reason: "the probe ran past its 500 ms deadline" },
     });
   }, 20_000);
+});
+
+describe("verifierName", () => {
+  it("[t5.verifier-name] names one VerifierDO per (namespace, probe, world)", () => {
+    const [probe, worldBundle] = [
+      Schema.decodeUnknownSync(ContentHash)(`sha256:${"a".repeat(64)}`),
+      Schema.decodeUnknownSync(ContentHash)(`sha256:${"b".repeat(64)}`),
+    ];
+    expect(verifierName({ namespace: NAMESPACE, probe, world: "A", worldBundle, run: 1 })).toBe(
+      `probe:org_01JZ8PT2C4E6G8J0M2N4Q6S8V0:${"a".repeat(64)}:${"b".repeat(64)}`,
+    );
+    expect(verifierName({ namespace: OTHER, probe, world: "A", worldBundle, run: 1 })).toBe(
+      `probe:org_01JZ8PT2C4E6G8J0M2N4Q6S8V1:${"a".repeat(64)}:${"b".repeat(64)}`,
+    );
+  });
 });
 
 describe("judgeIsolate", () => {

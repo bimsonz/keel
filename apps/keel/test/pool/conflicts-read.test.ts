@@ -14,6 +14,7 @@ import {
   type EventEnvelope,
   EventEnvelope as Envelope,
   makeId,
+  type OrgId,
 } from "@keeltown/core/kernel";
 import { ProbeStore } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
@@ -26,6 +27,7 @@ import {
   BASE,
   drainOutbox,
   OTHER_ORG,
+  POOL_ORG,
   seedAgent,
   seedForeignAgent,
   seedUser,
@@ -107,10 +109,12 @@ const SOURCE = [
   { path: ".keel/support/actors.ts", text: "export const actors = ['holder', 'other'];\n" },
 ];
 
-/** Keeps a probe's files in the real bucket, as the Probe Workflow's store does, and answers their hash. */
-const kept = (files: typeof SOURCE): Promise<ContentHash> =>
+/** Keeps a probe's files in the real bucket for a namespace, as the Probe Workflow's store does, and answers their hash. */
+const kept = (namespace: OrgId, files: typeof SOURCE): Promise<ContentHash> =>
   Effect.runPromise(
-    ProbeStore.use((store) => store.put(files)).pipe(Effect.provide(ProbeStoreR2(env.BUNDLES))),
+    ProbeStore.use((store) => store.put(namespace, files)).pipe(
+      Effect.provide(ProbeStoreR2(env.BUNDLES)),
+    ),
   );
 
 /** A GET through the doorway, with a bearer token or with none. */
@@ -272,7 +276,8 @@ describe("[b23.probe-source] a probe's source over REST, from the bundle the sto
       effect: { changeId: b.changeId, proposition: cached },
     });
     await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), WAIT);
-    const bundleHash = await kept(SOURCE.toReversed());
+    // seedAgent places the project in org `pool`: the read finds the probe among that namespace's bundles.
+    const bundleHash = await kept(POOL_ORG, SOURCE.toReversed());
     await runInDurableObject(subjectOf(projectId), async (instance: SubjectDO) => {
       await instance["runtime"].runPromise(
         probeDrafted(projectId, { conflictId, attempts: 1, bundleHash }),
@@ -304,7 +309,8 @@ describe("[b23.probe-source-audience] who may read a probe's source", () => {
     const p = await project();
     const [conflictId, probeId] = [makeId("cfl", ulid()), makeId("prb", ulid())];
     const [lostConflict, lost] = [makeId("cfl", ulid()), makeId("prb", ulid())];
-    const bundleHash = await kept(SOURCE);
+    // project() places it in org `pool`: its probe is kept among that namespace's bundles.
+    const bundleHash = await kept(POOL_ORG, SOURCE);
     await arrive(
       p.events.suspected(conflictId, makeId("chg", ulid()), makeId("chg", ulid())),
       p.events.probeDrafted(conflictId, probeId, bundleHash),

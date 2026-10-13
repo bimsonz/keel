@@ -3,6 +3,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ContentHash, makeId } from "@keeltown/core/kernel";
 import { BatchVerification, type VerificationJob } from "@keeltown/core/ports";
+import { sampleNamespace } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import {
   BatchVerificationWorkflow,
@@ -12,6 +13,8 @@ import { keelVerifyParams } from "../../src/rpc/keel-verify.ts";
 
 const hash = (c: string) => Schema.decodeUnknownSync(ContentHash)(`sha256:${c.repeat(64)}`);
 const JOB: VerificationJob = {
+  projectId: makeId("prj", "01JA0000000000000000000000"),
+  namespace: sampleNamespace,
   jobId: "job-1",
   laneId: "lane:prj_01JA0000000000000000000000:main",
   candidateId: makeId("cnd", "01JA0000000000000000000001"),

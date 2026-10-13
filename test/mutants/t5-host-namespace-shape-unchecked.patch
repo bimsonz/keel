@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: t5.pool.bundle-other-namespace
+# why: Any first path segment is taken as a namespace, so a path that is not `<namespace id>/<sha256>` reaches the bucket
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index ebbbb3a9..ef045771 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -128,7 +128,7 @@ export async function serveBundle(
+     return new Response("bundles are read-only", { status: 405 });
+   const url = new URL(request.url);
+   const [, namespace, sha256] = BUNDLE_PATH.exec(url.pathname) ?? [];
+-  if (namespace === undefined || sha256 === undefined || !isNamespace(namespace))
++  if (namespace === undefined || sha256 === undefined)
+     return new Response("not a namespace's bundle", { status: 400 });
+   const signed = await bundleUrlSigned(
+     env.BUNDLE_URL_PUBLIC_KEY,

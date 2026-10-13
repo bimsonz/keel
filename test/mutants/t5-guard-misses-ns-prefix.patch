@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t r2-namespace-keys
+# why: The guard lets a store write the whole `ns/…` key itself
+diff --git a/packages/tooling/src/guards/r2-namespace-keys.ts b/packages/tooling/src/guards/r2-namespace-keys.ts
+index 5f1e4a4f..d5a5a023 100644
+--- a/packages/tooling/src/guards/r2-namespace-keys.ts
++++ b/packages/tooling/src/guards/r2-namespace-keys.ts
+@@ -49,7 +49,7 @@ export function checkR2NamespaceKeys(root: string, options: GuardOptions = {}):
+   for (const file of files)
+     if (file.path === BUILDER)
+       walkAst(file.path, file.code, (node) => families.push(...familiesOf(node)));
+-  const prefixes = ["ns", ...families].map((name) => `${name}/`);
++  const prefixes = [...families].map((name) => `${name}/`);
+   const violations: Violation[] = [];
+   let built = 0;
+   for (const file of files) {

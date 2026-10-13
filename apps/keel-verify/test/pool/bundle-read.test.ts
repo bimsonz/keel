@@ -3,10 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type BundleCheckout,
   type BundleServed,
-  bundleKey,
   KeelSandbox,
   serveBundle,
 } from "../../src/adapters/driving/do/keel-sandbox.ts";
+import { signedUrl } from "./support/probes.ts";
+
+/** The namespace whose bundles these reads are of, by id, and where the bucket keeps one of them. */
+const NAMESPACE = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
+const bundleKey = (hash: string) => `ns/org_01JZ8PT2C4E6G8J0M2N4Q6S8V0/bundles/${hash}`;
 
 const sha256Hex = async (bytes: Uint8Array) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) =>
@@ -43,7 +47,7 @@ describe("bundle reads are logged, so a short read can be told from an extract f
     const hash = await sha256Hex(bytes);
     await env.BUNDLES.put(bundleKey(hash), bytes);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const response = await serveBundle(new Request(`https://bundles.keel.internal/${hash}`), env, {
+    const response = await serveBundle(new Request(await signedUrl(hash)), env, {
       containerId: "box-1",
     });
     const served = new Uint8Array(await response.arrayBuffer());
@@ -54,6 +58,7 @@ describe("bundle reads are logged, so a short read can be told from an extract f
     if (object === null) throw new Error("the bundle was not stored");
     expect(entry).toMatchObject({
       containerId: "box-1",
+      namespace: "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
       requested: hash,
       etag: object.etag,
       size: bytes.length,
@@ -68,7 +73,7 @@ describe("bundle reads are logged, so a short read can be told from an extract f
     const hash = await sha256Hex(bytes);
     await env.BUNDLES.put(bundleKey(hash), bytes);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const response = await serveBundle(new Request(`https://bundles.keel.internal/${hash}`), env, {
+    const response = await serveBundle(new Request(await signedUrl(hash)), env, {
       containerId: "box-2",
     });
     const reader = response.body?.getReader();
@@ -93,7 +98,7 @@ describe("bundle reads are logged, so a short read can be told from an extract f
     await env.BUNDLES.put(bundleKey(hash), bytes);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const response = await serveBundle(
-      new Request(`https://bundles.keel.internal/${hash}`, { method: "HEAD" }),
+      new Request(await signedUrl(hash), { method: "HEAD" }),
       env,
       { containerId: "box-3" },
     );
@@ -139,7 +144,7 @@ const overFake = async <T>(fn: (sandbox: KeelSandbox & FakeSandbox) => Promise<T
 
 describe("the engine's archive checkout is logged with its exit code and stderr", () => {
   const hash = "d".repeat(64);
-  const checkout = `rm -rf '/workspace' && mkdir -p '/workspace' && curl --connect-timeout 10 --max-time 300 --fail --silent --show-error --location 'https://bundles.keel.internal/${hash}' | tar -xz --strip-components=1 -C '/workspace'`;
+  const checkout = `rm -rf '/workspace' && mkdir -p '/workspace' && curl --connect-timeout 10 --max-time 300 --fail --silent --show-error --location 'https://bundles.keel.internal/${NAMESPACE}/${hash}?exp=1800000000&sig=${"A".repeat(86)}' | tar -xz --strip-components=1 -C '/workspace'`;
 
   it("[bundle.checkout] logs the checkout's exit code and stderr, and passes its result through", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});

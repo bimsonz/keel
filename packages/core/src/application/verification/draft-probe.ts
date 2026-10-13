@@ -1,6 +1,6 @@
 import { Effect, Result } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
-import type { ContentHash } from "../../domain/kernel/index.ts";
+import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
 import {
   ADMISSION_RUNS,
   admit,
@@ -185,6 +185,7 @@ const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
  * cannot run at all fails, for the caller to retry.
  */
 export const draftProbe = <S, R>(
+  namespace: OrgId,
   template: ProbeTemplate<S>,
   context: DraftContext,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,
@@ -246,8 +247,9 @@ export const draftProbe = <S, R>(
         continue;
       }
       const files = template.render(slots.success);
-      const probe = yield* store.put(files);
+      const probe = yield* store.put(namespace, files);
       const { cells, harnessErrors } = yield* runMatrix(
+        namespace,
         probe,
         { ...worlds, "A-noop": noop.success },
         ADMISSION_RUNS,

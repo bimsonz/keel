@@ -11,9 +11,9 @@ const dec = new TextDecoder();
 
 PORTS.ProbeStore.contract("r2 (BUNDLES)", () => ({
   layer: ProbeStoreR2(env.BUNDLES),
-  read: (hash) =>
+  read: (namespace, hash) =>
     Effect.promise(async () => {
-      const object = await env.BUNDLES.get(bundleKey(hash));
+      const object = await env.BUNDLES.get(bundleKey(namespace, hash));
       if (object === null) return undefined;
       const files = await readBundle(new Uint8Array(await object.arrayBuffer()));
       return files.map((f) => ({ path: f.path, text: dec.decode(f.bytes) }));

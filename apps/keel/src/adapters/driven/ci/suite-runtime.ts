@@ -15,11 +15,11 @@ import {
   type TypecheckJudgement,
   WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
-import type { ContentHash, Json } from "@keeltown/core/kernel";
+import type { ContentHash, Json, OrgId } from "@keeltown/core/kernel";
 import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
-import { bundleUrl, HYDRATE_SH } from "@keeltown/runner-protocol";
-import { Effect, Layer } from "effect";
+import { BUNDLE_URL_TTL_SECONDS, HYDRATE_SH, signedBundleUrl } from "@keeltown/runner-protocol";
+import { Clock, Effect, Layer } from "effect";
 
 /** Where the ExecBox image bakes the pack's dependencies, with the sha256 of the lockfile they came from. */
 export const BAKED_DEPS = "/opt/forge-deps";
@@ -115,12 +115,13 @@ export interface SuiteRunnerOptions {
 }
 
 /**
- * exec passes on only PATH, so HOME is given explicitly, with the bundle's
- * URL for a hydration diagnosis; nothing else is.
+ * exec passes on only PATH, so HOME is given explicitly, with the signed URL
+ * of the namespace's bundle for a hydration diagnosis and its one refetch;
+ * nothing else is.
  */
-export const suiteEnv = (bundle: ContentHash): SuiteRunnerOptions["env"] => ({
+export const suiteEnv = (bundleUrl: string): SuiteRunnerOptions["env"] => ({
   HOME: "/root",
-  KEEL_BUNDLE_URL: bundleUrl(bundle),
+  KEEL_BUNDLE_URL: bundleUrl,
 });
 
 export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
@@ -272,31 +273,38 @@ const abstained = (step: PlanStep): StepResult => ({
 /**
  * `VerifierRuntime` for Tier 2 steps, over the CI engine's runner. Each step
  * in TIER2_RUNNERS is one runner (a fresh sandbox hydrated from the job's
- * bundle); its in-band report is parsed and judged by that step's judge, and
+ * bundle, the namespace's); its in-band report is parsed and judged by that step's judge, and
  * the judgement's evidence is redacted and stored durably before the result
  * cites it. A runner the engine gave up on abstains, and so does any step this
  * runtime has no runner for.
  *
  * `literals` are secret values to redact wherever they appear (the account id).
+ * `signingKey` signs the bundle URL each runner is handed, for its own bundle
+ * and for a step's life.
  */
 export const SuiteRuntimeCi = (deps: {
   readonly runner: SuiteRunner;
   readonly durable: Durable;
   readonly literals: readonly string[];
+  readonly signingKey: string;
 }) =>
   Layer.effect(
     VerifierRuntime,
     Effect.gen(function* () {
       const evidence = yield* EvidenceStore;
-      const runStep = (bundle: ContentHash) => (step: PlanStep) =>
+      const runStep = (namespace: OrgId, bundle: ContentHash) => (step: PlanStep) =>
         Effect.gen(function* () {
           const tier2 = TIER2_RUNNERS[step.id];
           if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+          const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+          const url = yield* Effect.promise(() =>
+            signedBundleUrl(deps.signingKey, namespace, bundle, now + BUNDLE_URL_TTL_SECONDS),
+          );
           const stdout = yield* Effect.tryPromise(() =>
             deps.runner({
               name: step.id,
               command: tier2.command,
-              env: suiteEnv(bundle),
+              env: suiteEnv(url),
               config: SUITE_CONFIG,
               cloudflareCredentials: false,
               sourceControlCredentials: false,
@@ -310,13 +318,13 @@ export const SuiteRuntimeCi = (deps: {
           const judged = yield* tier2.judge(step, stdout, deps.literals);
           const resultRef = yield* deps.durable(
             `${step.id}:evidence`,
-            evidence.put(judged.document),
+            evidence.put(namespace, judged.document),
           );
           const { failure: _failure, ...result } = judged.report;
           return { ...result, resultRef } satisfies StepResult;
         });
       return VerifierRuntime.of({
-        run: (job) => Effect.forEach(job.steps, runStep(job.bundle)),
+        run: (namespace, job) => Effect.forEach(job.steps, runStep(namespace, job.bundle)),
       });
     }),
   );

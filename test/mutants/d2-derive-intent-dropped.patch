@@ -2,10 +2,10 @@
 # kills: d21.derive.declared
 # why: What the agent declared never reaches derivation, so an effect it declared honestly is recorded as undeclared and the change is treated as drifting
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index ae2251d..fda20ef 100644
+index c65897aa..da58b320 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -171,7 +171,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+@@ -190,7 +190,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
            base: before.facts,
            head: after.facts,
            subjects: anchors,
@@ -13,4 +13,4 @@ index ae2251d..fda20ef 100644
 +          intent: { ...workspace.intent, declaredEffects: [] },
          });
    const derivationRef = yield* (yield* EvidenceStore).put(
-     recordJson({
+     namespace,

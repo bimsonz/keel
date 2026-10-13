@@ -1,6 +1,15 @@
 import type { WorkflowStep, WorkflowStepConfig } from "cloudflare:workers";
-import type { ProbeSteps, StepPolicy } from "@keeltown/core/application/verification";
-import { Effect } from "effect";
+import { NonRetryableError } from "cloudflare:workflows";
+import {
+  describeNoNamespace,
+  jobNamespace,
+  type ProbeSteps,
+  projectNamespace,
+  type StepPolicy,
+} from "@keeltown/core/application/verification";
+import { OrgId, type ProjectId } from "@keeltown/core/kernel";
+import type { ProjectOrgs } from "@keeltown/core/ports";
+import { Effect, Option, Result, Schema } from "effect";
 
 /** Reads and ledger writes retry quickly; a draft calls the model up to four times, so it is given long and tried twice. */
 const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
@@ -10,6 +19,52 @@ const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
   },
   draft: { retries: { limit: 1, delay: "30 seconds", backoff: "constant" }, timeout: "30 minutes" },
 };
+
+/**
+ * The `namespace` step every Workflow of a project runs before it keeps or
+ * reads anything of that project: the namespace the project belongs to, read
+ * once and kept, so each store call of the instance names it. A project with
+ * no place ends the instance at once, naming the project: there is no
+ * namespace to fall back on, and trying again finds none. `named` is the
+ * namespace a job's payload carries (the engine fixes where runners fetch
+ * their bundle from the payload, before any step): the step reads the
+ * project's own again, and a job naming another ends the same way.
+ */
+export async function namespaceStep(
+  step: WorkflowStep,
+  run: <A>(effect: Effect.Effect<A, never, ProjectOrgs>) => Promise<A>,
+  projectId: ProjectId,
+  named?: OrgId,
+): Promise<OrgId> {
+  const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string> => {
+    const read = await run(
+      Effect.result(
+        named === undefined ? projectNamespace(projectId) : jobNamespace(projectId, named),
+      ),
+    );
+    if (Result.isFailure(read)) throw new NonRetryableError(describeNoNamespace(read.failure));
+    return read.success;
+  });
+  return Schema.decodeUnknownSync(OrgId)(kept);
+}
+
+/**
+ * Precheck's `namespace` step: the namespace the project belongs to, or
+ * `undefined` for a project with no place, kept either way. Precheck answers
+ * a submission, so it refuses one on the change's own log; every other
+ * Workflow of a project follows a plan its Precheck compiled, and ends
+ * instead (`namespaceStep`).
+ */
+export async function placedStep(
+  step: WorkflowStep,
+  run: <A>(effect: Effect.Effect<A, never, ProjectOrgs>) => Promise<A>,
+  projectId: ProjectId,
+): Promise<OrgId | undefined> {
+  const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string | null> =>
+    Option.getOrNull(await run(Effect.option(projectNamespace(projectId)))),
+  );
+  return kept === null ? undefined : Schema.decodeUnknownSync(OrgId)(kept);
+}
 
 /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */
 const timedOut = (error: unknown) =>

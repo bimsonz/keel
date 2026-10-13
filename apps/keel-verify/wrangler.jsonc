@@ -14,6 +14,9 @@
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
     // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
     "BOXGATE_CLASSES": "",
+    // The public half (SPKI) of the key pair keel signs bundle URLs with: the bundle host verifies with it.
+    // scripts/deploy.ts fills it from Terraform. It signs nothing, so keel-verify still holds no secret.
+    "BUNDLE_URL_PUBLIC_KEY": "",
   },
   "durable_objects": {
     "bindings": [

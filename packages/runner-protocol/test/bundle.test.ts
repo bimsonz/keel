@@ -336,6 +336,31 @@ describe("hydrating a runner's workspace", () => {
     expect(snapshot(dir)).toEqual(before);
   });
 
+  it("[t5.bundle-url.rehydrate] refetches by a signed URL: the content address is its path, whatever its query carries, and the signature is never printed", async () => {
+    const bundle = await writeBundle(files);
+    const other = await writeBundle([file("package.json", "{}\n"), file("evil.ts", "x\n")]);
+    const signature = "S".repeat(86);
+    const signed = (url: string) => `${url}?exp=1800000000&sig=${signature}`;
+    const dir = extract(bundle);
+    rmSync(join(dir, "test/a.test.ts"));
+    const result = hydrate(dir, signed(serve(await sha256Hex(bundle), bundle)));
+    expect(result.status).toBe(0);
+    expect(result.lines[0]).toBe("KEEL_HYDRATION_RETRIED hash-mismatch");
+    expect(result.lines.at(-1)).toBe("KEEL_HYDRATION ok");
+    expect(verify(dir)).toEqual({ ok: true, reason: "" });
+    const diff = result.lines.find((l) => l.startsWith("KEEL_HYDRATION_DIFF "));
+    const printed = Buffer.from(diff?.slice("KEEL_HYDRATION_DIFF ".length) ?? "", "base64");
+    expect(printed.toString("utf8")).toContain(`want ${await sha256Hex(bundle)}\n`);
+    expect(printed.toString("utf8")).not.toContain(signature);
+
+    // Signed or not, a refetch that is not the bundle its path names is refused.
+    const bad = extract(bundle);
+    rmSync(join(bad, "test/a.test.ts"));
+    const refused = hydrate(bad, signed(serve(await sha256Hex(bundle), other)));
+    expect(refused.status).toBe(1);
+    expect(refused.lines.at(-1)).toBe("KEEL_HYDRATION failed hash-mismatch");
+  });
+
   it("[bundle.rehydrate-once] never refetches a second time", async () => {
     const bundle = await writeBundle(files);
     const dir = extract(bundle);

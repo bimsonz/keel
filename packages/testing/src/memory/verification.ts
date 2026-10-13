@@ -4,6 +4,7 @@ import {
   CommitSha,
   ContentHash,
   makeId,
+  type OrgId,
   type VerdictId,
 } from "@keeltown/core/kernel";
 import {
@@ -44,6 +45,7 @@ import {
 } from "@keeltown/core/ports";
 import {
   guardFileText,
+  namespaceKey,
   type ProbeFile,
   type ProbeRun,
   readGuardFile,
@@ -57,6 +59,7 @@ import type {
 } from "../contracts/verification.ts";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { makeClockMemory } from "./identity.ts";
+import { sampleNamespace } from "../namespaces.ts";
 
 /**
  * A scripted decision model. Without a script every question is answered
@@ -115,14 +118,18 @@ export function makeVerifierRuntimeMemory(
   outcome?: (step: VerificationJob["steps"][number]) => StepResult["outcome"],
 ) {
   const jobs: VerificationJob[] = [];
+  const namespaces: OrgId[] = [];
   return {
     jobs,
+    /** The namespace each job was run for, in the order of `jobs`. */
+    namespaces,
     layer: Layer.succeed(
       VerifierRuntime,
       VerifierRuntime.of({
-        run: (job) =>
+        run: (namespace, job) =>
           Effect.sync(() => {
             jobs.push(job);
+            namespaces.push(namespace);
             return job.steps.map((step) => ({
               stepId: step.id,
               outcome: outcome?.(step) ?? "pass",
@@ -451,6 +458,7 @@ const probeHash = (i: number) =>
   Schema.decodeUnknownSync(ContentHash)(`sha256:${String(i).padStart(64, "0")}`);
 
 const probeRequest = (i: number): ProbeRunRequest => ({
+  namespace: sampleNamespace,
   probe: probeHash(i),
   world: "A",
   worldBundle: probeHash(9),
@@ -480,9 +488,14 @@ export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
   return { layer: runner.layer, prepared };
 }
 
+/** Where the memory ProbeStore keeps a namespace's probe: the key the R2 adapter keeps its bundle at. */
+const probeKeyOf = (namespace: OrgId, hash: ContentHash) =>
+  namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
+
 /**
  * Probes kept as files, under the sha256 of their canonical JSON (the files
- * sorted by path), so the hash is as stable as a bundle's.
+ * sorted by path), so the hash is as stable as a bundle's, at the key the R2
+ * adapter keeps a namespace's bundles at.
  */
 export function makeProbeStoreMemory(): ProbeStoreHarness & {
   readonly stored: ReadonlyMap<string, readonly ProbeFile[]>;
@@ -490,11 +503,11 @@ export function makeProbeStoreMemory(): ProbeStoreHarness & {
   const stored = new Map<string, readonly ProbeFile[]>();
   return {
     stored,
-    read: (hash) => Effect.sync(() => stored.get(hash)),
+    read: (namespace, hash) => Effect.sync(() => stored.get(probeKeyOf(namespace, hash))),
     layer: Layer.succeed(
       ProbeStore,
       ProbeStore.of({
-        put: (files) =>
+        put: (namespace, files) =>
           Effect.promise(async () => {
             const sorted = files.toSorted((a, b) =>
               a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
@@ -506,11 +519,11 @@ export function makeProbeStoreMemory(): ProbeStoreHarness & {
             const hash = Schema.decodeUnknownSync(ContentHash)(
               `sha256:${[...digest].map((b) => b.toString(16).padStart(2, "0")).join("")}`,
             );
-            stored.set(hash, sorted);
+            stored.set(probeKeyOf(namespace, hash), sorted);
             return hash;
           }),
-        get: (hash) => {
-          const files = stored.get(hash);
+        get: (namespace, hash) => {
+          const files = stored.get(probeKeyOf(namespace, hash));
           return files === undefined
             ? Effect.fail(new BundleMissing({ hash }))
             : Effect.succeed(files);

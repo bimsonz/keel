@@ -1,5 +1,5 @@
 import { Clock, Effect } from "effect";
-import type { ContentHash } from "../../domain/kernel/index.ts";
+import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
 import type { PlanStep, StepReport } from "../../domain/verification/index.ts";
 import { EvidenceStore, ProbeRunner } from "../ports/index.ts";
 import type { StepRunner } from "./run-plan.ts";
@@ -20,6 +20,7 @@ import type { StepRunner } from "./run-plan.ts";
  */
 export const withGuards =
   <R>(
+    namespace: OrgId,
     candidate: ContentHash,
     otherwise: StepRunner<R>,
   ): StepRunner<R | ProbeRunner | EvidenceStore> =>
@@ -29,7 +30,13 @@ export const withGuards =
     return Effect.gen(function* () {
       const started = yield* Clock.currentTimeMillis;
       const run = yield* (yield* ProbeRunner)
-        .run({ probe: guards.probe, world: world ?? "AB", worldBundle: candidate, run: 1 })
+        .run({
+          namespace,
+          probe: guards.probe,
+          world: world ?? "AB",
+          worldBundle: candidate,
+          run: 1,
+        })
         .pipe(
           Effect.catchTag("ProbeRunnerUnavailable", (e) =>
             Effect.succeed({ _tag: "unavailable", reason: e.reason } as const),
@@ -49,7 +56,7 @@ export const withGuards =
       });
       const finished = yield* Clock.currentTimeMillis;
       const durationMs = finished - started;
-      const resultRef = yield* (yield* EvidenceStore).put({
+      const resultRef = yield* (yield* EvidenceStore).put(namespace, {
         stepId: step.id,
         outcome: run._tag === "ran" ? run.outcome : "abstain",
         guard: { predicate: guards.predicate, probe: guards.probe },

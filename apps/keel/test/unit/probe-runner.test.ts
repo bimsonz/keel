@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { VerifierUnavailable } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { ProbeRunner, type ProbeRunRequest } from "@keeltown/core/ports";
+import { sampleNamespace } from "@keeltown/testing";
 import { Effect, Exit, Schema } from "effect";
 import {
   encodeExit as encodeVerifierExit,
@@ -15,7 +16,13 @@ import {
 } from "../../src/adapters/driven/do-rpc/probe-runner.ts";
 
 const hash = (n: number) => ContentHash.make(`sha256:${String(n).padStart(64, "0")}`);
-const REQUEST: ProbeRunRequest = { probe: hash(1), world: "A-noop", worldBundle: hash(2), run: 3 };
+const REQUEST: ProbeRunRequest = {
+  namespace: sampleNamespace,
+  probe: hash(1),
+  world: "A-noop",
+  worldBundle: hash(2),
+  run: 3,
+};
 
 /** keel-verify's entrypoint, answering with keel-verify's own codec: the other copy of the contract. */
 function verifier(answer: () => Exit.Exit<ProbeRunReply, VerifierUnavailable> | "throw") {

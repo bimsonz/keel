@@ -2,14 +2,14 @@
 # kills: bundle.rehydrate-verified
 # why: The refetch skips its sha256 check, so any whole bundle served at the address replaces the workspace
 diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
-index 1d9d8f2..d6fa2c4 100644
+index 46850588..0c0ef087 100644
 --- a/packages/runner-protocol/src/bundle.ts
 +++ b/packages/runner-protocol/src/bundle.ts
-@@ -247,7 +247,6 @@ export const REHYDRATE_BUNDLE_SH = [
-   "  rm -rf $r; mkdir -p $r",
+@@ -457,7 +457,6 @@ export const REHYDRATE_BUNDLE_SH = [
    '  [ -n "$url" ] || { echo no-url; return 1; }',
    '  curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o $r/bundle.tgz "$url" 2>/dev/null || { echo fetch-failed; return 1; }',
--  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${url##*/}" ] || { echo archive-hash-mismatch; return 1; }',
+   "  addr=${url%%\\?*}",
+-  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${addr##*/}" ] || { echo archive-hash-mismatch; return 1; }',
    '  find "$dir" -mindepth 1 -delete || { echo clear-failed; return 1; }',
    '  tar -xzf $r/bundle.tgz --strip-components=1 -C "$dir" || { echo extract-failed; return 1; }',
    "}",

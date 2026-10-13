@@ -8,6 +8,6 @@ import { planKey, PlanStoreR2 } from "../../src/adapters/driven/r2/plan-store.ts
 
 PORTS.PlanStore.contract("r2 (ARCHIVE)", () => ({
   layer: PlanStoreR2(env.ARCHIVE),
-  plant: (hash, text) =>
-    Effect.promise(() => env.ARCHIVE.put(planKey(hash), text)).pipe(Effect.asVoid),
+  plant: (namespace, hash, text) =>
+    Effect.promise(() => env.ARCHIVE.put(planKey(namespace, hash), text)).pipe(Effect.asVoid),
 }));

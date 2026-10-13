@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: t5.probe-source.unplaced
+# why: Reading the source of a probe whose project has no place fails, where the probe is there and only its files are not
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index a900383a..3f92fac6 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -352,7 +352,6 @@ export const readProbeSource: (
+       Effect.flatMap((namespace) => store.get(namespace, bundleHash)),
+       Effect.catchTags({
+         BundleMissing: () => Effect.succeed(NO_FILES),
+-        ProjectUnplaced: () => Effect.succeed(NO_FILES),
+       }),
+     );
+     return { probeId, bundleHash, files };

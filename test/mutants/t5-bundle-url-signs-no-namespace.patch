@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-url.test.ts
+# kills: t5.bundle-url.other-namespace, t5.bundle-url.tampered
+# why: The signature covers the hash and not whose bundle it is: one namespace's signed URL opens the same hash under any other namespace's id
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 46850588..f44f8816 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -311,7 +311,7 @@ const derOf = (key: string): Uint8Array<ArrayBuffer> =>
+ 
+ /** What a bundle URL's signature covers: whose bundle, which bundle, and when the URL stops being good. */
+ const signedText = (namespace: string, sha256: string, expires: number): Uint8Array<ArrayBuffer> =>
+-  new TextEncoder().encode(`${namespace}|${sha256}|${expires}`).slice();
++  new TextEncoder().encode(`${sha256}|${expires}`).slice();
+ 
+ /**
+  * Where a sandbox fetches a namespace's bundle, signed by Keel: `bundleUrl`

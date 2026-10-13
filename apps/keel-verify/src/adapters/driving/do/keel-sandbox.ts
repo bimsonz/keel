@@ -1,3 +1,7 @@
+import { namespaceKey } from "@keeltown/core/application/verification";
+import { OrgId } from "@keeltown/core/kernel";
+import { bundleUrlSigned } from "@keeltown/runner-protocol";
+import { Schema } from "effect";
 import { CiSandbox } from "./ci-sandbox.js";
 
 type BackupOptions = Parameters<CiSandbox["createBackup"]>[0];
@@ -7,8 +11,10 @@ type ExecOptions = Parameters<CiSandbox["execWithSessionToken"]>[2];
 /** The one host family a sandbox may reach: virtual, answered here, never on the internet. */
 export const BUNDLE_HOSTS = "*.keel.internal";
 
-/** Where a candidate bundle lives in the BUNDLES bucket, by its sha256 hex. */
-export const bundleKey = (sha256: string): string => `bundles/${sha256}`;
+/** A bundle's address on the host: `/<namespace id>/<sha256 hex>`, and nothing else. */
+const BUNDLE_PATH = /^\/([^/]+)\/([0-9a-f]{64})$/;
+
+const isNamespace = Schema.is(OrgId);
 
 /**
  * One bundle read as the handler saw it, logged when its stream ends: what R2
@@ -19,6 +25,7 @@ export const bundleKey = (sha256: string): string => `bundles/${sha256}`;
 export interface BundleServed {
   readonly event: "keel.bundle.served";
   readonly containerId: string;
+  readonly namespace: string;
   readonly requested: string;
   readonly etag: string;
   readonly size: number;
@@ -96,10 +103,21 @@ function measured(
 }
 
 /**
- * Answers `GET <anything>.keel.internal/<sha256>` with that bundle, read from
- * BUNDLES. keel-verify only ever reads BUNDLES (guard: readonly-bundles), and
- * no URL or token for it exists outside this handler. Each read is logged as
- * a `BundleServed` once its body ends.
+ * Answers `GET <anything>.keel.internal/<namespace id>/<sha256>?exp=…&sig=…`
+ * with that namespace's bundle, read from BUNDLES at the namespace's own key:
+ * a hash kept for one namespace is not there under another's id. Any other
+ * path is refused, the bare `/<sha256>` of before namespaces included.
+ *
+ * Nothing is read until the URL carries Keel's signature for exactly this
+ * namespace and bundle, still in date (403 otherwise). keel signs a URL only
+ * for the job it starts, so a sandbox holds one for its own bundle and can
+ * make none: knowing another namespace's id and a bundle's hash fetches
+ * nothing. The check needs only BUNDLE_URL_PUBLIC_KEY, which signs nothing,
+ * so keel-verify still holds no secret.
+ *
+ * keel-verify only ever reads BUNDLES (guard: readonly-bundles), and no URL
+ * or token for it exists outside this handler. Each read is logged as a
+ * `BundleServed` once its body ends.
  */
 export async function serveBundle(
   request: Request,
@@ -108,10 +126,20 @@ export async function serveBundle(
 ): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD")
     return new Response("bundles are read-only", { status: 405 });
-  const sha256 = new URL(request.url).pathname.replace(/^\/+/, "");
-  if (!/^[0-9a-f]{64}$/.test(sha256)) return new Response("not a bundle hash", { status: 400 });
+  const url = new URL(request.url);
+  const [, namespace, sha256] = BUNDLE_PATH.exec(url.pathname) ?? [];
+  if (namespace === undefined || sha256 === undefined || !isNamespace(namespace))
+    return new Response("not a namespace's bundle", { status: 400 });
+  const signed = await bundleUrlSigned(
+    env.BUNDLE_URL_PUBLIC_KEY,
+    namespace,
+    sha256,
+    url.searchParams,
+    Math.floor(Date.now() / 1000),
+  );
+  if (!signed) return new Response("not a bundle URL Keel signed", { status: 403 });
   const started = Date.now();
-  const object = await env.BUNDLES.get(bundleKey(sha256));
+  const object = await env.BUNDLES.get(namespaceKey(namespace, "bundles", sha256));
   if (object === null) return new Response("no such bundle", { status: 404 });
   const body =
     request.method === "HEAD"
@@ -121,6 +149,7 @@ export async function serveBundle(
             JSON.stringify({
               event: "keel.bundle.served",
               containerId: ctx.containerId,
+              namespace,
               requested: sha256,
               etag: object.etag,
               size: object.size,
@@ -139,7 +168,8 @@ export async function serveBundle(
 }
 
 /** @cloudflare/ci's archive checkout (`curl … '<url>' | tar -xz …`) for a bundle host, capturing the bundle's hash. */
-const ARCHIVE_CHECKOUT = /https:\/\/[a-z0-9.-]+\.keel\.internal\/([0-9a-f]{64})'? \| tar -xz /;
+const ARCHIVE_CHECKOUT =
+  /https:\/\/[a-z0-9.-]+\.keel\.internal\/[A-Za-z0-9_]+\/([0-9a-f]{64})(?:\?[^' ]*)?'? \| tar -xz /;
 
 /** How much of a checkout's stderr is logged: curl's and tar's last words, never a workspace's worth. */
 const CHECKOUT_STDERR = 2_000;

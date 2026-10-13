@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: runner.no-credentials
+# why: The hydration URL a step is given expires the second it is made, so its one verified refetch is always refused
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 0a9c7641..1f62dbb3 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -298,7 +298,7 @@ export const SuiteRuntimeCi = (deps: {
+           if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+           const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+           const url = yield* Effect.promise(() =>
+-            signedBundleUrl(deps.signingKey, namespace, bundle, now + BUNDLE_URL_TTL_SECONDS),
++            signedBundleUrl(deps.signingKey, namespace, bundle, now),
+           );
+           const stdout = yield* Effect.tryPromise(() =>
+             deps.runner({

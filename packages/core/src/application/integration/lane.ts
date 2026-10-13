@@ -57,6 +57,7 @@ import {
   type Transaction,
   type Transition,
 } from "../ports/index.ts";
+import { projectNamespace } from "../verification/index.ts";
 import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kinds the Lane keeps: its queue and batch in flight, and each batch as its events fold. */
@@ -716,8 +717,10 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
   composed: NonNullable<ActiveBatch["composed"]>,
 ) {
   const staging = projectRepos(lane.projectId).staging;
+  // A project with no place never has a batch: its Precheck ends before it compiles a plan.
+  const namespace = yield* projectNamespace(lane.projectId).pipe(Effect.orDie);
   const bundled = yield* Effect.result(
-    (yield* CandidateBundles).bundle(staging, composed.commitSha),
+    (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha),
   );
   if (Result.isSuccess(bundled)) {
     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
@@ -814,6 +817,8 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
       lane: () => now,
     })).pipe(Effect.orDie);
   yield* (yield* BatchVerification).start(instanceId, {
+    projectId: lane.projectId,
+    namespace: yield* projectNamespace(lane.projectId).pipe(Effect.orDie),
     jobId: `${batch.id}#${batch.attempt}`,
     laneId: lane.laneId,
     candidateId: active.candidateId,

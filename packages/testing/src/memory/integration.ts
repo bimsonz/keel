@@ -4,7 +4,13 @@ import {
   PushRejected,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
-import { type ChangeId, CommitSha, ContentHash, type ProjectId } from "@keeltown/core/kernel";
+import {
+  type ChangeId,
+  CommitSha,
+  ContentHash,
+  type OrgId,
+  type ProjectId,
+} from "@keeltown/core/kernel";
 import {
   BatchVerification,
   BundleRefused,
@@ -292,18 +298,22 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
 /**
  * Bundles by address only: a commit's bundle is `sha256:` of the staging repo
  * and the commit, so one commit always has one address. `refuse` lists commits
- * whose tree the bundle format cannot carry. `bundled` records each call.
+ * whose tree the bundle format cannot carry. `bundled` records each call, and
+ * `namespaces` the namespace each was bundled for.
  */
 export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly string[] } = {}) {
   const bundled: CommitSha[] = [];
+  const namespaces: OrgId[] = [];
   return {
     bundled,
+    namespaces,
     layer: Layer.succeed(
       CandidateBundles,
       CandidateBundles.of({
-        bundle: (staging, commit) =>
+        bundle: (namespace, staging, commit) =>
           Effect.gen(function* () {
             bundled.push(commit);
+            namespaces.push(namespace);
             if (options.refuse?.includes(commit) === true)
               return yield* new BundleRefused({ reason: `symlink in ${commit}` });
             const digest = yield* Effect.promise(() =>

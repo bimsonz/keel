@@ -5,6 +5,7 @@ import type {
   CommitSha,
   ConflictId,
   ContentHash,
+  OrgId,
   ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -42,6 +43,8 @@ export interface PlannedCheck {
 
 /** One KeelWorldCheck instance's work: the checks of one world of a conflict's matrix, run on that world's bundle. */
 export interface WorldCheckJob {
+  /** The namespace the project belongs to: where the world's bundle and the checks' plans and evidence are kept. */
+  readonly namespace: OrgId;
   readonly projectId: ProjectId;
   readonly key: SubjectKey;
   readonly conflictId: ConflictId;
@@ -63,6 +66,7 @@ export const worldCheckInstanceId = (conflictId: ConflictId, world: FlowWorld): 
  */
 export const worldCheckJobs = (
   conflict: {
+    readonly namespace: OrgId;
     readonly projectId: ProjectId;
     readonly key: SubjectKey;
     readonly conflictId: ConflictId;
@@ -149,7 +153,7 @@ export const worldCheckCell = (
  * by hash as KeelVerify runs a change's. A flow that cannot be read or does
  * not compile leaves trunk's check unplanned, saying why.
  */
-export const trunkCheckPlan = (staging: RepoRef, commit: CommitSha) =>
+export const trunkCheckPlan = (namespace: OrgId, staging: RepoRef, commit: CommitSha) =>
   Effect.gen(function* () {
     const sources = yield* Effect.result((yield* FlowSpecSource).read(staging, commit));
     if (Result.isFailure(sources))
@@ -184,7 +188,7 @@ export const trunkCheckPlan = (staging: RepoRef, commit: CommitSha) =>
       } satisfies CheckPlan;
     return {
       _tag: "Planned",
-      planHash: yield* (yield* PlanStore).put(plan.success),
+      planHash: yield* (yield* PlanStore).put(namespace, plan.success),
     } satisfies CheckPlan;
   });
 

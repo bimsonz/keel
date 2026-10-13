@@ -17,6 +17,8 @@ import {
   buildTree,
   type FixtureFiles,
   makeBundleStoreMemory,
+  otherNamespace,
+  sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { CandidateBundlesGitCore } from "../../src/adapters/driven/gitcore/candidate-bundles.ts";
@@ -69,14 +71,20 @@ describe("CandidateBundles over gitcore", () => {
           ]),
         );
         const program = Effect.gen(function* () {
-          const hash = yield* (yield* CandidateBundles).bundle(STAGING, commit);
-          const again = yield* (yield* CandidateBundles).bundle(STAGING, commit);
-          const stored = yield* (yield* BundleStore).get(hash);
-          return { hash, again, stored };
+          const hash = yield* (yield* CandidateBundles).bundle(sampleNamespace, STAGING, commit);
+          const again = yield* (yield* CandidateBundles).bundle(sampleNamespace, STAGING, commit);
+          const store = yield* BundleStore;
+          const stored = yield* store.get(sampleNamespace, hash);
+          // [t5.candidate-bundles.namespace] The bundle is the namespace's it was bundled for, and no other's.
+          const elsewhere = yield* Effect.flip(store.get(otherNamespace, hash));
+          return { hash, again, stored, elsewhere };
         });
-        const { hash, again, stored } = yield* program.pipe(Effect.provide(bundling(reader)));
+        const { hash, again, stored, elsewhere } = yield* program.pipe(
+          Effect.provide(bundling(reader)),
+        );
         expect(stored).toEqual(expected);
         expect(again).toBe(hash);
+        expect(elsewhere).toMatchObject({ _tag: "BundleMissing", hash });
       }),
   );
 
@@ -93,9 +101,9 @@ describe("CandidateBundles over gitcore", () => {
             repoOf({ "README.md": "keel\n", [path]: odd }),
           );
           const error = yield* Effect.flip(
-            Effect.flatMap(CandidateBundles, (b) => b.bundle(STAGING, commit)).pipe(
-              Effect.provide(bundling(reader)),
-            ),
+            Effect.flatMap(CandidateBundles, (b) =>
+              b.bundle(sampleNamespace, STAGING, commit),
+            ).pipe(Effect.provide(bundling(reader))),
           );
           expect(error).toMatchObject({
             _tag: "BundleRefused",

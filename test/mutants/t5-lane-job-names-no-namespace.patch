@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.verify-start
+# why: The Lane starts KeelVerify without naming the namespace the candidate was bundled for
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4482c8f3..20d5f5b7 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -818,7 +818,6 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
+     })).pipe(Effect.orDie);
+   yield* (yield* BatchVerification).start(instanceId, {
+     projectId: lane.projectId,
+-    namespace: yield* projectNamespace(lane.projectId).pipe(Effect.orDie),
+     jobId: `${batch.id}#${batch.attempt}`,
+     laneId: lane.laneId,
+     candidateId: active.candidateId,

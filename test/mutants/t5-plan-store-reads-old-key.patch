@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts
+# kills: t5.pool.plan-old-key
+# why: A plan kept under the key of before namespaces is still read when the namespace's own key holds nothing
+diff --git a/apps/keel/src/adapters/driven/r2/plan-store.ts b/apps/keel/src/adapters/driven/r2/plan-store.ts
+index 617392f1..cd2f4548 100644
+--- a/apps/keel/src/adapters/driven/r2/plan-store.ts
++++ b/apps/keel/src/adapters/driven/r2/plan-store.ts
+@@ -36,7 +36,9 @@ export const PlanStoreR2 = (bucket: R2Bucket) =>
+       },
+       get: (namespace, hash) =>
+         Effect.promise(async () => {
+-          const object = await bucket.get(planKey(namespace, hash));
++          const object =
++            (await bucket.get(planKey(namespace, hash))) ??
++            (await bucket.get(`plans/${hash.slice("sha256:".length)}`));
+           return object === null ? undefined : await object.text();
+         }).pipe(
+           Effect.flatMap((text): Effect.Effect<FlowPlan, PlanMissing | PlanCorrupt> => {

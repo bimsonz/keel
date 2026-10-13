@@ -30,8 +30,15 @@
     // @cloudflare/ci's CF_TOKEN and R2 S3 keys are deliberately absent: backups go through
     // the BACKUP_BUCKET binding and no runner asks for credentials (guard: runner-credentials).
     // BETTER_AUTH_SECRET: signs and encrypts Better Auth's cookies and tokens. From Terraform.
+    // BUNDLE_URL_SIGNING_KEY: the Ed25519 private key (PKCS#8) that signs each bundle URL a sandbox is
+    // handed; keel-verify's bundle host verifies with the public half and holds no secret. From Terraform.
     // GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET are optional: GitHub sign-in is offered only when both are set.
-    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID", "BETTER_AUTH_SECRET"],
+    "required": [
+      "KEEL_SIGNING_KEY",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "BETTER_AUTH_SECRET",
+      "BUNDLE_URL_SIGNING_KEY",
+    ],
   },
   // Workers Rate Limiting: each IP's writes to /v1/auth/* (sign-in, codes, sign-up).
   "ratelimits": [

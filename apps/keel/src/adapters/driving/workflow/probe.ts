@@ -6,7 +6,7 @@ import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { ConflictId, ProjectId } from "@keeltown/core/kernel";
 import { Option, Schema } from "effect";
 import { probeRuntime } from "../../../composition/workflow.ts";
-import { workflowSteps } from "./steps.ts";
+import { namespaceStep, workflowSteps } from "./steps.ts";
 
 /** What the fan-out starts a Probe with, for ConflictSuspected: where the conflict lives. */
 export const ProbeParams = Schema.Struct({
@@ -27,7 +27,9 @@ const failure = (end: ProbeEnd): string | undefined =>
 /**
  * Probe, started by ConflictSuspected as `probe-<conflictId>` (one per
  * conflict): drafts the conflict's probe and reports it to the conflict's
- * Subject DO, through core's `probeConflict`, one durable step at a time. An
+ * Subject DO, through core's `probeConflict`, one durable step at a time,
+ * after a `namespace` step reads the namespace its project belongs to, under
+ * which every world, probe, plan and evidence document of it is kept. An
  * end that is a harness error (a world unreadable in staging, a conflict that
  * is not where its event said) logs one ops line and fails the instance.
  */
@@ -37,10 +39,16 @@ export class Probe extends WorkflowEntrypoint<Env, ProbeParams> {
     if (Option.isNone(params)) throw new NonRetryableError("not a Probe's params");
     const runtime = probeRuntime(this.env);
     try {
+      const namespace = await namespaceStep(
+        step,
+        (effect) => runtime.runPromise(effect),
+        params.value.projectId,
+      );
       const end = await runtime.runPromise(
         probeConflict(
           {
             ...params.value,
+            namespace,
             instanceId: event.instanceId,
             staging: projectRepos(params.value.projectId).staging,
           },

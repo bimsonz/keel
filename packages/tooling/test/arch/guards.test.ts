@@ -47,6 +47,11 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /BUNDLES is destructured/,
   ],
   "xstate-test-only": [/imports xstate; xstate is a test-only/, /imports @xstate\/inspect/],
+  "r2-namespace-keys": [
+    /builds a key under bundles\/ by hand/,
+    /builds a key under evidence\/ by hand/,
+    /builds a key under ns\/ by hand/,
+  ],
   R1: [
     /outside the domain/,
     /package hono/,

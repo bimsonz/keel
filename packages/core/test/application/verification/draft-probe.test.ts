@@ -22,7 +22,7 @@ import {
   ProbeStore,
 } from "../../../src/application/ports/index.ts";
 import { Proposition } from "../../../src/domain/coordination/index.ts";
-import { ContentHash } from "../../../src/domain/kernel/index.ts";
+import { ContentHash, OrgId } from "../../../src/domain/kernel/index.ts";
 import {
   type FlowWorld,
   ModelAbstained,
@@ -41,6 +41,9 @@ const WORLDS: Readonly<Record<FlowWorld, ContentHash>> = {
 };
 /** The A-noop world the default builder answers with. */
 const A_NOOP = hash(14);
+
+/** The namespace every call names, and the only one the stores below keep anything for. */
+const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** A's revoke, as S-1's a.patch adds it: what the slots name for A-noop. */
 const REVOKE_PATH = "src/routes/collaborators.ts";
@@ -179,8 +182,9 @@ function drafting(
     Layer.succeed(
       ProbeStore,
       ProbeStore.of({
-        put: (files) =>
+        put: (namespace, files) =>
           Effect.sync(() => {
+            expect(namespace).toBe("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
             puts += 1;
             const probe = hash(1000 + puts);
             attemptOf.set(probe, calls.length);
@@ -203,7 +207,7 @@ function drafting(
   );
   const run = () =>
     Effect.runPromise(
-      draftProbe(template, CONTEXT, WORLDS, (recipe) =>
+      draftProbe(NAMESPACE, template, CONTEXT, WORLDS, (recipe) =>
         Effect.suspend(() => {
           recipes.push(recipe);
           return aNoop(recipe);

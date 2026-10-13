@@ -8,10 +8,13 @@ import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { VerifierRuntime } from "@keeltown/core/ports";
+import { bundleUrlSigned } from "@keeltown/runner-protocol";
 import {
   contractJob,
+  makeBundleUrlKeys,
   makeEvidenceStoreMemory,
   PORTS,
+  sampleNamespace,
   suitePlan,
   workerAppPlan,
 } from "@keeltown/testing";
@@ -38,6 +41,10 @@ const TSC_RED = [
   "",
 ].join("\n");
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
+/** The pair bundle URLs are signed with here: keel's half signs, the bundle host's half checks. */
+const KEYS = await makeBundleUrlKeys();
+const X = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
+const Y = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V1";
 const TOKEN = "art_v2_x_SECRETsecret123?expires=1760140800";
 
 const runnerStdout = (tests: number, failed: number, tail: string) =>
@@ -68,6 +75,7 @@ const runtime = (runner: SuiteRunner) => {
       },
       durable,
       literals: [ACCOUNT],
+      signingKey: KEYS.signingKey,
     }).pipe(Layer.provide(store.layer)),
   );
   return { calls, steps, store, layer };
@@ -81,11 +89,13 @@ PORTS.VerifierRuntime.contract("ci (scripted runner)", () => runtime(stdoutRunne
 
 describe("the Tier 2 suite runtime", () => {
   it.effect(
-    "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME and the bundle's URL in its env",
+    "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME and the bundle's signed URL in its env",
     () =>
       Effect.gen(function* () {
         const rt = runtime(stdoutRunner(""));
-        yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(Effect.provide(rt.layer));
+        yield* Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, job())).pipe(
+          Effect.provide(rt.layer),
+        );
         const [options] = rt.calls;
         if (options === undefined) throw new Error("no runner was started");
         expect(Object.keys(options)).toEqual(
@@ -95,35 +105,77 @@ describe("the Tier 2 suite runtime", () => {
           cloudflareCredentials: false,
           sourceControlCredentials: false,
         });
-        expect(options.env).toEqual({
-          HOME: "/root",
-          KEEL_BUNDLE_URL: `https://bundles.keel.internal/${"b".repeat(64)}`,
-        });
+        expect(Object.keys(options.env).toSorted()).toEqual(["HOME", "KEEL_BUNDLE_URL"]);
+        expect(options.env.HOME).toBe("/root");
+        // [t5.bundle-url.suite-env] The URL is the namespace's bundle, signed for it and good for thirty minutes from now (the test clock's zero).
+        const url = new URL(options.env["KEEL_BUNDLE_URL"] ?? "");
+        expect(`${url.origin}${url.pathname}`).toBe(
+          `https://bundles.keel.internal/org_01JZ8PT2C4E6G8J0M2N4Q6S8V0/${"b".repeat(64)}`,
+        );
+        expect(url.searchParams.get("exp")).toBe("1800");
+        const signedFor = (namespace: string, sha256: string, now: number) =>
+          Effect.promise(() =>
+            bundleUrlSigned(KEYS.publicKey, namespace, sha256, url.searchParams, now),
+          );
+        expect(yield* signedFor(X, "b".repeat(64), 1_800)).toBe(true);
+        expect(yield* signedFor(X, "b".repeat(64), 1_801)).toBe(false);
+        expect(yield* signedFor(Y, "b".repeat(64), 0)).toBe(false);
+        expect(yield* signedFor(X, "c".repeat(64), 0)).toBe(false);
         expect(options.config.retries.limit).toBe(1);
       }),
   );
 
-  it("hydrates only from the bundle host, and refuses every credential", async () => {
-    expect(
-      checkoutOf({
+  it("[t5.bundle-url.checkout] hydrates only from the bundle host, by a URL signed for the source's own bundle, and refuses every credential", async () => {
+    const checkout = await checkoutOf(
+      {
         owner: "keel",
         repo: "l",
         sha: "x",
-        providerData: { bundle: `sha256:${"c".repeat(64)}` },
-      }),
-    ).toEqual({
-      kind: "archive",
-      url: `https://bundles.keel.internal/${"c".repeat(64)}`,
-    });
-    expect(() =>
-      checkoutOf({
-        owner: "keel",
-        repo: "l",
-        sha: "x",
-        providerData: { url: "https://example.com/x.tgz" },
-      }),
-    ).toThrow(/bundle/);
-    const provider = keelBundleSource.create({});
+        providerData: {
+          namespace: "org_01JZ8PT2C4E6G8J0M2N4Q6S8V1",
+          bundle: `sha256:${"c".repeat(64)}`,
+        },
+      },
+      KEYS.signingKey,
+      1_000,
+    );
+    expect(checkout.kind).toBe("archive");
+    const url = new URL(checkout.url);
+    expect(`${url.origin}${url.pathname}`).toBe(
+      `https://bundles.keel.internal/org_01JZ8PT2C4E6G8J0M2N4Q6S8V1/${"c".repeat(64)}`,
+    );
+    // Signed for that namespace's bundle alone, until thirty minutes after it was asked for.
+    expect(url.searchParams.get("exp")).toBe("2800");
+    const q = url.searchParams;
+    expect(await bundleUrlSigned(KEYS.publicKey, Y, "c".repeat(64), q, 2_800)).toBe(true);
+    expect(await bundleUrlSigned(KEYS.publicKey, Y, "c".repeat(64), q, 2_801)).toBe(false);
+    expect(await bundleUrlSigned(KEYS.publicKey, X, "c".repeat(64), q, 1_000)).toBe(false);
+    // [t5.checkout.namespace] A source that names no namespace, or one that is not a namespace's id, has no checkout.
+    for (const providerData of [
+      { bundle: `sha256:${"c".repeat(64)}` },
+      { namespace: "keel-verify", bundle: `sha256:${"c".repeat(64)}` },
+      { namespace: "../org_01JZ8PT2C4E6G8J0M2N4Q6S8V1", bundle: `sha256:${"c".repeat(64)}` },
+      // Made only of an id's characters, so nothing but the id's own shape refuses it.
+      { namespace: "keel_lane_d", bundle: `sha256:${"c".repeat(64)}` },
+    ])
+      await expect(
+        checkoutOf({ owner: "keel", repo: "l", sha: "x", providerData }, KEYS.signingKey, 1_000),
+      ).rejects.toThrow(/namespace/);
+    await expect(
+      checkoutOf(
+        {
+          owner: "keel",
+          repo: "l",
+          sha: "x",
+          providerData: { url: "https://example.com/x.tgz" },
+        },
+        KEYS.signingKey,
+        1_000,
+      ),
+    ).rejects.toThrow(/namespace/);
+    // An env with no signing key makes no provider: no runner is ever handed an unsigned URL.
+    expect(() => keelBundleSource.create({})).toThrow(/BUNDLE_URL_SIGNING_KEY/);
+    const provider = keelBundleSource.create({ BUNDLE_URL_SIGNING_KEY: KEYS.signingKey });
     await expect(
       provider.getStepCredentialEnv({ owner: "keel", repo: "l", sha: "x", providerData: {} }),
     ).rejects.toThrow(/no credentials/);
@@ -149,9 +201,9 @@ describe("the Tier 2 suite runtime", () => {
     Effect.gen(function* () {
       const stdout = yield* Effect.promise(() => runnerStdout(200, 0, "200 passed"));
       const rt = runtime(stdoutRunner(stdout));
-      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-        Effect.provide(rt.layer),
-      );
+      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+        v.run(sampleNamespace, job()),
+      ).pipe(Effect.provide(rt.layer));
       expect(result).toMatchObject({
         stepId: step.id,
         outcome: "pass",
@@ -168,9 +220,9 @@ describe("the Tier 2 suite runtime", () => {
     Effect.gen(function* () {
       const stdout = yield* Effect.promise(() => suiteStdout(5, 2));
       const rt = runtime(stdoutRunner(stdout));
-      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-        Effect.provide(rt.layer),
-      );
+      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+        v.run(sampleNamespace, job()),
+      ).pipe(Effect.provide(rt.layer));
       expect(result?.outcome).toBe("fail");
       const [stored] = [...rt.store.documents.values()];
       expect(JSON.parse(String(stored))).toMatchObject({
@@ -187,9 +239,9 @@ describe("the Tier 2 suite runtime", () => {
           runnerStdout(5, 2, `tail ${TOKEN} https://${ACCOUNT}.artifacts.cloudflare.net/x`),
         );
         const rt = runtime(stdoutRunner(stdout));
-        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-          Effect.provide(rt.layer),
-        );
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, job()),
+        ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [document] = [...rt.store.documents.values()];
         const stored = String(document);
@@ -230,9 +282,9 @@ describe("the Tier 2 suite runtime", () => {
           suiteStdout(1, 1, { tail: "1 failed", message: `Error: ${dump}` }),
         );
         const rt = runtime(stdoutRunner(stdout));
-        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-          Effect.provide(rt.layer),
-        );
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, job()),
+        ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [document] = [...rt.store.documents.values()];
         expect(JSON.parse(String(document))).toMatchObject({
@@ -252,9 +304,9 @@ describe("the Tier 2 suite runtime", () => {
           stdoutRunner(new ReadableStream()),
           stdoutRunner(""),
         ]) {
-          const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-            Effect.provide(runtime(runner).layer),
-          );
+          const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+            v.run(sampleNamespace, job()),
+          ).pipe(Effect.provide(runtime(runner).layer));
           expect(result?.outcome).toBe("abstain");
         }
       }),
@@ -273,9 +325,9 @@ describe("the Tier 2 suite runtime", () => {
           "",
         ].join("\n");
         const rt = runtime(stdoutRunner(stdout));
-        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
-          Effect.provide(rt.layer),
-        );
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, job()),
+        ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [stored] = [...rt.store.documents.values()];
         expect(JSON.parse(String(stored))).toMatchObject({
@@ -295,7 +347,7 @@ describe("the Tier 2 suite runtime", () => {
     Effect.gen(function* () {
       const rt = runtime(stdoutRunner(""));
       const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run({ ...job(), steps: [{ ...step, id: "other.suite" }] }),
+        v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }),
       ).pipe(Effect.provide(rt.layer));
       expect(results.map((r) => r.outcome)).toEqual(["abstain"]);
       expect(rt.calls).toEqual([]);
@@ -327,9 +379,9 @@ describe("the Tier 2 typecheck", () => {
       Effect.gen(function* () {
         const stdout = yield* Effect.promise(() => typecheckStdout(1, TSC_RED));
         const rt = runtime(stdoutRunner(stdout));
-        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
-          Effect.provide(rt.layer),
-        );
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, typecheckJob()),
+        ).pipe(Effect.provide(rt.layer));
         expect(rt.calls.map((c) => [c.name, c.command])).toEqual([
           [typecheck.id, TYPECHECK_COMMAND],
         ]);
@@ -350,9 +402,9 @@ describe("the Tier 2 typecheck", () => {
   it.effect("passes a clean typecheck", () =>
     Effect.gen(function* () {
       const stdout = yield* Effect.promise(() => typecheckStdout(0, ""));
-      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
-        Effect.provide(runtime(stdoutRunner(stdout)).layer),
-      );
+      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+        v.run(sampleNamespace, typecheckJob()),
+      ).pipe(Effect.provide(runtime(stdoutRunner(stdout)).layer));
       expect(result?.outcome).toBe("pass");
     }),
   );
@@ -364,9 +416,9 @@ describe("the Tier 2 typecheck", () => {
         const leak = `src/keel-canary.ts(1,14): error TS2322: Type '"${TOKEN}"' is not assignable to type '1'.\n`;
         const stdout = yield* Effect.promise(() => typecheckStdout(1, leak));
         const rt = runtime(stdoutRunner(stdout));
-        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
-          Effect.provide(rt.layer),
-        );
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, typecheckJob()),
+        ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const stored = String([...rt.store.documents.values()][0]);
         expect(JSON.parse(stored)).toMatchObject({

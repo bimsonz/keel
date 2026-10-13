@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/evidence-store.test.ts
+# kills: t5.evidence-store.namespaces-apart
+# why: The R2 evidence store files every namespace's document under one fixed namespace
+diff --git a/apps/keel/src/adapters/driven/r2/evidence-store.ts b/apps/keel/src/adapters/driven/r2/evidence-store.ts
+index 87cdf884..749f0c71 100644
+--- a/apps/keel/src/adapters/driven/r2/evidence-store.ts
++++ b/apps/keel/src/adapters/driven/r2/evidence-store.ts
+@@ -11,7 +11,7 @@ import { Effect, Layer } from "effect";
+ 
+ /** Where a namespace's evidence document lives in the bucket. */
+ export const evidenceKey = (namespace: OrgId, hash: ContentHash): string =>
+-  namespaceKey(namespace, "evidence", hash.slice("sha256:".length));
++  namespaceKey("org_00000000000000000000000000", "evidence", hash.slice("sha256:".length));
+ 
+ /**
+  * Evidence documents in the ARCHIVE bucket, which keel-verify has no binding

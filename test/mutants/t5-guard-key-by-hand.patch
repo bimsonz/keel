@@ -1,0 +1,15 @@
+# expect-red: pnpm guards
+# why: A store builds its key by hand, with no namespace in it
+diff --git a/apps/keel/src/adapters/driven/r2/bundle-store.ts b/apps/keel/src/adapters/driven/r2/bundle-store.ts
+index c316ac18..3e3bc9b0 100644
+--- a/apps/keel/src/adapters/driven/r2/bundle-store.ts
++++ b/apps/keel/src/adapters/driven/r2/bundle-store.ts
+@@ -7,7 +7,7 @@ import { Effect, Layer } from "effect";
+ 
+ /** Where a namespace's bundle lives: keel-verify's outbound handler and its VerifierDOs read exactly this key. */
+ export const bundleKey = (namespace: OrgId, hash: ContentHash): string =>
+-  namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
++  `bundles/${hash.slice("sha256:".length)}`;
+ 
+ /**
+  * Candidate bundles in R2, each under its namespace's key, by the sha256 of

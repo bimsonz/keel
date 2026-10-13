@@ -41,6 +41,7 @@ import {
   makeProjectsMemory,
   makeSyntaxSourceMemory,
   type ParsedTree,
+  sampleNamespace,
   ulidOf,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
@@ -49,6 +50,10 @@ const changeId = makeId("chg", "01JZD21D21D21D21D21D21D21D");
 const projectId: ProjectId = makeId("prj", "01JZD21D21D21D21D21D21D21D");
 const workspaceId: WorkspaceId = makeId("wsp", "01JZD21D21D21D21D21D21D21D");
 const INSTANCE = "precheck-evt_1";
+
+/** Where the evidence store keeps a derivation record: among the evidence of the namespace the step was given. */
+const keptAt = (ref: ContentHash): string =>
+  `ns/org_01JZ8PT2C4E6G8J0M2N4Q6S8V0/evidence/${ref.slice("sha256:".length)}`;
 
 const key = (value: string) => Schema.decodeUnknownSync(SubjectKey)(value);
 const EVALUATION = key("authz.permission-evaluation");
@@ -293,15 +298,21 @@ function derivingWorld() {
           instanceId: INSTANCE,
         };
         const workspace = yield* startPrecheck(submission);
-        const answer = yield* deriveSubmission(workspace, submission, base.sha, touched);
+        const answer = yield* deriveSubmission(
+          sampleNamespace,
+          workspace,
+          submission,
+          base.sha,
+          touched,
+        );
         return { submission, answer };
       }).pipe(Effect.provide(Layer.mergeAll(parser, index, kept))),
     /** The `derived` step. */
     commitKept: (submission: PrecheckSubmission, derivationRef: ContentHash) =>
-      commitDerivation(submission, derivationRef).pipe(Effect.provide(kept)),
-    /** The record the evidence store holds under `ref`, as the JSON it keeps. */
+      commitDerivation(sampleNamespace, submission, derivationRef).pipe(Effect.provide(kept)),
+    /** The record the evidence store holds under `ref` for the submission's namespace, as the JSON it keeps. */
     record: (ref: ContentHash): Record<string, unknown> =>
-      JSON.parse(evidence.documents.get(ref) ?? "{}"),
+      JSON.parse(evidence.documents.get(keptAt(ref)) ?? "{}"),
   };
 }
 
@@ -343,7 +354,7 @@ describe("Precheck's derivation", () => {
         const head = yield* world.commit({ [GUARD]: "same\n", [CACHE]: "head\n" }, ROLE_CACHE);
         const { answer, submission } = yield* world.derive(base, head, [CACHE]);
         expect(answer.subjects).toEqual([]);
-        expect([...world.evidence.documents.keys()]).toEqual([answer.derivationRef]);
+        expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);
         expect(world.record(answer.derivationRef)).toMatchObject({
           kind: "keel.derivation/1",
           base: base.sha,
@@ -485,7 +496,7 @@ describe("Precheck's derivation", () => {
           ],
         };
         expect(world.record(answer.derivationRef)).toEqual(record);
-        expect([...world.evidence.documents.keys()]).toEqual([answer.derivationRef]);
+        expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);
         expect(answer.derivationRef).toBe(contentHashOf(record));
       });
     },
@@ -595,7 +606,7 @@ describe("Precheck's derivation", () => {
           derivationRef: answer.derivationRef,
         };
         expect(world.committed).toEqual([payload, payload]);
-        expect([...world.evidence.documents.keys()]).toEqual([answer.derivationRef]);
+        expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);
         // The change took it once: the replay committed nothing new.
         expect(world.changes.calls.map((c) => c.method)).toEqual([
           "precheckStarted",
@@ -690,7 +701,7 @@ describe("Precheck's derivation", () => {
         expect(answer.subjects).toHaveLength(40);
         expect(world.record(answer.derivationRef)["effects"]).toHaveLength(40);
         expect(JSON.stringify(answer).length).toBeLessThan(4096);
-        expect(world.evidence.documents.get(answer.derivationRef)?.length).toBeGreaterThan(
+        expect(world.evidence.documents.get(keptAt(answer.derivationRef))?.length).toBeGreaterThan(
           256 * 1024,
         );
       });

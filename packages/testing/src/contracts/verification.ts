@@ -11,6 +11,7 @@ import {
   ContentHash,
   contentHashOf,
   makeId,
+  type OrgId,
   type ProjectId,
   weakest,
 } from "@keeltown/core/kernel";
@@ -40,6 +41,7 @@ import {
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Result, Schema } from "effect";
+import { otherNamespace, sampleNamespace } from "../namespaces.ts";
 import { suitePlan } from "../plans.ts";
 import type { LayerFactory } from "./index.ts";
 
@@ -63,19 +65,33 @@ export function describeBundleStoreContract(adapter: string, make: LayerFactory<
       Effect.gen(function* () {
         const store = yield* BundleStore;
         const bytes = new TextEncoder().encode(`bundle ${random(16)}`);
-        const hash = yield* store.put(bytes);
+        const hash = yield* store.put(sampleNamespace, bytes);
         expect(hash).toBe(yield* Effect.promise(() => sha256(bytes)));
-        expect(yield* store.put(bytes)).toBe(hash);
-        expect([...(yield* store.get(hash))]).toEqual([...bytes]);
+        expect(yield* store.put(sampleNamespace, bytes)).toBe(hash);
+        expect([...(yield* store.get(sampleNamespace, hash))]).toEqual([...bytes]);
       }).pipe(Effect.provide(make())),
     );
     it.effect("fails BundleMissing for a hash it never stored", () =>
       Effect.gen(function* () {
         const store = yield* BundleStore;
         const missing = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
-        const error = yield* Effect.flip(store.get(missing));
+        const error = yield* Effect.flip(store.get(sampleNamespace, missing));
         expect(error._tag).toBe("BundleMissing");
       }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[t5.bundle-store.namespaces-apart] a bundle kept for one namespace is missing for another, and still there for its own",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* BundleStore;
+          const bytes = new TextEncoder().encode(`bundle ${random(16)}`);
+          const hash = yield* store.put(sampleNamespace, bytes);
+          expect(yield* Effect.flip(store.get(otherNamespace, hash))).toMatchObject({
+            _tag: "BundleMissing",
+            hash,
+          });
+          expect([...(yield* store.get(sampleNamespace, hash))]).toEqual([...bytes]);
+        }).pipe(Effect.provide(make())),
     );
   });
 }
@@ -92,33 +108,47 @@ export function describeEvidenceStoreContract(adapter: string, make: LayerFactor
             nonce: random(8),
             failing: [{ file: "a", test: "b" }],
           };
-          const hash = yield* store.put(document);
+          const hash = yield* store.put(sampleNamespace, document);
           expect(hash).toBe(contentHashOf(document));
           expect(
-            yield* store.put({
+            yield* store.put(sampleNamespace, {
               failing: document.failing,
               nonce: document.nonce,
               stepId: "js-ts.suite",
             }),
           ).toBe(hash);
-          expect(yield* store.get(hash)).toEqual(document);
+          expect(yield* store.get(sampleNamespace, hash)).toEqual(document);
         }).pipe(Effect.provide(make())),
     );
     it.effect("fails EvidenceMissing for a hash it never stored", () =>
       Effect.gen(function* () {
         const store = yield* EvidenceStore;
         const missing = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
-        const error = yield* Effect.flip(store.get(missing));
+        const error = yield* Effect.flip(store.get(sampleNamespace, missing));
         expect(error._tag).toBe("EvidenceMissing");
       }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[t5.evidence-store.namespaces-apart] a document kept for one namespace is missing for another, and still there for its own",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* EvidenceStore;
+          const document = { stepId: "js-ts.suite", nonce: random(8) };
+          const hash = yield* store.put(sampleNamespace, document);
+          expect(yield* Effect.flip(store.get(otherNamespace, hash))).toMatchObject({
+            _tag: "EvidenceMissing",
+            hash,
+          });
+          expect(yield* store.get(sampleNamespace, hash)).toEqual(document);
+        }).pipe(Effect.provide(make())),
     );
   });
 }
 
 export interface PlanStoreHarness {
   readonly layer: Layer.Layer<PlanStore>;
-  /** Files raw text under a plan hash, as storage at rest might hold it. */
-  readonly plant: (hash: ContentHash, text: string) => Effect.Effect<void>;
+  /** Files raw text under a plan hash in a namespace, as storage at rest might hold it. */
+  readonly plant: (namespace: OrgId, hash: ContentHash, text: string) => Effect.Effect<void>;
 }
 
 /** A worker-app plan on a fresh base, so no two tests share a hash. */
@@ -147,9 +177,25 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         return Effect.gen(function* () {
           const store = yield* PlanStore;
           const plan = freshPlan();
-          expect(yield* store.put(plan)).toBe(plan.planHash);
-          expect(yield* store.put(plan)).toBe(plan.planHash);
-          expect(yield* store.get(plan.planHash)).toEqual(plan);
+          expect(yield* store.put(sampleNamespace, plan)).toBe(plan.planHash);
+          expect(yield* store.put(sampleNamespace, plan)).toBe(plan.planHash);
+          expect(yield* store.get(sampleNamespace, plan.planHash)).toEqual(plan);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect(
+      "[t5.plan-store.namespaces-apart] a plan kept for one namespace is missing for another, and still there for its own",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const store = yield* PlanStore;
+          const plan = freshPlan();
+          yield* store.put(sampleNamespace, plan);
+          expect(yield* Effect.flip(store.get(otherNamespace, plan.planHash))).toMatchObject({
+            _tag: "PlanMissing",
+            hash: plan.planHash,
+          });
+          expect(yield* store.get(sampleNamespace, plan.planHash)).toEqual(plan);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -157,7 +203,7 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
       const harness = make();
       return Effect.gen(function* () {
         const missing = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
-        const error = yield* Effect.flip((yield* PlanStore).get(missing));
+        const error = yield* Effect.flip((yield* PlanStore).get(sampleNamespace, missing));
         expect(error).toMatchObject({ _tag: "PlanMissing", hash: missing });
       }).pipe(Effect.provide(harness.layer));
     });
@@ -168,14 +214,14 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         return Effect.gen(function* () {
           const plan = freshPlan();
           const edited = { ...JSON.parse(textOf(plan)), humanClass: !plan.humanClass };
-          yield* harness.plant(plan.planHash, JSON.stringify(edited));
-          const error = yield* Effect.flip((yield* PlanStore).get(plan.planHash));
+          yield* harness.plant(sampleNamespace, plan.planHash, JSON.stringify(edited));
+          const error = yield* Effect.flip((yield* PlanStore).get(sampleNamespace, plan.planHash));
           expect(error).toMatchObject({ _tag: "PlanCorrupt", hash: plan.planHash });
           const dropped = { ...JSON.parse(textOf(plan)), steps: [] };
-          yield* harness.plant(plan.planHash, JSON.stringify(dropped));
-          expect((yield* Effect.flip((yield* PlanStore).get(plan.planHash)))._tag).toBe(
-            "PlanCorrupt",
-          );
+          yield* harness.plant(sampleNamespace, plan.planHash, JSON.stringify(dropped));
+          expect(
+            (yield* Effect.flip((yield* PlanStore).get(sampleNamespace, plan.planHash)))._tag,
+          ).toBe("PlanCorrupt");
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -183,8 +229,8 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
       const harness = make();
       return Effect.gen(function* () {
         const [wanted, other] = [freshPlan(), freshPlan()];
-        yield* harness.plant(wanted.planHash, textOf(other));
-        const error = yield* Effect.flip((yield* PlanStore).get(wanted.planHash));
+        yield* harness.plant(sampleNamespace, wanted.planHash, textOf(other));
+        const error = yield* Effect.flip((yield* PlanStore).get(sampleNamespace, wanted.planHash));
         expect(error).toMatchObject({ _tag: "PlanCorrupt", hash: wanted.planHash });
       }).pipe(Effect.provide(harness.layer));
     });
@@ -194,8 +240,8 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         const store = yield* PlanStore;
         for (const text of ["not json", "{}", JSON.stringify({ planHash: "sha256:x" })]) {
           const hash = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
-          yield* harness.plant(hash, text);
-          expect((yield* Effect.flip(store.get(hash)))._tag).toBe("PlanCorrupt");
+          yield* harness.plant(sampleNamespace, hash, text);
+          expect((yield* Effect.flip(store.get(sampleNamespace, hash)))._tag).toBe("PlanCorrupt");
         }
       }).pipe(Effect.provide(harness.layer));
     });
@@ -205,8 +251,10 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         const store = yield* PlanStore;
         const plan = freshPlan();
         const lying = { ...plan, humanClass: !plan.humanClass };
-        expect(Exit.isFailure(yield* Effect.exit(store.put(lying)))).toBe(true);
-        expect((yield* Effect.flip(store.get(plan.planHash)))._tag).toBe("PlanMissing");
+        expect(Exit.isFailure(yield* Effect.exit(store.put(sampleNamespace, lying)))).toBe(true);
+        expect((yield* Effect.flip(store.get(sampleNamespace, plan.planHash)))._tag).toBe(
+          "PlanMissing",
+        );
       }).pipe(Effect.provide(harness.layer));
     });
   });
@@ -214,8 +262,11 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
 
 export interface ProbeStoreHarness {
   readonly layer: Layer.Layer<ProbeStore>;
-  /** The files stored under a hash, as a VerifierDO would read them back; none when nothing is. */
-  readonly read: (hash: ContentHash) => Effect.Effect<readonly ProbeFile[] | undefined>;
+  /** The files stored under a hash for a namespace, as a VerifierDO would read them back; none when nothing is. */
+  readonly read: (
+    namespace: OrgId,
+    hash: ContentHash,
+  ) => Effect.Effect<readonly ProbeFile[] | undefined>;
 }
 
 const byPath = (files: readonly ProbeFile[]) =>
@@ -238,9 +289,9 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
         const harness = make();
         return Effect.gen(function* () {
           const put = probeFiles(random(8));
-          const hash = yield* (yield* ProbeStore).put(put);
+          const hash = yield* (yield* ProbeStore).put(sampleNamespace, put);
           expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-          const read = yield* harness.read(hash);
+          const read = yield* harness.read(sampleNamespace, hash);
           expect(read === undefined ? undefined : byPath(read)).toEqual(byPath(put));
         }).pipe(Effect.provide(harness.layer));
       },
@@ -253,15 +304,33 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
         return Effect.gen(function* () {
           const store = yield* ProbeStore;
           const [first, second] = [probeFiles(random(8)), probeFiles(random(8))];
-          const hash = yield* store.put(first.toReversed());
-          yield* store.put(second);
+          const hash = yield* store.put(sampleNamespace, first.toReversed());
+          yield* store.put(sampleNamespace, second);
           const unkept = ContentHash.make(`sha256:${"0".repeat(64)}`);
 
-          expect(byPath(yield* store.get(hash))).toEqual(byPath(first));
-          expect(yield* Effect.flip(store.get(unkept))).toMatchObject({
+          expect(byPath(yield* store.get(sampleNamespace, hash))).toEqual(byPath(first));
+          expect(yield* Effect.flip(store.get(sampleNamespace, unkept))).toMatchObject({
             _tag: "BundleMissing",
             hash: unkept,
           });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[t5.probe-store.namespaces-apart] a probe kept for one namespace is missing for another, through the port and where a VerifierDO reads",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const store = yield* ProbeStore;
+          const put = probeFiles(random(8));
+          const hash = yield* store.put(sampleNamespace, put);
+          expect(yield* Effect.flip(store.get(otherNamespace, hash))).toMatchObject({
+            _tag: "BundleMissing",
+            hash,
+          });
+          expect(yield* harness.read(otherNamespace, hash)).toBeUndefined();
+          expect(byPath(yield* store.get(sampleNamespace, hash))).toEqual(byPath(put));
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -273,9 +342,9 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
         return Effect.gen(function* () {
           const store = yield* ProbeStore;
           const marker = random(8);
-          const hash = yield* store.put(probeFiles(marker));
-          expect(yield* store.put(probeFiles(marker).toReversed())).toBe(hash);
-          expect(yield* store.put(probeFiles(`${marker}!`))).not.toBe(hash);
+          const hash = yield* store.put(sampleNamespace, probeFiles(marker));
+          expect(yield* store.put(sampleNamespace, probeFiles(marker).toReversed())).toBe(hash);
+          expect(yield* store.put(sampleNamespace, probeFiles(`${marker}!`))).not.toBe(hash);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -453,7 +522,7 @@ export function describeVerifierRuntimeContract(
         Effect.gen(function* () {
           const runtime = yield* VerifierRuntime;
           const job = contractJob();
-          const results = yield* runtime.run(job);
+          const results = yield* runtime.run(sampleNamespace, job);
           expect(results.map((r) => r.stepId)).toEqual(job.steps.map((s) => s.id));
           for (const [i, r] of results.entries()) {
             const step = job.steps[i];

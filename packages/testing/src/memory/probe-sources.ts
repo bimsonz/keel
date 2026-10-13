@@ -1,5 +1,5 @@
 import { noopTree, type TextCodec } from "@keeltown/core/application/verification";
-import { CommitSha, contentHashOf } from "@keeltown/core/kernel";
+import { CommitSha, contentHashOf, type OrgId } from "@keeltown/core/kernel";
 import { NoopWorlds, ObjectNotFound, ProbeSources, type RepoRef } from "@keeltown/core/ports";
 import { Effect, Layer, Result } from "effect";
 
@@ -104,11 +104,15 @@ export function makeProbeSourcesMemory() {
   };
 }
 
+/** Where the memory NoopWorlds keeps a namespace's world: one namespace's hash is never another's. */
+const worldKeyOf = (namespace: OrgId, hash: string) => `${namespace}\u0000${hash}`;
+
 /**
- * NoopWorlds in memory: world bundles stored as whole trees under the
- * content hash of the tree, and A-noop's world the tree with the recipe
- * applied, answered as the content hash of that tree. The real adapter
- * reads and writes bundles; the contract asks only what both do.
+ * NoopWorlds in memory: world bundles stored as whole trees, for a namespace,
+ * under the content hash of the tree, and A-noop's world the tree with the
+ * recipe applied, kept for the same namespace and answered as the content
+ * hash of that tree. The real adapter reads and writes bundles; the contract
+ * asks only what both do.
  */
 export function makeNoopWorldsMemory() {
   const worlds = new Map<string, MemoryTree>();
@@ -119,18 +123,18 @@ export function makeNoopWorldsMemory() {
         .map(([path, file]) => [path, typeof file === "string" ? file : [...file]]),
     );
   return {
-    world: (files: MemoryTree) =>
+    world: (namespace: OrgId, files: MemoryTree) =>
       Effect.sync(() => {
         const hash = hashOf(files);
-        worlds.set(hash, files);
+        worlds.set(worldKeyOf(namespace, hash), files);
         return hash;
       }),
     layer: Layer.succeed(
       NoopWorlds,
       NoopWorlds.of({
-        build: (world, recipe) =>
+        build: (namespace, world, recipe) =>
           Effect.gen(function* () {
-            const files = worlds.get(world);
+            const files = worlds.get(worldKeyOf(namespace, world));
             if (files === undefined)
               return yield* Effect.die(new Error(`world bundle ${world} is not in the store`));
             const applied = noopTree(
@@ -141,7 +145,7 @@ export function makeNoopWorldsMemory() {
             if (Result.isFailure(applied)) return yield* Effect.fail(applied.failure);
             const tree = Object.fromEntries(applied.success.map((e) => [e.path, e.file]));
             const hash = hashOf(tree);
-            worlds.set(hash, tree);
+            worlds.set(worldKeyOf(namespace, hash), tree);
             return hash;
           }),
       }),

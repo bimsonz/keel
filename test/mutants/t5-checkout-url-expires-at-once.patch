@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: t5.bundle-url.checkout
+# why: The checkout URL is signed to expire the second it is made, so a runner that starts a moment later fetches nothing
+diff --git a/apps/keel/src/adapters/driving/workflow/bundle-source.ts b/apps/keel/src/adapters/driving/workflow/bundle-source.ts
+index c57a4ff8..1043fb16 100644
+--- a/apps/keel/src/adapters/driving/workflow/bundle-source.ts
++++ b/apps/keel/src/adapters/driving/workflow/bundle-source.ts
+@@ -28,7 +28,7 @@ export const checkoutOf = async (
+   const { namespace, bundle } = Schema.decodeUnknownSync(ProviderData)(source.providerData);
+   return {
+     kind: "archive",
+-    url: await signedBundleUrl(signingKey, namespace, bundle, now + BUNDLE_URL_TTL_SECONDS),
++    url: await signedBundleUrl(signingKey, namespace, bundle, now),
+   };
+ };
+ 

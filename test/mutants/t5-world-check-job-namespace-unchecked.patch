@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts
+# kills: t5.pool.job-namespace
+# why: KeelWorldCheck never compares the namespace its job names with its project's own
+diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
+index 3b5b6fc4..88d3b9f0 100644
+--- a/apps/keel/src/adapters/driving/workflow/world-check.ts
++++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
+@@ -77,7 +77,6 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+         step,
+         (effect) => runtime.runPromise(effect),
+         job.projectId,
+-        job.namespace,
+       );
+       const checks = await runtime.runPromise(
+         resolveCheckPlans(job.checks, event.instanceId, workflowSteps(step)),

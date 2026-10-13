@@ -50,6 +50,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeManualClock,
+  makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
   suitePlan,
@@ -163,6 +164,7 @@ function world(options: WorldOptions = {}) {
         )
       : staging.layer,
     projects.layer,
+    makePlacedProject(PROJECT).layer,
     changesLayer,
   );
   const seeded = Effect.gen(function* () {
@@ -573,12 +575,16 @@ describe("the Lane", () => {
         const formed = (yield* committed).find((e) => e.type === "BatchFormed");
         expect(instanceId).toBe(`keel-verify-${formed?.eventId}`);
         expect(w.verification.started.get(instanceId)).toMatchObject({
+          projectId: PROJECT,
+          namespace: "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
           laneId: LANE,
           candidateId,
           fence: { batchId, attempt: 0, chainEpoch: 0 },
           planHash: PLAN.planHash,
           bundle: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         });
+        // The candidate was bundled for the project's namespace, the one the job names.
+        expect(w.bundles.namespaces).toEqual(["org_01JZ8PT2C4E6G8J0M2N4Q6S8V0"]);
         expect(w.startedIn).toEqual(["verifying"]);
         expect(yield* laneStep(LANE)).toBe("waiting");
         expect(w.verification.started.size).toBe(1);

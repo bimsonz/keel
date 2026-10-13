@@ -1,10 +1,11 @@
 // The live S-1 probe: two changes that merge cleanly and disagree about
 // one premise, through the deployed Keel.
 //
-//   KEEL_SESSION=<token> [KEEL_ORG=<org>] node apps/keel-verify/test/live/d22-live.ts <run>
+//   KEEL_SESSION=<token> [KEEL_ORG=<org>] KEEL_NAMESPACE_ID=<id> node apps/keel-verify/test/live/d22-live.ts <run>
 //
 // KEEL_SESSION is the maintainer's bearer session (a maintainer of KEEL_ORG,
-// `keel` by default); it is read, never printed. In a project of its own
+// `keel` by default); it is read, never printed. KEEL_NAMESPACE_ID is the id
+// of the namespace KEEL_ORG names: the stored plan is read from R2 under it. In a project of its own
 // (d22-live-<run>, forked from the seeded fixture repo):
 //   A relies on permission evaluation being fresh at most per-request, and adds
 //     the revoke route (scenarios/s1/a.patch);
@@ -29,8 +30,10 @@ import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { namespaceKey } from "@keeltown/core/application/verification";
 import { cloneWorkspace, commitAndPush } from "../../../../e2e/src/lib/git.ts";
 import { KeelClient, KeelProblem } from "../../../../packages/sdk/src/index.ts";
+import { harnessNamespace } from "./bundles.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
 const KEEL = join(ROOT, "apps/keel");
@@ -564,7 +567,8 @@ try {
         "r2",
         "object",
         "get",
-        `${archiveBucket()}/plans/${planHash.slice("sha256:".length)}`,
+        // PlanStoreR2's key: the plans of the namespace the project is in, by id (KEEL_NAMESPACE_ID).
+        `${archiveBucket()}/${namespaceKey(harnessNamespace(), "plans", planHash.slice("sha256:".length))}`,
         "--remote",
         "--pipe",
       );
@@ -592,7 +596,7 @@ try {
           "r2",
           "object",
           "get",
-          `${archiveBucket()}/evidence/${ref.slice("sha256:".length)}`,
+          `${archiveBucket()}/${namespaceKey(harnessNamespace(), "evidence", ref.slice("sha256:".length))}`,
           "--remote",
           "--pipe",
         ),

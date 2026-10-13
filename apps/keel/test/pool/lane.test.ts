@@ -19,6 +19,7 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeOrgUsageMemory,
@@ -134,6 +135,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
       set: (to) => void stagingRefs()?.set(MAIN, to),
     }).layer,
     projects.layer,
+    makePlacedProject(projectId).layer,
   );
   await runInDurableObject(stub, (instance: LaneDO, state) => {
     Reflect.set(

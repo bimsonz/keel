@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: t5.pool.bundle-unsigned, t5.pool.bundle-signed-for-another, t5.pool.bundle-expired
+# why: The bundle host answers any well-formed address, signed or not: a sandbox that knows another namespace's id and a bundle's hash reads that bundle
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index ebbbb3a9..f570bafb 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -137,7 +137,6 @@ export async function serveBundle(
+     url.searchParams,
+     Math.floor(Date.now() / 1000),
+   );
+-  if (!signed) return new Response("not a bundle URL Keel signed", { status: 403 });
+   const started = Date.now();
+   const object = await env.BUNDLES.get(namespaceKey(namespace, "bundles", sha256));
+   if (object === null) return new Response("no such bundle", { status: 404 });

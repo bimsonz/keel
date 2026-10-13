@@ -2,10 +2,10 @@
 # kills: bundle.served, bundle.checkout
 # why: The bundle handler logs R2's metadata as what it read, and the checkout goes unlogged, so a short read looks whole
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-index 019e7f5..7d1b138 100644
+index ebbbb3a9..56734605 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-@@ -118,6 +118,8 @@ export async function serveBundle(
+@@ -154,6 +154,8 @@ export async function serveBundle(
                etag: object.etag,
                size: object.size,
                ...read,
@@ -14,12 +14,12 @@ index 019e7f5..7d1b138 100644
                ms: Date.now() - started,
              } satisfies BundleServed),
            ),
-@@ -132,7 +134,7 @@ export async function serveBundle(
- }
+@@ -169,7 +171,7 @@ export async function serveBundle(
  
  /** @cloudflare/ci's archive checkout (`curl … '<url>' | tar -xz …`) for a bundle host, capturing the bundle's hash. */
--const ARCHIVE_CHECKOUT = /https:\/\/[a-z0-9.-]+\.keel\.internal\/([0-9a-f]{64})'? \| tar -xz /;
-+const ARCHIVE_CHECKOUT = /https:\/\/[a-z0-9.-]+\.keel\.internal\/([0-9a-f]{64})'? \| tar -xzf /;
+ const ARCHIVE_CHECKOUT =
+-  /https:\/\/[a-z0-9.-]+\.keel\.internal\/[A-Za-z0-9_]+\/([0-9a-f]{64})(?:\?[^' ]*)?'? \| tar -xz /;
++  /https:\/\/[a-z0-9.-]+\.keel\.internal\/[A-Za-z0-9_]+\/([0-9a-f]{64})(?:\?[^' ]*)?'? \| tar -xzf /;
  
  /** How much of a checkout's stderr is logged: curl's and tar's last words, never a workspace's worth. */
  const CHECKOUT_STDERR = 2_000;

@@ -2,15 +2,15 @@
 # kills: verify.bounce-cites
 # why: A bounce never reads its failing tests back from the evidence
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index 8cbb68c..adca2f0 100644
+index 21306e6e..a037565a 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -153,7 +153,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -163,7 +163,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
    const missing: string[] = [];
    for (const r of decided.success.evidence) {
      const ref = Schema.decodeUnknownOption(ContentHash)(r.resultRef);
 -    if (r.outcome !== "fail" || Option.isNone(ref)) continue;
 +    if (r.outcome !== "fail" || Option.isNone(ref) || r.outcome === "fail") continue;
-     const document = yield* store.get(ref.value).pipe(
+     const document = yield* store.get(namespace, ref.value).pipe(
        Effect.map(Option.some),
        Effect.catchTag("EvidenceMissing", () => Effect.succeed(Option.none())),

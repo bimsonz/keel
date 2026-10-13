@@ -8,9 +8,13 @@ import {
   contentHashOf,
   type Json,
   makeId,
+  OrgId,
 } from "../../../src/domain/kernel/index.ts";
 import { compile, type StepReport } from "../../../src/domain/verification/index.ts";
 import { fc } from "../../support/fast-check.ts";
+
+/** The namespace every call names, and the only one the stores below keep anything for. */
+const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The worker-app pack's plan: two proof steps in Tier 2, the suite and the typecheck. */
 const PLAN = Result.getOrThrow(
@@ -63,9 +67,12 @@ const settle = (es: readonly (readonly [Ending, ContentHash])[]) => {
     Layer.succeed(
       EvidenceStore,
       EvidenceStore.of({
-        put: (document) => Effect.die(`settling stores nothing, not ${JSON.stringify(document)}`),
-        get: (hash) => {
-          const document = stored.get(hash);
+        put: (_namespace, document) =>
+          Effect.die(`settling stores nothing, not ${JSON.stringify(document)}`),
+        // Evidence is read for the namespace the verdict is settled in, and no other.
+        get: (namespace, hash) => {
+          const document =
+            namespace === "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0" ? stored.get(hash) : undefined;
           return document === undefined
             ? Effect.fail(new EvidenceMissing({ hash }))
             : Effect.succeed(document);
@@ -82,7 +89,9 @@ const settle = (es: readonly (readonly [Ending, ContentHash])[]) => {
       }),
     ]),
   );
-  const exit = Effect.runSyncExit(settleVerdict(PLAN, reports).pipe(Effect.provide(layer)));
+  const exit = Effect.runSyncExit(
+    settleVerdict(NAMESPACE, PLAN, reports).pipe(Effect.provide(layer)),
+  );
   return { exit, logged, reports };
 };
 

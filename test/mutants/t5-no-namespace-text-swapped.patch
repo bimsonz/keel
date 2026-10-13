@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/project-namespace.test.ts
+# kills: t5.no-namespace-text
+# why: The text an instance ends with names the two namespaces the wrong way round
+diff --git a/packages/core/src/application/verification/project-namespace.ts b/packages/core/src/application/verification/project-namespace.ts
+index ea0d604c..c0cd955c 100644
+--- a/packages/core/src/application/verification/project-namespace.ts
++++ b/packages/core/src/application/verification/project-namespace.ts
+@@ -44,4 +44,4 @@ export const jobNamespace = Effect.fn("verification/jobNamespace")(function* (
+ export const describeNoNamespace = (error: ProjectUnplaced | NamespaceMisnamed): string =>
+   error._tag === "ProjectUnplaced"
+     ? `project ${error.projectId} belongs to no namespace`
+-    : `project ${error.projectId} belongs to namespace ${error.namespace}, and its job names ${error.named}`;
++    : `project ${error.projectId} belongs to namespace ${error.named}, and its job names ${error.namespace}`;

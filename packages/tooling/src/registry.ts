@@ -4,6 +4,7 @@ import { checkLintConfig, LINT_CONFIG } from "./guards/lint-config.ts";
 import { checkLoaderSpec, LOADER_SPEC } from "./guards/loader-spec.ts";
 import { checkModelPins, MODEL_PINS } from "./guards/model-pins.ts";
 import { checkPublicScrub, PUBLIC_SCRUB } from "./guards/public-scrub.ts";
+import { checkR2NamespaceKeys, R2_NAMESPACE_KEYS } from "./guards/r2-namespace-keys.ts";
 import { checkReadonlyBundles, READONLY_BUNDLES } from "./guards/readonly-bundles.ts";
 import { checkRunnerCredentials, RUNNER_CREDENTIALS } from "./guards/runner-credentials.ts";
 import { checkXstateTestOnly, XSTATE_TEST_ONLY } from "./guards/xstate-test-only.ts";
@@ -49,6 +50,11 @@ export const guards: readonly RegisteredGuard[] = [
     name: XSTATE_TEST_ONLY,
     run: checkXstateTestOnly,
     controlCanary: "packages/core/src/domain/coordination/change-machine.ts",
+  },
+  {
+    name: R2_NAMESPACE_KEYS,
+    run: checkR2NamespaceKeys,
+    controlCanary: "apps/keel/src/adapters/driven/r2/bundle-store.ts",
   },
 ];
 

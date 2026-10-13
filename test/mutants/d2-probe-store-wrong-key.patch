@@ -2,15 +2,15 @@
 # kills: probe-store.round-trip
 # why: A drafted probe is stored where no VerifierDO looks for it, so every run of it is unavailable
 diff --git a/apps/keel/src/adapters/driven/r2/probe-store.ts b/apps/keel/src/adapters/driven/r2/probe-store.ts
-index adeaed6..a41aad1 100644
+index da93bfbc..43911301 100644
 --- a/apps/keel/src/adapters/driven/r2/probe-store.ts
 +++ b/apps/keel/src/adapters/driven/r2/probe-store.ts
-@@ -22,7 +22,7 @@ export const ProbeStoreR2 = (bucket: R2Bucket) =>
+@@ -25,7 +25,7 @@ export const ProbeStoreR2 = (bucket: R2Bucket) =>
              files.map((f) => ({ path: f.path, bytes: enc.encode(f.text) })),
            );
            const hash = ContentHash.make(`sha256:${await sha256Hex(bytes)}`);
--          await bucket.put(bundleKey(hash), bytes, {
-+          await bucket.put(`probes/${hash.slice("sha256:".length)}`, bytes, {
+-          await bucket.put(bundleKey(namespace, hash), bytes, {
++          await bucket.put(`ns/${namespace}/probes/${hash.slice("sha256:".length)}`, bytes, {
              httpMetadata: { contentType: "application/gzip" },
            });
            return hash;

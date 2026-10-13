@@ -17,12 +17,18 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { storedPlanText } from "@keeltown/core/application/verification";
-import { BatchId, CandidateId, ContentHash } from "@keeltown/core/kernel";
+import { namespaceKey, storedPlanText } from "@keeltown/core/application/verification";
+import { BatchId, CandidateId, ContentHash, ProjectId } from "@keeltown/core/kernel";
 import { suitePlan } from "@keeltown/testing";
 import { Option, Result, Schema } from "effect";
 import { keelVerifyParams } from "../../../keel/src/rpc/keel-verify.ts";
-import { buildBundle, CANARY_ENV, CANARY_TOKEN, type Variant } from "./bundles.ts";
+import {
+  buildBundle,
+  CANARY_ENV,
+  CANARY_TOKEN,
+  harnessNamespace,
+  type Variant,
+} from "./bundles.ts";
 
 const KEEL = join(import.meta.dirname, "../../../keel");
 const WORKFLOW = "keel-verify-batch";
@@ -60,7 +66,7 @@ const upload = async () => {
       "r2",
       "object",
       "put",
-      `${BUCKET}/bundles/${bundle.hash.slice(7)}`,
+      `${BUCKET}/${namespaceKey(harnessNamespace(), "bundles", bundle.hash.slice(7))}`,
       "--file",
       file,
       "--remote",
@@ -74,8 +80,8 @@ const upload = async () => {
     "r2",
     "object",
     "put",
-    // PlanStoreR2's key: `plans/<hex>` of the planHash.
-    `${ARCHIVE}/plans/${PLAN.planHash.slice("sha256:".length)}`,
+    // PlanStoreR2's key: the namespace's plans, by the planHash's hex.
+    `${ARCHIVE}/${namespaceKey(harnessNamespace(), "plans", PLAN.planHash.slice("sha256:".length))}`,
     "--file",
     file,
     "--remote",
@@ -85,6 +91,9 @@ const upload = async () => {
 
 const params = async (variant: Variant, id: string) =>
   keelVerifyParams({
+    // The project KEEL_NAMESPACE_ID's namespace holds: KeelVerify refuses a job whose project is in another.
+    projectId: Schema.decodeUnknownSync(ProjectId)(process.env["KEEL_PROJECT_ID"]),
+    namespace: harnessNamespace(),
     jobId: id,
     laneId: "lane:prj_d1:default",
     candidateId: Schema.decodeUnknownSync(CandidateId)("cnd_01JZD1D1D1D1D1D1D1D1D1D1D1"),
@@ -242,7 +251,7 @@ const evidenceOf = (d: { steps: Step[] }) => {
     "r2",
     "object",
     "get",
-    `${ARCHIVE}/evidence/${ref.slice(7)}`,
+    `${ARCHIVE}/${namespaceKey(harnessNamespace(), "evidence", ref.slice(7))}`,
     "--remote",
     "--pipe",
   );

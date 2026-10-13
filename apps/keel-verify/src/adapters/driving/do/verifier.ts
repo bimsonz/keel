@@ -20,7 +20,7 @@ import {
 const decodeProbeRun = Schema.decodeUnknownExit(ProbeRunRequest);
 
 /**
- * One VerifierDO per (probe, world): it runs that probe against that world in
+ * One VerifierDO per (namespace, probe, world): it runs that probe against that world in
  * throwaway isolates with no outbound network, at most PROBE_SLOTS at once
  * (the rest wait), each run reusing the one bundle built for the pair. Plan
  * jobs (`run`) still answer VerifierUnavailable until Tier 1 steps are

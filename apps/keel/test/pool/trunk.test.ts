@@ -21,6 +21,7 @@ import {
   freshOrg,
   makeCodeHostMemory,
   makeOrgUsageMemory,
+  makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
@@ -197,6 +198,7 @@ async function promoting(placed?: { readonly org: OrgId; readonly history: numbe
       set: (to) => void stagingRefs()?.set(MAIN, to),
     }).layer,
     makeProjectsMemory().layer,
+    makePlacedProject(projectId).layer,
   );
   const lane = drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${projectId}:main`)));
   await runInDurableObject(lane, (instance: LaneDO, state) => {

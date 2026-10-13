@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-url.test.ts
+# kills: t5.bundle-url.other-namespace
+# why: The expiry is not signed, so whoever holds a URL can move its expiry as far ahead as it likes
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 46850588..23510443 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -311,7 +311,7 @@ const derOf = (key: string): Uint8Array<ArrayBuffer> =>
+ 
+ /** What a bundle URL's signature covers: whose bundle, which bundle, and when the URL stops being good. */
+ const signedText = (namespace: string, sha256: string, expires: number): Uint8Array<ArrayBuffer> =>
+-  new TextEncoder().encode(`${namespace}|${sha256}|${expires}`).slice();
++  new TextEncoder().encode(`${namespace}|${sha256}`).slice();
+ 
+ /**
+  * Where a sandbox fetches a namespace's bundle, signed by Keel: `bundleUrl`

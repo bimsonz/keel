@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-sources.test.ts
+# kills: t5.noop-worlds.namespaces-apart
+# why: A-noop's world is stored outside the namespace it was built for, so that namespace's VerifierDO cannot read it
+diff --git a/apps/keel/src/adapters/driven/r2/noop-world.ts b/apps/keel/src/adapters/driven/r2/noop-world.ts
+index 1a9bd024..d5978ba8 100644
+--- a/apps/keel/src/adapters/driven/r2/noop-world.ts
++++ b/apps/keel/src/adapters/driven/r2/noop-world.ts
+@@ -40,7 +40,7 @@ export const noopWorld =
+       const tree = noopTree(a, recipe, BUNDLE_TEXT);
+       if (Result.isFailure(tree)) return yield* Effect.fail(tree.failure);
+       const bytes = yield* Effect.promise(() => writeBundle(tree.success));
+-      return yield* (yield* BundleStore).put(namespace, bytes);
++      return yield* (yield* BundleStore).put("org_00000000000000000000000000", bytes);
+     });
+ 
+ /**

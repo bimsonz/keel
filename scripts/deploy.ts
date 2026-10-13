@@ -163,6 +163,12 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
   set(["vars", "KEEL_HOST"], host);
   const vars = committed["vars"];
   if (isObject(vars) && "KEEL_API_HOST" in vars) set(["vars", "KEEL_API_HOST"], host);
+  // The half of the bundle URL key pair that only verifies: a var, so keel-verify holds no secret.
+  if (isObject(vars) && "BUNDLE_URL_PUBLIC_KEY" in vars)
+    set(
+      ["vars", "BUNDLE_URL_PUBLIC_KEY"],
+      requireOutput(outputs, "bundle_url_public_key", "the bundle URL public key"),
+    );
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const pins = pinProblems(rendered);
@@ -221,6 +227,7 @@ async function signingKey(): Promise<string> {
 /** Secrets whose value is a Terraform output, so replacing the resource there rotates them. */
 const FROM_TERRAFORM: Readonly<Record<string, string>> = {
   BETTER_AUTH_SECRET: "better_auth_secret",
+  BUNDLE_URL_SIGNING_KEY: "bundle_url_signing_key",
 };
 
 /** The secrets a config's `secrets.required` names. */
@@ -230,9 +237,9 @@ function requiredSecrets(config: Json): string[] {
 }
 
 /**
- * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID and
- * BETTER_AUTH_SECRET (Terraform's output, so replacing it there rotates it
- * here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
+ * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID,
+ * BETTER_AUTH_SECRET and BUNDLE_URL_SIGNING_KEY (Terraform's outputs, so
+ * replacing one there rotates it here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
  * one, because a new key invalidates every token already issued. The console
  * requires none: it holds no credential.
  */

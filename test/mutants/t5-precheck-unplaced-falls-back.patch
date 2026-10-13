@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts
+# kills: t5.pool.namespace-step
+# why: A project with no place is given a namespace to fall back on, so everything of it is kept where no one owns it
+diff --git a/apps/keel/src/adapters/driving/workflow/steps.ts b/apps/keel/src/adapters/driving/workflow/steps.ts
+index 01376ecf..77d2bf5d 100644
+--- a/apps/keel/src/adapters/driving/workflow/steps.ts
++++ b/apps/keel/src/adapters/driving/workflow/steps.ts
+@@ -63,7 +63,7 @@ export async function placedStep(
+   const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string | null> =>
+     Option.getOrNull(await run(Effect.option(projectNamespace(projectId)))),
+   );
+-  return kept === null ? undefined : Schema.decodeUnknownSync(OrgId)(kept);
++  return Schema.decodeUnknownSync(OrgId)(kept ?? "org_00000000000000000000000000");
+ }
+ 
+ /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */

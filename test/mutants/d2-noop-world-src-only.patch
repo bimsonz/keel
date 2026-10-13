@@ -2,15 +2,20 @@
 # kills: noop-worlds.bundle
 # why: A-noop's world is bundled from src/ alone, so it is not A's tree with one call removed
 diff --git a/apps/keel/src/adapters/driven/r2/noop-world.ts b/apps/keel/src/adapters/driven/r2/noop-world.ts
-index 530e356..c83ce8e 100644
+index 1a9bd024..d5ec30d2 100644
 --- a/apps/keel/src/adapters/driven/r2/noop-world.ts
 +++ b/apps/keel/src/adapters/driven/r2/noop-world.ts
-@@ -58,7 +58,7 @@ export const NoopWorldsBundles = Layer.effect(
-         store.get(world).pipe(
+@@ -59,7 +59,12 @@ export const NoopWorldsBundles = Layer.effect(
+         store.get(namespace, world).pipe(
            Effect.orDie,
            Effect.flatMap((bytes) => Effect.promise(() => readBundle(bytes))),
--          Effect.flatMap((files) => noopWorld(files)(recipe)),
-+          Effect.flatMap((files) => noopWorld(files.filter((f) => f.path.startsWith("src/")))(recipe)),
+-          Effect.flatMap((files) => noopWorld(namespace, files)(recipe)),
++          Effect.flatMap((files) =>
++            noopWorld(
++              namespace,
++              files.filter((f) => f.path.startsWith("src/")),
++            )(recipe),
++          ),
            Effect.provideService(BundleStore, store),
          ),
      });

@@ -6,6 +6,7 @@ import {
   resolvePlan,
   runPlan,
   settleUnresolved,
+  storedPlanText,
 } from "@keeltown/core/application/verification";
 import type { FlowPlan, VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
@@ -18,6 +19,7 @@ import {
   makeProbeRunnerMemory,
   makeVerifierRuntimeMemory,
   guardedPlan,
+  sampleNamespace,
   TEST_GUARD,
   workerAppPlan,
 } from "@keeltown/testing";
@@ -56,7 +58,7 @@ const runOn = (plan: FlowPlan, probe: "pass" | "fail") => {
   const runtime = makeVerifierRuntimeMemory();
   const probes = makeProbeRunnerMemory(() => ran(probe));
   const durable = recordingDurable();
-  return runPlan(plan, candidateRunner(job, durable.durable)).pipe(
+  return runPlan(plan, candidateRunner(sampleNamespace, job, durable.durable)).pipe(
     Effect.provide(Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer)),
     Effect.map((reports) => ({ reports, runtime, probes, durable })),
   );
@@ -69,15 +71,19 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
       Effect.gen(function* () {
         const store = makePlanStoreMemory();
         const plan = guardedPlan();
-        const before = yield* resolvePlan(plan.planHash).pipe(Effect.provide(store.layer));
+        const before = yield* resolvePlan(sampleNamespace, plan.planHash).pipe(
+          Effect.provide(store.layer),
+        );
         expect(before).toEqual({
           _tag: "Unresolved",
           why: `plan ${plan.planHash} is not in the plan store`,
         });
         yield* Effect.gen(function* () {
-          return yield* (yield* PlanStore).put(plan);
+          return yield* (yield* PlanStore).put(sampleNamespace, plan);
         }).pipe(Effect.provide(store.layer));
-        const after = yield* resolvePlan(plan.planHash).pipe(Effect.provide(store.layer));
+        const after = yield* resolvePlan(sampleNamespace, plan.planHash).pipe(
+          Effect.provide(store.layer),
+        );
         if (after._tag !== "Resolved") throw new Error(`unresolved: ${after.why}`);
         expect(Result.getOrThrow(readStoredPlan(plan.planHash, after.text))).toEqual(plan);
       }),
@@ -91,11 +97,17 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
         const plan = guardedPlan();
         const other = workerAppPlan();
         yield* Effect.gen(function* () {
-          return yield* (yield* PlanStore).put(other);
+          return yield* (yield* PlanStore).put(sampleNamespace, other);
         }).pipe(Effect.provide(store.layer));
         // Another plan's text, filed under this plan's hash.
-        yield* store.plant(plan.planHash, store.plans.get(other.planHash) ?? "");
-        const resolved = yield* resolvePlan(plan.planHash).pipe(Effect.provide(store.layer));
+        yield* store.plant(
+          sampleNamespace,
+          plan.planHash,
+          Result.getOrThrow(storedPlanText(other)),
+        );
+        const resolved = yield* resolvePlan(sampleNamespace, plan.planHash).pipe(
+          Effect.provide(store.layer),
+        );
         expect(resolved._tag).toBe("Unresolved");
         expect(resolved._tag === "Unresolved" && resolved.why).toContain("stored corrupt");
       }),
@@ -135,7 +147,7 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
         );
         expect(runtime.jobs.every((j) => j.bundle === CANDIDATE)).toBe(true);
         expect(probes.requests).toEqual([
-          { probe: PROBE, world: "AB", worldBundle: CANDIDATE, run: 1 },
+          { namespace: sampleNamespace, probe: PROBE, world: "AB", worldBundle: CANDIDATE, run: 1 },
         ]);
         expect(durable.names).toEqual([`guard ${guard.id}`]);
       }),
@@ -166,7 +178,11 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
         const probes = makeProbeRunnerMemory(() => ran("pass"));
         const [step] = guardedPlan().steps;
         if (step === undefined) throw new Error("the plan has steps");
-        const report = yield* candidateRunner(job, recordingDurable().durable)(step, "A").pipe(
+        const report = yield* candidateRunner(
+          sampleNamespace,
+          job,
+          recordingDurable().durable,
+        )(step, "A").pipe(
           Effect.provide(
             Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer),
           ),

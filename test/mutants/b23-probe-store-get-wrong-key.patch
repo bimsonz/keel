@@ -2,15 +2,15 @@
 # kills: probe-store.get
 # why: a probe's files are read from a key nothing is written under, so every kept source reads as missing
 diff --git a/apps/keel/src/adapters/driven/r2/probe-store.ts b/apps/keel/src/adapters/driven/r2/probe-store.ts
-index dff5b75..a86a872 100644
+index da93bfbc..3e4737bf 100644
 --- a/apps/keel/src/adapters/driven/r2/probe-store.ts
 +++ b/apps/keel/src/adapters/driven/r2/probe-store.ts
 @@ -31,7 +31,7 @@ export const ProbeStoreR2 = (bucket: R2Bucket) =>
            return hash;
          }),
-       get: (hash) =>
--        Effect.promise(() => bucket.get(bundleKey(hash))).pipe(
-+        Effect.promise(() => bucket.get(hash)).pipe(
+       get: (namespace, hash) =>
+-        Effect.promise(() => bucket.get(bundleKey(namespace, hash))).pipe(
++        Effect.promise(() => bucket.get(`ns/${namespace}/bundles/${hash}`)).pipe(
            Effect.flatMap((object) =>
              object === null
                ? Effect.fail(new BundleMissing({ hash }))

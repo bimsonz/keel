@@ -24,7 +24,7 @@ import { SYNTAX_WASM } from "../../src/adapters/driven/syntax/wasm.ts";
 import { PrecheckParams } from "../../src/adapters/driving/workflow/precheck.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { drainAfter, drainOutbox } from "./helpers.ts";
+import { drainAfter, drainOutbox, POOL_ORG } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 const WAIT = { timeout: 15_000, interval: 50 };
@@ -85,8 +85,8 @@ const INVOICES: AdmittedGuard = {
  * it, and the outbox then starts its Precheck: a test that mocks a step with
  * something of the change's own mocks it before it submits.
  */
-async function pushed(premises: readonly Proposition[] = []) {
-  const c = await changeUnderTest();
+async function pushed(premises: readonly Proposition[] = [], on?: ChangeUnderTest) {
+  const c = on ?? (await changeUnderTest());
   const lease = ok(await c.declare("declare-1", { premises })).change.lease.id;
   const commitSha = await c.push();
   const submit = async () =>
@@ -137,7 +137,7 @@ async function kept(c: ChangeUnderTest, commitSha: string, effects: readonly Der
     ),
   );
   const derivationRef = await Effect.runPromise(
-    EvidenceStore.use((store) => store.put(record)).pipe(
+    EvidenceStore.use((store) => store.put(POOL_ORG, record)).pipe(
       Effect.provide(EvidenceStoreR2(env.ARCHIVE)),
     ),
   );
@@ -228,6 +228,7 @@ const derivedFrom = (
 ) =>
   Effect.runPromise(
     deriveSubmission(
+      POOL_ORG,
       workspace,
       {
         changeId: c.changeId,
@@ -325,7 +326,7 @@ describe("Precheck", () => {
       compiled,
     );
     expect(queued).toMatchObject({ planHash });
-    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const text = await (await env.ARCHIVE.get(planKey(POOL_ORG, planHash)))?.text();
     const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
     expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
       { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
@@ -364,7 +365,7 @@ describe("Precheck", () => {
     const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
       log.find((e) => e.type === "PlanCompiled")?.payload,
     );
-    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const text = await (await env.ARCHIVE.get(planKey(POOL_ORG, planHash)))?.text();
     const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
     expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
       { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
@@ -468,7 +469,7 @@ describe("Precheck", () => {
     const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
       log.find((e) => e.type === "PlanCompiled")?.payload,
     );
-    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const text = await (await env.ARCHIVE.get(planKey(POOL_ORG, planHash)))?.text();
     const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
     expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
       { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
@@ -482,7 +483,7 @@ describe("Precheck", () => {
       skipped: [],
     };
     const record = await Effect.runPromise(
-      EvidenceStore.use((store) => store.get(answer.derivationRef)).pipe(
+      EvidenceStore.use((store) => store.get(POOL_ORG, answer.derivationRef)).pipe(
         Effect.provide(EvidenceStoreR2(env.ARCHIVE)),
       ),
     );
@@ -553,6 +554,33 @@ describe("Precheck", () => {
       _tag: "ChangeBounced",
       reasons: ["precheck:guard:.keel/guards/g1.test.ts (.keel/guards/**)"],
       nextActions: [{ kind: "call", operationId: "submit" }],
+    });
+  });
+
+  it("[t5.pool.namespace-step] refuses a submission to a project with no place, naming the project, and reads nothing more of it", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const unplaced: ProjectId = makeId("prj", ulid());
+    // No later step is mocked: were the instance to go on, ancestry would read the code host.
+    const { c, submit } = await pushed([], await changeUnderTest(unplaced, "memory", false));
+    await submit();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    const [instance] = await workflows.get();
+    await instance?.waitForStatus("complete");
+
+    expect((await c.current()).state).toBe("bounced");
+    const log = await c.log();
+    // Nothing was derived or compiled between the start and the refusal.
+    expect(log.map((e) => e.type).slice(-3)).toEqual([
+      "ChangeSubmitted",
+      "PrecheckStarted",
+      "ChangeBounced",
+    ]);
+    expect(log.at(-1)?.payload).toMatchObject({
+      _tag: "ChangeBounced",
+      reasons: [
+        `precheck:project-unplaced:project ${unplaced} belongs to no namespace, so nothing of this change can be kept or verified`,
+      ],
+      nextActions: [{ kind: "escalate", args: { projectId: unplaced } }],
     });
   });
 

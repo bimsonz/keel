@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import { ContentHash } from "../../domain/kernel/index.ts";
+import { ContentHash, type OrgId } from "../../domain/kernel/index.ts";
 import type { FlowPlan } from "../../domain/verification/index.ts";
 
 /** Nothing is stored under this plan hash. */
@@ -19,12 +19,16 @@ export class PlanCorrupt extends Schema.TaggedError<PlanCorrupt>()("PlanCorrupt"
  * the plan its job names, so the plan that runs is the plan that was
  * compiled, across deploys and compiler versions. A read is verified: the
  * plan must rehash to the hash asked for (`planHashOf`), or it is
- * `PlanCorrupt`. A plan whose own hash lies is never stored (a defect).
+ * `PlanCorrupt`. A plan whose own hash lies is never stored (a defect). Each
+ * plan is kept for one namespace, and is `PlanMissing` for every other.
  */
 export class PlanStore extends Context.Service<
   PlanStore,
   {
-    readonly put: (plan: FlowPlan) => Effect.Effect<ContentHash>;
-    readonly get: (hash: ContentHash) => Effect.Effect<FlowPlan, PlanMissing | PlanCorrupt>;
+    readonly put: (namespace: OrgId, plan: FlowPlan) => Effect.Effect<ContentHash>;
+    readonly get: (
+      namespace: OrgId,
+      hash: ContentHash,
+    ) => Effect.Effect<FlowPlan, PlanMissing | PlanCorrupt>;
   }
 >()("keel/PlanStore") {}

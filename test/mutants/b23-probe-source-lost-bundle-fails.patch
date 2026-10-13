@@ -2,17 +2,15 @@
 # kills: b23.probe-source
 # why: a bundle the store no longer keeps fails the read instead of answering the probe with no files
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 899e685..753811a 100644
+index a900383a..f2595108 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -333,9 +333,7 @@ export const readProbeSource: (
-     const bundleHash = probe?.bundleHash;
-     if (bundleHash === undefined) return { probeId, files: NO_FILES };
-     const store = yield* ProbeStore;
--    const files = yield* store
--      .get(bundleHash)
--      .pipe(Effect.catchTag("BundleMissing", () => Effect.succeed(NO_FILES)));
-+    const files = yield* store.get(bundleHash).pipe(Effect.orDie);
-     return { probeId, bundleHash, files };
-   });
- 
+@@ -351,7 +351,7 @@ export const readProbeSource: (
+     const files = yield* projectNamespace(scope.project).pipe(
+       Effect.flatMap((namespace) => store.get(namespace, bundleHash)),
+       Effect.catchTags({
+-        BundleMissing: () => Effect.succeed(NO_FILES),
++        BundleMissing: (missing) => Effect.die(missing),
+         ProjectUnplaced: () => Effect.succeed(NO_FILES),
+       }),
+     );

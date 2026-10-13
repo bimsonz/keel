@@ -1,17 +1,26 @@
 # expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
 # why: The bundle host serves whatever key the request path names, not only bundles/<sha256>
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-index 019e7f5..30a4c42 100644
+index ebbbb3a9..bdd64912 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-@@ -102,9 +102,8 @@ export async function serveBundle(
+@@ -127,9 +127,7 @@ export async function serveBundle(
    if (request.method !== "GET" && request.method !== "HEAD")
      return new Response("bundles are read-only", { status: 405 });
-   const sha256 = new URL(request.url).pathname.replace(/^\/+/, "");
--  if (!/^[0-9a-f]{64}$/.test(sha256)) return new Response("not a bundle hash", { status: 400 });
+   const url = new URL(request.url);
+-  const [, namespace, sha256] = BUNDLE_PATH.exec(url.pathname) ?? [];
+-  if (namespace === undefined || sha256 === undefined || !isNamespace(namespace))
+-    return new Response("not a namespace's bundle", { status: 400 });
++  const [namespace = "", sha256 = ""] = url.pathname.replace(/^\/+/, "").split("/");
+   const signed = await bundleUrlSigned(
+     env.BUNDLE_URL_PUBLIC_KEY,
+     namespace,
+@@ -139,7 +137,7 @@ export async function serveBundle(
+   );
+   if (!signed) return new Response("not a bundle URL Keel signed", { status: 403 });
    const started = Date.now();
--  const object = await env.BUNDLES.get(bundleKey(sha256));
-+  const object = await env.BUNDLES.get(sha256);
+-  const object = await env.BUNDLES.get(namespaceKey(namespace, "bundles", sha256));
++  const object = await env.BUNDLES.get(url.pathname.replace(/^\/+/, ""));
    if (object === null) return new Response("no such bundle", { status: 404 });
    const body =
      request.method === "HEAD"

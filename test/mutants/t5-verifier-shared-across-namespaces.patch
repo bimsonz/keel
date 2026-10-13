@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: t5.verifier-name, t5.pool.verifier-per-namespace
+# why: Two namespaces that hold the same probe and world share one VerifierDO and its four slots
+diff --git a/apps/keel-verify/src/rpc/verifier.ts b/apps/keel-verify/src/rpc/verifier.ts
+index 410299de..4c9cfd76 100644
+--- a/apps/keel-verify/src/rpc/verifier.ts
++++ b/apps/keel-verify/src/rpc/verifier.ts
+@@ -54,7 +54,7 @@ export const VerifierCodecs = {
+  * one, whatever hashes they hold.
+  */
+ export const verifierName = (request: ProbeRunRequest): string =>
+-  `probe:${request.namespace}:${request.probe.slice("sha256:".length)}:${request.worldBundle.slice("sha256:".length)}`;
++  `probe:${request.probe.slice("sha256:".length)}:${request.worldBundle.slice("sha256:".length)}`;
+ 
+ /**
+  * A VerifierDO in keel-verify: one per (namespace, probe, world), running throwaway

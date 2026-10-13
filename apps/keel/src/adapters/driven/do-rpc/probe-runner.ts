@@ -27,7 +27,7 @@ export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
 
 /**
  * ProbeRunner over keel-verify's entrypoint (the VERIFIER service binding),
- * which routes each run to the VerifierDO for its (probe, world): a fresh
+ * which routes each run to the VerifierDO for its (namespace, probe, world): a fresh
  * isolate with no network. keel-verify's VerifierUnavailable (a bundle
  * missing or forged, a world with no deps bundle) and a call that never
  * reached it are both ProbeRunnerUnavailable, for the caller to retry or

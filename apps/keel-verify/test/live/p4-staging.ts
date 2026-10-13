@@ -20,6 +20,7 @@ import { join } from "node:path";
 import {
   type FreshnessSlots,
   MATRIX_WORLDS,
+  namespaceKey,
   renderFreshness,
 } from "@keeltown/core/application/verification";
 import {
@@ -33,6 +34,7 @@ import { type BundleFile, depsNeed, sha256Hex, writeBundle } from "@keeltown/run
 import { Exit, Schema } from "effect";
 import { unstable_startWorker } from "wrangler";
 import { decodeExit, ProbeRunRequest, VerifierCodecs } from "../../src/rpc/index.ts";
+import { harnessNamespace } from "./bundles.ts";
 import { RECIPE, S26, s1Worlds } from "./s1-worlds.ts";
 
 /** S-1's slots for the freshness template, as scenarios/s1/probe.test.ts makes its calls: bob's admin role is revoked mid-session. */
@@ -129,12 +131,15 @@ const call = async (path: string, init: Parameters<typeof driver.fetch>[1]) => {
 
 const has = async (key: string) => (await call(`/r2/${key}`, { method: "HEAD" })).status === 200;
 
-/** Puts files as a content-addressed bundle at `bundles/<hex>` unless the bucket holds it already. */
+/** The namespace every bundle of this run is kept for, and every probe run names. */
+const namespace = harnessNamespace();
+
+/** Puts files as a content-addressed bundle among the namespace's bundles unless the bucket holds it already. */
 const put = async (files: readonly BundleFile[]): Promise<ContentHash> => {
   const bytes = await writeBundle(files);
   const hex = await sha256Hex(bytes);
-  if (!(await has(`bundles/${hex}`)))
-    await call(`/r2/bundles/${hex}`, { method: "PUT", body: Buffer.from(bytes) });
+  const key = namespaceKey(namespace, "bundles", hex);
+  if (!(await has(key))) await call(`/r2/${key}`, { method: "PUT", body: Buffer.from(bytes) });
   return ContentHash.make(`sha256:${hex}`);
 };
 
@@ -142,9 +147,10 @@ const put = async (files: readonly BundleFile[]): Promise<ContentHash> => {
 const requireDeps = async (world: readonly BundleFile[]) => {
   const need = await depsNeed(world);
   if (need._tag !== "lockfile") return;
-  if (!(await has(`deps/${need.sha256}`)))
+  const key = namespaceKey(namespace, "deps", need.sha256);
+  if (!(await has(key)))
     throw new Error(
-      `no deps/${need.sha256} in the bucket: run deps-bundle.ts fixtures/forge-lite --upload first`,
+      `no ${key} in the bucket: run deps-bundle.ts fixtures/forge-lite --upload first`,
     );
 };
 
@@ -233,7 +239,13 @@ const matrix = async (runs: number, fresh: boolean) => {
     // A run's worlds go at once, the runs one after another, as runMatrix does.
     // oxlint-disable-next-line no-await-in-loop -- the runs are sequential on purpose
     const answers = await runBatch(
-      MATRIX_WORLDS.map((world) => ({ probe, world, worldBundle: bundles[world], run })),
+      MATRIX_WORLDS.map((world) => ({
+        namespace,
+        probe,
+        world,
+        worldBundle: bundles[world],
+        run,
+      })),
     );
     for (const reply of answers) console.log(JSON.stringify(reply));
     replies.push(...answers);
@@ -267,10 +279,16 @@ const queue = async () => {
   const probe = await put(NAP_PROBE);
   const worldBundle = await put(world);
   // Bundled once, outside the measured five.
-  const [warmUp] = await runBatch([{ probe, world: "trunk", worldBundle, run: 100 }]);
+  const [warmUp] = await runBatch([{ namespace, probe, world: "trunk", worldBundle, run: 100 }]);
   console.log(JSON.stringify({ warmUp }));
   const five = await runBatch(
-    [101, 102, 103, 104, 105].map((run) => ({ probe, world: "trunk" as const, worldBundle, run })),
+    [101, 102, 103, 104, 105].map((run) => ({
+      namespace,
+      probe,
+      world: "trunk" as const,
+      worldBundle,
+      run,
+    })),
   );
   for (const reply of five) console.log(JSON.stringify(reply));
   console.log(
@@ -289,7 +307,13 @@ const hog = async () => {
   const world = s1Worlds().trunk;
   await requireDeps(world);
   const [reply] = await runBatch([
-    { probe: await put(HOG_PROBE), world: "trunk", worldBundle: await put(world), run: 1 },
+    {
+      namespace,
+      probe: await put(HOG_PROBE),
+      world: "trunk",
+      worldBundle: await put(world),
+      run: 1,
+    },
   ]);
   console.log(JSON.stringify(reply));
 };

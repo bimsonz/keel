@@ -2,7 +2,7 @@
 # kills: b23.probe-source
 # why: a probe none of whose drafts compiled is answered as a probe that does not exist, though the conflict's page names it
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 65424ff..b9960a5 100644
+index a900383a..9adbf77c 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
 @@ -32,7 +32,7 @@ import {
@@ -14,12 +14,12 @@ index 65424ff..b9960a5 100644
  } from "../../domain/verification/index.ts";
  import {
    type ChangeListPage,
-@@ -340,7 +340,7 @@ export const readProbeSource: (
+@@ -346,7 +346,7 @@ export const readProbeSource: (
      const views = yield* ProjectViews;
      const { probe } = yield* views.probeConflict(scope.project, probeId);
      const bundleHash = probe?.bundleHash;
 -    if (bundleHash === undefined) return { probeId, files: NO_FILES };
 +    if (bundleHash === undefined) return yield* new ProbeNotFound({ probeId });
      const store = yield* ProbeStore;
-     const files = yield* store
-       .get(bundleHash)
+     const files = yield* projectNamespace(scope.project).pipe(
+       Effect.flatMap((namespace) => store.get(namespace, bundleHash)),

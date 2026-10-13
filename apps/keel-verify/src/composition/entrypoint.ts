@@ -8,7 +8,7 @@ const decodeProbeRun = Schema.decodeUnknownExit(ProbeRunRequest);
 /**
  * keel-verify's front door, which keel reaches over its VERIFIER service
  * binding: /healthz, and `runProbe`, which routes a probe run to the
- * VerifierDO for its (probe, world).
+ * VerifierDO for its (namespace, probe, world).
  */
 export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {

@@ -18,7 +18,7 @@ import {
   PlanStore,
 } from "../../../src/application/ports/index.ts";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
-import { CommitSha, ContentHash, makeId } from "../../../src/domain/kernel/index.ts";
+import { CommitSha, ContentHash, makeId, OrgId } from "../../../src/domain/kernel/index.ts";
 import {
   compile,
   type FlowPlan,
@@ -30,6 +30,9 @@ import { fc } from "../../support/fast-check.ts";
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const hash = (n: number) =>
   Schema.decodeUnknownSync(ContentHash)(`sha256:${String(n).padStart(64, "0")}`);
+
+/** The namespace every call names, and the only one the stores below keep anything for. */
+const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The worker-app pack's plan: two proof steps in Tier 2, the suite and the typecheck. */
 const PLAN = Result.getOrThrow(
@@ -63,6 +66,7 @@ const PARTIES: ProbeParties = {
 /** trunkCheckPlan over a flow source answering `sources` (or failing) and a plan store keeping what it is given. */
 const trunkPlan = (sources: FlowSources | "unreadable") => {
   const stored: FlowPlan[] = [];
+  const namespaces: string[] = [];
   const layer = Layer.mergeAll(
     Layer.succeed(
       FlowSpecSource,
@@ -76,8 +80,9 @@ const trunkPlan = (sources: FlowSources | "unreadable") => {
     Layer.succeed(
       PlanStore,
       PlanStore.of({
-        put: (plan) =>
+        put: (namespace, plan) =>
           Effect.sync(() => {
+            namespaces.push(namespace);
             stored.push(plan);
             return plan.planHash;
           }),
@@ -86,10 +91,10 @@ const trunkPlan = (sources: FlowSources | "unreadable") => {
     ),
   );
   return Effect.runPromise(
-    trunkCheckPlan({ namespace: "keel-core", name: "prj-staging" }, sha("b")).pipe(
+    trunkCheckPlan(NAMESPACE, { namespace: "keel-core", name: "prj-staging" }, sha("b")).pipe(
       Effect.provide(layer),
     ),
-  ).then((plan) => ({ plan, stored }));
+  ).then((plan) => ({ plan, stored, namespaces }));
 };
 
 describe("world checks", () => {
@@ -167,7 +172,12 @@ describe("world checks", () => {
       { _tag: "OfChange", changeId: A },
       { _tag: "OfChange", changeId: B },
     ];
-    const conflict = { projectId: makeId("prj", ulid(3)), key, conflictId: makeId("cfl", ulid(4)) };
+    const conflict = {
+      namespace: NAMESPACE,
+      projectId: makeId("prj", ulid(3)),
+      key,
+      conflictId: makeId("cfl", ulid(4)),
+    };
     expect(worldCheckJobs(conflict, PARTIES, worlds, trunk)).toEqual([
       {
         ...conflict,
@@ -205,8 +215,9 @@ describe("world checks", () => {
   });
 
   it("[world-check.trunk-plan] trunk's check runs the plan compiled from trunk head's flow with no subjects and no guards, stored by its hash", async () => {
-    const { plan, stored } = await trunkPlan({ rootPaths: ["src"] });
+    const { plan, stored, namespaces } = await trunkPlan({ rootPaths: ["src"] });
     expect(stored).toHaveLength(1);
+    expect(namespaces).toEqual(["org_01JZ8PT2C4E6G8J0M2N4Q6S8V0"]);
     expect(plan).toEqual({ _tag: "Planned", planHash: stored[0]?.planHash });
     expect(stored[0]?.steps.map((s) => s.id)).toContain("js-ts.suite");
     expect(stored[0]?.steps.some((s) => s.guards !== undefined)).toBe(false);
