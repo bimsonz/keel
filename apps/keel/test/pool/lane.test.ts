@@ -7,6 +7,7 @@ import { env } from "cloudflare:workers";
 import {
   batchOf,
   laneHeard,
+  laneOf,
   projectRepos,
   VERIFY_BUDGET_MS,
 } from "@keeltown/core/application/integration";
@@ -437,6 +438,53 @@ describe("the Lane DO", () => {
     const [, [, second] = []] = [...verification.started.entries()];
     expect(second?.fence.batchId).not.toBe(job.fence.batchId);
     await drainOutbox(stub);
+  });
+
+  it("[lane.do.step-killed] the lane's deadline hands its step how often it was started: started a third time, it fails the batch's bundle on the infrastructure and starts no verification", async () => {
+    const { stub, laneId, verification } = await lane();
+    // The change is queued in the lane's own store, past the object's receive: no step is armed, so only the deadline under test runs one.
+    const event = Schema.decodeUnknownSync(EventEnvelope)(queued(laneId, 1));
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.gen(function* () {
+          const store = yield* EntityStore;
+          const outbox = yield* EventOutbox;
+          const at = Instant(0);
+          store.transaction(
+            () =>
+              outbox.receive(event.dedupeKey, at) &&
+              laneHeard({ store, outbox, at }, laneId, event),
+          );
+        }),
+      ),
+    );
+    // The step's request as two dead invocations leave it: started twice, never finished, and due.
+    await runInDurableObject(stub, async (_instance: LaneDO, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO keel_alarms (reason, kind, at, starts) VALUES (?, 'debounce', ?, 2)",
+        LANE_STEP,
+        Date.now() - 1,
+      );
+      await state.storage.setAlarm(Date.now());
+    });
+    const infra = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        ManagedRuntime.make(backbone(state.storage)).runPromise(
+          Effect.map(EntityStore, (store) =>
+            laneOf(store, laneId)?.infra.map((entry) => entry.reasons),
+          ),
+        ),
+      );
+    await vi.waitFor(
+      async () => {
+        await runDurableObjectAlarm(stub);
+        expect(await infra()).toEqual([
+          ["bundle-refused: the lane's step was killed 2 times before the candidate was bundled"],
+        ]);
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    expect(verification.started.size).toBe(0);
   });
 
   it("[lane.do.backoff] a step that keeps failing is retried 1 s·2ⁿ later, not on a fixed loop", async () => {

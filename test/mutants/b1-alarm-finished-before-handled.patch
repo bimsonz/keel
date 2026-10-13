@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-kept"
+# kills: b1.alarm-kept
+# why: A due request is removed before its handler runs, so one whose invocation dies is never run again: a lane stalls until its next delivery
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 960e3dac..9db2f52a 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -184,6 +184,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+       // Counted as started only now, so a request waiting behind one that dies is not counted with it.
+       const request = await startAlarm(this.ctx.storage, found, now);
+       if (request === undefined) continue;
++      await finishAlarm(this.ctx.storage, request);
+       if (request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY) {
+         if (!flushed) await this.flush();
+         flushed = true;

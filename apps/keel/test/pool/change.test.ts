@@ -108,7 +108,12 @@ const leaseAlarms = (c: ChangeUnderTest) =>
 /** The lease's deadline, run as the alarm would run it, whenever the test says. */
 const deadline = (c: ChangeUnderTest, leaseId: string) =>
   runInDurableObject(c.stub, (instance: ChangeDO) =>
-    instance["onDeadline"]({ kind: "deadline", reason: `lease ${leaseId} lapses`, at: Date.now() }),
+    instance["onDeadline"]({
+      kind: "deadline",
+      reason: `lease ${leaseId} lapses`,
+      at: Date.now(),
+      starts: 1,
+    }),
   );
 
 /** The stored change agrees with its log: the state the events say, but for `renewedAt`. */

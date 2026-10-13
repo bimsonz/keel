@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-killed-once
+# why: One dead invocation is enough to fail the bundle on the infrastructure, so a single eviction costs the change a round
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8cb9cee8..496ea681 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -89,7 +89,7 @@ export const INFRA_FAILURE_LIMIT = 3;
+  * trying: the bundle is failed on the infrastructure for this round, which
+  * requeues the change and counts towards `INFRA_FAILURE_LIMIT`.
+  */
+-export const STEP_KILLS_BEFORE_INFRA = 2;
++export const STEP_KILLS_BEFORE_INFRA = 1;
+ 
+ /** A green batch trunk has not answered is first re-offered this long after its BatchVerified. */
+ export const REOFFER_AFTER_MS = 30_000;

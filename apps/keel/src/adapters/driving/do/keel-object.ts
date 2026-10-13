@@ -26,7 +26,14 @@ import {
   encodeExit,
   readDelivery,
 } from "../../../rpc/index.ts";
-import { type AlarmRequest, cancelAlarm, dueAlarms, scheduleAlarm } from "./alarm.ts";
+import {
+  cancelAlarm,
+  dueAlarms,
+  finishAlarm,
+  scheduleAlarm,
+  startAlarm,
+  type StartedAlarm,
+} from "./alarm.ts";
 import { Waiters } from "./waiters.ts";
 
 /** The alarm reasons the backbone owns. Every other reason is the subclass's, handed to `onDeadline`. */
@@ -119,8 +126,12 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
    */
   protected async received(): Promise<void> {}
 
-  /** One of the object's own alarms came due. */
-  protected async onDeadline(request: AlarmRequest): Promise<void> {
+  /**
+   * One of the object's own alarms came due. It is run again, with a higher
+   * `starts`, when the invocation that ran it died: a handler resumes from
+   * what it last committed, so a second run does only what the first left.
+   */
+  protected async onDeadline(request: StartedAlarm): Promise<void> {
     throw new Error(`${this.constructor.name} armed "${request.reason}" but handles no deadline`);
   }
 
@@ -163,13 +174,24 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
 
   override async alarm(): Promise<void> {
     let flushed = false;
-    for (const request of await dueAlarms(this.ctx.storage, Date.now())) {
+    const now = Date.now();
+    const { due, abandoned } = await dueAlarms(this.ctx.storage, now);
+    for (const request of abandoned)
+      console.error(
+        `${this.constructor.name} ${this.ctx.id.name ?? this.ctx.id.toString()} gave up on "${request.reason}": started ${request.starts} times and never finished`,
+      );
+    for (const found of due) {
+      // Counted as started only now, so a request waiting behind one that dies is not counted with it.
+      const request = await startAlarm(this.ctx.storage, found, now);
+      if (request === undefined) continue;
       if (request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY) {
         if (!flushed) await this.flush();
         flushed = true;
       } else {
         await this.onDeadline(request);
       }
+      // Only now is the request done: an invocation that dies above leaves it to be run again.
+      await finishAlarm(this.ctx.storage, request);
     }
     this.waiters.wake();
     await this.armFlush();

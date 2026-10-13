@@ -11,7 +11,17 @@ import { FanOutRpc, workflowInstanceId } from "../../src/adapters/driven/do-rpc/
 import { EntityStoreSql } from "../../src/adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql } from "../../src/adapters/driven/do-storage/event-outbox.ts";
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
-import { armedAlarms, dueAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
+import {
+  ALARM_START_LIMIT,
+  armedAlarms,
+  ALARM_RETRY_MS,
+  dueAlarms,
+  finishAlarm,
+  type RunningAlarm,
+  scheduleAlarm,
+  startAlarm,
+  type StartedAlarm,
+} from "../../src/adapters/driving/do/alarm.ts";
 import { OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
@@ -340,6 +350,50 @@ describe("ten concurrent commits on one Durable Object", () => {
   });
 });
 
+const TEST_DEADLINE = "a test's deadline";
+
+/**
+ * Runs the object's alarm as if the test deadline's retry had come due: the
+ * wait before a dead handler's request is run again is real time otherwise.
+ */
+const retried = async (stub: DurableObjectStub<ChangeDO>) => {
+  await runInDurableObject(stub, async (_instance: ChangeDO, state) => {
+    state.storage.sql.exec(
+      "UPDATE keel_alarms SET retry = ? WHERE reason = ? AND retry IS NOT NULL",
+      Date.now() - 1,
+      TEST_DEADLINE,
+    );
+    await state.storage.setAlarm(Date.now());
+  });
+  await runDurableObjectAlarm(stub).catch(() => false);
+};
+
+/** Each due request's reason with the starts counted against it. */
+const counts = (due: readonly RunningAlarm[]) => due.map((found) => [found.reason, found.starts]);
+
+/** Whether the test's deadline is still armed, as the reasons that are. */
+const armed = (storage: DurableObjectStorage) =>
+  armedAlarms(storage)
+    .map((alarm) => alarm.reason)
+    .filter((reason) => reason === TEST_DEADLINE);
+
+/**
+ * Gives the object a handler for deadlines that records each start it is
+ * given and dies when `dies` says so, as an invocation the platform killed.
+ */
+const handling = (stub: DurableObjectStub<ChangeDO>, dies: (starts: number) => boolean) => {
+  const seen: number[] = [];
+  return runInDurableObject(stub, (instance: ChangeDO) => {
+    Reflect.set(instance, "onDeadline", (request: StartedAlarm) => {
+      seen.push(request.starts);
+      return dies(request.starts)
+        ? Promise.reject(new Error(`killed at start ${request.starts}`))
+        : Promise.resolve();
+    });
+    return seen;
+  });
+};
+
 describe("alarms", () => {
   it("[b1.alarm-multiplex] keep several deadlines on the one platform alarm, firing only what is due", async () => {
     const result = await runInDurableObject(changeStub(), async (_instance: ChangeDO, state) => {
@@ -356,21 +410,144 @@ describe("alarms", () => {
       });
       const armedFirst = await state.storage.getAlarm();
       const fired = await dueAlarms(state.storage, now + 1000);
+      const [found] = fired.due;
+      const begun =
+        found === undefined ? undefined : await startAlarm(state.storage, found, now + 1000);
+      if (begun !== undefined) await finishAlarm(state.storage, begun);
       return {
         now,
         armedFirst,
         fired,
+        begun,
         armedThen: await state.storage.getAlarm(),
         left: armedAlarms(state.storage),
       };
     });
     expect(result.armedFirst).toBe(result.now + 1000);
-    expect(result.fired).toEqual([
-      { kind: "deadline", reason: "outbox redelivery", at: result.now + 1000 },
-    ]);
+    const redelivery = { kind: "deadline", reason: "outbox redelivery", at: result.now + 1000 };
+    expect(result.fired).toEqual({ due: [{ ...redelivery, starts: 0, armed: 0 }], abandoned: [] });
+    expect(result.begun).toEqual({ ...redelivery, starts: 1, armed: 0 });
     expect(result.armedThen).toBe(result.now + 15 * 60_000);
     expect(result.left).toEqual([
       { kind: "deadline", reason: "lease lse_1 lapses", at: result.now + 15 * 60_000 },
+    ]);
+  });
+
+  it("[b1.alarm-kept] runs a deadline again when the invocation that ran it died: the handler that throws once handles it the second time", async () => {
+    const stub = changeStub();
+    const seen = await handling(stub, (starts) => starts === 1);
+    await runInDurableObject(stub, (_instance: ChangeDO, state) =>
+      scheduleAlarm(state.storage, { kind: "deadline", reason: TEST_DEADLINE, at: Date.now() - 1 }),
+    );
+    // The platform may run a due alarm before the test does: each run is asked for, and its effect awaited.
+    await vi.waitFor(
+      async () => {
+        await retried(stub);
+        expect(seen.length).toBeGreaterThanOrEqual(1);
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    // The invocation died with its request still armed: the next run of the alarm handles it.
+    await vi.waitFor(
+      async () => {
+        await retried(stub);
+        expect(
+          await runInDurableObject(stub, (_i: ChangeDO, state) => armed(state.storage)),
+        ).toEqual([]);
+      },
+      { timeout: 10_000, interval: 25 },
+    );
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it("[b1.alarm-abandoned] gives up on a deadline started five times that never finished: it is removed, never started again, and the object says so", async () => {
+    const stub = changeStub();
+    const seen = await handling(stub, () => true);
+    const said = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await runInDurableObject(stub, (_instance: ChangeDO, state) =>
+        scheduleAlarm(state.storage, {
+          kind: "deadline",
+          reason: TEST_DEADLINE,
+          at: Date.now() - 1,
+        }),
+      );
+      await vi.waitFor(
+        async () => {
+          await retried(stub);
+          expect(
+            await runInDurableObject(stub, (_i: ChangeDO, state) => armed(state.storage)),
+          ).toEqual([]);
+        },
+        { timeout: 20_000, interval: 25 },
+      );
+      expect(seen).toEqual(Array.from({ length: ALARM_START_LIMIT }, (_, index) => index + 1));
+      expect(
+        said.mock.calls.map((call) => String(call[0])).filter((line) => line.includes("gave up")),
+      ).toEqual([
+        expect.stringMatching(
+          /^ChangeDO .* gave up on "a test's deadline": started 5 times and never finished$/,
+        ),
+      ]);
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it("[b1.alarm-rearmed] keeps a request armed again while its handler ran, even for the same time, with no run counted against it, and finishes one that was not", async () => {
+    const result = await runInDurableObject(changeStub(), async (_instance: ChangeDO, state) => {
+      const at = Date.now() - 1;
+      const again = { kind: "debounce", reason: "armed again", at } as const;
+      const once = { kind: "debounce", reason: "armed once", at } as const;
+      await scheduleAlarm(state.storage, again);
+      await scheduleAlarm(state.storage, once);
+      const running: RunningAlarm[] = [];
+      for (const found of (await dueAlarms(state.storage, at)).due) {
+        const begun = await startAlarm(state.storage, found, at);
+        if (begun !== undefined) running.push(begun);
+      }
+      // A delivery arrives while the handlers run, and asks for the same reason at the same time.
+      await scheduleAlarm(state.storage, again);
+      for (const begun of running) await finishAlarm(state.storage, begun);
+      const next = await dueAlarms(state.storage, at);
+      return { running, left: armedAlarms(state.storage), next: next.due };
+    });
+    expect(result.running.map((begun) => [begun.reason, begun.starts])).toEqual([
+      ["armed again", 1],
+      ["armed once", 1],
+    ]);
+    expect(result.left.map((alarm) => alarm.reason)).toEqual(["armed again"]);
+    expect(result.next.map((found) => [found.reason, found.starts])).toEqual([["armed again", 0]]);
+  });
+
+  it("[b1.alarm-counted] counts a start against the request whose handler ran, not the one waiting behind it; runs it again no sooner than its retry; and keeps the count when its reason is armed again", async () => {
+    const result = await runInDurableObject(changeStub(), async (_instance: ChangeDO, state) => {
+      const at = Date.now() - 1;
+      const dies = { kind: "deadline", reason: "a handler that dies", at } as const;
+      await scheduleAlarm(state.storage, dies);
+      await scheduleAlarm(state.storage, { kind: "deadline", reason: "behind it", at });
+      const [first] = (await dueAlarms(state.storage, at)).due;
+      if (first === undefined) throw new Error("nothing was due");
+      // The invocation dies under the first handler: nothing is finished, and the second never started.
+      await startAlarm(state.storage, first, at);
+      const atOnce = (await dueAlarms(state.storage, at)).due;
+      const armedFor = await state.storage.getAlarm();
+      const later = (await dueAlarms(state.storage, at + ALARM_RETRY_MS)).due;
+      // A delivery arms the dead handler's reason again: it is due at once, its one start still counted.
+      await scheduleAlarm(state.storage, dies);
+      const rearmed = (await dueAlarms(state.storage, at)).due;
+      return { at, atOnce, armedFor, later, rearmed };
+    });
+    expect(counts(result.atOnce)).toEqual([["behind it", 0]]);
+    // Armed for the request that is due now, not held back to the dead one's retry.
+    expect(result.armedFor).toBeLessThan(result.at + ALARM_RETRY_MS);
+    expect(counts(result.later)).toEqual([
+      ["a handler that dies", 1],
+      ["behind it", 0],
+    ]);
+    expect(counts(result.rearmed)).toEqual([
+      ["a handler that dies", 1],
+      ["behind it", 0],
     ]);
   });
 });

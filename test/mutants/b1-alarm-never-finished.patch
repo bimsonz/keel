@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-kept"
+# kills: b1.alarm-kept
+# why: A handled request is never removed, so every deadline is run again and again until it is given up on
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 960e3dac..8a14feac 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -191,7 +191,6 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+         await this.onDeadline(request);
+       }
+       // Only now is the request done: an invocation that dies above leaves it to be run again.
+-      await finishAlarm(this.ctx.storage, request);
+     }
+     this.waiters.wake();
+     await this.armFlush();

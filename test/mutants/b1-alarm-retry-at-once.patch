@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-counted"
+# kills: b1.alarm-counted
+# why: A request whose handler died is due again at once, so a poison deadline spends its five starts in a tight loop
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..4f80dc97 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -181,7 +181,7 @@ export async function startAlarm(
+   const { rowsWritten } = storage.sql.exec(
+     "UPDATE keel_alarms SET starts = ?, retry = ? WHERE reason = ? AND armed = ? AND starts = ?",
+     starts,
+-    now + ALARM_RETRY_MS * 2 ** due.starts,
++    null,
+     due.reason,
+     due.armed,
+     due.starts,

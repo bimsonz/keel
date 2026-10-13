@@ -14,7 +14,7 @@ import {
   RaiseCommand,
   RuleCommand,
 } from "../../../rpc/index.ts";
-import { type AlarmRequest, armedAlarms, cancelAlarm, scheduleAlarm } from "./alarm.ts";
+import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObject } from "./keel-object.ts";
 
 const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
@@ -63,7 +63,7 @@ export class NamespaceDO extends KeelObject implements NamespaceRpc {
   }
 
   /** An escalation's thirty minutes are up: its maintainers are asked too, if it is still open. */
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     const escalationId = WIDENS.exec(request.reason)?.[1];
     if (escalationId === undefined) return super.onDeadline(request);
     await this.runtime.runPromise(

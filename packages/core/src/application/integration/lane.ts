@@ -42,6 +42,7 @@ import {
   AgentDirectory,
   type BatchVerdict,
   BatchVerification,
+  BundleRefused,
   CandidateBundles,
   CandidateComposer,
   type CandidateMember,
@@ -82,6 +83,13 @@ const MEMBER_EVENTS = [
 
 /** On this many consecutive infra failures of one change the Lane bounces it, so it never loops. */
 export const INFRA_FAILURE_LIMIT = 3;
+
+/**
+ * A step that died this many times before its candidate was bundled stops
+ * trying: the bundle is failed on the infrastructure for this round, which
+ * requeues the change and counts towards `INFRA_FAILURE_LIMIT`.
+ */
+export const STEP_KILLS_BEFORE_INFRA = 2;
 
 /** A green batch trunk has not answered is first re-offered this long after its BatchVerified. */
 export const REOFFER_AFTER_MS = 30_000;
@@ -735,19 +743,31 @@ export const bundleBlame = Effect.fn("integration/bundleBlame")(function* (
  * Bundles the composed candidate for KeelVerify. A refused bundle fails the
  * batch through RefuseBundle with the verdict first: on the member whose
  * commit introduced the entry, or `infra` when the base already held it.
+ * `kills` is how often this step's invocation died before it got here: at
+ * `STEP_KILLS_BEFORE_INFRA` the bundle is not tried again and is refused on
+ * `infra`, since a bundle too heavy for one step would otherwise be started
+ * until its deadline is given up on, with the lane held behind it.
  */
 const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
   lane: Lane,
   active: ActiveBatch,
   batch: Batch,
   composed: NonNullable<ActiveBatch["composed"]>,
+  kills: number,
 ) {
   const staging = projectRepos(lane.projectId).staging;
   // A project with no place never has a batch: its Precheck ends before it compiles a plan.
   const namespace = yield* projectNamespace(lane.projectId).pipe(Effect.orDie);
-  const bundled = yield* Effect.result(
-    (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha),
-  );
+  const bundled =
+    kills >= STEP_KILLS_BEFORE_INFRA
+      ? Result.fail(
+          new BundleRefused({
+            reason: `the lane's step was killed ${kills} times before the candidate was bundled`,
+          }),
+        )
+      : yield* Effect.result(
+          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha),
+        );
   if (Result.isSuccess(bundled)) {
     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
       ...now,
@@ -1054,9 +1074,12 @@ export type LaneStep = "idle" | "waiting";
  * trunk, then Form → Compose → Bundle → Verify for the one batch in flight,
  * and one look at a verification that has outrun its budget. Every step
  * reads its I/O first and commits after, so a retry resumes where the last
- * commit left the lane.
+ * commit left the lane. `starts` is how often this step was started for one
+ * deadline: more than once when the invocation that ran it died.
  */
-export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string) {
+export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string, starts = 1) {
+  // The deaths count against the first bundle this run reaches, and against no later one.
+  let kills = starts - 1;
   for (;;) {
     const store = yield* EntityStore;
     const lane = laneOf(store, laneId);
@@ -1093,7 +1116,10 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
         return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
       const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
       if (settings.verification === "off") yield* passUnverified(lane, active, batch);
-      else yield* bundleBatch(lane, active, batch, active.composed);
+      else {
+        yield* bundleBatch(lane, active, batch, active.composed, kills);
+        kills = 0;
+      }
       continue;
     }
     if (

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-abandoned"
+# kills: b1.alarm-abandoned
+# why: A deadline given up on goes without a word, so nobody learns that an object stopped doing something it owed
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 960e3dac..f7cd3678 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -176,7 +176,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+     let flushed = false;
+     const now = Date.now();
+     const { due, abandoned } = await dueAlarms(this.ctx.storage, now);
+-    for (const request of abandoned)
++    for (const request of abandoned.slice(0, 0))
+       console.error(
+         `${this.constructor.name} ${this.ctx.id.name ?? this.ctx.id.toString()} gave up on "${request.reason}": started ${request.starts} times and never finished`,
+       );

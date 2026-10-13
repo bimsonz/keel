@@ -19,7 +19,7 @@ import {
   RecordVerdictCommand,
   VerificationEndedCommand,
 } from "../../../rpc/lane.ts";
-import { type AlarmRequest, cancelAlarm, scheduleAlarm } from "./alarm.ts";
+import { cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The lane's own deadline: one debounced step, after every delivery and verdict. */
@@ -115,11 +115,12 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
     return answer;
   }
 
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     if (request.reason === LANE_REOFFER) return this.reoffer();
     if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
       return super.onDeadline(request);
-    const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
+    // The step is told how often this request was started: one the platform killed runs again.
+    const exit = await this.runtime.runPromiseExit(laneStep(this.laneId, request.starts));
     // Whether or not the step got through: a batch may be Verifying with its instance never made.
     await this.armVerification();
     if (Exit.isSuccess(exit)) {

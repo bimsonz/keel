@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-rearmed"
+# kills: b1.alarm-rearmed
+# why: A finished handler removes its reason's row whatever it now holds, so a request armed while the handler ran is lost
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..24d2ede2 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -201,11 +201,7 @@ export async function finishAlarm(
+   running: RunningAlarm,
+ ): Promise<void> {
+   storage.transactionSync(() => {
+-    storage.sql.exec(
+-      "DELETE FROM keel_alarms WHERE reason = ? AND armed = ?",
+-      running.reason,
+-      running.armed,
+-    );
++    storage.sql.exec("DELETE FROM keel_alarms WHERE reason = ?", running.reason);
+     storage.sql.exec("UPDATE keel_alarms SET starts = 0 WHERE reason = ?", running.reason);
+   });
+   await armEarliest(storage);

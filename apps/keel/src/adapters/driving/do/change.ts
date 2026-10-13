@@ -50,7 +50,7 @@ import {
   ReviseCommand,
   SubmitCommand,
 } from "../../../rpc/index.ts";
-import { type AlarmRequest, armedAlarms, cancelAlarm, scheduleAlarm } from "./alarm.ts";
+import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The Change DO is named `change:<changeId>`. */
@@ -272,7 +272,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
   }
 
   /** The lease's deadline: makes the lapse visible, then re-arms only while the lease is still active. */
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     const leaseId = LEASE_DEADLINE.exec(request.reason)?.[1];
     if (leaseId === undefined) return super.onDeadline(request);
     const exit = await this.runtime.runPromiseExit(

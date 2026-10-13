@@ -14,7 +14,7 @@ import {
   OrgUsageSettings,
   UsageCount,
 } from "../../../rpc/org-usage.ts";
-import { type AlarmRequest, armedAlarms, scheduleAlarm } from "./alarm.ts";
+import { armedAlarms, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObject } from "./keel-object.ts";
 
 /** The object's own deadline: forget the keys first answered a week ago or longer. */
@@ -81,16 +81,21 @@ export class OrgUsageDO extends KeelObject implements OrgUsageRpc {
     );
   }
 
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     if (request.reason !== USAGE_PRUNE) return super.onDeadline(request);
     const { kept } = await this.runtime.runPromise(pruneUsageKeys());
-    if (kept > 0) await this.armPrune();
+    // This run's own request is on the table until it returns, so the next is armed whatever is there.
+    if (kept > 0) await this.schedulePrune();
   }
 
   /** Arms the prune a day from now unless it is armed already, so a burst of counts never postpones it. */
   private async armPrune(): Promise<void> {
     if (armedAlarms(this.ctx.storage).some((alarm) => alarm.reason === USAGE_PRUNE)) return;
-    await scheduleAlarm(this.ctx.storage, {
+    await this.schedulePrune();
+  }
+
+  private schedulePrune(): Promise<void> {
+    return scheduleAlarm(this.ctx.storage, {
       kind: "deadline",
       reason: USAGE_PRUNE,
       at: Date.now() + USAGE_PRUNE_EVERY_MS,

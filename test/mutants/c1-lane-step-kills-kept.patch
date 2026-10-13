@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-killed
+# why: The deaths of one step count against every bundle the run reaches, so the next batch is failed on the infrastructure untried
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8cb9cee8..a66a879a 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1118,7 +1118,6 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       if (settings.verification === "off") yield* passUnverified(lane, active, batch);
+       else {
+         yield* bundleBatch(lane, active, batch, active.composed, kills);
+-        kills = 0;
+       }
+       continue;
+     }

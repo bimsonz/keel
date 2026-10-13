@@ -29,7 +29,7 @@ import {
   WorkspacePoolCodecs,
   type WorkspacePoolRpc,
 } from "../../../rpc/workspace-pool.ts";
-import { type AlarmRequest, armedAlarms, cancelAlarm, scheduleAlarm } from "./alarm.ts";
+import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObject, type Reaction } from "./keel-object.ts";
 
 /** The pool's own deadlines, alongside the outbox's. */
@@ -173,7 +173,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     return answer;
   }
 
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     if (request.reason === POOL_REFILL) {
       const report = await this.runtime.runPromise(
         refillPool(this.project).pipe(Effect.provide(this.services)),

@@ -25,7 +25,7 @@ import {
 import { Cause, Effect, Exit, Schema } from "effect";
 import { TrunkCodecs, type TrunkRpc } from "../../../rpc/trunk.ts";
 import { type TrunkServices, trunkServices } from "../../../composition/do.ts";
-import { type AlarmRequest, scheduleAlarm } from "./alarm.ts";
+import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The trunk's own deadlines: the group-commit debounce, a push to retry, and the mirror to sync. */
@@ -157,7 +157,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     return answer;
   }
 
-  protected override async onDeadline(request: AlarmRequest): Promise<void> {
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
     const projectId = this.projectId;
     const { reason } = request;
     if (reason === TRUNK_DESTROY) {

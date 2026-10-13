@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-abandoned"
+# kills: b1.alarm-abandoned
+# why: A request that never finishes is never removed: it stays armed and is reported for good
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..730a5275 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -152,11 +152,6 @@ export async function dueAlarms(storage: DurableObjectStorage, now: number): Pro
+         now,
+       )
+       .toArray();
+-    storage.sql.exec(
+-      "DELETE FROM keel_alarms WHERE COALESCE(retry, at) <= ? AND starts >= ?",
+-      now,
+-      ALARM_START_LIMIT,
+-    );
+     return found;
+   });
+   const abandoned = rows.filter((row) => row.starts >= ALARM_START_LIMIT).map(toRunning);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-rearmed"
+# kills: b1.alarm-rearmed
+# why: A handler that returned leaves its start counted against the request armed while it ran, so a healthy deadline creeps towards being given up on
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..ae1ddca0 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -206,7 +206,6 @@ export async function finishAlarm(
+       running.reason,
+       running.armed,
+     );
+-    storage.sql.exec("UPDATE keel_alarms SET starts = 0 WHERE reason = ?", running.reason);
+   });
+   await armEarliest(storage);
+ }

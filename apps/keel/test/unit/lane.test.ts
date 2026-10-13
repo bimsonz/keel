@@ -1107,6 +1107,42 @@ describe("the Lane", () => {
   );
 
   it.effect(
+    "[lane.step-killed] a step that died twice before its candidate was bundled refuses the bundle on the infrastructure without trying it again, and goes on to bundle the next batch as any step does",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        // The third start of one deadline: two invocations died under it.
+        expect(yield* laneStep(LANE, 3)).toBe("waiting");
+        expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
+          outcome: "bounce",
+          evidence: [
+            "bundle-refused: the lane's step was killed 2 times before the candidate was bundled",
+          ],
+        });
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
+        // The deaths counted against the first bundle alone: the second change's was made, and is verifying.
+        expect(w.bundles.bundled).toHaveLength(1);
+        expect(w.verification.started.size).toBe(1);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect("[lane.step-killed-once] a step that died once bundles its candidate again", () => {
+    const w = world();
+    return Effect.gen(function* () {
+      yield* w.seeded;
+      yield* queue(w, change(1));
+      expect(yield* laneStep(LANE, 2)).toBe("waiting");
+      expect(w.bundles.bundled).toHaveLength(1);
+      expect(yield* payloads("BatchFailed")).toEqual([]);
+      expect(w.verification.started.size).toBe(1);
+    }).pipe(Effect.provide(w.layer));
+  });
+
+  it.effect(
     `[lane.infra-limit] the third infra failure in a row bounces the change with every reason and a remedy, instead of looping`,
     () => {
       const w = world();

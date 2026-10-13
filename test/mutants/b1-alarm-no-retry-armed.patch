@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-kept"
+# kills: b1.alarm-kept
+# why: Starting a request arms nothing, so one whose invocation died waits for some other deadline to find it
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..9931b1ca 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -186,7 +186,6 @@ export async function startAlarm(
+     due.armed,
+     due.starts,
+   );
+-  await armEarliest(storage);
+   return rowsWritten === 0 ? undefined : { ...due, starts };
+ }
+ 

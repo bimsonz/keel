@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-counted"
+# kills: b1.alarm-counted
+# why: Arming a reason again forgets how often its handler died, so a step that dies between deliveries is never given up on
+diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
+index 0fb24ffa..10eb2bcf 100644
+--- a/apps/keel/src/adapters/driving/do/alarm.ts
++++ b/apps/keel/src/adapters/driving/do/alarm.ts
+@@ -115,7 +115,7 @@ export async function scheduleAlarm(
+   // Arming a reason again moves it, and is told from the request a running handler was given by
+   // `armed`. Its starts are kept: they count runs that never returned, whatever was armed between.
+   storage.sql.exec(
+-    "INSERT INTO keel_alarms (reason, kind, at) VALUES (?, ?, ?) ON CONFLICT (reason) DO UPDATE SET kind = excluded.kind, at = excluded.at, retry = NULL, armed = armed + 1",
++    "INSERT INTO keel_alarms (reason, kind, at) VALUES (?, ?, ?) ON CONFLICT (reason) DO UPDATE SET kind = excluded.kind, at = excluded.at, retry = NULL, starts = 0, armed = armed + 1",
+     request.reason,
+     request.kind,
+     request.at,
