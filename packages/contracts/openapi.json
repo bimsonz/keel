@@ -4247,7 +4247,17 @@
       "get": {
         "operationId": "Memory_listDecisions",
         "summary": "List decisions",
+        "description": "A project's decisions, newest first. An agent reads its own project unless\nit names another; anyone else names one. Without a token only a public\nproject is read, and a private or unknown one is the same 404.",
         "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          },
           {
             "name": "subject",
             "in": "query",
@@ -4297,6 +4307,16 @@
           },
           "403": {
             "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4358,6 +4378,7 @@
           "Memory"
         ],
         "security": [
+          {},
           {
             "OAuth2Auth": [
               "agent:read"
@@ -4373,6 +4394,7 @@
       "get": {
         "operationId": "Memory_getDecision",
         "summary": "Get a decision",
+        "description": "One decision, read by whoever may read its project: one the caller may not read is the 404 of an unknown one.",
         "parameters": [
           {
             "name": "decisionId",
@@ -4487,6 +4509,7 @@
           "Memory"
         ],
         "security": [
+          {},
           {
             "OAuth2Auth": [
               "agent:read"
@@ -12808,16 +12831,31 @@
         "type": "object",
         "required": [
           "id",
+          "label",
+          "option",
           "summary",
           "decidedAt",
-          "state"
+          "state",
+          "escalationId",
+          "project",
+          "holds",
+          "guards"
         ],
         "properties": {
           "id": {
             "$ref": "#/components/schemas/DecisionId"
           },
+          "label": {
+            "type": "string",
+            "description": "Its `D-n`, counted per project, as the feed labels it."
+          },
+          "option": {
+            "type": "string",
+            "description": "The option the ruling chose."
+          },
           "summary": {
-            "type": "string"
+            "type": "string",
+            "description": "The chosen option's label."
           },
           "scope": {
             "type": "string"
@@ -12833,11 +12871,60 @@
               "superseded",
               "overruled"
             ]
+          },
+          "escalationId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EscalationId"
+              }
+            ],
+            "description": "The escalation whose ruling recorded it."
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "conflictId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConflictId"
+              }
+            ],
+            "description": "The conflict it ruled."
+          },
+          "subject": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SubjectKey"
+              }
+            ],
+            "description": "That conflict's subject."
+          },
+          "holds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            },
+            "description": "What the ruling upheld of the conflict's premise and effect: empty when it favoured neither."
+          },
+          "against": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "The changes the ruling went against."
+          },
+          "guards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuardId"
+            },
+            "description": "The guards that hold it while it is active."
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "A decision as Keel remembers it: what a person's ruling chose, and what it\nsettled of the conflict it ruled. A guard that holds an active decision\nbounces a change that breaks what it upheld, whatever the predicate's policy."
       },
       "DeclareRequest": {
         "type": "object",
@@ -18542,6 +18629,7 @@
           "escalation.not_found",
           "escalation.state_refused",
           "escalation.option_unknown",
+          "decision.not_found",
           "probe.not_found",
           "change.lease_stale",
           "change.lease_not_lapsed",

@@ -722,9 +722,14 @@ export class KeelClient {
     );
   }
 
-  /** Decisions, optionally about one subject; pass a page's `nextCursor` for the next. */
+  /**
+   * A project's decisions, newest first, optionally about one subject: an
+   * agent's own project unless `project` names another. Pass a page's
+   * `nextCursor` for the next.
+   */
   decisions(
     options: CallOptions & {
+      readonly project?: string;
       readonly subject?: string;
       readonly cursor?: string;
       readonly limit?: number;
@@ -732,7 +737,12 @@ export class KeelClient {
   ): Promise<WireOutputs["Memory_listDecisions"]> {
     return this.call(
       "Memory_listDecisions",
-      { subject: options.subject, cursor: options.cursor, limit: options.limit },
+      {
+        project: options.project,
+        subject: options.subject,
+        cursor: options.cursor,
+        limit: options.limit,
+      },
       options,
     );
   }

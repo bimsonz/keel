@@ -8,7 +8,13 @@ import {
 import type { FlowPlan } from "@keeltown/core/domain/verification";
 import { BatchId, CandidateId, ContentHash, makeId } from "@keeltown/core/kernel";
 import { EvidenceStore, PlanStore } from "@keeltown/core/ports";
-import { guardedPlan, suitePlan, TEST_GUARD, workerAppPlan } from "@keeltown/testing";
+import {
+  guardedPlan,
+  suitePlan,
+  TEST_DECISION,
+  TEST_GUARD,
+  workerAppPlan,
+} from "@keeltown/testing";
 import { Effect, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -194,6 +200,53 @@ describe("KeelVerify", () => {
     expect(verdict.evidence).toContain(`guard failed: ${cited}`);
     expect(verdict.nextActions).toEqual([
       expect.objectContaining({ operationId: "submit", args: { failingGuards: [cited] } }),
+    ]);
+  });
+
+  it("[s2.bounce-cites] a guard that holds a decision bounces under advise, its fail citing the decision and pointing to it", async () => {
+    const plan = await stored(guardedPlan("advise", TEST_DECISION));
+    const guard = plan.steps.find((s) => s.guards !== undefined);
+    if (guard === undefined) throw new Error("the change is exposed to the guard");
+    expect(guard.guards).toMatchObject({ policy: "block", decision: TEST_DECISION });
+    const resultRef = await Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* (yield* EvidenceStore).put(POOL_ORG, {
+          stepId: guard.id,
+          outcome: "fail",
+          guard: { predicate: "freshness", probe: TEST_GUARD.probe },
+          reason: "a revoked session is still served",
+          observations: ["[probe] GET /me -> 200 (expected 401)"],
+        });
+      }).pipe(Effect.provide(EvidenceStoreR2(env.ARCHIVE))),
+    );
+    const failed = Schema.encodeSync(StoredStepReport)({
+      stepId: guard.id,
+      outcome: "fail",
+      evidenceClass: "proof",
+      tier: { tier: 1, reason: `guards freshness with its admitted probe ${TEST_GUARD.probe}` },
+      durationMs: 12,
+      resultRef,
+    });
+    const verdict = await runWith(
+      "keel-verify-decided",
+      {
+        [SUITE_STEP]: runnerOutput(await suiteStdout(3, 0)),
+        "worker-app.typecheck": runnerOutput(await typecheckStdout(0, "")),
+        [`guard ${guard.id}`]: JSON.stringify(failed),
+      },
+      keelVerifyParams(job({ planHash: plan.planHash })),
+    );
+    expect(verdict.outcome).toBe("bounce");
+    const cited = `${guard.id} (freshness): a revoked session is still served; it holds decision ${TEST_DECISION.id}: The premise holds`;
+    expect(verdict.evidence).toContain(`guard failed: ${cited}`);
+    expect(verdict.nextActions).toEqual([
+      expect.objectContaining({ operationId: "submit", args: { failingGuards: [cited] } }),
+      {
+        kind: "call",
+        title: `Read decision ${TEST_DECISION.id}, which the failed guard holds: The premise holds`,
+        operationId: "Memory_getDecision",
+        args: { decisionId: TEST_DECISION.id },
+      },
     ]);
   });
 

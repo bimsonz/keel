@@ -1,13 +1,7 @@
 import type { Effect } from "effect";
 import type { SubjectKey } from "../../domain/coordination/index.ts";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type { DecisionId } from "../../domain/kernel/index.ts";
-import type {
-  Decision,
-  DecisionNotFound,
-  NothingToExplain,
-  WhyLink,
-} from "../../domain/memory/index.ts";
+import type { NothingToExplain, WhyLink } from "../../domain/memory/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { EntityStore, SubjectRegistry } from "../ports/index.ts";
 
@@ -23,18 +17,8 @@ export const why: (
 ) => Effect.Effect<readonly WhyLink[], NothingToExplain, EntityStore | SubjectRegistry> =
   stub("memory/why");
 
-export const listDecisions: (
-  principal: AgentToken,
-  subject: SubjectKey | undefined,
-) => Effect.Effect<readonly Decision[], never, EntityStore | SubjectRegistry> =
-  stub("memory/listDecisions");
-
-export const getDecision: (
-  principal: AgentToken,
-  decisionId: DecisionId,
-) => Effect.Effect<Decision, DecisionNotFound, EntityStore> = stub("memory/getDecision");
-
 export * from "./change-views.ts";
 export * from "./conflict-views.ts";
+export * from "./decision-index.ts";
 export * from "./escalation-views.ts";
 export * from "./feed.ts";

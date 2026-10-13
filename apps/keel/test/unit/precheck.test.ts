@@ -32,6 +32,9 @@ import {
   CodeHostFixture,
   type FixtureFiles,
   makeAdmittedGuardsMemory,
+  makeDecisionsMemory,
+  projectEvents,
+  ruledConflict,
   makeChangePrecheckMemory,
   makeCodeHostMemory,
   makePlanStoreMemory,
@@ -85,6 +88,8 @@ function precheckWorld(
   const changes = makeChangePrecheckMemory();
   const projects = makeProjectsMemory();
   const guards = makeAdmittedGuardsMemory();
+  /** Keel's memory of the project's rulings: empty until a case makes a ruling's events arrive. */
+  const decisions = makeDecisionsMemory();
   for (const g of options.guards ?? [])
     Effect.runSync(
       Effect.gen(function* () {
@@ -170,7 +175,14 @@ function precheckWorld(
       }),
     ).pipe(Layer.provide(changes.layer)),
   );
-  const layer = Layer.mergeAll(recording, flows, ordered, projects.layer, guards.layer);
+  const layer = Layer.mergeAll(
+    recording,
+    flows,
+    ordered,
+    projects.layer,
+    guards.layer,
+    decisions.layer,
+  );
   /** Commits `files` as the whole tree on `ref`, on top of its head and then `merged`. */
   const commitOn = (ref: string, files: FixtureFiles, merged?: readonly CommitSha[]) =>
     Effect.gen(function* () {
@@ -263,6 +275,7 @@ function precheckWorld(
   return {
     code,
     changes,
+    decisions,
     layer,
     reads,
     recorded,
@@ -515,6 +528,84 @@ describe("Precheck", () => {
           `compiled ${decision.planHash}`,
         ]);
         expect(world.storedPlan(decision.planHash).steps).toHaveLength(decision.steps);
+      });
+    },
+  );
+
+  it.effect(
+    "[s2.guard-cites] a guard that holds an active decision compiles to block under the default advise, its step naming the decision",
+    () => {
+      const world = precheckWorld({ guards: [GUARD], subjects: [GUARD.tenet.proposition.subject] });
+      const ruled = ruledConflict(projectEvents(projectId), GUARD.guardId);
+      return Effect.gen(function* () {
+        for (const event of [
+          ...ruled.conflict,
+          ruled.recorded("premise-holds"),
+          ruled.resolved([ruled.other]),
+        ])
+          yield* world.decisions.arrive(event);
+        const decision = yield* world.run(yield* world.submitted([withFile("src/b.ts")]));
+        if (decision._tag !== "Compile") throw new Error(`refused: ${decision.reasons.join("; ")}`);
+        const [guarded] = world.storedPlan(decision.planHash).steps.filter((s) => s.guards);
+
+        expect(guarded?.guards).toMatchObject({
+          policy: "block",
+          decision: { id: ruled.decisionId, summary: "The premise holds" },
+        });
+        expect(guarded?.because).toContain(`holds decision ${ruled.decisionId}: The premise holds`);
+      });
+    },
+  );
+
+  it.effect(
+    "[s2.guard-cites] a guard that holds no decision keeps the project's policy, and its step names none",
+    () => {
+      const world = precheckWorld({ guards: [GUARD], subjects: [GUARD.tenet.proposition.subject] });
+      return Effect.gen(function* () {
+        const decision = yield* world.run(yield* world.submitted([withFile("src/b.ts")]));
+        if (decision._tag !== "Compile") throw new Error(`refused: ${decision.reasons.join("; ")}`);
+        const [guarded] = world.storedPlan(decision.planHash).steps.filter((s) => s.guards);
+
+        expect(guarded?.guards?.policy).toBe("advise");
+        expect(guarded?.guards?.decision).toBeUndefined();
+        expect(guarded?.because).not.toContain("holds decision");
+      });
+    },
+  );
+
+  it.effect(
+    "[s2.guard-cites] a guard whose decision was superseded, or whose ruling went for the effect, takes the project's policy again",
+    () => {
+      const ended = precheckWorld({ guards: [GUARD], subjects: [GUARD.tenet.proposition.subject] });
+      const overturned = precheckWorld({
+        guards: [GUARD],
+        subjects: [GUARD.tenet.proposition.subject],
+      });
+      const superseded = ruledConflict(projectEvents(projectId), GUARD.guardId);
+      const forEffect = ruledConflict(projectEvents(projectId), GUARD.guardId);
+      return Effect.gen(function* () {
+        for (const event of [
+          ...superseded.conflict,
+          superseded.recorded("premise-holds"),
+          superseded.resolved([superseded.other]),
+          superseded.superseded(),
+        ])
+          yield* ended.decisions.arrive(event);
+        for (const event of [
+          ...forEffect.conflict,
+          forEffect.recorded("effect-stands"),
+          forEffect.resolved([forEffect.holder]),
+        ])
+          yield* overturned.decisions.arrive(event);
+        for (const world of [ended, overturned]) {
+          const decision = yield* world.run(yield* world.submitted([withFile("src/b.ts")]));
+          if (decision._tag !== "Compile")
+            throw new Error(`refused: ${decision.reasons.join("; ")}`);
+          const [guarded] = world.storedPlan(decision.planHash).steps.filter((s) => s.guards);
+
+          expect(guarded?.guards?.policy).toBe("advise");
+          expect(guarded?.guards?.decision).toBeUndefined();
+        }
       });
     },
   );

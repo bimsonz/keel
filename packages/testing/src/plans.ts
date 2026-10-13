@@ -1,7 +1,12 @@
 /** Compiled Verification Plans for tests: what Precheck would store for a change, before KeelVerify runs it. */
 import { JS_TS_SUITE_PACK, WORKER_APP_PACK } from "@keeltown/core/application/verification";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import { type AdmittedGuard, compile, type FlowPlan } from "@keeltown/core/domain/verification";
+import {
+  type AdmittedGuard,
+  compile,
+  type FlowPlan,
+  type HeldDecision,
+} from "@keeltown/core/domain/verification";
 import { CommitSha, ContentHash, makeId, type PredicatePolicy } from "@keeltown/core/kernel";
 import { Result, Schema } from "effect";
 
@@ -35,15 +40,27 @@ export const suitePlan = (): FlowPlan =>
 export const workerAppPlan = (): FlowPlan =>
   Result.getOrThrow(compile(undefined, { ...facts, subjects: [] }, WORKER_APP_PACK));
 
-/** The worker-app plan for a change exposed to TEST_GUARD, under `policy` for freshness. */
-export const guardedPlan = (policy: PredicatePolicy = "advise"): FlowPlan =>
+/** A ruling TEST_GUARD can hold: "the premise holds" on its freshness. */
+export const TEST_DECISION: HeldDecision = {
+  id: makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+  summary: "The premise holds",
+};
+
+/**
+ * The worker-app plan for a change exposed to TEST_GUARD, under `policy` for
+ * freshness, with the decision the guard holds when one is given.
+ */
+export const guardedPlan = (
+  policy: PredicatePolicy = "advise",
+  decision?: HeldDecision,
+): FlowPlan =>
   Result.getOrThrow(
     compile(
       undefined,
       {
         ...facts,
         subjects: [SUBJECT],
-        admittedGuards: [TEST_GUARD],
+        admittedGuards: [decision === undefined ? TEST_GUARD : { ...TEST_GUARD, decision }],
         predicatePolicy: { freshness: policy },
       },
       WORKER_APP_PACK,

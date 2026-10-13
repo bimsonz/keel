@@ -160,6 +160,7 @@ import {
   noSuchRequest,
   sponsoredOk,
 } from "./sponsorship.ts";
+import { decisionHandlers } from "./decisions.ts";
 import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -641,6 +642,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           ),
         ...invitationHandlers(run, touched),
         ...projectInvitationHandlers(run, touched),
+        ...decisionHandlers(run),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
             caller,
@@ -858,8 +860,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           );
         },
         why: notYet,
-        Memory_listDecisions: notYet,
-        Memory_getDecision: notYet,
         inbox: (caller: Caller, input: Input<"inbox">) =>
           caller.principal._tag !== "Agent"
             ? agentsOnly(caller.requestId)

@@ -23,6 +23,7 @@ import {
   AdmittedGuards,
   ChangePrecheck,
   CodeHost,
+  Decisions,
   FlowSpecSource,
   type FlowSources,
   type GuardRefused,
@@ -219,16 +220,40 @@ export type GuardsRead =
     }
   | { readonly _tag: "Unreadable"; readonly reason: string };
 
-/** Every guard the project has admitted, from the guard repo, for compile to select from. */
+/**
+ * Every guard the project has admitted, from the guard repo, for compile to
+ * select from, each with the active decision it holds: a guard is admitted at
+ * proof, before any ruling, so what it holds is Keel's memory, not its file.
+ */
 export const listGuards = Effect.fn("verification/listGuards")(function* (
   workspace: PrecheckWorkspace,
 ) {
-  return yield* (yield* AdmittedGuards).list(workspace.projectId).pipe(
+  const listed = yield* (yield* AdmittedGuards).list(workspace.projectId).pipe(
     Effect.map((list): GuardsRead => ({ _tag: "Listed", ...list })),
     Effect.catchTag("GuardsUnreadable", (e) =>
       Effect.succeed<GuardsRead>({ _tag: "Unreadable", reason: `guards: ${e.reason}` }),
     ),
   );
+  if (listed._tag === "Unreadable" || listed.admitted.length === 0) return listed;
+  const held = yield* (yield* Decisions).ofGuards(
+    workspace.projectId,
+    listed.admitted.map((g) => g.guardId),
+  );
+  const active = new Map(
+    held
+      .filter((h) => h.decision.decision.state === "active")
+      .map((h) => [
+        h.guardId,
+        { id: h.decision.decision.id, summary: h.decision.decision.summary },
+      ]),
+  );
+  return {
+    ...listed,
+    admitted: listed.admitted.map((g) => {
+      const decision = active.get(g.guardId);
+      return decision === undefined ? g : { ...g, decision };
+    }),
+  };
 });
 
 /**

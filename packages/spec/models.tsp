@@ -190,10 +190,44 @@ model VerdictView {
   issuedAt: utcDateTime;
 }
 
+/**
+ * A decision as Keel remembers it: what a person's ruling chose, and what it
+ * settled of the conflict it ruled. A guard that holds an active decision
+ * bounces a change that breaks what it upheld, whatever the predicate's policy.
+ */
 model DecisionView {
   id: DecisionId;
+
+  /** Its `D-n`, counted per project, as the feed labels it. */
+  label: string;
+
+  /** The option the ruling chose. */
+  option: string;
+
+  /** The chosen option's label. */
   summary: string;
+
   scope?: string;
   decidedAt: utcDateTime;
   state: "active" | "superseded" | "overruled";
+
+  /** The escalation whose ruling recorded it. */
+  escalationId: EscalationId;
+
+  project: ProjectId;
+
+  /** The conflict it ruled. */
+  conflictId?: ConflictId;
+
+  /** That conflict's subject. */
+  subject?: SubjectKey;
+
+  /** What the ruling upheld of the conflict's premise and effect: empty when it favoured neither. */
+  holds: EventProposition[];
+
+  /** The changes the ruling went against. */
+  against?: ChangeId[];
+
+  /** The guards that hold it while it is active. */
+  guards: GuardId[];
 }

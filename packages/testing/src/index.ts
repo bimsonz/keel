@@ -53,5 +53,6 @@ export * from "./contracts/projects.ts";
 export * from "./contracts/notifier.ts";
 export * from "./contracts/event-feed.ts";
 export * from "./contracts/project-views.ts";
+export * from "./contracts/decisions.ts";
 export * from "./contracts/tenancy.ts";
 export { PORTS, type PortName } from "./ports.ts";

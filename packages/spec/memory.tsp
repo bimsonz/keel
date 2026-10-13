@@ -41,14 +41,24 @@ interface Memory {
     @query subject?: SubjectKey,
   ): WhyEnvelope | NotFound | StandardErrors;
 
+  /**
+   * A project's decisions, newest first. An agent reads its own project unless
+   * it names another; anyone else names one. Without a token only a public
+   * project is read, and a private or unknown one is the same 404.
+   */
   @summary("List decisions")
-  @useAuth(AgentRead | SessionAuth)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/decisions")
   @get
-  listDecisions(@query subject?: SubjectKey, ...PageQuery): DecisionPage | StandardErrors;
+  listDecisions(
+    @query project?: ProjectId,
+    @query subject?: SubjectKey,
+    ...PageQuery,
+  ): DecisionPage | NotFound | StandardErrors;
 
+  /** One decision, read by whoever may read its project: one the caller may not read is the 404 of an unknown one. */
   @summary("Get a decision")
-  @useAuth(AgentRead | SessionAuth)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/decisions/{decisionId}")
   @get
   getDecision(@path decisionId: DecisionId): DecisionView | NotFound | StandardErrors;

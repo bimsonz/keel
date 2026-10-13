@@ -1,5 +1,10 @@
-import { ChangeState, ParkReason } from "@keeltown/core/domain/coordination";
-import { EscalationState } from "@keeltown/core/domain/memory";
+import {
+  ChangeState,
+  ParkReason,
+  Proposition,
+  SubjectKey,
+} from "@keeltown/core/domain/coordination";
+import { Decision, DecisionNotFound, EscalationState } from "@keeltown/core/domain/memory";
 import {
   Conflict,
   ConflictEscalated,
@@ -21,6 +26,7 @@ import {
   ChangeId,
   CommitSha,
   ConflictId,
+  DecisionId,
   EscalationId,
   EventEnvelope,
   GuardId,
@@ -29,6 +35,7 @@ import {
   NamespaceId,
   ProbeId,
   ProjectId,
+  SubjectId,
   UserId,
 } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -225,6 +232,43 @@ export const EscalationPage = Schema.Struct({
 
 export const EscalationRead = Schema.Struct({ escalationId: EscalationId });
 
+/** A decision as the Projector's index reads it, joined to its conflict (the port's `IndexedDecision`). */
+export const IndexedDecision = Schema.Struct({
+  decision: Decision,
+  label: Schema.String,
+  project: ProjectId,
+  conflictId: Schema.optional(ConflictId),
+  subjectId: Schema.optional(SubjectId),
+  subjectKey: Schema.optional(SubjectKey),
+  holds: Schema.Array(Proposition),
+  against: Schema.optional(Schema.Array(ChangeId)),
+  guards: Schema.Array(GuardId),
+});
+
+export const DecisionPage = Schema.Struct({
+  items: Schema.Array(IndexedDecision),
+  nextCursor: Schema.optional(Schema.String),
+});
+
+export const DecisionRead = Schema.Struct({ decisionId: DecisionId });
+
+export const DecisionsRead = Schema.Struct({
+  project: ProjectId,
+  subject: Schema.optional(SubjectKey),
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.Int),
+});
+
+export const GuardDecisionsRead = Schema.Struct({
+  project: ProjectId,
+  guardIds: Schema.Array(GuardId),
+});
+
+export const SubjectDecisionsRead = Schema.Struct({
+  project: ProjectId,
+  subjects: Schema.Array(SubjectKey),
+});
+
 export const ProjectorCodecs = {
   nudge: exitCodec(Schema.Struct({ drained: Schema.Int }), Schema.Never),
   read: exitCodec(FeedPage, Schema.Never),
@@ -235,6 +279,13 @@ export const ProjectorCodecs = {
   probeConflict: exitCodec(ConflictRecord, ProbeNotFound),
   escalations: exitCodec(EscalationPage, Schema.Never),
   escalation: exitCodec(LabelledEscalation, EscalationNotFound),
+  decision: exitCodec(IndexedDecision, DecisionNotFound),
+  decisions: exitCodec(DecisionPage, Schema.Never),
+  guardDecisions: exitCodec(
+    Schema.Array(Schema.Struct({ guardId: GuardId, decision: IndexedDecision })),
+    Schema.Never,
+  ),
+  subjectDecisions: exitCodec(Schema.Array(IndexedDecision), Schema.Never),
 };
 
 /**
@@ -262,4 +313,12 @@ export interface ProjectorRpc extends EventReceiverRpc {
   escalations(request: typeof EscalationsRead.Encoded): Promise<ExitJson>;
   /** One escalation with its place. EscalationNotFound for one the feed has not heard raised. */
   escalation(request: typeof EscalationRead.Encoded): Promise<ExitJson>;
+  /** One decision, joined to its conflict. DecisionNotFound for one the index has not heard recorded. */
+  decision(request: typeof DecisionRead.Encoded): Promise<ExitJson>;
+  /** A project's decisions, newest first, on one subject when asked. */
+  decisions(request: typeof DecisionsRead.Encoded): Promise<ExitJson>;
+  /** The decision each of a project's guards holds; a guard that holds none is left out. */
+  guardDecisions(request: typeof GuardDecisionsRead.Encoded): Promise<ExitJson>;
+  /** A project's decisions on any of these subjects, newest first. */
+  subjectDecisions(request: typeof SubjectDecisionsRead.Encoded): Promise<ExitJson>;
 }

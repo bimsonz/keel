@@ -9,6 +9,7 @@ import {
 import {
   coerce,
   type FlowPlan,
+  type HeldDecision,
   type StepReport,
   type StepResult,
   VerdictOutcome,
@@ -131,6 +132,14 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
   };
 };
 
+/** Where a bounce points for a decision a failing guard holds: the ruling, read whole. */
+const readDecision = (decision: HeldDecision): NextAction => ({
+  kind: "call",
+  title: `Read decision ${decision.id}, which the failed guard holds: ${decision.summary}`,
+  operationId: "Memory_getDecision",
+  args: { decisionId: decision.id },
+});
+
 /**
  * What a failing step stored that names its failures: a suite's tests, a
  * typecheck's errors, a guard's probe, or the dependencies it was refused
@@ -181,6 +190,8 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
   const store = yield* EvidenceStore;
   const failures: Cited[] = [];
   const missing: string[] = [];
+  /** The decisions the failing guards hold, each once: the bounce points to each. */
+  const held = new Map<string, HeldDecision>();
   for (const r of decided.success.evidence) {
     const ref = Schema.decodeUnknownOption(ContentHash)(r.resultRef);
     if (r.outcome !== "fail" || Option.isNone(ref)) continue;
@@ -209,11 +220,16 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
     if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
       failures.push({ kind: "deps", name: depsName });
-    if (stored.value.guard !== undefined)
+    if (stored.value.guard !== undefined) {
+      const decision = plan.steps.find((s) => s.id === r.stepId)?.guards?.decision;
+      if (decision !== undefined) held.set(decision.id, decision);
       failures.push({
         kind: "guard",
-        name: `${r.stepId} (${stored.value.guard.predicate}): ${stored.value.reason ?? "its probe failed"}`,
+        name: `${r.stepId} (${stored.value.guard.predicate}): ${stored.value.reason ?? "its probe failed"}${
+          decision === undefined ? "" : `; it holds decision ${decision.id}: ${decision.summary}`
+        }`,
       });
+    }
   }
   const failingTests = failures.map((f) => f.name);
   const cited = failures.slice(0, CITED_FAILURES);
@@ -229,7 +245,10 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
       ...(more > 0 ? [`and ${more} more failing`] : []),
     ],
     failingTests,
-    nextActions: decided.success.outcome === "bounce" ? [remedy(cited, more)] : [],
+    nextActions:
+      decided.success.outcome === "bounce"
+        ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
+        : [],
   };
   return settled;
 });

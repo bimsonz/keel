@@ -52,6 +52,7 @@ import { isD1Unavailable } from "../adapters/driven/d1/unavailable.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
+import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
 import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { AgentSignUpsRpc } from "../adapters/driven/do-rpc/sign-ups.ts";
@@ -108,6 +109,7 @@ export function isolateLayer(
     overrides.inbox ?? InboxRpc(agentSession),
     overrides.eventFeed ?? EventFeedRpc(projector),
     ProjectViewsRpc(projector),
+    DecisionsRpc(projector),
     EscalationsRpc(projector, (address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
     ConflictMovesRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
     ProbeStoreR2(env.BUNDLES),

@@ -7,6 +7,7 @@ import type {
   CodeHost,
   ConflictMoves,
   Enrolments,
+  Decisions,
   Escalations,
   EventFeed,
   Ids,
@@ -61,6 +62,7 @@ export type IsolateServices =
   | Notifier
   | Projects
   | ProjectViews
+  | Decisions
   | Escalations
   | ConflictMoves
   | ProbeStore

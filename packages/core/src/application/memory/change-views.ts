@@ -16,6 +16,7 @@ import {
   type ViewSnapshot,
 } from "../ports/index.ts";
 import { foldConflictViews, foldsConflict } from "./conflict-views.ts";
+import { foldDecisionIndex, foldsDecision } from "./decision-index.ts";
 import { foldEscalationViews, foldsEscalation } from "./escalation-views.ts";
 import { FEED, feedCursor } from "./feed.ts";
 
@@ -112,7 +113,9 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
  * receipt never fails, so nothing is owed for ever.
  */
 export function foldViews(store: Store, event: EventEnvelope): string | undefined {
-  if (foldsEscalation(event)) return foldEscalationViews(store, event);
+  // A ruling's decision is both the escalation's answer and the index's row.
+  const decided = foldsDecision(event) ? foldDecisionIndex(store, event) : undefined;
+  if (foldsEscalation(event)) return foldEscalationViews(store, event) ?? decided;
   // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
   const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;
   if (event.entity.kind === "change") return foldChange(store, event) ?? conflict;

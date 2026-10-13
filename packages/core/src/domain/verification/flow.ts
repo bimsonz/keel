@@ -1,6 +1,7 @@
 import type {
   CommitSha,
   ContentHash,
+  DecisionId,
   EvidenceClass,
   Glob,
   GuardId,
@@ -57,12 +58,20 @@ export type Read =
   | { readonly _tag: "step"; readonly step: string }
   | { readonly _tag: "fact"; readonly fact: string };
 
+/** The active decision a guard holds: a ruling upheld the proposition it asserts. */
+export type HeldDecision = { readonly id: DecisionId; readonly summary: string };
+
 /**
  * What a guard step guards and runs: a tenet's predicate, and the admitted
  * probe bundle it runs, by content hash. The verifier fetches that bundle from
  * the guard store by its hash, never from the candidate's `.keel/guards/`.
+ * With the decision it holds, its fail blocks whatever the predicate's policy.
  */
-export type GuardSpec = { readonly predicate: Predicate; readonly probe: ContentHash };
+export type GuardSpec = {
+  readonly predicate: Predicate;
+  readonly probe: ContentHash;
+  readonly decision?: HeldDecision;
+};
 
 /** One typed step, as the project's flow spec declares it. */
 export type StepSpec = {
@@ -116,6 +125,8 @@ export type AdmittedGuard = {
    * id may be absent while selection already works from the proposition.
    */
   readonly tenet: { readonly id?: TenetId; readonly proposition: Proposition };
+  /** The active decision the guard holds, once a ruling upheld its proposition (ADR 0005, decided 13 Oct). */
+  readonly decision?: HeldDecision;
 };
 
 /** What compile knows about the change. */

@@ -148,7 +148,7 @@ const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<u
   Probes_getProbeSource: (c) => c.probeSource("prb_1", { project: "prj_1" }),
   why: (c) => c.why({ path: "src/a.ts", line: 3, subject: "authz.permissions" }),
   Memory_listDecisions: (c) =>
-    c.decisions({ subject: "authz.permissions", cursor: "c1", limit: 5 }),
+    c.decisions({ project: "prj_1", subject: "authz.permissions", cursor: "c1", limit: 5 }),
   Inbox_getSnapshot: (c) => c.snapshot({ project: "prj_1" }),
   Views_listLanes: (c) => c.lanes("prj_1", { cursor: "c1", limit: 5 }),
   Operator_listProjects: (c) => c.projects({ cursor: "c1", limit: 5 }),

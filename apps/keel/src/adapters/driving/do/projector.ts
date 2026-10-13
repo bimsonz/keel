@@ -1,5 +1,7 @@
 import {
   conflictRecord,
+  decisionsOfGuards,
+  decisionsOnSubjects,
   escalationView,
   foldViews,
   listChanges,
@@ -7,6 +9,8 @@ import {
   listConflicts,
   probeConflict,
   FEED_END,
+  getDecision,
+  listDecisions,
   readFeed,
   recordFeed,
   viewSnapshot,
@@ -27,13 +31,17 @@ import {
   ChangesRead,
   ConflictRead,
   ConflictsRead,
+  DecisionRead,
+  DecisionsRead,
   EscalationRead,
   EscalationsRead,
+  GuardDecisionsRead,
   ProbeConflictRead,
   ProjectorCodecs,
   ProjectorRead,
   type ProjectorRpc,
   SnapshotRead,
+  SubjectDecisionsRead,
 } from "../../../rpc/index.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
@@ -168,5 +176,37 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
         : record;
     });
     return this.answer(ProjectorCodecs.escalation, program);
+  }
+
+  async decision(request: typeof DecisionRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(DecisionRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ decisionId }) => getDecision(decisionId)),
+    );
+    return this.answer(ProjectorCodecs.decision, program);
+  }
+
+  async decisions(request: typeof DecisionsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(DecisionsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(listDecisions),
+    );
+    return this.answer(ProjectorCodecs.decisions, program);
+  }
+
+  async guardDecisions(request: typeof GuardDecisionsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(GuardDecisionsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, guardIds }) => decisionsOfGuards(project, guardIds)),
+    );
+    return this.answer(ProjectorCodecs.guardDecisions, program);
+  }
+
+  async subjectDecisions(request: typeof SubjectDecisionsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(SubjectDecisionsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, subjects }) => decisionsOnSubjects(project, subjects)),
+    );
+    return this.answer(ProjectorCodecs.subjectDecisions, program);
   }
 }

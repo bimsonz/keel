@@ -3,6 +3,7 @@ import { type DurableReport, StoredStepReport } from "@keeltown/core/application
 import { ContentHash } from "@keeltown/core/kernel";
 import type {
   AdmittedGuards,
+  Decisions,
   BatchVerdicts,
   CandidateBundles,
   CandidateComposer,
@@ -29,6 +30,7 @@ import type {
   WorkspacePool,
   WorldChecks,
 } from "@keeltown/core/ports";
+import { PROJECTOR } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import {
   type Durable,
@@ -53,6 +55,7 @@ import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { NoopWorldsBundles } from "../adapters/driven/r2/noop-world.ts";
 import { WorldChecksWorkflow } from "../adapters/driven/workflow/world-checks.ts";
 import { ProbeRunnerRpc, verifierEntrypoint } from "../adapters/driven/do-rpc/probe-runner.ts";
+import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EvidenceStoreR2 } from "../adapters/driven/r2/evidence-store.ts";
@@ -162,6 +165,7 @@ export function precheckRuntime(
   | CodeHost
   | FlowSpecSource
   | AdmittedGuards
+  | Decisions
   | SyntaxSource
   | PlanStore
   | EvidenceStore
@@ -170,11 +174,13 @@ export function precheckRuntime(
 > {
   const project = (projectId: string) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
   const code = codeHostLayer(env);
   return ManagedRuntime.make(
     Layer.mergeAll(
       ChangePrecheckRpc(env.CHANGE),
       ProjectsRpc(project),
+      DecisionsRpc(projector),
       code,
       Layer.mergeAll(
         FlowSpecSourceCodeHost,

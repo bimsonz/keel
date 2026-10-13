@@ -50,7 +50,11 @@ const stepOf = (g: AdmittedGuard): StepSpec => ({
   determinism: "deterministic",
   suite: false,
   optional: false,
-  guards: { predicate: g.tenet.proposition.predicate, probe: g.probe },
+  guards: {
+    predicate: g.tenet.proposition.predicate,
+    probe: g.probe,
+    ...(g.decision === undefined ? {} : { decision: g.decision }),
+  },
 });
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -77,6 +81,9 @@ export const selectGuards = (
         spec,
         because: [
           g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
+          ...(g.decision === undefined
+            ? []
+            : [`holds decision ${g.decision.id}: ${g.decision.summary}`]),
           ...because,
         ],
       });

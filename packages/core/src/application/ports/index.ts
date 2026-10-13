@@ -19,6 +19,7 @@ export * from "./commit.ts";
 export * from "./conflict-moves.ts";
 export * from "./code-host.ts";
 export * from "./decision-model.ts";
+export * from "./decisions.ts";
 export * from "./deployer.ts";
 export * from "./deps-builder.ts";
 export * from "./enrolments.ts";

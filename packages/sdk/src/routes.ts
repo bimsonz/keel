@@ -167,7 +167,7 @@ export const ROUTES = {
   Memory_listDecisions: {
     method: "GET",
     path: "/decisions",
-    query: ["subject", "cursor", "limit"],
+    query: ["project", "subject", "cursor", "limit"],
   },
   Memory_getDecision: { method: "GET", path: "/decisions/{decisionId}" },
   Lattices_listLattices: { method: "GET", path: "/lattices" },

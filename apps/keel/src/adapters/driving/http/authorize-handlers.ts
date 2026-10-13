@@ -17,6 +17,7 @@ import {
 import {
   AgentId,
   ChangeId,
+  DecisionId,
   EscalationId,
   namespaceKind,
   ProjectId,
@@ -25,6 +26,7 @@ import {
 import {
   AgentDirectory,
   Changes,
+  Decisions,
   Escalations,
   NamespaceAgents,
   Namespaces,
@@ -34,6 +36,7 @@ import {
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
+import { decisionNotFound } from "./decisions.ts";
 import { escalationNotFound } from "./escalations.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -59,6 +62,7 @@ type ResolverServices =
   | Namespaces
   | Projects
   | Changes
+  | Decisions
   | AgentDirectory
   | Escalations
   | NamespaceAgents;
@@ -122,6 +126,7 @@ const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
 const decodeEscalationId = Schema.decodeUnknownOption(EscalationId);
+const decodeDecisionId = Schema.decodeUnknownOption(DecisionId);
 
 /** The project an id names, or missing when it names none. */
 const projectNamed = (id: unknown) =>
@@ -151,6 +156,17 @@ const changeProject = (id: unknown) =>
       Changes.use((changes) => changes.get(changeId)).pipe(
         Effect.flatMap((read) => projectResource(read.projectId)),
         Effect.catchTag("ChangeNotFound", () => Effect.succeed(MISSING)),
+      ),
+  });
+
+/** The project a decision was ruled in, read from Keel's memory. */
+const decisionProject = (id: unknown) =>
+  Option.match(decodeDecisionId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (decisionId) =>
+      Decisions.use((decisions) => decisions.get(decisionId)).pipe(
+        Effect.flatMap((read) => projectResource(read.project)),
+        Effect.catchTag("DecisionNotFound", () => Effect.succeed(MISSING)),
       ),
   });
 
@@ -331,8 +347,8 @@ export const RESOLVERS: Resolvers = {
   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
-  Memory_listDecisions: ownProject,
-  Memory_getDecision: ownProject,
+  Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
+  Memory_getDecision: (input) => decisionProject(input.decisionId),
   why: ownProject,
 
   Operator_getSettings: (input) => projectNamed(input.projectId),
@@ -397,6 +413,8 @@ export function refusalResult(
         return changeNotFound({ requestId }, { changeId: String(Object(input).changeId) });
       if (action === "Conflicts_getConflict")
         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+      if (action === "Memory_getDecision")
+        return decisionNotFound({ requestId }, String(Object(input).decisionId));
       if (action === "Probes_getProbeSource")
         return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
       if (action === "Operator_giveRuling")

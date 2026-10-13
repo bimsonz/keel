@@ -190,7 +190,7 @@ const anchorBody = (anchor: NonNullable<Proposition["anchors"]>[number]) => ({
 });
 
 /** A side's proposition in the shape ConflictSuspected carries it on the feed (`EventProposition`). */
-const eventProposition = (proposition: Proposition) => ({
+export const eventProposition = (proposition: Proposition) => ({
   subject: proposition.subject,
   predicate: proposition.predicate,
   relation: proposition.relation,

@@ -76,6 +76,7 @@ import {
   describeProjectViewsContract,
   type ProjectViewsHarness,
 } from "./contracts/project-views.ts";
+import { type DecisionsHarness, describeDecisionsContract } from "./contracts/decisions.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
@@ -141,6 +142,7 @@ import type {
   AgentDirectory,
   CodeHost,
   ConflictMoves,
+  Decisions,
   Escalations,
   HumanGate,
   BatchVerdicts,
@@ -277,6 +279,11 @@ function memoryEventFeedHarness(): EventFeedHarness {
 
 function memoryProjectViewsHarness(): ProjectViewsHarness {
   const memory = projectViews.makeProjectViewsMemory();
+  return { layer: memory.layer, arrive: memory.arrive };
+}
+
+function memoryDecisionsHarness(): DecisionsHarness {
+  const memory = projectViews.makeDecisionsMemory();
   return { layer: memory.layer, arrive: memory.arrive };
 }
 
@@ -617,6 +624,10 @@ export const PORTS = {
   ProjectViews: harnessed<ProjectViews, ProjectViewsHarness>(
     memoryProjectViewsHarness,
     describeProjectViewsContract,
+  ),
+  Decisions: harnessed<Decisions, DecisionsHarness>(
+    memoryDecisionsHarness,
+    describeDecisionsContract,
   ),
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),
   WorkQueue: port(() => storage.makeWorkQueueMemory().layer, pending("WorkQueue", ["enqueue"])),

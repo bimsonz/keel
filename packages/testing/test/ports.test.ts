@@ -26,6 +26,7 @@ const CONTRACT_PORTS = [
   "EventOutbox",
   "EventFeed",
   "ProjectViews",
+  "Decisions",
   "EventLog",
   "WorkQueue",
   "DecisionModel",

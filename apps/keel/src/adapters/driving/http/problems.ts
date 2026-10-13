@@ -43,6 +43,7 @@ const TITLES: Record<ProblemCode, string> = {
   "escalation.not_found": "No such escalation",
   "escalation.state_refused": "The escalation is not open to a ruling",
   "escalation.option_unknown": "The escalation does not offer that option",
+  "decision.not_found": "No such decision",
   "probe.not_found": "No such probe",
   "change.lease_stale": "The lease is not the change's active lease",
   "change.lease_not_lapsed": "The change's lease has not lapsed, so it cannot be adopted yet",

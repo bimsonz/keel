@@ -202,6 +202,7 @@ union ProblemCode {
   escalationNotFound: "escalation.not_found",
   escalationStateRefused: "escalation.state_refused",
   escalationOptionUnknown: "escalation.option_unknown",
+  decisionNotFound: "decision.not_found",
   probeNotFound: "probe.not_found",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",

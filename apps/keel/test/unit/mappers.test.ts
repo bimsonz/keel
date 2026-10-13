@@ -27,6 +27,7 @@ import {
   makeProjectsMemory,
   makeProbeLedgerMemory,
   makeProbeStoreMemory,
+  makeDecisionsMemory,
   makeProjectViewsMemory,
   makeSessionsMemory,
   invitationsMemoryLayer,
@@ -111,13 +112,7 @@ describe("mappers", () => {
  * The operations still answering 503 service.not_implemented to a caller the
  * policy grants them. Shrinks, visibly, as lanes land each one.
  */
-const STUBBED = [
-  "Workspaces_refreshWorkspaceToken",
-  "why",
-  "Memory_listDecisions",
-  "Memory_getDecision",
-  "Views_getVerdict",
-];
+const STUBBED = ["Workspaces_refreshWorkspaceToken", "why", "Views_getVerdict"];
 
 /**
  * A project placed in its org with settings, so the policy sees it, and the
@@ -165,6 +160,7 @@ function grantedSurface() {
       inbox.notifier,
       makeEventFeedMemory().layer,
       makeProjectViewsMemory().layer,
+      makeDecisionsMemory().layer,
       makeProbeStoreMemory().layer,
       makeProbeLedgerMemory().world,
       makeCodeHostMemory().layer,
