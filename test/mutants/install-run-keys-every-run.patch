@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install-run.test.ts
+# kills: install.run-again
+# why: every run makes keel's keys again, so each push to a copy replaces its signing keys and every session, bundle address and commit signature made before it stops verifying
+diff --git a/scripts/install.ts b/scripts/install.ts
+index 83f5444b..012a39e4 100644
+--- a/scripts/install.ts
++++ b/scripts/install.ts
+@@ -409,7 +409,7 @@ if (mode === "check") {
+   process.exit(0);
+ }
+ 
+-const fresh = keys === "generate" ? generateKeys(new Date()) : undefined;
++const fresh = generateKeys(new Date());
+ render({
+   host,
+   d1,

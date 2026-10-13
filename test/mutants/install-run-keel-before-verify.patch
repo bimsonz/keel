@@ -1,0 +1,26 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install-run.test.ts
+# kills: install.run-new
+# why: keel is deployed before the Worker its service binding names, so the first build on a new account fails
+diff --git a/scripts/install.ts b/scripts/install.ts
+index 83f5444b..af45248f 100644
+--- a/scripts/install.ts
++++ b/scripts/install.ts
+@@ -420,15 +420,15 @@ render({
+ 
+ const DEPLOY = ["deploy", "-c", "wrangler.deploy.jsonc", "--no-x-provision", "--no-x-auto-create"];
+ 
+-console.log(`\n== ${verifyName}: deploying (building its container image)`);
+-wrangler("keel-verify", DEPLOY);
+-
+ console.log(`\n== ${keelName}: migrating its database, then deploying`);
+ wrangler("keel", ["d1", "migrations", "apply", "DB", "--remote", "-c", "wrangler.deploy.jsonc"]);
+ wrangler("keel", [...DEPLOY, "--secrets-file", "/dev/stdin"], {
+   input: JSON.stringify({ CLOUDFLARE_ACCOUNT_ID: account, ...fresh?.secrets }),
+ });
+ 
++console.log(`\n== ${verifyName}: deploying (building its container image)`);
++wrangler("keel-verify", DEPLOY);
++
+ console.log(`\n== ${consoleName}: building the page, then deploying`);
+ execFileSync("pnpm", ["--dir", join(root, "apps/console"), "run", "build"], { stdio: "inherit" });
+ wrangler("console", DEPLOY);

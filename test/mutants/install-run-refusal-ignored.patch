@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install-run.test.ts
+# kills: install.run-keys-lost
+# why: the keys' refusal is printed and the run goes on, deploying keel with no commit signer while its signing key is held
+diff --git a/scripts/install.ts b/scripts/install.ts
+index 83f5444b..615583d8 100644
+--- a/scripts/install.ts
++++ b/scripts/install.ts
+@@ -385,10 +385,7 @@ const shown = {
+   ),
+ };
+ const keys = keyState(heldSecrets, shown);
+-if (typeof keys === "object") {
+-  console.error(`${keys.refuse}\nNothing was deployed.`);
+-  process.exit(1);
+-}
++if (typeof keys === "object") console.error(keys.refuse);
+ console.log(`keel's keys: ${keys === "keep" ? "kept" : changing ? "made now" : "not made yet"}`);
+ 
+ if (mode === "check") {

@@ -1,0 +1,57 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install-run.test.ts
+# kills: install.run-refused
+# why: the database is made before the token's reach is read, so a build whose token is refused leaves a store behind on the account of whoever pressed the button
+diff --git a/scripts/install.ts b/scripts/install.ts
+index 83f5444b..6a4df047 100644
+--- a/scripts/install.ts
++++ b/scripts/install.ts
+@@ -217,6 +217,24 @@ if (mode === "dry-run") {
+   process.exit(0);
+ }
+ 
++const changing = mode === "install";
++const made = (what: string, existed: boolean): void =>
++  console.log(`${what}: ${existed ? "exists" : changing ? "created" : "missing"}`);
++let absent = 0;
++
++const d1: Record<string, string> = {};
++for (const name of stores.d1) {
++  const listed = objects(
++    await api("GET", `/d1/database?name=${encodeURIComponent(name)}&per_page=100`, "D1: Edit"),
++  ).find((db) => db["name"] === name);
++  let id = text(listed, "uuid");
++  made(`D1 database ${name}`, id !== undefined);
++  if (id === undefined && changing)
++    id = text(await api("POST", "/d1/database", "D1: Edit", { name }), "uuid");
++  if (id === undefined) absent += 1;
++  else d1[name] = id;
++}
++
+ // Preflight: one read of each API the install will write through, so every
+ // missing permission is named together. A read proves the token reaches the
+ // API, not that it may write: a write that is refused names its permission.
+@@ -273,24 +291,6 @@ if (subdomain === undefined) {
+ const host = siteHost(consoleName, subdomain);
+ console.log(`site: https://${host}`);
+ 
+-const changing = mode === "install";
+-const made = (what: string, existed: boolean): void =>
+-  console.log(`${what}: ${existed ? "exists" : changing ? "created" : "missing"}`);
+-let absent = 0;
+-
+-const d1: Record<string, string> = {};
+-for (const name of stores.d1) {
+-  const listed = objects(
+-    await api("GET", `/d1/database?name=${encodeURIComponent(name)}&per_page=100`, "D1: Edit"),
+-  ).find((db) => db["name"] === name);
+-  let id = text(listed, "uuid");
+-  made(`D1 database ${name}`, id !== undefined);
+-  if (id === undefined && changing)
+-    id = text(await api("POST", "/d1/database", "D1: Edit", { name }), "uuid");
+-  if (id === undefined) absent += 1;
+-  else d1[name] = id;
+-}
+-
+ for (const bucket of stores.buckets) {
+   const existed =
+     (await find(`/r2/buckets/${bucket.name}`, "Workers R2 Storage: Edit")) !== undefined;
