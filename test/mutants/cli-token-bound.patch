@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.token
+# why: the token handed to a tool is bound to a key the tool does not have, so every request the tool makes with it is refused
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 7295afd..96b52ce 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -388,7 +388,6 @@ async function keyCommand(
+     baseUrl,
+     agentId: held.agentId,
+     key: held.signer,
+-    bound: false,
+     ...target(values, io.env),
+     ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
+   }).token();

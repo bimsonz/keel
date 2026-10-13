@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/key-client.test.ts
+# kills: sdk.key-bearer
+# why: a client asked for a plain token asks for a bound one, so the token it hands a tool that cannot sign is refused wherever the tool presents it
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index ff295d6..b72b066 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -130,7 +130,7 @@ export class KeelClient {
+ 
+   /** The key a bound token's proofs are made by, or none for a client that asked for a plain bearer. */
+   #binding(): Promise<AgentSigner> | undefined {
+-    if (!("key" in this.#options) || this.#options.bound === false) return undefined;
++    if (!("key" in this.#options)) return undefined;
+     this.#runKey ??= runKey();
+     return this.#runKey;
+   }

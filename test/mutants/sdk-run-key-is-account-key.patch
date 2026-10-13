@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/key-client.test.ts
+# kills: sdk.key-token
+# why: a token is bound to the account's own key, which Keel refuses, and which would put the key that never expires on every request
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index ff295d6..768dce9 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -131,7 +131,7 @@ export class KeelClient {
+   /** The key a bound token's proofs are made by, or none for a client that asked for a plain bearer. */
+   #binding(): Promise<AgentSigner> | undefined {
+     if (!("key" in this.#options) || this.#options.bound === false) return undefined;
+-    this.#runKey ??= runKey();
++    this.#runKey ??= Promise.resolve(this.#options.key);
+     return this.#runKey;
+   }
+ 

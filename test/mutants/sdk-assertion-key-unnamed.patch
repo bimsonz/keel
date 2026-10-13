@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-assertion
+# why: a signed token request does not say which key signed it, so an agent with a second key gets no token
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..7587b65 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -189,7 +189,7 @@ export async function clientAssertion(
+   const issuedAt = now();
+   return signed(
+     signer,
+-    { typ: "client-authentication+jwt", kid: await thumbprint(signer.publicJwk) },
++    { typ: "client-authentication+jwt" },
+     {
+       iss: asked.agentId,
+       sub: asked.agentId,

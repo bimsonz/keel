@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-thumbprint
+# why: a key's thumbprint is taken over its members out of order, so it is not the thumbprint Keel computes and the agent names a key Keel does not know
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..184593c 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -135,7 +135,7 @@ export function thumbprint(jwk: PublicJwk): Promise<string> {
+   // The required members, in the order of their names.
+   return sha256(
+     jwk.kty === "OKP"
+-      ? `{"crv":"${jwk.crv}","kty":"${jwk.kty}","x":"${jwk.x}"}`
++      ? `{"kty":"${jwk.kty}","crv":"${jwk.crv}","x":"${jwk.x}"}`
+       : `{"crv":"${jwk.crv}","kty":"${jwk.kty}","x":"${jwk.x}","y":"${jwk.y}"}`,
+   );
+ }

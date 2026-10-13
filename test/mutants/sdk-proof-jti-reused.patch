@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-proof
+# why: every proof carries the same id, so the second call an agent makes is refused as a replay of the first
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..884e1aa 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -165,7 +165,7 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro
+     signer,
+     { typ: "dpop+jwt", jwk: signer.publicJwk },
+     {
+-      jti: crypto.randomUUID(),
++      jti: "proof",
+       htm: request.method.toUpperCase(),
+       htu: `${url.origin}${url.pathname}`,
+       iat: now(),

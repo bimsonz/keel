@@ -47,7 +47,10 @@ function keel(options: { readonly store?: "none"; readonly env?: Record<string, 
   const store = memoryStore(log);
   const io: Io = {
     env: { KEEL_URL: ORIGIN, ...options.env },
-    stdout: (line) => void out.push(line),
+    stdout: (line) => {
+      log.push("stdout");
+      out.push(line);
+    },
     stderr: (line) => void err.push(line),
     keyStore: options.store === "none" ? undefined : store,
     fetch: async (url, init) => {
@@ -156,6 +159,9 @@ describe("keeltown, for an agent that holds a key", () => {
     expect(printed.sent.map((s) => s.body).join("\n")).not.toContain(d);
     // The key is on stdout before sign-up is asked, so a crash after it never loses the key.
     expect(printed.to(REGISTER)).toHaveLength(1);
+    expect(printed.log.indexOf("stdout")).toBeLessThan(
+      printed.log.indexOf(`fetch:POST ${REGISTER}`),
+    );
 
     const given = keel({ store: "none", env: { KEEL_AGENT_KEY: printed.out[0] ?? "" } });
     expect(await run(["agent", "signup"], given.io)).toBe(0);

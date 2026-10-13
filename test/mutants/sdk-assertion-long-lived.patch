@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-assertion
+# why: a signed token request says it is good for ten minutes, which Keel refuses, so no agent using the SDK gets a token
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..1df5504 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -175,7 +175,7 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro
+ }
+ 
+ /** How long a signed token request says it is good for: the most Keel takes. */
+-const ASSERTION_SECONDS = 60;
++const ASSERTION_SECONDS = 600;
+ 
+ /**
+  * A signed request for a token (RFC 7523 §3): the agent, as itself, to one

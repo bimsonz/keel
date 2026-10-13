@@ -1,0 +1,26 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.signup-no-store
+# why: with no key store sign-up makes a key and signs up anyway, so the account exists and its key is gone when the command ends
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 7295afd..8533a42 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -330,15 +330,15 @@ async function signUpCommand(
+   }
+   let held = await heldKey(io.env, io.keyStore, entry);
+   if (held === undefined) {
+-    if (io.keyStore === undefined) {
++    if (io.keyStore === undefined && entry === "") {
+       io.stderr(
+         "This machine has no key store the CLI can use, and a key is never written to a file. Set KEEL_AGENT_KEY to the agent's private key, or run `keeltown agent signup --print-key` to make one and print it once for a secret manager.",
+       );
+       return 2;
+     }
+     const { signer, privateJwk } = await generateAgentKey();
+-    await io.keyStore.write(entry, encodeEntry({ jwk: privateJwk }));
+-    held = { signer, where: io.keyStore.kind, stored: privateJwk };
++    await io.keyStore?.write(entry, encodeEntry({ jwk: privateJwk }));
++    held = { signer, where: io.keyStore?.kind ?? "nowhere" };
+   }
+   const made = await signUp({ ...asked, signer: held.signer });
+   if (held.stored !== undefined && io.keyStore !== undefined)

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.signup
+# why: sign-up prints the private key it has just stored, so the key is in the terminal's scrollback and in any log the output went to
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 7295afd..b3a3721 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -349,7 +349,7 @@ async function signUpCommand(
+   io.stdout(
+     values.json === true
+       ? JSON.stringify({ ...made, key: held.where }, null, 2)
+-      : `${made.created ? "Signed up" : "Already signed up:"} agent ${made.handle} (${made.agentId}). Its key is held in ${held.where}.`,
++      : `${made.created ? "Signed up" : "Already signed up:"} agent ${made.handle} (${made.agentId}). Its key ${JSON.stringify(held.stored)} is held in ${held.where}.`,
+   );
+   return 0;
+ }

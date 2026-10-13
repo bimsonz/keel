@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-proof
+# why: a proof names its URL with the query, which Keel compares without one, so every call with a query is refused
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..a55733b 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -167,7 +167,7 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro
+     {
+       jti: crypto.randomUUID(),
+       htm: request.method.toUpperCase(),
+-      htu: `${url.origin}${url.pathname}`,
++      htu: request.url,
+       iat: now(),
+       ...(request.accessToken === undefined ? {} : { ath: await sha256(request.accessToken) }),
+     },

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel packages/sdk/test/agent-key.test.ts apps/keel/test/pool/agent-sdk.test.ts
+# kills: sdk.key-proof, sdk.key-live
+# why: a proof does not name the token it goes with, so Keel refuses every call an agent makes with a bound token, and a proof alone would do for any token
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..940abeb 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -169,7 +169,6 @@ export async function dpopProof(signer: AgentSigner, request: ProofRequest): Pro
+       htm: request.method.toUpperCase(),
+       htu: `${url.origin}${url.pathname}`,
+       iat: now(),
+-      ...(request.accessToken === undefined ? {} : { ath: await sha256(request.accessToken) }),
+     },
+   );
+ }

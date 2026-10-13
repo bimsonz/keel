@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/key-client.test.ts
+# kills: sdk.key-call
+# why: a bound token is presented as a plain bearer with no proof, which Keel refuses: a token bound to a key needs the key shown
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index ff295d6..2e64259 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -230,7 +230,7 @@ export class KeelClient {
+     const binding = this.#binding();
+     /** How the token is presented: under the DPoP scheme with a proof for this request when it is bound to a key. */
+     const presenting = async (token: string): Promise<Record<string, string>> =>
+-      binding === undefined
++      binding === undefined || token !== ""
+         ? { authorization: `Bearer ${token}` }
+         : {
+             authorization: `DPoP ${token}`,

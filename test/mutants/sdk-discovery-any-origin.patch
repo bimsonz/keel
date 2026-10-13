@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/agent-key.test.ts
+# kills: sdk.key-discovery
+# why: the client follows the discovery document wherever it points, so a tampered document sends the agent's signed token request to another server, which spends it at Keel for a token of its own
+diff --git a/packages/sdk/src/agent-key.ts b/packages/sdk/src/agent-key.ts
+index c780180..2174070 100644
+--- a/packages/sdk/src/agent-key.ts
++++ b/packages/sdk/src/agent-key.ts
+@@ -239,7 +239,7 @@ export async function discover(baseUrl: string, fetcher: Fetch = fetch): Promise
+   if (issuer === undefined || tokenEndpoint === undefined || signUpEndpoint === undefined)
+     throw refused("names no issuer, token endpoint or sign-up.");
+   for (const place of [issuer, tokenEndpoint, signUpEndpoint])
+-    if (!URL.canParse(place) || new URL(place).origin !== origin || !place.startsWith("https:"))
++    if (!URL.canParse(place))
+       throw refused(`names ${place}, which is not ${origin} over https.`);
+   return { issuer, tokenEndpoint, signUpEndpoint };
+ }

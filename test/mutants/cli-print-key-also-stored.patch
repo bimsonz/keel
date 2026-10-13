@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.signup-no-store
+# why: a key made for a secret manager is also written over the key this machine holds, so the machine's own agent loses its key
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 7295afd..41fcc7b 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -322,6 +322,7 @@ async function signUpCommand(
+     // A key for somewhere else to keep: printed once, before Keel is asked, and written nowhere.
+     const { signer, privateJwk } = await generateAgentKey();
+     io.stdout(JSON.stringify(privateJwk));
++    await io.keyStore?.write(entry, encodeEntry({ jwk: privateJwk }));
+     const made = await signUp({ ...asked, signer });
+     io.stderr(
+       `Signed up agent ${made.handle}. The line above is the only copy of its private key: keep it in a CI secret or a secret manager as KEEL_AGENT_KEY, with KEEL_AGENT_ID=${made.agentId}. Keel cannot give it back.`,

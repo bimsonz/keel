@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/key-client.test.ts
+# kills: sdk.key-token
+# why: a key client keeps its first token for ever, so five minutes in every call is refused once, and each of them pays for a second token
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index ff295d6..ac65b3e 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -171,7 +171,7 @@ export class KeelClient {
+     if (!isTokenResponse(body)) throw new KeelTokenError("invalid_response", response.status);
+     this.#token = {
+       value: body.access_token,
+-      expiresAt: Date.now() + body.expires_in * 1000 - EXPIRY_MARGIN_MS,
++      expiresAt: Number.POSITIVE_INFINITY,
+     };
+     return body.access_token;
+   }

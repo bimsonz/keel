@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.signup
+# why: a profile is taken as it is typed, so a name with a space or a quote in it reaches the key store's own command line
+diff --git a/packages/cli/src/agent-key.ts b/packages/cli/src/agent-key.ts
+index b927d02..ebd26ec 100644
+--- a/packages/cli/src/agent-key.ts
++++ b/packages/cli/src/agent-key.ts
+@@ -28,7 +28,7 @@ export class KeyError extends Error {}
+ 
+ /** The key store entry for a Keel host: its host, and `#<profile>` for any agent but the first. */
+ export function entryName(baseUrl: string, profile: string | undefined): string {
+-  if (profile !== undefined && !PROFILE.test(profile))
++  if (profile !== undefined && profile === "")
+     throw new KeyError("--profile takes lower-case letters, digits and hyphens");
+   const host = URL.parse(baseUrl)?.host;
+   if (host === undefined || host === "") throw new KeyError("KEEL_URL is not a URL");
