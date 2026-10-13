@@ -43,18 +43,22 @@ export function waitingRows(listed: readonly EscalationView[]): WaitingRow[] {
 /** How long a read that failed on the way is left before it is asked again, at most. */
 const LONGEST_PAUSE_MS = 30_000;
 
+/** Keel's word for the head of a feed: asked for as a cursor, it answers no entry and where to read on from. */
+const HEAD = "end";
+
 /**
  * Says when the list is to be read again, and never by the clock: it follows the reader's own feed, and calls
- * `again` when an entry that puts or closes a question arrives. The feed is first read to its end as it stood,
- * and `again` is called once there, for whatever came while it was being read. It ends when `signal` aborts, or
- * when Keel refuses the feed: a refusal is Keel's answer, and asking again would not change it.
+ * `again` when an entry that puts or closes a question arrives. The feed is joined at its head in one read,
+ * with nothing of what came before, and `again` is called once there, for whatever came between the list's own
+ * read and that one. It ends when `signal` aborts, or when Keel refuses the feed: a refusal is Keel's answer,
+ * and asking again would not change it.
  */
 export async function followTurns(
   directory: Pick<KeelDirectory, "readOwnFeed">,
   again: () => void,
   signal: AbortSignal,
 ): Promise<void> {
-  let cursor: string | undefined;
+  let cursor = HEAD;
   let level = false;
   let pause = 1_000;
   while (!signal.aborted) {
@@ -63,7 +67,7 @@ export async function followTurns(
     try {
       // oxlint-disable-next-line no-await-in-loop -- a long-poll loop reads one page after another by nature
       const page = await directory.readOwnFeed({
-        ...(cursor === undefined ? {} : { cursor }),
+        cursor,
         ...(level ? { waitSec: 25 } : {}),
         signal,
       });
@@ -71,8 +75,7 @@ export async function followTurns(
       const movedOn = page.nextCursor !== cursor;
       cursor = page.nextCursor;
       if (!level) {
-        // A stretch of the log behind its end: the next is read at once. The end is the page whose cursor stood.
-        if (movedOn) continue;
+        // Keel has said where its log ends now. Everything after is waited for from there.
         level = true;
         again();
         continue;

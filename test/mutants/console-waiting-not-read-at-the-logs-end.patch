@@ -1,13 +1,13 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
 # kills: waiting.follow
-# why: a question put while the feed was being read to its end is never listed: the list is not read again there
+# why: a question put between the list's own read and the feed's head is never listed: the list is not read again once the head is found
 diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
-index 4c11fac..57f015c 100644
+index f804dbb..674ba24 100644
 --- a/apps/console/src/engine/waiting.ts
 +++ b/apps/console/src/engine/waiting.ts
-@@ -74,7 +74,6 @@ export async function followTurns(
-         // A stretch of the log behind its end: the next is read at once. The end is the page whose cursor stood.
-         if (movedOn) continue;
+@@ -77,7 +77,6 @@ export async function followTurns(
+       if (!level) {
+         // Keel has said where its log ends now. Everything after is waited for from there.
          level = true;
 -        again();
          continue;

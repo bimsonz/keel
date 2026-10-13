@@ -507,13 +507,20 @@ export function createFakeKeel(
         // and a visitor is asked for a session: the spec's "without a token and without `project`, 401".
         if (asked === null && reader === null) return problem(401, "auth.required");
         if (asked !== null && (asked !== project.id || !visible)) return gone();
-        const from = Number(url.searchParams.get("cursor") ?? "0") || 0;
+        const cursor = url.searchParams.get("cursor") ?? "0";
+        // A cursor is a place an earlier page gave, or Keel's word for the head. Anything else is refused.
+        if (cursor !== "end" && !/^\d+$/.test(cursor)) return problem(400, "request.invalid");
+        const wait = Number(url.searchParams.get("wait") ?? "0") || 0;
+        const head = ahead + log.events.length;
+        // Asked for the head with no wait, Keel answers no entry and where its log ends now.
+        if (cursor === "end" && wait === 0)
+          return Response.json({ items: [], nextCursor: String(head) } satisfies EventPage);
+        const from = cursor === "end" ? head : Number(cursor);
         const limit = Math.min(Number(url.searchParams.get("limit") ?? "500") || 500, pageSize);
         // A stretch of the instance's log that is all other projects' is an empty page, and the cursor moves on.
         if (from < ahead)
           return Response.json({ items: [], nextCursor: String(Math.min(from + limit, ahead)) });
         const start = from - ahead;
-        const wait = Number(url.searchParams.get("wait") ?? "0") || 0;
         if (start >= log.events.length && wait > 0) {
           // Nothing new: hold the request until the log grows or the wait runs out.
           await new Promise<void>((resolve) => {

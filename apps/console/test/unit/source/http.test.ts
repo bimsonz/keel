@@ -721,6 +721,16 @@ describe("the questions Keel has put to someone, from the page", () => {
     expect(first.items).toContain("EscalationRaised");
     expect(first.items.every((kind) => typeof kind === "string")).toBe(true);
 
+    // The feed's head is asked for by Keel's own word for it: no entry from before, and where to read on from,
+    // which is where reading the whole feed ends.
+    const head = await directory.readOwnFeed({ cursor: "end" });
+    expect(fromThePage.at(-1)?.url).toBe(`${ORIGIN}/v1/events?limit=500&cursor=end`);
+    expect(head).toEqual({ items: [], nextCursor: first.nextCursor });
+    // A cursor Keel gave on no page is refused, as Keel refuses one.
+    expect(
+      await directory.readOwnFeed({ cursor: "the-start" }).catch((error: unknown) => error),
+    ).toMatchObject({ status: 400, code: "request.invalid" });
+
     // The cursor and the wait are Keel's own inputs, and the wait is never more than Keel allows.
     const asked: string[] = [];
     const tail = createHttpDirectory({

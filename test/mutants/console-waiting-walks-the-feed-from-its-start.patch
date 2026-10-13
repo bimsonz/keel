@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.follow, waiting.no-clock, waiting.refused
+# why: the home's wait is started from the feed's first entry and not its head, so the first thing an open home does is read every entry Keel ever read this person
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index f804dbb..213af53 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -58,7 +58,7 @@ export async function followTurns(
+   again: () => void,
+   signal: AbortSignal,
+ ): Promise<void> {
+-  let cursor = HEAD;
++  let cursor = "";
+   let level = false;
+   let pause = 1_000;
+   while (!signal.aborted) {

@@ -67,10 +67,9 @@ describe("the questions waiting for someone", () => {
     });
   });
 
-  it("[waiting.follow] reads the list again when the reader's feed puts a question or closes one, once the feed has been read to its end, and for nothing else", async () => {
+  it("[waiting.follow] joins the reader's feed at its head in one read, and reads the list again when the feed then puts a question or closes one, and for nothing else", async () => {
     const feed = scripted([
-      // The log as it stood: a stretch that moves the cursor on, then the page whose cursor stands.
-      { items: ["ProjectCreated", "EscalationRaised"], nextCursor: "2" },
+      // The head: Keel answers no entry, and where its log ends now.
       { items: [], nextCursor: "2" },
       // The tail: an entry that is no question's, then one that closes a question.
       { items: ["ChangeDeclared"], nextCursor: "3" },
@@ -79,13 +78,12 @@ describe("the questions waiting for someone", () => {
     const stop = new AbortController();
     const again = vi.fn<() => void>();
     const following = followTurns(feed, again, stop.signal);
-    await vi.waitFor(() => expect(feed.asked).toHaveLength(5));
-    // Once for the end of the log as it stood, and once for the ruling: not for the raise it read on the way
-    // there, which the first list already held, nor for the change.
+    await vi.waitFor(() => expect(feed.asked).toHaveLength(4));
+    // Once at the head, for whatever came since the list was read, and once for the ruling: not for the change.
     expect(again).toHaveBeenCalledTimes(2);
+    // The first read asks for the head by Keel's own word, and waits for nothing: no entry from before is read.
     expect(feed.asked).toEqual([
-      {},
-      { cursor: "2" },
+      { cursor: "end" },
       { cursor: "2", waitSec: 25 },
       { cursor: "3", waitSec: 25 },
       { cursor: "4", waitSec: 25 },
@@ -115,7 +113,8 @@ describe("the questions waiting for someone", () => {
     // asked again, and the list is not.
     expect(again).toHaveBeenCalledTimes(1);
     expect(feed.asked.length).toBeGreaterThan(100);
-    expect(feed.asked.slice(2).every((read) => read.waitSec === 25)).toBe(true);
+    expect(feed.asked[0]).toEqual({ cursor: "end" });
+    expect(feed.asked.slice(1).every((read) => read.waitSec === 25)).toBe(true);
     stop.abort();
     await following;
   });
@@ -125,19 +124,26 @@ describe("the questions waiting for someone", () => {
     const never = vi.fn<() => void>();
     await followTurns(refusing, never, new AbortController().signal);
     expect(never).not.toHaveBeenCalled();
-    expect(refusing.asked).toEqual([{}]);
+    expect(refusing.asked).toEqual([{ cursor: "end" }]);
 
     vi.useFakeTimers();
     const dropping = scripted([
-      { items: ["ProjectCreated"], nextCursor: "1" },
+      // The head is asked for again where that read dropped, and a wait where it did.
+      new Error("the network dropped"),
+      { items: [], nextCursor: "1" },
       new Error("the network dropped"),
       { items: [], nextCursor: "1" },
     ]);
     const stop = new AbortController();
     const again = vi.fn<() => void>();
     const following = followTurns(dropping, again, stop.signal);
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(dropping.asked.slice(0, 3)).toEqual([{}, { cursor: "1" }, { cursor: "1" }]);
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(dropping.asked.slice(0, 4)).toEqual([
+      { cursor: "end" },
+      { cursor: "end" },
+      { cursor: "1", waitSec: 25 },
+      { cursor: "1", waitSec: 25 },
+    ]);
     expect(again).toHaveBeenCalledTimes(1);
     stop.abort();
     await following;
