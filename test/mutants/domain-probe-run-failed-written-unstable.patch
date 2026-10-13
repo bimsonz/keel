@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.run-failed, probe.admits-by-matrix
+# why: a failed run is written as an unstable probe: a reason the matrix never gave, hiding that the run died
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 12d9def3..622079ac 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -258,7 +258,7 @@ export const decideProbe = (
+       return Result.succeed([
+         ProbeDiscarded.make({
+           probeId: probe.id,
+-          reason: "run-failed",
++          reason: "unstable",
+           conflictId: probe.conflictId,
+         }),
+       ]);

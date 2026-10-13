@@ -2,10 +2,10 @@
 # kills: probe.fold-table
 # why: the fold takes GuardAdmitted with its guard gone: `probe.state === "calibrating" && event.probeId === probe.id && admit(probe.cells)._tag === "admitted"`.
 diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
-index 64c72893..2e8a7cf2 100644
+index 12d9def3..700d7fd2 100644
 --- a/packages/core/src/domain/verification/probe-machine.ts
 +++ b/packages/core/src/domain/verification/probe-machine.ts
-@@ -310,11 +310,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+@@ -329,11 +329,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
            }
          : illegal(probe, event);
      case "GuardAdmitted":
@@ -17,4 +17,4 @@ index 64c72893..2e8a7cf2 100644
 +      return { ...probe, state: "admitted", guardId: event.guardId };
      case "ProbeDiscarded": {
        const admission = admit(probe.cells);
-       return probe.state === "calibrating" &&
+       // A run that failed ends a probe whose matrix has decided nothing.

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: the fold takes a failed run without the check `admission._tag === "pending"`: a probe whose matrix has decided is discarded as if it had not.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 12d9def3..12ab7208 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -339,8 +339,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+       // A run that failed ends a probe whose matrix has decided nothing.
+       if (event.reason === "run-failed")
+         return probe.state === "calibrating" &&
+-          event.probeId === probe.id &&
+-          admission._tag === "pending"
++          event.probeId === probe.id
+           ? { ...probe, state: "discarded", discarded: event.reason }
+           : illegal(probe, event);
+       return probe.state === "calibrating" &&

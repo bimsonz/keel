@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.run-failed, probe.fold-table
+# why: a probe whose run failed loses the cells it recorded: the evidence of how far the matrix got
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 12d9def3..3e2f0725 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -341,7 +341,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+         return probe.state === "calibrating" &&
+           event.probeId === probe.id &&
+           admission._tag === "pending"
+-          ? { ...probe, state: "discarded", discarded: event.reason }
++          ? { ...probe, cells: [], state: "discarded", discarded: event.reason }
+           : illegal(probe, event);
+       return probe.state === "calibrating" &&
+         event.probeId === probe.id &&

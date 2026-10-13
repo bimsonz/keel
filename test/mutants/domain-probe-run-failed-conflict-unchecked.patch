@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.run-failed
+# why: a failed run is taken whatever the probe's conflict is doing: with no conflict held, or one probing another probe
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 12d9def3..e3d085a7 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -252,9 +252,6 @@ export const decideProbe = (
+     }
+     case "RunFailed": {
+       if (probe.state !== "calibrating") return refuse();
+-      const conflict = facts.conflict;
+-      if (conflict?.state !== "probing" || conflict.probeId !== probe.id)
+-        return refuse("conflict-not-probing");
+       return Result.succeed([
+         ProbeDiscarded.make({
+           probeId: probe.id,

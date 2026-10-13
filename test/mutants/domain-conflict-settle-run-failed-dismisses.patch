@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.run-failed-unprovable
+# why: a failed run is read as a probe that did not discriminate, so a conflict nobody tested is dismissed
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 830a88bb..a0084396 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -269,7 +269,11 @@ export const decideConflict = (
+             evidence: { _tag: "probe", probeId: probe.id },
+           }),
+         ]);
+-      if (probe.state === "discarded" && probe.discarded === "non-discriminating" && drafted)
++      if (
++        probe.state === "discarded" &&
++        (probe.discarded === "non-discriminating" || probe.discarded === "run-failed") &&
++        drafted
++      )
+         return Result.succeed([
+           ConflictDismissed.make({
+             conflictId: conflict.id,

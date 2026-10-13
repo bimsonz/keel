@@ -2,19 +2,14 @@
 # kills: probe.fold-table
 # why: the fold takes ProbeDiscarded without the check `event.probeId === probe.id`.
 diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
-index 64c72893..63fa1ec6 100644
+index 12d9def3..7dc90840 100644
 --- a/packages/core/src/domain/verification/probe-machine.ts
 +++ b/packages/core/src/domain/verification/probe-machine.ts
-@@ -317,11 +317,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
-         : illegal(probe, event);
-     case "ProbeDiscarded": {
-       const admission = admit(probe.cells);
--      return probe.state === "calibrating" &&
+@@ -344,7 +344,6 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+           ? { ...probe, state: "discarded", discarded: event.reason }
+           : illegal(probe, event);
+       return probe.state === "calibrating" &&
 -        event.probeId === probe.id &&
--        admission._tag === "rejected" &&
--        admission.reason === event.reason
--        ? { ...probe, state: "discarded", discarded: event.reason }
-+      return probe.state === "calibrating" && admission._tag === "rejected" && admission.reason === event.reason ? { ...probe, state: "discarded", discarded: event.reason }
-         : illegal(probe, event);
-     }
-     case "GuardRetired":
+         admission._tag === "rejected" &&
+         admission.reason === event.reason
+         ? { ...probe, state: "discarded", discarded: event.reason }

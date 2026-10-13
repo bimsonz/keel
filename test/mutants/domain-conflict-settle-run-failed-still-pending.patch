@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.run-failed-unprovable
+# why: a conflict whose probe's run failed still waits for the probe, so it stays Probing for good, as it did before the rule
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 830a88bb..a390d072 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -278,7 +278,6 @@ export const decideConflict = (
+         ]);
+       const unprovable =
+         (probe.state === "discarded" && probe.discarded === "unstable" && drafted) ||
+-        (probe.state === "discarded" && probe.discarded === "run-failed" && drafted) ||
+         (probe.state === "discarded" && probe.discarded === "draft-failed" && !drafted);
+       if (!unprovable) return refuse("probe-pending", awaitProbe);
+       return command.escalationId === undefined
