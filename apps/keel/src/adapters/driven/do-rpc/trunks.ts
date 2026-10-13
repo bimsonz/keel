@@ -1,5 +1,5 @@
 import { TrunkOrigin } from "@keeltown/core/domain/integration";
-import { ImportTooLarge, Trunks } from "@keeltown/core/ports";
+import { ImportTooLarge, RepoNotFound, Trunks } from "@keeltown/core/ports";
 import { Effect, Layer, Option, Schema } from "effect";
 import { TrunkCodecs } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
@@ -42,6 +42,14 @@ export function TrunksRpc(
         callObject(TrunkCodecs.adopt, () => trunk(projectId).adopt(commit)),
       seed: (projectId, name, at) =>
         callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
+      take: (projectId, source) =>
+        callObject(TrunkCodecs.take, () => trunk(projectId).take(source)).pipe(
+          // The RPC carries both by shape (rule R15); the port's are its classes.
+          Effect.catchTags({
+            RepoNotFound: (missing) => Effect.fail(new RepoNotFound({ repo: missing.repo })),
+            ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
+          }),
+        ),
       head: (projectId) =>
         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
           Effect.map((status) => status.head),

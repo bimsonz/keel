@@ -11,6 +11,7 @@ import {
   seedTrunk,
   syncMirror,
   syncTrunk,
+  takeTrunk,
   trunkHeard,
   trunkOf,
   trunkStanding,
@@ -156,6 +157,14 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       Effect.flatMap((when) => seedTrunk(projectId, name, when)),
     );
     return this.answer(TrunkCodecs.seed, program);
+  }
+
+  async take(source: string) {
+    const projectId = this.projectId;
+    const program = Effect.sync(() => decodeProject(source)).pipe(
+      Effect.flatMap((from) => takeTrunk(projectId, from)),
+    );
+    return this.answer(TrunkCodecs.take, program);
   }
 
   async sync() {

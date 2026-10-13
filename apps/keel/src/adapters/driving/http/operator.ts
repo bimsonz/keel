@@ -6,6 +6,7 @@ import type {
   ImportRefused,
   ProjectRecord,
   ProjectSettings,
+  ProjectSource,
   ProjectStartRefused,
   PutProjectSettings,
   StandingInput,
@@ -226,10 +227,12 @@ const again = (title: string) => ({
   operationId: "Operator_createProject",
 });
 
+/** `start` is how the refused project was to start: a history too large reads as a fork's or an import's by it. */
 export function createProjectError(
   caller: Caller,
   namespace: string,
   error: IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
+  start: ProjectSource["_tag"],
 ): Operator_createProjectResult {
   switch (error._tag) {
     case "IdempotencyConflict":
@@ -268,12 +271,23 @@ export function createProjectError(
       };
     }
     case "ImportTooLarge":
+      // A fork's history is read until it passes the limit and no further: its size is not known, and no smaller start of it exists.
       return {
         status: 403,
-        body: problem(403, "project.import_too_large", caller.requestId, {
-          detail: `The repository's history is ${error.bytes} bytes, and Keel imports at most ${error.limit} in one piece. Nothing was kept, and no project was made.`,
-          nextActions: [again("Import a smaller repository, or one branch of it with `ref`")],
-        }),
+        body: problem(
+          403,
+          "project.import_too_large",
+          caller.requestId,
+          start === "Project"
+            ? {
+                detail: `The project's history is over ${error.limit} bytes, the most Keel forks in one piece. Nothing was kept, and no project was made.`,
+                nextActions: [],
+              }
+            : {
+                detail: `The repository's history is ${error.bytes} bytes, and Keel imports at most ${error.limit} in one piece. Nothing was kept, and no project was made.`,
+                nextActions: [again("Import a smaller repository, or one branch of it with `ref`")],
+              },
+        ),
       };
     case "QuotaExceeded":
       // A namespace's count of projects is no size: its refusal names the count, and the one way on.

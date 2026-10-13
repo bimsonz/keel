@@ -94,6 +94,9 @@ export const TrunkWriterGitCore = (
 
       const trunkHead = host.head(trunk, MAIN).pipe(Effect.catchTag("RefNotFound", Effect.die));
 
+      /** Trunk's main, or null before it has one. Trunk's own repo missing is a defect, never a source's. */
+      const ownHead = headOf(trunk).pipe(Effect.catchTag("RepoNotFound", Effect.die));
+
       /** A promotion's move, built once so that weighing it and pushing it ask staging for the same pack. */
       const promotion = (from: CommitSha, to: CommitSha): RelayMove => ({ ref: MAIN, from, to });
 
@@ -158,6 +161,29 @@ export const TrunkWriterGitCore = (
             const tip = toCommitSha(root.oid);
             yield* makeMain(tip, root.objects);
             return tip;
+          }),
+        take: (source) =>
+          Effect.gen(function* () {
+            // A main that exists is never moved: a retry answers it, whatever the source holds now.
+            const held = yield* ownHead;
+            if (held !== null) return held;
+            const tip = yield* host
+              .head(source, MAIN)
+              .pipe(Effect.catchTag("RefNotFound", Effect.die));
+            const from = yield* remoteOf(source, "read");
+            const target = yield* remoteOf(trunk, "write").pipe(
+              Effect.catchTag("RepoNotFound", Effect.die),
+            );
+            const outcome = yield* Effect.tryPromise({
+              try: () => relay(from, target, { ref: MAIN, from: null, to: tip }),
+              catch: (cause) => cause,
+            }).pipe(Effect.catch(tooLarge(source)));
+            if (outcome.kind !== "rejected") return tip;
+            // A racing attempt of the same bootstrap made main first: what trunk holds is the answer.
+            const raced = yield* ownHead;
+            if (raced === null)
+              return yield* Effect.die(new Error("trunk refused its source's history"));
+            return raced;
           }),
         push: (from, to, admit) =>
           Effect.gen(function* () {

@@ -109,7 +109,13 @@ const branchOf = (branches: readonly Imported[], ref: string) =>
  * Makes trunk by the project's start, and answers its first head with where
  * it came from. Every start is idempotent: a trunk that exists is not made
  * again, and what it holds says whether its first write is still due.
- * - A template and a fork are forked, as they are.
+ * - A template is forked, as it is.
+ * - A fork's trunk is created, and the trunk's one writer takes the source
+ *   trunk's whole history into it, unless main is already there. It is not
+ *   forked: the code host serves a fork's whole history at several times
+ *   its source's size, and a trunk is fetched whole by its mirror's first
+ *   sync and by every clone. A source that is gone, or over what one relay
+ *   carries, refuses the start, and the empty repo is deleted.
  * - An empty project's repo is created, and the trunk's one writer seeds
  *   Keel's first commit, unless main is already there.
  * - An import takes the upstream's one branch under its own name. When that
@@ -125,18 +131,25 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
   const repos = projectRepos(projectId);
   const host = yield* CodeHost;
   const made = yield* exists(repos.trunk);
-  if (source._tag === "Template" || source._tag === "Project") {
-    const from =
-      source._tag === "Template"
-        ? { namespace: repos.trunk.namespace, name: source.repo }
-        : projectRepos(source.projectId).trunk;
+  if (source._tag === "Template") {
+    const from = { namespace: repos.trunk.namespace, name: source.repo };
     if (!made)
       yield* host.fork(from, repos.trunk).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
     const head = yield* Effect.orDie(host.head(repos.trunk, MAIN));
-    const forked: TrunkOrigin =
-      source._tag === "Template"
-        ? { kind: "template", name: source.repo, commit: head }
-        : { kind: "forked", project: source.projectId, commit: head };
+    const template: TrunkOrigin = { kind: "template", name: source.repo, commit: head };
+    return { head, origin: template };
+  }
+  if (source._tag === "Project") {
+    if (!made)
+      yield* host.create(repos.trunk).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+    const main = branchOf(yield* Effect.orDie(host.branches(repos.trunk)), MAIN);
+    const head =
+      main?.commit ??
+      (yield* (yield* Trunks)
+        .take(projectId, source.projectId)
+        // Nothing was taken: the empty repo goes, so a refused fork leaves none.
+        .pipe(Effect.tapError(() => host.delete(repos.trunk))));
+    const forked: TrunkOrigin = { kind: "forked", project: source.projectId, commit: head };
     return { head, origin: forked };
   }
   if (source._tag === "Empty") {
@@ -176,7 +189,8 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
  * 2. trunk is initialized at its first head, with where it came from. An
  *    imported history is admitted there: over what its namespace has left,
  *    or over what one relay carries, trunk's repo is deleted and the create
- *    is refused with nothing else made;
+ *    is refused with nothing else made (a fork over what one relay carries
+ *    was refused the same way in step 1, where its history is taken);
  * 3. staging is forked from trunk, and the mirror is created empty in the
  *    workspaces namespace (a fork cannot cross namespaces);
  * 4. trunk is synced, which brings staging and the mirror to its head;

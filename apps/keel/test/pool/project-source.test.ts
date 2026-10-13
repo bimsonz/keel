@@ -17,7 +17,7 @@ import {
   type RunRef,
   UserId,
 } from "@keeltown/core/kernel";
-import { CodeHost, EventOutbox, type RepoRef } from "@keeltown/core/ports";
+import { CodeHost, EventOutbox, RELAY_PACK_CAP_BYTES, type RepoRef } from "@keeltown/core/ports";
 import { makeCodeHostMemory, makeTrunksMemory, makeWorkspacePoolMemory } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -155,7 +155,8 @@ const logOf = (projectId: ProjectId) =>
  */
 function sourceApp(options: { readonly template?: boolean } = {}) {
   const code = makeCodeHostMemory();
-  const trunks = makeTrunksMemory();
+  // A fork's history lands in the shared host, as the real writer's relay puts it in trunk's repo.
+  const trunks = makeTrunksMemory({ host: code });
   const onHost = <A, E>(effect: Effect.Effect<A, E, CodeHost>) =>
     Effect.runPromise(effect.pipe(Effect.provide(code.layer)));
   /** Puts a repo on the host with one commit of its own, and answers that commit. */
@@ -276,6 +277,8 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
       const moved = await onHost(code.fixture.commit(trunk, MAIN, { "PLAN.md": "ours alone" }));
       return { id: made.body.id, name: made.body.name, trunk: trunk.name, head: moved };
     },
+    /** The project's history is over what one relay carries from here on: a fork of it is refused. */
+    outgrow: (projectId: ProjectId) => trunks.outgrow(projectId),
     /** A maintainer makes the project public through the settings route. */
     open: async (token: string, projectId: ProjectId) => {
       const put = await call(token, "PUT", `/projects/${projectId}/settings`, {
@@ -509,6 +512,42 @@ describe("a new project's source", () => {
       source: FROM_TEMPLATE,
     });
     expect([made.status, made.body.name]).toEqual([201, name]);
+  });
+
+  it("[project.fork-too-large] a fork of a project over what one relay carries is refused 403 project.import_too_large in a fork's own words, with no next action; its empty trunk is gone and it holds no place: its name is free for the next try", async () => {
+    // In a person's own namespace: the org's ten places are the other cases'.
+    const world = sourceApp();
+    const ada = await world.signUp("forker");
+    const source = await world.create(ada.token, {
+      namespace: ada.namespace,
+      name: uniqueHandle("src"),
+      source: FROM_TEMPLATE,
+    });
+    expect(source.status).toBe(201);
+    world.outgrow(source.body.id);
+    const asked = key();
+    const fork = {
+      namespace: ada.namespace,
+      name: uniqueHandle("fork"),
+      source: forkOf(source.body.id),
+    };
+    const refused = await world.create(ada.token, fork, asked);
+    expect([
+      refused.status,
+      refused.body.code,
+      refused.body.detail,
+      refused.body.nextActions,
+    ]).toEqual([
+      403,
+      "project.import_too_large",
+      `The project's history is over ${RELAY_PACK_CAP_BYTES} bytes, the most Keel forks in one piece. Nothing was kept, and no project was made.`,
+      [],
+    ]);
+    const unmade = wouldBe(ada.userId, asked);
+    expect(await world.holds(projectRepos(unmade).trunk)).toBe(false);
+    expect(await placed(unmade)).toBe(false);
+    const next = await world.create(ada.token, { ...fork, source: FROM_TEMPLATE });
+    expect([next.status, next.body.name]).toEqual([201, fork.name]);
   });
 
   it("[project.source-absent] a template the core namespace does not hold answers 404, naming its repo, and the project that was not made holds no place: its name is free for the next try", async () => {

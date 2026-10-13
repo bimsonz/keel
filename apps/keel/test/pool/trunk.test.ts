@@ -24,6 +24,7 @@ import {
   ImportTooLarge,
   OrgUsage,
   RELAY_PACK_CAP_BYTES,
+  RepoNotFound,
   Trunks,
 } from "@keeltown/core/ports";
 import {
@@ -511,6 +512,52 @@ describe("the Trunk DO's promotion", () => {
       "TrunkAdvanced",
     ]);
     expect(t.writer.pushes()).toEqual([{ from: moved, to: tip }]);
+  });
+
+  it("[trunk.do.take] the Trunks port asks the object, whose writer takes the source project's trunk, and the head comes back; a source that is gone and one over what a relay carries come back as the port's own errors, with nothing taken; once trunk is initialized the ask is a defect", async () => {
+    const tip = Schema.decodeUnknownSync(CommitSha)("b".repeat(40));
+    const parent: ProjectId = makeId("prj", ulid());
+    const source = projectRepos(parent).trunk;
+    const { projectId, writer } = await placedTrunk("0".repeat(40));
+    const take = () =>
+      viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.take(projectId, parent)));
+    const refused = () =>
+      viaTrunks(Effect.flatMap(Trunks, (trunks) => Effect.flip(trunks.take(projectId, parent))));
+    const refusalOf = (exit: Awaited<ReturnType<typeof refused>>) =>
+      Exit.isSuccess(exit) ? exit.value : undefined;
+
+    const gone = refusalOf(await refused());
+    expect(gone).toBeInstanceOf(RepoNotFound);
+    expect(gone).toMatchObject({ repo: source });
+    writer.offers(source, tip, RELAY_PACK_CAP_BYTES + 1);
+    const large = refusalOf(await refused());
+    expect(large).toBeInstanceOf(ImportTooLarge);
+    expect(large).toMatchObject({
+      projectId,
+      bytes: RELAY_PACK_CAP_BYTES + 1,
+      limit: RELAY_PACK_CAP_BYTES,
+    });
+    expect(writer.taken()).toEqual([]);
+
+    writer.offers(source, tip);
+    expect(await take()).toEqual(Exit.succeed(tip));
+    expect(writer.taken()).toEqual([source]);
+    expect(
+      await viaTrunks(
+        Effect.flatMap(Trunks, (trunks) =>
+          trunks.initialize(projectId, tip, "seed", {
+            kind: "forked",
+            project: parent,
+            commit: tip,
+          }),
+        ),
+      ),
+    ).toEqual(Exit.void);
+    const again = await take();
+    expect(Exit.isFailure(again) ? Cause.pretty(again.cause) : "done").toContain(
+      `trunk ${projectId} is initialized: take`,
+    );
+    expect(writer.taken()).toEqual([source]);
   });
 
   it("[trunk.do.view] through the real object and the port a trunk is shown at its head with the time of the event that moved it there, and frozen while its promotion is", async () => {

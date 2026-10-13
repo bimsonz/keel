@@ -10,6 +10,7 @@ import {
 } from "@keeltown/core/domain/identity";
 import type { Change } from "@keeltown/core/domain/coordination";
 import { AgentId, CommitSha, Instant, makeId } from "@keeltown/core/kernel";
+import { ImportTooLarge } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
   makeBetterAuthMemory,
@@ -308,6 +309,7 @@ describe("a project's name that is taken", () => {
         caller,
         handle,
         new ProjectNameTaken({ namespace, name: "notes" }),
+        "Empty",
       );
       expect([refused.status, refused.body]).toEqual([
         409,
@@ -320,6 +322,42 @@ describe("a project's name that is taken", () => {
       ]);
     },
   );
+});
+
+describe("a history too large to start a project from", () => {
+  const tooLarge = new ImportTooLarge({ projectId: "prj_x", bytes: 62_914_561, limit: 62_914_560 });
+
+  it("[projects.fork-too-large-http] a fork is refused 403 project.import_too_large in a fork's words: the limit, no size (the read stops at the limit) and no next action", () => {
+    const refused = createProjectError(caller, "ada", tooLarge, "Project");
+    expect([refused.status, refused.body]).toEqual([
+      403,
+      expect.objectContaining({
+        code: "project.import_too_large",
+        detail:
+          "The project's history is over 62914560 bytes, the most Keel forks in one piece. Nothing was kept, and no project was made.",
+        nextActions: [],
+      }),
+    ]);
+  });
+
+  it("[projects.fork-too-large-http] an import of that size keeps its own sentence, with its size and the way on", () => {
+    const refused = createProjectError(caller, "ada", tooLarge, "Import");
+    expect([refused.status, refused.body]).toEqual([
+      403,
+      expect.objectContaining({
+        code: "project.import_too_large",
+        detail:
+          "The repository's history is 62914561 bytes, and Keel imports at most 62914560 in one piece. Nothing was kept, and no project was made.",
+        nextActions: [
+          {
+            kind: "call",
+            title: "Import a smaller repository, or one branch of it with `ref`",
+            operationId: "Operator_createProject",
+          },
+        ],
+      }),
+    ]);
+  });
 });
 
 describe("a namespace at its limit of projects", () => {
@@ -335,6 +373,7 @@ describe("a namespace at its limit of projects", () => {
         requested: 1,
         nextActions: [{ kind: "escalate", title: "The org is at its projects limit (10)" }],
       }),
+      "Empty",
     );
     expect([refused.status, refused.body]).toEqual([
       403,
@@ -364,6 +403,7 @@ describe("a namespace at its limit of projects", () => {
         requested: 20,
         nextActions: [],
       }),
+      "Import",
     );
     expect(refused.status === 403 && refused.body.detail).toContain("20 bytes");
   });

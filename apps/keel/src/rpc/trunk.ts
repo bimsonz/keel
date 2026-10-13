@@ -55,6 +55,7 @@ export const TrunkCodecs = {
   ),
   adopt: exitCodec(Schema.Void, Schema.Never),
   seed: exitCodec(CommitSha, Schema.Never),
+  take: exitCodec(CommitSha, Schema.Union([RepoNotFound, ImportTooLarge])),
   sync: exitCodec(TrunkSync, Schema.Union([RepoNotFound, PackTooLarge])),
   destroy: exitCodec(Schema.Void, Schema.Never),
 };
@@ -97,6 +98,14 @@ export interface TrunkRpc {
    * before `initialize`). A defect once trunk is initialized.
    */
   seed(name: string, at: typeof InstantSchema.Encoded): Promise<ExitJson>;
+  /**
+   * Brings an empty trunk the whole history of the project `source`'s trunk
+   * and answers the head it now has (the Project DO's createProject for a
+   * fork, before `initialize`). A trunk that has a main answers it and takes
+   * nothing. A source with no trunk repo is RepoNotFound, and one over what
+   * a relay carries ImportTooLarge. A defect once trunk is initialized.
+   */
+  take(source: string): Promise<ExitJson>;
   /**
    * Copies trunk's head into the project's staging and mirror (relaying
    * trunk's pack, so commit ids survive). Idempotent; the Project DO's

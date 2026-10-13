@@ -1077,7 +1077,9 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   ),
                 ),
                 Effect.catch((error) =>
-                  Effect.succeed(createProjectError(caller, input.namespace.toLowerCase(), error)),
+                  Effect.succeed(
+                    createProjectError(caller, input.namespace.toLowerCase(), error, source._tag),
+                  ),
                 ),
               );
             }),

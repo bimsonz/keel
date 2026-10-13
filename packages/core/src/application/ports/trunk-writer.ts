@@ -47,6 +47,18 @@ export class TrunkWriter extends Context.Service<
      */
     readonly seed: (name: string, at: Instant) => Effect.Effect<CommitSha>;
     /**
+     * Brings an empty trunk the whole history of `source`'s main and makes
+     * trunk's main at its head, relaying the source's own pack so commit ids
+     * survive: how a forked project's trunk starts. Answers the commit. The
+     * pack is fetched once and sent with no old value, so a main that exists
+     * is never moved: a trunk that has one is a retry, and its main is
+     * answered as it is, whatever the source's has moved to since. A source
+     * that is gone is RepoNotFound. A history over the receive-pack cap is
+     * PackTooLarge with nothing sent, and its `bytes` are what had been read
+     * when the read stopped, not what the history weighs.
+     */
+    readonly take: (source: RepoRef) => Effect.Effect<CommitSha, RepoNotFound | PackTooLarge>;
+    /**
      * Moves trunk's main `from → to`, `from` being the WAL's old value, sent
      * explicitly whatever trunk's head reads now. `to` is a commit in staging
      * (a verified candidate), carried byte for byte. PushRejected: trunk no

@@ -14,6 +14,7 @@ import {
   pushPromotion,
   resumeTrunk,
   seedTrunk,
+  takeTrunk,
   syncMirror,
   syncTrunk,
   trunkDestroyed,
@@ -40,6 +41,7 @@ import {
   CodeHost,
   EntityStore,
   EventOutbox,
+  ImportTooLarge,
   OrgUsage,
   RELAY_PACK_CAP_BYTES,
 } from "@keeltown/core/ports";
@@ -62,6 +64,8 @@ const seed = process.env["FC_SEED"];
 fc.configureGlobal({ numRuns: 50, ...(seed === undefined ? {} : { seed: Number(seed) }) });
 
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
+/** Another project, whose trunk a fork takes its history from. */
+const PARENT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZY");
 /** Whoever releases a freeze: a person, as a command names one. */
 const RELEASER = userActor(makeId("usr", "01J9ZZZZZZZZZZZZZZZZZZZZZZ"));
 const ORG: NamespaceId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
@@ -325,6 +329,38 @@ describe("the Trunk's first write", () => {
         const said = yield* defectOf(seedTrunk(PROJECT, "other", Instant(1)));
         expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: seed`);
         expect(w.writer.seeds()).toEqual([{ name: "keel", at }]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.take] before trunk has a head the writer takes the history of the source project's trunk and its head is answered; a source that is gone is RepoNotFound, and one over what one relay carries ImportTooLarge naming this project; once trunk is initialized the ask is a defect and the writer is not reached",
+    () => {
+      const w = ports();
+      const source = projectRepos(PARENT).trunk;
+      const forked: TrunkOrigin = { kind: "forked", project: PARENT, commit: sha("b") };
+      return Effect.gen(function* () {
+        const gone = yield* Effect.flip(takeTrunk(PROJECT, PARENT));
+        expect(gone).toMatchObject({ _tag: "RepoNotFound", repo: source });
+        w.writer.offers(source, sha("b"), RELAY_PACK_CAP_BYTES + 1);
+        const large = yield* Effect.flip(takeTrunk(PROJECT, PARENT));
+        expect(large).toEqual(
+          new ImportTooLarge({
+            projectId: PROJECT,
+            bytes: RELAY_PACK_CAP_BYTES + 1,
+            limit: RELAY_PACK_CAP_BYTES,
+          }),
+        );
+        expect(w.writer.taken()).toEqual([]);
+        expect(w.writer.head()).toBe(sha("a"));
+        // A history of exactly what one relay carries is taken.
+        w.writer.offers(source, sha("b"), RELAY_PACK_CAP_BYTES);
+        expect(yield* takeTrunk(PROJECT, PARENT)).toBe(sha("b"));
+        expect(w.writer.taken()).toEqual([source]);
+        yield* initializeTrunk(PROJECT, sha("b"), "seed", forked);
+        const said = yield* defectOf(takeTrunk(PROJECT, PARENT));
+        expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: take`);
+        expect(w.writer.taken()).toEqual([source]);
       }).pipe(Effect.provide(w.layer));
     },
   );

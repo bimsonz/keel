@@ -331,6 +331,26 @@ export const seedTrunk = Effect.fn("integration/seedTrunk")(function* (
 });
 
 /**
+ * Brings an empty trunk the whole history of its source project's trunk and
+ * answers the head it now has: a fork's start. A source over what one relay
+ * carries is refused as an import of that size is. A defect once trunk is
+ * initialized.
+ */
+export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
+  projectId: ProjectId,
+  source: ProjectId,
+) {
+  yield* beforeItsHead(projectId, "take");
+  return yield* (yield* TrunkWriter)
+    .take(projectRepos(source).trunk)
+    .pipe(
+      Effect.catchTag("PackTooLarge", (large) =>
+        Effect.fail(new ImportTooLarge({ projectId, bytes: large.bytes, limit: large.limit })),
+      ),
+    );
+});
+
+/**
  * Copies trunk's head into the project's staging and mirror, off the
  * promotion path: a lagging mirror is safe (a change's base is its
  * workspace's head), and trunk never waits on or fails by it. Idempotent.

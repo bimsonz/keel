@@ -30,6 +30,8 @@ import { gitServer, PACK, type Reply } from "./git-server.ts";
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const TRUNK: RepoRef = { namespace: "memory", name: "prj" };
 const STAGING: RepoRef = { namespace: "memory", name: "prj-staging" };
+/** Another project's trunk: what a fork takes its history from. */
+const SOURCE: RepoRef = { namespace: "memory", name: "src" };
 const FROM = sha("a");
 const TO = sha("b");
 const MAIN = "refs/heads/main";
@@ -387,10 +389,10 @@ describe("StagingWriter.fastForward", () => {
 });
 
 /** An empty trunk in memory, its writer signing with a fresh key, and the recording server its pushes reach. */
-const emptyTrunk = (replies: Reply[]) =>
+const emptyTrunk = (replies: Reply[], pack?: Uint8Array) =>
   Effect.gen(function* () {
     const keys = yield* Effect.promise(() => makeCommitSigningKeys());
-    const server = gitServer(replies);
+    const server = gitServer(replies, pack);
     vi.stubGlobal("fetch", server.fetch);
     const code = makeCodeHostMemory();
     yield* Effect.flatMap(CodeHost, (h) => h.create(TRUNK)).pipe(Effect.provide(code.layer));
@@ -402,7 +404,12 @@ const emptyTrunk = (replies: Reply[]) =>
     const setMain = (to: CommitSha) => {
       code.repos.get("memory/prj")?.refs.set(MAIN, to);
     };
-    return { keys, server, layer, setMain };
+    /** The source repo with one commit on main, which is answered. */
+    const sourced = Effect.gen(function* () {
+      yield* (yield* CodeHost).create(SOURCE);
+      return yield* code.fixture.commit(SOURCE, MAIN, { "README.md": "the source\n" });
+    }).pipe(Effect.provide(code.layer));
+    return { keys, server, layer, setMain, sourced };
   });
 
 /** Keel's first commit for `name` at `at`, built here from the key itself. */
@@ -509,6 +516,81 @@ describe("TrunkWriter.seed and adopt", () => {
           "trunk already has a main, at another commit",
         );
         expect(server.requests).toHaveLength(2);
+      }),
+  );
+});
+
+describe("TrunkWriter.take", () => {
+  const take = Effect.flatMap(TrunkWriter, (w) => w.take(SOURCE));
+
+  it.effect(
+    "[trunkwriter.take] brings an empty trunk its source's whole history: one pack asked of the source at its head with no have, pushed to trunk with no old value, and the head answered",
+    () =>
+      Effect.gen(function* () {
+        const { server, layer, sourced } = yield* emptyTrunk(["ok"]);
+        const tip = yield* sourced;
+        expect(yield* take.pipe(Effect.provide(layer))).toBe(tip);
+        expect(
+          server.requests.map(({ auth, ...r }) => ({ ...r, auth: auth?.replace(/_\d+$/, "") })),
+        ).toEqual([
+          {
+            service: "upload-pack",
+            repo: "memory/src.git",
+            auth: "Bearer memrepo_read_memory/src",
+            lines: [expect.stringMatching(new RegExp(`^want ${tip} `)), "done"],
+          },
+          {
+            service: "receive-pack",
+            repo: "memory/prj.git",
+            auth: "Bearer memrepo_write_memory/prj",
+            lines: [`${ZERO_OID} ${tip} ${MAIN}`],
+          },
+        ]);
+        expect(server.received).toEqual([PACK.length]);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.take-keeps-main] a trunk that has a main is a retry: nothing is asked of the source or sent, and its main is answered though the source is elsewhere; a push refused because a racing attempt made main first answers what trunk then holds",
+    () =>
+      Effect.gen(function* () {
+        const { server, layer, setMain, sourced } = yield* emptyTrunk(["stale"]);
+        const tip = yield* sourced;
+        // The racing attempt lands as ours is pushed: ours is refused, and trunk holds the racer's.
+        vi.stubGlobal("fetch", (...asked: Parameters<typeof server.fetch>) => {
+          const [input] = asked;
+          const url =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+          if (url.endsWith("/git-receive-pack")) setMain(TO);
+          return server.fetch(...asked);
+        });
+        expect(yield* take.pipe(Effect.provide(layer))).toBe(TO);
+        expect(server.requests.map((r) => r.service)).toEqual(["upload-pack", "receive-pack"]);
+        // From here trunk has its main: a retry asks nothing and answers it.
+        expect(TO).not.toBe(tip);
+        expect(yield* take.pipe(Effect.provide(layer))).toBe(TO);
+        expect(server.requests).toHaveLength(2);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.take-refused] a source over the receive-pack cap is PackTooLarge naming the source, with nothing sent to trunk; a source that is gone is RepoNotFound, with nothing asked",
+    () =>
+      Effect.gen(function* () {
+        const big = new Uint8Array(61 * 1024 * 1024);
+        big.set(PACK);
+        const { server, layer, sourced } = yield* emptyTrunk(["ok"], big);
+        const gone = yield* Effect.flip(take.pipe(Effect.provide(layer)));
+        expect(gone).toMatchObject({ _tag: "RepoNotFound", repo: SOURCE });
+        expect(server.requests).toEqual([]);
+        yield* sourced;
+        const large = yield* Effect.flip(take.pipe(Effect.provide(layer)));
+        expect(large).toMatchObject({
+          _tag: "PackTooLarge",
+          repo: SOURCE,
+          limit: RELAY_PACK_CAP_BYTES,
+        });
+        expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
       }),
   );
 });

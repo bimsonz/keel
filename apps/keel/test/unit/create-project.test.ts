@@ -4,6 +4,7 @@ import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
   AgentId,
   agentActor,
+  type CommitSha,
   type Instant,
   ProjectId,
   RunRef,
@@ -31,6 +32,7 @@ import { Effect, Exit, Layer, Schema } from "effect";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const parentId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+const goneId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V2");
 const creator = Schema.decodeUnknownSync(UserId)("usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const SOURCE = { namespace: "keel-core", name: "seed-app" };
 const TEMPLATE: ProjectSource = { _tag: "Template", repo: SOURCE.name };
@@ -41,24 +43,55 @@ const POOL_TARGET = 2;
  * A Project DO's state in memory, beside a code host holding the source, a
  * trunk and a pool that journal their calls. The memory trunk's first writes
  * land in the memory code host, as the real writer's land in trunk's repo:
- * an adopt makes main there, and a seed commits a README. `loseSeedOnce`
- * makes the first seed die before it writes, as a push whose answer and
- * effect were both lost.
+ * an adopt makes main there, a seed commits a README, and a take brings the
+ * source trunk's objects and makes main at its head (the memory trunks do
+ * that themselves, given the host). `loseSeedOnce` makes
+ * the first seed die before it writes, as a push whose answer and effect
+ * were both lost, and `loseTakeOnce` the first take. `hostCalls` is every
+ * repo the code host was asked to make or delete, and how.
  */
 function bootstrap(
-  options: { readonly failSyncOnce?: boolean; readonly loseSeedOnce?: boolean } = {},
+  options: {
+    readonly failSyncOnce?: boolean;
+    readonly loseSeedOnce?: boolean;
+    readonly loseTakeOnce?: boolean;
+  } = {},
 ) {
   const journal: string[] = [];
   const code = makeCodeHostMemory();
+  const hostCalls: string[] = [];
+  const host = Layer.effect(
+    CodeHost,
+    Effect.map(CodeHost, (inner) =>
+      CodeHost.of({
+        ...inner,
+        create: (repo) => {
+          hostCalls.push(`create ${nameOf(repo)}`);
+          return inner.create(repo);
+        },
+        fork: (source, target) => {
+          hostCalls.push(`fork ${nameOf(source)} as ${nameOf(target)}`);
+          return inner.fork(source, target);
+        },
+        delete: (repo) => {
+          hostCalls.push(`delete ${nameOf(repo)}`);
+          return inner.delete(repo);
+        },
+      }),
+    ),
+  ).pipe(Layer.provide(code.layer));
   const clock = makeManualClock();
   const memory = makeTrunksMemory({
     journal,
+    host: code,
     ...(options.failSyncOnce === undefined ? {} : { failSyncOnce: options.failSyncOnce }),
   });
   const pool = makeWorkspacePoolMemory({ journal });
   const seedsAsked: { readonly name: string; readonly at: Instant }[] = [];
   let seedsToLose = options.loseSeedOnce === true ? 1 : 0;
-  const refsOf = (repo: RepoRef) => code.repos.get(`${repo.namespace}/${repo.name}`)?.refs;
+  const takesAsked: ProjectId[] = [];
+  let takesToLose = options.loseTakeOnce === true ? 1 : 0;
+  const refsOf = (repo: RepoRef) => code.repos.get(nameOf(repo))?.refs;
   const trunks = Layer.effect(
     Trunks,
     Effect.map(Trunks, (inner) =>
@@ -84,18 +117,53 @@ function bootstrap(
                 Effect.orDie,
               );
           }),
+        take: (id, source) =>
+          Effect.suspend(() => {
+            takesAsked.push(source);
+            if (takesToLose > 0) {
+              takesToLose -= 1;
+              return Effect.die(new Error("the take's relay was lost"));
+            }
+            return inner.take(id, source);
+          }),
       }),
     ),
   ).pipe(Layer.provide(memory.layer));
   const layer = Layer.mergeAll(
     makeEventOutboxMemory().layer,
     clock.layer,
-    code.layer,
+    host,
+    Layer.succeed(CodeHostFixture, code.fixture),
     trunks,
     pool.layer,
   );
-  return { journal, code, clock, trunks: memory, pool, seedsAsked, layer };
+  return {
+    journal,
+    code,
+    hostCalls,
+    clock,
+    trunks: memory,
+    pool,
+    seedsAsked,
+    takesAsked,
+    layer,
+  };
 }
+
+/** A repo as the journal of the code host's calls names it. */
+function nameOf(repo: RepoRef) {
+  return `${repo.namespace}/${repo.name}`;
+}
+
+/** The project a fork names: its trunk's repo with one commit on main, and its trunk initialized there. */
+const parentProject = (trunks: { readonly heads: Map<ProjectId, CommitSha> }) =>
+  Effect.gen(function* () {
+    const parent = projectRepos(parentId).trunk;
+    yield* (yield* CodeHost).create(parent);
+    const head = yield* (yield* CodeHostFixture).commit(parent, MAIN, { "README.md": "parent" });
+    trunks.heads.set(parentId, head);
+    return head;
+  });
 
 const creating = (
   idempotencyKey = "create-1",
@@ -113,6 +181,12 @@ const creating = (
 
 /** A project started as `source`, under the first key. */
 const starting = (source: ProjectSource) => creating("create-1", "body-1", source);
+
+const createProjectOf = (source: ProjectSource) =>
+  Effect.suspend(() => createProject(starting(source), POOL_TARGET));
+
+/** The project, started as a fork of the parent. */
+const forking = createProjectOf({ _tag: "Project", projectId: parentId });
 
 /** Whether the code host holds the repo. */
 const held = (repo: RepoRef) =>
@@ -274,12 +348,8 @@ describe("createProject by start", () => {
     () => {
       const { trunks, layer } = bootstrap();
       return Effect.gen(function* () {
-        const parent = projectRepos(parentId).trunk;
-        yield* (yield* CodeHost).create(parent);
-        const head = yield* (yield* CodeHostFixture).commit(parent, MAIN, {
-          "README.md": "parent",
-        });
-        yield* createProject(starting({ _tag: "Project", projectId: parentId }), POOL_TARGET);
+        const head = yield* parentProject(trunks);
+        yield* forking;
         expect(yield* (yield* CodeHost).head(projectRepos(projectId).trunk, MAIN)).toBe(head);
         expect(trunks.heads.get(projectId)).toBe(head);
         expect(trunks.origins.get(projectId)).toEqual({
@@ -287,6 +357,116 @@ describe("createProject by start", () => {
           project: parentId,
           commit: head,
         });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[create.fork-relays] a fork's trunk is created empty and takes the source trunk's history once, through its own writer: the code host is never asked to fork the source, and trunk starts at the source's head",
+    () => {
+      const { journal, hostCalls, trunks, takesAsked, layer } = bootstrap();
+      return Effect.gen(function* () {
+        const head = yield* parentProject(trunks);
+        hostCalls.length = 0;
+        yield* forking;
+        const repos = projectRepos(projectId);
+        // Staging is still a fork of trunk: it is only ever asked past a have.
+        expect(hostCalls).toEqual([
+          `create ${nameOf(repos.trunk)}`,
+          `fork ${nameOf(repos.trunk)} as ${nameOf(repos.staging)}`,
+          `create ${nameOf(repos.mirror)}`,
+        ]);
+        expect(takesAsked).toEqual([parentId]);
+        expect(trunks.taken.get(projectId)).toBe(parentId);
+        expect(journal).toEqual([
+          `take ${projectId}`,
+          `initialize ${projectId}`,
+          `sync ${projectId}`,
+          `configure ${projectId}`,
+        ]);
+        const host = yield* CodeHost;
+        expect(yield* host.head(repos.trunk, MAIN)).toBe(head);
+        expect(yield* host.head(repos.staging, MAIN)).toBe(head);
+        expect(trunks.heads.get(projectId)).toBe(head);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[create.fork-retry] a retry after trunk's repo was made and before its history came takes it then; a retry after it came takes nothing, and trunk stays where it started though the source has moved on",
+    () => {
+      const { hostCalls, trunks, takesAsked, layer } = bootstrap({
+        loseTakeOnce: true,
+        failSyncOnce: true,
+      });
+      return Effect.gen(function* () {
+        const head = yield* parentProject(trunks);
+        const repos = projectRepos(projectId);
+        const host = yield* CodeHost;
+        // The relay is lost: trunk's repo is there, with no main.
+        const lost = yield* Effect.exit(forking);
+        expect(Exit.isFailure(lost)).toBe(true);
+        expect(yield* held(repos.trunk)).toBe(true);
+        expect(yield* host.branches(repos.trunk)).toEqual([]);
+        // The retry makes no second repo and takes the history; then its sync crashes.
+        hostCalls.length = 0;
+        const crashed = yield* Effect.exit(forking);
+        expect(Exit.isFailure(crashed)).toBe(true);
+        expect(takesAsked).toEqual([parentId, parentId]);
+        expect(hostCalls).not.toContain(`create ${nameOf(repos.trunk)}`);
+        expect(yield* host.head(repos.trunk, MAIN)).toBe(head);
+        // The source moves on: the next retry takes nothing, and the fork starts where it first did.
+        const later = yield* (yield* CodeHostFixture).commit(projectRepos(parentId).trunk, MAIN, {
+          "README.md": "parent, later",
+        });
+        trunks.heads.set(parentId, later);
+        const project = yield* forking;
+        expect(project.id).toBe(projectId);
+        expect(takesAsked).toEqual([parentId, parentId]);
+        expect(yield* host.head(repos.trunk, MAIN)).toBe(head);
+        expect(trunks.heads.get(projectId)).toBe(head);
+        expect(trunks.origins.get(projectId)).toEqual({
+          kind: "forked",
+          project: parentId,
+          commit: head,
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[create.fork-refused] a fork of a project over what one relay carries is refused as an import of that size is, and one of a project that is gone as the host said it: the empty trunk is deleted, and there is no staging, no mirror, no trunk, no pool and no project",
+    () => {
+      const { journal, hostCalls, trunks, pool, layer } = bootstrap();
+      return Effect.gen(function* () {
+        yield* parentProject(trunks);
+        trunks.outgrow(parentId);
+        const repos = projectRepos(projectId);
+        const tooLarge = yield* Effect.flip(forking);
+        expect(tooLarge).toEqual(
+          new ImportTooLarge({
+            projectId,
+            bytes: RELAY_PACK_CAP_BYTES + 1,
+            limit: RELAY_PACK_CAP_BYTES,
+          }),
+        );
+        const gone = yield* Effect.flip(createProjectOf({ _tag: "Project", projectId: goneId }));
+        expect(gone).toMatchObject({ _tag: "RepoNotFound", repo: projectRepos(goneId).trunk });
+        expect(hostCalls.filter((call) => call.endsWith(nameOf(repos.trunk)))).toEqual([
+          `create ${nameOf(repos.trunk)}`,
+          `delete ${nameOf(repos.trunk)}`,
+          `create ${nameOf(repos.trunk)}`,
+          `delete ${nameOf(repos.trunk)}`,
+        ]);
+        expect([
+          yield* held(repos.trunk),
+          yield* held(repos.staging),
+          yield* held(repos.mirror),
+        ]).toEqual([false, false, false]);
+        expect(trunks.heads.has(projectId)).toBe(false);
+        expect(journal).toEqual([]);
+        expect(pool.configured.size).toBe(0);
+        expect(yield* projectEvents).toEqual([]);
       }).pipe(Effect.provide(layer));
     },
   );

@@ -1,4 +1,4 @@
-import { mainLane } from "@keeltown/core/application/integration";
+import { mainLane, projectRepos } from "@keeltown/core/application/integration";
 import {
   CompositionRefused,
   type PromotionState,
@@ -20,12 +20,13 @@ import {
   BatchVerification,
   BundleRefused,
   CandidateBundles,
-  type ImportTooLarge,
+  ImportTooLarge,
   CandidateComposer,
   type CandidateRequest,
   Lanes,
   PackTooLarge,
   RELAY_PACK_CAP_BYTES,
+  RepoNotFound,
   type RepoRef,
   StagingWriter,
   type SyncOutcome,
@@ -110,13 +111,15 @@ export const MEMORY_SEED = Schema.decodeUnknownSync(CommitSha)("5eed".repeat(10)
 
 /**
  * One head. A push from anything but the head is refused, as a fenced writer
- * must refuse it. `adopt` and `seed` set the head and are recorded. `sync` copies the head into each target's main, which
+ * must refuse it. `adopt`, `seed` and `take` set the head and are recorded. `sync` copies the head into each target's main, which
  * `synced` reads back (undefined: never synced).
  */
 export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
   const adopted: CommitSha[] = [];
   const seeds: { readonly name: string; readonly at: Instant }[] = [];
+  const sources = new Map<string, { readonly commit: CommitSha; readonly bytes: number }>();
+  const taken: RepoRef[] = [];
   let dropping = 0;
   const weights = new Map<CommitSha, number>();
   const histories = new Map<CommitSha, number>();
@@ -129,6 +132,17 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     adopted: (): readonly CommitSha[] => [...adopted],
     /** Every first commit asked for with `seed`, in order; each answered `MEMORY_SEED`. */
     seeds: (): readonly { readonly name: string; readonly at: Instant }[] => [...seeds],
+    /**
+     * `source` is a repo whose main is at `commit` and whose whole history
+     * weighs `bytes` (an empty pack's 32 when not said): what `take` relays
+     * from it. Over the receive-pack cap the take is PackTooLarge and moves
+     * nothing; a source never offered is RepoNotFound.
+     */
+    offers: (source: RepoRef, commit: CommitSha, bytes: number = EMPTY_PACK_BYTES) => {
+      sources.set(repoKey(source), { commit, bytes });
+    },
+    /** Every source whose history `take` brought in, in order. */
+    taken: (): readonly RepoRef[] => [...taken],
     synced: (repo: RepoRef) => targets.get(repoKey(repo)),
     /** Every push that was sent (its pack under the cap and admitted), in order, whatever came of it. */
     pushes: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...pushes],
@@ -169,6 +183,16 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             seeds.push({ name, at });
             current = MEMORY_SEED;
             return MEMORY_SEED;
+          }),
+        take: (source) =>
+          Effect.suspend((): Effect.Effect<CommitSha, RepoNotFound | PackTooLarge> => {
+            const offered = sources.get(repoKey(source));
+            if (offered === undefined) return Effect.fail(new RepoNotFound({ repo: source }));
+            if (offered.bytes > RECEIVE_PACK_CAP_BYTES)
+              return Effect.fail(overTheCap(offered.bytes));
+            taken.push(source);
+            current = offered.commit;
+            return Effect.succeed(offered.commit);
           }),
         push: (from, to, admit) =>
           Effect.gen(function* () {
@@ -257,16 +281,27 @@ const afterItsHead = (projectId: ProjectId, write: string) =>
  * who destroyed it. `journal` records each call in order beside other
  * adapters'; `failSyncOnce` makes the first sync die, as a crash
  * mid-bootstrap would. A trunk is shown idle and moved when it was
- * initialized, until `advance` or `stand` says otherwise.
+ * initialized, until `advance` or `stand` says otherwise. A `take` answers
+ * the head the source's trunk has here; given a memory code host as `host`
+ * it relays there as the real writer does instead, and answers the main the
+ * source's repo holds.
  */
 export function makeTrunksMemory(
-  options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
+  options: {
+    readonly journal?: string[];
+    readonly failSyncOnce?: boolean;
+    readonly host?: {
+      readonly relayMain: (source: RepoRef, target: RepoRef) => CommitSha | undefined;
+    };
+  } = {},
 ) {
   const heads = new Map<ProjectId, CommitSha>();
   const origins = new Map<ProjectId, TrunkOrigin>();
   const refusals = new Map<ProjectId, QuotaExceeded | ImportTooLarge>();
   const adopted = new Map<ProjectId, CommitSha>();
   const seeded = new Map<ProjectId, { readonly name: string; readonly at: Instant }>();
+  const taken = new Map<ProjectId, ProjectId>();
+  const overCap = new Set<ProjectId>();
   const syncs = new Map<ProjectId, number>();
   const destroyed = new Map<ProjectId, string>();
   const standings = new Map<
@@ -299,6 +334,12 @@ export function makeTrunksMemory(
     adopted,
     /** What each project's first commit was asked to be made of with `seed`; each answered `MEMORY_SEED`. */
     seeded,
+    /** The project each trunk took its history from with `take`: its source's head here is what it answered. */
+    taken,
+    /** `source`'s history is over what one relay carries from here on: a `take` from it is ImportTooLarge. */
+    outgrow: (source: ProjectId) => {
+      overCap.add(source);
+    },
     syncs,
     destroyed,
     layer: Layer.succeed(
@@ -342,6 +383,27 @@ export function makeTrunksMemory(
             seeded.set(projectId, { name, at });
             options.journal?.push(`seed ${projectId}`);
             return Effect.succeed(MEMORY_SEED);
+          }),
+        take: (projectId, source) =>
+          Effect.suspend((): Effect.Effect<CommitSha, RepoNotFound | ImportTooLarge> => {
+            if (heads.has(projectId)) return afterItsHead(projectId, "take");
+            const from = projectRepos(source).trunk;
+            if (overCap.has(source))
+              return Effect.fail(
+                new ImportTooLarge({
+                  projectId,
+                  bytes: RELAY_PACK_CAP_BYTES + 1,
+                  limit: RELAY_PACK_CAP_BYTES,
+                }),
+              );
+            const head =
+              options.host === undefined
+                ? heads.get(source)
+                : options.host.relayMain(from, projectRepos(projectId).trunk);
+            if (head === undefined) return Effect.fail(new RepoNotFound({ repo: from }));
+            taken.set(projectId, source);
+            options.journal?.push(`take ${projectId}`);
+            return Effect.succeed(head);
           }),
         origin: (projectId) => Effect.sync(() => Option.fromUndefinedOr(origins.get(projectId))),
         head: (projectId) =>

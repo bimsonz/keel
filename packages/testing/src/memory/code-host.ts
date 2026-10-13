@@ -367,6 +367,21 @@ export function makeCodeHostMemory() {
     repos,
     upstreams,
     fixture,
+    /**
+     * What a relay of `source`'s main into `target` leaves there: the
+     * source's objects, and main at the source's. Answers that commit, or
+     * nothing (and does nothing) when the host holds no such source, no main
+     * in it, or no such target.
+     */
+    relayMain: (source: RepoRef, target: RepoRef): CommitSha | undefined => {
+      const from = repos.get(repoKey(source));
+      const to = repos.get(repoKey(target));
+      const head = from?.refs.get("refs/heads/main");
+      if (from === undefined || to === undefined || head === undefined) return undefined;
+      for (const [oid, held] of from.objects) to.objects.set(oid, held);
+      to.refs.set("refs/heads/main", head);
+      return head;
+    },
     layer: Layer.mergeAll(Layer.succeed(CodeHost, host), Layer.succeed(CodeHostFixture, fixture)),
   };
 }

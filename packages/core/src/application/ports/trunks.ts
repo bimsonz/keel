@@ -6,11 +6,14 @@ import type {
   TrunkOrigin,
 } from "../../domain/integration/index.ts";
 import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
+import type { RepoNotFound } from "./code-host.ts";
 
 /**
- * An imported history too large to become a project: its one pack is over
- * what a relay carries (`limit`), so staging and the mirror could never be
- * brought to trunk's head. Trunk was given no head.
+ * A history too large to start a project from, imported or forked: its one
+ * pack is over what a relay carries (`limit`), so staging and the mirror
+ * could never be brought to trunk's head. Trunk was given no head. An
+ * import's `bytes` are what its history weighs; a fork's are what the relay
+ * had read of its source when it stopped, which is only known to be over.
  */
 export class ImportTooLarge extends Schema.TaggedError<ImportTooLarge>()("ImportTooLarge", {
   projectId: Schema.String,
@@ -73,6 +76,20 @@ export class Trunks extends Context.Service<
      * is already initialized it is a defect, and nothing is written.
      */
     readonly seed: (projectId: ProjectId, name: string, at: Instant) => Effect.Effect<CommitSha>;
+    /**
+     * Brings an empty trunk the whole history of `source`'s trunk and makes
+     * main at its head, through the trunk's one writer (`TrunkWriter.take`),
+     * and answers that head: how a fork starts. A trunk that already has a
+     * main answers it and takes nothing. A source with no trunk repo is
+     * RepoNotFound, and one whose history is over what one relay carries
+     * ImportTooLarge, as an import of that size is: either way nothing was
+     * written. A first write: asked of a trunk that is already initialized it
+     * is a defect.
+     */
+    readonly take: (
+      projectId: ProjectId,
+      source: ProjectId,
+    ) => Effect.Effect<CommitSha, RepoNotFound | ImportTooLarge>;
     /**
      * Trunk's head as its Trunk DO records it: what the Lane composes onto,
      * never a ref read that may lag or lead it. Dies for a trunk not yet
