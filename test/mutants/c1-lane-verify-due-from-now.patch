@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.verification-due
+# why: The budget is counted from whenever it is asked, so arming it after every step postpones it for ever
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..b934a9b 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1276,7 +1276,8 @@ const verifying = (store: Store, outbox: (typeof EventOutbox)["Service"], laneId
+  * it.
+  */
+ export const verificationDue = Effect.fn("integration/verificationDue")(function* (laneId: string) {
+-  return verifying(yield* EntityStore, yield* EventOutbox, laneId)?.due;
++  const found = verifying(yield* EntityStore, yield* EventOutbox, laneId);
++  return found === undefined ? undefined : (yield* (yield* Clock).now) + VERIFY_BUDGET_MS;
+ });
+ 
+ /** What a look at the verifying batch's instance came to. */

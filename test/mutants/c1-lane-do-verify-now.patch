@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts
+# kills: lane.do.verify-armed
+# why: The deadline is armed for now instead of the end of the budget, so every verifying batch is looked at in a loop
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 9fac126..879e5d0 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -176,7 +176,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+   private async armVerification(): Promise<void> {
+     const due = await this.runtime.runPromise(verificationDue(this.laneId));
+     if (due === undefined || due <= Date.now()) await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+-    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_VERIFY, at: due });
++    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_VERIFY, at: Date.now() + 1000 });
+   }
+ 
+   /** Arms the step: a debounce, so a burst of deliveries runs it once. */

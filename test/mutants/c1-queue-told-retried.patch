@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workflow-events.test.ts
+# kills: queue.instance-ended, queue.instance-ended-retry
+# why: A report passed to its lane is retried, and is delivered until the queue gives up
+diff --git a/apps/keel/src/adapters/driving/queue/consumer.ts b/apps/keel/src/adapters/driving/queue/consumer.ts
+index 60868a1..b18618d 100644
+--- a/apps/keel/src/adapters/driving/queue/consumer.ts
++++ b/apps/keel/src/adapters/driving/queue/consumer.ts
+@@ -27,7 +27,7 @@ export function consumeQueue(
+         return Effect.map(Effect.exit(instanceEnded(ended.instanceId)), (told) => {
+           if (Exit.isSuccess(told)) {
+             console.log(`instance ${ended.instanceId} ended: its lane was ${told.value}`);
+-            message.ack();
++            message.retry();
+             return;
+           }
+           console.warn(

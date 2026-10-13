@@ -1,14 +1,14 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/bindings.test.ts -t Queue
 diff --git a/apps/keel/src/adapters/driving/queue/consumer.ts b/apps/keel/src/adapters/driving/queue/consumer.ts
-index 08c0d94..4427d65 100644
+index 60868a1..fea5be9 100644
 --- a/apps/keel/src/adapters/driving/queue/consumer.ts
 +++ b/apps/keel/src/adapters/driving/queue/consumer.ts
-@@ -12,7 +12,7 @@ export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.Man
-       (message) =>
-         Effect.sync(() => {
-           console.log("job", batch.queue, message.id);
--          message.ack();
-+          message.retry();
-         }),
-       { concurrency: 8, discard: true },
-     ),
+@@ -22,7 +22,7 @@ export function consumeQueue(
+         if (ended === null)
+           return Effect.sync(() => {
+             console.log("job", batch.queue, message.id);
+-            message.ack();
++            message.retry();
+           });
+         return Effect.map(Effect.exit(instanceEnded(ended.instanceId)), (told) => {
+           if (Exit.isSuccess(told)) {

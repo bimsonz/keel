@@ -23,6 +23,7 @@ import {
   type SyncOutcome,
   TrunkWriter,
   Trunks,
+  type InstanceStanding,
   type VerificationJob,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -277,11 +278,17 @@ export function makeTrunksMemory(
   };
 }
 
-/** Who destroyed each project's lanes. `journal` records each call in order beside other adapters'. */
+/**
+ * Who destroyed each project's lanes, and each report that a lane's KeelVerify
+ * instance ended. `journal` records each destroy in order beside other
+ * adapters'.
+ */
 export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
   const destroyed = new Map<ProjectId, string>();
+  const ended: { readonly laneId: string; readonly instanceId: string }[] = [];
   return {
     destroyed,
+    ended,
     layer: Layer.succeed(
       Lanes,
       Lanes.of({
@@ -289,6 +296,10 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
           Effect.sync(() => {
             if (!destroyed.has(projectId)) destroyed.set(projectId, by);
             options.journal?.push(`destroy lanes ${projectId}`);
+          }),
+        verificationEnded: (laneId, instanceId) =>
+          Effect.sync(() => {
+            ended.push({ laneId, instanceId });
           }),
       }),
     ),
@@ -330,17 +341,46 @@ export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly
   };
 }
 
-/** KeelVerify's starts, by instance id; starting an id again starts nothing new. */
+/**
+ * KeelVerify's starts, by instance id; starting an id again starts nothing
+ * new. A started instance stands Running until `end` says how it ended, one
+ * never started is `missing`, and `stopped` lists the instances stopped while
+ * they ran, in order: each then stands terminated. `looked` lists every
+ * instance whose standing was read.
+ */
 export function makeBatchVerificationMemory() {
   const started = new Map<string, VerificationJob>();
+  const ended = new Map<string, InstanceStanding>();
+  const stopped: string[] = [];
+  const looked: string[] = [];
+  const standingOf = (instanceId: string): InstanceStanding =>
+    ended.get(instanceId) ??
+    (started.has(instanceId) ? { _tag: "Running" } : { _tag: "Failed", status: "missing" });
   return {
     started,
+    stopped,
+    looked,
+    /** Ends an instance as the platform would report it from here on. */
+    end: (instanceId: string, standing: InstanceStanding) => {
+      ended.set(instanceId, standing);
+    },
     layer: Layer.succeed(
       BatchVerification,
       BatchVerification.of({
         start: (instanceId, job) =>
           Effect.sync(() => {
             if (!started.has(instanceId)) started.set(instanceId, job);
+          }),
+        standing: (instanceId) =>
+          Effect.sync(() => {
+            looked.push(instanceId);
+            return standingOf(instanceId);
+          }),
+        stop: (instanceId) =>
+          Effect.sync(() => {
+            if (standingOf(instanceId)._tag !== "Running") return;
+            stopped.push(instanceId);
+            ended.set(instanceId, { _tag: "Failed", status: "terminated" });
           }),
       }),
     ),

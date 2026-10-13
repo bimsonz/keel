@@ -21,7 +21,9 @@ import {
   evolveCandidate,
   isCandidateTerminal,
   PromotionDeclined,
+  ResultFenced,
   TrunkAdvanced,
+  VerificationStarted,
 } from "../../domain/integration/index.ts";
 import {
   BatchId,
@@ -50,6 +52,7 @@ import {
   type EventDraft,
   EventOutbox,
   Ids,
+  Lanes,
   Projects,
   REDELIVERY_CAP_MS,
   type RepoRef,
@@ -242,6 +245,7 @@ const decodeParked = Schema.decodeUnknownSync(ChangeParked);
 const decodeResumed = Schema.decodeUnknownSync(ChangeResumed);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
 const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
+const decodeStarted = Schema.decodeUnknownSync(VerificationStarted);
 const decodeEnded = Schema.decodeUnknownSync(
   Schema.Union([ChangeWithdrawn, ChangeSuperseded, ChangeBounced]),
 );
@@ -351,6 +355,16 @@ const formedOf = (outbox: (typeof EventOutbox)["Service"], batchId: BatchId) => 
   const formed = outbox.log(batchRef(batchId)).find((event) => event.type === "BatchFormed");
   if (formed === undefined) throw new Error(`batch ${batchId} has no BatchFormed`);
   return formed;
+};
+
+/** The batch's VerificationStarted, with the KeelVerify instance it named and when; undefined before it. */
+const startedOf = (outbox: (typeof EventOutbox)["Service"], batchId: BatchId) => {
+  const started = outbox
+    .log(batchRef(batchId))
+    .findLast((event) => event.type === "VerificationStarted");
+  return started === undefined
+    ? undefined
+    : { instanceId: decodeStarted(started.payload).instanceId, at: started.at };
 };
 
 /** Writes lane state that carries no event (a step's bookkeeping), on the lane's project. */
@@ -795,8 +809,36 @@ const plannedOf = (active: ActiveBatch) =>
     ? Effect.die(new Error(`batch ${active.batchId} got past composition with no plan`))
     : Effect.succeed(active.planHash);
 
-/** The KeelVerify instance of a batch: named by its BatchFormed, so a retried start starts nothing new. */
-const instanceOf = (formedEventId: string): string => `keel-verify-${formedEventId}`;
+const INSTANCE_PREFIX = "keel-verify-";
+/** What the platform allows in an instance id, and how long one may be. */
+const INSTANCE_NAME = /^[A-Za-z0-9_-]+$/;
+const INSTANCE_ID_MAX = 100;
+
+/**
+ * The KeelVerify instance of a lane's batch,
+ * `keel-verify-<projectId>-<laneName>-<BatchFormed eventId>`. It is named by
+ * the batch's BatchFormed, so a retried start starts nothing new, and by its
+ * lane, because the platform's report that an instance ended carries nothing
+ * but this id. A lane whose name such an id cannot carry is a defect.
+ */
+export const instanceOf = (laneId: string, formedEventId: string): string => {
+  const project = laneProject(laneId);
+  const name = laneId.slice(`lane:${project}:`.length);
+  const id = `${INSTANCE_PREFIX}${project}-${name}-${formedEventId}`;
+  if (!INSTANCE_NAME.test(name) || id.length > INSTANCE_ID_MAX)
+    throw new Error(
+      `lane ${laneId} cannot name a KeelVerify instance: ${id} must be letters, digits, _ and -, and at most ${INSTANCE_ID_MAX} characters`,
+    );
+  return id;
+};
+
+/** The lane a KeelVerify instance verifies for, read from its id; undefined for an id `instanceOf` did not make. */
+export const laneOfInstance = (instanceId: string): string | undefined => {
+  const match = /^keel-verify-([^-]+)-(.+)-([^-]+)$/.exec(instanceId);
+  const [project, name] = [match?.[1], match?.[2]];
+  if (project === undefined || name === undefined) return undefined;
+  return Schema.is(ProjectId)(project) ? `lane:${project}:${name}` : undefined;
+};
 
 /**
  * Commits VerificationStarted, then creates the KeelVerify instance: its
@@ -810,7 +852,7 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
   bundle: ContentHash,
 ) {
   const planHash = yield* plannedOf(active);
-  const instanceId = instanceOf(formedOf(yield* EventOutbox, batch.id).eventId);
+  const instanceId = instanceOf(lane.laneId, formedOf(yield* EventOutbox, batch.id).eventId);
   if (batch.state === "assembled")
     yield* onBatch(lane.laneId, batch.id, `verify:${batch.id}`, (_, now) => ({
       moves: [{ command: { _tag: "StartVerification", instanceId, planHash } }],
@@ -997,9 +1039,10 @@ export type LaneStep = "idle" | "waiting";
 
 /**
  * Drives the lane as far as it can go without a reply from outside: follow
- * trunk, then Form → Compose → Bundle → Verify for the one batch in flight.
- * Every step reads its I/O first and commits after, so a retry resumes where
- * the last commit left the lane.
+ * trunk, then Form → Compose → Bundle → Verify for the one batch in flight,
+ * and one look at a verification that has outrun its budget. Every step
+ * reads its I/O first and commits after, so a retry resumes where the last
+ * commit left the lane.
  */
 export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string) {
   for (;;) {
@@ -1048,6 +1091,10 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
       yield* verifyBatch(lane, active, batch, active.bundle);
       continue;
     }
+    // A verification past its budget gets one look, which settles it: the step then goes on.
+    const due = verifying(store, yield* EventOutbox, laneId)?.due;
+    if (due !== undefined && (yield* (yield* Clock).now) >= due)
+      if ((yield* checkVerification(laneId)) !== "running") continue;
     return "waiting" satisfies LaneStep;
   }
 });
@@ -1074,7 +1121,13 @@ interface Issued {
   readonly exhausted?: string;
 }
 
-const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
+/** What a verdict is issued from: KeelVerify's own, or the Lane's for an instance that will send none. */
+type Verdict = Pick<
+  BatchVerdict,
+  "verdictId" | "outcome" | "planHash" | "evidence" | "failingTests" | "nextActions"
+>;
+
+const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
   const cleared = withoutInfra(lane, batch.members);
   if (verdict.outcome === "land")
     return { outcome: "land", evidence: verdict.evidence, lane: cleared };
@@ -1116,13 +1169,67 @@ const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
 };
 
 /**
- * KeelVerify's verdict on the batch in flight: VerdictIssued, then
- * BatchVerified (a land) or BatchFailed, in one transaction through the
- * Candidate machine, fenced on `(batchId, attempt, chainEpoch)`. Idempotent
- * by the instance (cause `<instanceId>:recordVerdict`). A result for another
- * attempt or epoch is ResultFenced, which is terminal; the third consecutive
- * infra failure of a change bounces it, and is logged at error level. A
- * destroyed lane holds no candidate: its verdict is CandidateNotFound.
+ * Commits a verdict on the verifying batch: VerdictIssued, then BatchVerified
+ * (a land) or BatchFailed, in one transaction through the Candidate machine,
+ * fenced on the batch's attempt and chain epoch. The third consecutive infra
+ * failure of a change bounces it, and is logged at error level.
+ */
+const issue = Effect.fn("integration/issue")(function* (
+  laneId: string,
+  batch: Batch,
+  cause: string,
+  verdict: Verdict,
+  fence: { readonly attempt: number; readonly chainEpoch: number },
+) {
+  // Set inside the transaction when this verdict is the change's last infra failure allowed.
+  let exhausted: string | undefined;
+  const committed = yield* onBatch(laneId, batch.id, cause, (now, lane) => {
+    const issued = issuedFor(verdict, now, lane);
+    exhausted = issued.exhausted;
+    return {
+      moves: [
+        {
+          command:
+            issued.attribution === undefined
+              ? { _tag: "Verified", verdictId: verdict.verdictId, ...fence }
+              : {
+                  _tag: "Failed",
+                  verdictId: verdict.verdictId,
+                  attribution: issued.attribution,
+                  ...fence,
+                },
+          before: [
+            verdictDraft(
+              VerdictIssued.make({
+                verdictId: verdict.verdictId,
+                subject: now.id,
+                outcome: issued.outcome,
+                evidence: issued.evidence,
+                planHash: verdict.planHash,
+                ...(issued.nextActions === undefined ? {} : { nextActions: issued.nextActions }),
+              }),
+              now.members,
+            ),
+          ],
+        },
+      ],
+      lane: (after) =>
+        after.state === "red" ? { ...issued.lane, active: undefined } : issued.lane,
+    };
+  });
+  if (!committed.duplicate && exhausted !== undefined)
+    yield* Effect.logError(`lane ${laneId} bounced ${batch.members.join(", ")} on ${exhausted}`);
+  return committed;
+});
+
+/**
+ * KeelVerify's verdict on the batch in flight, fenced on `(batchId, attempt,
+ * chainEpoch)`. Idempotent by the instance (cause
+ * `<instanceId>:recordVerdict`). A result for another attempt or epoch is
+ * ResultFenced, which is terminal, and so is one for a batch the Lane has
+ * already settled (its instance was given up on at its budget, and the
+ * verdict came after). A destroyed lane holds no candidate: its verdict is
+ * CandidateNotFound.
  */
 export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
   laneId: string,
@@ -1135,52 +1242,124 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
       ? found
       : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
   const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
-  // Set inside the transaction when this verdict is the change's last infra failure allowed.
-  let exhausted: string | undefined;
-  const committed = yield* onBatch(
-    laneId,
-    batch.id,
-    `${verdict.instanceId}:recordVerdict`,
-    (now, lane) => {
-      const issued = issuedFor(verdict, now, lane);
-      exhausted = issued.exhausted;
-      return {
-        moves: [
-          {
-            command:
-              issued.attribution === undefined
-                ? { _tag: "Verified", verdictId: verdict.verdictId, ...fence }
-                : {
-                    _tag: "Failed",
-                    verdictId: verdict.verdictId,
-                    attribution: issued.attribution,
-                    ...fence,
-                  },
-            before: [
-              verdictDraft(
-                VerdictIssued.make({
-                  verdictId: verdict.verdictId,
-                  subject: now.id,
-                  outcome: issued.outcome,
-                  evidence: issued.evidence,
-                  planHash: verdict.planHash,
-                  ...(issued.nextActions === undefined ? {} : { nextActions: issued.nextActions }),
-                }),
-                now.members,
-              ),
-            ],
-          },
-        ],
-        lane: (after) =>
-          after.state === "red" ? { ...issued.lane, active: undefined } : issued.lane,
-      };
-    },
-  ).pipe(
+  yield* issue(laneId, batch, `${verdict.instanceId}:recordVerdict`, verdict, fence).pipe(
     Effect.catchTags({
-      CandidateStateRefused: (refused) => Effect.die(refused),
+      CandidateStateRefused: (refused) => {
+        const now = batchOf(store, batch.id);
+        return now !== undefined && isCandidateTerminal(now)
+          ? Effect.fail(new ResultFenced({ batchId: batch.id, ...fence }))
+          : Effect.die(refused);
+      },
       InvalidBatch: (invalid) => Effect.die(invalid),
     }),
   );
-  if (!committed.duplicate && exhausted !== undefined)
-    yield* Effect.logError(`lane ${laneId} bounced ${batch.members.join(", ")} on ${exhausted}`);
+});
+
+/**
+ * How long a KeelVerify instance has to send its verdict. Past it the Lane
+ * ends the instance and fails its batch on the infrastructure, so one
+ * instance that never answers cannot hold the lane.
+ */
+export const VERIFY_BUDGET_MS = 900_000;
+
+/** The batch in flight while it verifies, with its KeelVerify instance and when its budget runs out. */
+const verifying = (store: Store, outbox: (typeof EventOutbox)["Service"], laneId: string) => {
+  const lane = laneOf(store, laneId);
+  const active = lane?.active;
+  const batch = active === undefined ? undefined : batchOf(store, active.batchId);
+  if (active === undefined || batch?.state !== "verifying") return undefined;
+  const started = startedOf(outbox, batch.id);
+  return started === undefined
+    ? undefined
+    : { active, batch, instanceId: started.instanceId, due: started.at + VERIFY_BUDGET_MS };
+};
+
+/**
+ * When the verifying batch's instance runs out of its budget, or undefined
+ * when no batch is verifying. It is derived from the batch's own
+ * VerificationStarted, so arming it again after every step never postpones
+ * it.
+ */
+export const verificationDue = Effect.fn("integration/verificationDue")(function* (laneId: string) {
+  return verifying(yield* EntityStore, yield* EventOutbox, laneId)?.due;
+});
+
+/** What a look at the verifying batch's instance came to. */
+export type VerificationCheck =
+  /** No batch is verifying, or the report named another instance than the batch in flight's. */
+  | "idle"
+  /** The instance may still send its verdict: nothing is settled. */
+  | "running"
+  /** The instance will send none: its batch is failed on the infrastructure. */
+  | "settled";
+
+/**
+ * Looks once at the KeelVerify instance of the batch in flight, and settles
+ * the batch when no verdict can come from it. `reported` is the instance a
+ * platform event named: a hint, so only the batch in flight's own instance
+ * is looked at, and only what the read says is acted on. An instance that
+ * Failed (in error, terminated, never made) is settled whenever it is seen.
+ * At the budget's end one that completed with its batch still verifying is
+ * settled too, and one still running is stopped first, so its verdict cannot
+ * arrive after.
+ *
+ * Settling is KeelVerify's `park`, issued by the Lane: BatchFailed `infra`
+ * requeues the change to be verified afresh by a new instance, and the third
+ * such failure of one change in a row bounces it with its next actions. A
+ * verdict that got there first leaves nothing to settle.
+ */
+export const checkVerification = Effect.fn("integration/checkVerification")(function* (
+  laneId: string,
+  reported?: string,
+) {
+  const found = verifying(yield* EntityStore, yield* EventOutbox, laneId);
+  if (found === undefined || (reported !== undefined && reported !== found.instanceId))
+    return "idle" satisfies VerificationCheck;
+  const { active, batch, instanceId } = found;
+  const verification = yield* BatchVerification;
+  const standing = yield* verification.standing(instanceId);
+  const overdue = (yield* (yield* Clock).now) >= found.due;
+  if (standing._tag !== "Failed" && !overdue) return "running" satisfies VerificationCheck;
+  if (standing._tag === "Running") yield* verification.stop(instanceId);
+  const why =
+    standing._tag === "Failed"
+      ? `${standing.status}${standing.error === undefined ? "" : `: ${standing.error}`}`
+      : standing._tag === "Running"
+        ? `still running after ${VERIFY_BUDGET_MS / 60_000} minutes, and was stopped`
+        : "completed without recording a verdict";
+  const settled = yield* issue(
+    laneId,
+    batch,
+    `${instanceId}:instance-failed`,
+    {
+      verdictId: yield* (yield* Ids).next("vrd"),
+      outcome: "park",
+      planHash: yield* plannedOf(active),
+      evidence: [`verification-failed: instance ${instanceId} ${why}`],
+      failingTests: [],
+    },
+    { attempt: batch.attempt, chainEpoch: batch.chainEpoch },
+  ).pipe(
+    Effect.as("settled" as const),
+    Effect.catchTags({
+      // A verdict was recorded while this looked: the batch is no longer verifying.
+      CandidateStateRefused: () => Effect.succeed("idle" as const),
+      ResultFenced: (fenced) => Effect.die(fenced),
+      InvalidBatch: (invalid) => Effect.die(invalid),
+    }),
+  );
+  return settled satisfies VerificationCheck;
+});
+
+/**
+ * The platform reported that a KeelVerify instance ended without completing:
+ * its lane, read from the instance's id, is told. An id that names no lane
+ * (another Workflow's, or one started before ids carried their lane) is
+ * dropped: the lane's own deadline settles such an instance.
+ */
+export const instanceEnded = Effect.fn("integration/instanceEnded")(function* (instanceId: string) {
+  const laneId = laneOfInstance(instanceId);
+  if (laneId === undefined) return "dropped" as const;
+  yield* (yield* Lanes).verificationEnded(laneId, instanceId);
+  return "told" as const;
 });

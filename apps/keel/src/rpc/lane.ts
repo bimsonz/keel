@@ -25,10 +25,15 @@ export const RecordVerdictCommand = Schema.Struct({
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 
+/** The platform's report that a KeelVerify instance ended without completing: the instance, nothing more. */
+export const VerificationEndedCommand = Schema.Struct({ instanceId: Schema.NonEmptyString });
+export type VerificationEndedCommand = typeof VerificationEndedCommand.Type;
+
 export const LaneCodecs = {
   batch: exitCodec(Batch, CandidateNotFound),
   recordVerdict: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
   destroy: exitCodec(Schema.Void, Schema.Never),
+  verificationEnded: exitCodec(Schema.Void, Schema.Never),
 };
 
 /**
@@ -47,4 +52,13 @@ export interface LaneRpc {
    * ProjectDeleted first, as for `TrunkRpc.destroy`.
    */
   destroy(by: string): Promise<ExitJson>;
+  /**
+   * The platform reported that a KeelVerify instance ended without
+   * completing. A hint: the lane reads that instance's standing itself, and
+   * only for its own batch in flight while it verifies. One that will send no
+   * verdict fails its batch on the infrastructure, so its change is verified
+   * afresh, and bounced with next actions the third time in a row. A
+   * duplicate, a late or a stray report changes nothing.
+   */
+  verificationEnded(command: typeof VerificationEndedCommand.Encoded): Promise<ExitJson>;
 }

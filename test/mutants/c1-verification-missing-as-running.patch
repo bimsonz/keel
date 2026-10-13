@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/batch-verification.test.ts
+# kills: verification.standing
+# why: An instance that was never made reads as running
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index bc9dec3..410ffca 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -76,7 +76,7 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
+         }),
+       standing: (instanceId) =>
+         Effect.promise(async () => {
+-          if (!(await exists(workflow, instanceId))) return { _tag: "Failed", status: "missing" };
++          if (!(await exists(workflow, instanceId))) return { _tag: "Running" };
+           return standingOf(await (await workflow.get(instanceId)).status());
+         }),
+       stop: (instanceId) =>

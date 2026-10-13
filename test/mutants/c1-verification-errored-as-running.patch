@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/batch-verification.test.ts
+# kills: verification.standing
+# why: An errored instance reads as running, so its batch waits out the whole budget
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index bc9dec3..ea5ca5b 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -23,6 +23,7 @@ export const INSTANCE_ERROR_MAX = 200;
+ 
+ /** The platform's states an instance may still leave with a verdict. */
+ const RUNNING = new Set([
++  "errored",
+   "queued",
+   "running",
+   "paused",

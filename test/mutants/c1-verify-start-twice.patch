@@ -2,15 +2,14 @@
 # kills: verification.start
 # why: A retried step creates the KeelVerify instance again instead of finding the one it started, so a replay fails or doubles the run
 diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
-index c782d97..ada5ac5 100644
+index bc9dec3..092d43d 100644
 --- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
 +++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
-@@ -31,7 +31,7 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
+@@ -71,7 +71,6 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
      BatchVerification.of({
        start: (instanceId, job) =>
          Effect.promise(async () => {
 -          if (await exists(workflow, instanceId)) return;
-+
            await workflow.create({ id: instanceId, params: keelVerifyParams(job) });
          }),
-     }),
+       standing: (instanceId) =>

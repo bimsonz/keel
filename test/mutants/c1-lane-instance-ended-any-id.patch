@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-ended
+# why: An id that names no lane is passed on to a lane made up from it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..6fcd947 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1353,8 +1353,7 @@ export const checkVerification = Effect.fn("integration/checkVerification")(func
+  * dropped: the lane's own deadline settles such an instance.
+  */
+ export const instanceEnded = Effect.fn("integration/instanceEnded")(function* (instanceId: string) {
+-  const laneId = laneOfInstance(instanceId);
+-  if (laneId === undefined) return "dropped" as const;
++  const laneId = laneOfInstance(instanceId) ?? `lane:${instanceId}:main`;
+   yield* (yield* Lanes).verificationEnded(laneId, instanceId);
+   return "told" as const;
+ });

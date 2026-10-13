@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/batch-verification.test.ts
+# kills: verification.standing
+# why: A paused instance reads as failed, so its batch is settled while its verdict may still come
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index bc9dec3..dce3f4d 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -25,7 +25,6 @@ export const INSTANCE_ERROR_MAX = 200;
+ const RUNNING = new Set([
+   "queued",
+   "running",
+-  "paused",
+   "waiting",
+   "waitingForPause",
+   "rollingBack",

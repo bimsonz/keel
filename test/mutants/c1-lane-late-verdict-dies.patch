@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.late-verdict-fenced
+# why: A verdict for a batch already settled is a defect, so KeelVerify retries its record step and errors
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..47af51a 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1241,7 +1241,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+     Effect.catchTags({
+       CandidateStateRefused: (refused) => {
+         const now = batchOf(store, batch.id);
+-        return now !== undefined && isCandidateTerminal(now)
++        return now === undefined
+           ? Effect.fail(new ResultFenced({ batchId: batch.id, ...fence }))
+           : Effect.die(refused);
+       },

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.verification-due
+# why: A batch that has its verdict still has a budget running, so its deadline stays armed
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..61238dc 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1262,7 +1262,7 @@ const verifying = (store: Store, outbox: (typeof EventOutbox)["Service"], laneId
+   const lane = laneOf(store, laneId);
+   const active = lane?.active;
+   const batch = active === undefined ? undefined : batchOf(store, active.batchId);
+-  if (active === undefined || batch?.state !== "verifying") return undefined;
++  if (active === undefined || batch === undefined) return undefined;
+   const started = startedOf(outbox, batch.id);
+   return started === undefined
+     ? undefined

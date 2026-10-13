@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/batch-verification.test.ts
+# kills: verification.stop
+# why: Stopping an instance does not terminate it
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index bc9dec3..0bb13eb 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -83,7 +83,7 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
+         Effect.promise(async () => {
+           if (!(await exists(workflow, instanceId))) return;
+           const run = await workflow.get(instanceId);
+-          if (standingOf(await run.status())._tag === "Running") await run.terminate();
++          if (standingOf(await run.status())._tag !== "Running") await run.terminate();
+         }),
+     }),
+   );

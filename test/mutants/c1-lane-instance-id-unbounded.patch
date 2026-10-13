@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-id
+# why: A lane whose name makes the instance id longer than the platform allows is started anyway, and its create fails for ever
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..04e5535 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -822,7 +822,7 @@ export const instanceOf = (laneId: string, formedEventId: string): string => {
+   const project = laneProject(laneId);
+   const name = laneId.slice(`lane:${project}:`.length);
+   const id = `${INSTANCE_PREFIX}${project}-${name}-${formedEventId}`;
+-  if (!INSTANCE_NAME.test(name) || id.length > INSTANCE_ID_MAX)
++  if (!INSTANCE_NAME.test(name))
+     throw new Error(
+       `lane ${laneId} cannot name a KeelVerify instance: ${id} must be letters, digits, _ and -, and at most ${INSTANCE_ID_MAX} characters`,
+     );

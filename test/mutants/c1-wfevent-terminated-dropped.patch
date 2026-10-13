@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workflow-events.test.ts
+# kills: wfevent.translate-live
+# why: A terminated instance is not read as a report
+diff --git a/apps/keel/src/adapters/driving/queue/workflow-events.ts b/apps/keel/src/adapters/driving/queue/workflow-events.ts
+index 6658d66..78e5186 100644
+--- a/apps/keel/src/adapters/driving/queue/workflow-events.ts
++++ b/apps/keel/src/adapters/driving/queue/workflow-events.ts
+@@ -11,7 +11,6 @@ import { Option, Schema } from "effect";
+ export const WorkflowInstanceEnded = Schema.Struct({
+   type: Schema.Literals([
+     "cf.workflows.workflow.instance.errored",
+-    "cf.workflows.workflow.instance.terminated",
+   ]),
+   payload: Schema.Struct({ instanceId: Schema.NonEmptyString }),
+ });

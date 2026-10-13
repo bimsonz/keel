@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.verification-due
+# why: The budget is ninety seconds, shorter than an honest verification may take
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..8f6aaf7 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1255,7 +1255,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+  * ends the instance and fails its batch on the infrastructure, so one
+  * instance that never answers cannot hold the lane.
+  */
+-export const VERIFY_BUDGET_MS = 900_000;
++export const VERIFY_BUDGET_MS = 90_000;
+ 
+ /** The batch in flight while it verifies, with its KeelVerify instance and when its budget runs out. */
+ const verifying = (store: Store, outbox: (typeof EventOutbox)["Service"], laneId: string) => {

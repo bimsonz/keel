@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-failed, lane.instance-limit
+# why: An instance that failed bounces its change at once instead of having it verified afresh
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..303d1b1 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1328,7 +1328,7 @@ export const checkVerification = Effect.fn("integration/checkVerification")(func
+     `${instanceId}:instance-failed`,
+     {
+       verdictId: yield* (yield* Ids).next("vrd"),
+-      outcome: "park",
++      outcome: "bounce",
+       planHash: yield* plannedOf(active),
+       evidence: [`verification-failed: instance ${instanceId} ${why}`],
+       failingTests: [],

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/batch-verification.test.ts
+# kills: verification.standing-redacted
+# why: An instance's error message is cited whole, however long
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index bc9dec3..0c7d6d8 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -44,7 +44,7 @@ export function standingOf(run: Awaited<ReturnType<WorkflowRun["status"]>>): Ins
+   const message = run.error?.message;
+   return message === undefined || message === ""
+     ? { _tag: "Failed", status: "errored" }
+-    : { _tag: "Failed", status: "errored", error: redact(message).slice(0, INSTANCE_ERROR_MAX) };
++    : { _tag: "Failed", status: "errored", error: redact(message) };
+ }
+ 
+ /** Whether the binding already holds an instance by this id; `get` throws for one it does not. */

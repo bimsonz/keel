@@ -2,15 +2,21 @@
 # kills: lane.verdict-replay
 # why: The verdict's cause carries the time, so KeelVerify's replayed step is not a no-op and commits again
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 92a44f1..4c174e7 100644
+index 4c57f5d..e1df0d9 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -981,7 +981,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
-   const committed = yield* onBatch(
-     laneId,
-     batch.id,
--    `${verdict.instanceId}:recordVerdict`,
+@@ -1237,7 +1237,13 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+       ? found
+       : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
+   const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
+-  yield* issue(laneId, batch, `${verdict.instanceId}:recordVerdict`, verdict, fence).pipe(
++  yield* issue(
++    laneId,
++    batch,
 +    `${verdict.instanceId}:recordVerdict@${yield* (yield* Clock).now}`,
-     (now, lane) => {
-       const issued = issuedFor(verdict, now, lane);
-       exhausted = issued.exhausted;
++    verdict,
++    fence,
++  ).pipe(
+     Effect.catchTags({
+       CandidateStateRefused: (refused) => {
+         const now = batchOf(store, batch.id);

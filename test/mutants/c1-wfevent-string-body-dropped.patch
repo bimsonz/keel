@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workflow-events.test.ts
+# kills: wfevent.translate-live, queue.instance-ended
+# why: A body that arrives as a JSON string is dropped
+diff --git a/apps/keel/src/adapters/driving/queue/workflow-events.ts b/apps/keel/src/adapters/driving/queue/workflow-events.ts
+index 6658d66..94a6806 100644
+--- a/apps/keel/src/adapters/driving/queue/workflow-events.ts
++++ b/apps/keel/src/adapters/driving/queue/workflow-events.ts
+@@ -31,7 +31,7 @@ export function translateWorkflowEvent(raw: unknown): InstanceEnded | null {
+   let body = raw;
+   if (typeof raw === "string") {
+     try {
+-      body = JSON.parse(raw);
++      body = null;
+     } catch {
+       return null;
+     }

@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts
+# kills: lane.do.verify-armed
+# why: The deadline at the budget's end runs no step, so nothing looks at the instance
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 9fac126..ed1839f 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -117,8 +117,8 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+ 
+   protected override async onDeadline(request: AlarmRequest): Promise<void> {
+     if (request.reason === LANE_REOFFER) return this.reoffer();
+-    if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
+-      return super.onDeadline(request);
++    if (request.reason === LANE_VERIFY) return;
++    if (request.reason !== LANE_STEP) return super.onDeadline(request);
+     const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
+     // Whether or not the step got through: a batch may be Verifying with its instance never made.
+     await this.armVerification();

@@ -9,7 +9,7 @@ export interface DestroyableLanes {
   get(
     id: DurableObjectId,
     options?: { readonly locationHint?: DurableObjectLocationHint },
-  ): Pick<LaneRpc, "destroy">;
+  ): Pick<LaneRpc, "destroy" | "verificationEnded">;
   idFromName(name: string): DurableObjectId;
 }
 
@@ -21,17 +21,16 @@ export function LanesRpc(
   lanes: DestroyableLanes,
   locationHint?: DurableObjectLocationHint,
 ): Layer.Layer<Lanes> {
+  const lane = (laneId: string) =>
+    lanes.get(lanes.idFromName(laneId), locationHint === undefined ? undefined : { locationHint });
   return Layer.succeed(
     Lanes,
     Lanes.of({
       destroy: (projectId, by) =>
-        callObject(LaneCodecs.destroy, () =>
-          lanes
-            .get(
-              lanes.idFromName(mainLane(projectId)),
-              locationHint === undefined ? undefined : { locationHint },
-            )
-            .destroy(by),
+        callObject(LaneCodecs.destroy, () => lane(mainLane(projectId)).destroy(by)),
+      verificationEnded: (laneId, instanceId) =>
+        callObject(LaneCodecs.verificationEnded, () =>
+          lane(laneId).verificationEnded({ instanceId }),
         ),
     }),
   );

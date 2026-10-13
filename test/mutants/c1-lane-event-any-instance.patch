@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-hint
+# why: A report that names another instance makes the lane read and settle its own batch in flight
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..699e576 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1308,7 +1308,7 @@ export const checkVerification = Effect.fn("integration/checkVerification")(func
+   reported?: string,
+ ) {
+   const found = verifying(yield* EntityStore, yield* EventOutbox, laneId);
+-  if (found === undefined || (reported !== undefined && reported !== found.instanceId))
++  if (found === undefined)
+     return "idle" satisfies VerificationCheck;
+   const { active, batch, instanceId } = found;
+   const verification = yield* BatchVerification;

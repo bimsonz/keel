@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-budget
+# why: The step never looks at a verification past its budget, so the deadline that runs the step settles nothing
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..74280ba 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1088,7 +1088,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+     }
+     // A verification past its budget gets one look, which settles it: the step then goes on.
+     const due = verifying(store, yield* EventOutbox, laneId)?.due;
+-    if (due !== undefined && (yield* (yield* Clock).now) >= due)
++    if (due !== undefined && due < 0)
+       if ((yield* checkVerification(laneId)) !== "running") continue;
+     return "waiting" satisfies LaneStep;
+   }

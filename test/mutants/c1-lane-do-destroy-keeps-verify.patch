@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts
+# kills: lane.do.destroy
+# why: Destroy leaves the look at a verifying batch armed, so a destroyed Lane object still wakes on it
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 9fac126..34ff059 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -89,7 +89,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+     const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
+     await cancelAlarm(this.ctx.storage, LANE_STEP);
+     await cancelAlarm(this.ctx.storage, LANE_REOFFER);
+-    await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+     return answer;
+   }
+ 

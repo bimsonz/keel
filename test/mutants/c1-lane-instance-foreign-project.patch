@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-id
+# why: An id that names no project is read as a lane, and its report is sent to an object that is no lane of Keel
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..e08da9a 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -834,7 +834,7 @@ export const laneOfInstance = (instanceId: string): string | undefined => {
+   const match = /^keel-verify-([^-]+)-(.+)-([^-]+)$/.exec(instanceId);
+   const [project, name] = [match?.[1], match?.[2]];
+   if (project === undefined || name === undefined) return undefined;
+-  return Schema.is(ProjectId)(project) ? `lane:${project}:${name}` : undefined;
++  return `lane:${project}:${name}`;
+ };
+ 
+ /**

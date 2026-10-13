@@ -4,8 +4,13 @@
 // are in memory, the backbone is the object's own storage.
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { batchOf, projectRepos } from "@keeltown/core/application/integration";
-import { CommitSha, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
+import {
+  batchOf,
+  laneHeard,
+  projectRepos,
+  VERIFY_BUDGET_MS,
+} from "@keeltown/core/application/integration";
+import { CommitSha, EventEnvelope, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   Changes,
   CodeHost,
@@ -29,7 +34,12 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
-import { LANE_REOFFER, LANE_STEP, type LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import {
+  LANE_REOFFER,
+  LANE_STEP,
+  LANE_VERIFY,
+  type LaneDO,
+} from "../../src/adapters/driving/do/lane.ts";
 import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import { LanesRpc } from "../../src/adapters/driven/do-rpc/lanes.ts";
@@ -205,7 +215,7 @@ describe("the Lane DO", () => {
     await runDurableObjectAlarm(stub);
     await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
     const [started] = [...verification.started.entries()];
-    expect(started?.[0]).toMatch(/^keel-verify-evt_/);
+    expect(started?.[0]).toMatch(/^keel-verify-prj_[0-9A-Z]{26}-main-evt_[0-9A-Z]{26}$/);
     const job = started?.[1];
     if (job === undefined) throw new Error("KeelVerify never started");
     const fenced = decodeExit(
@@ -303,19 +313,24 @@ describe("the Lane DO", () => {
       runInDurableObject(stub, (_instance: LaneDO, state) =>
         armedAlarms(state.storage)
           .map((a) => a.reason)
-          .filter((reason) => reason === LANE_STEP || reason === LANE_REOFFER),
+          .filter((reason) => [LANE_STEP, LANE_REOFFER, LANE_VERIFY].includes(reason)),
       );
     await vi.waitFor(async () => expect(await laneDeadlines()).toEqual([LANE_REOFFER]), {
       timeout: 10_000,
     });
-    // A step backing off a failure is armed too.
-    await runInDurableObject(stub, (_instance: LaneDO, state) =>
-      scheduleAlarm(state.storage, {
+    // A step backing off a failure is armed too, and so is the look at a verifying batch's instance.
+    await runInDurableObject(stub, async (_instance: LaneDO, state) => {
+      await scheduleAlarm(state.storage, {
         kind: "debounce",
         reason: LANE_STEP,
         at: Date.now() + 60_000,
-      }),
-    );
+      });
+      await scheduleAlarm(state.storage, {
+        kind: "deadline",
+        reason: LANE_VERIFY,
+        at: Date.now() + 60_000,
+      });
+    });
     const destroy = Effect.flatMap(Lanes, (lanes) => lanes.destroy(projectId, "operator"));
     await Effect.runPromise(destroy.pipe(Effect.provide(LanesRpc(env.LANE))));
     expect(await laneDeadlines()).toEqual([]);
@@ -335,6 +350,83 @@ describe("the Lane DO", () => {
         decodeExit(LaneCodecs.recordVerdict, await stub.recordVerdict(landing(job, instanceId))),
       ),
     ).toBe(true);
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.verify-armed] a verifying batch arms one deadline, for the end of its instance's budget; that deadline runs the lane's step; and a verdict clears it", async () => {
+    const { stub, laneId, verification, pushCandidate } = await lane();
+    const armedLook = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        armedAlarms(state.storage).filter((a) => a.reason === LANE_VERIFY),
+      );
+    const before = Date.now();
+    // The change is queued in the lane's own store, past the object's receive: no step is armed, so only the deadline under test can run one.
+    const event = Schema.decodeUnknownSync(EventEnvelope)(queued(laneId, 1));
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.gen(function* () {
+          const store = yield* EntityStore;
+          const outbox = yield* EventOutbox;
+          const at = Instant(0);
+          store.transaction(
+            () =>
+              outbox.receive(event.dedupeKey, at) &&
+              laneHeard({ store, outbox, at }, laneId, event),
+          );
+        }),
+      ),
+    );
+    expect(
+      await runInDurableObject(stub, (_instance: LaneDO, state) => armedAlarms(state.storage)),
+    ).toEqual([]);
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      scheduleAlarm(state.storage, { kind: "deadline", reason: LANE_VERIFY, at: Date.now() }),
+    );
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 5000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    await vi.waitFor(
+      async () => {
+        const [armed, ...more] = await armedLook();
+        expect(more).toEqual([]);
+        expect(armed?.kind).toBe("deadline");
+        expect(armed?.at).toBeGreaterThanOrEqual(before + VERIFY_BUDGET_MS);
+        expect(armed?.at).toBeLessThanOrEqual(Date.now() + VERIFY_BUDGET_MS);
+      },
+      { timeout: 5000 },
+    );
+    await pushCandidate(job.candidateId);
+    expect(
+      decodeExit(LaneCodecs.recordVerdict, await stub.recordVerdict(landing(job, instanceId))),
+    ).toEqual(Exit.void);
+    await vi.waitFor(
+      async () => {
+        expect(await armedLook()).toEqual([]);
+        expect(await batchState(stub, job.fence.batchId)).toBe("promoted");
+      },
+      { timeout: 20_000, interval: 50 },
+    );
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.instance-failed] the platform's report of an errored instance, through the Lanes adapter, fails its batch on the infrastructure and frees the lane for the next change; a report of an instance still running changes nothing", async () => {
+    const { stub, laneId, verification } = await lane();
+    await stub.receive([queued(laneId, 1), queued(laneId, 2)]);
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 5000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    const ended = Effect.flatMap(Lanes, (lanes) => lanes.verificationEnded(laneId, instanceId));
+    await Effect.runPromise(ended.pipe(Effect.provide(LanesRpc(env.LANE))));
+    expect(await batchState(stub, job.fence.batchId)).toBe("verifying");
+    verification.end(instanceId, { _tag: "Failed", status: "errored", error: "not a job" });
+    await Effect.runPromise(ended.pipe(Effect.provide(LanesRpc(env.LANE))));
+    expect(await batchState(stub, job.fence.batchId)).toBe("red");
+    // The lane is free: the change behind gets a batch and an instance of its own.
+    await vi.waitFor(() => expect(verification.started.size).toBe(2), { timeout: 5000 });
+    const [, [, second] = []] = [...verification.started.entries()];
+    expect(second?.fence.batchId).not.toBe(job.fence.batchId);
     await drainOutbox(stub);
   });
 

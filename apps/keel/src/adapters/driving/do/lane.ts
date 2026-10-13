@@ -1,4 +1,5 @@
 import {
+  checkVerification,
   destroyLane,
   laneHeard,
   laneProject,
@@ -6,12 +7,18 @@ import {
   recordVerdict,
   reofferDue,
   reofferVerified,
+  verificationDue,
 } from "@keeltown/core/application/integration";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { REDELIVERY_CAP_MS, redeliveryDelay, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Schema } from "effect";
 import { type LaneServices, laneServices } from "../../../composition/do.ts";
-import { LaneCodecs, type LaneRpc, RecordVerdictCommand } from "../../../rpc/lane.ts";
+import {
+  LaneCodecs,
+  type LaneRpc,
+  RecordVerdictCommand,
+  VerificationEndedCommand,
+} from "../../../rpc/lane.ts";
 import { type AlarmRequest, cancelAlarm, scheduleAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
@@ -19,8 +26,11 @@ import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 export const LANE_STEP = "lane step";
 /** While its green batch waits on trunk, the lane re-offers the batch's BatchVerified. */
 export const LANE_REOFFER = "lane reoffer";
+/** The end of the verifying batch's budget: the lane's step runs then, and looks at the batch's KeelVerify instance once. */
+export const LANE_VERIFY = "lane verification";
 
 const decodeVerdict = Schema.decodeUnknownEffect(RecordVerdictCommand);
+const decodeEnded = Schema.decodeUnknownEffect(VerificationEndedCommand);
 
 /** A Lane DO is addressed as `lane:<projectId>:<name>`. */
 const laneIdOf = (name: string | undefined): string => {
@@ -38,7 +48,12 @@ const laneIdOf = (name: string | undefined): string => {
  * follows. A step that fails (a defect: a binding or a member's DO was
  * unreachable) is retried 1 s·2ⁿ up to 60 s, as deliveries are (ADR 0009).
  * While a green batch has no answer from trunk, `lane reoffer` hands trunk
- * its BatchVerified again (30 s after it, then every 60 s). Once destroyed
+ * its BatchVerified again (30 s after it, then every 60 s). A verifying
+ * batch whose KeelVerify instance will send no verdict is failed on the
+ * infrastructure: when the platform reports the instance ended
+ * (`verificationEnded`), and by the step that `lane verification` runs, one
+ * deadline at the end of the instance's budget, for whatever no report
+ * covers. Once destroyed
  * it holds nothing and no deadline of its own, hears nothing and takes no
  * verdict.
  * Repo-touching: callers place it with the deployment's `locationHint`.
@@ -74,6 +89,19 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
     const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
     await cancelAlarm(this.ctx.storage, LANE_STEP);
     await cancelAlarm(this.ctx.storage, LANE_REOFFER);
+    await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+    return answer;
+  }
+
+  async verificationEnded(command: unknown) {
+    const laneId = this.laneId;
+    const program = decodeEnded(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((ended) => checkVerification(laneId, ended.instanceId)),
+      Effect.asVoid,
+    );
+    const answer = await this.answer(LaneCodecs.verificationEnded, program);
+    await this.step(Date.now());
     return answer;
   }
 
@@ -89,8 +117,11 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
 
   protected override async onDeadline(request: AlarmRequest): Promise<void> {
     if (request.reason === LANE_REOFFER) return this.reoffer();
-    if (request.reason !== LANE_STEP) return super.onDeadline(request);
+    if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
+      return super.onDeadline(request);
     const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
+    // Whether or not the step got through: a batch may be Verifying with its instance never made.
+    await this.armVerification();
     if (Exit.isSuccess(exit)) {
       this.failures = 0;
       await this.armReoffer();
@@ -134,6 +165,18 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
     const due = await this.runtime.runPromise(reofferDue(this.laneId));
     if (due === undefined) await cancelAlarm(this.ctx.storage, LANE_REOFFER);
     else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_REOFFER, at: due });
+  }
+
+  /**
+   * Arms `lane verification` for the end of the verifying batch's budget, as
+   * its state gives it, and clears it otherwise. Past that time nothing is
+   * armed here: a step that failed its look is retried by the step's own
+   * backoff.
+   */
+  private async armVerification(): Promise<void> {
+    const due = await this.runtime.runPromise(verificationDue(this.laneId));
+    if (due === undefined || due <= Date.now()) await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_VERIFY, at: due });
   }
 
   /** Arms the step: a debounce, so a burst of deliveries runs it once. */

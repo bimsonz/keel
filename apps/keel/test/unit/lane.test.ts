@@ -6,15 +6,21 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   batchOf,
   bundleBlame,
+  checkVerification,
   destroyLane,
+  instanceEnded,
+  instanceOf,
   laneDestroyed,
   laneHeard,
   laneOf,
+  laneOfInstance,
   laneStep,
   projectRepos,
   recordVerdict,
   reofferDue,
   reofferVerified,
+  VERIFY_BUDGET_MS,
+  verificationDue,
 } from "@keeltown/core/application/integration";
 import type { Change } from "@keeltown/core/domain/coordination";
 import type { VerdictOutcome } from "@keeltown/core/domain/verification";
@@ -49,6 +55,7 @@ import {
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeIdsMemory,
+  makeLanesMemory,
   makeManualClock,
   makePlacedProject,
   makeProjectsMemory,
@@ -132,6 +139,8 @@ function world(options: WorldOptions = {}) {
   );
   // What the batch's state is when KeelVerify is started: it must already be Verifying.
   const startedIn: string[] = [];
+  /** `look` runs as an instance's standing is read, before the answer: what happened to the lane meanwhile. */
+  const hooks: { look?: (store: (typeof EntityStore)["Service"]) => void } = {};
   const recordingVerification = Layer.effect(
     BatchVerification,
     Effect.gen(function* () {
@@ -143,6 +152,12 @@ function world(options: WorldOptions = {}) {
             startedIn.push(batchOf(store, job.fence.batchId)?.state ?? "none");
             return inner.start(instanceId, job);
           }),
+        standing: (instanceId) =>
+          Effect.suspend(() => {
+            hooks.look?.(store);
+            return inner.standing(instanceId);
+          }),
+        stop: inner.stop,
       });
     }),
   ).pipe(Layer.provide(Layer.merge(verification.layer, outbox.layer)));
@@ -172,7 +187,7 @@ function world(options: WorldOptions = {}) {
     yield* (yield* CodeHost).create(STAGING);
     return yield* code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
   });
-  return { code, clock, verification, bundles, staging, changes, startedIn, layer, seeded };
+  return { code, clock, verification, bundles, staging, changes, startedIn, hooks, layer, seeded };
 }
 type World = ReturnType<typeof world>;
 
@@ -573,7 +588,7 @@ describe("the Lane", () => {
         yield* queue(w, change(1));
         const { batchId, candidateId, instanceId } = yield* toVerifying(w);
         const formed = (yield* committed).find((e) => e.type === "BatchFormed");
-        expect(instanceId).toBe(`keel-verify-${formed?.eventId}`);
+        expect(instanceId).toBe(`keel-verify-${PROJECT}-main-${formed?.eventId}`);
         expect(w.verification.started.get(instanceId)).toMatchObject({
           projectId: PROJECT,
           namespace: "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
@@ -1176,6 +1191,256 @@ describe("bundleBlame", () => {
         expect(yield* bundleBlame(repo, "b.txt", base, chain)).toBe(change(2));
         expect(yield* bundleBlame(repo, "old", base, chain)).toBe("infra");
       }).pipe(Effect.provide(code.layer));
+    },
+  );
+});
+
+/** The newest event of a type the lane committed. */
+const last = (type: string) => Effect.map(payloads(type), (found) => found.at(-1));
+/** What `infraBlame` keeps of a terminated instance's failure. */
+const terminatedReason = (instanceId: string | undefined) =>
+  `park: verification-failed: instance ${instanceId} terminated`;
+
+describe("the Lane's verification that sends no verdict", () => {
+  const ERRORED = { _tag: "Failed", status: "errored", error: "not a KeelVerify job" } as const;
+
+  it.effect(
+    "[lane.instance-id] a batch's KeelVerify instance names its lane, which is read back from the id; an id the Lane did not make names none, and a lane the id cannot carry is a defect",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const { instanceId } = yield* toVerifying(w);
+        const formed = (yield* committed).find((e) => e.type === "BatchFormed");
+        expect(instanceId).toBe(`keel-verify-${PROJECT}-main-${formed?.eventId}`);
+        expect(laneOfInstance(instanceId)).toBe(LANE);
+        const event = `evt_${"0".repeat(26)}`;
+        const dashed = `lane:${PROJECT}:hot-fix_2`;
+        expect(laneOfInstance(instanceOf(dashed, event))).toBe(dashed);
+        const longest = `lane:${PROJECT}:${"x".repeat(26)}`;
+        expect(instanceOf(longest, event)).toHaveLength(100);
+        expect(laneOfInstance(instanceOf(longest, event))).toBe(longest);
+        for (const foreign of [
+          `keel-verify-${formed?.eventId}`,
+          `keel-world-check-${PROJECT}-main-${event}`,
+          `keel-verify-prj_nope-main-${event}`,
+          "",
+        ])
+          expect(laneOfInstance(foreign)).toBeUndefined();
+        expect(() => instanceOf(`lane:${PROJECT}:${"x".repeat(27)}`, event)).toThrow(/at most 100/);
+        expect(() => instanceOf(`lane:${PROJECT}:a.b`, event)).toThrow(/letters, digits/);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-failed] an instance that ended in error fails its batch on the infrastructure, citing the instance and its error, and the lane moves on to the next change",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        const { batchId, instanceId } = yield* toVerifying(w);
+        w.verification.end(instanceId, ERRORED);
+        expect(yield* checkVerification(LANE, instanceId)).toBe("settled");
+        expect(yield* last("VerdictIssued")).toMatchObject({
+          subject: batchId,
+          outcome: "park",
+          planHash: PLAN.planHash,
+          evidence: [`verification-failed: instance ${instanceId} errored: not a KeelVerify job`],
+        });
+        expect(yield* last("BatchFailed")).toMatchObject({ batchId, attribution: "infra" });
+        expect(w.verification.stopped).toEqual([]);
+        expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
+        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect((yield* inFlight).batchId).not.toBe(batchId);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-limit] a change whose instance fails is verified afresh twice, and bounced the third time in a row with every reason and its next actions",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const instances: string[] = [];
+        for (let round = 1; round <= 3; round += 1) {
+          const { batchId, instanceId } = yield* toVerifying(w);
+          instances.push(instanceId);
+          w.verification.end(instanceId, { _tag: "Failed", status: "terminated" });
+          expect(yield* checkVerification(LANE, instanceId)).toBe("settled");
+          yield* requeue(change(1), batchId);
+        }
+        expect(new Set(instances).size).toBe(3);
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
+          "infra",
+          "infra",
+          change(1),
+        ]);
+        expect(yield* last("VerdictIssued")).toMatchObject({
+          outcome: "bounce",
+          evidence: [
+            `infra-failure x3: ${instances.map(terminatedReason).join("; ")}`,
+            `verification-failed: instance ${instances[2]} terminated`,
+          ],
+          nextActions: [
+            { kind: "call", operationId: "submit", args: { changeId: change(1) } },
+            { kind: "wait" },
+          ],
+        });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-hint] a report is a hint: an instance that reads as running, one that reads as completed, and another instance than the batch in flight's settle nothing, and the last is not even read",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const { batchId, instanceId } = yield* toVerifying(w);
+        expect(yield* checkVerification(LANE, instanceId)).toBe("running");
+        w.verification.end(instanceId, { _tag: "Completed" });
+        expect(yield* checkVerification(LANE, instanceId)).toBe("running");
+        expect(w.verification.looked).toEqual([instanceId, instanceId]);
+        w.verification.end(instanceId, ERRORED);
+        expect(yield* checkVerification(LANE, `${instanceId}-earlier`)).toBe("idle");
+        expect(w.verification.looked).toEqual([instanceId, instanceId]);
+        expect(batchOf(yield* EntityStore, batchId)?.state).toBe("verifying");
+        expect((yield* committed).map((e) => e.type)).not.toContain("VerdictIssued");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-budget] at the end of its budget the lane's step stops an instance still running and settles its batch, and settles one that completed with no verdict; a millisecond earlier it does neither",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        w.clock.advance(VERIFY_BUDGET_MS - 1);
+        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(w.verification.looked).toEqual([]);
+        w.clock.advance(1);
+        expect(w.clock.now()).toBe(yield* verificationDue(LANE));
+        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(w.verification.stopped).toEqual([first.instanceId]);
+        expect(yield* last("VerdictIssued")).toMatchObject({
+          outcome: "park",
+          evidence: [
+            `verification-failed: instance ${first.instanceId} still running after 15 minutes, and was stopped`,
+          ],
+        });
+        expect(yield* last("BatchFailed")).toMatchObject({
+          batchId: first.batchId,
+          attribution: "infra",
+        });
+        yield* requeue(change(1), first.batchId);
+        const second = yield* toVerifying(w);
+        w.verification.end(second.instanceId, { _tag: "Completed" });
+        w.clock.advance(VERIFY_BUDGET_MS - 1);
+        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(batchOf(yield* EntityStore, second.batchId)?.state).toBe("verifying");
+        w.clock.advance(1);
+        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(w.verification.stopped).toEqual([first.instanceId]);
+        expect(yield* last("VerdictIssued")).toMatchObject({
+          evidence: [
+            `verification-failed: instance ${second.instanceId} completed without recording a verdict`,
+          ],
+        });
+        expect(yield* last("BatchFailed")).toMatchObject({ batchId: second.batchId });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.verification-due] the budget is fifteen minutes from the batch's own VerificationStarted, however late it is asked, and runs only while the batch verifies",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        expect(yield* verificationDue(LANE)).toBeUndefined();
+        yield* queue(w, change(1));
+        expect(yield* verificationDue(LANE)).toBeUndefined();
+        const { batchId, candidateId, instanceId } = yield* toVerifying(w);
+        const started = (yield* committed).find((e) => e.type === "VerificationStarted");
+        if (started === undefined) throw new Error("the lane committed no VerificationStarted");
+        expect(yield* verificationDue(LANE)).toBe(started.at + 15 * 60_000);
+        w.clock.advance(60_000);
+        expect(yield* verificationDue(LANE)).toBe(started.at + 15 * 60_000);
+        yield* recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "land"));
+        expect(batchOf(yield* EntityStore, batchId)?.state).toBe("green");
+        expect(yield* verificationDue(LANE)).toBeUndefined();
+        w.verification.end(instanceId, ERRORED);
+        expect(yield* checkVerification(LANE, instanceId)).toBe("idle");
+        expect(yield* payloads("BatchFailed")).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.late-verdict-fenced] a verdict that arrives after its batch was settled is ResultFenced and writes nothing, and looking again settles nothing more",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const { batchId, candidateId, instanceId } = yield* toVerifying(w);
+        w.verification.end(instanceId, ERRORED);
+        expect(yield* checkVerification(LANE, instanceId)).toBe("settled");
+        const before = (yield* committed).map((e) => e.type);
+        const late = yield* Effect.flip(
+          recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "land")),
+        );
+        expect(late).toMatchObject({ _tag: "ResultFenced", batchId, attempt: 0, chainEpoch: 0 });
+        expect(yield* checkVerification(LANE, instanceId)).toBe("idle");
+        expect((yield* committed).map((e) => e.type)).toEqual(before);
+        expect(batchOf(yield* EntityStore, batchId)?.state).toBe("red");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-settled-once] a verdict recorded while the Lane was looking leaves nothing to settle: the look answers idle and commits nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const { batchId, instanceId } = yield* toVerifying(w);
+        w.verification.end(instanceId, ERRORED);
+        // The batch goes green between the Lane's read of its state and its commit, as a verdict's transaction would leave it.
+        w.hooks.look = (store) => {
+          const stored = store.get("batch", batchId);
+          if (!isRecord(stored)) throw new Error("the lane holds no batch");
+          store.put("batch", batchId, { ...stored, state: "green" });
+        };
+        expect(yield* checkVerification(LANE, instanceId)).toBe("idle");
+        expect((yield* committed).map((e) => e.type)).not.toContain("VerdictIssued");
+        expect(yield* payloads("BatchFailed")).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.instance-ended] a reported instance's lane, read from its id, is told; an id that names no lane is dropped",
+    () => {
+      const lanes = makeLanesMemory();
+      return Effect.gen(function* () {
+        const event = `evt_${"0".repeat(26)}`;
+        const instanceId = instanceOf(LANE, event);
+        expect(yield* instanceEnded(instanceId)).toBe("told");
+        expect(yield* instanceEnded(`keel-verify-${event}`)).toBe("dropped");
+        expect(lanes.ended).toEqual([{ laneId: LANE, instanceId }]);
+      }).pipe(Effect.provide(lanes.layer));
     },
   );
 });

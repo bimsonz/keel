@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts
+# kills: lane.do.instance-failed
+# why: A report is passed to another lane's object than the one its instance names
+diff --git a/apps/keel/src/adapters/driven/do-rpc/lanes.ts b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+index c13f7cf..ba95054 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/lanes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+@@ -30,7 +30,7 @@ export function LanesRpc(
+         callObject(LaneCodecs.destroy, () => lane(mainLane(projectId)).destroy(by)),
+       verificationEnded: (laneId, instanceId) =>
+         callObject(LaneCodecs.verificationEnded, () =>
+-          lane(laneId).verificationEnded({ instanceId }),
++          lane(`${laneId}-other`).verificationEnded({ instanceId }),
+         ),
+     }),
+   );

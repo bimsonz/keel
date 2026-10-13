@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-hint
+# why: A report settles the batch whatever the instance reads as, so a duplicate or early event fails a healthy verification
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..574fb17 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1314,7 +1314,8 @@ export const checkVerification = Effect.fn("integration/checkVerification")(func
+   const verification = yield* BatchVerification;
+   const standing = yield* verification.standing(instanceId);
+   const overdue = (yield* (yield* Clock).now) >= found.due;
+-  if (standing._tag !== "Failed" && !overdue) return "running" satisfies VerificationCheck;
++  if (reported === undefined && standing._tag !== "Failed" && !overdue)
++    return "running" satisfies VerificationCheck;
+   if (standing._tag === "Running") yield* verification.stop(instanceId);
+   const why =
+     standing._tag === "Failed"

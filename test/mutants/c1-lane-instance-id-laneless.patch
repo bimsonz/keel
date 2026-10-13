@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-id
+# why: A KeelVerify instance is named by its BatchFormed alone, so the report that it ended names no lane
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..5772da1 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -821,7 +821,7 @@ const INSTANCE_ID_MAX = 100;
+ export const instanceOf = (laneId: string, formedEventId: string): string => {
+   const project = laneProject(laneId);
+   const name = laneId.slice(`lane:${project}:`.length);
+-  const id = `${INSTANCE_PREFIX}${project}-${name}-${formedEventId}`;
++  const id = `${INSTANCE_PREFIX}${formedEventId}`;
+   if (!INSTANCE_NAME.test(name) || id.length > INSTANCE_ID_MAX)
+     throw new Error(
+       `lane ${laneId} cannot name a KeelVerify instance: ${id} must be letters, digits, _ and -, and at most ${INSTANCE_ID_MAX} characters`,

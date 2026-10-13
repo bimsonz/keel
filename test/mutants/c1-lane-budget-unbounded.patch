@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.instance-budget
+# why: No budget ever ends: an instance that never answers holds its lane for good
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4c57f5d..51861cf 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1313,7 +1313,7 @@ export const checkVerification = Effect.fn("integration/checkVerification")(func
+   const { active, batch, instanceId } = found;
+   const verification = yield* BatchVerification;
+   const standing = yield* verification.standing(instanceId);
+-  const overdue = (yield* (yield* Clock).now) >= found.due;
++  const overdue = false;
+   if (standing._tag !== "Failed" && !overdue) return "running" satisfies VerificationCheck;
+   if (standing._tag === "Running") yield* verification.stop(instanceId);
+   const why =

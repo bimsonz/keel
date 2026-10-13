@@ -12,5 +12,12 @@ export class Lanes extends Context.Service<
      * verdict. Idempotent.
      */
     readonly destroy: (projectId: ProjectId, by: string) => Effect.Effect<void>;
+    /**
+     * Tells the lane that the platform reported a KeelVerify instance ended
+     * without completing. It is a hint: the lane reads the instance's
+     * standing itself and settles only its own batch in flight, so a
+     * duplicate, a late or a stray report changes nothing.
+     */
+    readonly verificationEnded: (laneId: string, instanceId: string) => Effect.Effect<void>;
   }
 >()("keel/Lanes") {}
