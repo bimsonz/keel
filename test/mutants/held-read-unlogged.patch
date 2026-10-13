@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-read
+# kills: rpc.held-read
+# why: a read that was read again leaves no line, so a restart under held reads cannot be told from none
+diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+index 3fa64d93..6b412f47 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+@@ -49,13 +49,6 @@ export function callHeldRead<A, E>(
+   return callObject(codec, () => call(waitMs)).pipe(
+     Effect.catchDefect((defect): Effect.Effect<A, E> => {
+       if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
+-      console.warn(
+-        JSON.stringify({
+-          ops: "held-read",
+-          read,
+-          readAgain: defect instanceof Error ? defect.message : String(defect),
+-        }),
+-      );
+       return callObject(codec, () => call(0));
+     }),
+   );

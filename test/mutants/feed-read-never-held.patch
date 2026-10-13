@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-feed
+# kills: rpc.held-feed
+# why: the feed's first read is sent with no wait, so no reader is ever held and every long poll answers at once
+diff --git a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
+index c1cf501d..56aa0d2c 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
+@@ -27,7 +27,7 @@ export function EventFeedRpc(projector: () => ProjectorStub): Layer.Layer<EventF
+           projector().read({
+             ...(cursor === undefined ? {} : { cursor }),
+             ...(limit === undefined ? {} : { limit }),
+-            waitMs,
++            waitMs: 0 * waitMs,
+             ...(project === undefined ? {} : { project }),
+           }),
+         ),

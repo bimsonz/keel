@@ -25,6 +25,42 @@ export function callObject<A, E>(
   });
 }
 
+/** Whether the platform refused the call because the object has more work than it can take. */
+const overloaded = (defect: unknown): boolean =>
+  typeof defect === "object" && defect !== null && Reflect.get(defect, "overloaded") === true;
+
+/**
+ * A read an object may hold: `call(waitMs)` waits inside the object for up to
+ * `waitMs`, and `call(0)` is the same read as it stands. An object restarts
+ * under the calls it holds (a deploy, a runtime update, a move to another
+ * host), and a held call is then stopped with an error the moment it touches
+ * storage. That is no defect of the read, so it is made once more on a fresh
+ * stub, not held, and that answer is served: from a position it is the same
+ * page or a later one, and nothing between is lost. A second failure is the
+ * object's own and stays a defect. An overloaded object is not asked again,
+ * and neither is a method that is not built yet.
+ */
+export function callHeldRead<A, E>(
+  codec: ExitCodec<A, E>,
+  read: string,
+  waitMs: number,
+  call: (waitMs: number) => Promise<unknown>,
+): Effect.Effect<A, E> {
+  return callObject(codec, () => call(waitMs)).pipe(
+    Effect.catchDefect((defect): Effect.Effect<A, E> => {
+      if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
+      console.warn(
+        JSON.stringify({
+          ops: "held-read",
+          read,
+          readAgain: defect instanceof Error ? defect.message : String(defect),
+        }),
+      );
+      return callObject(codec, () => call(0));
+    }),
+  );
+}
+
 /** Object keys sorted at every depth, so equal bodies hash equal however their keys were ordered. */
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);

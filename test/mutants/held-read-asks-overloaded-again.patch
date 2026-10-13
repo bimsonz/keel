@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-read
+# kills: rpc.held-read
+# why: an object that refused a call as overloaded is sent the same call again at once
+diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+index 3fa64d93..ac7ac899 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+@@ -48,7 +48,7 @@ export function callHeldRead<A, E>(
+ ): Effect.Effect<A, E> {
+   return callObject(codec, () => call(waitMs)).pipe(
+     Effect.catchDefect((defect): Effect.Effect<A, E> => {
+-      if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
++      if (defect instanceof NotImplemented) return Effect.die(defect);
+       console.warn(
+         JSON.stringify({
+           ops: "held-read",

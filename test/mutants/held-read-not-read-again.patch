@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-read
+# kills: rpc.held-read
+# why: a held read whose object restarts under it is a defect again, the 500 a deploy gave every waiting reader
+diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+index 3fa64d93..92c285b5 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+@@ -56,7 +56,7 @@ export function callHeldRead<A, E>(
+           readAgain: defect instanceof Error ? defect.message : String(defect),
+         }),
+       );
+-      return callObject(codec, () => call(0));
++      return Effect.die(defect);
+     }),
+   );
+ }

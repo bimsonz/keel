@@ -2,12 +2,13 @@ import type { AgentId } from "@keeltown/core/kernel";
 import { Inbox } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { AgentSessionCodecs } from "../../../rpc/index.ts";
-import { callObject } from "./answer.ts";
+import { callHeldRead } from "./answer.ts";
 import type { AgentSessionStub } from "./changes.ts";
 
 /**
  * `Inbox` over the agent's AgentSession DO, whose waiter holds the read until
- * a notice arrives or the deadline passes.
+ * a notice arrives or the deadline passes. A read the object restarts under
+ * is read again with no wait (`callHeldRead`).
  *
  * The caller's token was verified against the AgentDirectory, a projection of
  * the AgentSession DOs, and enrolment commits to the DO first. A DO that does
@@ -21,10 +22,10 @@ export function InboxRpc(
     Inbox,
     Inbox.of({
       read: (agentId, cursor, waitSeconds) =>
-        callObject(AgentSessionCodecs.inbox, () =>
+        callHeldRead(AgentSessionCodecs.inbox, "inbox", waitSeconds * 1000, (waitMs) =>
           agentSession(agentId).inbox({
             ...(cursor === undefined ? {} : { cursor }),
-            waitMs: waitSeconds * 1000,
+            waitMs,
           }),
         ).pipe(
           Effect.catchTag("AgentNotKnown", (error) =>

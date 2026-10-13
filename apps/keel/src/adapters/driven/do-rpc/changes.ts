@@ -19,7 +19,7 @@ import {
   type TakeNotices,
   SubmitCommand,
 } from "../../../rpc/index.ts";
-import { callObject, fingerprintOf } from "./answer.ts";
+import { callHeldRead, callObject, fingerprintOf } from "./answer.ts";
 
 /** The Change DO methods the isolate calls (`change:<id>`), answering Exit envelopes. */
 export interface ChangeStub {
@@ -203,9 +203,10 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
       workspace: (changeId) =>
         callObject(ChangeCodecs.workspace, () => objects.change(changeId).workspace()),
+      // Held by the change's object, which may restart under it: read again as it stands.
       awaitSubmission: (changeId, waitSeconds) =>
-        callObject(ChangeCodecs.submission, () =>
-          objects.change(changeId).submission(waitSeconds * 1000),
+        callHeldRead(ChangeCodecs.submission, "submission", waitSeconds * 1000, (waitMs) =>
+          objects.change(changeId).submission(waitMs),
         ),
     }),
   );

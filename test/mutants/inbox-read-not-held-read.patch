@@ -1,0 +1,29 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-inbox
+# kills: rpc.held-inbox
+# why: an agent's waiting inbox read is a plain object call again, a 500 when its AgentSession restarts under it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/inbox.ts b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+index 7fcde56c..8667592f 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/inbox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+@@ -2,7 +2,7 @@ import type { AgentId } from "@keeltown/core/kernel";
+ import { Inbox } from "@keeltown/core/ports";
+ import { Effect, Layer } from "effect";
+ import { AgentSessionCodecs } from "../../../rpc/index.ts";
+-import { callHeldRead } from "./answer.ts";
++import { callObject } from "./answer.ts";
+ import type { AgentSessionStub } from "./changes.ts";
+ 
+ /**
+@@ -22,10 +22,10 @@ export function InboxRpc(
+     Inbox,
+     Inbox.of({
+       read: (agentId, cursor, waitSeconds) =>
+-        callHeldRead(AgentSessionCodecs.inbox, "inbox", waitSeconds * 1000, (waitMs) =>
++        callObject(AgentSessionCodecs.inbox, () =>
+           agentSession(agentId).inbox({
+             ...(cursor === undefined ? {} : { cursor }),
+-            waitMs,
++            waitMs: waitSeconds * 1000,
+           }),
+         ).pipe(
+           Effect.catchTag("AgentNotKnown", (error) =>

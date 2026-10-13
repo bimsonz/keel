@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-read.test.ts -t rpc.held-read
+# kills: rpc.held-read
+# why: a method that is not built yet is called a second time before the doorway answers its 503
+diff --git a/apps/keel/src/adapters/driven/do-rpc/answer.ts b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+index 3fa64d93..32942092 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/answer.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/answer.ts
+@@ -48,7 +48,7 @@ export function callHeldRead<A, E>(
+ ): Effect.Effect<A, E> {
+   return callObject(codec, () => call(waitMs)).pipe(
+     Effect.catchDefect((defect): Effect.Effect<A, E> => {
+-      if (defect instanceof NotImplemented || overloaded(defect)) return Effect.die(defect);
++      if (overloaded(defect)) return Effect.die(defect);
+       console.warn(
+         JSON.stringify({
+           ops: "held-read",

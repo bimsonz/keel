@@ -1,3 +1,4 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -224,6 +225,26 @@ describe("GET /v1/events", () => {
     const on = await events(member, `?cursor=${end.body.nextCursor}`);
     expect(on.body.items.map((e) => e.eventId)).toContain(arrived.eventId);
     expect(on.body.items.map((e) => e.eventId)).not.toContain(before.eventId);
+  });
+
+  it("[feed.restart-under-wait] a waiting read whose Projector restarts under it is answered with the page as it stands, never a 500, and reading on from it misses nothing", async () => {
+    const { projectA, member } = await tenancy();
+    const from = await head(member);
+    const started = Date.now();
+    const waiting = events(member, `?project=${projectA}&cursor=${from}&limit=500&wait=20`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    // What a deploy does to the object: it restarts with the read held inside it.
+    await runInDurableObject(projector(), (_instance, state) =>
+      state.abort("the Projector restarts under a held read"),
+    ).catch(() => undefined);
+    const page = await waiting;
+    expect([page.status, page.body.items]).toEqual([200, []]);
+    expect(page.body.nextCursor >= from).toBe(true);
+    // Answered when the object went, not at the wait's end.
+    expect(Date.now() - started).toBeLessThan(10_000);
+    const arrived = await arrive(projectA);
+    const on = await events(member, `?project=${projectA}&cursor=${page.body.nextCursor}`);
+    expect(on.body.items.map((e) => e.eventId)).toEqual([arrived.eventId]);
   });
 
   it("[a11.events-cursor] refuses a cursor that is not a feed position, naming it", async () => {

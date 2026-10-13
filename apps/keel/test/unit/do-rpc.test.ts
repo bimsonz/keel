@@ -298,6 +298,34 @@ describe("Changes over Durable Object RPC", () => {
     }).pipe(Effect.provide(ChangesRpc(fake)));
   });
 
+  it.effect(
+    "[rpc.held-submission] a wait on a submission whose object restarts under it is read again with no wait, and answers the change as it stands",
+    () => {
+      const { fake, sent } = objects({});
+      let restarts = 1;
+      const restarting: ChangeObjects = {
+        ...fake,
+        change: (id) => {
+          const stub = fake.change(id);
+          return {
+            ...stub,
+            submission: async (waitMs) => {
+              if (restarts === 0) return stub.submission(waitMs);
+              restarts -= 1;
+              sent.waits.push(waitMs);
+              throw new Error("Durable Object reset because its code was updated.");
+            },
+          };
+        },
+      };
+      return Effect.gen(function* () {
+        const status = yield* (yield* Changes).awaitSubmission(changeId, 7);
+        expect(status).toEqual({ change, commitSha: null });
+        expect(sent.waits).toEqual([7_000, 0]);
+      }).pipe(Effect.provide(ChangesRpc(restarting)));
+    },
+  );
+
   it.effect("[changes.workspace] reads a change's workspace from its own DO", () => {
     const { fake, sent } = objects({});
     return Effect.gen(function* () {

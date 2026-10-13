@@ -1,0 +1,30 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.restart-under-wait
+# kills: feed.restart-under-wait
+# why: the feed's read is a plain object call again, so a person's waiting read answers 500 when the Projector restarts under it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
+index c1cf501d..16a08fcc 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/event-feed.ts
+@@ -1,7 +1,7 @@
+ import { EventFeed } from "@keeltown/core/ports";
+ import { Layer } from "effect";
+ import { type ProjectorRead, ProjectorCodecs } from "../../../rpc/index.ts";
+-import { callHeldRead } from "./answer.ts";
++import { callObject } from "./answer.ts";
+ 
+ /** The Projector DO method the isolate calls, answering an Exit envelope. */
+ export interface ProjectorStub {
+@@ -23,11 +23,11 @@ export function EventFeedRpc(projector: () => ProjectorStub): Layer.Layer<EventF
+     EventFeed,
+     EventFeed.of({
+       read: ({ cursor, limit, waitSeconds, project }) =>
+-        callHeldRead(ProjectorCodecs.read, "feed", waitSeconds * 1000, (waitMs) =>
++        callObject(ProjectorCodecs.read, () =>
+           projector().read({
+             ...(cursor === undefined ? {} : { cursor }),
+             ...(limit === undefined ? {} : { limit }),
+-            waitMs,
++            waitMs: waitSeconds * 1000,
+             ...(project === undefined ? {} : { project }),
+           }),
+         ),
