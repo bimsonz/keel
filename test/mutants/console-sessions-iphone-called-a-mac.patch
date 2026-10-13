@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.device
+# why: an iPhone, which carries the Mac's mark, is called a Mac
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..b0551283 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -30,7 +30,6 @@ const BROWSERS: readonly (readonly [string, string])[] = [
+ const SYSTEMS: readonly (readonly [string, string])[] = [
+   ["Windows", "Windows"],
+   ["Android", "Android"],
+-  ["iPhone", "iOS"],
+   ["iPad", "iPadOS"],
+   ["CrOS", "ChromeOS"],
+   ["Mac OS X", "macOS"],

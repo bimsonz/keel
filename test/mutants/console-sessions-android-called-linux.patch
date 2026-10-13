@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.device
+# why: an Android phone, which carries Linux's mark, is called Linux
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..856d887f 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -29,7 +29,6 @@ const BROWSERS: readonly (readonly [string, string])[] = [
+ /** A system by its mark. The order matters: Android carries Linux's, and an iPhone's and an iPad's carry the Mac's. */
+ const SYSTEMS: readonly (readonly [string, string])[] = [
+   ["Windows", "Windows"],
+-  ["Android", "Android"],
+   ["iPhone", "iOS"],
+   ["iPad", "iPadOS"],
+   ["CrOS", "ChromeOS"],

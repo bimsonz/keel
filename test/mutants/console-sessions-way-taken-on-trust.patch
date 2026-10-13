@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.as-answered
+# why: a way of signing in this page has no words for is handed on as it came, and its row has none
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..28181a01 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -71,7 +71,7 @@ function sessionOf(answer: SessionAnswer): OwnSession {
+     id: answer.id,
+     current: answer.current === true,
+     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it is one of the four, by the set
+-    signedInBy: SIGNED_IN_BY.has(by) ? (by as SignedInBy) : "other",
++    signedInBy: by as SignedInBy,
+     userAgent:
+       typeof answer.userAgent === "string" && answer.userAgent !== "" ? answer.userAgent : null,
+     createdAt: new Date(answer.createdAt).toISOString(),

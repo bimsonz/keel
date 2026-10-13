@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.as-answered
+# why: a page is handed whatever Keel's answer carried of a session, a token among it if it ever did
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..28485f18 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -68,6 +68,7 @@ interface SessionAnswer {
+ function sessionOf(answer: SessionAnswer): OwnSession {
+   const by = answer.signedInBy ?? "";
+   return {
++    ...answer,
+     id: answer.id,
+     current: answer.current === true,
+     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it is one of the four, by the set

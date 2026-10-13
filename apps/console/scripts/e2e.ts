@@ -2655,6 +2655,92 @@ expectEqual(
   await passkeysSaid(person),
   "no refusal | 0 offered | 1 kept",
 );
+/** A row of a list on the settings page, with its days and this browser's own name for itself taken out. */
+const rowSaid = (text: string): string =>
+  squash(text)
+    .replace(/\d{4}-\d{2}-\d{2}/g, "{day}")
+    .replace(/^.*? · this session/, "this session");
+const passkeyRows = (shown: Page) =>
+  shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem");
+// A passkey made a moment ago has signed nobody in yet. Keel has no last use of it, and the page says none.
+expectEqual(
+  "passkeys: one that has not signed its person in says the day it was added, and nothing of a last use",
+  rowSaid(await passkeyRows(person).first().innerText()),
+  "This laptop added {day} Rename Remove",
+);
+
+// ── Her sessions ──
+// Keel lists each browser signed in as her. This one is marked, and is offered no End: it is ended by signing out.
+const sessionRows = (shown: Page) =>
+  shown.getByRole("list", { name: "Your sessions" }).getByRole("listitem");
+const sessionsSaid = async (shown: Page): Promise<string> =>
+  `${(await sessionRows(shown).allInnerTexts()).map(rowSaid).join(" || ")} | ${(
+    await sessionRows(shown)
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getAttribute("aria-label") ?? button.textContent ?? ""),
+      )
+  ).join(", ")}`;
+await sessionRows(person)
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sessions: her one session is this one, by how it was signed in and its days, with no way offered to end it",
+  await sessionsSaid(person),
+  "this session Signed in with an email code on {day} · last used {day} | ",
+);
+// The same person signs in from another browser, which says it is Firefox on Windows.
+const elsewhere = await browser.newContext({
+  viewport: { width: 1280, height: 900 },
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
+});
+await asDeployed(elsewhere, { keel: shut, sent: sentToKeel });
+const otherBrowser = watch(
+  await elsewhere.newPage(),
+  "account, the same person in another browser",
+);
+await otherBrowser.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
+const codesBefore = identity.outbox.length;
+await otherBrowser.getByLabel("Email").fill("ada@example.com");
+await otherBrowser.getByRole("button", { name: "Send a code" }).click();
+await otherBrowser.getByLabel("The code sent to ada@example.com").waitFor();
+for (let tries = 0; tries < 50 && identity.outbox.length === codesBefore; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the code to be sent
+  await new Promise((resolve) => setTimeout(resolve, 100));
+await otherBrowser
+  .getByLabel("The code sent to ada@example.com")
+  .fill(identity.outbox.at(-1)?.otp ?? "");
+await otherBrowser.getByRole("button", { name: "Sign in", exact: true }).click();
+await otherBrowser.getByRole("heading", { name: "Your account" }).waitFor();
+// Her settings, opened again in the first browser, list both: the other by what it called itself, with its End.
+await person.reload({ waitUntil: "domcontentloaded" });
+await sessionRows(person)
+  .nth(1)
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await shot(person, "settings-sessions");
+expectEqual(
+  "sessions: another browser signed in as her is listed by what it called itself, the one used last first, and it alone may be ended",
+  await sessionsSaid(person),
+  "Firefox on Windows Signed in with an email code on {day} · last used {day} End || this session Signed in with an email code on {day} · last used {day} | End the session on Firefox on Windows",
+);
+const endings = (): number =>
+  sentToKeel.filter((request) => request.path === "/v1/auth/sessions/revoke").length;
+const endedBefore = endings();
+if ((await sessionRows(person).getByRole("button").count()) > 0)
+  await sessionRows(person).getByRole("button").first().click();
+for (let tries = 0; tries < 50 && (await sessionRows(person).count()) > 1; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the list to be read again
+  await new Promise((resolve) => setTimeout(resolve, 100));
+await otherBrowser.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await otherBrowser.waitForURL(/\/login/, { timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "sessions: ended, it leaves the list and signs nobody in, by one call of Keel's, and this browser stays signed in",
+  `${await sessionsSaid(person)} | ${endings() - endedBefore} asked | the other at ${new URL(otherBrowser.url()).pathname} | ${await sessionsHeld()} session here`,
+  "this session Signed in with an email code on {day} · last used {day} |  | 1 asked | the other at /login | 1 session here",
+);
+await elsewhere.close();
 
 // Once signed in, an address cannot send the reader on to another site.
 await person.goto(`${built}/login?next=${encodeURIComponent("https://elsewhere.example/")}`, {
@@ -3530,6 +3616,10 @@ await newcomer.waitForURL(`${built}/`);
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("heading", { name: "Your account" }).waitFor();
 await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").first().waitFor();
+const usedBeforeSignIn = rowSaid(await passkeyRows(newcomer).first().innerText()).replace(
+  /^.*?(?=added)/,
+  "",
+);
 expectEqual(
   "passkey sign-up: signed up and in, by a handle and a passkey, and no address is shown",
   `${squash(await newcomer.locator("header").first().innerText())} | ${squash(await newcomer.locator("main header").innerText())} | ${await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} | ${String((await newcomer.content()).includes("keel.invalid"))}`,
@@ -3557,6 +3647,37 @@ expectEqual(
   "passkey sign-up: signed back in with the same passkey",
   squash(await newcomer.locator("header").first().innerText()),
   "Keel turing",
+);
+// The passkey has now signed its person in, and Keel says when: the row says the day.
+await passkeyRows(newcomer)
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await passkeyRows(newcomer)
+  .first()
+  .getByText(/last used/)
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "passkeys: one that has signed its person in says the day it last did, and before it had, nothing",
+  `${rowSaid(await passkeyRows(newcomer).first().innerText()).replace(/^.*?(?=added)/, "")} | before: ${usedBeforeSignIn}`,
+  "added {day} · last used {day} Rename Remove | before: added {day} Rename Remove",
+);
+// Its name is changed where it is listed: the name as typed, without the spaces round it, by one call of Keel's.
+const renamings = (): number =>
+  sentAtTheDoor.filter((request) => request.path === "/v1/auth/passkey/update-passkey").length;
+await passkeyRows(newcomer).first().getByRole("button", { name: "Rename" }).click();
+await newcomer.getByLabel(/^New name for/).fill("  Desk key  ");
+await newcomer.getByRole("button", { name: "Save" }).click();
+await passkeyRows(newcomer)
+  .filter({ hasText: "Desk key" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await shot(newcomer, "settings-passkey-renamed");
+expectEqual(
+  "passkeys: a passkey is given the name typed, and keeps its days",
+  `${rowSaid(await passkeyRows(newcomer).first().innerText())} | ${renamings()} asked | ${await newcomer.getByLabel(/^New name for/).count()} still being named`,
+  "Desk key added {day} · last used {day} Rename Remove | 1 asked | 0 still being named",
 );
 // A second device takes the first one's place at the browser: a device keeps one passkey for an account.
 // Signed in by a passkey a moment ago, the session is fresh, and Keel takes the second device's passkey from it.

@@ -3,13 +3,14 @@
 // and nothing here imitates a route by hand. Nothing in the built console imports this.
 
 import { passkey } from "@better-auth/passkey";
-import { betterAuth } from "better-auth";
+import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import {
   APIError,
   createAuthEndpoint,
   createAuthMiddleware,
   getSessionFromCtx,
+  sessionMiddleware,
 } from "better-auth/api";
 import {
   admin,
@@ -45,6 +46,11 @@ export interface Identity {
    * in the last ten minutes. Null where it carries none.
    */
   reads(request: Request): Promise<{ id: string; fresh: boolean } | null>;
+  /**
+   * Gives an account a passkey with no browser to make one, for a test of what is listed of it: the row alone,
+   * which signs nobody in. `usedAt` is when it last signed its person in, where it has. Answers the passkey's id.
+   */
+  keyed(userId: string, name: string, usedAt?: Date): Promise<string>;
   /** Whose a handle is here, as Keel says it of a namespace: a person's or an org's, by its account's id, or nobody's. */
   whose(handle: string): Promise<{ id: string; kind: "user" | "org" } | undefined>;
 }
@@ -105,6 +111,86 @@ function signInMethod(path: string): string {
       return "other";
   }
 }
+
+/** The ways of signing in Keel names on a session: any other, or none, it answers as `other`. Keel's `WAYS`. */
+const WAYS: ReadonlySet<string> = new Set(["passkey", "email-otp", "github", "device"]);
+
+interface SessionRow {
+  id: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  expiresAt: Date | string;
+  userAgent?: string | null;
+  signedInBy?: string | null;
+}
+
+const at = (time: Date | string): string => new Date(time).toISOString();
+
+/**
+ * A person's own sessions and ending one, as Keel's `ownSessions` serves them (`sessions.ts` beside its
+ * `auth.ts`), written beside it and not imported: the list answers each session by its row's id and never its
+ * token, the one used last first, and only the asker's own that have not run out; ending takes that id, and an
+ * id that is not the asker's is no session at all.
+ */
+const ownSessions = () =>
+  ({
+    id: "own-sessions",
+    endpoints: {
+      listOwnSessions: createAuthEndpoint(
+        "/sessions",
+        { method: "GET", use: [sessionMiddleware] },
+        async (ctx) => {
+          const { session } = ctx.context.session;
+          const rows = await ctx.context.adapter.findMany<SessionRow>({
+            model: "session",
+            where: [
+              { field: "userId", value: session.userId },
+              { field: "expiresAt", operator: "gt", value: new Date() },
+            ],
+            sortBy: { field: "updatedAt", direction: "desc" },
+          });
+          return ctx.json({
+            sessions: rows.map((row) => ({
+              id: row.id,
+              current: row.id === session.id,
+              signedInBy:
+                typeof row.signedInBy === "string" && WAYS.has(row.signedInBy)
+                  ? row.signedInBy
+                  : "other",
+              userAgent:
+                typeof row.userAgent === "string" && row.userAgent !== "" ? row.userAgent : null,
+              createdAt: at(row.createdAt),
+              lastUsedAt: at(row.updatedAt),
+              expiresAt: at(row.expiresAt),
+            })),
+          });
+        },
+      ),
+      revokeOwnSession: createAuthEndpoint(
+        "/sessions/revoke",
+        { method: "POST", use: [sessionMiddleware] },
+        async (ctx) => {
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- whatever was sent, read as it may be
+          const id = (ctx.body as { id?: unknown } | undefined)?.id;
+          if (typeof id !== "string")
+            throw new APIError("BAD_REQUEST", { message: "Name the session to end by its id" });
+          const ended = await ctx.context.adapter.deleteMany({
+            model: "session",
+            where: [
+              { field: "id", value: id },
+              { field: "userId", value: ctx.context.session.session.userId },
+            ],
+          });
+          if (ended === 0)
+            throw new APIError("NOT_FOUND", {
+              code: "SESSION_NOT_FOUND",
+              message: "No session of yours has that id",
+            });
+          return ctx.json({ ended: true });
+        },
+      ),
+    },
+  }) satisfies BetterAuthPlugin;
 
 /** Both steps of adding a passkey: all of them an account with no passkey may take. Keel's `ADDS_PASSKEY`. */
 const ADDS_PASSKEY: ReadonlySet<string> = new Set([
@@ -363,6 +449,18 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
         rpID: new URL(origin).hostname,
         rpName: "Keel",
         origin,
+        // A passkey is marked used once its assertion has verified, as Keel's `usedNow` marks it.
+        authentication: {
+          afterVerification: async ({ ctx, verification }) => {
+            await ctx.context.adapter.update({
+              model: "passkey",
+              where: [
+                { field: "credentialID", value: verification.authenticationInfo.credentialID },
+              ],
+              update: { lastUsedAt: new Date() },
+            });
+          },
+        },
         // Passkey-first sign-up, as Keel has it: the handle chosen names a user made only once the passkey verifies.
         registration: {
           requireSession: false,
@@ -396,6 +494,14 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
           },
         },
       }),
+      // When each passkey last signed its person in: Keel's `keyUse`, a column the library's own list answers.
+      {
+        id: "key-use",
+        schema: {
+          passkey: { fields: { lastUsedAt: { type: "date", required: false, input: false } } },
+        },
+      },
+      ownSessions(),
       deviceAuthorization({ verificationUri: `${origin}/device` }),
       bearer(),
       organization({
@@ -437,6 +543,25 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
           update: { createdAt: made },
         });
       }
+    },
+    async keyed(userId, name, usedAt) {
+      const context = await auth.$context;
+      const made = await context.adapter.create<Record<string, unknown>, { id: string }>({
+        model: "passkey",
+        data: {
+          name,
+          userId,
+          publicKey: "a key no assertion is ever checked against",
+          credentialID: crypto.randomUUID(),
+          counter: 0,
+          deviceType: "singleDevice",
+          backedUp: false,
+          transports: "internal",
+          createdAt: new Date(),
+          ...(usedAt === undefined ? {} : { lastUsedAt: usedAt }),
+        },
+      });
+      return made.id;
     },
     async reads(request) {
       const carried = await auth.api.getSession({ headers: request.headers });

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: passkeys.used
+# why: a passkey Keel has no last use of is given one, in 1970
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..9e2b1261 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -386,9 +386,7 @@ export function createAccount(options: AccountOptions) {
+           id: passkey.id,
+           name: passkey.name ?? "",
+           createdAt: new Date(passkey.createdAt).toISOString(),
+-          ...(used === undefined || used === null
+-            ? {}
+-            : { lastUsedAt: new Date(used).toISOString() }),
++          lastUsedAt: new Date(used ?? 0).toISOString(),
+         };
+       });
+     },

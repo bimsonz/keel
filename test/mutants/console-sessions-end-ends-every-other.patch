@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.end
+# why: ending one session ends every other of the person's, the ones they meant to keep among them
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..55550b33 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -423,7 +423,7 @@ export function createAccount(options: AccountOptions) {
+ 
+     /** Ends one of the user's own sessions, by the id Keel listed it under. Whoever was using it signs in again. */
+     async endSession(id: string): Promise<void> {
+-      taken(await client.$fetch("/sessions/revoke", { method: "POST", body: { id } }));
++      taken(await client.revokeOtherSessions());
+     },
+ 
+     /** Claims a code that `keeltown login` is showing, for whoever is signed in here. Nothing is approved yet. */

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.device
+# why: Edge, which carries Chrome's mark, is called Chrome
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..a51dd186 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -19,7 +19,6 @@ const SIGNED_IN: Record<SignedInBy, string> = {
+ 
+ /** A browser by the mark its user agent carries. The order matters: Edge and Opera carry Chrome's, and Chrome carries Safari's. */
+ const BROWSERS: readonly (readonly [string, string])[] = [
+-  ["Edg/", "Edge"],
+   ["OPR/", "Opera"],
+   ["Firefox/", "Firefox"],
+   ["Chrome/", "Chrome"],

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.rows
+# why: a session's last use is said to the minute, where Keel writes it once an hour
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..17cd71ca 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -77,6 +77,6 @@ export function rowsOf(sessions: readonly OwnSession[]): SessionRow[] {
+     userAgent: session.userAgent ?? "",
+     current: session.current,
+     signedIn: `${SIGNED_IN[session.signedInBy]} on ${day(session.createdAt)}`,
+-    lastUsed: day(session.lastUsedAt),
++    lastUsed: session.lastUsedAt.slice(0, 16).replace("T", " "),
+   }));
+ }

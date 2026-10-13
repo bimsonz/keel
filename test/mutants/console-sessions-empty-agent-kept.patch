@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.as-answered
+# why: a browser that sent an empty description is listed as if it had named itself
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..1e089ca7 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -73,7 +73,7 @@ function sessionOf(answer: SessionAnswer): OwnSession {
+     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it is one of the four, by the set
+     signedInBy: SIGNED_IN_BY.has(by) ? (by as SignedInBy) : "other",
+     userAgent:
+-      typeof answer.userAgent === "string" && answer.userAgent !== "" ? answer.userAgent : null,
++      typeof answer.userAgent === "string" ? answer.userAgent : null,
+     createdAt: new Date(answer.createdAt).toISOString(),
+     lastUsedAt: new Date(answer.lastUsedAt).toISOString(),
+   };

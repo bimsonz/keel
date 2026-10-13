@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.rows
+# why: the list is put in an order of the page's own, the session asking first, and not the one Keel listed it in
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..4e31e34e 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -71,7 +71,7 @@ const day = (iso: string): string => iso.slice(0, 10);
+ 
+ /** The list as Keel ordered it, the one used last first. No row is moved, left out or added. */
+ export function rowsOf(sessions: readonly OwnSession[]): SessionRow[] {
+-  return sessions.map((session) => ({
++  return sessions.toSorted((a, b) => Number(b.current) - Number(a.current)).map((session) => ({
+     id: session.id,
+     device: deviceOf(session.userAgent),
+     userAgent: session.userAgent ?? "",

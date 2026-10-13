@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.not-theirs
+# why: the stand-in ends a session for anyone who names its id, another person's among them
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 7335dfc5..282db88d 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -178,7 +178,6 @@ const ownSessions = () =>
+             model: "session",
+             where: [
+               { field: "id", value: id },
+-              { field: "userId", value: ctx.context.session.session.userId },
+             ],
+           });
+           if (ended === 0)

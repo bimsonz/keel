@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.rows
+# why: a session whose row names no way, as every session made before Keel recorded one does, reads as something gone wrong
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..5e241a97 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -14,7 +14,7 @@ const SIGNED_IN: Record<SignedInBy, string> = {
+   "email-otp": "Signed in with an email code",
+   github: "Signed in with GitHub",
+   device: "Signed in from a terminal",
+-  other: "Signed in",
++  other: "Signed in by an unknown method",
+ };
+ 
+ /** A browser by the mark its user agent carries. The order matters: Edge and Opera carry Chrome's, and Chrome carries Safari's. */

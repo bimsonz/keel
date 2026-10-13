@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.list
+# why: the stand-in lists every person's sessions to whoever asks
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 7335dfc5..6ced0ebb 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -144,7 +144,6 @@ const ownSessions = () =>
+           const rows = await ctx.context.adapter.findMany<SessionRow>({
+             model: "session",
+             where: [
+-              { field: "userId", value: session.userId },
+               { field: "expiresAt", operator: "gt", value: new Date() },
+             ],
+             sortBy: { field: "updatedAt", direction: "desc" },

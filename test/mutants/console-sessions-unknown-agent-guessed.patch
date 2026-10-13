@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.device
+# why: something that is no browser the page knows, a terminal among them, is called a browser
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..77b0ed31 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -48,7 +48,7 @@ const marked = (marks: readonly (readonly [string, string])[], userAgent: string
+ export function deviceOf(userAgent: string | null): string {
+   if (userAgent === null || userAgent.trim() === "") return "A device that named no browser";
+   const browser = marked(BROWSERS, userAgent);
+-  if (browser === undefined) return userAgent.trim().split(/[\s/]/)[0] ?? userAgent;
++  if (browser === undefined) return "A browser";
+   const system = marked(SYSTEMS, userAgent);
+   return system === undefined ? browser : `${browser} on ${system}`;
+ }

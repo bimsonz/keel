@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.rows
+# why: a terminal's session is worded as a passkey sign-in
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..0dd13e4c 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -13,7 +13,7 @@ const SIGNED_IN: Record<SignedInBy, string> = {
+   passkey: "Signed in with a passkey",
+   "email-otp": "Signed in with an email code",
+   github: "Signed in with GitHub",
+-  device: "Signed in from a terminal",
++  device: "Signed in with a passkey",
+   other: "Signed in",
+ };
+ 

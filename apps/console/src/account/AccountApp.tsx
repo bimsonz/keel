@@ -33,6 +33,7 @@ import { wayToFresh } from "./fresh.ts";
 import { NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
+import { Sessions } from "./Sessions.tsx";
 import { Sponsor } from "./Sponsor.tsx";
 import { Sponsored } from "./Sponsored.tsx";
 import { type SponsorLink, takeLink } from "./sponsorLink.ts";
@@ -348,6 +349,8 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
 function Passkeys({ account, who }: { account: Account; who: Who }) {
   const [passkeys, setPasskeys] = useState<Passkey[] | null>(null);
   const [name, setName] = useState("");
+  /** The passkey being given another name, and the name as typed so far. */
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const { busy, refused, ask } = useAsking();
   /** What was last asked of Keel here: asked again, as it was, once the reader has signed in afresh. */
   const last = useRef<(() => Promise<void>) | null>(null);
@@ -397,24 +400,77 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
       )}
       <ul className="flex flex-col gap-1.5" aria-label="Your passkeys">
         {(passkeys ?? []).map((passkey) => (
-          <li key={passkey.id} className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-kumo-strong">
-              {passkey.name === "" ? "Unnamed" : passkey.name}
-            </span>
-            <span className="text-kumo-subtle">added {passkey.createdAt.slice(0, 10)}</span>
-            <button
-              type="button"
-              className="a-link"
-              disabled={busy}
-              onClick={() =>
-                void asking(async () => {
-                  await account.removePasskey(passkey.id);
-                  await read();
-                })
-              }
-            >
-              Remove
-            </button>
+          <li
+            key={passkey.id}
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
+          >
+            {renaming?.id === passkey.id ? (
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const named = renaming.name;
+                  void asking(async () => {
+                    await account.renamePasskey(passkey.id, named);
+                    setRenaming(null);
+                    await read();
+                  });
+                }}
+              >
+                <Input
+                  label={`New name for ${passkey.name === "" ? "this passkey" : passkey.name}`}
+                  name="rename"
+                  required
+                  value={renaming.name}
+                  onChange={(event) => setRenaming({ id: passkey.id, name: event.target.value })}
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={busy || renaming.name.trim() === ""}
+                >
+                  Save
+                </Button>
+                <button type="button" className="a-link" onClick={() => setRenaming(null)}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <>
+                <span className="text-kumo-strong">
+                  {passkey.name === "" ? "Unnamed" : passkey.name}
+                </span>
+                {/* A last use is said only where Keel has one: a passkey with none is not said never to have signed in. */}
+                <span className="text-kumo-subtle">
+                  added {passkey.createdAt.slice(0, 10)}
+                  {passkey.lastUsedAt !== undefined &&
+                    ` · last used ${passkey.lastUsedAt.slice(0, 10)}`}
+                </span>
+                <span className="flex gap-3">
+                  <button
+                    type="button"
+                    className="a-link"
+                    disabled={busy}
+                    onClick={() => setRenaming({ id: passkey.id, name: passkey.name })}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="a-link"
+                    disabled={busy}
+                    onClick={() =>
+                      void asking(async () => {
+                        await account.removePasskey(passkey.id);
+                        await read();
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                </span>
+              </>
+            )}
           </li>
         ))}
       </ul>
@@ -472,8 +528,6 @@ function Settings({
   sponsorship: KeelSponsorship;
   who: Who;
 }) {
-  const { busy, refused, ask } = useAsking();
-  const [ended, setEnded] = useState(false);
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-6 py-10">
       <header className="flex flex-col gap-1">
@@ -484,41 +538,7 @@ function Settings({
       </header>
       <Passkeys account={account} who={who} />
       <Sponsored account={account} sponsorship={sponsorship} who={who} />
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Sessions">
-        <h2 className="a-h">Sessions</h2>
-        <p className="text-sm text-kumo-subtle">
-          Signing out everywhere else ends every other browser and terminal signed in as you. Agents
-          are not signed in as you, and are not touched.
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() =>
-              void ask(async () => {
-                await account.signOutElsewhere();
-                setEnded(true);
-              })
-            }
-          >
-            Sign out everywhere else
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() =>
-              void ask(async () => {
-                await account.signOut();
-                go("/");
-              })
-            }
-          >
-            Sign out
-          </Button>
-        </div>
-        {ended && <p className="text-sm text-kumo-default">Every other session is ended.</p>}
-        <Refusal said={refused} />
-      </section>
+      <Sessions account={account} onSignedOut={() => go("/")} />
     </div>
   );
 }

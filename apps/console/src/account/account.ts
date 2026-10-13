@@ -28,6 +28,55 @@ export interface Passkey {
   id: string;
   name: string;
   createdAt: string;
+  /** When it last signed them in. Absent where it has not since Keel began recording it: that is not "never". */
+  lastUsedAt?: string;
+}
+
+/** How Keel says a session was signed in. `other` is a session whose row names no way. */
+export type SignedInBy = "passkey" | "email-otp" | "github" | "device" | "other";
+
+const SIGNED_IN_BY: ReadonlySet<string> = new Set<SignedInBy>([
+  "passkey",
+  "email-otp",
+  "github",
+  "device",
+]);
+
+/** One of the user's own sessions, as Keel lists it: named by the id of its row, which signs nothing in. */
+export interface OwnSession {
+  id: string;
+  /** The session this page is asking with. */
+  current: boolean;
+  signedInBy: SignedInBy;
+  /** What the browser called itself when it signed in. Null where it sent nothing. */
+  userAgent: string | null;
+  createdAt: string;
+  /** Its last use, to within the hour: Keel writes a session's row once an hour while it is used. */
+  lastUsedAt: string;
+}
+
+interface SessionAnswer {
+  id: string;
+  current?: boolean;
+  signedInBy?: string;
+  userAgent?: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+/** A session as Keel answered it, and no field more: a way of signing in this page does not know is `other`. */
+function sessionOf(answer: SessionAnswer): OwnSession {
+  const by = answer.signedInBy ?? "";
+  return {
+    id: answer.id,
+    current: answer.current === true,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it is one of the four, by the set
+    signedInBy: SIGNED_IN_BY.has(by) ? (by as SignedInBy) : "other",
+    userAgent:
+      typeof answer.userAgent === "string" && answer.userAgent !== "" ? answer.userAgent : null,
+    createdAt: new Date(answer.createdAt).toISOString(),
+    lastUsedAt: new Date(answer.lastUsedAt).toISOString(),
+  };
 }
 
 /** An org, by its name and by its handle: the first segment of its projects' addresses. */
@@ -142,7 +191,9 @@ function nextOf(given: unknown): string[] {
 }
 
 function refusal(error: Failure): Error {
-  if (error.status === 404) return new NotOpen();
+  // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
+  // there, a session that is not the asker's among them, and is a refusal like any other.
+  if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
   return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
 }
 
@@ -327,11 +378,27 @@ export function createAccount(options: AccountOptions) {
     },
 
     async passkeys(): Promise<Passkey[]> {
-      return taken(await client.passkey.listUserPasskeys()).map((passkey) => ({
-        id: passkey.id,
-        name: passkey.name ?? "",
-        createdAt: new Date(passkey.createdAt).toISOString(),
-      }));
+      return taken(await client.passkey.listUserPasskeys()).map((passkey) => {
+        // Keel adds when each last signed its person in. The library's own answer has no such field.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Keel's added field
+        const used = (passkey as { lastUsedAt?: string | Date | null }).lastUsedAt;
+        return {
+          id: passkey.id,
+          name: passkey.name ?? "",
+          createdAt: new Date(passkey.createdAt).toISOString(),
+          ...(used === undefined || used === null
+            ? {}
+            : { lastUsedAt: new Date(used).toISOString() }),
+        };
+      });
+    },
+
+    /**
+     * Gives one of the user's own passkeys another name, without the spaces typed round it. Keel asks for no
+     * fresh sign-in: it changes no way in.
+     */
+    async renamePasskey(id: string, name: string): Promise<void> {
+      taken(await client.passkey.updatePasskey({ id, name: name.trim() }));
     },
 
     /** Makes a passkey on this device and gives it to Keel. */
@@ -347,6 +414,19 @@ export function createAccount(options: AccountOptions) {
     /** Ends every session of this user but the one asking. */
     async signOutElsewhere(): Promise<void> {
       taken(await client.revokeOtherSessions());
+    },
+
+    /** The user's own sessions, as Keel orders them: the one used last first. No answer of it carries a token. */
+    async sessions(): Promise<OwnSession[]> {
+      const answer = await client.$fetch<{ sessions?: SessionAnswer[] }>("/sessions", {
+        method: "GET",
+      });
+      return (taken(answer).sessions ?? []).map(sessionOf);
+    },
+
+    /** Ends one of the user's own sessions, by the id Keel listed it under. Whoever was using it signs in again. */
+    async endSession(id: string): Promise<void> {
+      taken(await client.$fetch("/sessions/revoke", { method: "POST", body: { id } }));
     },
 
     /** Claims a code that `keeltown login` is showing, for whoever is signed in here. Nothing is approved yet. */

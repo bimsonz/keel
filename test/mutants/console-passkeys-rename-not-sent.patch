@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: passkeys.rename
+# why: a passkey's new name is never sent to Keel
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index d0bd0a20..6c03e554 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -398,7 +398,7 @@ export function createAccount(options: AccountOptions) {
+      * fresh sign-in: it changes no way in.
+      */
+     async renamePasskey(id: string, name: string): Promise<void> {
+-      taken(await client.passkey.updatePasskey({ id, name: name.trim() }));
++      taken(await client.passkey.listUserPasskeys());
+     },
+ 
+     /** Makes a passkey on this device and gives it to Keel. */

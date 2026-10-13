@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.list
+# why: every session is taken for the one asking, so none is offered an End
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 07431fb1..f0dfe036 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -69,7 +69,7 @@ function sessionOf(answer: SessionAnswer): OwnSession {
+   const by = answer.signedInBy ?? "";
+   return {
+     id: answer.id,
+-    current: answer.current === true,
++    current: true,
+     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- it is one of the four, by the set
+     signedInBy: SIGNED_IN_BY.has(by) ? (by as SignedInBy) : "other",
+     userAgent:

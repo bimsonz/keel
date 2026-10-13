@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.device
+# why: a session that sent only spaces for its description is listed under an empty name
+diff --git a/apps/console/src/account/sessions.ts b/apps/console/src/account/sessions.ts
+index ee1f8204..3102f80f 100644
+--- a/apps/console/src/account/sessions.ts
++++ b/apps/console/src/account/sessions.ts
+@@ -46,7 +46,7 @@ const marked = (marks: readonly (readonly [string, string])[], userAgent: string
+  * named none. It is the browser's own claim: Keel records it and checks none of it.
+  */
+ export function deviceOf(userAgent: string | null): string {
+-  if (userAgent === null || userAgent.trim() === "") return "A device that named no browser";
++  if (userAgent === null) return "A device that named no browser";
+   const browser = marked(BROWSERS, userAgent);
+   if (browser === undefined) return userAgent.trim().split(/[\s/]/)[0] ?? userAgent;
+   const system = marked(SYSTEMS, userAgent);

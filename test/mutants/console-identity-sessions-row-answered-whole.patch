@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sessions.test.ts
+# kills: sessions.no-token
+# why: the stand-in's list answers each session's whole row, its token with it, where Keel's reads the columns it answers
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 7335dfc5..e62647b8 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -151,6 +151,7 @@ const ownSessions = () =>
+           });
+           return ctx.json({
+             sessions: rows.map((row) => ({
++              ...row,
+               id: row.id,
+               current: row.id === session.id,
+               signedInBy:

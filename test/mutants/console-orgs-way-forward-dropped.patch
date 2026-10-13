@@ -2,13 +2,13 @@
 # kills: orgs.only-owner
 # why: the way forward Keel gave with a refusal is not handed on: the only owner is told no, and not how to go on
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 2cca937..65313da 100644
+index 07431fb1..3dce76aa 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -143,7 +143,7 @@ function nextOf(given: unknown): string[] {
- 
- function refusal(error: Failure): Error {
-   if (error.status === 404) return new NotOpen();
+@@ -194,7 +194,7 @@ function refusal(error: Failure): Error {
+   // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
+   // there, a session that is not the asker's among them, and is a refusal like any other.
+   if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
 -  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
 +  return new Refused(error.code ?? "", error.message ?? UNSAID);
  }
