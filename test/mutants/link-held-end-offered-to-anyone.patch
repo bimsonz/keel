@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts
+# kills: link.sponsor-held
+# why: the refusal of a held link offers its end to whoever asked, so a person who is not the sponsor is told to make a call they cannot
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 125f8042..371b2784 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -84,7 +84,7 @@ function stateRefused(
+         status: 409,
+         body: problem(409, "agent.state_refused", caller.requestId, {
+           detail: `${error.agentId} already has a sponsor, and an agent has one.`,
+-          nextActions: itself
++          nextActions: itself || error.agentId !== undefined
+             ? [
+                 {
+                   kind: "call",

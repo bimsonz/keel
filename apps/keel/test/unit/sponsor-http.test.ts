@@ -34,7 +34,7 @@ import {
   makeTokenIssuerMemory,
   makeUsersMemory,
 } from "@keeltown/testing";
-import { Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
@@ -42,6 +42,7 @@ import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 import {
   approveError,
+  askError,
   endError,
   NO_SUCH_REQUEST,
 } from "../../src/adapters/driving/http/sponsorship.ts";
@@ -345,6 +346,56 @@ describe("the sponsor link at the doorway", () => {
       409,
       "agent.state_refused",
     ]);
+    await w.runtime.dispose();
+  });
+
+  it("[link.sponsor-held] a held link's refusal offers its end only to the agent itself: the sponsor's own approval is the link they have, and anyone else is told the agent has a sponsor with nothing to call", async () => {
+    const w = world();
+    const bot = await sponsored(w, ANN);
+    const held = [
+      409,
+      "agent.state_refused",
+      `${bot} already has a sponsor, and an agent has one.`,
+    ];
+    const consent = (by: UserId) =>
+      Sponsorships.use((links) =>
+        links.approve({ agentId: bot, by, asked: { _tag: "Consent" }, idempotencyKey: key() }),
+      );
+    // The agent, asking for a sponsor it already has: it may end the link, and is told how.
+    const own = answer(await w.handlers.askSponsor(agent(bot)));
+    expect(refusal(own)).toEqual(held);
+    expect(own.body["nextActions"]).toEqual([
+      {
+        kind: "call",
+        title: "End the link you have first",
+        operationId: "Agents_endSponsorship",
+        args: { agentId: bot },
+      },
+    ]);
+    // Its sponsor, approving again: answered the link they have, so this refusal never reaches them.
+    expect(await w.runtime.runPromise(consent(ANN))).toMatchObject({ id: bot, sponsor: ANN });
+    // Another person: refused, and offered no call, since the link is not theirs to end.
+    const refused = await w.runtime.runPromise(Effect.flip(consent(BOB)));
+    expect(refused).toMatchObject({ _tag: "AgentStateRefused", reason: "sponsor-held" });
+    for (const stranger of [person(BOB), may(), agent(w.enrolled("another")), VISITOR]) {
+      const told = answer(approveError(stranger, refused));
+      expect(refusal(told)).toEqual(held);
+      expect(told.body["nextActions"]).toEqual([]);
+    }
+    expect(
+      answer(
+        askError(
+          agent(w.enrolled("third")),
+          new AgentStateRefused({
+            agentId: bot,
+            state: "active",
+            command: "Sponsor",
+            reason: "sponsor-held",
+          }),
+        ),
+      ).body["nextActions"],
+    ).toEqual([]);
+    expect(w.rowOf(bot)).toEqual([ANN, "active"]);
     await w.runtime.dispose();
   });
 

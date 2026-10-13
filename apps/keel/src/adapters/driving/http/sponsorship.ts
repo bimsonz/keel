@@ -64,26 +64,39 @@ export function askOk(origin: string, agentId: AgentId, request: SponsorRequest)
   };
 }
 
-/** The refusals of a link move by the agent as it stands: 409, saying what is in the way. */
+/**
+ * The refusals of a link move by the agent as it stands: 409, saying what is in
+ * the way. A held link's end is offered only to a caller who can make it. Of
+ * the two who can, the sponsor never reads this refusal (the Agent machine
+ * answers their own approval as the link they have), so that is the agent
+ * itself; anyone else is told the agent has a sponsor and is given nothing to
+ * call.
+ */
 function stateRefused(
   caller: Caller,
   error: AgentStateRefused,
 ): { readonly status: 409; readonly body: ProblemBody } {
-  const ending = {
-    kind: "call" as const,
-    title: "End the link the agent has first",
-    operationId: "Agents_endSponsorship",
-    args: { agentId: error.agentId },
-  };
   switch (error.reason) {
-    case "sponsor-held":
+    case "sponsor-held": {
+      const itself =
+        caller.principal._tag === "Agent" && caller.principal.agentId === error.agentId;
       return {
         status: 409,
         body: problem(409, "agent.state_refused", caller.requestId, {
           detail: `${error.agentId} already has a sponsor, and an agent has one.`,
-          nextActions: [ending],
+          nextActions: itself
+            ? [
+                {
+                  kind: "call",
+                  title: "End the link you have first",
+                  operationId: "Agents_endSponsorship",
+                  args: { agentId: error.agentId },
+                },
+              ]
+            : [],
         }),
       };
+    }
     case "not-sponsored":
       return {
         status: 409,
