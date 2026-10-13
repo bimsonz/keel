@@ -89,6 +89,16 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 
 `node scripts/level.ts <origin> <namespace> <project>` sets the console's fold of a public project's log beside Keel's own read of each of its conflicts, and says where the two differ. It reads only, as a visitor.
 
+## A project's decisions
+
+Keel remembers what each ruling settled, and the Decisions tab reads that memory: `GET /v1/decisions` for the list and `GET /v1/decisions/{id}` for one, each asked of Keel with nothing added. Keel reads them to whoever reads the project, so a visitor reads a public project's.
+
+- **The list is Keel's**, newest first and a page at a time by the cursor Keel gives. A row is what was decided, when, whether it still stands, its subject and the conflict it ruled. `?subject=` narrows it to one subject's.
+- **A decision's page says what the ruling upheld**, in the propositions Keel's own row holds, and names the guard that holds it, which leads to the probe it was admitted from. While the decision stands and a guard holds it, the page says the one thing that follows: a change that fails this guard is bounced, whatever the project's policy for the predicate. A decision that was superseded or overruled says its guard no longer blocks for it.
+- **The changes bounced citing it are the log's.** A bounce cites a decision where Keel's next action for its agent says to read one, by that action's own argument and never by a sentence. The bounced change's page links the decision the same way, and shows the verdict the bounce names: Keel judges a batch's candidate, so the verdict names the batch, and the bounce is what ties it to the change.
+- **The question a decision answered is its members' to see.** Keel reads a project's questions to its members, so the page links the question for them and shows nobody else that there was one.
+- **Nothing is read by the clock.** The page asks Keel again when the project's log says something Keel's read is joined from: a decision recorded or ended, a resolution that names one, a guard admitted or retired, a bounce that cites one.
+
 ## The review funnel
 
 `/N/P/insights/funnel` is counted from the project's log (`src/engine/funnel.ts`), and from nothing the console works out.
@@ -123,6 +133,7 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 | `/N/P/changes`, `/N/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked A verdict is said by Keel's own outcome, and with it that no plan ran where Keel says so; the evidence its event recorded is listed as Keel wrote it where Keel serves no view of the verdict; and what Keel derived names the commit it derived from, or says that none was pushed. A landed change names the commit it landed as on trunk, linked to that commit's page, and its Files tab offers the way there where Keel serves no diff of the change itself |
 | `/N/P/conflicts`, `/N/P/conflicts/<C-n>`, `…/probe`, `…/evidence` | The conflicts, and one conflict. `?state=` is `open` or `settled` |
 | `/N/P/escalations`, `/N/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
+| `/N/P/decisions`, `/N/P/decisions/<D-n>` | What was ruled, as Keel remembers it, and one decision: what it upheld, the guard that holds it and the changes bounced citing it. `?subject=` narrows the list to one subject's |
 | `/N/P/mission-control`, `/N/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
 | `/N/P/insights`, `/N/P/insights/funnel`, `/N/P/insights/benchmark` | Trunk's numbers, the review funnel, the benchmark |
 | `/N/P/agents`, `/N/P/agents/<handle>` | The agents Keel's log names in the project, and one agent's runs here. Above them, where there are any: the agents a person invited to this one project that have joined, as Keel reads them to anyone who reads it. An agent with no handle is called by Keel's id for it. `?shown=` is how many rows |
