@@ -87,6 +87,41 @@ export function gitSync(args: string[], opts: GitSyncOptions = {}) {
   return run;
 }
 
+/**
+ * A git child that runs beside the test instead of holding it, for a git
+ * client of a server in the test's own process: a synchronous child would
+ * stop that server answering it. It is killed at its timeout like every
+ * other child (GitTimedOut), and any exit but 0 rejects with what git wrote
+ * to its standard error. Resolves to its standard output.
+ */
+export function gitBeside(args: readonly string[], timeoutMs = GIT_TIMEOUT_MS): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", [...args], { env: GIT_ENV });
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new GitTimedOut(subcommandOf(args), timeoutMs));
+    }, timeoutMs);
+    child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (status, signal) => {
+      clearTimeout(timer);
+      if (status === 0) resolve(Buffer.concat(out).toString());
+      else
+        reject(
+          new Error(
+            `git ${args.join(" ")} failed (${status ?? signal}): ${Buffer.concat(err).toString()}`,
+          ),
+        );
+    });
+  });
+}
+
 export function git(cwd: string, args: string[], input?: string | Uint8Array): string {
   const run = gitSync(args, { cwd, input });
   if (run.status !== 0)

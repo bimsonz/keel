@@ -3,18 +3,16 @@
 // through the rewrite, and what comes out must be what git itself answers for
 // a twin repo that holds main alone. Then stock git clones through it.
 
-import { execFile } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { concat, dec, enc, ZERO_OID } from "../src/bytes.ts";
 import { FLUSH, pkt } from "../src/push.ts";
 import { LS_REFS_MAIN, mainOnly, type ServedRequest } from "../src/serve-main.ts";
-import { fastImport, GIT_ENV, git, gitSync, tempRepo } from "./git-harness.ts";
+import { fastImport, git, gitBeside, gitSync, tempRepo } from "./git-harness.ts";
 import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
 const MAIN = "refs/heads/main";
@@ -93,16 +91,6 @@ const subsets = <A>(items: readonly A[]): A[][] =>
   items.reduce<A[][]>((sets, item) => [...sets, ...sets.map((set) => [...set, item])], [[]]);
 
 const text = (bytes: Uint8Array | null) => (bytes === null ? null : dec.decode(bytes));
-
-/** A git client run beside a server in this process: a synchronous child would stop the server answering it. */
-const client = async (args: readonly string[]) =>
-  (
-    await promisify(execFile)("git", [...args], {
-      env: GIT_ENV,
-      timeout: PROPERTY_TIMEOUT,
-      killSignal: "SIGKILL",
-    })
-  ).stdout;
 
 afterAll(() => {
   for (const repo of [host, twin, mainless, empty]) repo.cleanup();
@@ -269,7 +257,7 @@ describe("mainOnly", { timeout: PROPERTY_TIMEOUT }, () => {
       async (version) => {
         const protocol = ["-c", `protocol.version=${version}`];
         const dir = join(scratch, `v${version}`);
-        await client([...protocol, "clone", "-q", url, dir]);
+        await gitBeside([...protocol, "clone", "-q", url, dir]);
         expect(git(dir, ["rev-parse", "HEAD"]).trim()).toBe(main);
         expect(git(dir, ["symbolic-ref", "HEAD"]).trim()).toBe(MAIN);
         expect(git(dir, ["for-each-ref", "--format=%(refname) %(objectname)"]).trim()).toBe(
@@ -280,13 +268,13 @@ describe("mainOnly", { timeout: PROPERTY_TIMEOUT }, () => {
           ].join("\n"),
         );
         expect(gitSync(["fsck", "--full"], { cwd: dir }).status).toBe(0);
-        expect(await client([...protocol, "ls-remote", url])).toBe(
+        expect(await gitBeside([...protocol, "ls-remote", url])).toBe(
           `${main}\tHEAD\n${main}\t${MAIN}\n`,
         );
-        expect(await client([...protocol, "ls-remote", url, "HEAD"])).toBe(`${main}\tHEAD\n`);
-        expect(await client([...protocol, "ls-remote", url, "master", "v1"])).toBe("");
+        expect(await gitBeside([...protocol, "ls-remote", url, "HEAD"])).toBe(`${main}\tHEAD\n`);
+        expect(await gitBeside([...protocol, "ls-remote", url, "master", "v1"])).toBe("");
         // A fetch of HEAD by name asks protocol 2 for prefixes that leave main out: it still gets main's commit.
-        await client([...protocol, "-C", dir, "fetch", "-q", url, "HEAD"]);
+        await gitBeside([...protocol, "-C", dir, "fetch", "-q", url, "HEAD"]);
         expect(git(dir, ["rev-parse", "FETCH_HEAD"]).trim()).toBe(main);
       },
     );
