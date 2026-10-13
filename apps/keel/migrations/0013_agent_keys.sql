@@ -4,8 +4,15 @@
 -- `agents` is rebuilt, as 0004 rebuilt it, because SQLite cannot relax a
 -- column's NOT NULL in place: `kind` becomes optional (an agent that signed up
 -- by key has none) and `handle` is new (the name it was given, made from its
--- key). `project_id` keeps its empty default, which is what such an agent has.
--- Expand-only: every row and every column an earlier Worker reads is kept.
+-- key; the `namespaces` row of kind `agent` is what holds it unique).
+-- `project_id` keeps its empty default, which is what such an agent has.
+--
+-- A rebuild copies a named list of columns, so it holds every column and every
+-- index `agents` had when it was written (0012's `sponsor_seq` and
+-- `agents_by_sponsor` among them), and its number is above every migration
+-- before it: it runs in the same place in a new database as in one that has
+-- been deployed to. Expand-only: every row and every column an earlier Worker
+-- reads is kept.
 
 CREATE TABLE credentials_kept AS SELECT client_id, agent_id, secret_hash FROM credentials;
 DROP TABLE credentials;
@@ -21,17 +28,17 @@ CREATE TABLE agents_v3 (
   project_id       TEXT NOT NULL DEFAULT '',
   on_behalf_of     TEXT,
   standing_seq     INTEGER NOT NULL DEFAULT 0,
-  org_id           TEXT,
+  namespace_id     TEXT,
   sponsor_user     TEXT,
+  sponsor_seq      INTEGER NOT NULL DEFAULT 0,
   handle           TEXT
 );
-INSERT INTO agents_v3 (id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, org_id, sponsor_user)
-  SELECT id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, org_id, sponsor_user FROM agents;
+INSERT INTO agents_v3 (id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user, sponsor_seq)
+  SELECT id, name, kind, scopes, state, revocation_epoch, created_at, project_id, on_behalf_of, standing_seq, namespace_id, sponsor_user, sponsor_seq FROM agents;
 DROP TABLE agents;
 ALTER TABLE agents_v3 RENAME TO agents;
 CREATE INDEX agents_by_project ON agents (project_id);
--- An agent's given handle is its alone.
-CREATE UNIQUE INDEX agents_by_handle ON agents (handle) WHERE handle IS NOT NULL;
+CREATE INDEX agents_by_sponsor ON agents (sponsor_user);
 
 CREATE TABLE credentials (
   client_id   TEXT PRIMARY KEY,
