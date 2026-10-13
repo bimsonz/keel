@@ -401,6 +401,16 @@ describe("Better Auth at /v1/auth", () => {
     holdsNoToken(bearer, token.json.access_token);
   }, 30_000);
 
+  it("[ba.device-sign-out] keeltown's token ends its own session and no other: it then reads nobody, and the session that approved it reads its person still", async () => {
+    const { jar } = await signUpByPasskey("eli");
+    const { token } = await keeltownLogin(jar);
+    const cli = { headers: { authorization: `Bearer ${token.json.access_token}` }, origin: null };
+    expect((await site("/get-session", cli)).json.user.username).toBe("eli");
+    answered(await site("/sign-out", { ...cli, body: {} }), 200);
+    expect((await site("/get-session", cli)).json).toBeNull();
+    expect((await site("/get-session", { jar })).json.user.username).toBe("eli");
+  }, 30_000);
+
   it("[ba.fresh-sign-in] by cookie: a session adds a passkey only within ten minutes of its own passkey sign-in", async () => {
     // The one it signed up with, one while fresh, and one after signing in again.
     expect(await addsPasskeysOnlyWhileFresh("gail", byCookie)).toBe(3);

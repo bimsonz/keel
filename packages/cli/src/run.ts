@@ -10,7 +10,9 @@ import {
   thumbprint,
 } from "@keeltown/sdk";
 import { encodeEntry, entryName, type Held, heldKey, KeyError } from "./agent-key.ts";
-import type { KeyStore } from "./key-store.ts";
+import { gitCredential, setupGit } from "./git-credential.ts";
+import type { Exec, KeyStore } from "./key-store.ts";
+import { heldSignIn, LoginFailed, loginCommand, logoutCommand } from "./login.ts";
 
 /** Where the CLI writes, and how it reaches Keel; tests pass their own. */
 export interface Io {
@@ -20,6 +22,17 @@ export interface Io {
   readonly fetch?: KeelClientOptions["fetch"];
   /** This machine's key store, where an agent's key is kept; undefined when it has none. */
   readonly keyStore?: KeyStore | undefined;
+  /** The same store as it keeps a person's sign-in, under a service of its own. */
+  readonly signIns?: KeyStore | undefined;
+  /** Everything on stdin: git writes its helper the address it wants a credential for. */
+  readonly stdin?: () => Promise<string>;
+  /** Runs a program on this machine: git, for `auth setup-git`. */
+  readonly exec?: Exec;
+  /** The command that runs this CLI again, as git's config is given it. */
+  readonly self?: readonly string[];
+  /** Waiting and the time, for `login`'s polling; tests pass their own. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  readonly now?: () => number;
 }
 
 /** 0: done. 1: Keel refused (the next actions are printed). 2: the command line or credentials are wrong. */
@@ -27,6 +40,9 @@ export type ExitCode = 0 | 1 | 2;
 
 const USAGE = `keeltown <command> [options]
 
+  login [--profile <name>] [--print-token]
+  logout [--profile <name>]
+  auth setup-git [--profile <name>]
   agent signup [--name <label>] [--profile <name>] [--print-key]
   agent show [--profile <name>]
   token [--project <prj_…>] [--run <label>] [--header] [--profile <name>]
@@ -54,6 +70,11 @@ run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that ta
 comes from KEEL_AGENT_KEY with KEEL_AGENT_ID (\`agent signup --print-key\` prints one, once).
 Other credentials: KEEL_URL always; an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's
 KEEL_SESSION, which win over a key when set. Projects and agents are governed by a user.
+A person signs in with \`login\`: Keel names a page to open, the sign-in is approved there, and it
+is kept in this machine's key store, never in a file (--print-token prints its token once where
+there is no store, for KEEL_SESSION). \`auth setup-git\` has git ask keeltown for it, so a private
+project clones with nothing pasted, and \`logout\` ends it at Keel and here. With no agent's
+credential on the machine, a command runs as the person signed in.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -83,6 +104,7 @@ const OPTIONS = {
   profile: { type: "string" },
   header: { type: "boolean" },
   "print-key": { type: "boolean" },
+  "print-token": { type: "boolean" },
   harness: { type: "string" },
   model: { type: "string" },
   "if-match": { type: "string" },
@@ -430,7 +452,35 @@ async function keyCommand(
   return 0;
 }
 
-/** The client a work command runs as: an agent's secret or a user's session when set, else the agent this machine holds a key for. */
+/**
+ * The commands about a person's sign-in on this machine. Undefined for every
+ * other command.
+ */
+async function personCommand(
+  io: Io,
+  command: string,
+  values: ReturnType<typeof parse>["values"],
+  baseUrl: string,
+  entry: string,
+): Promise<ExitCode | undefined> {
+  if (command === "login")
+    return loginCommand(io, {
+      baseUrl,
+      entry,
+      printToken: values["print-token"] === true,
+      json: values.json === true,
+    });
+  if (command === "logout") return logoutCommand(io, { baseUrl, entry });
+  if (command === "auth setup-git")
+    return setupGit(io, baseUrl, values.profile ?? io.env["KEEL_PROFILE"]);
+  return undefined;
+}
+
+/**
+ * The client a work command runs as: an agent's secret or a user's session
+ * when set, else the agent this machine holds a key for, else the person
+ * signed in on it.
+ */
 async function clientFor(
   io: Io,
   values: ReturnType<typeof parse>["values"],
@@ -446,14 +496,19 @@ async function clientFor(
     return createKeelClient({ baseUrl, clientId, clientSecret, ...fetch });
   if (session !== undefined) return createKeelClient({ baseUrl, session, ...fetch });
   const held = await signedUpKey(io, entry);
-  if (held === undefined) return undefined;
-  return createKeelClient({
-    baseUrl,
-    agentId: held.agentId,
-    key: held.signer,
-    ...target(values, io.env),
-    ...fetch,
-  });
+  if (held !== undefined)
+    return createKeelClient({
+      baseUrl,
+      agentId: held.agentId,
+      key: held.signer,
+      ...target(values, io.env),
+      ...fetch,
+    });
+  // No agent's credential at all: the person signed in on this machine.
+  const signIn = await heldSignIn(io.env, io.signIns, entry);
+  return signIn === undefined
+    ? undefined
+    : createKeelClient({ baseUrl, session: signIn.token, ...fetch });
 }
 
 export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
@@ -469,6 +524,9 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     io.stdout(USAGE);
     return positionals.length === 0 && values.help !== true ? 2 : 0;
   }
+  // git names the host it wants a credential for, so its helper runs with no KEEL_URL.
+  if (positionals[0] === "auth" && positionals[1] === "git-credential" && positionals.length <= 3)
+    return gitCredential(io, positionals[2], values.profile ?? io.env["KEEL_PROFILE"]);
   const baseUrl = io.env["KEEL_URL"];
   if (baseUrl === undefined) {
     io.stderr("Set KEEL_URL to Keel's address, such as https://keel.town.");
@@ -476,12 +534,14 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
   }
   try {
     const entry = entryName(baseUrl, values.profile ?? io.env["KEEL_PROFILE"]);
+    const person = await personCommand(io, positionals.join(" "), values, baseUrl, entry);
+    if (person !== undefined) return person;
     const about = await keyCommand(io, positionals.join(" "), values, baseUrl, entry);
     if (about !== undefined) return about;
     const client = await clientFor(io, values, baseUrl, entry);
     if (client === undefined) {
       io.stderr(
-        `${NO_KEY} Or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
+        `${NO_KEY} Or run \`keeltown login\` to sign in as yourself, or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
       );
       return 2;
     }
@@ -507,6 +567,10 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     if (error instanceof KeelTokenError) {
       io.stderr(error.message);
       return 2;
+    }
+    if (error instanceof LoginFailed) {
+      io.stderr(error.message);
+      return 1;
     }
     throw error;
   }
