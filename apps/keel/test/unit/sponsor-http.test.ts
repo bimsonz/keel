@@ -40,7 +40,11 @@ import { describe, expect, it } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
-import { approveError, endError } from "../../src/adapters/driving/http/sponsorship.ts";
+import {
+  approveError,
+  endError,
+  NO_SUCH_REQUEST,
+} from "../../src/adapters/driving/http/sponsorship.ts";
 import { doorwayOf } from "../../src/composition/doorway.ts";
 
 /**
@@ -269,10 +273,14 @@ describe("the sponsor link at the doorway", () => {
     const other = w.enrolled("other");
     const code = await asked(w, bot);
     const miss = await approve(w, person(ANN), bot, "not-the-code");
+    // The refusal names the way forward itself, and again as its one next action.
     expect(refusal(miss)).toEqual([
       404,
       "resource.not_found",
-      "No agent is asking for a sponsor with that code.",
+      "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.",
+    ]);
+    expect(miss.body["nextActions"]).toEqual([
+      { kind: "escalate", title: "Ask the agent for a new link, and approve with it" },
     ]);
     // Each miss reads exactly as the first: nothing says which it was.
     expect(await approve(w, person(ANN), makeId("agt", ulid()), code)).toEqual(miss);
@@ -326,7 +334,7 @@ describe("the sponsor link at the doorway", () => {
     expect(refusal(await approve(w, person(ANN), bot, code))).toEqual([
       404,
       "resource.not_found",
-      "No agent is asking for a sponsor with that code.",
+      NO_SUCH_REQUEST,
     ]);
     expect(w.rowOf(bot)).toEqual([BOB, "active"]);
 
@@ -501,7 +509,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the org it works in, its handle when it signed itself up, never who stands behind it", async () => {
+  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the namespace it works in, its handle when it signed itself up, never who stands behind it", async () => {
     const w = world();
     const held = await sponsored(w, ANN, "carded");
     const card = async (caller: Caller, agentId: string) =>
@@ -509,12 +517,12 @@ describe("the sponsor link at the doorway", () => {
     const visitor = await card(VISITOR, held);
     expect(visitor).toEqual({
       status: 200,
-      body: { id: held, name: "carded", kind: "interactive", org: "acme" },
+      body: { id: held, name: "carded", kind: "interactive", namespace: "acme" },
     });
     for (const reader of [person(BOB), may(), person(ANN), agent(held), agent(w.enrolled("x"))])
       expect(await card(reader, held)).toEqual(visitor);
     expect(JSON.stringify(visitor)).not.toContain(ANN);
-    // An agent in no org has no org on its card.
+    // An agent in no namespace has none on its card.
     const placeless = w.enrolled("placeless");
     w.directory.agents.set(placeless, { ...agentRecord(placeless, "placeless"), org: undefined });
     expect((await card(VISITOR, placeless)).body).toEqual({
@@ -522,7 +530,7 @@ describe("the sponsor link at the doorway", () => {
       name: "placeless",
       kind: "interactive",
     });
-    // An agent that signed itself up has a handle, which is its own namespace's, and no kind or org.
+    // An agent that signed itself up has a handle, which is its own namespace's, and no kind; it works nowhere yet, so its card names no namespace.
     const { jkt, jwk } = freshAgentKey();
     const { agent: keyed } = await w.runtime.runPromise(signUpAgent({ jkt, jwk }, "keyed"));
     expect(keyed.handle).toBe(givenHandle(keyed.id));

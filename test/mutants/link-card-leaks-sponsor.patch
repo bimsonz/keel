@@ -2,13 +2,13 @@
 # kills: link.card-public
 # why: an agent's public card names the person who stands behind it, to every visitor
 diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
-index 44b9dcb8..3d8c32a2 100644
+index f73ed729..9a27fa59 100644
 --- a/apps/keel/src/adapters/driving/http/sponsorship.ts
 +++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
-@@ -243,6 +243,7 @@ export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentRe
-       name: agent.name,
-       kind: agent.kind,
-       ...(org === undefined ? {} : { org }),
+@@ -252,6 +252,7 @@ export function cardOk(agent: Agent, namespace: string | undefined): Agents_getA
+       ...(agent.handle === undefined ? {} : { handle: agent.handle }),
+       ...(agent.kind === undefined ? {} : { kind: agent.kind }),
+       ...(namespace === undefined ? {} : { namespace }),
 +      ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
      },
    };

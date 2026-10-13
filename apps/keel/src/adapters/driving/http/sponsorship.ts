@@ -154,8 +154,14 @@ export function askError(
 /**
  * The one answer to an approval that finds no live request: the code is wrong,
  * used or run out, or there is no such agent. Nothing in it says which, so a
- * code tells its holder nothing about an agent until it is the right one.
+ * code tells its holder nothing about an agent until it is the right one. It
+ * does say what to do next, in its detail as well as its next action: the
+ * person holds a link that no longer works, and only the agent can give
+ * another.
  */
+export const NO_SUCH_REQUEST =
+  "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.";
+
 export function noSuchRequest(caller: Caller): {
   readonly status: 404;
   readonly body: ProblemBody;
@@ -163,9 +169,9 @@ export function noSuchRequest(caller: Caller): {
   return {
     status: 404,
     body: problem(404, "resource.not_found", caller.requestId, {
-      detail: "No agent is asking for a sponsor with that code.",
+      detail: NO_SUCH_REQUEST,
       nextActions: [
-        { kind: "escalate", title: "Ask the agent to ask again, and approve with its new code" },
+        { kind: "escalate", title: "Ask the agent for a new link, and approve with it" },
       ],
     }),
   };
@@ -233,10 +239,11 @@ export function sponsoredOk(agents: readonly Agent[]): Agents_listSponsoredResul
 
 /**
  * An agent as anyone may see it: who it is, the handle it was given when it
- * signed itself up, and the org it works in, by that org's handle. Never its
- * sponsor, its scopes or its standing.
+ * signed itself up, and the namespace it works in, by that namespace's handle
+ * (an org's, a person's own or an agent's own). Never its sponsor, its scopes
+ * or its standing.
  */
-export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentResult {
+export function cardOk(agent: Agent, namespace: string | undefined): Agents_getAgentResult {
   return {
     status: 200,
     body: {
@@ -244,7 +251,7 @@ export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentRe
       name: agent.name,
       ...(agent.handle === undefined ? {} : { handle: agent.handle }),
       ...(agent.kind === undefined ? {} : { kind: agent.kind }),
-      ...(org === undefined ? {} : { org }),
+      ...(namespace === undefined ? {} : { namespace }),
     },
   };
 }

@@ -202,7 +202,7 @@ describe("the sponsor link through the real Worker", () => {
     expect(mine.body).toMatchObject({ items: [{ id: agentId, sponsor: sponsor.userId }] });
     expect(await http(null, "GET", `/agents/${agentId}`)).toEqual({
       status: 200,
-      body: { id: agentId, name: "link-agent", kind: "interactive", org: "pool" },
+      body: { id: agentId, name: "link-agent", kind: "interactive", namespace: "pool" },
     });
     expect(Object(Object((await me()).body["result"]).agent).sponsor).toBe(sponsor.userId);
 

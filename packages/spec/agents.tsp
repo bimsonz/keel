@@ -99,8 +99,8 @@ model AgentCard {
   /** What runs it. An agent that signed itself up with a key has none. */
   kind?: AgentKind;
 
-  /** The org the agent works in, by its handle. */
-  org?: string;
+  /** The namespace the agent works in, by its handle: an org's, a person's own, or an agent's own. */
+  `namespace`?: string;
 }
 
 /** The agents a person stands behind. */

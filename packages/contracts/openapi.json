@@ -7834,9 +7834,9 @@
             ],
             "description": "What runs it. An agent that signed itself up with a key has none."
           },
-          "org": {
+          "namespace": {
             "type": "string",
-            "description": "The org the agent works in, by its handle."
+            "description": "The namespace the agent works in, by its handle: an org's, a person's own, or an agent's own."
           }
         },
         "additionalProperties": {

@@ -3161,7 +3161,7 @@ const BETA = {
   id: "agt_0000000000000000000000BETA",
   name: "beta",
   kind: "hosted",
-  org: "acme",
+  namespace: "acme",
 } as const;
 const GAMMA = { id: "agt_000000000000000000000GAMMA", name: "gamma", kind: "interactive" } as const;
 const sponsoring = createFakeKeel({

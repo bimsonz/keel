@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.card-public
+# kills: link.card-public
+# why: an agent's public card names the namespace it works in as `org`, though it is a person's own or an agent's own as often as an org's
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index f73ed729..16d55354 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -251,7 +251,7 @@ export function cardOk(agent: Agent, namespace: string | undefined): Agents_getA
+       name: agent.name,
+       ...(agent.handle === undefined ? {} : { handle: agent.handle }),
+       ...(agent.kind === undefined ? {} : { kind: agent.kind }),
+-      ...(namespace === undefined ? {} : { namespace }),
++      ...(namespace === undefined ? {} : { org: namespace }),
+     },
+   };
+ }

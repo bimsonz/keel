@@ -18,7 +18,7 @@ const AGENT: AgentCard = {
   id: "agt_0000000000000000000000BETA",
   name: "beta",
   kind: "hosted",
-  org: "acme",
+  namespace: "acme",
 };
 const ADA: Who = { id: "ada", name: "Ada", handle: "ada" };
 const GRACE: Who = { id: "grace", name: "Grace", handle: "grace" };

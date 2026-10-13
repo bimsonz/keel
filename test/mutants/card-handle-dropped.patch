@@ -2,14 +2,14 @@
 # kills: link.card-public
 # why: the public card of an agent that signed itself up leaves out its handle, so nothing a reader is shown names the agent's own namespace
 diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
-index 6b034fd1..ca584381 100644
+index f73ed729..4da2bb18 100644
 --- a/apps/keel/src/adapters/driving/http/sponsorship.ts
 +++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
-@@ -242,7 +242,6 @@ export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentRe
+@@ -249,7 +249,6 @@ export function cardOk(agent: Agent, namespace: string | undefined): Agents_getA
      body: {
        id: agent.id,
        name: agent.name,
 -      ...(agent.handle === undefined ? {} : { handle: agent.handle }),
        ...(agent.kind === undefined ? {} : { kind: agent.kind }),
-       ...(org === undefined ? {} : { org }),
+       ...(namespace === undefined ? {} : { namespace }),
      },

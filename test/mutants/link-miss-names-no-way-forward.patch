@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: a missed approval says only that nothing matched, leaving a person with a dead link and no word that the agent can give another
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 1f5e9494..d197684a 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -160,7 +160,7 @@ export function askError(
+  * another.
+  */
+ export const NO_SUCH_REQUEST =
+-  "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.";
++  "No agent is asking for a sponsor with that code.";
+ 
+ export function noSuchRequest(caller: Caller): {
+   readonly status: 404;

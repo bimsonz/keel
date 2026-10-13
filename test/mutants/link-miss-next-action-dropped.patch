@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: a missed approval carries no next action, so a client that shows a refusal's way forward shows none
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 1f5e9494..3736b1f6 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -170,9 +170,7 @@ export function noSuchRequest(caller: Caller): {
+     status: 404,
+     body: problem(404, "resource.not_found", caller.requestId, {
+       detail: NO_SUCH_REQUEST,
+-      nextActions: [
+-        { kind: "escalate", title: "Ask the agent for a new link, and approve with it" },
+-      ],
++      nextActions: [],
+     }),
+   };
+ }

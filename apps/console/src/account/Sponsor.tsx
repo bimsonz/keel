@@ -143,12 +143,12 @@ export function Sponsor({
         {/* The kind is what the agent said of itself when it enrolled, and Keel vouches for none of it. */}
         <dt className="text-kumo-subtle">Declared as</dt>
         <dd className="text-kumo-default">{agent.kind}</dd>
-        {agent.org !== undefined && (
+        {agent.namespace !== undefined && (
           <>
             <dt className="text-kumo-subtle">Works in</dt>
             <dd className="text-kumo-default">
-              <a className="a-link" href={`/${encodeURIComponent(agent.org)}`}>
-                {agent.org}
+              <a className="a-link" href={`/${encodeURIComponent(agent.namespace)}`}>
+                {agent.namespace}
               </a>
             </dd>
           </>
