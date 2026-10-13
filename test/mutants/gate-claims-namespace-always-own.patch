@@ -2,15 +2,15 @@
 # kills: gate.claims
 # why: the agent is stood in its own namespace whatever project its token names, so the policy reads another's project as the agent's own
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 75dc530c..ae4e0914 100644
+index b47ae279..32ef8b3e 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -205,7 +205,7 @@ export const principalOf: (
+@@ -212,7 +212,7 @@ export const principalOf: (
          projectId === undefined
            ? Option.none()
            : yield* ProjectNamespaces.use((places) => places.byId(projectId));
 -      const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
 +      const org = Option.match(place, { onNone: () => own, onSome: () => own });
        const governs = projectId === undefined || (Option.isSome(place) && org === own);
+       // An org takes an agent into the whole of it; anyone else's namespace takes it on one project.
        const invited =
-         governs || Option.isNone(place)

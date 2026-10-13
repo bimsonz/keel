@@ -2,10 +2,10 @@
 # kills: authz.org-rows
 # why: only an agent's own namespace is answered as missing, so a person's own takes an org's actions.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index a673edda..7c9dae8b 100644
+index ab00e909..acb57409 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -632,7 +632,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+@@ -730,7 +730,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
   * and goes only with its account.
   */
  const noOrg = (asked: ResourceKind, resource: Resource): boolean =>
@@ -13,4 +13,4 @@ index a673edda..7c9dae8b 100644
 +  asked === "Org" && resource._tag === "Namespace" && kindOf(resource) === "agent";
  
  /**
-  * The one authorization policy: whether `principal` may take `action` on
+  * Whether an action of a person's own project is asked of a project somewhere

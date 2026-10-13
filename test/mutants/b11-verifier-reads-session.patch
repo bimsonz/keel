@@ -2,18 +2,18 @@
 # kills: b11.gate-no-hop
 # why: the request gate runs whoami, so every authenticated request calls the agent's AgentSession DO
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 75dc530c..143ad646 100644
+index b47ae279..3623b083 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -15,6 +15,7 @@ import {
-   Memberships,
+@@ -16,6 +16,7 @@ import {
    NamespaceAgents,
+   ProjectAgents,
    ProjectNamespaces,
 +  Sessions,
    TokenIssuer,
    Users,
  } from "../ports/index.ts";
-@@ -172,6 +173,7 @@ export const principalOf: (
+@@ -179,6 +180,7 @@ export const principalOf: (
      case "Token": {
        const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
        const agent = yield* admit(token);

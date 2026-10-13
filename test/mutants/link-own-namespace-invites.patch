@@ -2,15 +2,15 @@
 # kills: link.own-namespace
 # why: a person invites an agent into their own namespace, which the policy asks of an org alone
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 6fccc289..87cdf166 100644
+index ab00e909..6d1e40a9 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -96,7 +96,7 @@ export const SPEC_ACTIONS = {
+@@ -109,7 +109,7 @@ export const SPEC_ACTIONS = {
    Namespaces_getProject: rule("Project", "read"),
    Namespaces_listAgents: rule("Namespace", "read"),
-   // An agent is invited into an org, never into a person's own namespace.
--  Namespaces_inviteAgent: rule("Org", "member"),
-+  Namespaces_inviteAgent: rule("Namespace", "member"),
+   // An agent is invited into an org, never into a person's own namespace, and by a person.
+-  Namespaces_inviteAgent: rule("Org", "invite"),
++  Namespaces_inviteAgent: rule("Namespace", "invite"),
    Namespaces_removeAgent: rule("Org", "inviterOrMaintain"),
- 
-   Changes_listChanges: rule("Project", "read"),
+   // In a person's own namespace an agent is invited to one project, never to the whole of it.
+   Projects_inviteAgent: rule("PersonalProject", "own"),

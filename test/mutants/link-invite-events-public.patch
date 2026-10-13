@@ -2,7 +2,7 @@
 # kills: b12.event-audience
 # why: an invitation's event is served to anyone, and it names the member who invited the agent
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index 7e1781d9..9744a98e 100644
+index 3e559cfb..289d6bb0 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
 @@ -39,7 +39,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
@@ -13,4 +13,4 @@ index 7e1781d9..9744a98e 100644
 +  AgentInvited: "public",
    AgentJoinedNamespace: "public",
    AgentLeftNamespace: "members",
-   UserSignedUp: "members",
+   // A project's invitation, as an org's: only the joining names no person.

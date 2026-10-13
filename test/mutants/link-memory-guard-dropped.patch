@@ -2,14 +2,14 @@
 # kills: nsagents.contract
 # why: the in-memory rows take a late move over a newer one, so a suite on memory passes where D1 would not
 diff --git a/packages/testing/src/memory/invitations.ts b/packages/testing/src/memory/invitations.ts
-index 805a39a9..90f4c3fd 100644
+index 78942465..220ba67f 100644
 --- a/packages/testing/src/memory/invitations.ts
 +++ b/packages/testing/src/memory/invitations.ts
-@@ -29,7 +29,6 @@ export function makeNamespaceAgentsMemory() {
-   const apply = (move: NamespaceAgentMove, seq: number): boolean => {
-     const key = rowKey(move.namespace, move.agentId);
-     const held = rows.get(key);
--    if (held !== undefined && held.seq >= seq) return true;
-     switch (move._tag) {
-       case "Invited":
-         rows.set(key, {
+@@ -40,7 +40,6 @@ function makeRows() {
+         .toSorted((a, b) => a.invitedAt - b.invitedAt || a.agentId.localeCompare(b.agentId)),
+     apply: (key: string, move: RowMove, seq: number): boolean => {
+       const held = rows.get(key);
+-      if (held !== undefined && held.seq >= seq) return true;
+       switch (move._tag) {
+         case "Invited":
+           rows.set(key, { invitation: move.invitation, seq });

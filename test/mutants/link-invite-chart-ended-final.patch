@@ -2,14 +2,17 @@
 # kills: link.invite-chart
 # why: the chart ends at Ended, so the machine inviting the agent again makes a move the chart does not draw
 diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
-index db48566b..c521b890 100644
+index d5ca2583..82066b5b 100644
 --- a/packages/core/test/charts/charts.ts
 +++ b/packages/core/test/charts/charts.ts
-@@ -282,7 +282,7 @@ export const invitationChart: Chart = {
-   states: {
-     invited: { on: { AgentJoinedNamespace: i("joined"), AgentLeftNamespace: i("ended") } },
-     joined: { on: { AgentLeftNamespace: i("ended") } },
--    ended: { tags: ["terminal"], on: { AgentInvited: i("invited") } },
+@@ -291,10 +291,7 @@ export const invitationChart: Chart = {
+       },
+     },
+     joined: { on: { AgentLeftNamespace: i("ended"), AgentLeftProject: i("ended") } },
+-    ended: {
+-      tags: ["terminal"],
+-      on: { AgentInvited: i("invited"), AgentInvitedToProject: i("invited") },
+-    },
 +    ended: { type: "final" },
    },
  };

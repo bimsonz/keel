@@ -2,15 +2,15 @@
 # kills: link.standing
 # why: the invited agent is never subscribed to its own invitation, so it is not told a member invited it or took it out
 diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
-index d55cddba..696f898e 100644
+index f3978d8b..5ce7e09f 100644
 --- a/packages/core/src/application/identity/invitations.ts
 +++ b/packages/core/src/application/identity/invitations.ts
-@@ -187,8 +187,6 @@ const moveInvitation = Effect.fn("identity/moveInvitation")(function* (
+@@ -282,8 +282,6 @@ const moveInvitation = Effect.fn("identity/moveInvitation")(function* <R>(
        if (invitation === undefined)
-         throw new IllegalTransition(`${command._tag} left ${agentId} no place in ${namespace}`);
-       tx.store.put(NAMESPACE_AGENT, agentId, asStored(encodeInvitation(invitation)));
+         throw new IllegalTransition(`${command._tag} left ${agentId} no place in ${where}`);
+       tx.store.put(kind, agentId, asStored(encodeInvitation(invitation)));
 -      if (decided.success.some((event) => event._tag === "AgentInvited"))
 -        tx.outbox.subscribe(`agent:${agentId}`, INVITATION_TELLS, { kind: "agent", id: agentId });
-       return Result.succeed({ value: invitation, drafts });
-     },
-   );
+       if (decided.success.some((event) => event._tag === "AgentInvitedToProject"))
+         tx.outbox.subscribe(`agent:${agentId}`, PROJECT_INVITATION_TELLS, {
+           kind: "agent",

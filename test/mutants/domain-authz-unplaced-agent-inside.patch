@@ -2,15 +2,15 @@
 # kills: authz.private-is-missing, authz.org-isolation
 # why: an agent with no standing counts as inside the org of its token's project, so it can tell a private project from a missing one
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index a673edda..dc6fc4a4 100644
+index ab00e909..e3c512d8 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -437,7 +437,7 @@ const lacksRole = (need: "member" | "maintain" | "own", kind: NamespaceKind): De
- const inside = (principal: UserPrincipal | AgentPrincipal, namespace: NamespaceId): boolean =>
-   principal._tag === "User"
-     ? roleOf(principal, namespace) !== undefined
--    : principal.namespace === namespace && principal.standing._tag !== "None";
-+    : principal.namespace === namespace;
- 
- /**
-  * Whether the resource is there for this caller to be refused: a private or
+@@ -518,7 +518,7 @@ const inside = (
+ ): boolean => {
+   if (principal._tag === "User") return roleOf(principal, resource.namespace) !== undefined;
+   const { standing } = principal;
+-  if (principal.namespace !== resource.namespace || standing._tag === "None") return false;
++  if (principal.namespace !== resource.namespace) return false;
+   const oneProject = standing._tag === "Invited" && standing.projectOnly === true;
+   return !oneProject || isTokenProject(principal, resource);
+ };

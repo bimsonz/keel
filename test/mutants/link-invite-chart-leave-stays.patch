@@ -2,13 +2,13 @@
 # kills: link.invite-chart
 # why: an end leaves the agent where it was, invited or joined, where the chart says it is Ended
 diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
-index b3f76cba..e8c9c6bc 100644
+index ddd9a8e4..163fb798 100644
 --- a/packages/core/src/domain/identity/invitation-machine.ts
 +++ b/packages/core/src/domain/identity/invitation-machine.ts
-@@ -165,7 +165,7 @@ export const evolveInvitation = (
-         ? { ...state, state: "joined", joinedAt: committed.at }
+@@ -207,7 +207,7 @@ export const evolveInvitation = (
          : illegal(state, event);
      case "AgentLeftNamespace":
+     case "AgentLeftProject":
 -      return standing(state) ? { ...state, state: "ended" } : illegal(state, event);
 +      return standing(state) ? { ...state } : illegal(state, event);
      default: {

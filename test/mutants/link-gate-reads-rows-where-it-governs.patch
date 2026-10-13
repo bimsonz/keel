@@ -2,15 +2,15 @@
 # kills: gate.invited
 # why: the gate reads the rows of invitations for an agent in its own namespace too, a D1 read on every request that can decide nothing
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 75dc530c..25bb71c8 100644
+index b47ae279..2df70594 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -208,7 +208,7 @@ export const principalOf: (
-       const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
+@@ -216,7 +216,7 @@ export const principalOf: (
        const governs = projectId === undefined || (Option.isSome(place) && org === own);
+       // An org takes an agent into the whole of it; anyone else's namespace takes it on one project.
        const invited =
--        governs || Option.isNone(place)
-+        Option.isNone(place)
+-        governs || Option.isNone(place) || projectId === undefined
++        Option.isNone(place) || projectId === undefined
            ? Option.none()
-           : yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org));
-       const standing: AgentStanding = governs
+           : namespaceKind(org) === "org"
+             ? yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org))
