@@ -22,8 +22,8 @@ export interface RaiseRequest {
   readonly sponsor?: UserId | undefined;
   /**
    * The agent the question concerns. Where a member invited it into the
-   * namespace, that member answers for it there and is the one asked first,
-   * whoever `sponsor` names.
+   * namespace, or the namespace's person invited it to this project, they
+   * answer for it there and are the one asked first, whoever `sponsor` names.
    */
   readonly agent?: AgentId | undefined;
   /** The object told when a person has ruled: it hears the escalation's DecisionRecorded. */

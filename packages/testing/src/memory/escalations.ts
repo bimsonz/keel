@@ -20,12 +20,14 @@ import {
   Escalations,
   type EventOutbox,
   HumanGate,
+  type ProjectAgents,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { makeEventOutboxMemory, makeManualClock, type ManualClock } from "./event-outbox.ts";
+import { makeProjectAgentsMemory } from "./invitations.ts";
 import { makeEntityStoreMemory } from "./storage.ts";
 
-type Hosted = Clock | EntityStore | EventOutbox;
+type Hosted = Clock | EntityStore | EventOutbox | ProjectAgents;
 
 const notFound = (escalationId: EscalationId) =>
   new EscalationNotFound({ escalationId, nextActions: [] });
@@ -39,6 +41,8 @@ const notFound = (escalationId: EscalationId) =>
  */
 export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
   const objects = new Map<string, ReturnType<typeof makeEventOutboxMemory>>();
+  // The rows of the agents invited to a project, which a raise outside an org reads for who is asked first.
+  const projectAgents = makeProjectAgentsMemory();
   const views = makeEntityStoreMemory().service;
   const folded = new Set<string>();
   const objectAt = (namespace: NamespaceId) => {
@@ -51,7 +55,10 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
     return object;
   };
   const on = <A, E>(namespace: NamespaceId, program: Effect.Effect<A, E, Hosted>) =>
-    Effect.provide(program, Layer.mergeAll(objectAt(namespace).layer, clock.layer));
+    Effect.provide(
+      program,
+      Layer.mergeAll(objectAt(namespace).layer, clock.layer, projectAgents.layer),
+    );
   const log = (namespace: NamespaceId, entity: EntityRef): readonly EventEnvelope[] =>
     objectAt(namespace).service.log(entity);
   /** Folds what the namespace's object has committed on an escalation and its decision, in commit order. */
@@ -102,6 +109,7 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
   );
   return {
     clock,
+    projectAgents: projectAgents.service,
     gate,
     layer: Layer.mergeAll(gate, escalations),
     /** The events committed on `entity` in a namespace's object. */

@@ -134,6 +134,21 @@ model AgentNamespaces {
   items: AgentNamespace[];
 }
 
+/** A project an agent was invited to, as the agent reads it: which one, what it gives, and never who invited it. */
+model AgentProject {
+  project: ProjectRef;
+
+  /** `invited` until you accept; `joined` once you have. Only the call that ends one reads `ended`. */
+  state: InvitationState;
+  scopes: Scope[];
+  invitedAt: utcDateTime;
+  joinedAt?: utcDateTime;
+}
+
+model AgentProjects {
+  items: AgentProject[];
+}
+
 /** The agents a person stands behind. */
 model SponsoredAgents {
   items: AgentProfile[];
@@ -196,6 +211,31 @@ interface Agents {
   @route("/me/namespaces/{namespace}")
   @delete
   leaveNamespace(@path `namespace`: string, ...IdempotencyKey): AgentNamespace | NotFound | Conflict | StandardErrors;
+
+  /** The projects you were invited to, one by one: the ones you have joined and the ones still asking, oldest first. */
+  @summary("List the projects you were invited to")
+  @useAuth(AgentRead)
+  @route("/me/projects")
+  @get
+  listProjects(): AgentProjects | StandardErrors;
+
+  /**
+   * Accept an invitation to one project, by its id as the invitation's notice names it. From then on a token
+   * that names that project reads and works on it, within what the invitation gives, and on nothing else of its
+   * namespace. A project that has not invited you is not found (404).
+   */
+  @summary("Accept an invitation to a project")
+  @useAuth(AgentRead)
+  @route("/me/projects/{projectId}")
+  @put
+  acceptProjectInvitation(@path projectId: ProjectId, ...IdempotencyKey): AgentProject | NotFound | Conflict | StandardErrors;
+
+  /** Decline an invitation to a project you have not accepted, or leave one you joined. A project that has not invited you is not found (404). */
+  @summary("Decline an invitation to a project, or leave it")
+  @useAuth(AgentRead)
+  @route("/me/projects/{projectId}")
+  @delete
+  leaveProject(@path projectId: ProjectId, ...IdempotencyKey): AgentProject | NotFound | Conflict | StandardErrors;
 
   /** The agents the caller stands behind, oldest first. */
   @summary("List the agents you sponsor")

@@ -272,17 +272,29 @@ export const agentChart: Chart = {
   },
 };
 
-// Invitation: an agent's place in one namespace. Ended is where a run may rest, and no end: the agent may be invited again.
+// Invitation: an agent's place in one namespace, or on one project of a person's. The two share
+// every edge under their own events. Ended is where a run may rest, and no end: the agent may be
+// invited again.
 const i = to("invitation");
 
 export const invitationChart: Chart = {
   id: "invitation",
   initial: "invited",
-  meta: { createdBy: "AgentInvited", section: "Invitation" },
+  meta: { createdBy: "AgentInvited / AgentInvitedToProject", section: "Invitation" },
   states: {
-    invited: { on: { AgentJoinedNamespace: i("joined"), AgentLeftNamespace: i("ended") } },
-    joined: { on: { AgentLeftNamespace: i("ended") } },
-    ended: { tags: ["terminal"], on: { AgentInvited: i("invited") } },
+    invited: {
+      on: {
+        AgentJoinedNamespace: i("joined"),
+        AgentJoinedProject: i("joined"),
+        AgentLeftNamespace: i("ended"),
+        AgentLeftProject: i("ended"),
+      },
+    },
+    joined: { on: { AgentLeftNamespace: i("ended"), AgentLeftProject: i("ended") } },
+    ended: {
+      tags: ["terminal"],
+      on: { AgentInvited: i("invited"), AgentInvitedToProject: i("invited") },
+    },
   },
 };
 

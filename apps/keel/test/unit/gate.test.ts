@@ -7,7 +7,7 @@ import {
 } from "@keeltown/core/application/identity";
 import type { Agent, AgentClaims } from "@keeltown/core/domain/identity";
 import { Instant, makeId } from "@keeltown/core/kernel";
-import { NamespaceAgents, TokenIssuer } from "@keeltown/core/ports";
+import { NamespaceAgents, ProjectAgents, TokenIssuer } from "@keeltown/core/ports";
 import {
   hashSecret,
   makeAgentDirectoryMemory,
@@ -15,6 +15,7 @@ import {
   makeClockMemory,
   makeMembershipsMemory,
   makeNamespaceAgentsMemory,
+  makeProjectAgentsMemory,
   makeProjectNamespacesMemory,
   makeTokenIssuerMemory,
   makeUsersMemory,
@@ -129,6 +130,7 @@ function layers(override: Partial<Agent> = {}) {
     makeMembershipsMemory(rows).layer,
     makeProjectNamespacesMemory().layer,
     makeNamespaceAgentsMemory().layer,
+    makeProjectAgentsMemory().layer,
     clock,
   );
 }
@@ -137,6 +139,9 @@ const KEYED = makeId("agt", ulidOf(54));
 const OWN = makeId("prj", ulidOf(55));
 const ELSEWHERE = makeId("prj", ulidOf(56));
 const NOWHERE = makeId("prj", ulidOf(57));
+/** Two projects of Ann's own namespace, whose id is hers. */
+const HERS = makeId("prj", ulidOf(58));
+const HERS_TOO = makeId("prj", ulidOf(59));
 
 /** An agent that signed itself up: a handle and no project, kind, org or sponsor. */
 const keyed: Agent = {
@@ -157,19 +162,25 @@ const claims = (over: Partial<AgentClaims> = {}): Credential => ({
 
 /**
  * The ports with the keyed agent as `override` has it, one project in its own
- * namespace and one in an org Ann is a member of. `invitations` are the rows
- * of the org's agents, and `reads` counts each read of them.
+ * namespace, one in an org Ann is a member of, and two in Ann's own
+ * namespace. `invitations` are the rows of the org's agents and `toProjects`
+ * the rows of the agents invited to one project; `reads` and `projectReads`
+ * count each read of them.
  */
 function keyedLayers(
   override: Partial<Agent> = {},
   invitations: ReturnType<typeof makeNamespaceAgentsMemory> = makeNamespaceAgentsMemory(),
   reads: { count: number } = { count: 0 },
+  toProjects: ReturnType<typeof makeProjectAgentsMemory> = makeProjectAgentsMemory(),
+  projectReads: { count: number } = { count: 0 },
 ) {
   const directory = makeAgentDirectoryMemory();
   directory.agents.set(KEYED, { ...keyed, ...override });
   const places = makeProjectNamespacesMemory();
   places.places.set(OWN, { projectId: OWN, namespace: KEYED, name: "mine" });
   places.places.set(ELSEWHERE, { projectId: ELSEWHERE, namespace: sampleOrgId, name: "theirs" });
+  places.places.set(HERS, { projectId: HERS, namespace: ANN, name: "hers" });
+  places.places.set(HERS_TOO, { projectId: HERS_TOO, namespace: ANN, name: "hers-too" });
   const rows = makeBetterAuthMemory({
     users: [{ id: ANN, username: "ann" }],
     orgs: [{ id: sampleOrgId, slug: "sample" }],
@@ -193,7 +204,40 @@ function keyedLayers(
           }),
       }),
     ),
+    Layer.succeed(
+      ProjectAgents,
+      ProjectAgents.of({
+        ...toProjects.service,
+        standing: (agentId, projectId) =>
+          Effect.suspend(() => {
+            projectReads.count += 1;
+            return toProjects.service.standing(agentId, projectId);
+          }),
+      }),
+    ),
     clock,
+  );
+}
+
+/** The rows of one project of Ann's with the keyed agent invited to it by `by`, and accepted or ended as asked. */
+function invitedTo(
+  projectId: typeof HERS,
+  by: typeof ANN,
+  scopes: readonly ("agent:read" | "agent:work")[],
+  then: readonly ("Joined" | "Left")[],
+) {
+  const toProjects = makeProjectAgentsMemory();
+  const at = { projectId, agentId: KEYED };
+  const moves = [
+    { _tag: "Invited" as const, ...at, namespace: ANN, by, scopes, at: Instant(1_760_000_000_000) },
+    ...then.map((tag) =>
+      tag === "Joined"
+        ? { _tag: tag, ...at, at: Instant(1_760_000_000_001) }
+        : { _tag: tag, ...at },
+    ),
+  ];
+  return Effect.forEach(moves, (move, index) => toProjects.service.apply(move, index + 1)).pipe(
+    Effect.as(toProjects),
   );
 }
 
@@ -553,8 +597,8 @@ describe("the request gate", () => {
 
         // Where it governs, and where the project has no place, the rows are never read.
         const both = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined"]);
-        const reads = { count: 0 };
-        const layer = keyedLayers({}, both, reads);
+        const [reads, projectReads] = [{ count: 0 }, { count: 0 }];
+        const layer = keyedLayers({}, both, reads, undefined, projectReads);
         const own = yield* principalOf(claims({ projectId: OWN })).pipe(Effect.provide(layer));
         const account = yield* principalOf(claims()).pipe(Effect.provide(layer));
         const nowhere = yield* principalOf(claims({ projectId: NOWHERE })).pipe(
@@ -563,9 +607,105 @@ describe("the request gate", () => {
         expect(own.principal).toMatchObject({ standing: { _tag: "Governs" } });
         expect(account.principal).toMatchObject({ standing: { _tag: "Governs" } });
         expect(nowhere.principal).toMatchObject({ standing: { _tag: "None" } });
-        expect(reads.count).toBe(0);
+        // Neither table: not the org's rows, and not a project's.
+        expect([reads.count, projectReads.count]).toEqual([0, 0]);
         yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(Effect.provide(layer));
-        expect(reads.count).toBe(1);
+        expect([reads.count, projectReads.count]).toEqual([1, 0]);
+      }),
+  );
+
+  it.effect(
+    "[gate.project-invited] invited to one project of a person's own namespace and accepted, it stands Invited by that person, the namespace's owner, on that project, with its token's scopes cut; on another project of theirs it has no standing",
+    () =>
+      Effect.gen(function* () {
+        const both = yield* invitedTo(HERS, ANN, ["agent:read", "agent:work"], ["Joined"]);
+        const given = (rows: typeof both) => keyedLayers({}, undefined, undefined, rows);
+        const working = yield* principalOf(claims({ projectId: HERS })).pipe(
+          Effect.provide(given(both)),
+        );
+        expect(working.principal).toMatchObject({
+          namespace: ANN,
+          projectId: HERS,
+          scopes: ["agent:work", "agent:read"],
+          standing: {
+            _tag: "Invited",
+            by: { userId: ANN, role: "owner", suspended: false },
+            projectOnly: true,
+          },
+        });
+
+        const readOnly = yield* invitedTo(HERS, ANN, ["agent:read"], ["Joined"]);
+        const reading = yield* principalOf(claims({ projectId: HERS })).pipe(
+          Effect.provide(given(readOnly)),
+        );
+        expect(reading.principal).toMatchObject({
+          scopes: ["agent:read"],
+          standing: { _tag: "Invited", by: { userId: ANN } },
+        });
+
+        // Her other project: the invitation says nothing of it, and cuts nothing.
+        const beside = yield* principalOf(claims({ projectId: HERS_TOO })).pipe(
+          Effect.provide(given(readOnly)),
+        );
+        expect(beside.principal).toMatchObject({
+          namespace: ANN,
+          projectId: HERS_TOO,
+          scopes: ["agent:work", "agent:read"],
+          standing: { _tag: "None" },
+        });
+
+        // Invited by someone who does not own the namespace: a standing with no role, which the policy reads as none.
+        const stranger = yield* invitedTo(HERS, BOB, ["agent:read", "agent:work"], ["Joined"]);
+        const orphaned = yield* principalOf(claims({ projectId: HERS })).pipe(
+          Effect.provide(given(stranger)),
+        );
+        if (orphaned.principal._tag !== "Agent" || orphaned.principal.standing._tag !== "Invited")
+          throw new Error("the agent was not admitted as invited");
+        expect(orphaned.principal.standing.by).toMatchObject({ userId: BOB, suspended: false });
+        expect(orphaned.principal.standing.by.role).toBeUndefined();
+      }),
+  );
+
+  it.effect(
+    "[gate.project-invited] an invitation to a project not yet accepted and one that ended give no standing; a person's namespace reads the project's rows once and never the org's, and an org the other way",
+    () =>
+      Effect.gen(function* () {
+        const pending = yield* invitedTo(HERS, ANN, ["agent:read"], []);
+        const waiting = yield* principalOf(claims({ projectId: HERS })).pipe(
+          Effect.provide(keyedLayers({}, undefined, undefined, pending)),
+        );
+        expect(waiting.principal).toMatchObject({
+          scopes: ["agent:work", "agent:read"],
+          standing: { _tag: "None" },
+        });
+        const ended = yield* invitedTo(HERS, ANN, ["agent:read", "agent:work"], ["Joined", "Left"]);
+        const gone = yield* principalOf(claims({ projectId: HERS })).pipe(
+          Effect.provide(keyedLayers({}, undefined, undefined, ended)),
+        );
+        expect(gone.principal).toMatchObject({ standing: { _tag: "None" } });
+
+        // An org's rows give nothing in a person's namespace, and a project's nothing in an org.
+        const inOrg = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined"]);
+        const toHers = yield* invitedTo(HERS, ANN, ["agent:read", "agent:work"], ["Joined"]);
+        const [reads, projectReads] = [{ count: 0 }, { count: 0 }];
+        const layer = keyedLayers({}, inOrg, reads, toHers, projectReads);
+        const hers = yield* principalOf(claims({ projectId: HERS })).pipe(Effect.provide(layer));
+        expect(hers.principal).toMatchObject({ standing: { _tag: "Invited" } });
+        expect([reads.count, projectReads.count]).toEqual([0, 1]);
+        const theirs = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
+          Effect.provide(layer),
+        );
+        expect(theirs.principal).toMatchObject({ standing: { _tag: "Invited" } });
+        // An org takes an agent whole: its standing there is not to one project.
+        if (theirs.principal._tag !== "Agent" || theirs.principal.standing._tag !== "Invited")
+          throw new Error("the agent was not admitted as invited");
+        expect(theirs.principal.standing).not.toHaveProperty("projectOnly");
+        expect([reads.count, projectReads.count]).toEqual([1, 1]);
+        // Its own namespace, no project and a project with no place read neither.
+        yield* principalOf(claims({ projectId: OWN })).pipe(Effect.provide(layer));
+        yield* principalOf(claims()).pipe(Effect.provide(layer));
+        yield* principalOf(claims({ projectId: NOWHERE })).pipe(Effect.provide(layer));
+        expect([reads.count, projectReads.count]).toEqual([1, 1]);
       }),
   );
 

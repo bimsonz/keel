@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
@@ -8,6 +8,7 @@ import {
   EscalationId,
   Instant,
   NamespaceId,
+  namespaceKind,
   userActor,
 } from "../../domain/kernel/index.ts";
 import {
@@ -36,6 +37,7 @@ import {
   EntityStore,
   type EscalationAsk,
   EscalationRecord,
+  ProjectAgents,
   type RaiseRequest,
   type RulingCommand,
   type RulingRefusal,
@@ -265,6 +267,15 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
   request: RaiseRequest,
 ) {
   const entity = escalationRef(request.escalationId);
+  // Outside an org an agent is invited to one project, and that record is the project's own:
+  // its row is read here, before the transaction, and an org's from its own store inside it.
+  const { agent: concerned } = request;
+  const toProject =
+    concerned === undefined || namespaceKind(request.namespace) === "org"
+      ? undefined
+      : Option.getOrUndefined(
+          yield* ProjectAgents.use((rows) => rows.standing(concerned, request.project)),
+        )?.by;
   const raise = (tx: Transaction): Result.Result<Transition<undefined>, InvalidEscalation> => {
     if (storedRow(tx.store, request.escalationId) !== undefined)
       return Result.succeed({ drafts: [], value: undefined });
@@ -282,9 +293,10 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
     for (const payload of decided.success)
       escalation = evolveEscalation(escalation, { at: tx.at, payload });
     if (escalation === undefined) return Result.succeed({ drafts: [], value: undefined });
-    // In a namespace a member invited the agent into, that member answers for it and is asked first.
+    // Where a member invited the agent into the namespace, or its person to this project, they answer for it and are asked first.
     const first =
-      (request.agent === undefined ? undefined : invitedBy(tx.store, request.agent)) ??
+      (concerned === undefined ? undefined : invitedBy(tx.store, concerned)) ??
+      toProject ??
       request.sponsor;
     const row: Row = {
       escalation,

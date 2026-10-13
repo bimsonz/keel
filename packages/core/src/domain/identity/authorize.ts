@@ -38,8 +38,10 @@ import type {
  * - `member`, `maintain`, `own`: that role or above in the resource's org, or
  *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
  *   sponsor of the agent concerned, or whoever holds `maintain`;
+ *   `invite`: a member, and a person: an invitation names the person who
+ *   answers for the agent, so no agent makes one, wherever it governs;
  *   `inviterOrMaintain`: the member who invited the agent concerned into the
- *   org, or whoever holds `maintain` there;
+ *   org, or whoever holds `maintain` there, and a person too;
  * - `sponsor`: the person who stands behind the agent the action is on, and
  *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
  *   the agent itself.
@@ -55,6 +57,7 @@ export type Need =
   | "work"
   | "workOrMaintain"
   | "member"
+  | "invite"
   | "sponsorOrMaintain"
   | "inviterOrMaintain"
   | "maintain"
@@ -65,8 +68,18 @@ export type Need =
 /**
  * The kind of resource an action is decided on. `Org` is a namespace asked for
  * what only an org has: its members, its owners, its deletion.
+ * `PersonalProject` is a project asked for what only a person's own namespace
+ * gives it: an agent invited to that one project (an org takes an agent whole).
  */
-export type ResourceKind = "Instance" | "Self" | "Namespace" | "Org" | "Project" | "Agent" | "Fork";
+export type ResourceKind =
+  | "Instance"
+  | "Self"
+  | "Namespace"
+  | "Org"
+  | "Project"
+  | "PersonalProject"
+  | "Agent"
+  | "Fork";
 
 export interface ActionRule {
   readonly resource: ResourceKind;
@@ -95,9 +108,13 @@ export const SPEC_ACTIONS = {
   Namespaces_getNamespace: rule("Namespace", "read"),
   Namespaces_getProject: rule("Project", "read"),
   Namespaces_listAgents: rule("Namespace", "read"),
-  // An agent is invited into an org, never into a person's own namespace.
-  Namespaces_inviteAgent: rule("Org", "member"),
+  // An agent is invited into an org, never into a person's own namespace, and by a person.
+  Namespaces_inviteAgent: rule("Org", "invite"),
   Namespaces_removeAgent: rule("Org", "inviterOrMaintain"),
+  // In a person's own namespace an agent is invited to one project, never to the whole of it.
+  Projects_inviteAgent: rule("PersonalProject", "own"),
+  Projects_listAgents: rule("Project", "read"),
+  Projects_removeAgent: rule("PersonalProject", "own"),
 
   Changes_listChanges: rule("Project", "read"),
   change: rule("Project", "read"),
@@ -145,6 +162,9 @@ export const SPEC_ACTIONS = {
   Agents_listNamespaces: rule("Self", "self"),
   Agents_acceptInvitation: rule("Self", "self"),
   Agents_leaveNamespace: rule("Self", "self"),
+  Agents_listProjects: rule("Self", "self"),
+  Agents_acceptProjectInvitation: rule("Self", "self"),
+  Agents_leaveProject: rule("Self", "self"),
   Operator_putSettings: rule("Project", "maintain"),
 } as const satisfies Record<string, ActionRule>;
 
@@ -179,7 +199,8 @@ export type SpecAction = keyof typeof SPEC_ACTIONS;
 /**
  * The resources an action of each kind is decided on. A project or a namespace
  * may be missing, and an `Org` action is asked of whatever namespace was named:
- * one that is no org is answered as missing.
+ * one that is no org is answered as missing. So is a `PersonalProject` action
+ * asked of a project that is not in a person's own namespace.
  */
 interface ResourceOfKind {
   readonly Instance: InstanceResource;
@@ -187,6 +208,7 @@ interface ResourceOfKind {
   readonly Namespace: NamespaceResource | MissingResource;
   readonly Org: NamespaceResource | MissingResource;
   readonly Project: ProjectResource | MissingResource;
+  readonly PersonalProject: ProjectResource | MissingResource;
   readonly Agent: AgentResource | MissingResource;
   readonly Fork: ForkResource;
 }
@@ -489,12 +511,19 @@ const lacksRole = (need: "member" | "maintain" | "own", kind: NamespaceKind): De
  * Whether someone with a role in the resource's namespace is asking. An agent
  * counts as inside the namespace of its token's project while it has a standing
  * there, also one whose inviter no longer answers for it: it is told why it is
- * refused.
+ * refused. An agent invited to one project alone is inside on that project and
+ * nowhere else: another private project of the namespace is not there for it.
  */
-const inside = (principal: UserPrincipal | AgentPrincipal, namespace: NamespaceId): boolean =>
-  principal._tag === "User"
-    ? roleOf(principal, namespace) !== undefined
-    : principal.namespace === namespace && principal.standing._tag !== "None";
+const inside = (
+  principal: UserPrincipal | AgentPrincipal,
+  resource: ProjectResource | NamespaceResource,
+): boolean => {
+  if (principal._tag === "User") return roleOf(principal, resource.namespace) !== undefined;
+  const { standing } = principal;
+  if (principal.namespace !== resource.namespace || standing._tag === "None") return false;
+  const oneProject = standing._tag === "Invited" && standing.projectOnly === true;
+  return !oneProject || isTokenProject(principal, resource);
+};
 
 /**
  * Whether the resource is there for this caller to be refused: a private or
@@ -507,7 +536,7 @@ const notSeen = (
   resource: ProjectResource | NamespaceResource | MissingResource,
 ): Decision | undefined => {
   if (resource._tag === "Missing") return hidden();
-  const within = inside(principal, resource.namespace);
+  const within = inside(principal, resource);
   const suspended =
     resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended;
   if (suspended) return within ? refused("org-suspended") : hidden();
@@ -573,6 +602,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "readMembers":
       return rights.has("member") ? granted("members") : lacksRole("member", kind);
     case "member":
+    case "invite":
       return rights.has("member") ? granted() : lacksRole("member", kind);
     case "maintain":
     case "workOrMaintain":
@@ -685,8 +715,12 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     case "own":
       return rights.has(need) ? granted() : refused(whyNoRule(principal, resource));
     case "sponsorOrMaintain":
-    case "inviterOrMaintain":
       return rights.has("maintain") ? granted() : refused(whyNoRule(principal, resource));
+    // An invitation names the person who answers for the agent: no agent makes or ends one for
+    // another, wherever it governs. Its own invitation it ends as itself, by another action.
+    case "invite":
+    case "inviterOrMaintain":
+      return refused("users-only");
     default:
       return hidden();
   }
@@ -699,6 +733,14 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
  */
 const noOrg = (asked: ResourceKind, resource: Resource): boolean =>
   asked === "Org" && resource._tag === "Namespace" && kindOf(resource) !== "org";
+
+/**
+ * Whether an action of a person's own project is asked of a project somewhere
+ * else, where it is asked of nothing: an org takes an agent into the whole of
+ * it, and an agent's own namespace takes none.
+ */
+const notPersonal = (asked: ResourceKind, resource: Resource): boolean =>
+  asked === "PersonalProject" && resource._tag === "Project" && kindOf(resource) !== "user";
 
 /**
  * The one authorization policy: whether `principal` may take `action` on
@@ -719,7 +761,9 @@ const noOrg = (asked: ResourceKind, resource: Resource): boolean =>
  * A person owns the namespace whose id is their own, by identity, and nobody
  * else holds a role there: a membership counts in an org alone. Inviting,
  * removing, making an owner and deleting are an org's own actions: of a
- * person's or an agent's own namespace they are NotVisible. Whoever lacks a
+ * person's or an agent's own namespace they are NotVisible. Inviting an agent
+ * to one project is a person's own project's: of a project anywhere else it is
+ * NotVisible, and it is a person's act, never an agent's. Whoever lacks a
  * role is told whom to ask in an org, and in anyone's own namespace that there
  * is nobody to ask.
  *
@@ -742,7 +786,8 @@ export const authorize = <A extends Action>(
   resource: ResourceFor<A>,
 ): Decision => {
   const { need, resource: asked } = ACTIONS[action];
-  const on: Resource = noOrg(asked, resource) ? { _tag: "Missing" } : resource;
+  const on: Resource =
+    noOrg(asked, resource) || notPersonal(asked, resource) ? { _tag: "Missing" } : resource;
   switch (principal._tag) {
     case "Anonymous":
       return anonymous(need, on);

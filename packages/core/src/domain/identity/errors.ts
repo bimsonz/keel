@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentId, NextAction, NamespaceId } from "../kernel/index.ts";
+import { AgentId, NextAction, NamespaceId, ProjectId } from "../kernel/index.ts";
 import { AgentState } from "./agent.ts";
 
 /** No agent has this id. */
@@ -68,14 +68,16 @@ export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
 ) {}
 
 /**
- * The command is not valid for the agent's place in the namespace: an
- * invitation already stands there (`already-invited`), none does
- * (`not-invited`), or another agent asked to end it (`not-a-party`).
+ * The command is not valid for the agent's place in the namespace, or on the
+ * one project of it that `projectId` names: an invitation already stands
+ * there (`already-invited`), none does (`not-invited`), or another agent asked
+ * to end it (`not-a-party`).
  */
 export class InvitationRefused extends Schema.TaggedError<InvitationRefused>()(
   "InvitationRefused",
   {
     namespace: NamespaceId,
+    projectId: Schema.optional(ProjectId),
     agentId: AgentId,
     state: Schema.optional(Schema.Literals(["invited", "joined", "ended"])),
     command: Schema.String,

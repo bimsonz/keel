@@ -11,16 +11,21 @@ import {
   type AgentId,
   EventEnvelope,
   makeId,
-  type NamespaceId,
+  NamespaceId,
   type ProjectId,
   type UserId,
 } from "@keeltown/core/kernel";
-import { Invitations, NamespaceAgents, PROJECTOR } from "@keeltown/core/ports";
-import { describeInvitationsContract, describeNamespaceAgentsContract } from "@keeltown/testing";
+import { Invitations, NamespaceAgents, ProjectAgents, PROJECTOR } from "@keeltown/core/ports";
+import {
+  describeInvitationsContract,
+  describeNamespaceAgentsContract,
+  describeProjectAgentsContract,
+} from "@keeltown/testing";
 import { Effect, Exit, Layer, Option, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { NamespaceAgentsD1 } from "../../src/adapters/driven/d1/namespace-agents.ts";
+import { ProjectAgentsD1 } from "../../src/adapters/driven/d1/project-agents.ts";
 import { InvitationsRpc } from "../../src/adapters/driven/do-rpc/invitations.ts";
 import { decodeExit, NamespaceCodecs } from "../../src/rpc/index.ts";
 import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
@@ -43,10 +48,18 @@ const namespaceStub = (address: string) =>
 const agentStub = (agentId: AgentId) =>
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
+const projectStub = (projectId: ProjectId) =>
+  drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
+
 // The real adapters pass the same contract suites as the in-memory ones, inside workerd.
 describeNamespaceAgentsContract("d1", () => NamespaceAgentsD1(env.DB));
-describeInvitationsContract("the namespace's own object, and d1", () =>
-  Layer.mergeAll(InvitationsRpc(namespaceStub), NamespaceAgentsD1(env.DB)),
+describeProjectAgentsContract("d1", () => ProjectAgentsD1(env.DB));
+describeInvitationsContract("the object that holds each record, and d1", () =>
+  Layer.mergeAll(
+    InvitationsRpc(namespaceStub, projectStub),
+    NamespaceAgentsD1(env.DB),
+    ProjectAgentsD1(env.DB),
+  ),
 );
 
 interface Answer {
@@ -414,16 +427,292 @@ describe("an agent's invitation into an org, through the real Worker", () => {
   });
 });
 
+const projectRows = <A>(effect: Effect.Effect<A, never, ProjectAgents>) =>
+  Effect.runPromise(Effect.provide(effect, ProjectAgentsD1(env.DB)));
+
+/** A person signed in by passkey just now, with two private projects in their own namespace, whose id is theirs. */
+async function aSoloPerson() {
+  const person = await seedUser(uniqueHandle("solo"), { role: null, signedInBy: "passkey" });
+  const namespace = Schema.decodeUnknownSync(NamespaceId)(person.userId);
+  const projectId: ProjectId = makeId("prj", ulid());
+  const other: ProjectId = makeId("prj", ulid());
+  for (const id of [projectId, other]) {
+    await placeProject(id, namespace);
+    await establishProject(id);
+  }
+  return { person, namespace, projectId, other };
+}
+
+/** Another session of the same person, signed in some other way than by a passkey. */
+async function codedSession(userId: UserId): Promise<string> {
+  const token = crypto.randomUUID().replaceAll("-", "");
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId, signedInBy) VALUES (?, ?, ?, ?, ?, ?, 'email-otp')",
+  )
+    .bind(ulid(), new Date(Date.now() + 3_600_000).toISOString(), token, now, now, userId)
+    .run();
+  return token;
+}
+
+/** The notices an agent's inbox holds, as kind and detail, read with a token of its own. */
+async function noticesOf(token: string) {
+  const inbox = await http(token, "GET", "/inbox");
+  const found: Record<string, unknown>[] = Object(inbox.body["result"])["notices"] ?? [];
+  return found;
+}
+
+describe("an agent's invitation to one project of a person's own namespace, through the real Worker", () => {
+  it("[link.project-standing] invited to one project it has nothing; accepted it reads and works on that project and on nothing else of the person's; its lists by reader; taken off it is a stranger again", async () => {
+    const { person, projectId, other } = await aSoloPerson();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const onIt = await agent.token(projectId);
+    const onOther = await agent.token(other);
+    const read = (token = onIt, id = projectId) => http(token, "GET", `/changes?project=${id}`);
+    const work = () => http(onIt, "POST", "/sessions", { harness: "pool" });
+    const agents = `/projects/${projectId}/agents`;
+
+    // Before anyone invites it the person's private project is not there for it.
+    expect(refusal(await read())).toEqual([404, "resource.not_found"]);
+    expect(items(await http(own, "GET", "/agents/me/projects"))).toEqual([]);
+
+    // The person's own session that is no fresh passkey sign-in is refused the touch; nothing is written.
+    const coded = await codedSession(person.userId);
+    const untouched = await http(coded, "POST", agents, { agent: agent.handle });
+    expect(refusal(untouched)).toEqual([403, "auth.fresh_sign_in_required"]);
+    // Somebody else invites no one to it: the project is private, and not there for them.
+    const outsider = await seedUser(uniqueHandle("otto"), { role: null, signedInBy: "passkey" });
+    const foreign = await http(outsider.token, "POST", agents, { agent: agent.handle });
+    expect(refusal(foreign)).toEqual([404, "resource.not_found"]);
+    expect(await projectRows(ProjectAgents.use((r) => r.find(agent.agentId, projectId)))).toEqual(
+      Option.none(),
+    );
+
+    // The person invites it by its handle.
+    const invited = await http(person.token, "POST", agents, { agent: agent.handle });
+    expect(invited.status).toBe(201);
+    expect(invited.body).toMatchObject({
+      id: agent.agentId,
+      handle: agent.handle,
+      state: "invited",
+      scopes: ["agent:read", "agent:work"],
+      invitedBy: person.userId,
+    });
+    // No agent has that handle, a person's handle names no agent, and more than read and work is never given.
+    const unknown = await http(person.token, "POST", agents, { agent: "agent-nobodyatall0000" });
+    expect(refusal(unknown)).toEqual([404, "resource.not_found"]);
+    const aHuman = await http(person.token, "POST", agents, { agent: outsider.handle });
+    expect(refusal(aHuman)).toEqual([404, "resource.not_found"]);
+    const tooMuch = await http(person.token, "POST", agents, {
+      agent: agent.handle,
+      scopes: ["agent:work"],
+    });
+    expect(refusal(tooMuch)).toEqual([400, "request.invalid"]);
+    // Asked again on the same terms it is the same invitation; on other terms it is refused while this one stands.
+    expect((await http(person.token, "POST", agents, { agent: agent.handle })).status).toBe(201);
+    const changed = await http(person.token, "POST", agents, {
+      agent: agent.handle,
+      scopes: ["agent:read"],
+    });
+    expect(refusal(changed)).toEqual([409, "invitation.state_refused"]);
+    expect(String(changed.body["detail"])).toContain("already has an invitation to this project");
+
+    // A pending invitation gives nothing, and the row says so.
+    expect(refusal(await read())).toEqual([404, "resource.not_found"]);
+    expect(
+      await projectRows(ProjectAgents.use((r) => r.standing(agent.agentId, projectId))),
+    ).toEqual(Option.none());
+    // The agent is told, with what it can do about it, and reads the invitation as its own.
+    const notices = await vi.waitFor(async () => {
+      const found = await noticesOf(onIt);
+      expect(found.map((notice) => notice["kind"])).toEqual(["AgentInvitedToProject"]);
+      return found;
+    }, WAIT);
+    expect(String(notices[0]?.["detail"])).toBe(
+      `you were invited to the project ${projectId}: accept, and a token that names it reads and works there, and nowhere else in its namespace`,
+    );
+    const next = Array.isArray(notices[0]?.["nextActions"]) ? notices[0]["nextActions"] : [];
+    expect(
+      next.map((action: Record<string, unknown>) => [action["operationId"], action["args"]]),
+    ).toEqual([
+      ["Agents_acceptProjectInvitation", { projectId }],
+      ["Agents_leaveProject", { projectId }],
+    ]);
+    const mine = await http(own, "GET", "/agents/me/projects");
+    expect(items(mine)).toMatchObject([
+      {
+        project: { id: projectId, namespace: person.handle, name: projectId.toLowerCase() },
+        state: "invited",
+        scopes: ["agent:read", "agent:work"],
+      },
+    ]);
+    expect(JSON.stringify(mine.body)).not.toContain(person.userId);
+    // An invitation to a project is none into its namespace.
+    expect(items(await http(own, "GET", "/agents/me/namespaces"))).toEqual([]);
+
+    // A project that never invited it, and one that does not exist, read the same to it.
+    const uninvited = await http(own, "PUT", `/agents/me/projects/${other}`);
+    const missing = await http(own, "PUT", `/agents/me/projects/${makeId("prj", ulid())}`);
+    expect(refusal(uninvited)).toEqual([404, "resource.not_found"]);
+    expect({ ...uninvited.body, requestId: null, instance: null }).toEqual({
+      ...missing.body,
+      requestId: null,
+      instance: null,
+    });
+
+    // It accepts, by the id its notice named; the token it already held works on its next request.
+    const accepted = await http(own, "PUT", `/agents/me/projects/${projectId}`);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({
+      project: { id: projectId, namespace: person.handle },
+      state: "joined",
+    });
+    expect((await read()).status).toBe(200);
+    expect((await work()).status).toBe(201);
+    // The person's other private project is not there for it: by a token that names it, and by this one.
+    expect(refusal(await read(onOther, other))).toEqual([404, "resource.not_found"]);
+    expect(refusal(await read(onIt, other))).toEqual([404, "resource.not_found"]);
+    expect(
+      refusal(
+        await http(onIt, "GET", `/namespaces/${person.handle}/projects/${other.toLowerCase()}`),
+      ),
+    ).toEqual([404, "resource.not_found"]);
+    // Nor does it stand in the namespace: the org's list of a person's namespace holds no one.
+    expect(items(await http(person.token, "GET", `/namespaces/${person.handle}/agents`))).toEqual(
+      [],
+    );
+
+    // The person reads who they invited and on what; the agent, and anyone once the project is public, who has joined.
+    const second = await keyAgent();
+    expect(
+      (await http(person.token, "POST", agents, { agent: second.handle, scopes: ["agent:read"] }))
+        .status,
+    ).toBe(201);
+    const owners = await http(person.token, "GET", agents);
+    expect(items(owners)).toMatchObject([
+      { id: agent.agentId, state: "joined", invitedBy: person.userId },
+      { id: second.agentId, state: "invited", scopes: ["agent:read"], invitedBy: person.userId },
+    ]);
+    const itsOwn = await http(onIt, "GET", agents);
+    expect(items(itsOwn)).toEqual([
+      expect.objectContaining({ id: agent.agentId, handle: agent.handle, state: "joined" }),
+    ]);
+    expect(JSON.stringify(itsOwn.body)).not.toContain(person.userId);
+    expect(refusal(await http(null, "GET", agents))).toEqual([404, "resource.not_found"]);
+    const shown = await http(person.token, "PUT", `/projects/${projectId}/settings`, {
+      protectedPaths: [],
+      maxBatchSize: 1,
+      visibility: "public",
+    });
+    expect(shown.status).toBe(200);
+    const anyones = await http(null, "GET", agents);
+    expect(items(anyones)).toEqual([
+      expect.objectContaining({ id: agent.agentId, handle: agent.handle, state: "joined" }),
+    ]);
+    expect(items(anyones)[0]).not.toHaveProperty("scopes");
+    expect(JSON.stringify(anyones.body)).not.toContain(person.userId);
+    // The first agent hears nothing of the second's invitation.
+    expect((await noticesOf(onIt)).map((notice) => notice["kind"])).toEqual([
+      "AgentInvitedToProject",
+    ]);
+
+    // Taking it off wants the touch too, and somebody else takes no one off.
+    const untouchedEnd = await http(coded, "DELETE", `${agents}/${agent.agentId}`);
+    expect(refusal(untouchedEnd)).toEqual([403, "auth.fresh_sign_in_required"]);
+    const notTheirs = await http(outsider.token, "DELETE", `${agents}/${agent.agentId}`);
+    expect(notTheirs.status).toBe(403);
+    expect((await work()).status).toBe(201);
+
+    // The person takes it off; from its next request it is a stranger there, and it is told.
+    const removed = await http(person.token, "DELETE", `${agents}/${agent.agentId}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body).toMatchObject({ id: agent.agentId, state: "ended" });
+    expect(reason(await work())).toEqual([403, "auth.forbidden", "Refused: foreign-project."]);
+    expect(items(await http(null, "GET", agents))).toEqual([]);
+    expect(items(await http(own, "GET", "/agents/me/projects"))).toEqual([]);
+    await vi.waitFor(async () => {
+      expect((await noticesOf(onIt)).map((notice) => [notice["kind"], notice["detail"]])).toEqual([
+        [
+          "AgentInvitedToProject",
+          `you were invited to the project ${projectId}: accept, and a token that names it reads and works there, and nowhere else in its namespace`,
+        ],
+        [
+          "AgentLeftProject",
+          `you were taken off the project ${projectId}: you have no standing there now`,
+        ],
+      ]);
+    }, WAIT);
+    expect(refusal(await http(own, "DELETE", `/agents/me/projects/${projectId}`))).toEqual([
+      404,
+      "resource.not_found",
+    ]);
+  });
+
+  it("[link.project-standing] an invitation to a project that gives read alone lets the agent read and never work, and the agent leaves by itself", async () => {
+    const { person, projectId } = await aSoloPerson();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const onIt = await agent.token(projectId);
+    const invited = await http(person.token, "POST", `/projects/${projectId}/agents`, {
+      agent: agent.handle,
+      scopes: ["agent:read"],
+    });
+    expect(invited.body).toMatchObject({ state: "invited", scopes: ["agent:read"] });
+    expect((await http(own, "PUT", `/agents/me/projects/${projectId}`)).status).toBe(200);
+
+    expect((await http(onIt, "GET", `/changes?project=${projectId}`)).status).toBe(200);
+    expect(reason(await http(onIt, "POST", "/sessions", { harness: "pool" }))).toEqual([
+      403,
+      "auth.forbidden",
+      "Refused: scope.",
+    ]);
+
+    const left = await http(own, "DELETE", `/agents/me/projects/${projectId}`);
+    expect(left.status).toBe(200);
+    expect(left.body).toMatchObject({ state: "ended" });
+    expect(refusal(await http(onIt, "GET", `/changes?project=${projectId}`))).toEqual([
+      404,
+      "resource.not_found",
+    ]);
+  });
+
+  it("[link.project-own-only] an org's project takes no such invitation, whoever asks, and holds no such agents: an org takes an agent whole", async () => {
+    const { org, member, projectId } = await anOrg();
+    const agent = await keyAgent();
+    const invited = await http(member.token, "POST", `/projects/${projectId}/agents`, {
+      agent: agent.handle,
+    });
+    expect(refusal(invited)).toEqual([404, "resource.not_found"]);
+    const owner = await seedUser(uniqueHandle("olga"), {
+      org,
+      role: "owner",
+      signedInBy: "passkey",
+    });
+    expect(
+      refusal(
+        await http(owner.token, "POST", `/projects/${projectId}/agents`, { agent: agent.handle }),
+      ),
+    ).toEqual([404, "resource.not_found"]);
+    expect(
+      refusal(await http(owner.token, "DELETE", `/projects/${projectId}/agents/${agent.agentId}`)),
+    ).toEqual([404, "resource.not_found"]);
+    expect(items(await http(member.token, "GET", `/projects/${projectId}/agents`))).toEqual([]);
+    expect(await projectRows(ProjectAgents.use((r) => r.inProject(projectId)))).toEqual([]);
+  });
+});
+
 describe("who is asked first, on the real namespace object", () => {
   const raise = async (
     org: NamespaceId,
     agent: AgentId | undefined,
     sponsor: UserId | undefined,
+    project: ProjectId = makeId("prj", ulid()),
   ) => {
     const escalationId = makeId("esc", ulid());
     const answer = await namespaceStub(namespaceAddress(org)).raise({
       escalationId,
-      project: makeId("prj", ulid()),
+      project,
       ...(sponsor === undefined ? {} : { sponsor }),
       ...(agent === undefined ? {} : { agent }),
       raisedBy: `subj:${ulid()}`,
@@ -444,7 +733,7 @@ describe("who is asked first, on the real namespace object", () => {
     if (!Exit.isSuccess(record)) throw new Error("the raise failed");
     return record.value.sponsor;
   };
-  const invitations = InvitationsRpc(namespaceStub);
+  const invitations = InvitationsRpc(namespaceStub, projectStub);
   const move = <A, E>(effect: Effect.Effect<A, E, Invitations>) =>
     Effect.runPromise(Effect.provide(effect, invitations));
 
@@ -493,6 +782,59 @@ describe("who is asked first, on the real namespace object", () => {
     );
     expect(await raise(org, joined, sponsor)).toBe(sponsor);
   });
+
+  it("[link.project-asked-first] in a person's namespace, the person who invited the agent to a project is asked first about that project, whoever sponsors it; on another of their projects, pending, or taken off, the sponsor given is", async () => {
+    const person: UserId = makeId("usr", ulid());
+    const namespace = Schema.decodeUnknownSync(NamespaceId)(person);
+    const sponsor: UserId = makeId("usr", ulid());
+    const here: ProjectId = makeId("prj", ulid());
+    const there: ProjectId = makeId("prj", ulid());
+    const joined: AgentId = makeId("agt", ulid());
+    const pending: AgentId = makeId("agt", ulid());
+    const invite = (agentId: AgentId) =>
+      move(
+        Invitations.use((i) =>
+          i.invite({
+            namespace,
+            projectId: here,
+            agentId,
+            by: person,
+            scopes: ["agent:read", "agent:work"],
+            idempotencyKey: `invite-${ulid()}`,
+          }),
+        ),
+      );
+    await invite(joined);
+    await move(
+      Invitations.use((i) =>
+        i.accept({
+          namespace,
+          projectId: here,
+          agentId: joined,
+          idempotencyKey: `accept-${ulid()}`,
+        }),
+      ),
+    );
+    await invite(pending);
+
+    expect(await raise(namespace, joined, sponsor, here)).toBe(person);
+    expect(await raise(namespace, joined, undefined, here)).toBe(person);
+    // The invitation is to one project: about another of the person's, it says nothing.
+    expect(await raise(namespace, joined, sponsor, there)).toBe(sponsor);
+    expect(await raise(namespace, joined, undefined, there)).toBeUndefined();
+    expect(await raise(namespace, pending, sponsor, here)).toBe(sponsor);
+    expect(await raise(namespace, undefined, sponsor, here)).toBe(sponsor);
+
+    await move(
+      Invitations.use((i) =>
+        i.end(
+          { _tag: "User", userId: person },
+          { namespace, projectId: here, agentId: joined, idempotencyKey: `end-${ulid()}` },
+        ),
+      ),
+    );
+    expect(await raise(namespace, joined, sponsor, here)).toBe(sponsor);
+  });
 });
 
 describe("[link.repair] the Projector repeats an invitation's moves in the rows the gate reads", () => {
@@ -531,6 +873,53 @@ describe("[link.repair] the Projector repeats an invitation's moves in the rows 
     ]);
     await vi.waitFor(async () => {
       expect(await rows(NamespaceAgents.use((r) => r.standing(agentId, org)))).toEqual(
+        Option.none(),
+      );
+    }, WAIT);
+  });
+});
+
+describe("[link.project-repair] the Projector repeats a project invitation's moves in the rows the gate reads", () => {
+  it("[link.project-repair] an invitation to a project and its acceptance the Projector receives are written in the project's order, even if the inline writes never happened", async () => {
+    const person: UserId = makeId("usr", ulid());
+    const projectId: ProjectId = makeId("prj", ulid());
+    const agentId: AgentId = makeId("agt", ulid());
+    const envelope = (seq: number, type: string, payload: object) =>
+      Schema.encodeSync(EventEnvelope)(
+        Schema.decodeUnknownSync(EventEnvelope)({
+          eventId: makeId("evt", ulid()),
+          type,
+          entity: { kind: "project", id: projectId },
+          project: projectId,
+          seq,
+          at: Date.now(),
+          dedupeKey: `project:${projectId}/repair-${seq}/${type}#1`,
+          affected: [{ kind: "agent", id: agentId }],
+          notified: [],
+          payload: { _tag: type, projectId, namespace: person, agentId, ...payload },
+        }),
+      );
+    const projector = env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
+    // The acceptance arrives first: it waits for its invitation's row.
+    await projector.receive([envelope(2, "AgentJoinedProject", {})]);
+    expect(await projectRows(ProjectAgents.use((r) => r.find(agentId, projectId)))).toEqual(
+      Option.none(),
+    );
+    await projector.receive([
+      envelope(1, "AgentInvitedToProject", { by: person, scopes: ["agent:read", "agent:work"] }),
+    ]);
+    await vi.waitFor(async () => {
+      const standing = await projectRows(ProjectAgents.use((r) => r.standing(agentId, projectId)));
+      expect(Option.getOrNull(standing)).toMatchObject({ by: person });
+    }, WAIT);
+    // It wrote nothing into the namespace's own rows.
+    expect(await rows(NamespaceAgents.use((r) => r.ofAgent(agentId)))).toEqual([]);
+    // Its end is repeated too.
+    await projector.receive([
+      envelope(3, "AgentLeftProject", { by: `user:${person}`, reason: "removed" }),
+    ]);
+    await vi.waitFor(async () => {
+      expect(await projectRows(ProjectAgents.use((r) => r.standing(agentId, projectId)))).toEqual(
         Option.none(),
       );
     }, WAIT);

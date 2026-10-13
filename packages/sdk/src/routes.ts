@@ -51,6 +51,28 @@ export const ROUTES = {
     path: "/agents/me/namespaces/{namespace}",
     headers: ["idempotency-key"],
   },
+  Agents_listProjects: { method: "GET", path: "/agents/me/projects" },
+  Agents_acceptProjectInvitation: {
+    method: "PUT",
+    path: "/agents/me/projects/{projectId}",
+    headers: ["idempotency-key"],
+  },
+  Agents_leaveProject: {
+    method: "DELETE",
+    path: "/agents/me/projects/{projectId}",
+    headers: ["idempotency-key"],
+  },
+  Projects_listAgents: { method: "GET", path: "/projects/{projectId}/agents" },
+  Projects_inviteAgent: {
+    method: "POST",
+    path: "/projects/{projectId}/agents",
+    headers: ["idempotency-key"],
+  },
+  Projects_removeAgent: {
+    method: "DELETE",
+    path: "/projects/{projectId}/agents/{agentId}",
+    headers: ["idempotency-key"],
+  },
   Namespaces_listAgents: { method: "GET", path: "/namespaces/{handle}/agents" },
   Namespaces_inviteAgent: {
     method: "POST",

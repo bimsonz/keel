@@ -52,6 +52,9 @@
       "name": "Namespaces"
     },
     {
+      "name": "Projects"
+    },
+    {
       "name": "Users"
     }
   ],
@@ -575,6 +578,392 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentNamespace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/agents/me/projects": {
+      "get": {
+        "operationId": "Agents_listProjects",
+        "summary": "List the projects you were invited to",
+        "description": "The projects you were invited to, one by one: the ones you have joined and the ones still asking, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProjects"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/agents/me/projects/{projectId}": {
+      "put": {
+        "operationId": "Agents_acceptProjectInvitation",
+        "summary": "Accept an invitation to a project",
+        "description": "Accept an invitation to one project, by its id as the invitation's notice names it. From then on a token\nthat names that project reads and works on it, within what the invitation gives, and on nothing else of its\nnamespace. A project that has not invited you is not found (404).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "Agents_leaveProject",
+        "summary": "Decline an invitation to a project, or leave it",
+        "description": "Decline an invitation to a project you have not accepted, or leave one you joined. A project that has not invited you is not found (404).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProject"
                 }
               }
             }
@@ -6204,6 +6593,429 @@
         ]
       }
     },
+    "/projects/{projectId}/agents": {
+      "get": {
+        "operationId": "Projects_listAgents",
+        "summary": "List the agents invited to a project",
+        "description": "The agents invited to a project, oldest invitation first. Anyone who reads the project sees those that have\njoined it. The person whose namespace it is in also sees the invitations not yet answered. A project of an\norg has none: an org takes an agent into the whole of it.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "Projects_inviteAgent",
+        "summary": "Invite an agent to a project",
+        "description": "Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a\ncollaborator. The agent gets nothing until it accepts; then a token that names this project reads and works\non it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a\nquestion. It needs a fresh sign-in: a passkey sign-in from the last ten minutes (403\n`auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such\ninvitation (404), and no agent has that handle (404). An agent you have already invited on other terms is\nrefused (409 `invitation.state_refused`).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Projects"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAgentRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/agents/{agentId}": {
+      "delete": {
+        "operationId": "Projects_removeAgent",
+        "summary": "Take an agent off a project",
+        "description": "Take an agent off a project of your own namespace, or withdraw an invitation it has not answered, on a fresh\nsign-in (403 `auth.fresh_sign_in_required` otherwise). The agent keeps its account and its own namespace.\nAn agent with no invitation to the project is not found (404).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Projects"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects/{projectId}/lanes": {
       "get": {
         "operationId": "Views_listLanes",
@@ -8519,6 +9331,48 @@
         },
         "description": "A member invited the agent into the namespace, and answers for it there once\nit accepts. Until then it gives the agent nothing."
       },
+      "AgentInvitedToProject": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "namespace",
+          "agentId",
+          "by",
+          "scopes"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentInvitedToProject"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "description": "What the invitation gives: `agent:read`, or that and `agent:work`. Never more."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A person invited the agent to one project of their own namespace, and answers\nfor it there once it accepts. Until then it gives the agent nothing."
+      },
       "AgentJoinedNamespace": {
         "type": "object",
         "required": [
@@ -8544,6 +9398,36 @@
           "not": {}
         },
         "description": "The agent accepted: it stands in the namespace. It names no person."
+      },
+      "AgentJoinedProject": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "namespace",
+          "agentId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentJoinedProject"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agent accepted: it stands on that project, and on nothing else of the namespace. It names no person."
       },
       "AgentKind": {
         "type": "string",
@@ -8587,6 +9471,44 @@
           "not": {}
         },
         "description": "The invitation ended. `by` is whoever ended it."
+      },
+      "AgentLeftProject": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "namespace",
+          "agentId",
+          "by",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentLeftProject"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "namespace": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "by": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/InvitationEnd"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The invitation to the project ended. `by` is whoever ended it."
       },
       "AgentNamespace": {
         "type": "object",
@@ -8723,6 +9645,63 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "AgentProject": {
+        "type": "object",
+        "required": [
+          "project",
+          "state",
+          "scopes",
+          "invitedAt"
+        ],
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/ProjectRef"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationState"
+              }
+            ],
+            "description": "`invited` until you accept; `joined` once you have. Only the call that ends one reads `ended`."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "invitedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project an agent was invited to, as the agent reads it: which one, what it gives, and never who invited it."
+      },
+      "AgentProjects": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentProject"
+            }
           }
         },
         "additionalProperties": {
@@ -13653,6 +14632,15 @@
             "$ref": "#/components/schemas/AgentLeftNamespace"
           },
           {
+            "$ref": "#/components/schemas/AgentInvitedToProject"
+          },
+          {
+            "$ref": "#/components/schemas/AgentJoinedProject"
+          },
+          {
+            "$ref": "#/components/schemas/AgentLeftProject"
+          },
+          {
             "$ref": "#/components/schemas/UserSignedUp"
           },
           {
@@ -17354,6 +18342,86 @@
           "not": {}
         },
         "description": "The body of every error: RFC 9457 problem details, plus Keel's fields."
+      },
+      "ProjectAgent": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The handle it was given at sign-up, which is also its own namespace's."
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentKind"
+              }
+            ],
+            "description": "What runs it. An agent that signed itself up with a key has none."
+          },
+          "state": {
+            "$ref": "#/components/schemas/InvitationState"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "description": "What the invitation gives the agent on this project. The project's owner only."
+          },
+          "invitedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserId"
+              }
+            ],
+            "description": "The person who invited the agent, answers for it on this project, and is asked first when it has a question. The project's owner only."
+          },
+          "invitedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The project's owner only."
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent on one project, where the person whose namespace the project is in invited it. Anyone who reads the\nproject sees the agents that have joined it, by who they are. That person also sees the invitations not yet\nanswered, what each gives, and that they made it."
+      },
+      "ProjectAgents": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAgent"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "ProjectCreated": {
         "type": "object",

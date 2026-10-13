@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-machine
+# why: the row an invitation to a project makes does not name the project
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index ddd9a8e4..d59d25d1 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -193,7 +193,6 @@ export const evolveInvitation = (
+         ? illegal(state, event)
+         : {
+             namespace: event.namespace,
+-            ...(event._tag === "AgentInvitedToProject" ? { projectId: event.projectId } : {}),
+             agentId: event.agentId,
+             by: event.by,
+             scopes: event.scopes,

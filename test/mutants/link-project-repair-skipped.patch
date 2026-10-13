@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-repair
+# kills: link.project-repair
+# why: the Projector repeats no move of a project's invitation in the rows the gate reads
+diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
+index f3978d8b..306a9275 100644
+--- a/packages/core/src/application/identity/invitations.ts
++++ b/packages/core/src/application/identity/invitations.ts
+@@ -439,7 +439,7 @@ export const repairInvitations: Effect.Effect<
+   for (const { id, event } of noted) {
+     // Each event is one place's: the other writer finds no move in it and answers that it holds.
+     const held = yield* Effect.exit(
+-      Effect.zipWith(writeNamespaceRow(event), writeProjectRow(event), (a, b) => a && b),
++      writeNamespaceRow(event),
+     );
+     if (held._tag === "Failure" || !held.value) continue;
+     store.transaction(() => store.remove(NAMESPACE_AGENT_PENDING, id));

@@ -9,11 +9,12 @@ import {
   scopesUnder,
   TokenRejected,
 } from "../../domain/identity/index.ts";
-import { AgentId, type NamespaceId, UserId } from "../../domain/kernel/index.ts";
+import { AgentId, type NamespaceId, namespaceKind, UserId } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   Memberships,
   NamespaceAgents,
+  ProjectAgents,
   ProjectNamespaces,
   TokenIssuer,
   Users,
@@ -159,7 +160,13 @@ export const principalOf: (
 ) => Effect.Effect<
   Admitted,
   GateRefusal,
-  TokenIssuer | AgentDirectory | Users | Memberships | ProjectNamespaces | NamespaceAgents
+  | TokenIssuer
+  | AgentDirectory
+  | Users
+  | Memberships
+  | ProjectNamespaces
+  | NamespaceAgents
+  | ProjectAgents
 > = Effect.fn("identity/principalOf")(function* (credential: Credential) {
   switch (credential._tag) {
     case "None":
@@ -207,10 +214,13 @@ export const principalOf: (
           : yield* ProjectNamespaces.use((places) => places.byId(projectId));
       const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
       const governs = projectId === undefined || (Option.isSome(place) && org === own);
+      // An org takes an agent into the whole of it; anyone else's namespace takes it on one project.
       const invited =
-        governs || Option.isNone(place)
+        governs || Option.isNone(place) || projectId === undefined
           ? Option.none()
-          : yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org));
+          : namespaceKind(org) === "org"
+            ? yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org))
+            : yield* ProjectAgents.use((agents) => agents.standing(agent.id, projectId));
       const standing: AgentStanding = governs
         ? { _tag: "Governs" }
         : Option.isNone(invited)
@@ -220,6 +230,8 @@ export const principalOf: (
               by: yield* Memberships.use((memberships) =>
                 memberships.standing(invited.value.by, org),
               ),
+              // Outside an org the invitation was to this project, and to nothing else of the namespace.
+              ...(namespaceKind(org) === "org" ? {} : { projectOnly: true }),
             };
       return {
         principal: {

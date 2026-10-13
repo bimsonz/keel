@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t projinvitations.contract
+# kills: projinvitations.contract
+# why: an invitation to one project is sent to the namespace's object and stands in the whole namespace
+diff --git a/apps/keel/src/adapters/driven/do-rpc/invitations.ts b/apps/keel/src/adapters/driven/do-rpc/invitations.ts
+index 3cdb7fa9..ff1cbfa7 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/invitations.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/invitations.ts
+@@ -57,7 +57,7 @@ export function InvitationsRpc(
+             fingerprintOf({ invite: agentId, by, scopes: scopes.toSorted() }),
+           );
+           const asked = { agentId, by, scopes, idempotencyKey, fingerprint };
+-          return projectId === undefined
++          return projectId === undefined || projectId !== undefined
+             ? yield* callObject(NamespaceCodecs.inviteAgent, () =>
+                 namespace(namespaceAddress(invitation.namespace)).inviteAgent(encodeInvite(asked)),
+               )

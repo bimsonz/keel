@@ -42,6 +42,10 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AgentInvited: "members",
   AgentJoinedNamespace: "public",
   AgentLeftNamespace: "members",
+  // A project's invitation, as an org's: only the joining names no person.
+  AgentInvitedToProject: "members",
+  AgentJoinedProject: "public",
+  AgentLeftProject: "members",
   UserSignedUp: "members",
   OrgCreated: "members",
   MembershipChanged: "members",

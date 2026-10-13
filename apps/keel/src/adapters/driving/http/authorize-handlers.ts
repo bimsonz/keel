@@ -295,6 +295,9 @@ export const RESOLVERS: Resolvers = {
   Agents_listNamespaces: self,
   Agents_acceptInvitation: self,
   Agents_leaveNamespace: self,
+  Agents_listProjects: self,
+  Agents_acceptProjectInvitation: self,
+  Agents_leaveProject: self,
 
   Operator_listProjects: perItem,
   Operator_createProject: (input) => namespaceNamed(input.namespace),
@@ -303,6 +306,9 @@ export const RESOLVERS: Resolvers = {
   Namespaces_listAgents: (input) => namespaceNamed(input.handle),
   Namespaces_inviteAgent: (input) => namespaceNamed(input.handle),
   Namespaces_removeAgent: (input) => namespaceAgent(input.handle, input.agentId),
+  Projects_listAgents: (input) => projectNamed(input.projectId),
+  Projects_inviteAgent: (input) => projectNamed(input.projectId),
+  Projects_removeAgent: (input) => projectNamed(input.projectId),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),

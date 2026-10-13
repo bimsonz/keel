@@ -7,10 +7,10 @@ import {
   evolveInvitation,
   type Invitation,
   type InvitationCommand,
+  type InvitationEvent,
   type InvitationFacts,
   type InvitationScopes,
   INVITED_SCOPES,
-  type NamespaceAgentEvent,
   replayInvitation,
 } from "../../../src/domain/identity/index.ts";
 import {
@@ -22,6 +22,7 @@ import {
   Instant,
   makeId,
   type NamespaceId,
+  type ProjectId,
   userActor,
   type UserId,
 } from "../../../src/domain/kernel/index.ts";
@@ -36,16 +37,19 @@ const BOT: AgentId = makeId("agt", ulid(2));
 const OTHER_BOT: AgentId = makeId("agt", ulid(3));
 const ANN: UserId = makeId("usr", ulid(4));
 const BEN: UserId = makeId("usr", ulid(5));
-const FACTS = { namespace: ORG, agentId: BOT };
+const FACTS: InvitationFacts = { namespace: ORG, agentId: BOT };
+const PRJ: ProjectId = makeId("prj", ulid(6));
+/** One project of Ann's own namespace, whose id is hers. */
+const ON_PROJECT: InvitationFacts = { namespace: ANN, agentId: BOT, projectId: PRJ };
 const BOTH: InvitationScopes = ["agent:read", "agent:work"];
 const READ: InvitationScopes = ["agent:read"];
 
 /** Plays commands through decide and evolve, a millisecond apart, keeping what each committed or why it was refused. */
-function play(commands: readonly InvitationCommand[]) {
+function play(commands: readonly InvitationCommand[], facts: InvitationFacts = FACTS) {
   let state: Invitation | undefined;
-  const log: Committed<NamespaceAgentEvent>[] = [];
+  const log: Committed<InvitationEvent>[] = [];
   const results = commands.map((command, index) => {
-    const decided = decideInvitation(state, command, FACTS);
+    const decided = decideInvitation(state, command, facts);
     if (Result.isFailure(decided)) return decided.failure.reason;
     for (const payload of decided.success) {
       const committed = { at: Instant(1_760_000_000_000 + index), payload };
@@ -53,7 +57,7 @@ function play(commands: readonly InvitationCommand[]) {
       log.push(committed);
     }
     return decided.success.map((event) =>
-      event._tag === "AgentLeftNamespace" ? `${event._tag}:${event.reason}` : event._tag,
+      "reason" in event ? `${event._tag}:${event.reason}` : event._tag,
     );
   });
   return { state, log, results };
@@ -78,16 +82,27 @@ const decodes = (scopes: unknown) =>
 const end = (by: CommandActor): InvitationCommand => ({ _tag: "End", by });
 
 const START = 1_760_000_000_000;
-const machine: Machine<Invitation, InvitationCommand, NamespaceAgentEvent, InvitationFacts> = {
+const machine: Machine<Invitation, InvitationCommand, InvitationEvent, InvitationFacts> = {
   decide: decideInvitation,
   evolve: evolveInvitation,
 };
 
 // The chart checks the machine; it never drives it.
-const invitationView: View<Invitation, NamespaceAgentEvent> = {
+const invitationView: View<Invitation, InvitationEvent> = {
   from: (f) => f.before?.state ?? ABSENT,
   to: (f) => f.after.state,
 };
+
+/** What the model says, in the names the place gives its events: a namespace's as written, a project's its own. */
+const named = (says: unknown, facts: InvitationFacts) =>
+  !Array.isArray(says) || facts.projectId === undefined
+    ? says
+    : says.map((event) =>
+        String(event)
+          .replace("AgentInvited", "AgentInvitedToProject")
+          .replace("AgentJoinedNamespace", "AgentJoinedProject")
+          .replace("AgentLeftNamespace", "AgentLeftProject"),
+      );
 
 describe("the invitation machine", () => {
   it("[link.invite-machine] a member invites, the agent accepts, and only then does anyone answer for it, on what the invitation gives", () => {
@@ -176,6 +191,55 @@ describe("the invitation machine", () => {
     ).toEqual({ by: BEN, scopes: ["agent:read"] });
   });
 
+  it("[link.invite-machine] an invitation to one project of a person's namespace runs by the same rules and commits the project's own three events, each naming it", () => {
+    const itself = agentActor(BOT);
+    const run = play(
+      [invite(ANN, READ), invite(ANN, READ), invite(BEN), accept, accept, end(userActor(ANN))],
+      ON_PROJECT,
+    );
+    expect(run.results).toEqual([
+      ["AgentInvitedToProject"],
+      [],
+      "already-invited",
+      ["AgentJoinedProject"],
+      [],
+      ["AgentLeftProject:removed"],
+    ]);
+    for (const { payload } of run.log)
+      expect(payload).toMatchObject({ projectId: PRJ, namespace: ANN, agentId: BOT });
+    expect(run.state).toMatchObject({ projectId: PRJ, namespace: ANN, by: ANN, state: "ended" });
+
+    const joined = play([invite(ANN, READ), accept], ON_PROJECT);
+    expect(joined.state?.projectId).toBe(PRJ);
+    expect(answersFor(joined.state)).toEqual({ by: ANN, scopes: ["agent:read"] });
+    expect(play([invite(ANN)], ON_PROJECT).state?.state).toBe("invited");
+    expect(answersFor(play([invite(ANN)], ON_PROJECT).state)).toBeUndefined();
+
+    // Every end, by who makes it and when, as a namespace's.
+    expect(play([invite(ANN), end(itself)], ON_PROJECT).results[1]).toEqual([
+      "AgentLeftProject:declined",
+    ]);
+    expect(play([invite(ANN), accept, end(itself)], ON_PROJECT).results[2]).toEqual([
+      "AgentLeftProject:left",
+    ]);
+    expect(play([invite(ANN), end(userActor(ANN))], ON_PROJECT).results[1]).toEqual([
+      "AgentLeftProject:withdrawn",
+    ]);
+    expect(play([invite(ANN), end(agentActor(OTHER_BOT))], ON_PROJECT).results[1]).toBe(
+      "not-a-party",
+    );
+    expect(play([accept], ON_PROJECT).results).toEqual(["not-invited"]);
+    // A refusal names the project it was asked of; a namespace's names none.
+    const refused = decideInvitation(joined.state, invite(BEN), ON_PROJECT);
+    expect(Result.isFailure(refused) && refused.failure.projectId).toBe(PRJ);
+    const ofNamespace = decideInvitation(play([invite(ANN)]).state, invite(BEN), FACTS);
+    expect(Result.isFailure(ofNamespace) && ofNamespace.failure.projectId).toBeUndefined();
+    // A namespace's invitation names no project, in its events or its row.
+    const whole = play([invite(ANN), accept]);
+    expect(whole.state).not.toHaveProperty("projectId");
+    for (const { payload } of whole.log) expect(payload).not.toHaveProperty("projectId");
+  });
+
   it("[link.invite-machine] an invitation gives read, or read and work, each once; the schema refuses anything else", () => {
     expect(decodes(["agent:read"])).toBe(true);
     expect(decodes(["agent:read", "agent:work"])).toBe(true);
@@ -192,7 +256,7 @@ describe("the invitation machine", () => {
     const invited = { _tag: "AgentInvited", ...FACTS, by: ANN, scopes: BOTH } as const;
     const joined = { _tag: "AgentJoinedNamespace", ...FACTS } as const;
     const left = { _tag: "AgentLeftNamespace", ...FACTS, by: "x", reason: "left" } as const;
-    const fold = (events: readonly NamespaceAgentEvent[]) => () =>
+    const fold = (events: readonly InvitationEvent[]) => () =>
       replayInvitation(events.map((payload) => ({ at, payload })));
     expect(fold([joined])).toThrow(IllegalTransition);
     expect(fold([left])).toThrow(IllegalTransition);
@@ -205,6 +269,29 @@ describe("the invitation machine", () => {
       IllegalTransition,
     );
     expect(fold([invited, joined, left, invited])()).toMatchObject({ state: "invited" });
+
+    // A project's row takes the project's events and no other place's: not the namespace's, not another project's.
+    const place = { namespace: ANN, agentId: BOT, projectId: PRJ } as const;
+    const asked = { _tag: "AgentInvitedToProject", ...place, by: ANN, scopes: BOTH } as const;
+    const came = { _tag: "AgentJoinedProject", ...place } as const;
+    const went = { _tag: "AgentLeftProject", ...place, by: "x", reason: "left" } as const;
+    const whole = { namespace: ANN, agentId: BOT } as const;
+    expect(fold([came])).toThrow(IllegalTransition);
+    expect(fold([went])).toThrow(IllegalTransition);
+    expect(fold([asked, asked])).toThrow(IllegalTransition);
+    expect(fold([asked, came, came])).toThrow(IllegalTransition);
+    expect(fold([asked, { _tag: "AgentJoinedNamespace", ...whole }])).toThrow(IllegalTransition);
+    expect(
+      fold([asked, { _tag: "AgentLeftNamespace", ...whole, by: "x", reason: "left" }]),
+    ).toThrow(IllegalTransition);
+    expect(fold([asked, { ...came, projectId: makeId("prj", ulid(8)) }])).toThrow(
+      IllegalTransition,
+    );
+    expect(fold([asked, { ...came, agentId: OTHER_BOT }])).toThrow(IllegalTransition);
+    expect(fold([{ _tag: "AgentInvited", ...whole, by: ANN, scopes: BOTH }, came])).toThrow(
+      IllegalTransition,
+    );
+    expect(fold([asked, came, went, asked])()).toMatchObject({ state: "invited", projectId: PRJ });
   });
 
   const commandArb: fc.Arbitrary<InvitationCommand> = fc.oneof(
@@ -266,15 +353,20 @@ describe("the invitation machine", () => {
     }
   };
 
-  it("[link.invite-machine] any sequence of commands does what the rules say, somebody answers only for an accepted invitation, and the log replays to the state", () => {
+  const runArb = fc.tuple(
+    fc.constantFrom(FACTS, ON_PROJECT),
+    fc.array(commandArb, { size: "max", maxLength: 40 }),
+  );
+
+  it("[link.invite-machine] any sequence of commands does what the rules say, in a namespace and on one project alike, somebody answers only for an accepted invitation, and the log replays to the state", () => {
     fc.assert(
-      fc.property(fc.array(commandArb, { size: "max", maxLength: 40 }), (commands) => {
-        const { state, log, results } = play(commands);
+      fc.property(runArb, ([facts, commands]) => {
+        const { state, log, results } = play(commands, facts);
         let model: Model = { state: "none" };
         const expected = commands.map((command) => {
           const { next, says } = step(model, command);
           model = next;
-          return says;
+          return named(says, facts);
         });
         expect(results).toEqual(expected);
         expect(answersFor(state)).toEqual(
@@ -288,30 +380,43 @@ describe("the invitation machine", () => {
     );
   });
 
-  it("[link.invite-chart] every state change a run makes is an edge of the Invitation chart, and a tour of the machine takes every edge", () => {
+  it("[link.invite-chart] every state change a run makes, in a namespace or on one project, is an edge of the Invitation chart, and a tour of the machine in each takes every edge", () => {
     fc.assert(
-      fc.property(fc.array(commandArb, { size: "max", maxLength: 40 }), (commands) => {
+      fc.property(runArb, ([facts, commands]) => {
         let state: Invitation | undefined;
         for (const [index, command] of commands.entries()) {
-          const decided = decideInvitation(state, command, FACTS);
+          const decided = decideInvitation(state, command, facts);
           const folds = foldsOf(machine, state, [decided], Instant(START + index));
           expect(offChart(invitationChart, folds, invitationView)).toEqual([]);
           state = folds.at(-1)?.after ?? state;
         }
       }),
     );
-    // Every command from every state, with no seed: the agent's own end and a person's.
-    const walked = tour(machine, {
-      start: Instant(START),
-      facts: () => FACTS,
-      moves: () =>
-        [invite(ANN), accept, end(agentActor(BOT)), end(userActor(ANN))].map((command) => ({
-          command,
-          dt: 1,
-        })),
-      signature: (invitation) => invitation?.state ?? ABSENT,
-    });
+    // Every command from every state, with no seed, in each place: the agent's own end and a person's.
+    const walked = [FACTS, ON_PROJECT].flatMap((facts) =>
+      tour(machine, {
+        start: Instant(START),
+        facts: () => facts,
+        moves: () =>
+          [invite(ANN), accept, end(agentActor(BOT)), end(userActor(ANN))].map((command) => ({
+            command,
+            dt: 1,
+          })),
+        signature: (invitation) => invitation?.state ?? ABSENT,
+      }),
+    );
     expect(offChart(invitationChart, walked, invitationView)).toEqual([]);
     expect(uncovered(invitationChart, walked, invitationView)).toEqual([]);
+    // The two places share the chart's edges and no event: a namespace's run takes none of a project's.
+    const ofNamespace = walked.filter((fold) => !("projectId" in fold.event));
+    expect(ofNamespace.map((fold) => fold.event._tag).toSorted()).toEqual([
+      "AgentInvited",
+      "AgentInvited",
+      "AgentJoinedNamespace",
+      "AgentLeftNamespace",
+      "AgentLeftNamespace",
+      "AgentLeftNamespace",
+      "AgentLeftNamespace",
+    ]);
   });
 });

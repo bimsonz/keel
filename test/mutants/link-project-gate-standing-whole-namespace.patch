@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.project-invited
+# why: an agent invited to one project stands as one invited into the whole namespace
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index b47ae279..12c7feea 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -231,7 +231,6 @@ export const principalOf: (
+                 memberships.standing(invited.value.by, org),
+               ),
+               // Outside an org the invitation was to this project, and to nothing else of the namespace.
+-              ...(namespaceKind(org) === "org" ? {} : { projectOnly: true }),
+             };
+       return {
+         principal: {

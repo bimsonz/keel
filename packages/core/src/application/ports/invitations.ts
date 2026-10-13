@@ -6,10 +6,12 @@ import type {
   InvitationRefused,
   InvitationScopes,
 } from "../../domain/identity/index.ts";
-import type { AgentId, NamespaceId, RunRef, UserId } from "../../domain/kernel/index.ts";
+import type { AgentId, NamespaceId, ProjectId, RunRef, UserId } from "../../domain/kernel/index.ts";
 
 export interface AgentInvitation {
   readonly namespace: NamespaceId;
+  /** The one project of the namespace the invitation is to; absent, it is to the whole namespace. */
+  readonly projectId?: ProjectId | undefined;
   readonly agentId: AgentId;
   /** The member inviting, who answers for the agent in the namespace once it accepts. */
   readonly by: UserId;
@@ -19,6 +21,7 @@ export interface AgentInvitation {
 
 export interface InvitationAnswer {
   readonly namespace: NamespaceId;
+  readonly projectId?: ProjectId | undefined;
   readonly agentId: AgentId;
   /** The run the agent answers in, from its token. */
   readonly run?: RunRef | undefined;
@@ -27,6 +30,7 @@ export interface InvitationAnswer {
 
 export interface InvitationEnding {
   readonly namespace: NamespaceId;
+  readonly projectId?: ProjectId | undefined;
   readonly agentId: AgentId;
   /** The run an agent ends its own invitation in, from its token. A person names none. */
   readonly run?: RunRef | undefined;
@@ -48,9 +52,15 @@ export interface InvitationEnding {
  * - `end`: by the agent (it declines or leaves), or by a person, which the
  *   doorway decides: the member who invited it, or a maintainer.
  *
- * Each writes the row the request gate reads (`NamespaceAgents`) before it
- * answers. The same Idempotency-Key and body answers the invitation again;
- * another body is an IdempotencyConflict.
+ * Given a `projectId`, the place is that one project of the namespace and the
+ * record is the project's own object's (`project:<id>`): a person invites an
+ * agent to a project of their own namespace, never to the whole of it. The
+ * rules are the same.
+ *
+ * Each writes the row the request gate reads (`NamespaceAgents`, or
+ * `ProjectAgents` for a project) before it answers. The same Idempotency-Key
+ * and body answers the invitation again; another body is an
+ * IdempotencyConflict.
  */
 export class Invitations extends Context.Service<
   Invitations,

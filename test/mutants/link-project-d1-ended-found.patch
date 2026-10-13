@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t projagents.contract
+# kills: projagents.contract
+# why: an invitation to a project that has ended is still found there: the agent taken off reads as one still asked
+diff --git a/apps/keel/src/adapters/driven/d1/project-agents.ts b/apps/keel/src/adapters/driven/d1/project-agents.ts
+index d370ae68..3f942ec0 100644
+--- a/apps/keel/src/adapters/driven/d1/project-agents.ts
++++ b/apps/keel/src/adapters/driven/d1/project-agents.ts
+@@ -124,7 +124,7 @@ export function ProjectAgentsD1(db: D1Database) {
+           db
+             .prepare(
+               `SELECT ${COLUMNS} FROM project_agents
+-               WHERE project_id = ? AND agent_id = ? AND state <> 'ended'`,
++               WHERE project_id = ? AND agent_id = ?`,
+             )
+             .bind(projectId, agentId)
+             .first(),

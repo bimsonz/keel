@@ -103,6 +103,51 @@ export const NamespaceAgentEvent = Schema.Union([
 ]);
 export type NamespaceAgentEvent = typeof NamespaceAgentEvent.Type;
 
+/**
+ * A person invited the agent to one project of their own namespace, and
+ * answers for it there once it accepts. Until then it gives the agent nothing.
+ */
+export const AgentInvitedToProject = Schema.TaggedStruct("AgentInvitedToProject", {
+  projectId: ProjectId,
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: UserId,
+  scopes: InvitationScopes,
+});
+/** The agent accepted: it stands on the project. Names no person, so whoever reads the project may read it. */
+export const AgentJoinedProject = Schema.TaggedStruct("AgentJoinedProject", {
+  projectId: ProjectId,
+  namespace: NamespaceId,
+  agentId: AgentId,
+});
+/** The invitation to the project ended: `by` and `reason` as `AgentLeftNamespace` gives them. */
+export const AgentLeftProject = Schema.TaggedStruct("AgentLeftProject", {
+  projectId: ProjectId,
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: Schema.String,
+  reason: Schema.Literals(["declined", "left", "withdrawn", "removed"]),
+});
+
+/** The events of an agent's place on one project, which the project's own object commits. */
+export const ProjectAgentEvent = Schema.Union([
+  AgentInvitedToProject,
+  AgentJoinedProject,
+  AgentLeftProject,
+]);
+export type ProjectAgentEvent = typeof ProjectAgentEvent.Type;
+
+/** Every event of the Invitation machine: a namespace's three, and one project's three. */
+export const InvitationEvent = Schema.Union([
+  AgentInvited,
+  AgentJoinedNamespace,
+  AgentLeftNamespace,
+  AgentInvitedToProject,
+  AgentJoinedProject,
+  AgentLeftProject,
+]);
+export type InvitationEvent = typeof InvitationEvent.Type;
+
 /** The events of one agent, which the AgentSession DO commits. */
 export const AgentEvent = Schema.Union([
   AgentEnrolled,
@@ -187,6 +232,9 @@ export const IdentityEvent = Schema.Union([
   AgentInvited,
   AgentJoinedNamespace,
   AgentLeftNamespace,
+  AgentInvitedToProject,
+  AgentJoinedProject,
+  AgentLeftProject,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

@@ -29,10 +29,11 @@ An agent is tied to no project, but each token is for one run, in one namespace 
 - **A paused agent has no rights anywhere** and is refused everything, `anyone` included. `paused` is the Agent machine's `suspended` state.
 - Everywhere else an agent reads what is public, and an invitation whose inviter left or is suspended leaves exactly that.
 - **An invitation is a record of the namespace's own** ([state-machines.md § Invitation](state-machines.md#invitation)). A member invites an agent into an org and the agent accepts; the gate reads the row on every request, and only an accepted one makes the agent `Invited`. A token's scopes are cut to what the invitation gives: `agent:read`, or that and `agent:work`.
+- **In a person's own namespace an agent is invited to one project, never to the whole of it,** as a personal repository takes a collaborator. The record is the project's own; the gate reads its row for the project the token names, and an accepted one makes the agent `Invited` on that project alone (`projectOnly`): it reads and works there, and every other private project of the namespace is not there for it, exactly as for anyone outside.
 
 ## Resources and needs
 
-Each action names the kind of resource it is decided on (`Instance`, `Self`, `Org`, `Project` or `Fork`) and what it needs of the caller. `ACTIONS` lists every operation in the spec and the actions that are not operations (Better Auth's org management, the git routes, and operations not yet in the spec). `[authz.spec-covered]` holds the spec's list and the policy's equal.
+Each action names the kind of resource it is decided on (`Instance`, `Self`, `Namespace`, `Org`, `Project`, `PersonalProject`, `Agent` or `Fork`) and what it needs of the caller. `Org` is a namespace asked for what only an org has, and `PersonalProject` a project asked for what only a person's own namespace gives it (an agent invited to that one project): asked of anything else, each is answered as missing. `ACTIONS` lists every operation in the spec and the actions that are not operations (Better Auth's org management, the git routes, and operations not yet in the spec). `[authz.spec-covered]` holds the spec's list and the policy's equal.
 
 | Need | Granted to |
 |---|---|
@@ -47,6 +48,8 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Or
 | `workOrMaintain` | That, or whoever holds `maintain` |
 | `member`, `maintain`, `own` | A user with that role or above in the org, or an agent where it governs and no person owns |
 | `sponsorOrMaintain` | The sponsor of the agent the action concerns (a person), or whoever holds `maintain` |
+| `invite` | A user who is a member of the org. Never an agent, wherever it governs: an invitation names the person who answers for the agent |
+| `inviterOrMaintain` | The member who invited the agent the action concerns, or a user who holds `maintain`. Never an agent |
 
 ## Answers, in order
 

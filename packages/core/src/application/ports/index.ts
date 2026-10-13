@@ -45,6 +45,7 @@ export * from "./mfp-writer.ts";
 export * from "./notifier.ts";
 export * from "./namespaces.ts";
 export * from "./namespace-agents.ts";
+export * from "./project-agents.ts";
 export * from "./plan-store.ts";
 export * from "./probe-runner.ts";
 export * from "./probe-sources.ts";

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.personal-project
+# why: an org's owner invites an agent to one project of the org: the invitation is asked of an org's project as of a person's
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index ab00e909..08cdf5b8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -738,7 +738,7 @@ const noOrg = (asked: ResourceKind, resource: Resource): boolean =>
+  * it, and an agent's own namespace takes none.
+  */
+ const notPersonal = (asked: ResourceKind, resource: Resource): boolean =>
+-  asked === "PersonalProject" && resource._tag === "Project" && kindOf(resource) !== "user";
++  asked === "PersonalProject" && resource._tag === "Project" && kindOf(resource) === "agent";
+ 
+ /**
+  * The one authorization policy: whether `principal` may take `action` on

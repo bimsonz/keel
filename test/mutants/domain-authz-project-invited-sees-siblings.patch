@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.personal-project
+# why: an agent invited to one project is inside the whole namespace: another private project of it is told as foreign, not hidden
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index ab00e909..5769080d 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -520,7 +520,7 @@ const inside = (
+   const { standing } = principal;
+   if (principal.namespace !== resource.namespace || standing._tag === "None") return false;
+   const oneProject = standing._tag === "Invited" && standing.projectOnly === true;
+-  return !oneProject || isTokenProject(principal, resource);
++  return true;
+ };
+ 
+ /**

@@ -1,4 +1,9 @@
 import { hearLiveChange, liveAnchors, liveChanges } from "@keeltown/core/application/coordination";
+import {
+  acceptProjectInvitation,
+  endProjectInvitation,
+  inviteToProject,
+} from "@keeltown/core/application/identity";
 import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
 import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
@@ -9,7 +14,10 @@ import {
   projectServices,
 } from "../../../composition/do.ts";
 import {
+  AcceptProjectInvitationCommand,
   CreateProjectCommand,
+  EndProjectInvitationCommand,
+  InviteToProjectCommand,
   ProjectCodecs,
   type ProjectRpc,
   PutSettingsCommand,
@@ -22,15 +30,67 @@ const projectIdOf = (name: string | undefined) =>
 
 /**
  * The Project DO (`project:<id>`): the project, its settings and the subject
- * registry. Keel builds its RPC methods here, against the contract in src/rpc.
+ * registry. It holds the agents invited to it alone, one row an agent, and
+ * writes the row the request gate reads after each move. Its RPC methods are
+ * methods here, against the contract in src/rpc.
  */
 export class ProjectDO
   extends KeelObjectWith<ProjectServices>
   implements
-    Pick<ProjectRpc, "createProject" | "settings" | "putSettings" | "liveChanges" | "liveAnchors">
+    Pick<
+      ProjectRpc,
+      | "createProject"
+      | "settings"
+      | "putSettings"
+      | "liveChanges"
+      | "liveAnchors"
+      | "inviteAgent"
+      | "acceptInvitation"
+      | "endInvitation"
+    >
 {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, projectServices(env));
+  }
+
+  async inviteAgent(command: typeof InviteToProjectCommand.Encoded) {
+    // The address says which project the invitation is to; no caller picks one.
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.inviteAgent,
+      Schema.decodeUnknownEffect(InviteToProjectCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap(({ namespace, ...inviting }) =>
+          inviteToProject({ namespace, projectId }, inviting),
+        ),
+      ),
+    );
+  }
+
+  async acceptInvitation(command: typeof AcceptProjectInvitationCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.acceptInvitation,
+      Schema.decodeUnknownEffect(AcceptProjectInvitationCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap(({ namespace, ...accepting }) =>
+          acceptProjectInvitation({ namespace, projectId }, accepting),
+        ),
+      ),
+    );
+  }
+
+  async endInvitation(command: typeof EndProjectInvitationCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.endInvitation,
+      Schema.decodeUnknownEffect(EndProjectInvitationCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap(({ namespace, ...ending }) =>
+          endProjectInvitation({ namespace, projectId }, ending),
+        ),
+      ),
+    );
   }
 
   /** Bootstraps the project: its repos, trunk and pool, then ProjectCreated. Idempotent by the operator's key. */

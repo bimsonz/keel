@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-machine
+# why: an invitation to one project commits the namespace's events, which name no project
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index ddd9a8e4..6ea14acc 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -75,7 +75,7 @@ type EndReason = (typeof AgentLeftNamespace.Type)["reason"];
+ 
+ /** An invitation's three events as its place names them: a namespace's, or one project's. */
+ const eventsOf = ({ namespace, agentId, projectId }: InvitationFacts) =>
+-  projectId === undefined
++  projectId === undefined || projectId !== undefined
+     ? {
+         invited: (by: UserId, scopes: InvitationScopes): InvitationEvent =>
+           AgentInvited.make({ namespace, agentId, by, scopes }),

@@ -14,6 +14,7 @@ import {
   type OrgUsage,
   type NamespaceAgents,
   type Namespaces,
+  type ProjectAgents,
   type ProjectNamespaces,
   type Projects,
   type StagingWriter,
@@ -31,6 +32,7 @@ import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
+import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
@@ -76,22 +78,31 @@ export type AgentSessionServices = AgentDirectory | Namespaces;
  * namespace's agents: the repair after the AgentSession DO's, the Project
  * DO's and the namespace object's inline writes.
  */
-export type ProjectorServices = AgentDirectory | ProjectNamespaces | NamespaceAgents;
+export type ProjectorServices =
+  | AgentDirectory
+  | ProjectNamespaces
+  | NamespaceAgents
+  | ProjectAgents;
 
 export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
   return Layer.mergeAll(
     AgentDirectoryD1(env.DB),
     ProjectNamespacesD1(env.DB),
     NamespaceAgentsD1(env.DB),
+    ProjectAgentsD1(env.DB),
   );
 }
 
-/** The namespace object's driven adapter beyond the backbone: the rows of its agents that the request gate reads. */
-export type NamespaceServices = NamespaceAgents;
+/**
+ * The namespace object's driven adapters beyond the backbone: the rows of its
+ * agents that the request gate reads, and the rows of the agents invited to
+ * one of its projects, which it reads for who is asked first.
+ */
+export type NamespaceServices = NamespaceAgents | ProjectAgents;
 
 /** The namespace object writes its agents' D1 rows inline, so an acceptance or a removal binds the agent's next request. */
 export function namespaceServices(env: Env): Layer.Layer<NamespaceServices> {
-  return NamespaceAgentsD1(env.DB);
+  return Layer.mergeAll(NamespaceAgentsD1(env.DB), ProjectAgentsD1(env.DB));
 }
 
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
@@ -117,7 +128,7 @@ export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
 }
 
 /** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */
-export type ProjectServices = CodeHost | Trunks | WorkspacePool | ProjectNamespaces;
+export type ProjectServices = CodeHost | Trunks | WorkspacePool | ProjectNamespaces | ProjectAgents;
 
 /** How many ready workspaces a new project's pool keeps forked, until `vars.POOL_TARGET` is declared. */
 export const DEFAULT_POOL_TARGET = 2;
@@ -126,7 +137,8 @@ export const DEFAULT_POOL_TARGET = 2;
  * The Project DO forks and creates repos through the code host, initializes
  * and syncs trunk through the Trunk DO, and configures the project's pool. It
  * writes its visibility to its place's D1 row inline, so the next list of
- * projects is narrowed by it.
+ * projects is narrowed by it, and the rows of the agents invited to it, so an
+ * acceptance or a removal binds the agent's next request.
  */
 export function projectServices(env: Env): Layer.Layer<ProjectServices> {
   return Layer.mergeAll(
@@ -134,6 +146,7 @@ export function projectServices(env: Env): Layer.Layer<ProjectServices> {
     TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
     ProjectNamespacesD1(env.DB),
+    ProjectAgentsD1(env.DB),
   );
 }
 

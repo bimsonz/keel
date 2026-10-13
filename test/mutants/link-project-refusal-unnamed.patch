@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-machine
+# why: a refusal of a move on a project's invitation does not say which project it was asked of
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index ddd9a8e4..9ff3b8d7 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -128,7 +128,6 @@ export const decideInvitation = (
+     Result.fail(
+       new InvitationRefused({
+         namespace,
+-        ...(projectId === undefined ? {} : { projectId }),
+         agentId,
+         ...(invitation === undefined ? {} : { state: invitation.state }),
+         command: command._tag,

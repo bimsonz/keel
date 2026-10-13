@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-standing
+# kills: link.project-standing
+# why: an agent invited to a project is never told
+diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
+index f3978d8b..4a79f5be 100644
+--- a/packages/core/src/application/identity/invitations.ts
++++ b/packages/core/src/application/identity/invitations.ts
+@@ -284,11 +284,6 @@ const moveInvitation = Effect.fn("identity/moveInvitation")(function* <R>(
+       tx.store.put(kind, agentId, asStored(encodeInvitation(invitation)));
+       if (decided.success.some((event) => event._tag === "AgentInvited"))
+         tx.outbox.subscribe(`agent:${agentId}`, INVITATION_TELLS, { kind: "agent", id: agentId });
+-      if (decided.success.some((event) => event._tag === "AgentInvitedToProject"))
+-        tx.outbox.subscribe(`agent:${agentId}`, PROJECT_INVITATION_TELLS, {
+-          kind: "agent",
+-          id: agentId,
+-        });
+       return Result.succeed({ value: invitation, drafts });
+     },
+   );

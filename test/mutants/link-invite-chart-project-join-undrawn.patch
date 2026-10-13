@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts
+# kills: link.invite-chart
+# why: the chart draws no edge for an agent joining a project, a move the machine makes
+diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
+index d5ca2583..34fe7261 100644
+--- a/packages/core/test/charts/charts.ts
++++ b/packages/core/test/charts/charts.ts
+@@ -285,7 +285,6 @@ export const invitationChart: Chart = {
+     invited: {
+       on: {
+         AgentJoinedNamespace: i("joined"),
+-        AgentJoinedProject: i("joined"),
+         AgentLeftNamespace: i("ended"),
+         AgentLeftProject: i("ended"),
+       },

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-standing
+# kills: link.project-standing
+# why: an agent invited to a project reads who invited each agent there and on what terms
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 3492cf4b..9c565a0a 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -547,7 +547,7 @@ export function projectInvitationHandlers(
+         Effect.gen(function* () {
+           // An agent invited here reads who has joined, as anyone does: what waits and who asked is the person's to see.
+           const audience =
+-            caller.principal._tag === "User" ? (caller.audience ?? "public") : "public";
++            caller.audience ?? "public";
+           const rows = yield* ProjectAgents.use((agents) =>
+             agents.inProject(projectIn(caller).projectId),
+           );

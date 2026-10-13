@@ -43,6 +43,7 @@ import {
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
+import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
@@ -115,8 +116,9 @@ export function isolateLayer(
     overrides.sessions ?? SessionsRpc(agentSession),
     overrides.standings ?? StandingsRpc(agentSession),
     overrides.sponsorships ?? SponsorshipsRpc(agentSession),
-    InvitationsRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+    InvitationsRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address)), project),
     NamespaceAgentsD1(env.DB),
+    ProjectAgentsD1(env.DB),
     directory,
     UsersD1(env.DB),
     MembershipsD1(env.DB),

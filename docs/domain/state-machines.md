@@ -519,16 +519,22 @@ stateDiagram-v2
 
 ## Invitation
 
-Owner: the namespace's own object (`ns:<id>`), one row an agent, on the namespace's entity `org:<namespaceId>`. An agent is invited into an org by a member and stands there once it accepts (`read` and `work`, never more). A person's own namespace and an agent's own take no invitation: the policy asks it of an org alone.
+Owner: the object of the place the invitation is to, one row an agent. **Into an org:** the namespace's own object (`ns:<id>`), on the namespace's entity `org:<namespaceId>`. An agent is invited into an org by a member and stands there once it accepts (`read` and `work`, never more). A person's own namespace and an agent's own take no invitation into the whole of them: the policy asks it of an org alone. **To one project of a person's own namespace:** the Project DO (`project:<id>`), on the project's own entity, so its events carry the project. The person invites the agent to that project as a personal repository takes a collaborator, and it stands on that project and on nothing else of the namespace. An org's project and an agent's take no such invitation: the policy asks it of a person's own project alone.
+
+One machine decides both. Its facts name the namespace and, for a project, the project; the rules, the refusals and the reasons of an end are the same, and only the events' names differ.
 
 <!-- chart:invitation — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
-  [*] --> Invited: AgentInvited
+  [*] --> Invited: AgentInvited / AgentInvitedToProject
   Invited --> Joined: AgentJoinedNamespace
+  Invited --> Joined: AgentJoinedProject
   Invited --> Ended: AgentLeftNamespace
+  Invited --> Ended: AgentLeftProject
   Joined --> Ended: AgentLeftNamespace
+  Joined --> Ended: AgentLeftProject
   Ended --> Invited: AgentInvited
+  Ended --> Invited: AgentInvitedToProject
   Ended --> [*]
 ```
 <!-- /chart:invitation -->
@@ -543,11 +549,13 @@ stateDiagram-v2
 | Joined | `End` by the agent | `AgentLeftNamespace {reason: left}` | Ended |
 | Joined | `End` by a person | `AgentLeftNamespace {reason: removed}` | Ended |
 
-**One member answers for an agent in a namespace.** While an invitation stands, pending or accepted, the same member inviting again for the same scopes commits nothing, and anything else is refused (`already-invited`) until it has ended. Only an invited agent accepts (`not-invited` otherwise), and accepting again commits nothing. Another agent is no party to an invitation (`not-a-party`). Whether a person may invite or end is the policy's to decide before the machine: any member invites; the member who invited the agent, a maintainer or an owner ends.
+With a project in the facts, the same rows commit `AgentInvitedToProject`, `AgentJoinedProject` and `AgentLeftProject`, each naming the project and its namespace. A row takes the events of its own place and no other's: a project's event on a namespace's row, a namespace's on a project's, or another project's, is refused by the fold.
 
-**Only an accepted invitation gives standing.** The request gate reads the invitation's row in D1 (`namespace_agents`) on every request of an agent in a namespace that is not its own: `joined` makes it `Invited` by the standing its inviter holds now, with its token's scopes cut to the invitation's. So an inviter who leaves the org takes the agent's rights with them at once, with no write, and the row stays as it is. An ended invitation keeps its row as `ended`, and the agent may be invited again.
+**One member answers for an agent in a namespace.** While an invitation stands, pending or accepted, the same member inviting again for the same scopes commits nothing, and anything else is refused (`already-invited`) until it has ended. Only an invited agent accepts (`not-invited` otherwise), and accepting again commits nothing. Another agent is no party to an invitation (`not-a-party`). Whether a person may invite or end is the policy's to decide before the machine: in an org any member invites, and the member who invited the agent, a maintainer or an owner ends; on a person's own project that person does both. It is a person's act in either place: the invitation names the person who answers for the agent, so no agent invites one or takes one out, wherever it governs.
 
-**Who is asked first.** A question about the work of an agent that has joined a namespace goes first to the member who invited it there, whoever sponsors the agent. The namespace's object reads its own row when it raises the escalation.
+**Only an accepted invitation gives standing.** The request gate reads the invitation's row in D1 (`namespace_agents`) on every request of an agent in a namespace that is not its own: `joined` makes it `Invited` by the standing its inviter holds now, with its token's scopes cut to the invitation's. So an inviter who leaves the org takes the agent's rights with them at once, with no write. Until push 3 the row stays `joined` and no event says the membership ended: the inviter's leaving will end the invitation with an event of its own (`inviterLeft`). An ended invitation keeps its row as `ended`, and the agent may be invited again. An invitation to one project is read the same way from `project_agents`, by the project the token names: `joined` makes the agent `Invited` by the standing of the person who invited it, who owns the namespace for as long as their account stands, and marks the standing as that project's alone (`projectOnly`), so another private project of the namespace is not there for the agent.
+
+**Who is asked first.** A question about the work of an agent that has joined a namespace goes first to the member who invited it there, whoever sponsors the agent. The namespace's object reads its own row when it raises the escalation. Outside an org it reads the row of the escalation's own project in `project_agents`: the person who invited the agent to that project is asked first about it, and about another of their projects the invitation says nothing.
 
 ## Sketch
 

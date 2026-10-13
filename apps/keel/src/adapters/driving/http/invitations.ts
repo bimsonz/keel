@@ -8,23 +8,32 @@ import {
   type InvitationRefused,
   InvitationScopes,
 } from "@keeltown/core/domain/identity";
-import { AgentId, NamespaceId } from "@keeltown/core/kernel";
+import { AgentId, NamespaceId, ProjectId, type UserId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
   Invitations,
   NamespaceAgents,
   type NamespaceRecord,
   Namespaces,
+  ProjectAgents,
+  ProjectNamespaces,
+  type ProjectPlace,
 } from "@keeltown/core/ports";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import type {
   Agents_acceptInvitationResult,
+  Agents_acceptProjectInvitationResult,
   Agents_leaveNamespaceResult,
+  Agents_leaveProjectResult,
   Agents_listNamespacesResult,
+  Agents_listProjectsResult,
   Namespaces_inviteAgentResult,
   Namespaces_listAgentsResult,
   Namespaces_removeAgentResult,
   Operations,
+  Projects_inviteAgentResult,
+  Projects_listAgentsResult,
+  Projects_removeAgentResult,
 } from "../../../generated/http/app.gen.ts";
 import { agentsOnly } from "./authorize-handlers.ts";
 import type { Caller } from "./caller.ts";
@@ -33,9 +42,11 @@ import type { Runner } from "./run.ts";
 
 /**
  * The invitation of an agent into an org: a member's invitation and removal,
- * the list anyone reads, and the agent's own list, acceptance and leaving.
- * Mappers are pure and each error union is mapped exhaustively; the handlers
- * call the ports and nothing else.
+ * the list anyone reads, and the agent's own list, acceptance and leaving. And
+ * the same six for one project of a person's own namespace, where an agent is
+ * taken on a project and never on the whole namespace. Mappers are pure and
+ * each error union is mapped exhaustively; the handlers call the ports and
+ * nothing else.
  */
 
 type Input<A extends keyof Operations<Caller>> = Parameters<Operations<Caller>[A]>[1];
@@ -44,10 +55,12 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
 const decodeNamespaceId = Schema.decodeUnknownOption(NamespaceId);
+const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeScopes = Schema.decodeUnknownOption(InvitationScopes);
 
 type NamespaceAgentBody = Extract<Namespaces_removeAgentResult, { readonly status: 200 }>["body"];
 type AgentNamespaceBody = Extract<Agents_leaveNamespaceResult, { readonly status: 200 }>["body"];
+type AgentProjectBody = Extract<Agents_leaveProjectResult, { readonly status: 200 }>["body"];
 
 /**
  * An agent in an org as its members read it, or as anyone else does: who it
@@ -108,6 +121,24 @@ export const joinedOrgs = (agentId: AgentId) =>
     );
   });
 
+/**
+ * A project an agent was invited to, as the agent reads it: the project by its
+ * id, its name and its namespace's handle, and never who invited it.
+ */
+export function agentProject(
+  invitation: Invitation,
+  place: ProjectPlace,
+  namespace: NamespaceRecord,
+): AgentProjectBody {
+  return {
+    project: { id: place.projectId, namespace: namespace.handle, name: place.name },
+    state: invitation.state,
+    scopes: [...invitation.scopes],
+    invitedAt: iso(invitation.invitedAt),
+    ...(invitation.joinedAt === undefined ? {} : { joinedAt: iso(invitation.joinedAt) }),
+  };
+}
+
 const notFound = (caller: Caller, detail?: string) => ({
   status: 404 as const,
   body: problem(
@@ -129,9 +160,10 @@ const idempotencyConflict = (caller: Caller, error: IdempotencyConflict, operati
 });
 
 /**
- * The refusals of a move on an agent's place in a namespace as it stands: 409,
- * saying what is in the way. It names no person: a member reads who invited
- * the agent from the org's list.
+ * The refusals of a move on an agent's place as it stands, in a namespace or
+ * on one project: 409, saying what is in the way. It names no person: a member
+ * reads who invited the agent from the org's list, and a project's owner made
+ * every invitation to it.
  */
 function stateRefused(
   caller: Caller,
@@ -141,16 +173,32 @@ function stateRefused(
     case "already-invited":
       return {
         status: 409,
-        body: problem(409, "invitation.state_refused", caller.requestId, {
-          detail: `${error.agentId} already has an invitation here, and one member answers for an agent in an org. Take it out first to invite it again or to change what it may do.`,
-          nextActions: [
-            {
-              kind: "read",
-              title: "Read the org's agents and who invited each",
-              operationId: "Namespaces_listAgents",
-            },
-          ],
-        }),
+        body: problem(
+          409,
+          "invitation.state_refused",
+          caller.requestId,
+          error.projectId === undefined
+            ? {
+                detail: `${error.agentId} already has an invitation here, and one member answers for an agent in an org. Take it out first to invite it again or to change what it may do.`,
+                nextActions: [
+                  {
+                    kind: "read",
+                    title: "Read the org's agents and who invited each",
+                    operationId: "Namespaces_listAgents",
+                  },
+                ],
+              }
+            : {
+                detail: `${error.agentId} already has an invitation to this project. Take it off first to invite it again or to change what it may do.`,
+                nextActions: [
+                  {
+                    kind: "read",
+                    title: "Read the agents invited to the project",
+                    operationId: "Projects_listAgents",
+                  },
+                ],
+              },
+        ),
       };
     case "not-invited":
       return {
@@ -176,12 +224,13 @@ function stateRefused(
 export function inviteError(
   caller: Caller,
   error: InvitationRefused | IdempotencyConflict,
-): Namespaces_inviteAgentResult {
+  operationId = "Namespaces_inviteAgent",
+): { readonly status: 409; readonly body: ProblemBody } {
   switch (error._tag) {
     case "InvitationRefused":
       return stateRefused(caller, error);
     case "IdempotencyConflict":
-      return idempotencyConflict(caller, error, "Namespaces_inviteAgent");
+      return idempotencyConflict(caller, error, operationId);
     default: {
       const unmapped: never = error;
       return unmapped;
@@ -191,15 +240,15 @@ export function inviteError(
 
 /**
  * The refusals of an end, or of the agent's own answer: with no invitation
- * there the agent, or the namespace, is not found, whoever asks, so a
- * namespace that never invited an agent and one that does not exist read the
- * same to it.
+ * there the agent, or the namespace or the project, is not found, whoever
+ * asks, so a place that never invited an agent and one that does not exist
+ * read the same to it.
  */
 function moveError(
   caller: Caller,
   error: InvitationRefused | IdempotencyConflict,
   operationId: string,
-): Namespaces_removeAgentResult & Agents_acceptInvitationResult & Agents_leaveNamespaceResult {
+): { readonly status: 404 | 409; readonly body: ProblemBody } {
   switch (error._tag) {
     case "InvitationRefused":
       return error.reason === "not-invited" ? notFound(caller) : stateRefused(caller, error);
@@ -240,6 +289,72 @@ const withAgent = (invitation: Invitation) =>
   AgentDirectory.use((directory) => directory.findAgent(invitation.agentId)).pipe(
     Effect.map((agent) => namespaceAgent(invitation, Option.getOrUndefined(agent), "members")),
   );
+
+/**
+ * What an invitation's request asks, checked before any object is called: the
+ * person inviting, the agent its handle names, and what the invitation gives.
+ * A failure is the answer to give in its place.
+ */
+const invitationAsked = (
+  caller: Caller,
+  input: { readonly agent: string; readonly scopes?: readonly string[] | undefined },
+): Effect.Effect<
+  Result.Result<
+    { readonly by: UserId; readonly agentId: AgentId; readonly scopes: InvitationScopes },
+    { readonly status: 400 | 404; readonly body: ProblemBody }
+  >,
+  never,
+  Namespaces
+> =>
+  Effect.gen(function* () {
+    const { principal } = caller;
+    if (principal._tag !== "User")
+      return yield* Effect.die(new Error("an invitation ran without a user"));
+    const scopes = decodeScopes(input.scopes ?? INVITED_SCOPES);
+    if (Option.isNone(scopes))
+      return Result.fail({
+        status: 400 as const,
+        body: problem(400, "request.invalid", caller.requestId, {
+          detail: "An invitation gives agent:read, or agent:read and agent:work, each named once.",
+        }),
+      });
+    // An agent's handle is its own namespace's, and that namespace's id is the agent's.
+    const named = yield* Namespaces.use((namespaces) => namespaces.byHandle(input.agent));
+    const agentId = Option.flatMap(named, (found) =>
+      found.kind === "agent" ? decodeAgentId(found.namespace) : Option.none(),
+    );
+    if (Option.isNone(agentId))
+      return Result.fail(notFound(caller, `No agent has the handle ${input.agent}.`));
+    return Result.succeed({ by: principal.userId, agentId: agentId.value, scopes: scopes.value });
+  });
+
+/** The project the call was decided on, as `authorizeHandlers` resolved it. */
+function projectIn(caller: Caller) {
+  if (caller.resource?._tag !== "Project")
+    throw new Error("a project's operation ran without its project resolved");
+  return caller.resource;
+}
+
+/** A project as an agent names it, by its id, with its namespace: where its invitation is kept and how it is shown. */
+const projectGiven = (
+  given: string,
+): Effect.Effect<
+  Option.Option<{ readonly place: ProjectPlace; readonly namespace: NamespaceRecord }>,
+  never,
+  ProjectNamespaces | Namespaces
+> =>
+  Option.match(decodeProjectId(given), {
+    onNone: () => Effect.succeed(Option.none()),
+    onSome: (projectId) =>
+      Effect.gen(function* () {
+        const place = yield* ProjectNamespaces.use((places) => places.byId(projectId));
+        if (Option.isNone(place)) return Option.none();
+        const namespace = yield* Namespaces.use((namespaces) =>
+          namespaces.byId(place.value.namespace),
+        );
+        return Option.map(namespace, (record) => ({ place: place.value, namespace: record }));
+      }),
+  });
 
 /** An agent's own operation: asked by anyone else it is refused as every agents' operation is. */
 const asAgent = <A>(caller: Caller, move: (agentId: AgentId) => A) =>
@@ -288,31 +403,13 @@ export function invitationHandlers(
         run(
           caller,
           Effect.gen(function* () {
-            const { principal } = caller;
-            if (principal._tag !== "User")
-              return yield* Effect.die(new Error("an invitation ran without a user"));
-            const scopes = decodeScopes(input.scopes ?? INVITED_SCOPES);
-            if (Option.isNone(scopes))
-              return {
-                status: 400 as const,
-                body: problem(400, "request.invalid", caller.requestId, {
-                  detail:
-                    "An invitation gives agent:read, or agent:read and agent:work, each named once.",
-                }),
-              } satisfies Namespaces_inviteAgentResult;
-            // An agent's handle is its own namespace's, and that namespace's id is the agent's.
-            const named = yield* Namespaces.use((namespaces) => namespaces.byHandle(input.agent));
-            const agentId = Option.flatMap(named, (found) =>
-              found.kind === "agent" ? decodeAgentId(found.namespace) : Option.none(),
-            );
-            if (Option.isNone(agentId))
-              return notFound(caller, `No agent has the handle ${input.agent}.`);
+            const asked = yield* invitationAsked(caller, input);
+            if (Result.isFailure(asked))
+              return asked.failure satisfies Namespaces_inviteAgentResult;
             return yield* Invitations.use((invitations) =>
               invitations.invite({
                 namespace: namespaceOf(caller),
-                agentId: agentId.value,
-                by: principal.userId,
-                scopes: scopes.value,
+                ...asked.success,
                 idempotencyKey: input["idempotency-key"],
               }),
             ).pipe(
@@ -420,6 +517,189 @@ export function invitationHandlers(
                         body: agentNamespace(invitation, place),
                       }),
                       onFailure: (error) => moveError(caller, error, "Agents_leaveNamespace"),
+                    }),
+                  ),
+              }),
+            ),
+          ),
+        ),
+      ),
+  };
+}
+
+/**
+ * The six operations of an agent's invitation to one project of a person's
+ * own namespace. The policy has already answered a project anywhere else as
+ * missing, and an agent that asks to invite or remove as refused. `touched`
+ * asks the person's fresh sign-in before their two moves, as for an org.
+ */
+export function projectInvitationHandlers(
+  run: Runner,
+  touched: <A>(
+    caller: Caller,
+    move: () => A,
+  ) => A | { readonly status: 403; readonly body: ProblemBody },
+) {
+  return {
+    Projects_listAgents: (caller: Caller, _input: Input<"Projects_listAgents">) =>
+      run(
+        caller,
+        Effect.gen(function* () {
+          // An agent invited here reads who has joined, as anyone does: what waits and who asked is the person's to see.
+          const audience =
+            caller.principal._tag === "User" ? (caller.audience ?? "public") : "public";
+          const rows = yield* ProjectAgents.use((agents) =>
+            agents.inProject(projectIn(caller).projectId),
+          );
+          const directory = yield* AgentDirectory;
+          const items = yield* Effect.forEach(
+            rows.filter((row) => audience === "members" || row.state === "joined"),
+            (row) =>
+              directory
+                .findAgent(row.agentId)
+                .pipe(
+                  Effect.map((agent) =>
+                    namespaceAgent(row, Option.getOrUndefined(agent), audience),
+                  ),
+                ),
+          );
+          return { status: 200 as const, body: { items } } satisfies Projects_listAgentsResult;
+        }),
+      ),
+    Projects_inviteAgent: (caller: Caller, input: Input<"Projects_inviteAgent">) =>
+      touched(caller, () =>
+        run(
+          caller,
+          Effect.gen(function* () {
+            const asked = yield* invitationAsked(caller, input);
+            if (Result.isFailure(asked)) return asked.failure satisfies Projects_inviteAgentResult;
+            const { namespace, projectId } = projectIn(caller);
+            return yield* Invitations.use((invitations) =>
+              invitations.invite({
+                namespace,
+                projectId,
+                ...asked.success,
+                idempotencyKey: input["idempotency-key"],
+              }),
+            ).pipe(
+              Effect.flatMap(withAgent),
+              Effect.match({
+                onSuccess: (body) => ({ status: 201 as const, body }),
+                onFailure: (error) => inviteError(caller, error, "Projects_inviteAgent"),
+              }),
+            );
+          }),
+        ),
+      ),
+    Projects_removeAgent: (caller: Caller, input: Input<"Projects_removeAgent">) =>
+      touched(caller, () =>
+        run(
+          caller,
+          Option.match(decodeAgentId(input.agentId), {
+            onNone: () => Effect.succeed<Projects_removeAgentResult>(notFound(caller)),
+            onSome: (agentId) => {
+              const { namespace, projectId } = projectIn(caller);
+              return Invitations.use((invitations) =>
+                invitations.end(endingActor(caller), {
+                  namespace,
+                  projectId,
+                  agentId,
+                  idempotencyKey: input["idempotency-key"],
+                }),
+              ).pipe(
+                Effect.flatMap(withAgent),
+                Effect.match({
+                  onSuccess: (body): Projects_removeAgentResult => ({ status: 200, body }),
+                  onFailure: (error) => moveError(caller, error, "Projects_removeAgent"),
+                }),
+              );
+            },
+          }),
+        ),
+      ),
+    Agents_listProjects: (caller: Caller) =>
+      asAgent(caller, (agentId) =>
+        run(
+          caller,
+          Effect.gen(function* () {
+            const rows = yield* ProjectAgents.use((agents) => agents.ofAgent(agentId));
+            // A project that has no place any more is in no list.
+            const found = yield* Effect.forEach(rows, (row) =>
+              row.projectId === undefined
+                ? Effect.succeed(Option.none())
+                : projectGiven(row.projectId).pipe(
+                    Effect.map(
+                      Option.map(({ place, namespace }) => agentProject(row, place, namespace)),
+                    ),
+                  ),
+            );
+            return {
+              status: 200 as const,
+              body: { items: found.flatMap((item) => Option.toArray(item)) },
+            } satisfies Agents_listProjectsResult;
+          }),
+        ),
+      ),
+    Agents_acceptProjectInvitation: (
+      caller: Caller,
+      input: Input<"Agents_acceptProjectInvitation">,
+    ) =>
+      asAgent(caller, (agentId) =>
+        run(
+          caller,
+          projectGiven(input.projectId).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () =>
+                  Effect.succeed<Agents_acceptProjectInvitationResult>(notFound(caller)),
+                onSome: ({ place, namespace }) =>
+                  Invitations.use((invitations) =>
+                    invitations.accept({
+                      namespace: place.namespace,
+                      projectId: place.projectId,
+                      agentId,
+                      run: caller.token?.run,
+                      idempotencyKey: input["idempotency-key"],
+                    }),
+                  ).pipe(
+                    Effect.match({
+                      onSuccess: (invitation): Agents_acceptProjectInvitationResult => ({
+                        status: 200,
+                        body: agentProject(invitation, place, namespace),
+                      }),
+                      onFailure: (error) =>
+                        moveError(caller, error, "Agents_acceptProjectInvitation"),
+                    }),
+                  ),
+              }),
+            ),
+          ),
+        ),
+      ),
+    Agents_leaveProject: (caller: Caller, input: Input<"Agents_leaveProject">) =>
+      asAgent(caller, (agentId) =>
+        run(
+          caller,
+          projectGiven(input.projectId).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.succeed<Agents_leaveProjectResult>(notFound(caller)),
+                onSome: ({ place, namespace }) =>
+                  Invitations.use((invitations) =>
+                    invitations.end(endingActor(caller), {
+                      namespace: place.namespace,
+                      projectId: place.projectId,
+                      agentId,
+                      run: caller.token?.run,
+                      idempotencyKey: input["idempotency-key"],
+                    }),
+                  ).pipe(
+                    Effect.match({
+                      onSuccess: (invitation): Agents_leaveProjectResult => ({
+                        status: 200,
+                        body: agentProject(invitation, place, namespace),
+                      }),
+                      onFailure: (error) => moveError(caller, error, "Agents_leaveProject"),
                     }),
                   ),
               }),

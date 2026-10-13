@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/event-audience.test.ts
+# kills: b12.event-audience
+# why: an invitation to a project, which names the person who made it, is served to anyone who reads the project
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 3e559cfb..08ac385d 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -43,7 +43,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   AgentJoinedNamespace: "public",
+   AgentLeftNamespace: "members",
+   // A project's invitation, as an org's: only the joining names no person.
+-  AgentInvitedToProject: "members",
++  AgentInvitedToProject: "public",
+   AgentJoinedProject: "public",
+   AgentLeftProject: "members",
+   UserSignedUp: "members",

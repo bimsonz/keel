@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-standing
+# kills: link.project-standing
+# why: the invitation the person makes on a project is made into their whole namespace
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 3492cf4b..3f73ad05 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -577,7 +577,6 @@ export function projectInvitationHandlers(
+             return yield* Invitations.use((invitations) =>
+               invitations.invite({
+                 namespace,
+-                projectId,
+                 ...asked.success,
+                 idempotencyKey: input["idempotency-key"],
+               }),

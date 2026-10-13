@@ -801,6 +801,39 @@ model AgentLeftNamespace {
   reason: InvitationEnd;
 }
 
+/**
+ * A person invited the agent to one project of their own namespace, and answers
+ * for it there once it accepts. Until then it gives the agent nothing.
+ */
+model AgentInvitedToProject {
+  _tag: "AgentInvitedToProject";
+  projectId: ProjectId;
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+  by: UserId;
+
+  /** What the invitation gives: `agent:read`, or that and `agent:work`. Never more. */
+  scopes: Scope[];
+}
+
+/** The agent accepted: it stands on that project, and on nothing else of the namespace. It names no person. */
+model AgentJoinedProject {
+  _tag: "AgentJoinedProject";
+  projectId: ProjectId;
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+}
+
+/** The invitation to the project ended. `by` is whoever ended it. */
+model AgentLeftProject {
+  _tag: "AgentLeftProject";
+  projectId: ProjectId;
+  `namespace`: NamespaceId;
+  agentId: AgentId;
+  by: string;
+  reason: InvitationEnd;
+}
+
 // Tenancy. Better Auth's tables in D1 are identity's source of truth;
 // its after-hooks commit these for the feed and the audit, one per row-state
 // change, keyed `user:<userId>` or `org:<orgId>`. No event carries an email.
@@ -1707,6 +1740,9 @@ union KeelEvent {
   AgentInvited,
   AgentJoinedNamespace,
   AgentLeftNamespace,
+  AgentInvitedToProject,
+  AgentJoinedProject,
+  AgentLeftProject,
   UserSignedUp,
   OrgCreated,
   MembershipChanged,

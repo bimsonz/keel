@@ -1,7 +1,9 @@
 import { Effect, Option, Schema } from "effect";
 import {
   AgentInvited,
+  AgentInvitedToProject,
   AgentLeftNamespace,
+  AgentLeftProject,
   type AgentNotice,
   givesWork,
   type InboxEntry,
@@ -71,6 +73,8 @@ export const inboxDepth = (store: Store, run?: RunId): number => {
 /** The next actions an event's payload names, when it names any. */
 const decodeInvited = Schema.decodeUnknownOption(AgentInvited);
 const decodeLeft = Schema.decodeUnknownOption(AgentLeftNamespace);
+const decodeInvitedTo = Schema.decodeUnknownOption(AgentInvitedToProject);
+const decodeLeftProject = Schema.decodeUnknownOption(AgentLeftProject);
 const decodeActionable = Schema.decodeUnknownOption(
   Schema.Struct({ nextActions: Schema.optional(Schema.Array(NextAction)) }),
 );
@@ -147,6 +151,20 @@ export function detailOf(event: EventEnvelope): string | undefined {
             ? `the invitation into ${p.namespace} was withdrawn`
             : `you were taken out of ${p.namespace}: you have no standing there now`,
       });
+    case "AgentInvitedToProject":
+      return Option.match(decodeInvitedTo(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `you were invited to the project ${p.projectId}: accept, and a token that names it ${givesWork(p.scopes) ? "reads and works" : "reads"} there, and nowhere else in its namespace`,
+      });
+    case "AgentLeftProject":
+      return Option.match(decodeLeftProject(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          p.reason === "withdrawn"
+            ? `the invitation to the project ${p.projectId} was withdrawn`
+            : `you were taken off the project ${p.projectId}: you have no standing there now`,
+      });
     case "AgentSponsored":
       return "a person now stands behind you: your questions go to them, and they may pause you";
     case "AgentUnsponsored":
@@ -199,6 +217,32 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
         kind: "read",
         title: "Read the namespaces you stand in",
         operationId: "Agents_listNamespaces",
+      },
+    ];
+  if (event.type === "AgentInvitedToProject")
+    return Option.match(decodeInvitedTo(event.payload), {
+      onNone: () => undefined,
+      onSome: (p) => [
+        {
+          kind: "call",
+          title: "Accept the invitation",
+          operationId: "Agents_acceptProjectInvitation",
+          args: { projectId: p.projectId },
+        },
+        {
+          kind: "call",
+          title: "Decline it",
+          operationId: "Agents_leaveProject",
+          args: { projectId: p.projectId },
+        },
+      ],
+    });
+  if (event.type === "AgentLeftProject")
+    return [
+      {
+        kind: "read",
+        title: "Read the projects you were invited to",
+        operationId: "Agents_listProjects",
       },
     ];
   const conflictId = Option.getOrUndefined(decodeEscalation(event.payload))?.conflictId;

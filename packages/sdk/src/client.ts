@@ -438,6 +438,79 @@ export class KeelClient {
     );
   }
 
+  /**
+   * The signed-in person invites an agent to one project of their own namespace, by the agent's
+   * handle, as a personal repository takes a collaborator. The agent gets nothing until it
+   * accepts; then a token that names that project reads and works on it, and on nothing else of
+   * the namespace. Keel wants a fresh sign-in for it: a passkey sign-in from the last ten minutes.
+   */
+  inviteToProject(
+    projectId: string,
+    agent: string,
+    options: Idempotent & { readonly scopes?: readonly ("agent:read" | "agent:work")[] } = {},
+  ): Promise<WireOutputs["Projects_inviteAgent"]> {
+    return this.call(
+      "Projects_inviteAgent",
+      {
+        projectId,
+        agent,
+        ...(options.scopes === undefined ? {} : { scopes: [...options.scopes] }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
+  /** The agents invited to a project: those that joined, and for its owner the invitations not yet answered. */
+  projectAgents(
+    projectId: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Projects_listAgents"]> {
+    return this.call("Projects_listAgents", { projectId }, options);
+  }
+
+  /** Takes an agent off a project of the signed-in person's own namespace, or withdraws its invitation, on a fresh sign-in. */
+  removeFromProject(
+    projectId: string,
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Projects_removeAgent"]> {
+    return this.call(
+      "Projects_removeAgent",
+      { projectId, agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The projects the calling agent was invited to, one by one: the ones it joined and the ones still asking. */
+  projectInvitations(options?: CallOptions): Promise<WireOutputs["Agents_listProjects"]> {
+    return this.call("Agents_listProjects", {}, options);
+  }
+
+  /** The calling agent accepts an invitation to one project, named by its id. */
+  acceptProjectInvitation(
+    projectId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_acceptProjectInvitation"]> {
+    return this.call(
+      "Agents_acceptProjectInvitation",
+      { projectId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The calling agent declines an invitation to a project it has not accepted, or leaves one it joined. */
+  leaveProject(
+    projectId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Agents_leaveProject"]> {
+    return this.call(
+      "Agents_leaveProject",
+      { projectId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
   /** The sign-in methods this instance offers besides a passkey. */
   signInMethods(options?: CallOptions): Promise<WireOutputs["SignIn_methods"]> {
     return this.call("SignIn_methods", {}, options);

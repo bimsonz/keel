@@ -201,6 +201,7 @@ const resourceArb = (kind: ResourceKind): fc.Arbitrary<Resource> => {
         { weight: 6, arbitrary: orgResArb },
         { weight: 1, arbitrary: fc.constant(MISSING) },
       );
+    case "PersonalProject":
     case "Project":
       return fc.oneof(
         { weight: 6, arbitrary: projectArb },
@@ -255,11 +256,16 @@ const inside = (p: Principal, org: NamespaceId): boolean =>
 const READS: ReadonlySet<Need> = new Set(["read", "readMembers"]);
 const GOVERNING: ReadonlySet<Need> = new Set([
   "member",
+  "invite",
   "maintain",
   "own",
   "sponsorOrMaintain",
   "inviterOrMaintain",
 ]);
+/** The governing needs only a person meets, wherever an agent governs: an invitation names the person who answers for the agent. */
+const PEOPLE_ONLY: ReadonlySet<Need> = new Set(["invite", "inviterOrMaintain"]);
+/** A person's own namespace that no drawn user or agent is in: its id is that person's. */
+const SOMEONES: NamespaceId = makeId("usr", ulid(97));
 const PEOPLES: readonly Right[] = ["member", "maintain", "own"];
 const UNSCOPED: ReadonlySet<Need> = new Set(["anyone", "self", "account", "user", "handle"]);
 
@@ -598,6 +604,127 @@ describe("authorize", () => {
     expect(invite(as(ada, "owner"), into(agentsOwn, { personOwned: false }))).toBe("404");
   });
 
+  it("[authz.invite-people-only] no agent invites an agent or takes one out, even where it governs and no person owns: the invitation names the person who answers for it", () => {
+    const unowned = into(ORG_1, { personOwned: false });
+    const governor = agentIn(ORG_1, { standing: GOVERNS });
+    // It does govern there: it makes a project, as an owner would.
+    expect(outcome(authorize(governor, "Operator_createProject", unowned))).toBe("ok:");
+    expect(outcome(authorize(governor, "Namespaces_inviteAgent", unowned))).toBe("403:users-only");
+    expect(outcome(authorize(governor, "Namespaces_removeAgent", unowned))).toBe("403:users-only");
+    expect(
+      outcome(authorize(governor, "Namespaces_removeAgent", { ...unowned, inviter: INVITER })),
+    ).toBe("403:users-only");
+    // With a token for one of its projects, the same.
+    const placed = agentOn(PRJ_1, { standing: GOVERNS });
+    expect(outcome(authorize(placed, "Namespaces_inviteAgent", unowned))).toBe("403:users-only");
+    expect(outcome(authorize(placed, "Namespaces_removeAgent", unowned))).toBe("403:users-only");
+    // A person who is a member there still does, and a paused agent is told it is paused first.
+    const member = user({ memberships: [{ org: ORG_1, role: "member" }] });
+    expect(outcome(authorize(member, "Namespaces_inviteAgent", unowned))).toBe("ok:");
+    expect(
+      outcome(authorize({ ...governor, paused: true }, "Namespaces_inviteAgent", unowned)),
+    ).toBe("403:agent-paused");
+    // Every action that asks either need is asked of people alone.
+    expect(ACTION_NAMES.filter((a) => PEOPLE_ONLY.has(needOf(a))).toSorted()).toEqual([
+      "Namespaces_inviteAgent",
+      "Namespaces_removeAgent",
+    ]);
+  });
+
+  it("[authz.personal-project] a person invites an agent to a project of their own namespace and takes it off again; of a project anywhere else the action is asked of nothing, and no agent does either", () => {
+    const [ada, ben] = [USERS[0] ?? INVITER, INVITER];
+    const hers = project(PRJ_1, "private", { namespace: ada });
+    const invite = (principal: Principal, resource: ProjectResource = hers) =>
+      outcome(authorize(principal, "Projects_inviteAgent", resource));
+    const takeOff = (principal: Principal, resource: ProjectResource = hers) =>
+      outcome(authorize(principal, "Projects_removeAgent", resource));
+
+    // Her own project: hers to invite to and to take an agent off, with no membership anywhere.
+    expect(invite(user({ userId: ada }))).toBe("ok:");
+    expect(takeOff(user({ userId: ada }))).toBe("ok:");
+    // Anyone else: her private project is not there, and her public one gives them no role.
+    expect(invite(user({ userId: ben }))).toBe("404");
+    expect(takeOff(user({ userId: ben }))).toBe("404");
+    const shown = { ...hers, visibility: "public" as const };
+    expect(invite(user({ userId: ben }), shown)).toBe("403:role");
+    expect(takeOff(user({ userId: ben }), shown)).toBe("403:role");
+    expect(invite(ANON)).toBe("401");
+    expect(invite(user({ userId: ada, suspended: true }))).toBe("403:user-suspended");
+
+    // An org's project takes no such invitation, whoever asks: an org takes an agent whole.
+    const orgs = project(PRJ_1, "private");
+    const owner = user({ userId: ada, memberships: [{ org: ORG_1, role: "owner" }] });
+    expect(outcome(authorize(owner, "Operator_putSettings", orgs))).toBe("ok:");
+    expect(invite(owner, orgs)).toBe("404");
+    expect(takeOff(owner, orgs)).toBe("404");
+    expect(invite(owner, { ...orgs, visibility: "public" })).toBe("404");
+    // Nor does a project of an agent's own namespace.
+    const agentsOwn = makeId("agt", ulid(7));
+    const its = project(PRJ_1, "public", { namespace: agentsOwn, personOwned: false });
+    expect(invite(owner, its)).toBe("404");
+    expect(invite(agentOn(PRJ_1, { namespace: agentsOwn, standing: GOVERNS }), its)).toBe("404");
+
+    // An agent she invited to it works there and never governs: it invites no one and takes no one off.
+    const invited = agentOn(PRJ_1, {
+      namespace: ada,
+      standing: invitedBy({ userId: ada, role: "owner" }),
+    });
+    expect(outcome(authorize(invited, "declare", hers))).toBe("ok:");
+    expect(invite(invited)).toBe("403:users-only");
+    expect(takeOff(invited)).toBe("403:users-only");
+    // Invited to that one project, the rest of her namespace is to it what it is to anyone:
+    // her other private project is not there, where an agent an org took in is told it is another's.
+    const toOne = agentOn(PRJ_1, {
+      namespace: ada,
+      standing: {
+        _tag: "Invited",
+        by: { userId: ada, role: "owner", suspended: false },
+        projectOnly: true,
+      },
+    });
+    const sibling = project(PRJ_2, "private", { namespace: ada });
+    expect(outcome(authorize(toOne, "declare", hers))).toBe("ok:");
+    expect(outcome(authorize(toOne, "Views_getTrunk", hers))).toBe("ok:members");
+    expect(outcome(authorize(toOne, "Views_getTrunk", sibling))).toBe("404");
+    expect(outcome(authorize(toOne, "Namespaces_getProject", sibling))).toBe("404");
+    expect(rightsOf(toOne, sibling).size).toBe(0);
+    expect(outcome(authorize(toOne, "Views_getTrunk", { ...sibling, visibility: "public" }))).toBe(
+      "ok:public",
+    );
+    expect(outcome(authorize(invited, "Views_getTrunk", sibling))).toBe("403:foreign-project");
+    // Her namespace suspended: on its project it is told so, and of the rest it is told nothing.
+    expect(outcome(authorize(toOne, "declare", { ...hers, namespaceSuspended: true }))).toBe(
+      "403:org-suspended",
+    );
+    expect(
+      outcome(authorize(toOne, "Views_getTrunk", { ...sibling, namespaceSuspended: true })),
+    ).toBe("404");
+    // Its inviter no longer answering for it, it is told why on its project, and still nothing of the rest.
+    const orphaned = agentOn(PRJ_1, {
+      namespace: ada,
+      standing: {
+        _tag: "Invited",
+        by: { userId: ada, suspended: true, role: "owner" },
+        projectOnly: true,
+      },
+    });
+    expect(outcome(authorize(orphaned, "declare", hers))).toBe("403:inviter-suspended");
+    expect(outcome(authorize(orphaned, "Views_getTrunk", sibling))).toBe("404");
+
+    // Anyone who reads the project reads its agents: the policy says as whom.
+    expect(outcome(authorize(user({ userId: ada }), "Projects_listAgents", hers))).toBe(
+      "ok:members",
+    );
+    expect(outcome(authorize(ANON, "Projects_listAgents", shown))).toBe("ok:public");
+    expect(outcome(authorize(ANON, "Projects_listAgents", hers))).toBe("404");
+
+    // Typed apart from the table: the rows asked of a person's own project alone.
+    expect(ACTION_NAMES.filter((a) => kindOf(a) === "PersonalProject").toSorted()).toEqual([
+      "Projects_inviteAgent",
+      "Projects_removeAgent",
+    ]);
+  });
+
   it("[authz.agent-invited-read-work] an invited agent reads and works on its token's project while its inviter answers for it, and never holds more than that member", () => {
     fc.assert(
       fc.property(
@@ -804,6 +931,8 @@ describe("authorize", () => {
       Instance: { _tag: "Instance" },
       Self: { _tag: "Self" },
       Project: project(PRJ_1, "private"),
+      // A person's own project that anyone may read: an agent sees it, and still governs nothing on it.
+      PersonalProject: project(PRJ_1, "public", { namespace: SOMEONES }),
       Namespace: into(ORG_1),
       Org: into(ORG_1),
       Agent: { _tag: "Agent", agentId: BOT },
@@ -863,6 +992,8 @@ describe("authorize", () => {
             return its === (agent.scopes.includes("agent:work") ? "ok:" : "403:scope");
           if (READS.has(need))
             return its === (agent.scopes.includes("agent:read") ? theirs : "403:scope");
+          // Inviting an agent, and taking one out, are a person's even here: the record names who answers for it.
+          if (PEOPLE_ONLY.has(need)) return theirs === "ok:" && its === "403:users-only";
           return theirs === "ok:" && its === "ok:";
         },
       ),
@@ -944,6 +1075,7 @@ describe("authorize", () => {
       readMembers: 1,
       maintain: 2,
       workOrMaintain: 2,
+      invite: 1,
       sponsorOrMaintain: 2,
       inviterOrMaintain: 2,
       own: 3,
@@ -1114,6 +1246,7 @@ describe("authorize", () => {
         Instance: { _tag: "Instance" },
         Self: { _tag: "Self" },
         Project: project(PRJ_1, "public", { personOwned }),
+        PersonalProject: project(PRJ_1, "public", { namespace: SOMEONES }),
         Namespace: into(ORG_1, { personOwned }),
         Org: into(ORG_1, { personOwned }),
         Agent: { _tag: "Agent", agentId: BOT },

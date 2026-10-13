@@ -82,7 +82,9 @@ export interface MemberStanding {
  * - `Governs`: the namespace is the agent's own, or an org it created;
  * - `Invited`: a member invited it there and answers for it. `by` is that
  *   member's standing now, so an invitation counts only while its inviter holds
- *   a role and is not suspended;
+ *   a role and is not suspended. `projectOnly` says the invitation is to the
+ *   token's project alone (a person's own namespace takes an agent on one
+ *   project): the rest of the namespace is to the agent what it is to anyone;
  * - `None`: it has no standing there, and is the public.
  *
  * A sponsor is no standing: the link between a person and an agent carries no
@@ -90,7 +92,7 @@ export interface MemberStanding {
  */
 export type AgentStanding =
   | { readonly _tag: "Governs" }
-  | { readonly _tag: "Invited"; readonly by: MemberStanding }
+  | { readonly _tag: "Invited"; readonly by: MemberStanding; readonly projectOnly?: boolean }
   | { readonly _tag: "None" };
 
 /**

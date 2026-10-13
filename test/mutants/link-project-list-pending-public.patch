@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-standing
+# kills: link.project-standing
+# why: anyone who reads a public project reads the invitations to it that no agent has accepted
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 3492cf4b..0ba60445 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -553,7 +553,7 @@ export function projectInvitationHandlers(
+           );
+           const directory = yield* AgentDirectory;
+           const items = yield* Effect.forEach(
+-            rows.filter((row) => audience === "members" || row.state === "joined"),
++            rows,
+             (row) =>
+               directory
+                 .findAgent(row.agentId)

@@ -1,14 +1,23 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
-import { IdempotencyConflict, QuotaExceeded } from "@keeltown/core/domain/identity";
+import {
+  IdempotencyConflict,
+  Invitation,
+  InvitationRefused,
+  InvitationScopes,
+  QuotaExceeded,
+} from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import {
   CommandActor,
+  AgentId,
   Anchor,
   ChangeId,
   Glob,
   InstantSchema,
+  NamespaceId,
   ProjectId,
   RunRef,
+  UserId,
 } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
@@ -123,7 +132,53 @@ export const SubjectAnchorsView = Schema.Struct({
   anchors: Schema.Array(Anchor),
 });
 
+/**
+ * The person whose namespace the project is in invites an agent to it (core's
+ * `InviteAgent`). `namespace` is that namespace, which the invitation's events
+ * name; the object's own address says which project. The commit's cause is
+ * `invite:<agentId>:<idempotencyKey>`.
+ */
+export const InviteToProjectCommand = Schema.Struct({
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: UserId,
+  scopes: InvitationScopes,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/** The agent accepts its invitation to the project (core's `AcceptInvitation`): `run` is the run it answers in, from its token. */
+export const AcceptProjectInvitationCommand = Schema.Struct({
+  namespace: NamespaceId,
+  agentId: AgentId,
+  run: Schema.optional(RunRef),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/**
+ * An invitation to the project ends (core's `EndInvitation`): `by` is the
+ * agent itself or a person, the event's `by` and the commit's actor, and `run`
+ * the run an agent ends it in.
+ */
+export const EndProjectInvitationCommand = Schema.Struct({
+  namespace: NamespaceId,
+  agentId: AgentId,
+  by: CommandActor,
+  run: Schema.optional(RunRef),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+const invitationMove = exitCodec(
+  Invitation,
+  Schema.Union([InvitationRefused, IdempotencyConflict]),
+);
+
 export const ProjectCodecs = {
+  inviteAgent: invitationMove,
+  acceptInvitation: invitationMove,
+  endInvitation: invitationMove,
   liveChanges: exitCodec(Schema.Array(LiveChangeView), Schema.Never),
   liveAnchors: exitCodec(Schema.Array(SubjectAnchorsView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
@@ -143,4 +198,10 @@ export interface ProjectRpc extends EventReceiverRpc {
   settings(): Promise<ExitJson>;
   putSettings(command: typeof PutSettingsCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;
+  /** The person whose namespace the project is in invites an agent to it alone, idempotent by key. */
+  inviteAgent(command: typeof InviteToProjectCommand.Encoded): Promise<ExitJson>;
+  /** The invited agent accepts. */
+  acceptInvitation(command: typeof AcceptProjectInvitationCommand.Encoded): Promise<ExitJson>;
+  /** The agent's invitation to the project ends: it declines or leaves, or the person takes it off. */
+  endInvitation(command: typeof EndProjectInvitationCommand.Encoded): Promise<ExitJson>;
 }

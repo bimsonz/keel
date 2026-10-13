@@ -24,6 +24,7 @@ import type {
   Sponsorships,
   Invitations,
   NamespaceAgents,
+  ProjectAgents,
   Standings,
   TokenIssuer,
   Trunks,
@@ -60,6 +61,7 @@ export type IsolateServices =
   | Sponsorships
   | Invitations
   | NamespaceAgents
+  | ProjectAgents
   | Standings
   | Users
   | Memberships

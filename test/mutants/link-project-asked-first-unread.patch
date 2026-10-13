@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.project-asked-first
+# kills: link.project-asked-first
+# why: about a project a person invited the agent to, the sponsor is asked first and not that person
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 50da8e30..ab1aeecd 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -296,7 +296,6 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
+     // Where a member invited the agent into the namespace, or its person to this project, they answer for it and are asked first.
+     const first =
+       (concerned === undefined ? undefined : invitedBy(tx.store, concerned)) ??
+-      toProject ??
+       request.sponsor;
+     const row: Row = {
+       escalation,
