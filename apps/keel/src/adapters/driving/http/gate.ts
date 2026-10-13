@@ -4,6 +4,7 @@ import type {
   PresentedToken,
   SignedIn,
   TokenRefusal,
+  TokenUnchecked,
 } from "@keeltown/core/application/identity";
 import type { AgentClaims } from "@keeltown/core/domain/identity";
 import type { UserId } from "@keeltown/core/kernel";
@@ -47,7 +48,7 @@ export interface GateDeps {
   readonly agentToken: (
     presented: PresentedToken,
     door: Door,
-  ) => Promise<AgentClaims | TokenRefusal>;
+  ) => Promise<AgentClaims | TokenRefusal | TokenUnchecked>;
   /**
    * The `WWW-Authenticate` value of a 401 at `door`: where the door's metadata is, so a client
    * finds the server that issues its tokens, or for a refused proof what a proof must be.
@@ -109,6 +110,23 @@ function challenged(response: Response, challenge: string): Response {
   return response;
 }
 
+/** How long a client is told to wait before it sends again a request whose token could not be checked. */
+const RECHECK_SECONDS = 2;
+
+/**
+ * The answer to a token that could not be checked: the fault is Keel's, so it
+ * is never a 401, which would tell the agent to throw a good token away.
+ */
+function notChecked(requestId: string): Response {
+  const response = problemResponse(503, "service.unavailable", requestId, {
+    detail: "Keel could not check this token just now. Nothing says the token is bad.",
+    retryAfterMs: RECHECK_SECONDS * 1000,
+    nextActions: [{ kind: "wait", title: "Send the request again after retryAfterMs" }],
+  });
+  response.headers.set("retry-after", String(RECHECK_SECONDS));
+  return response;
+}
+
 function refusal(answer: GateRefusal, requestId: string): Response {
   switch (answer.refused) {
     case "revoked":
@@ -165,7 +183,9 @@ function refusal(answer: GateRefusal, requestId: string): Response {
  * the request came in by, and the core gate is handed its claims. Every 401
  * names the door's metadata in `WWW-Authenticate`: the gate's own, and the one
  * the policy answers a request with no credential, which carries the
- * challenge the gate hands on (`Gated.challenge`).
+ * challenge the gate hands on (`Gated.challenge`). A token the adapter could
+ * not check (a store it reads did not answer) is answered 503 with a wait:
+ * not admitted, and not told it is bad.
  *
  * A session is admitted with how and when it was signed in, so an operation
  * that wants a fresh sign-in can ask it of its caller. A paused agent is
@@ -206,6 +226,7 @@ export async function gate(
         },
         door,
       );
+      if ("unchecked" in answer) return notChecked(requestId);
       if ("refused" in answer)
         return challenged(
           problemResponse(401, "auth.invalid_token", requestId, {

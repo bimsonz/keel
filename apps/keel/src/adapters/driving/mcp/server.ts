@@ -77,6 +77,8 @@ export function makeMcpEndpoint(
     if (presented === null)
       return unauthenticated(deps.challenge("mcp"), "A bearer token is required");
     const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
+    // A token that could not be checked is the gate's own 503: a 401 here would tell a client its good token is bad.
+    if (gated instanceof Response && gated.status === 503) return gated;
     if (gated instanceof Response)
       return unauthenticated(
         gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),

@@ -47,6 +47,15 @@ export interface TokenRefusal {
 }
 
 /**
+ * An agent's own token that could not be checked: something Keel reads to check
+ * it did not answer. Nothing is known of the token, so the request is neither
+ * admitted nor told its credential is bad.
+ */
+export interface TokenUnchecked {
+  readonly unchecked: true;
+}
+
+/**
  * What a request presents, as the doorway reads it: a token of the secret
  * exchange, still to be verified; the claims of an agent's own token, which
  * the doorway has verified (its signature, audience, expiry and key binding);
