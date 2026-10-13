@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/world-ready.test.ts
+# kills: tier1.world-ready-undecoded
+# why: A request that names no world is answered as a ready one.
+diff --git a/apps/keel-verify/src/composition/entrypoint.ts b/apps/keel-verify/src/composition/entrypoint.ts
+index 570c20be..d13acf5c 100644
+--- a/apps/keel-verify/src/composition/entrypoint.ts
++++ b/apps/keel-verify/src/composition/entrypoint.ts
+@@ -41,9 +41,7 @@ export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
+     if (Exit.isFailure(decoded))
+       return encodeExit(
+         VerifierCodecs.worldReady,
+-        Exit.fail(
+-          new VerifierUnavailable({ reason: "the world readiness request did not decode" }),
+-        ),
++        Exit.succeed({ _tag: "Ready" as const }),
+       );
+     return encodeExit(
+       VerifierCodecs.worldReady,

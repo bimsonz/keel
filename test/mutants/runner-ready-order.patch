@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.runner-unready, probe.admits
+# why: The worlds are asked about out of order, so the end names a world other than the one that is unready.
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index d58d38d9..9aaf6d7b 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -337,7 +337,7 @@ export const draftConflict = (
+   );
+ 
+ /** The worlds a draft runs in besides A-noop, in the order the runner is asked about them. */
+-const RUNNER_WORLDS: readonly FlowWorld[] = ["trunk", "A", "B", "AB"];
++const RUNNER_WORLDS: readonly FlowWorld[] = ["trunk", "B", "A", "AB"];
+ 
+ /** Every world a draft runs in can take a probe, or the first that cannot and why. */
+ export type RunnerAnswer =

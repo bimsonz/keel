@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/world-ready.test.ts
+# kills: tier1.world-unready, tier1.world-unready-deps
+# why: A world is ready once its bundle is read, whatever its lockfile needs, so a namespace with no deps bundle is told a probe could run.
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 748a7575..dd685907 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -138,7 +138,7 @@ export async function worldReady(
+       hexOf(request.worldBundle),
+       "world bundle",
+     );
+-    await depsFor(env, request.namespace, world);
++    void world;
+     return { _tag: "Ready" };
+   } catch (error) {
+     if (error instanceof Unavailable) return { _tag: "Unready", reason: error.message };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-runner-unready
+# why: The runner step answers ready without asking, so a namespace with no deps bundle is drafted for three times and waited on twice before anything is recorded.
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index d58d38d9..2a1cbd32 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -605,7 +605,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+     if (Result.isFailure(worlds)) return yield* failDraft(worlds.failure, 0);
+     // Asked before any draft: a world no probe could run against is the namespace's store as it
+     // stands, which no later draft changes, so it ends here with no model call and no wait.
+-    const runner = yield* steps.step("runner", probeRunnerReady(call.namespace, worlds.success));
++    const runner = yield* steps.step("runner", Effect.succeed<RunnerAnswer>({ _tag: "Ready" }));
+     if (runner._tag === "Unready") {
+       yield* recordHarnessError("incomplete");
+       return {

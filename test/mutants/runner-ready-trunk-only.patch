@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.runner-unready, probe.admits
+# why: Only trunk is asked about, so a party whose lockfile has no deps bundle is still drafted for.
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index d58d38d9..f63f4e55 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -358,7 +358,7 @@ export const probeRunnerReady = (
+ ) =>
+   Effect.gen(function* () {
+     const runner = yield* ProbeRunner;
+-    for (const world of RUNNER_WORLDS) {
++    for (const world of RUNNER_WORLDS.slice(0, 1)) {
+       const asked = yield* runner
+         .ready({ namespace, worldBundle: worlds[world] })
+         .pipe(Effect.catchTag("ProbeRunnerUnavailable", () => Effect.succeed(undefined)));

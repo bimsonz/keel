@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.runner-silent
+# why: A runner that did not answer is read as a world no probe could run in, so one lost call ends a conflict that a draft would have probed.
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index d58d38d9..c7b8f52a 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -361,7 +361,11 @@ export const probeRunnerReady = (
+     for (const world of RUNNER_WORLDS) {
+       const asked = yield* runner
+         .ready({ namespace, worldBundle: worlds[world] })
+-        .pipe(Effect.catchTag("ProbeRunnerUnavailable", () => Effect.succeed(undefined)));
++        .pipe(
++          Effect.catchTag("ProbeRunnerUnavailable", (e) =>
++            Effect.succeed({ _tag: "Unready" as const, reason: e.reason }),
++          ),
++        );
+       if (asked?._tag === "Unready")
+         return { _tag: "Unready", world, reason: asked.reason } satisfies RunnerAnswer;
+     }

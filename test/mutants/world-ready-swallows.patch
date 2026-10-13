@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/world-ready.test.ts
+# kills: tier1.world-unready, tier1.world-unready-deps, tier1.world-unready-missing
+# why: What every run would be refused for is answered as ready.
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 748a7575..56a7130d 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -141,7 +141,7 @@ export async function worldReady(
+     await depsFor(env, request.namespace, world);
+     return { _tag: "Ready" };
+   } catch (error) {
+-    if (error instanceof Unavailable) return { _tag: "Unready", reason: error.message };
++    if (error instanceof Unavailable) return { _tag: "Ready" };
+     throw error;
+   }
+ }
