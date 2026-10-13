@@ -600,8 +600,10 @@ async function realTrunk(projectId: ProjectId, lane: Awaited<ReturnType<typeof r
       ),
     );
   });
-  expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(lane.base, "seed"))).toEqual(
-    Exit.succeed({ head: lane.base, promotion: "idle", redCount: 0 }),
+  expect(
+    decodeExit(TrunkCodecs.initialize, await stub.initialize(lane.base, "seed", { kind: "empty" })),
+  ).toEqual(
+    Exit.succeed({ head: lane.base, promotion: "idle", redCount: 0, origin: { kind: "empty" } }),
   );
   /** Trunk's own events, read inside the object. */
   const log = () =>

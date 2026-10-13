@@ -18713,12 +18713,151 @@
           },
           "by": {
             "type": "string"
+          },
+          "origin": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TrunkOrigin"
+              }
+            ],
+            "description": "Where that head came from; absent on a trunk initialized before origins were kept."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "The trunk's first known head, from the project's seed or an operator. Nothing promotes before it."
+        "description": "The trunk's first known head, from the project's start. Nothing promotes before it."
+      },
+      "TrunkOrigin": {
+        "type": "object",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrunkOriginEmpty"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkOriginImported"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkOriginForked"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkOriginTemplate"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "empty": "#/components/schemas/TrunkOriginEmpty",
+            "imported": "#/components/schemas/TrunkOriginImported",
+            "forked": "#/components/schemas/TrunkOriginForked",
+            "template": "#/components/schemas/TrunkOriginTemplate"
+          }
+        },
+        "description": "Where a project's trunk started, kept for good."
+      },
+      "TrunkOriginEmpty": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "empty"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An empty project: Keel wrote trunk's first commit itself."
+      },
+      "TrunkOriginForked": {
+        "type": "object",
+        "required": [
+          "kind",
+          "project",
+          "commit"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "forked"
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Another project's trunk, forked. `commit` is trunk's first head."
+      },
+      "TrunkOriginImported": {
+        "type": "object",
+        "required": [
+          "kind",
+          "url",
+          "ref",
+          "commit"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "imported"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upstream branch that came, by its full ref name."
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A public Git repository, imported once. `commit` is trunk's first head."
+      },
+      "TrunkOriginTemplate": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "commit"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "template"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A template. `commit` is trunk's first head."
       },
       "TrunkView": {
         "type": "object",

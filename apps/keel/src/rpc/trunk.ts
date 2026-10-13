@@ -1,4 +1,8 @@
-import { PromotionState, PromotionStateRefused } from "@keeltown/core/domain/integration";
+import {
+  PromotionState,
+  PromotionStateRefused,
+  TrunkOrigin,
+} from "@keeltown/core/domain/integration";
 import { CommitSha, type InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -9,6 +13,8 @@ export const TrunkStatus = Schema.Struct({
   head: CommitSha,
   promotion: PromotionState,
   redCount: Schema.Int,
+  /** Where trunk started; absent on a trunk initialized before origins were kept. */
+  origin: Schema.optional(TrunkOrigin),
 });
 
 /** What one sync did to a repo: it already held trunk's head, or its main moved there. */
@@ -44,11 +50,16 @@ export interface TrunkRpc {
   /** Releases a frozen promotion. Operator only. */
   resume(by: string): Promise<ExitJson>;
   /**
-   * Names trunk's first head (the Project DO's createProject, once it has
-   * created trunk). A retry with the same head answers the trunk; another
-   * head, or any head once trunk has one, is PromotionStateRefused.
+   * Names trunk's first head and where it came from (the Project DO's
+   * createProject, once it has created trunk). A retry with the same head
+   * answers the trunk; another head, or any head once trunk has one, is
+   * PromotionStateRefused. An origin naming another commit is a defect.
    */
-  initialize(head: typeof CommitSha.Encoded, by: string): Promise<ExitJson>;
+  initialize(
+    head: typeof CommitSha.Encoded,
+    by: string,
+    origin: typeof TrunkOrigin.Encoded,
+  ): Promise<ExitJson>;
   /**
    * Makes main at `commit` in a trunk that was imported under another
    * branch's name (the Project DO's createProject, before `initialize`). No

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.origin
+# why: TrunkInitialized is committed without the origin it was given, so nothing on record says where trunk started
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 33e84f91..62ad1499 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -278,7 +278,6 @@ export const decidePromotion = (
+             projectId: facts.projectId,
+             head: command.head,
+             by: command.by,
+-            ...(command.origin === undefined ? {} : { origin: command.origin }),
+           }),
+         ])
+       : Result.fail(new TrunkNotInitialized({ projectId: facts.projectId }));

@@ -27,6 +27,7 @@ import {
   PromotionStarted,
   TrunkAdvanced,
   TrunkInitialized,
+  type TrunkOrigin,
 } from "./events.ts";
 
 /**
@@ -57,7 +58,13 @@ export interface CommutationFacts {
 }
 
 export type PromotionCommand =
-  | { readonly _tag: "Initialize"; readonly head: CommitSha; readonly by: string }
+  | {
+      readonly _tag: "Initialize";
+      readonly head: CommitSha;
+      readonly by: string;
+      /** Where the head came from, recorded on TrunkInitialized as given. */
+      readonly origin?: TrunkOrigin;
+    }
   | {
       readonly _tag: "Enqueue";
       readonly batchId: BatchId;
@@ -267,7 +274,12 @@ export const decidePromotion = (
   if (state === undefined) {
     return command._tag === "Initialize"
       ? Result.succeed([
-          TrunkInitialized.make({ projectId: facts.projectId, head: command.head, by: command.by }),
+          TrunkInitialized.make({
+            projectId: facts.projectId,
+            head: command.head,
+            by: command.by,
+            ...(command.origin === undefined ? {} : { origin: command.origin }),
+          }),
         ])
       : Result.fail(new TrunkNotInitialized({ projectId: facts.projectId }));
   }
@@ -449,6 +461,7 @@ export const evolvePromotion = (
           queue: [],
           promoted: [],
           height: 0,
+          ...(event.origin === undefined ? {} : { origin: event.origin }),
         }
       : illegal(state, event);
   }

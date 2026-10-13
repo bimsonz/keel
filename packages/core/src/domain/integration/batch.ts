@@ -8,7 +8,7 @@ import {
   ProjectId,
   VerdictId,
 } from "../kernel/index.ts";
-import { BatchAttribution, MemberCommit, PromotionFrozenReason } from "./events.ts";
+import { BatchAttribution, MemberCommit, PromotionFrozenReason, TrunkOrigin } from "./events.ts";
 
 export const CandidateState = Schema.Literals([
   "forming",
@@ -99,6 +99,8 @@ export const Trunk = Schema.Struct({
   promoted: Schema.Array(ChangeId),
   /** How many times Keel has advanced trunk since TrunkInitialized; absent in state folded before it was kept. */
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  /** Where trunk started, as TrunkInitialized said it; absent on a trunk initialized before origins were kept. */
+  origin: Schema.optional(TrunkOrigin),
   wal: Schema.optional(PendingGroup),
   /**
    * Set once a group of several batches was refused as too large a pack:

@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
-import { ProjectCreated } from "../../domain/integration/index.ts";
+import { ProjectCreated, type TrunkOrigin } from "../../domain/integration/index.ts";
 import {
   type EntityRef,
   InstantSchema,
@@ -23,6 +23,7 @@ import {
   WorkspacePool,
 } from "../ports/index.ts";
 import { projectRepos } from "./project-repos.ts";
+import { projectSource } from "./project-source.ts";
 
 /** Where the Project DO keeps its project, keyed by the project id. */
 export const PROJECT = "project";
@@ -120,8 +121,13 @@ export const createProject: (
   const { defaultBranch } = yield* Effect.orDie(host.info(repos.trunk));
   const head = yield* Effect.orDie(host.head(repos.trunk, `refs/heads/${defaultBranch}`));
   const trunks = yield* Trunks;
+  const from = projectSource(command.source);
+  const origin: TrunkOrigin =
+    from._tag === "Project"
+      ? { kind: "forked", project: from.projectId, commit: head }
+      : { kind: "template", name: command.source, commit: head };
   // A retry names the same head (trunk was forked once), so only a trunk moved by someone else refuses.
-  yield* Effect.orDie(trunks.initialize(projectId, head, command.by));
+  yield* Effect.orDie(trunks.initialize(projectId, head, command.by, origin));
   yield* trunks.sync(projectId);
   yield* (yield* WorkspacePool).configure(projectId, { source: repos.mirror, target: poolTarget });
 

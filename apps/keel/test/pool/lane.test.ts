@@ -85,7 +85,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
         ),
       );
     });
-    await trunk.initialize(base, "seed");
+    await trunk.initialize(base, "seed", { kind: "empty" });
   }
   const verification = makeBatchVerificationMemory();
   const projects = makeProjectsMemory();

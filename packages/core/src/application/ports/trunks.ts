@@ -1,5 +1,5 @@
-import { Context, type Effect } from "effect";
-import type { PromotionStateRefused } from "../../domain/integration/index.ts";
+import { Context, type Effect, type Option } from "effect";
+import type { PromotionStateRefused, TrunkOrigin } from "../../domain/integration/index.ts";
 import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
 
 /** Where a sync left the project's repos: trunk's head, and staging and the mirror brought to it. */
@@ -14,14 +14,23 @@ export class Trunks extends Context.Service<
   Trunks,
   {
     /**
-     * Names trunk's first head. A retry with the same head answers as before;
-     * another head, or any once trunk has one, is PromotionStateRefused.
+     * Names trunk's first head, and where it came from: `origin` is recorded
+     * on TrunkInitialized as given, and one naming another commit than `head`
+     * is a defect. A retry with the same head answers as before; another
+     * head, or any once trunk has one, is PromotionStateRefused.
      */
     readonly initialize: (
       projectId: ProjectId,
       head: CommitSha,
       by: string,
+      origin: TrunkOrigin,
     ) => Effect.Effect<void, PromotionStateRefused>;
+    /**
+     * Where trunk started, as its TrunkInitialized recorded it: none for a
+     * trunk initialized before origins were kept. Dies for a trunk not yet
+     * initialized.
+     */
+    readonly origin: (projectId: ProjectId) => Effect.Effect<Option.Option<TrunkOrigin>>;
     /**
      * Makes main at `commit` in a trunk that was imported under another
      * branch's name, through the trunk's one writer (`TrunkWriter.adopt`). A

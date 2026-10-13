@@ -65,10 +65,10 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
       const orgs = yield* ProjectNamespaces;
       return Trunks.of({
         ...inner,
-        initialize: (projectId, head, by) =>
+        initialize: (projectId, head, by, origin) =>
           Effect.flatMap(orgs.byId(projectId), (place) => {
             seen.set(projectId, place);
-            return inner.initialize(projectId, head, by);
+            return inner.initialize(projectId, head, by, origin);
           }),
       });
     }),

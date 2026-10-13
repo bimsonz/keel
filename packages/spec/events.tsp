@@ -1347,12 +1347,60 @@ model ProjectSettingsChanged {
   by: string;
 }
 
-/** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
+/** An empty project: Keel wrote trunk's first commit itself. */
+model TrunkOriginEmpty {
+  kind: "empty";
+}
+
+/** A public Git repository, imported once. `commit` is trunk's first head. */
+model TrunkOriginImported {
+  kind: "imported";
+
+  @minLength(1)
+  url: string;
+
+  /** The upstream branch that came, by its full ref name. */
+  @minLength(1)
+  ref: string;
+
+  commit: CommitSha;
+}
+
+/** Another project's trunk, forked. `commit` is trunk's first head. */
+model TrunkOriginForked {
+  kind: "forked";
+  project: ProjectId;
+  commit: CommitSha;
+}
+
+/** A template. `commit` is trunk's first head. */
+model TrunkOriginTemplate {
+  kind: "template";
+
+  @minLength(1)
+  name: string;
+
+  commit: CommitSha;
+}
+
+/** Where a project's trunk started, kept for good. */
+@discriminated(#{ envelope: "none", discriminatorPropertyName: "kind" })
+union TrunkOrigin {
+  empty: TrunkOriginEmpty,
+  imported: TrunkOriginImported,
+  forked: TrunkOriginForked,
+  template: TrunkOriginTemplate,
+}
+
+/** The trunk's first known head, from the project's start. Nothing promotes before it. */
 model TrunkInitialized {
   _tag: "TrunkInitialized";
   projectId: ProjectId;
   head: CommitSha;
   by: string;
+
+  /** Where that head came from; absent on a trunk initialized before origins were kept. */
+  origin?: TrunkOrigin;
 }
 
 /** The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose. */

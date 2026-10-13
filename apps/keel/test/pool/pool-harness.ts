@@ -66,6 +66,7 @@ export async function followTrunk(
             )
           : Effect.succeed(followed.head),
       initialize: unused,
+      origin: unused,
       adopt: unused,
       seed: unused,
       sync: unused,

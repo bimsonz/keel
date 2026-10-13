@@ -12,6 +12,7 @@ import {
   type QueuedBatch,
   Trunk,
   TrunkEvent,
+  type TrunkOrigin,
 } from "../../domain/integration/index.ts";
 import type {
   CandidateId,
@@ -186,14 +187,27 @@ export const promote = Effect.fn("integration/promote")(function* (
  * then counted into its org's repo bytes, once per project and never refused
  * (the project already exists). A project is placed before its trunk is
  * initialized: one with no place is a defect, and is given no trunk.
+ * `origin` says where the head came from and is kept on TrunkInitialized as
+ * given; an origin that names another commit than the head is a defect, and
+ * names no trunk.
  */
 export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function* (
   projectId: ProjectId,
   head: CommitSha,
   by: string,
+  origin: TrunkOrigin,
 ) {
   const org = yield* orgOf(projectId);
-  const committed = yield* promote(projectId, { _tag: "Initialize", head, by }, "initialize", head);
+  if (origin.kind !== "empty" && origin.commit !== head)
+    return yield* Effect.die(
+      new Error(`trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`),
+    );
+  const committed = yield* promote(
+    projectId,
+    { _tag: "Initialize", head, by, origin },
+    "initialize",
+    head,
+  );
   const trunk = trunkOf(yield* EntityStore, projectId);
   if (trunk === undefined)
     return yield* Effect.die(

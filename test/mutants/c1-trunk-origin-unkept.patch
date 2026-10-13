@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.origin
+# why: The trunk folds TrunkInitialized without its origin, so the Trunk answers none for a trunk whose event has one
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 33e84f91..cdb403ed 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -461,7 +461,6 @@ export const evolvePromotion = (
+           queue: [],
+           promoted: [],
+           height: 0,
+-          ...(event.origin === undefined ? {} : { origin: event.origin }),
+         }
+       : illegal(state, event);
+   }

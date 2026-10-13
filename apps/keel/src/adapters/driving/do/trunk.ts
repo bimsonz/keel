@@ -14,7 +14,7 @@ import {
   trunkHeard,
   trunkOf,
 } from "@keeltown/core/application/integration";
-import type { Trunk } from "@keeltown/core/domain/integration";
+import { type Trunk, TrunkOrigin } from "@keeltown/core/domain/integration";
 import { CommitSha, type EventEnvelope, InstantSchema, ProjectId } from "@keeltown/core/kernel";
 import {
   EntityStore,
@@ -37,6 +37,7 @@ export const TRUNK_DESTROY = "trunk destroy";
 
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
 const decodeInstant = Schema.decodeUnknownEffect(InstantSchema);
+const decodeOrigin = Schema.decodeUnknownEffect(TrunkOrigin);
 const decodeProject = Schema.decodeUnknownSync(ProjectId);
 
 /** A Trunk DO is addressed as `trunk:<projectId>`. */
@@ -47,7 +48,12 @@ const projectOfName = (name: string | undefined): ProjectId => {
 };
 
 /** What the RPC answers for a trunk. No Auditor runs before L4, so nothing is red yet. */
-const statusOf = (trunk: Trunk) => ({ head: trunk.head, promotion: trunk.phase, redCount: 0 });
+const statusOf = (trunk: Trunk) => ({
+  head: trunk.head,
+  promotion: trunk.phase,
+  redCount: 0,
+  ...(trunk.origin === undefined ? {} : { origin: trunk.origin }),
+});
 
 /**
  * The Trunk DO (`trunk:<projectId>`): the one writer of trunk (ADR 0003),
@@ -98,11 +104,11 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     return answer;
   }
 
-  async initialize(head: string, by: string) {
+  async initialize(head: string, by: string, origin: unknown) {
     const projectId = this.projectId;
-    const program = decodeHead(head).pipe(
+    const program = Effect.all([decodeHead(head), decodeOrigin(origin)]).pipe(
       Effect.orDie,
-      Effect.flatMap((sha) => initializeTrunk(projectId, sha, by)),
+      Effect.flatMap(([sha, from]) => initializeTrunk(projectId, sha, by, from)),
       Effect.map(statusOf),
     );
     return this.answer(TrunkCodecs.initialize, program);

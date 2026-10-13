@@ -32,6 +32,7 @@ import {
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
+import type { TrunkOrigin } from "@keeltown/core/domain/integration";
 import { CodeHost, EntityStore, EventOutbox, OrgUsage, TrunkWriter } from "@keeltown/core/ports";
 import {
   makeClockMemory,
@@ -54,6 +55,8 @@ fc.configureGlobal({ numRuns: 50, ...(seed === undefined ? {} : { seed: Number(s
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const ORG: NamespaceId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
+/** An empty project's origin: the start that names no commit, for cases that are not about where trunk started. */
+const EMPTY: TrunkOrigin = { kind: "empty" };
 
 /** Puts the project in ORG, as creating it does before its trunk exists: its trunk is weighed, and counted into ORG's repo bytes. */
 const place = (places: ReturnType<typeof makeProjectNamespacesMemory>) =>
@@ -103,10 +106,10 @@ describe("the Trunk's Initialize", () => {
     "[trunk.init] commits TrunkInitialized once and leaves trunk idle at the head; a retry answers the same trunk",
     () =>
       Effect.gen(function* () {
-        const first = yield* initializeTrunk(PROJECT, sha("a"), "seed");
+        const first = yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
         expect(first).toMatchObject({ projectId: PROJECT, phase: "idle", head: sha("a") });
         expect(trunkOf(yield* EntityStore, PROJECT)).toEqual(first);
-        const again = yield* initializeTrunk(PROJECT, sha("a"), "seed");
+        const again = yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
         expect(again).toEqual(first);
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
       }).pipe(Effect.provide(ports().layer)),
@@ -114,7 +117,7 @@ describe("the Trunk's Initialize", () => {
 
   it.effect("[trunk.project] TrunkInitialized carries the trunk's project", () =>
     Effect.gen(function* () {
-      yield* initializeTrunk(PROJECT, sha("a"), "seed");
+      yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
       const log = (yield* EventOutbox).log({ kind: "trunk", id: PROJECT });
       expect(log.map((e) => [e.type, e.project])).toEqual([["TrunkInitialized", PROJECT]]);
     }).pipe(Effect.provide(ports().layer)),
@@ -124,13 +127,66 @@ describe("the Trunk's Initialize", () => {
     "[trunk.init-once] another head is PromotionStateRefused and trunk keeps its first head",
     () =>
       Effect.gen(function* () {
-        yield* initializeTrunk(PROJECT, sha("a"), "seed");
-        const refused = yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator"));
+        yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
+        const refused = yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator", EMPTY));
         expect(refused).toMatchObject({ _tag: "PromotionStateRefused", command: "Initialize" });
         expect(trunkOf(yield* EntityStore, PROJECT)?.head).toBe(sha("a"));
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
       }).pipe(Effect.provide(ports().layer)),
   );
+});
+
+describe("the Trunk's origin", () => {
+  const ORIGINS: readonly TrunkOrigin[] = [
+    EMPTY,
+    {
+      kind: "imported",
+      url: "https://git.example/team/app",
+      ref: "refs/heads/master",
+      commit: sha("a"),
+    },
+    { kind: "forked", project: makeId("prj", "01J9YYYYYYYYYYYYYYYYYYYYYY"), commit: sha("a") },
+    { kind: "template", name: "starter", commit: sha("a") },
+  ];
+
+  for (const origin of ORIGINS)
+    it.effect(
+      `[trunk.origin] TrunkInitialized says where trunk started (${origin.kind}), the trunk keeps it, and a retry that names another start changes neither`,
+      () =>
+        Effect.gen(function* () {
+          const first = yield* initializeTrunk(PROJECT, sha("a"), "seed", origin);
+          expect(first.origin).toEqual(origin);
+          const again = yield* initializeTrunk(PROJECT, sha("a"), "seed", {
+            kind: "template",
+            name: "another",
+            commit: sha("a"),
+          });
+          expect(again).toEqual(first);
+          expect(trunkOf(yield* EntityStore, PROJECT)?.origin).toEqual(origin);
+          const log = (yield* EventOutbox).log({ kind: "trunk", id: PROJECT });
+          expect(log.map((e) => e.payload)).toEqual([
+            { _tag: "TrunkInitialized", projectId: PROJECT, head: sha("a"), by: "seed", origin },
+          ]);
+        }).pipe(Effect.provide(ports().layer)),
+    );
+
+  for (const origin of ORIGINS.filter((o) => o.kind !== "empty"))
+    it.effect(
+      `[trunk.origin-head] an origin (${origin.kind}) that names another commit than trunk's first head is a defect: no trunk, no event, nothing counted`,
+      () => {
+        const w = ports();
+        w.writer.holds(sha("b"), 4_000);
+        return Effect.gen(function* () {
+          const said = yield* defectOf(initializeTrunk(PROJECT, sha("b"), "seed", origin));
+          expect(said ?? "no defect").toContain(
+            `trunk ${PROJECT} starts at ${sha("b")}, and its origin names ${sha("a")}`,
+          );
+          expect(trunkOf(yield* EntityStore, PROJECT)).toBeUndefined();
+          expect(yield* logOf(PROJECT)).toEqual([]);
+          expect(yield* counted).toBe(0);
+        }).pipe(Effect.provide(w.layer));
+      },
+    );
 });
 
 describe("the Trunk's first write", () => {
@@ -141,7 +197,7 @@ describe("the Trunk's first write", () => {
       return Effect.gen(function* () {
         yield* adoptTrunk(PROJECT, sha("b"));
         expect(w.writer.adopted()).toEqual([sha("b")]);
-        yield* initializeTrunk(PROJECT, sha("b"), "seed");
+        yield* initializeTrunk(PROJECT, sha("b"), "seed", EMPTY);
         const said = yield* defectOf(adoptTrunk(PROJECT, sha("c")));
         expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: adopt`);
         expect(w.writer.adopted()).toEqual([sha("b")]);
@@ -158,7 +214,7 @@ describe("the Trunk's first write", () => {
       return Effect.gen(function* () {
         expect(yield* seedTrunk(PROJECT, "keel", at)).toBe(MEMORY_SEED);
         expect(w.writer.seeds()).toEqual([{ name: "keel", at }]);
-        yield* initializeTrunk(PROJECT, MEMORY_SEED, "seed");
+        yield* initializeTrunk(PROJECT, MEMORY_SEED, "seed", EMPTY);
         const said = yield* defectOf(seedTrunk(PROJECT, "other", Instant(1)));
         expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: seed`);
         expect(w.writer.seeds()).toEqual([{ name: "keel", at }]);
@@ -175,10 +231,10 @@ describe("the Trunk's count at create", () => {
       w.writer.holds(sha("a"), 4_000);
       return Effect.gen(function* () {
         expect(yield* counted).toBe(0);
-        yield* initializeTrunk(PROJECT, sha("a"), "seed");
+        yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
         expect(yield* counted).toBe(4_000);
-        yield* initializeTrunk(PROJECT, sha("a"), "seed");
-        yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator"));
+        yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
+        yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator", EMPTY));
         expect(yield* counted).toBe(4_000);
       }).pipe(Effect.provide(w.layer));
     },
@@ -191,7 +247,7 @@ describe("the Trunk's count at create", () => {
       unplace(w.places);
       w.writer.holds(sha("a"), 4_000);
       return Effect.gen(function* () {
-        const said = yield* defectOf(initializeTrunk(PROJECT, sha("a"), "seed"));
+        const said = yield* defectOf(initializeTrunk(PROJECT, sha("a"), "seed", EMPTY));
         expect(said ?? "no defect").toContain(`project ${PROJECT} has no place`);
         expect(trunkOf(yield* EntityStore, PROJECT)).toBeUndefined();
         expect(yield* logOf(PROJECT)).toEqual([]);
@@ -270,7 +326,7 @@ function promotion() {
     yield* (yield* CodeHost).create(STAGING);
     const base = yield* code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
     writer.interfere(base);
-    yield* initializeTrunk(PROJECT, base, "seed");
+    yield* initializeTrunk(PROJECT, base, "seed", EMPTY);
     return base;
   });
   /** Candidate `n`, composed on `base` at refs/heads/cand/<cid> in staging, adding its own file. */
@@ -751,7 +807,7 @@ describe("the Trunk's promotion", () => {
             let head = yield* w.code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
             w.writer.interfere(head);
             w.writer.holds(head, history);
-            yield* initializeTrunk(PROJECT, head, "seed");
+            yield* initializeTrunk(PROJECT, head, "seed", EMPTY);
             for (const [i, bytes] of packs.entries()) {
               const tip = yield* w.composed(i + 1, head);
               w.writer.weigh(tip, bytes);
@@ -912,7 +968,7 @@ describe("the Trunk's destroy", () => {
   const project = Effect.gen(function* () {
     const host = yield* CodeHost;
     for (const repo of REPOS) yield* host.create(repo);
-    yield* initializeTrunk(PROJECT, sha("a"), "seed");
+    yield* initializeTrunk(PROJECT, sha("a"), "seed", EMPTY);
   });
 
   it.effect(

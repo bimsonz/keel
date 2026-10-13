@@ -5,7 +5,7 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { projectRepos } from "@keeltown/core/application/integration";
+import { projectRepos, promote } from "@keeltown/core/application/integration";
 import {
   CommitSha,
   EventEnvelope,
@@ -28,7 +28,7 @@ import {
   makeTrunkWriterMemory,
   MEMORY_SEED,
 } from "@keeltown/testing";
-import { Cause, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { ulid } from "ulid";
 import { TrunksRpc } from "../../src/adapters/driven/do-rpc/trunks.ts";
 import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
@@ -39,6 +39,8 @@ import { drainAfter } from "./helpers.ts";
 import { placedIn } from "./pool-harness.ts";
 
 const MAIN = "refs/heads/main";
+/** An empty project's origin: the start that names no commit, for cases that are not about where trunk started. */
+const EMPTY = { kind: "empty" } as const;
 const WAIT = { timeout: 20_000, interval: 50 };
 
 // Each trunk's events owe the Projector a delivery, drained after every case.
@@ -83,11 +85,14 @@ describe("the Trunk DO", () => {
   it("[trunk.do.init] initialize names trunk's first head once; a retry answers it, another head is refused", async () => {
     const head = "a".repeat(40);
     const { stub } = await placedTrunk(head);
-    const first = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed"));
-    expect(first).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0 }));
-    const again = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed"));
+    const first = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed", EMPTY));
+    expect(first).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0, origin: EMPTY }));
+    const again = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed", EMPTY));
     expect(again).toEqual(first);
-    const other = decodeExit(TrunkCodecs.initialize, await stub.initialize("b".repeat(40), "seed"));
+    const other = decodeExit(
+      TrunkCodecs.initialize,
+      await stub.initialize("b".repeat(40), "seed", EMPTY),
+    );
     expect(Exit.isFailure(other) ? JSON.stringify(other.cause) : "succeeded").toContain(
       "PromotionStateRefused",
     );
@@ -97,7 +102,9 @@ describe("the Trunk DO", () => {
     const head = Schema.decodeUnknownSync(CommitSha)("c".repeat(40));
     const { projectId } = await placedTrunk(head);
     const initialize = (sha: CommitSha) =>
-      viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, sha, "seed")));
+      viaTrunks(
+        Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, sha, "seed", EMPTY)),
+      );
     expect(await initialize(head)).toEqual(Exit.void);
     expect(await initialize(head)).toEqual(Exit.void);
     const other = await initialize(Schema.decodeUnknownSync(CommitSha)("d".repeat(40)));
@@ -106,15 +113,17 @@ describe("the Trunk DO", () => {
     );
     const trunk = decodeExit(
       TrunkCodecs.initialize,
-      await trunkStub(projectId).initialize(head, "seed"),
+      await trunkStub(projectId).initialize(head, "seed", EMPTY),
     );
-    expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0 }));
+    expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0, origin: EMPTY }));
   });
 
   it("[trunks.rpc.head] the Trunks port reads trunk's head as its Trunk DO records it", async () => {
     const head = Schema.decodeUnknownSync(CommitSha)("e".repeat(40));
     const { projectId } = await placedTrunk(head);
-    await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed")));
+    await viaTrunks(
+      Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed", EMPTY)),
+    );
     expect(await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.head(projectId)))).toEqual(
       Exit.succeed(head),
     );
@@ -136,7 +145,7 @@ describe("the Trunk DO", () => {
     expect(writer.seeds()).toEqual([{ name: "keel", at }]);
 
     await viaTrunks(
-      Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, MEMORY_SEED, "seed")),
+      Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, MEMORY_SEED, "seed", EMPTY)),
     );
     expect([
       said(await viaPort((trunks) => trunks.adopt(projectId, start))),
@@ -148,12 +157,50 @@ describe("the Trunk DO", () => {
     expect([writer.adopted(), writer.seeds()]).toEqual([[came], [{ name: "keel", at }]]);
   });
 
+  it("[trunk.do.origin] the Trunks port hands the origin to the object, which records it on TrunkInitialized, and reads it back; a trunk that kept none reads as none, and one with no head yet is a defect", async () => {
+    const head = Schema.decodeUnknownSync(CommitSha)("a".repeat(40));
+    const origin = {
+      kind: "imported",
+      url: "https://git.example/team/app",
+      ref: "refs/heads/master",
+      commit: head,
+    } as const;
+    const { projectId, stub } = await placedTrunk(head);
+    const read = () => viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.origin(projectId)));
+
+    expect(said(await read())).toContain("is not initialized");
+    expect(
+      await viaTrunks(
+        Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed", origin)),
+      ),
+    ).toEqual(Exit.void);
+    expect(await read()).toEqual(Exit.succeed(Option.some(origin)));
+    const log = await runInDurableObject(stub, (instance: TrunkDO) =>
+      Reflect.get(instance, "runtime").runPromise(
+        Effect.map(EventOutbox, (outbox) =>
+          outbox.log({ kind: "trunk", id: projectId }).map((e) => e.payload),
+        ),
+      ),
+    );
+    expect(log).toEqual([{ _tag: "TrunkInitialized", projectId, head, by: "seed", origin }]);
+
+    const older = await placedTrunk(head);
+    await runInDurableObject(older.stub, (instance: TrunkDO) =>
+      Reflect.get(instance, "runtime").runPromise(
+        promote(older.projectId, { _tag: "Initialize", head, by: "seed" }, "initialize", head),
+      ),
+    );
+    expect(
+      await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.origin(older.projectId))),
+    ).toEqual(Exit.succeed(Option.none()));
+  });
+
   it("[trunk.do.no-org] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {
     const projectId: ProjectId = makeId("prj", ulid());
     const stub = trunkStub(projectId);
     const refused = decodeExit(
       TrunkCodecs.initialize,
-      await stub.initialize("a".repeat(40), "seed"),
+      await stub.initialize("a".repeat(40), "seed", EMPTY),
     );
     expect(Exit.isFailure(refused) ? Cause.pretty(refused.cause) : "succeeded").toContain(
       `project ${projectId} has no place`,
@@ -242,8 +289,8 @@ async function promoting(placed?: { readonly org: NamespaceId; readonly history:
       ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), laneServices)),
     );
   });
-  expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(base, "seed"))).toEqual(
-    Exit.succeed({ head: base, promotion: "idle", redCount: 0 }),
+  expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(base, "seed", EMPTY))).toEqual(
+    Exit.succeed({ head: base, promotion: "idle", redCount: 0, origin: EMPTY }),
   );
   /** Change `n`'s candidate on `on`, at refs/heads/cand/<cid> in staging. */
   const composed = (n: number, on: CommitSha) => {
@@ -319,7 +366,7 @@ describe("the Trunk DO's promotion", () => {
       const types = (await t.log()).map((e) => e.type);
       expect(types.filter((x) => x === "PromotionDeclined")).toHaveLength(9);
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: tips[0], promotion: "idle", redCount: 0 }),
+        Exit.succeed({ head: tips[0], promotion: "idle", redCount: 0, origin: EMPTY }),
       );
     });
     const log = await t.log();
@@ -345,7 +392,7 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(1, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0 }),
+        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0, origin: EMPTY }),
       ),
     );
     expect((await t.log()).at(-1)?.payload).toMatchObject({
@@ -365,17 +412,19 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(1, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0 }),
+        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0, origin: EMPTY }),
       ),
     );
     expect(decodeExit(TrunkCodecs.resume, await t.stub.resume("operator:zach"))).toEqual(
-      Exit.succeed({ head: moved, promotion: "debouncing", redCount: 0 }),
+      Exit.succeed({ head: moved, promotion: "debouncing", redCount: 0, origin: EMPTY }),
     );
     // Batch 1 waited on the old head: it is declined, and batch 2, verified on the new one, lands.
     const tip = await t.composed(2, moved);
     await t.stub.receive([t.verified(2, moved)]);
     await t.until(async () =>
-      expect(await t.status()).toEqual(Exit.succeed({ head: tip, promotion: "idle", redCount: 0 })),
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+      ),
     );
     const types = (await t.log()).map((e) => e.type);
     expect(types.slice(types.indexOf("PromotionResumed"))).toEqual([
@@ -400,7 +449,9 @@ describe("the Trunk DO's promotion", () => {
     expect(await t.status()).toMatchObject(Exit.succeed({ head: t.base }));
     await t.stub.receive([t.verified(2, t.base)]);
     await t.until(async () =>
-      expect(await t.status()).toEqual(Exit.succeed({ head: tip, promotion: "idle", redCount: 0 })),
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+      ),
     );
     const log = await t.log();
     expect(log.map((e) => e.type)).not.toContain("PromotionFrozen");
@@ -432,7 +483,9 @@ describe("the Trunk DO's promotion", () => {
     expect(t.writer.pushes()).toEqual([]);
     await t.stub.receive([t.verified(2, t.base)]);
     await t.until(async () =>
-      expect(await t.status()).toEqual(Exit.succeed({ head: tip, promotion: "idle", redCount: 0 })),
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+      ),
     );
     const log = await t.log();
     expect(log.map((e) => e.type)).not.toContain("PromotionFrozen");
@@ -489,7 +542,7 @@ describe("the Trunk DO's promotion", () => {
     await t.until(async () => expect(t.code.repos.size).toBe(0));
     expect(mirrorDeletions).toEqual(["failed", "deleted"]);
     expect(await t.status()).toEqual(
-      Exit.succeed({ head: t.base, promotion: "idle", redCount: 0 }),
+      Exit.succeed({ head: t.base, promotion: "idle", redCount: 0, origin: EMPTY }),
     );
     expect((await t.log()).map((e) => e.type)).toEqual(["TrunkInitialized"]);
     expect(t.writer.pushes()).toEqual([]);

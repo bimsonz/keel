@@ -2,6 +2,7 @@ import {
   CompositionRefused,
   PromotionStateRefused,
   PushRejected,
+  type TrunkOrigin,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
 import {
@@ -28,7 +29,7 @@ import {
   type InstanceStanding,
   type VerificationJob,
 } from "@keeltown/core/ports";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 
 const sha1 = async (text: string): Promise<CommitSha> => {
   const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));
@@ -258,6 +259,7 @@ export function makeTrunksMemory(
   options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
 ) {
   const heads = new Map<ProjectId, CommitSha>();
+  const origins = new Map<ProjectId, TrunkOrigin>();
   const adopted = new Map<ProjectId, CommitSha>();
   const seeded = new Map<ProjectId, { readonly name: string; readonly at: Instant }>();
   const syncs = new Map<ProjectId, number>();
@@ -265,6 +267,8 @@ export function makeTrunksMemory(
   let failures = options.failSyncOnce === true ? 1 : 0;
   return {
     heads,
+    /** Where each project's trunk started, as its first `initialize` said. */
+    origins,
     /** The commit each project's main was made at with `adopt`. */
     adopted,
     /** What each project's first commit was asked to be made of with `seed`; each answered `MEMORY_SEED`. */
@@ -274,13 +278,20 @@ export function makeTrunksMemory(
     layer: Layer.succeed(
       Trunks,
       Trunks.of({
-        initialize: (projectId, head) =>
+        initialize: (projectId, head, _by, origin) =>
           Effect.suspend(() => {
             const held = heads.get(projectId);
             if (held !== undefined && held !== head)
               return Effect.fail(
                 new PromotionStateRefused({ projectId, phase: "idle", command: "Initialize" }),
               );
+            if (origin.kind !== "empty" && origin.commit !== head)
+              return Effect.die(
+                new Error(
+                  `trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`,
+                ),
+              );
+            if (held === undefined) origins.set(projectId, origin);
             heads.set(projectId, head);
             options.journal?.push(`initialize ${projectId}`);
             return Effect.void;
@@ -299,6 +310,12 @@ export function makeTrunksMemory(
             options.journal?.push(`seed ${projectId}`);
             return Effect.succeed(MEMORY_SEED);
           }),
+        origin: (projectId) =>
+          Effect.suspend(() =>
+            heads.has(projectId)
+              ? Effect.succeed(Option.fromUndefinedOr(origins.get(projectId)))
+              : Effect.die(new Error(`${projectId} has no trunk yet`)),
+          ),
         head: (projectId) =>
           Effect.suspend(() => {
             const head = heads.get(projectId);

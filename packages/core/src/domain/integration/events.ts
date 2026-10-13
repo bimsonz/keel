@@ -181,11 +181,41 @@ export const ProjectSettingsChanged = Schema.TaggedStruct("ProjectSettingsChange
   changes: Schema.Array(SettingChange),
   by: Schema.String,
 });
-/** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
+/**
+ * Where a project's trunk started, kept for good: Keel's own first
+ * commit for an empty project; the public Git URL an import took, with the
+ * upstream branch that came; the project a fork was taken from; or the
+ * template it was made from. `commit` is trunk's first head, which is the
+ * history Keel did not write: what a reader checks the start against.
+ */
+export const TrunkOrigin = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("empty") }),
+  Schema.Struct({
+    kind: Schema.Literal("imported"),
+    url: Schema.NonEmptyString,
+    /** The upstream branch that came, by its full ref name. */
+    ref: Schema.NonEmptyString,
+    commit: CommitSha,
+  }),
+  Schema.Struct({ kind: Schema.Literal("forked"), project: ProjectId, commit: CommitSha }),
+  Schema.Struct({
+    kind: Schema.Literal("template"),
+    name: Schema.NonEmptyString,
+    commit: CommitSha,
+  }),
+]);
+export type TrunkOrigin = typeof TrunkOrigin.Type;
+
+/**
+ * The trunk's first known head, from the project's start. Nothing promotes
+ * before it. `origin` says where that head came from; absent on a trunk
+ * initialized before origins were kept.
+ */
 export const TrunkInitialized = Schema.TaggedStruct("TrunkInitialized", {
   projectId: ProjectId,
   head: CommitSha,
   by: Schema.String,
+  origin: Schema.optional(TrunkOrigin),
 });
 /**
  * The write-ahead log entry (ADR 0003): the group about to be pushed, written

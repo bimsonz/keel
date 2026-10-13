@@ -1,7 +1,10 @@
+import { TrunkOrigin } from "@keeltown/core/domain/integration";
 import { Trunks } from "@keeltown/core/ports";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 import { TrunkCodecs } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
+
+const encodeOrigin = Schema.encodeSync(TrunkOrigin);
 
 /**
  * The Trunks port over the Trunk DO's RPC (`trunk:<projectId>`), placed by
@@ -23,9 +26,14 @@ export function TrunksRpc(
   return Layer.succeed(
     Trunks,
     Trunks.of({
-      initialize: (projectId, head, by) =>
-        callObject(TrunkCodecs.initialize, () => trunk(projectId).initialize(head, by)).pipe(
-          Effect.asVoid,
+      initialize: (projectId, head, by, origin) =>
+        callObject(TrunkCodecs.initialize, () =>
+          trunk(projectId).initialize(head, by, encodeOrigin(origin)),
+        ).pipe(Effect.asVoid),
+      origin: (projectId) =>
+        callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+          Effect.map((status) => Option.fromUndefinedOr(status.origin)),
+          Effect.orDie,
         ),
       adopt: (projectId, commit) =>
         callObject(TrunkCodecs.adopt, () => trunk(projectId).adopt(commit)),
