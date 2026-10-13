@@ -90,11 +90,21 @@ async function flood(project: ProjectId, count: number) {
   }
 }
 
-/** The feed's end as `token` sees it: read on until a page comes back empty. */
+/**
+ * The feed's end as `token` sees it: read on until a page comes back empty. A
+ * page of events that ends no later than the cursor it was read from is a feed
+ * that did not read from it, and would never come back empty.
+ */
 async function head(token: string) {
   let page = await events(token, "?limit=500");
-  while (page.body.items.length > 0)
-    page = await events(token, `?limit=500&cursor=${page.body.nextCursor}`);
+  while (page.body.items.length > 0) {
+    const from = page.body.nextCursor;
+    page = await events(token, `?limit=500&cursor=${from}`);
+    if (page.body.items.length > 0 && page.body.nextCursor <= from)
+      throw new Error(
+        `the feed read from ${from} answered events and ends at ${page.body.nextCursor}`,
+      );
+  }
   return page.body.nextCursor;
 }
 
