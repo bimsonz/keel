@@ -2,10 +2,10 @@
 # kills: conflict.fold-table
 # why: the fold takes ConflictEscalated with its guard gone: `ok`.
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index 80645e25..cffde6c9 100644
+index a390d072..6e3326c3 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -401,9 +401,7 @@ export const evolveConflict = (
+@@ -413,9 +413,7 @@ export const evolveConflict = (
          event.reason === "unprovable"
            ? conflict.state === "suspected" || conflict.state === "probing"
            : conflict.state === "proven";
@@ -15,4 +15,4 @@ index 80645e25..cffde6c9 100644
 +      return { ...conflict, state: "escalated", escalationId: event.escalationId };
      }
      case "ConflictResolved": {
-       const ok =
+       const against = event.against ?? [];

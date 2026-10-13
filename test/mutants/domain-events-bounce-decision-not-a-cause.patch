@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.ruling-bounces
+# why: the decision is not counted among a bounce's causes, so a bounce by a ruling names none and one by a verdict may name a decision beside it
+diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
+index 7f7dd326..650000eb 100644
+--- a/packages/core/src/domain/coordination/events.ts
++++ b/packages/core/src/domain/coordination/events.ts
+@@ -183,7 +183,7 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
+ }).check(
+   Schema.makeFilter(
+     (e) =>
+-      [e.verdictId, e.conflictId, e.declined, e.decisionId].filter((cause) => cause !== undefined)
++      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined)
+         .length === 1 ||
+       "a bounce names exactly one cause: its verdict, its conflict, its declined batch or the decision that went against it",
+   ),

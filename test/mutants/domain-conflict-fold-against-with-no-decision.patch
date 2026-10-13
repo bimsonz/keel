@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes a resolution against a party with no decision, where only a ruling goes against anyone
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index a390d072..1f56fa65 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -421,7 +421,7 @@ export const evolveConflict = (
+       const against = event.against ?? [];
+       const ruledAgainst =
+         against.length === 0 ||
+-        (event.decisionId !== undefined && against.every((id) => conflict.parties.includes(id)));
++        against.every((id) => conflict.parties.includes(id));
+       const ok =
+         conflict.state === "proven" ||
+         (conflict.state === "escalated" && event.decisionId !== undefined);

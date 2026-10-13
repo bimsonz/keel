@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.resolution-against
+# why: a ruling goes against a change that is no party of the conflict, so a change the conflict never named is bounced by its ruling
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index a390d072..31618f42 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -308,7 +308,6 @@ export const decideConflict = (
+       const against = command.against ?? [];
+       if (against.length > 0 && command.decisionId === undefined)
+         return refuse("no-ruling", askAPerson);
+-      if (!against.every((id) => conflict.parties.includes(id))) return refuse("not-a-party");
+       return Result.succeed([
+         ConflictResolved.make({
+           conflictId: conflict.id,

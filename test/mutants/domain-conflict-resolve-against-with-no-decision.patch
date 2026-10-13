@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.resolution-against
+# why: a resolution with no decision goes against a party, so a move nobody ruled on bounces a change as a ruling would
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index a390d072..8133416f 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -306,8 +306,6 @@ export const decideConflict = (
+       if (!(conflict.state === "proven" || ruled)) return refuse();
+       // Only a ruling goes against anyone, and only against a party of the conflict it rules on.
+       const against = command.against ?? [];
+-      if (against.length > 0 && command.decisionId === undefined)
+-        return refuse("no-ruling", askAPerson);
+       if (!against.every((id) => conflict.parties.includes(id))) return refuse("not-a-party");
+       return Result.succeed([
+         ConflictResolved.make({

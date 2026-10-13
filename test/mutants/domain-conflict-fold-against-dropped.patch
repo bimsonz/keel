@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.resolution-against, conflict.fold-table
+# why: the fold drops who the ruling went against, so the Conflict read back says no one lost
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index a390d072..3bec36ee 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -431,7 +431,6 @@ export const evolveConflict = (
+             state: "resolved",
+             move: event.move,
+             ...(event.decisionId === undefined ? {} : { decisionId: event.decisionId }),
+-            ...(against.length === 0 ? {} : { against }),
+           }
+         : illegal(conflict, event);
+     }

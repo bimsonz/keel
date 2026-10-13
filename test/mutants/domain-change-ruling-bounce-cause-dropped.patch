@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.ruling-bounces
+# why: the bounce leaves its decision off the event, so nothing says which ruling sent the change back
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2549e49a..922b102f 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -733,7 +733,6 @@ export const decideChange = (
+           now,
+           ChangeBounced.make({
+             changeId: id,
+-            decisionId: command.decisionId,
+             reasons: command.reasons,
+             nextActions:
+               command.nextActions.length > 0 ? command.nextActions : ruledAgainstActions(id),

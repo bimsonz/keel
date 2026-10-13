@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.ruling-bounces
+# why: the fold takes a bounce by a decision on a change parked for a lapsed lease
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2549e49a..5d40b3d7 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1013,7 +1013,7 @@ export const evolveChange = (
+             ])
+           : illegal(change, event);
+       if (event.decisionId !== undefined)
+-        return from("parked") && change.parkReason === "awaiting-ruling"
++        return from("parked")
+           ? moveTo(change, "bounced", [
+               "parkReason",
+               "escalationId",

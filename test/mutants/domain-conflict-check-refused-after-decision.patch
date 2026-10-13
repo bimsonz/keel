@@ -2,11 +2,11 @@
 # kills: conflict.world-checks, conflict.chart, conflict.transitions
 # why: A suite's cell is refused once the probe has decided, so the world checks, which finish minutes after the deciding cell, are never recorded
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index 80645e2..4404b1f 100644
+index a390d072..57f51998 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -307,7 +307,7 @@ export const decideConflict = (
-         : refuse();
+@@ -319,7 +319,7 @@ export const decideConflict = (
+       ]);
      }
      case "RecordCheck": {
 -      if (conflict.probeId === undefined) return refuse("no-probe-drafted", awaitProbe);

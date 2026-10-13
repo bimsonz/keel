@@ -2,15 +2,16 @@
 # kills: conflict.one-terminal
 # why: a resolved conflict takes Resolve again
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index f813fe9..fe38ca0 100644
+index a390d072..f8236f2e 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -233,7 +233,7 @@ export const decideConflict = (
+@@ -303,7 +303,8 @@ export const decideConflict = (
      case "Resolve": {
        const ruled = conflict.state === "escalated" && command.decisionId !== undefined;
        if (conflict.state === "escalated" && !ruled) return refuse("no-ruling", askAPerson);
--      return conflict.state === "proven" || ruled
-+      return conflict.state === "proven" || conflict.state === "resolved" || ruled
-         ? Result.succeed([
-             ConflictResolved.make({
-               conflictId: conflict.id,
+-      if (!(conflict.state === "proven" || ruled)) return refuse();
++      if (!(conflict.state === "proven" || conflict.state === "resolved" || ruled))
++        return refuse();
+       // Only a ruling goes against anyone, and only against a party of the conflict it rules on.
+       const against = command.against ?? [];
+       if (against.length > 0 && command.decisionId === undefined)

@@ -2,16 +2,17 @@
 # kills: conflict.fold-table
 # why: the fold's `ok` for ConflictResolved is always true, so it takes an event that check refused.
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index 80645e25..b224f919 100644
+index a390d072..467c2f1b 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -407,8 +407,7 @@ export const evolveConflict = (
-     }
-     case "ConflictResolved": {
-       const ok =
+@@ -422,9 +422,7 @@ export const evolveConflict = (
+       const ruledAgainst =
+         against.length === 0 ||
+         (event.decisionId !== undefined && against.every((id) => conflict.parties.includes(id)));
+-      const ok =
 -        conflict.state === "proven" ||
 -        (conflict.state === "escalated" && event.decisionId !== undefined);
-+true;
-       return ok
++      const ok = true;
+       return ok && ruledAgainst
          ? {
              ...conflict,

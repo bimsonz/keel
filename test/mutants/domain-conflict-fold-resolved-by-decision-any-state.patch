@@ -2,16 +2,17 @@
 # kills: conflict.fold-table
 # why: the fold takes a ConflictResolved that names a decision in any state, where only a proven or an escalated conflict resolves.
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index 80645e25..945ee0f1 100644
+index a390d072..92f885de 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -407,8 +407,7 @@ export const evolveConflict = (
-     }
-     case "ConflictResolved": {
-       const ok =
+@@ -422,9 +422,7 @@ export const evolveConflict = (
+       const ruledAgainst =
+         against.length === 0 ||
+         (event.decisionId !== undefined && against.every((id) => conflict.parties.includes(id)));
+-      const ok =
 -        conflict.state === "proven" ||
 -        (conflict.state === "escalated" && event.decisionId !== undefined);
-+conflict.state === "proven" || (event.decisionId !== undefined);
-       return ok
++      const ok = conflict.state === "proven" || event.decisionId !== undefined;
+       return ok && ruledAgainst
          ? {
              ...conflict,

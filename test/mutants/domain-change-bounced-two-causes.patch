@@ -1,16 +1,16 @@
 # expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
 # kills: change.bounce-declined
-# why: a bounce names exactly one cause: its verdict, its conflict or its declined batch
+# why: a bounce names exactly one cause: its verdict, its conflict, its declined batch or a ruling's decision
 diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
-index 542117c..a9da1d0 100644
+index 7f7dd326..9694ae73 100644
 --- a/packages/core/src/domain/coordination/events.ts
 +++ b/packages/core/src/domain/coordination/events.ts
-@@ -177,7 +177,7 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
- }).check(
+@@ -184,7 +184,7 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
    Schema.makeFilter(
      (e) =>
--      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined).length === 1 ||
-+      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined).length >= 1 ||
-       "a bounce names exactly one cause: its verdict, its conflict or its declined batch",
+       [e.verdictId, e.conflictId, e.declined, e.decisionId].filter((cause) => cause !== undefined)
+-        .length === 1 ||
++        .length >= 1 ||
+       "a bounce names exactly one cause: its verdict, its conflict, its declined batch or the decision that went against it",
    ),
  );

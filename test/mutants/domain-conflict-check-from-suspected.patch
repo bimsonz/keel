@@ -2,11 +2,11 @@
 # kills: conflict.world-checks
 # why: A suite cell is recorded for a conflict no probe was drafted for, so the matrix fills before its probe exists
 diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
-index 80645e2..7604d31 100644
+index a390d072..d0a174bb 100644
 --- a/packages/core/src/domain/verification/conflict-machine.ts
 +++ b/packages/core/src/domain/verification/conflict-machine.ts
-@@ -307,7 +307,8 @@ export const decideConflict = (
-         : refuse();
+@@ -319,7 +319,8 @@ export const decideConflict = (
+       ]);
      }
      case "RecordCheck": {
 -      if (conflict.probeId === undefined) return refuse("no-probe-drafted", awaitProbe);

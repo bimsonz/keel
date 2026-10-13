@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.ruling-bounces, change.transitions
+# why: a ruling's decision bounces a change parked for a lapsed lease, which waits for adoption and not for a ruling
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2549e49a..c991dd70 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -727,7 +727,7 @@ export const decideChange = (
+       }
+       if (command.decisionId !== undefined) {
+         // A ruling goes against a change only while the change waits for it.
+-        if (!awaitingRuling) return refuse(change, command);
++        if (!at("parked")) return refuse(change, command);
+         return intoAgentOwned(
+           change,
+           now,

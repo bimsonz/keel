@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.ruling-against
+# why: the premise's holder is ruled against whichever side stands, so a premise that holds bounces the change relying on it
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index f355e540..a8292380 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -163,5 +163,5 @@ export const sidesAgainst = (
+   const holder = conflict.premise?.holder;
+   const author = conflict.effect?.changeId;
+   if (holder === undefined || author === undefined || holder === author) return [];
+-  return [stands === "premise" ? author : holder];
++  return [holder];
+ };
