@@ -2,13 +2,13 @@
 # kills: lane.verify-start
 # why: KeelVerify is started before VerificationStarted commits, so a fast verdict finds the batch still Assembled and is refused
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 4482c8f3..3aefabf6 100644
+index 25ec6cd..ad3e377 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -811,6 +811,16 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
+@@ -853,6 +853,16 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
  ) {
    const planHash = yield* plannedOf(active);
-   const instanceId = instanceOf(formedOf(yield* EventOutbox, batch.id).eventId);
+   const instanceId = instanceOf(lane.laneId, formedOf(yield* EventOutbox, batch.id).eventId);
 +  yield* (yield* BatchVerification).start(instanceId, {
 +    projectId: lane.projectId,
 +    namespace: yield* projectNamespace(lane.projectId).pipe(Effect.orDie),
