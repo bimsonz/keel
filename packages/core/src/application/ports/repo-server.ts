@@ -36,10 +36,13 @@ export interface UploadPackAnswer {
 }
 
 /**
- * Serves a repo to a git client, for fetches only: there is no receive-pack
- * here, so nothing behind this port can write a repo. An adapter reads with a
- * credential of its own, minted for the one request, and never lets it, the
- * host's address or any header of the host's reach the answer.
+ * Serves a repo's `main` to a git client, for fetches only: there is no
+ * receive-pack here, so nothing behind this port can write a repo. Whatever
+ * else the repo holds and wherever its own HEAD points, a client is told of
+ * `HEAD`, a symbolic ref to `refs/heads/main`, and of that one branch: in the
+ * protocol 0 and 1 advertisement and in protocol 2's `ls-refs`. An adapter
+ * reads with a credential of its own, minted for the one request, and never
+ * lets it, the host's address or any header of the host's reach the answer.
  */
 export class RepoServer extends Context.Service<
   RepoServer,

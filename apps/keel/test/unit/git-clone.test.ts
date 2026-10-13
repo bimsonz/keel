@@ -12,10 +12,14 @@ import {
   type UploadPackAnswer,
   type UploadPackRequest,
 } from "@keeltown/core/ports";
+import { concat, FLUSH, pkt } from "@keeltown/gitcore";
 import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import { Hono } from "hono";
-import { RepoServerArtifacts } from "../../src/adapters/driven/artifacts/repo-server.ts";
+import {
+  MAX_REF_LIST_BYTES,
+  RepoServerArtifacts,
+} from "../../src/adapters/driven/artifacts/repo-server.ts";
 import { cloneAccess } from "../../src/adapters/driving/http/clone-access.ts";
 import {
   CLONE_CHALLENGE,
@@ -31,6 +35,8 @@ const TRUNK: RepoRef = { namespace: "memory", name: "prj" };
 const enc = new TextEncoder();
 const ADVERTISEMENT = enc.encode("001e# service=git-upload-pack\n0000");
 const RESULT = enc.encode("0008NAK\n");
+
+const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 const bytesOf = async (body: AsyncIterable<Uint8Array> | null) => {
   const parts: number[] = [];
@@ -218,6 +224,125 @@ describe("RepoServer over the code host's remote", () => {
         ).toMatchObject({ _tag: "RepoNotFound", repo: gone });
         expect(host.asked).toEqual([]);
         expect(minted).toEqual([]);
+      }),
+  );
+
+  it.effect(
+    "[reposerver.main-only] a host whose HEAD is on another branch is shown as main alone: its advertisement rewritten, its ls-refs asked for main only, a fetch passed through",
+    () =>
+      Effect.gen(function* () {
+        const main = "1".repeat(40);
+        const master = "2".repeat(40);
+        const caps = "multi_ack side-band-64k agent=host";
+        const service = [pkt("# service=git-upload-pack\n"), FLUSH];
+        const ls = (...args: string[]) =>
+          concat([
+            pkt("command=ls-refs\n"),
+            pkt("agent=git/2.50.1\n"),
+            enc.encode("0001"),
+            ...args.map((arg) => pkt(`${arg}\n`)),
+            FLUSH,
+          ]);
+        const fetch = concat([
+          pkt("command=fetch\n"),
+          enc.encode("0001"),
+          pkt(`want ${master}\n`),
+          pkt("done\n"),
+          FLUSH,
+        ]);
+        const host = recordingHost((asked) => {
+          if (asked.method === "GET")
+            return git(
+              UPLOAD_PACK_ANSWER_TYPE.advertise,
+              concat([
+                ...service,
+                pkt(`${master} HEAD\0${caps} symref=HEAD:refs/heads/master\n`),
+                pkt(`${main} refs/heads/main\n`),
+                pkt(`${master} refs/heads/master\n`),
+                FLUSH,
+              ]),
+            );
+          const sent = text(asked.body ?? new Uint8Array());
+          return git(
+            UPLOAD_PACK_ANSWER_TYPE.negotiate,
+            sent.includes("command=ls-refs")
+              ? concat([pkt(`${main} refs/heads/main\n`), FLUSH])
+              : RESULT,
+          );
+        });
+        const { uploadPack } = served(host.fetcher);
+        const answered = (request: UploadPackRequest) =>
+          Effect.flatMap(uploadPack(TRUNK, request), (answer) =>
+            Effect.promise(async () => text(await bytesOf(answer.body))),
+          );
+
+        expect(yield* answered({ service: "advertise", protocol: null, body: null })).toBe(
+          text(
+            concat([
+              ...service,
+              pkt(`${main} HEAD\0${caps} symref=HEAD:refs/heads/main\n`),
+              pkt(`${main} refs/heads/main\n`),
+              FLUSH,
+            ]),
+          ),
+        );
+
+        const v2 = { service: "negotiate", protocol: "version=2" } as const;
+        expect(yield* answered({ ...v2, body: ls("symrefs", "ref-prefix HEAD") })).toBe(
+          text(concat([pkt(`${main} HEAD symref-target:refs/heads/main\n`), FLUSH])),
+        );
+        const asked = text(host.asked[1]?.body ?? new Uint8Array());
+        expect(asked).toContain("ref-prefix refs/heads/main\n");
+        expect(asked).not.toContain("ref-prefix HEAD");
+        expect(host.asked[1]?.headers).toMatchObject({ "git-protocol": "version=2" });
+
+        // A fetch is the host's to answer: the client's own request, and the answer as it came.
+        expect(yield* answered({ ...v2, body: fetch })).toBe(text(RESULT));
+        expect(host.asked[2]?.body).toEqual(fetch);
+      }),
+  );
+
+  it.effect(
+    "[reposerver.ref-list-cap] a list of refs over the cap, or one the host answers with an error, is a 502 with nothing of the host in it",
+    () =>
+      Effect.gen(function* () {
+        const main = "1".repeat(40);
+        const lines = [
+          pkt(`${main} HEAD\0side-band-64k\n`),
+          pkt(`${main} refs/heads/main\n`),
+          ...Array.from({ length: 20 }, (_, i) =>
+            pkt(`${main} refs/heads/${i}-${"b".repeat(60_000)}\n`),
+          ),
+          FLUSH,
+        ];
+        const under = concat([...lines.slice(0, 12), FLUSH]);
+        const over = concat(lines);
+        expect(under.length).toBeLessThan(MAX_REF_LIST_BYTES);
+        expect(over.length).toBeGreaterThan(MAX_REF_LIST_BYTES);
+        const advertise = { service: "advertise", protocol: null, body: null } as const;
+
+        const small = served(
+          recordingHost(() => git(UPLOAD_PACK_ANSWER_TYPE.advertise, under)).fetcher,
+        );
+        expect(yield* small.uploadPack(TRUNK, advertise)).toMatchObject({ status: 200 });
+        const large = served(
+          recordingHost(() => git(UPLOAD_PACK_ANSWER_TYPE.advertise, over)).fetcher,
+        );
+        expect(yield* large.uploadPack(TRUNK, advertise)).toEqual({
+          status: 502,
+          contentType: "text/plain",
+          body: null,
+        });
+        const refusing = served(
+          recordingHost(() =>
+            git(UPLOAD_PACK_ANSWER_TYPE.advertise, pkt("ERR the repository is not available\n")),
+          ).fetcher,
+        );
+        expect(yield* refusing.uploadPack(TRUNK, advertise)).toEqual({
+          status: 502,
+          contentType: "text/plain",
+          body: null,
+        });
       }),
   );
 });

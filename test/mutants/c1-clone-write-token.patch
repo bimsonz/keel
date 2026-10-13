@@ -2,12 +2,12 @@
 # kills: reposerver.read-token
 # why: the token minted for a clone could push to trunk
 diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-index 6dcc0c9..be30ea2 100644
+index d496d859..1c9c8142 100644
 --- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-@@ -47,7 +47,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
-         uploadPack: (repo, request: UploadPackRequest) =>
+@@ -75,7 +75,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
            Effect.gen(function* () {
+             const { request, rewrite } = mainOnly(asked);
              const info = yield* host.info(repo);
 -            const token = yield* host.mintToken(repo, "read", CLONE_TOKEN_TTL_SECONDS);
 +            const token = yield* host.mintToken(repo, "write", CLONE_TOKEN_TTL_SECONDS);

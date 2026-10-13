@@ -329,7 +329,10 @@ for (const part of [importAndLand, startEmpty]) {
     await part();
   } catch (error) {
     if (error instanceof KeelProblem) {
-      console.log(`FAIL ${error.message}`);
+      // The request id is what finds this failure in Keel's logs.
+      console.log(
+        `FAIL ${error.message} (${error.status}, request ${error.requestId}, ${new Date().toISOString()})`,
+      );
       for (const next of error.nextActions) console.log(`       next: ${next.title}`);
     } else console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
     failures += 1;

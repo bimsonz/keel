@@ -11,5 +11,6 @@ export * from "./objects.ts";
 export * from "./pack-write.ts";
 export * from "./push.ts";
 export * from "./root.ts";
+export * from "./serve-main.ts";
 export * from "./sshsig.ts";
 export * from "./transfer.ts";

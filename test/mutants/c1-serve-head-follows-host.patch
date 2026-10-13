@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.advertisement"
+# kills: serve.main.advertisement
+# why: HEAD is advertised at the commit the host's own HEAD is on, so a clone of an import whose branch is not main starts from the upstream as it came
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..92cf127b 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -108,7 +108,7 @@ function advertisement(answer: Uint8Array): Uint8Array | null {
+       ? [pkt(`${ZERO_OID} capabilities^{}\0${others.join(" ")}\n`)]
+       : [
+           pkt(
+-            `${main} HEAD\0${others.toSpliced(symref < 0 ? others.length : symref, 0, SYMREF).join(" ")}\n`,
++            `${first.slice(0, 40)} HEAD\0${others.toSpliced(symref < 0 ? others.length : symref, 0, SYMREF).join(" ")}\n`,
+           ),
+           pkt(`${main} ${MAIN}\n`),
+         ];

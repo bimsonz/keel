@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "reposerver.main-only"
+# kills: reposerver.main-only
+# why: the adapter passes the host's refs on as they are, which is the defect: HEAD on the imported branch, and every other ref listed
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index d496d859..ad789a03 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -73,7 +73,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+       return RepoServer.of({
+         uploadPack: (repo, asked: UploadPackRequest) =>
+           Effect.gen(function* () {
+-            const { request, rewrite } = mainOnly(asked);
++            const { request, rewrite } = { request: asked, rewrite: null };
+             const info = yield* host.info(repo);
+             const token = yield* host.mintToken(repo, "read", CLONE_TOKEN_TTL_SECONDS);
+             const expected = UPLOAD_PACK_ANSWER_TYPE[request.service];

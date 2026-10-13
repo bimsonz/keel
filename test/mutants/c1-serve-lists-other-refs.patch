@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.advertisement|serve.main.stock-git"
+# kills: serve.main.advertisement, serve.main.stock-git
+# why: every ref of the host is advertised after HEAD and main, so a clone brings the imported branch and anything else trunk holds
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..c8b72644 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -116,7 +116,7 @@ function advertisement(answer: Uint8Array): Uint8Array | null {
+   return concat(
+     packets.flatMap((packet) => {
+       if (packet.text === null || !REF_LINE.test(packet.text)) return [packet.raw];
+-      if (placed) return [];
++      if (placed) return [packet.raw];
+       placed = true;
+       return shown;
+     }),

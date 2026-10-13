@@ -2,15 +2,26 @@
 # kills: clone.token-never-returned
 # why: the host's own content-type header is passed to the client, with whatever the host put in it
 diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-index 6dcc0c9..ef57b9f 100644
+index d496d859..c7fcf771 100644
 --- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-@@ -81,7 +81,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+@@ -109,13 +109,17 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
              }
+             const body = chunks(answered.body);
+             if (rewrite === null)
+-              return { status: 200, contentType: expected, body } satisfies UploadPackAnswer;
++              return {
++                status: 200,
++                contentType: answered.headers.get("content-type") ?? expected,
++                body,
++              } satisfies UploadPackAnswer;
+             const held = yield* Effect.promise(() => whole(body, MAX_REF_LIST_BYTES));
+             const shown = held === null ? null : rewrite(held);
+             if (shown === null) return BAD_GATEWAY;
              return {
                status: 200,
 -              contentType: expected,
 +              contentType: answered.headers.get("content-type") ?? expected,
-               body: chunks(answered.body),
+               body: once(shown),
              } satisfies UploadPackAnswer;
            }),

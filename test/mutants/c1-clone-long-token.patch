@@ -2,15 +2,15 @@
 # kills: reposerver.read-token
 # why: a clone's read token outlives its request by a day
 diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-index 6dcc0c9..407af55 100644
+index d496d859..c514755a 100644
 --- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
-@@ -9,7 +9,7 @@ import {
+@@ -10,7 +10,7 @@ import { concat, mainOnly } from "@keeltown/gitcore";
  import { Effect, Layer } from "effect";
  
  /** How long the read token minted for one upload-pack request lives. */
 -export const CLONE_TOKEN_TTL_SECONDS = 60;
 +export const CLONE_TOKEN_TTL_SECONDS = 86_400;
  
- /** The host answered something other than a git response: nothing of it is passed on. */
- const BAD_GATEWAY: UploadPackAnswer = { status: 502, contentType: "text/plain", body: null };
+ /**
+  * The most of a host's answer that is held to be rewritten: a list of refs,

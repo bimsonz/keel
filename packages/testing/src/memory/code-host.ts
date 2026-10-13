@@ -17,6 +17,7 @@ import {
   type SyncOutcome,
   type TreeEntry,
   UPLOAD_PACK_ANSWER_TYPE,
+  type UploadPackAnswer,
   type UploadPackRequest,
   WorkspaceRebaser,
   WorkspaceRefresher,
@@ -32,6 +33,7 @@ import {
   type GitObject,
   isAncestor,
   MissingObject,
+  mainOnly,
   MODE_GITLINK,
   MODE_TREE,
   pkt,
@@ -51,6 +53,8 @@ import {
 interface MemoryRepo {
   readonly refs: Map<string, CommitSha>;
   readonly objects: Map<string, GitObject>;
+  /** The branch the repo's own HEAD names, by full ref name: main unless an import brought another. */
+  readonly head?: string;
 }
 
 /** What answers at a URL the memory host is asked to import from: a repository, or a refusal. */
@@ -181,7 +185,11 @@ export function makeCodeHostMemory() {
     fork: (source, target) =>
       Effect.flatMap(find(source), (from) => {
         if (repos.has(repoKey(target))) return Effect.fail(alreadyExists(target));
-        repos.set(repoKey(target), { refs: new Map(from.refs), objects: new Map(from.objects) });
+        repos.set(repoKey(target), {
+          refs: new Map(from.refs),
+          objects: new Map(from.objects),
+          ...(from.head === undefined ? {} : { head: from.head }),
+        });
         return Effect.succeed(target);
       }),
     import: (source, target) =>
@@ -195,9 +203,11 @@ export function makeCodeHostMemory() {
         const commit = upstream.branches.get(branch);
         if (commit === undefined) return Effect.fail(new ImportRefused({ reason: "no-branch" }));
         const ref = `${BRANCH}${branch}`;
+        // As on the real host, the new repo's HEAD names the branch that came.
         repos.set(repoKey(target), {
           refs: new Map([[ref, commit]]),
           objects: new Map(upstream.objects),
+          head: ref,
         });
         return Effect.succeed({ ref, commit });
       }),
@@ -485,9 +495,9 @@ function banded(pack: Uint8Array): Uint8Array[] {
   return out;
 }
 
-/** A repo's refs as upload-pack lists them: HEAD first (it points at main), then each ref by name. */
+/** A repo's refs as its host lists them: HEAD first, at the branch it names when that branch exists, then each ref by name. */
 function listedRefs(found: MemoryRepo): (readonly [sha: string, ref: string])[] {
-  const head = found.refs.get(MAIN);
+  const head = found.refs.get(found.head ?? MAIN);
   return [
     ...(head === undefined ? [] : [[head, "HEAD"] as const]),
     ...[...found.refs]
@@ -496,9 +506,10 @@ function listedRefs(found: MemoryRepo): (readonly [sha: string, ref: string])[] 
   ];
 }
 
-/** One upload-pack answer over a memory repo, in protocol v0 or (for `version=2`) v2. */
+/** One upload-pack answer over a memory repo as its host gives it, every ref listed, in protocol v0 or (for `version=2`) v2. */
 async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
   const refs = listedRefs(found);
+  const target = found.head ?? MAIN;
   const lines = [...readPkts(request.body ?? new Uint8Array())].flatMap((line) =>
     line === null ? [] : [dec.decode(line).replace(/\n$/, "")],
   );
@@ -524,7 +535,7 @@ async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
         ...refs
           .filter(([, ref]) => prefixes.length === 0 || prefixes.some((p) => ref.startsWith(p)))
           .map(([sha, ref]) =>
-            pkt(`${sha} ${ref}${symrefs && ref === "HEAD" ? ` symref-target:${MAIN}` : ""}\n`),
+            pkt(`${sha} ${ref}${symrefs && ref === "HEAD" ? ` symref-target:${target}` : ""}\n`),
           ),
         FLUSH,
       ]);
@@ -535,7 +546,7 @@ async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
   }
 
   if (request.service === "advertise") {
-    const caps = `${UPLOAD_PACK_CAPS}${refs.length === 0 ? "" : ` symref=HEAD:${MAIN}`}`;
+    const caps = `${UPLOAD_PACK_CAPS}${refs[0]?.[1] === "HEAD" ? ` symref=HEAD:${target}` : ""}`;
     return concat([
       pkt("# service=git-upload-pack\n"),
       FLUSH,
@@ -554,10 +565,11 @@ async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
 }
 
 /**
- * RepoServer over a memory code host: a small upload-pack that advertises the
- * repo's refs and answers a fetch with every object reachable from its wants
- * (haves are ignored, which is valid and never thin), in protocol v0 and v2.
- * `served` records each request in order.
+ * RepoServer over a memory code host: a small upload-pack that lists the
+ * repo's refs as its host would, shown to the client as main alone (gitcore's
+ * `mainOnly`, as the real adapter applies it), and answers a fetch with every
+ * object reachable from its wants (haves are ignored, which is valid and
+ * never thin), in protocol v0 and v2. `served` records each request in order.
  */
 export function makeRepoServerMemory(code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">) {
   const served: {
@@ -579,8 +591,11 @@ export function makeRepoServerMemory(code: Pick<ReturnType<typeof makeCodeHostMe
               service: request.service,
               protocol: request.protocol,
             });
-            return Effect.promise(async () => {
-              const bytes = await uploadPackAnswer(found, request);
+            return Effect.promise(async (): Promise<UploadPackAnswer> => {
+              const { request: asked, rewrite } = mainOnly(request);
+              const answer = await uploadPackAnswer(found, asked);
+              const bytes = rewrite === null ? answer : rewrite(answer);
+              if (bytes === null) return { status: 502, contentType: "text/plain", body: null };
               return {
                 status: 200,
                 contentType: UPLOAD_PACK_ANSWER_TYPE[request.service],

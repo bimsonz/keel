@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.unborn"
+# kills: serve.main.unborn
+# why: an unborn HEAD is listed to a client that never said it understands one
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..aa26f490 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -166,7 +166,7 @@ function listed(asked: LsRefs, answer: Uint8Array): Uint8Array | null {
+   const target = asked.symrefs ? ` symref-target:${MAIN}` : "";
+   const lines: Uint8Array[] = [];
+   if (main === undefined) {
+-    if (asked.unborn && asked.symrefs && matches("HEAD")) lines.push(pkt(`unborn HEAD${target}\n`));
++    if (asked.symrefs && matches("HEAD")) lines.push(pkt(`unborn HEAD${target}\n`));
+   } else {
+     if (matches("HEAD")) lines.push(pkt(`${main} HEAD${target}\n`));
+     if (matches(MAIN)) lines.push(pkt(`${main} ${MAIN}\n`));

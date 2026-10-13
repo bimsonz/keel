@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.not-git"
+# kills: serve.main.not-git
+# why: the host's error line is passed to the client as an advertisement, with whatever the host wrote in it
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..11c68bda 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -88,7 +88,7 @@ const refOf = (line: string) => line.slice(41).split(/[\0 \n]/)[0] ?? "";
+  */
+ function advertisement(answer: Uint8Array): Uint8Array | null {
+   const packets = packetsOf(answer);
+-  if (packets === null || isError(packets)) return null;
++  if (packets === null) return null;
+   const said = packets.flatMap((packet) =>
+     packet.text === null || packet.text.startsWith("# service=") ? [] : [packet.text],
+   );

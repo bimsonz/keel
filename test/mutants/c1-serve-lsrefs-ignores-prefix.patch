@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.ls-refs"
+# kills: serve.main.ls-refs
+# why: HEAD and main are listed whatever prefixes the client asked for, so a client asking for tags is handed branches
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..47d56714 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -162,7 +162,7 @@ function listed(asked: LsRefs, answer: Uint8Array): Uint8Array | null {
+     .find((line) => REF_LINE.test(line) && refOf(line) === MAIN)
+     ?.slice(0, 40);
+   const matches = (ref: string) =>
+-    asked.prefixes.length === 0 || asked.prefixes.some((prefix) => ref.startsWith(prefix));
++    ref !== "" || asked.prefixes.some((prefix) => ref.startsWith(prefix));
+   const target = asked.symrefs ? ` symref-target:${MAIN}` : "";
+   const lines: Uint8Array[] = [];
+   if (main === undefined) {

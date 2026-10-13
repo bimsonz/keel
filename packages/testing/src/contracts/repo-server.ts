@@ -41,7 +41,8 @@ function packedObjects(bytes: Uint8Array): number {
 /**
  * The suite every RepoServer adapter passes, over the code host it reads and
  * a fixture that commits to it: what a git client's fetch asks, in protocol
- * v0 and v2, and what it must get back.
+ * v0 and v2, and what it must get back, which is the repo's main and no
+ * other ref.
  */
 export function describeRepoServerContract(
   adapter: string,
@@ -155,6 +156,83 @@ export function describeRepoServerContract(
           );
           expect(linesOf(fetched)).toContain("packfile");
           expect(packedObjects(fetched)).toBe(3);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[reposerver.contract.main-only] a repo whose own HEAD is on another branch is shown as HEAD on main and main alone, and main is fetched",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const server = yield* RepoServer;
+          const upstreams = yield* fixture.upstreams;
+          // An import's HEAD names the branch that came, which is not main; main then moves ahead of it.
+          const repo = fixture.scratch();
+          const imported = yield* host.import({ url: upstreams.url }, repo);
+          expect(imported.ref).not.toBe(MAIN);
+          const head = yield* fixture.commit(repo, MAIN, { "README.md": "landed\n" }, [
+            imported.commit,
+          ]);
+
+          const advertised = yield* bytesOf(
+            yield* server.uploadPack(repo, { service: "advertise", protocol: null, body: null }),
+          );
+          expect(linesOf(advertised)).toEqual([
+            "# service=git-upload-pack",
+            `${head} HEAD`,
+            `${head} ${MAIN}`,
+          ]);
+          expect(
+            [...readPkts(advertised)]
+              .flatMap((line) => (line === null ? [] : dec.decode(line).trim().split(/[\0 ]/)))
+              .filter((capability) => capability.startsWith("symref=")),
+          ).toEqual([`symref=HEAD:${MAIN}`]);
+
+          const v2 = { protocol: "version=2", service: "negotiate" } as const;
+          const listed = (...args: readonly string[]) =>
+            Effect.gen(function* () {
+              const answer = yield* server.uploadPack(repo, {
+                ...v2,
+                body: concat([
+                  pkt("command=ls-refs\n"),
+                  pkt("agent=keel-contract\n"),
+                  DELIM,
+                  ...args.map((arg) => pkt(`${arg}\n`)),
+                  FLUSH,
+                ]),
+              });
+              expect(answer.status).toBe(200);
+              return linesOf(yield* bytesOf(answer));
+            });
+          expect(yield* listed("symrefs", "peel")).toEqual([
+            `${head} HEAD symref-target:${MAIN}`,
+            `${head} ${MAIN}`,
+          ]);
+          // A client asking for HEAD alone leaves main out of its prefixes, and still gets main's commit.
+          expect(yield* listed("symrefs", "ref-prefix HEAD")).toEqual([
+            `${head} HEAD symref-target:${MAIN}`,
+          ]);
+          expect(yield* listed(`ref-prefix ${imported.ref}`, "ref-prefix refs/tags/")).toEqual([]);
+
+          const fetched = yield* bytesOf(
+            yield* server.uploadPack(repo, {
+              ...v2,
+              body: concat([
+                pkt("command=fetch\n"),
+                pkt("agent=keel-contract\n"),
+                DELIM,
+                pkt("ofs-delta\n"),
+                pkt("no-progress\n"),
+                pkt(`want ${head}\n`),
+                pkt(`have ${imported.commit}\n`),
+                pkt("done\n"),
+                FLUSH,
+              ]),
+            }),
+          );
+          expect(linesOf(fetched)).toContain("packfile");
+          expect(packedObjects(fetched)).toBeGreaterThanOrEqual(3);
         }).pipe(Effect.provide(make())),
     );
 

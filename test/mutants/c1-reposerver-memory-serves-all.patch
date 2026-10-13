@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "reposerver.contract.main-only"
+# kills: reposerver.contract.main-only
+# why: the memory server lists every ref its host holds with HEAD where the host has it, so no test over it can see what a client of an imported project gets
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index f4595a23..94e272de 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -592,7 +592,7 @@ export function makeRepoServerMemory(code: Pick<ReturnType<typeof makeCodeHostMe
+               protocol: request.protocol,
+             });
+             return Effect.promise(async (): Promise<UploadPackAnswer> => {
+-              const { request: asked, rewrite } = mainOnly(request);
++              const { request: asked, rewrite } = { request, rewrite: null };
+               const answer = await uploadPackAnswer(found, asked);
+               const bytes = rewrite === null ? answer : rewrite(answer);
+               if (bytes === null) return { status: 502, contentType: "text/plain", body: null };

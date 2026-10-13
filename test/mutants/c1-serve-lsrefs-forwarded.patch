@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.ls-refs|serve.main.stock-git"
+# kills: serve.main.ls-refs, serve.main.stock-git
+# why: the client's own ls-refs is passed to the host, so a client that asks for HEAD alone is told of no ref at all: its prefixes leave main out and there is no commit to put on HEAD
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..6a77602c 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -189,7 +189,7 @@ export function mainOnly<R extends ServedRequest>(request: R): MainOnly<R> {
+     const asked = lsRefsOf(request.body);
+     if (asked !== null)
+       return {
+-        request: { ...request, body: LS_REFS_MAIN },
++        request,
+         rewrite: (answer) => listed(asked, answer),
+       };
+   }

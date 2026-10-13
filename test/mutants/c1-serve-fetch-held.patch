@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/serve-main.test.ts -t "serve.main.passes|serve.main.stock-git"
+# kills: serve.main.passes, serve.main.stock-git
+# why: every protocol 2 command is taken for ls-refs, so a fetch is answered with a list of refs and no pack ever reaches the client
+diff --git a/packages/gitcore/src/serve-main.ts b/packages/gitcore/src/serve-main.ts
+index 7c27d5d1..731d28d0 100644
+--- a/packages/gitcore/src/serve-main.ts
++++ b/packages/gitcore/src/serve-main.ts
+@@ -133,7 +133,7 @@ interface LsRefs {
+ /** A protocol 2 request's `ls-refs` arguments, or null when it is another command or no command at all. */
+ function lsRefsOf(body: Uint8Array): LsRefs | null {
+   const packets = packetsOf(body);
+-  if (packets === null || packets[0]?.text?.replace(/\n$/, "") !== "command=ls-refs") return null;
++  if (packets === null || packets[0]?.text?.startsWith("command=") !== true) return null;
+   const delim = packets.findIndex((packet) => packet.text === null);
+   const args = (delim < 0 ? [] : packets.slice(delim + 1)).flatMap((packet) =>
+     packet.text === null ? [] : [packet.text.replace(/\n$/, "")],

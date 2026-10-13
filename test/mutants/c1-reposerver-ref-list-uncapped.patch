@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "reposerver.ref-list-cap"
+# kills: reposerver.ref-list-cap
+# why: a list of refs of any size is held in memory to be rewritten
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index d496d859..f29cfe62 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -110,7 +110,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+             const body = chunks(answered.body);
+             if (rewrite === null)
+               return { status: 200, contentType: expected, body } satisfies UploadPackAnswer;
+-            const held = yield* Effect.promise(() => whole(body, MAX_REF_LIST_BYTES));
++            const held = yield* Effect.promise(() => whole(body, Number.POSITIVE_INFINITY));
+             const shown = held === null ? null : rewrite(held);
+             if (shown === null) return BAD_GATEWAY;
+             return {
