@@ -67,17 +67,19 @@ const shot = async (shown: Page, name: string): Promise<void> => {
 const tabsOf = (page: Page) => page.getByRole("navigation", { name: "Project" }).getByRole("link");
 const qrOn = (page: Page) =>
   page.locator("svg", { has: page.locator("title", { hasText: "QR code" }) });
-const stageOn = async (page: Page, index: number): Promise<string> =>
-  (await page.locator("table.a-funnel tbody tr").nth(index).locator("td").allInnerTexts())
-    .map(squash)
-    .join(" | ");
+/** The review funnel's three tables: the changes, the conflicts, and the comparisons where a source reports them. */
+type FunnelTable = "changes" | "conflicts" | "comparisons";
+const funnelRows = (page: Page, table: FunnelTable) =>
+  page.locator(`table.a-funnel[data-funnel="${table}"] tbody tr`);
+const stageOn = async (page: Page, table: FunnelTable, index: number): Promise<string> =>
+  (await funnelRows(page, table).nth(index).locator("td").allInnerTexts()).map(squash).join(" | ");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The pages, on the fixtures the dev server serves
 // ─────────────────────────────────────────────────────────────────────────────
 const page = watch(await browser.newPage({ viewport: { width: 1920, height: 1080 } }), "fixtures");
 const stat = (label: string): Promise<string> => statOn(page, label);
-const stage = (index: number): Promise<string> => stageOn(page, index);
+const stage = (table: FunnelTable, index: number): Promise<string> => stageOn(page, table, index);
 const tabs = tabsOf(page);
 const at = (place: string, fixture: string): string =>
   `${dev}/acme/demo${place}${place.includes("?") ? "&" : "?"}${fixture}`;
@@ -1324,42 +1326,74 @@ await page
 await page.getByRole("heading", { name: "Review funnel" }).waitFor();
 expectEqual("funnel: at its own address", pathOf(page), "/acme/demo/insights/funnel");
 expectEqual(
+  "funnel: the changes, the conflicts and the comparisons, each under its own heading",
+  (await page.getByRole("heading", { level: 2 }).allInnerTexts()).map(squash).join(" | "),
+  "Changes | Conflicts | Comparisons",
+);
+// The changes first: how many Keel's events took as far as each stage, and what became of the rest.
+expectEqual(
+  "funnel: a change's four stages, by name",
+  (await funnelRows(page, "changes").locator("th span").allInnerTexts()).map(squash).join(" | "),
+  "Declared | Precheck | Verified | Landed",
+);
+expectEqual("funnel: changes landed, of those declared", await stat("Changes landed"), "692");
+expectEqual("funnel: changes Keel bounced", await stat("Changes bounced"), "7");
+expectEqual(
+  "funnel: declared, and how many went on to a precheck",
+  await stage("changes", 0),
+  "1,420 | 0 0% 363 still here, 1,057 went on 363 still here | 1,057 | —",
+);
+expectEqual(
+  "funnel: precheck, with what left there under the cause Keel named",
+  await stage("changes", 1),
+  "1,057 | 3 0.3% 3 left here, 358 still here, 696 went on 3 bounced on a verdict · 358 still here, 1 of them parked | 696 | —",
+);
+expectEqual(
+  "funnel: verified, with Keel's estimate for its plans worded as an estimate",
+  await stage("changes", 2),
+  "696 | 0 0% 4 still here, 692 went on 4 still here | 692 | Keel's estimate $5.48 for 1,051 plans, before any ran",
+);
+expectEqual("funnel: landed", await stage("changes", 3), "692 |  |  | —");
+// The comparison counters are the fixture's own: they keep a heading of their own, and their stages a number.
+expectEqual(
   "stages in the funnel",
-  String(await page.locator("table.a-funnel tbody tr").count()),
-  "6",
+  `${await funnelRows(page, "conflicts").count()} + ${await funnelRows(page, "comparisons").count()}`,
+  "2 + 4",
 );
 expectEqual(
   "stages are named as stages",
-  squash(await page.locator("table.a-funnel tbody tr").nth(2).locator("th").innerText()).slice(
-    0,
-    12,
-  ),
+  squash(await funnelRows(page, "comparisons").nth(2).locator("th").innerText()).slice(0, 12),
   "Stage 2 Clef",
+);
+expectEqual(
+  "funnel: a conflict's two stages go by name",
+  squash(await funnelRows(page, "conflicts").nth(0).locator("th").innerText()).slice(0, 11),
+  "Probe Proof",
 );
 expectEqual("comparisons per change", await stat("Comparisons per change"), "2.4");
 expectEqual(
   "subject index",
-  await stage(0),
+  await stage("comparisons", 0),
   "1,004,556 | 1,002,025 99.7% 1,002,025 settled here, 2,531 passed on | 2,531 | $0.00016",
 );
 expectEqual(
   "lattice",
-  await stage(1),
+  await stage("comparisons", 1),
   "2,531 | 2,146 84.8% 2,146 settled here, 385 passed on | 385 | $0",
 );
 expectEqual(
   "code model, one probe still being drafted",
-  await stage(3),
+  await stage("comparisons", 3),
   "16 | 0 0% 1 still here, 15 passed on 1 still here | 15 | $0.014",
 );
 expectEqual(
   "probe, four still deciding",
-  await stage(4),
+  await stage("conflicts", 0),
   "15 | 10 66.7% 10 settled here, 4 still here, 1 passed on 3 dismissed as false alarms · 7 proven · 4 still here | 1 | $0.011",
 );
 expectEqual(
   "a person, being asked",
-  await stage(5),
+  await stage("conflicts", 1),
   "1 | 0 0% 1 waiting for a person 1 waiting for a person Open the escalations |  | a person's time",
 );
 
@@ -1797,18 +1831,31 @@ expectEqual(
   "0",
 );
 
-// Keel sends no funnel counters yet: those stages are left empty, and probes and questions are counted from events.
+// Keel sends no comparison counters yet: nothing is drawn for them, and the page says so. The changes and the
+// conflicts are counted from events, and a visitor is read every event they are counted from.
 await visitor.goto(`${built}/ada/demo/insights/funnel`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { name: "Review funnel" }).waitFor();
+await funnelRows(visitor, "changes").first().waitFor();
 expectEqual(
-  "built: stages with no count are left empty",
-  String(await visitor.getByText("not counted yet").count()),
-  "4",
+  "built: no comparison is drawn where Keel reports none, and the page says so",
+  `${await funnelRows(visitor, "comparisons").count()} rows, ${await visitor.getByRole("heading", { name: "Comparisons" }).count()} heading, ${await visitor.getByText("Keel does not report how many comparisons each change needed yet").count()} line`,
+  "0 rows, 0 heading, 1 line",
 );
-expectEqual("built: subject index", await stageOn(visitor, 0), "— | — not counted yet | — | —");
+expectEqual(
+  "built: a visitor is shown a change's four stages, counted from Keel's events",
+  (await funnelRows(visitor, "changes").locator("td:nth-child(2)").allInnerTexts())
+    .map(squash)
+    .join(" > "),
+  "2 > 2 > 0 > 0",
+);
+expectEqual(
+  "built: a change Keel parked is still at its stage, and is said to be parked",
+  await stageOn(visitor, "changes", 1),
+  "2 | 0 0% 2 still here 2 still here, 2 of them parked | 0 | —",
+);
 expectEqual(
   "built: probe, counted from events",
-  await stageOn(visitor, 4),
+  await stageOn(visitor, "conflicts", 0),
   "1 | 0 0% 1 passed on | 1 | —",
 );
 // Keel records no cost yet. Where there is none the funnel shows none: a review that cost nothing is not what it says.
@@ -1822,9 +1869,16 @@ expectEqual(
   String(await visitor.getByText("Keel records no cost yet.").count()),
   "1",
 );
+// Keel's one cost on a live log is its own estimate for a plan. It is worded as that, beside the stage it is of
+// and under the cost Keel has not recorded, and is never the cost of review.
+expectEqual(
+  "built: Keel's estimate for its plans is worded as an estimate, and is not the cost of review",
+  `${(await stageOn(visitor, "changes", 2)).split(" | ").at(-1)} / ${squash(await visitor.locator("dl dt", { hasText: "Cost of review" }).locator("xpath=following-sibling::dd[2]").innerText())}`,
+  "Keel's estimate $0.0080 for 2 plans, before any ran / Keel records no cost yet. Its own estimate for the 2 plans it compiled is $0.0080.",
+);
 expectEqual(
   "visitor: the stage where a person is asked is not counted, and says whose it is to read",
-  `${await stageOn(visitor, 5)} | ${await statOn(visitor, "People asked").catch(() => "no tile")}`,
+  `${await stageOn(visitor, "conflicts", 1)} | ${await statOn(visitor, "People asked").catch(() => "no tile")}`,
   "— | — shown to members |  | a person's time | —",
 );
 

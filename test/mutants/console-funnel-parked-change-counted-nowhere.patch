@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.parked
+# why: a change Keel has parked is counted neither as still at its stage nor as out of the flow, so the stage's numbers no longer add up to the changes that reached it
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..ed86c331 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -146,7 +146,6 @@ export function changeFunnelOf(world: World): ChangeFunnel {
+           break;
+         case "parked":
+           row.parked += 1;
+-          row.here += 1;
+           break;
+         default:
+           row.here += 1;

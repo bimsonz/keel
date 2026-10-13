@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.unverified
+# why: a change that landed where the project's verification is off is counted as verified, though Keel said its plan was not run
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index ade5ea9e..fa18dc91 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -1232,7 +1232,7 @@ export class World {
+             landing.verdictIds.push(event.payload.verdictId);
+             landing.verdictRevision = landing.revision;
+             // Where the project's verification is off Keel passes the batch and says the plan was not run.
+-            if (event.payload.verified !== false) landing.reached.verified = true;
++            landing.reached.verified = true;
+           }
+         const next: Record<typeof event.type, CandidateState> = {
+           VerificationStarted: "verifying",

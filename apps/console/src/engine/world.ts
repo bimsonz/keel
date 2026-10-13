@@ -114,6 +114,14 @@ export interface ChangeEntry {
     declined?: PushRefusedReason;
     next: string[];
   };
+  /** Every bounce Keel recorded of it, each counted under the one cause Keel named for it. */
+  bounces: BounceCounts;
+  /**
+   * How far Keel's own events have taken it, of the stages Insights counts, each set by the event that says
+   * so. Neither is taken back: a bounce, a drift or a revision sends a change round again, and it is still
+   * one that got that far.
+   */
+  reached: { precheck: boolean; verified: boolean };
   /**
    * Conflicts Keel proved against it and did not stop it for: its plan's policy for the predicate was not to
    * block. `next` is what Keel told its agent it could do, which it does only when the policy is to advise.
@@ -140,6 +148,13 @@ export interface ChangeEntry {
     scope?: string;
     stance?: "followed" | "distinguished" | "overrule-requested";
   }[];
+}
+
+/** Bounces by the one cause Keel names for each: a verdict, a conflict proven against the change, or its batch's push refused. */
+export interface BounceCounts {
+  verdict: number;
+  conflict: number;
+  declined: number;
 }
 
 export interface TimelineEntry {
@@ -375,6 +390,11 @@ export class World {
    * that put it on trunk is what says how high trunk then stood and whether it was verified.
    */
   readonly landed = new Map<string, { changeId?: string; height: number; unverified: boolean }>();
+  /**
+   * The plans Keel compiled to verify a change, and its own estimates of what each would cost to run, added
+   * up. An estimate is what Keel reckoned before it ran anything: it is never what was spent.
+   */
+  readonly planned = { plans: 0, usd: 0 };
   readonly trunk: TrunkEntry = {
     head: "",
     advances: 0,
@@ -501,6 +521,8 @@ export class World {
           unverified: false,
           conflictIds: [],
           guardFailures: [],
+          bounces: { verdict: 0, conflict: 0, declined: 0 },
+          reached: { precheck: false, verified: false },
           noted: [],
           alternatives: [],
           precedents: [],
@@ -586,6 +608,7 @@ export class World {
       case "PrecheckStarted": {
         const change = this.#change(event.payload.changeId, "deriving");
         if (change === undefined) break;
+        change.reached.precheck = true;
         // Drift and step runs belong to one revision's check. The next revision's starts clean.
         change.drift = [];
         for (const key of this.steps.keys())
@@ -615,6 +638,8 @@ export class World {
             ...(typeof steps === "number" ? { stepCount: steps } : { spec: steps }),
             costEstimate: event.payload.costEstimate,
           };
+          this.planned.plans += 1;
+          this.planned.usd += event.payload.costEstimate;
         }
         break;
       }
@@ -671,6 +696,10 @@ export class World {
           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
             change.conflictIds.push(conflictId);
+          // Keel names exactly one cause for a bounce.
+          if (declined !== undefined) change.bounces.declined += 1;
+          else if (conflictId !== undefined) change.bounces.conflict += 1;
+          else if (verdictId !== undefined) change.bounces.verdict += 1;
           this.#note(
             this.#conflictOf(change.id),
             event,
@@ -1202,6 +1231,8 @@ export class World {
             if (landing === undefined) continue;
             landing.verdictIds.push(event.payload.verdictId);
             landing.verdictRevision = landing.revision;
+            // Where the project's verification is off Keel passes the batch and says the plan was not run.
+            if (event.payload.verified !== false) landing.reached.verified = true;
           }
         const next: Record<typeof event.type, CandidateState> = {
           VerificationStarted: "verifying",

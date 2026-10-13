@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.no-estimate
+# why: where Keel has compiled no plan the page is given an estimate of nothing for no plans, which Keel never made
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..8e6433d6 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -246,9 +246,7 @@ export function funnelOf(world: World, people = true): FunnelState {
+     changes: changeFunnelOf(world),
+     rows,
+     suspected: world.conflicts.size,
+-    ...(world.planned.plans === 0
+-      ? {}
+-      : { estimate: { plans: world.planned.plans, usd: total([world.planned.usd]) } }),
++    estimate: { plans: world.planned.plans, usd: total([world.planned.usd]) },
+     ...(frame === undefined ? {} : { changesCompared: compared }),
+     ...(index === undefined || compared === 0
+       ? {}

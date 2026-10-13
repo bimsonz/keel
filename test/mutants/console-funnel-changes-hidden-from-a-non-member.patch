@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.public
+# why: a reader who is no member is shown no stage of the changes' funnel, though every event the stages are counted from is public
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..24534986 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -243,7 +243,7 @@ export function funnelOf(world: World, people = true): FunnelState {
+   const compared = frame?.changesCompared ?? 0;
+   const costs = rows.flatMap((row) => (row.usd === undefined ? [] : [row.usd]));
+   return {
+-    changes: changeFunnelOf(world),
++    changes: people ? changeFunnelOf(world) : { ...changeFunnelOf(world), rows: [] },
+     rows,
+     suspected: world.conflicts.size,
+     ...(world.planned.plans === 0

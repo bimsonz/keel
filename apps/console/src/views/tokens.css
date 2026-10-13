@@ -704,6 +704,7 @@
 
 :root .a-funnel thead th {
   padding-block: 12px;
+  white-space: nowrap;
   border-bottom: 1px solid var(--color-kumo-hairline);
   color: var(--text-color-kumo-subtle);
   font-size: 13px;

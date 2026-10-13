@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.stages
+# why: a change that got no further than a stage is counted as having gone on from it, so no stage ever has a change still at it or one that left there
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..cf5eb2df 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -129,7 +129,7 @@ export function changeFunnelOf(world: World): ChangeFunnel {
+       if (!got(change, stage)) continue;
+       row.reached += 1;
+       if (stage === "landed") continue;
+-      if (CHANGE_STAGES.indexOf(furthest(change)) > index) {
++      if (CHANGE_STAGES.indexOf(furthest(change)) >= index) {
+         row.wentOn += 1;
+         continue;
+       }

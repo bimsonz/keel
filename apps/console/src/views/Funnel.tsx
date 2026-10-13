@@ -1,14 +1,18 @@
-// The review funnel. Every submitted change could be compared with every
-// premise any other change holds; this shows how few comparisons are ever made,
-// which stage settled each one, and what that cost. A person is the last stage,
-// and the rarest.
+// The review funnel. First the changes: how many Keel's events took as far as
+// each stage, and what became of the ones that got no further. Then the
+// conflicts Keel found on the way: what a probe settled and what went to a
+// person, the last stage and the rarest. Both are counted from Keel's events.
+//
+// Under them, where a source reports it and nowhere else: every submitted
+// change could be compared with every premise any other change holds, and the
+// counters show how few comparisons are ever made and which stage settled each.
 
 import { usePublicOnly } from "../engine/react.tsx";
 import { ArrowDownIcon, HandPalmIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { EvidenceClass } from "../contract/mfp.ts";
 import type { FunnelStage } from "../contract/observations.ts";
-import type { FunnelRow, FunnelState } from "../engine/funnel.ts";
+import type { ChangeRow, ChangeStage, FunnelRow, FunnelState } from "../engine/funnel.ts";
 import { PAGE } from "../engine/lists.ts";
 import { Link } from "../router.tsx";
 import { ClassTag } from "./parts.tsx";
@@ -45,7 +49,36 @@ const STAGES: Record<FunnelStage, { name: string; does: string; evidence?: Evide
   },
 };
 
+/** A change's stages, in Keel's own words for them. */
+const CHANGE: Record<ChangeStage, { name: string; does: string }> = {
+  declared: {
+    name: "Declared",
+    does: "An agent tells Keel what it means to change, and what it relies on.",
+  },
+  precheck: {
+    name: "Precheck",
+    does: "Keel derives what the submitted commit does, and compiles the plan that will verify it.",
+  },
+  verified: {
+    name: "Verified",
+    does: "Keel runs the plan on the change's batch, and its verdict is to land it.",
+  },
+  landed: { name: "Landed", does: "On trunk. Only Keel writes there." },
+};
+
+/** What Keel said of a change that is out of the flow, in the order the page lists them. */
+const LEFT: readonly [keyof ChangeRow["out"], string][] = [
+  ["verdict", "bounced on a verdict"],
+  ["conflict", "bounced on a proven conflict"],
+  ["declined", "bounced on a refused push"],
+  ["drifted", "drifted from what it declared"],
+  ["withdrawn", "withdrawn"],
+  ["superseded", "superseded"],
+];
+
 const count = (value: number): string => value.toLocaleString("en-US");
+const plural = (n: number, one: string, many: string): string =>
+  `${count(n)} ${n === 1 ? one : many}`;
 
 /** Dollars to two significant figures: $0.067, $0.00028. Below a thousandth of a cent it only says so. */
 function dollars(value: number): string {
@@ -105,22 +138,12 @@ const NO_COST = (
   </span>
 );
 
-/** What reached the level, as one bar: settled here, passed on, and still open. */
-function Split({ row }: { row: FunnelRow }) {
-  if (!row.reported) return <div className="a-funnel-bar" data-empty="unreported" />;
-  if (row.reached === 0) return <div className="a-funnel-bar" data-empty="nothing" />;
-  const parts = [
-    { part: "settled", n: row.settled, title: `${count(row.settled)} settled here` },
-    {
-      part: "open",
-      n: row.open,
-      title:
-        row.stage === 5
-          ? `${count(row.open)} waiting for a person`
-          : `${count(row.open)} still here`,
-    },
-    { part: "passed", n: row.passedOn, title: `${count(row.passedOn)} passed on` },
-  ];
+type Part = { part: "settled" | "open" | "passed"; n: number; title: string };
+
+/** What reached a stage, as one bar, each part as wide as its share. */
+function Bar({ parts, person = false }: { parts: readonly Part[]; person?: boolean }) {
+  if (parts.every((entry) => entry.n === 0))
+    return <div className="a-funnel-bar" data-empty="nothing" />;
   return (
     <div className="a-funnel-bar">
       <span className="sr-only">
@@ -132,7 +155,7 @@ function Split({ row }: { row: FunnelRow }) {
             <i
               key={entry.part}
               data-part={entry.part}
-              data-person={row.stage === 5 ? "" : undefined}
+              data-person={person ? "" : undefined}
               style={{ flexGrow: entry.n }}
               title={entry.title}
             />
@@ -142,20 +165,152 @@ function Split({ row }: { row: FunnelRow }) {
   );
 }
 
-function Stage({ row }: { row: FunnelRow }) {
+/** What reached the level, as one bar: settled here, passed on, and still open. */
+function Split({ row }: { row: FunnelRow }) {
+  if (!row.reported) return <div className="a-funnel-bar" data-empty="unreported" />;
+  return (
+    <Bar
+      person={row.stage === 5}
+      parts={[
+        { part: "settled", n: row.settled, title: `${count(row.settled)} settled here` },
+        {
+          part: "open",
+          n: row.open,
+          title:
+            row.stage === 5
+              ? `${count(row.open)} waiting for a person`
+              : `${count(row.open)} still here`,
+        },
+        { part: "passed", n: row.passedOn, title: `${count(row.passedOn)} passed on` },
+      ]}
+    />
+  );
+}
+
+/**
+ * One stage of the changes' funnel: how many Keel's events took this far, what became of the ones that got no
+ * further, and how many went on. `estimate` is Keel's own, of the plans it compiled, and is worded as one.
+ */
+function ChangeStageRow({
+  row,
+  unverified,
+  estimate,
+}: {
+  row: ChangeRow;
+  unverified: number;
+  estimate?: FunnelState["estimate"];
+}) {
+  const stage = CHANGE[row.stage];
+  const last = row.stage === "landed";
+  const causes = LEFT.flatMap(([cause, words]) =>
+    row.out[cause] > 0 ? [{ n: row.out[cause], words }] : [],
+  );
+  const left = causes.reduce((sum, entry) => sum + entry.n, 0);
+  const told = [
+    ...causes.map((entry) => `${count(entry.n)} ${entry.words}`),
+    ...(row.here > 0
+      ? [
+          `${count(row.here)} still here${row.parked > 0 ? `, ${count(row.parked)} of them parked` : ""}`,
+        ]
+      : []),
+  ];
+  return (
+    <tr data-stage={row.stage}>
+      <th scope="row">
+        <span className="text-lg font-semibold text-kumo-strong">{stage.name}</span>
+        <p className="mt-1 text-sm font-normal leading-snug text-kumo-default">{stage.does}</p>
+      </th>
+      <td className="a-num text-right text-[28px] font-semibold leading-none text-kumo-strong">
+        {count(row.reached)}
+      </td>
+      <td>
+        {last ? (
+          <p className="text-sm text-kumo-subtle">
+            {unverified > 0 &&
+              `${count(unverified)} without verification, which is off for this project`}
+          </p>
+        ) : (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="a-num text-lg font-semibold text-kumo-strong">{count(left)}</span>
+              <span className="a-num text-sm text-kumo-subtle">{share(left, row.reached)}</span>
+            </div>
+            <Bar
+              parts={[
+                { part: "settled", n: left, title: `${count(left)} left here` },
+                { part: "open", n: row.here, title: `${count(row.here)} still here` },
+                { part: "passed", n: row.wentOn, title: `${count(row.wentOn)} went on` },
+              ]}
+            />
+            <p className="mt-1.5 min-h-5 text-sm text-kumo-subtle">{told.join(" · ")}</p>
+          </>
+        )}
+      </td>
+      <td className="a-num text-right text-lg text-kumo-default">
+        {!last && (
+          <span className="inline-flex items-center gap-1.5">
+            {count(row.wentOn)}
+            <ArrowDownIcon size={15} className="text-kumo-subtle" aria-hidden />
+          </span>
+        )}
+      </td>
+      <td className="a-num text-right text-lg text-kumo-default">
+        {row.stage === "verified" && estimate !== undefined ? (
+          <>
+            <span className="block text-sm text-kumo-subtle">Keel's estimate</span>
+            {dollars(estimate.usd)}
+            <span className="block text-sm text-kumo-subtle">
+              for {plural(estimate.plans, "plan", "plans")}, before any ran
+            </span>
+          </>
+        ) : (
+          NO_COST
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/** One of the page's three tables, under its own heading. */
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="a-panel overflow-hidden" aria-label={title}>
+      <header className="flex items-baseline justify-between gap-4 border-b border-kumo-hairline px-6 py-3">
+        <h2 className="text-base font-semibold text-kumo-strong">{title}</h2>
+        <span className="text-sm text-kumo-subtle">{note}</span>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** `numbered` for the comparison counters, which Keel numbers cheapest first. A conflict's two stages go by name. */
+function Stage({ row, numbered }: { row: FunnelRow; numbered: boolean }) {
   const stage = STAGES[row.stage];
   const person = row.stage === 5;
   return (
     <tr data-waiting={person && row.open > 0 ? "" : undefined}>
       <th scope="row">
         <div className="flex items-baseline gap-3">
-          <span className="w-[62px] shrink-0 text-sm font-normal text-kumo-subtle">
-            Stage {row.stage}
-          </span>
+          {numbered && (
+            <span className="w-[62px] shrink-0 text-sm font-normal text-kumo-subtle">
+              Stage {row.stage}
+            </span>
+          )}
           <span className="text-lg font-semibold text-kumo-strong">{stage.name}</span>
           {stage.evidence !== undefined && <ClassTag evidenceClass={stage.evidence} />}
         </div>
-        <p className="mt-1 pl-[74px] text-sm font-normal leading-snug text-kumo-default">
+        <p
+          className={`mt-1 text-sm font-normal leading-snug text-kumo-default ${numbered ? "pl-[74px]" : ""}`}
+        >
           {stage.does}
         </p>
       </th>
@@ -229,10 +384,41 @@ function Stage({ row }: { row: FunnelRow }) {
   );
 }
 
+/** The columns of the conflicts' and the comparisons' tables, which are the same. */
+function Settled() {
+  return (
+    <thead>
+      <tr>
+        <th scope="col">Stage</th>
+        <th scope="col" className="text-right">
+          Reached
+        </th>
+        <th scope="col">
+          <span className="flex items-center justify-between gap-3">
+            Settled here
+            <span className="a-funnel-key">
+              <i data-part="settled" /> settled <i data-part="open" /> still here{" "}
+              <i data-part="passed" /> passed on
+            </span>
+          </span>
+        </th>
+        <th scope="col" className="text-right">
+          Passed on
+        </th>
+        <th scope="col" className="text-right">
+          Cost
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
 export function Funnel({ state }: { state: FunnelState }) {
   // A reader who is not shown the questions put to a person is given no count of them.
   const hidden = usePublicOnly();
   const counted = state.rows.some((row) => row.reported && row.stage === 0);
+  const { changes, estimate } = state;
+  const bounces = changes.bounces.verdict + changes.bounces.conflict + changes.bounces.declined;
   const perThousand =
     state.usd === undefined || state.changesLanded === 0
       ? undefined
@@ -247,40 +433,30 @@ export function Funnel({ state }: { state: FunnelState }) {
               Models translate, lattices compare, probes prove, people decide.
             </p>
           </div>
-          <span className="text-sm text-kumo-subtle">
-            {state.changesCompared === undefined
-              ? "Counted from events"
-              : `${count(state.changesCompared)} submitted changes compared`}
-          </span>
+          <span className="text-sm text-kumo-subtle">Counted from Keel's events</span>
         </header>
 
         <dl className="a-panel grid grid-cols-2 divide-x divide-kumo-hairline xl:grid-cols-4">
-          <Tile
-            label="Comparisons per change"
-            value={
-              state.perChange === undefined ? NOT_COUNTED : state.perChange.compared.toFixed(1)
-            }
-          >
-            {state.perChange === undefined
-              ? "Keel does not count this yet."
-              : `not ${count(Math.round(state.perChange.everything))}, the premises other changes hold`}
+          <Tile label="Changes landed" value={count(changes.landed)}>
+            of {count(changes.declared)} declared
+            {changes.landedUnverified > 0 &&
+              ` · ${count(changes.landedUnverified)} without verification`}
           </Tile>
-          <Tile
-            label="Settled before any model is asked"
-            value={
-              state.settledBeforeModels === undefined
-                ? NOT_COUNTED
-                : share(state.settledBeforeModels, 1)
-            }
-          >
-            by the subject index and the lattice, in code
+          <Tile label="Changes bounced" value={count(changes.bounced)}>
+            {changes.bounced === 0
+              ? "Keel has bounced no change."
+              : `${plural(bounces, "bounce", "bounces")} in all · ${count(changes.bouncedThenLanded)} of those changes landed since`}
           </Tile>
           <Tile
             label="Cost of review"
             value={state.usd === undefined ? NO_COST : dollars(state.usd)}
           >
             {state.usd === undefined
-              ? "Keel records no cost yet."
+              ? `Keel records no cost yet.${
+                  estimate === undefined
+                    ? ""
+                    : ` Its own estimate for the ${plural(estimate.plans, "plan", "plans")} it compiled is ${dollars(estimate.usd)}.`
+                }`
               : perThousand === undefined
                 ? "Nothing has landed yet."
                 : `${dollars(perThousand)} per thousand changes landed${counted ? "" : ", probes only"}`}
@@ -299,46 +475,113 @@ export function Funnel({ state }: { state: FunnelState }) {
           </Tile>
         </dl>
 
-        <section className="a-panel overflow-hidden">
-          <table className="a-funnel">
-            <thead>
-              <tr>
-                <th scope="col">Stage</th>
-                <th scope="col" className="text-right">
-                  Reached
-                </th>
-                <th scope="col">
-                  <span className="flex items-center justify-between gap-3">
-                    Settled here
-                    <span className="a-funnel-key">
-                      <i data-part="settled" /> settled <i data-part="open" /> still here{" "}
-                      <i data-part="passed" /> passed on
+        <Section title="Changes" note="each counted once at a stage, however often it came back">
+          <div className="overflow-x-auto">
+            <table className="a-funnel" data-funnel="changes">
+              <thead>
+                <tr>
+                  <th scope="col">Stage</th>
+                  <th scope="col" className="text-right">
+                    Reached
+                  </th>
+                  <th scope="col">
+                    <span className="flex items-center justify-between gap-3">
+                      Left here
+                      <span className="a-funnel-key">
+                        <i data-part="settled" /> left <i data-part="open" /> still here{" "}
+                        <i data-part="passed" /> went on
+                      </span>
                     </span>
-                  </span>
-                </th>
-                <th scope="col" className="text-right">
-                  Passed on
-                </th>
-                <th scope="col" className="text-right">
-                  Cost
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.rows.map((row) => (
-                <Stage key={row.stage} row={row} />
-              ))}
-            </tbody>
-          </table>
-        </section>
+                  </th>
+                  <th scope="col" className="text-right">
+                    Went on
+                  </th>
+                  <th scope="col" className="text-right">
+                    Cost
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {changes.rows.map((row) => (
+                  <ChangeStageRow
+                    key={row.stage}
+                    row={row}
+                    unverified={changes.landedUnverified}
+                    estimate={estimate}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
 
-        <p className="text-sm leading-relaxed text-kumo-subtle">
-          A comparison is one derived effect on a subject, checked against one distinct premise
-          another change holds there, in flight or landed.{" "}
-          {counted
-            ? "The first four stages are Keel's own counters; probes and questions are counted from events."
-            : "Keel does not send counters for the first four stages yet, so they are left empty and never shown as zero. Probes and questions are counted from events."}
-        </p>
+        <Section
+          title="Conflicts"
+          note={`${plural(state.suspected, "conflict", "conflicts")} suspected`}
+        >
+          <div className="overflow-x-auto">
+            <table className="a-funnel" data-funnel="conflicts">
+              <Settled />
+              <tbody>
+                {state.rows
+                  .filter((row) => row.stage >= 4)
+                  .map((row) => (
+                    <Stage key={row.stage} row={row} numbered={false} />
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        {counted ? (
+          <Section
+            title="Comparisons"
+            note={`${count(state.changesCompared ?? 0)} submitted changes compared`}
+          >
+            <dl className="grid grid-cols-2 divide-x divide-kumo-hairline border-b border-kumo-hairline">
+              <Tile
+                label="Comparisons per change"
+                value={
+                  state.perChange === undefined ? NOT_COUNTED : state.perChange.compared.toFixed(1)
+                }
+              >
+                {state.perChange !== undefined &&
+                  `not ${count(Math.round(state.perChange.everything))}, the premises other changes hold`}
+              </Tile>
+              <Tile
+                label="Settled before any model is asked"
+                value={
+                  state.settledBeforeModels === undefined
+                    ? NOT_COUNTED
+                    : share(state.settledBeforeModels, 1)
+                }
+              >
+                by the subject index and the lattice, in code
+              </Tile>
+            </dl>
+            <div className="overflow-x-auto">
+              <table className="a-funnel" data-funnel="comparisons">
+                <Settled />
+                <tbody>
+                  {state.rows
+                    .filter((row) => row.stage < 4)
+                    .map((row) => (
+                      <Stage key={row.stage} row={row} numbered />
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="border-t border-kumo-hairline px-6 py-3 text-sm leading-relaxed text-kumo-subtle">
+              A comparison is one derived effect on a subject, checked against one distinct premise
+              another change holds there, in flight or landed. These four stages are Keel's own
+              counters; what they pass on is what reaches the probe.
+            </p>
+          </Section>
+        ) : (
+          <p className="text-sm leading-relaxed text-kumo-subtle">
+            Keel does not report how many comparisons each change needed yet, so none is shown.
+          </p>
+        )}
       </div>
     </div>
   );

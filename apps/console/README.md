@@ -86,6 +86,16 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 
 `node scripts/level.ts <origin> <namespace> <project>` sets the console's fold of a public project's log beside Keel's own read of each of its conflicts, and says where the two differ. It reads only, as a visitor.
 
+## The review funnel
+
+`/N/P/insights/funnel` is counted from the project's log (`src/engine/funnel.ts`), and from nothing the console works out.
+
+- **Changes, by stage.** Declared, precheck, verified, landed: each is the changes one of Keel's events took that far. `IntentDeclared`; `PrecheckStarted`; `BatchVerified` for a batch the change is in, since Keel runs a plan on a batch and never on a change alone; `ChangeLanded`. A change is counted once at a stage however often a bounce sent it round again, and one that landed where the project's verification is off is counted as landed and not as verified.
+- **What became of the rest.** Of the changes that got no further than a stage: how many are still there, and how many of those Keel has parked; and how many are out of the flow as it stands, each under what Keel said of it. A bounce is listed under the one cause Keel named for it: a verdict, a conflict proven against the change, or its batch's push refused.
+- **Conflicts** are under the changes: what a probe settled, and what went to a person. A reader Keel reads no questions is shown no count of them.
+- **A cost is what Keel recorded, and an estimate is worded as one.** Keel's log carries one figure today: its own estimate for each plan it compiles (`PlanCompiled.costEstimate`). The page adds those up beside the stage the plans are run at, as "Keel's estimate", and never into the cost of review, which stays empty until an event carries what something cost.
+- **Comparisons**, how many premises a change was checked against and which stage settled each, are counters only Keel can keep. They have a table of their own, drawn only where a source sends them. Keel sends none yet, and the page says so.
+
 ## Addresses
 
 `src/route.ts` is the whole table. `O` is an org's handle and `P` a project's name in it.

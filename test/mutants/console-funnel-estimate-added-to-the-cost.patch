@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.estimate
+# why: Keel's estimate for the plans it compiled is added into the cost of review, so an estimate is shown as money spent
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..b1e3922b 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -261,7 +261,9 @@ export function funnelOf(world: World, people = true): FunnelState {
+     ...(index === undefined || lattice === undefined || index.considered === 0
+       ? {}
+       : { settledBeforeModels: (index.settled + lattice.settled) / index.considered }),
+-    ...(costs.length === 0 ? {} : { usd: total(costs) }),
++    ...(costs.length === 0 && world.planned.plans === 0
++      ? {}
++      : { usd: total([...costs, world.planned.usd]) }),
+     changesLanded: world.trunk.changesLanded,
+     peopleAsked: escalations.length,
+     peopleWaiting: waiting,

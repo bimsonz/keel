@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.cause
+# why: a change bounced on a proven conflict is listed as bounced on a verdict, and one bounced on a verdict as on a conflict: the cause shown is not the one Keel named
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index cd060491..e7dbd6d5 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -136,8 +136,8 @@ export function changeFunnelOf(world: World): ChangeFunnel {
+       switch (change.state) {
+         case "bounced":
+           if (change.bounce?.declined !== undefined) row.out.declined += 1;
+-          else if (change.bounce?.conflictId !== undefined) row.out.conflict += 1;
+-          else row.out.verdict += 1;
++          else if (change.bounce?.conflictId !== undefined) row.out.verdict += 1;
++          else row.out.conflict += 1;
+           break;
+         case "drifted":
+         case "withdrawn":
