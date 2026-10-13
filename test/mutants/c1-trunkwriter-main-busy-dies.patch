@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts
+# kills: trunkwriter.adopt
+# why: A trunk that answers busy once fails the bootstrap instead of being asked again
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index e8a424d4..dec4d86f 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -132,8 +132,7 @@ export const TrunkWriterGitCore = (
+             if (outcome.kind === "applied") return "made" as const;
+             // Another push holds trunk: back off briefly, then send the same pack again.
+             if (outcome.kind === "busy") {
+-              yield* Effect.sleep(50 * 2 ** attempt);
+-              continue;
++              return yield* Effect.die(new Error("trunk was busy"));
+             }
+             // A racing attempt of the same bootstrap may have made it first.
+             if (outcome.kind === "rejected" && (yield* headOf(trunk)) === tip)

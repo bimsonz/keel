@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts
+# kills: project.start-empty, trunkwriter.adopt
+# why: A main that already holds another commit is no defect, so a seed or an adopt is pushed at a trunk that has history of its own
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index e8a424d4..a2014382 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -121,8 +121,6 @@ export const TrunkWriterGitCore = (
+         Effect.gen(function* () {
+           const held = yield* headOf(trunk);
+           if (held === tip) return "held" as const;
+-          if (held !== null)
+-            return yield* Effect.die(new Error("trunk already has a main, at another commit"));
+           const target = yield* remoteOf(trunk, "write");
+           const pack = yield* Effect.promise(() => writePack(objects));
+           for (let attempt = 0; attempt <= BUSY_RETRIES; attempt += 1) {

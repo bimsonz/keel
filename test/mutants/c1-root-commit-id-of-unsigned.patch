@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/root.test.ts
+# kills: gitcore.root-commit
+# why: A signed root commit is named by the id of its unsigned form, an object the pack does not hold, so the push that makes main is refused
+diff --git a/packages/gitcore/src/root.ts b/packages/gitcore/src/root.ts
+index 7a35741f..dfa59718 100644
+--- a/packages/gitcore/src/root.ts
++++ b/packages/gitcore/src/root.ts
+@@ -55,7 +55,7 @@ export async function rootCommit(spec: RootSpec): Promise<RootCommit> {
+       ? unsigned
+       : encodeCommit({ ...commit, gpgsig: await spec.sign(unsigned) });
+   return {
+-    oid: await hashObject("commit", body),
++    oid: await hashObject("commit", unsigned),
+     tree: commit.tree,
+     objects: [blob, tree, { type: "commit", body }],
+   };

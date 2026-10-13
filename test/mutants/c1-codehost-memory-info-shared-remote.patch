@@ -2,10 +2,10 @@
 # kills: codehost.info
 # why: Every repo reports the same remote, so a grant could hand one holder another workspace's URL
 diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
-index 781945e..13dcf5f 100644
+index 5bdbc174..a8d280f3 100644
 --- a/packages/testing/src/memory/code-host.ts
 +++ b/packages/testing/src/memory/code-host.ts
-@@ -106,10 +106,7 @@ export function makeCodeHostMemory() {
+@@ -212,10 +212,7 @@ export function makeCodeHostMemory() {
          };
        }),
      info: (repo) =>
@@ -14,6 +14,6 @@ index 781945e..13dcf5f 100644
 -        defaultBranch: "main",
 -      })),
 +      Effect.map(find(repo), () => ({ remote: "memory://repos.git", defaultBranch: "main" })),
-     head: (repo, ref) =>
-       Effect.flatMap(find(repo), (found) => {
-         const sha = found.refs.get(ref);
+     branches: (repo) =>
+       Effect.map(find(repo), (found) =>
+         [...found.refs]

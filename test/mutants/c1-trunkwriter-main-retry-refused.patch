@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts
+# kills: project.start-empty, trunkwriter.adopt
+# why: A main already at the commit being made is taken for another's, so a retried bootstrap dies on its own first commit
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index e8a424d4..9601fd83 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -120,7 +120,6 @@ export const TrunkWriterGitCore = (
+       const makeMain = (tip: CommitSha, objects: readonly GitObject[]) =>
+         Effect.gen(function* () {
+           const held = yield* headOf(trunk);
+-          if (held === tip) return "held" as const;
+           if (held !== null)
+             return yield* Effect.die(new Error("trunk already has a main, at another commit"));
+           const target = yield* remoteOf(trunk, "write");

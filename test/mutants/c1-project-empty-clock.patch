@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts
+# kills: project.start-empty
+# why: The first commit is dated by the clock, not the time it was asked for, so a retry writes another commit and finds a main that is not its own
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index e8a424d4..5d1fe7ac 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -148,7 +148,7 @@ export const TrunkWriterGitCore = (
+         adopt: (commit) => Effect.asVoid(makeMain(commit, [])),
+         seed: (name, at) =>
+           Effect.gen(function* () {
+-            const keel = keelCommitter(signing.host, at);
++            const keel = keelCommitter(signing.host, Date.now());
+             const sign = yield* Effect.promise(() => signerAt(keel.time));
+             const root = yield* Effect.promise(() =>
+               rootCommit({ ...seedSpec(name), author: keel, committer: keel, sign }),

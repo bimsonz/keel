@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts
+# kills: project.start-empty
+# why: Keel's first commit to an empty project is written unsigned, the one commit on its trunk no reader can verify
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index e8a424d4..3080d55d 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -151,7 +151,7 @@ export const TrunkWriterGitCore = (
+             const keel = keelCommitter(signing.host, at);
+             const sign = yield* Effect.promise(() => signerAt(keel.time));
+             const root = yield* Effect.promise(() =>
+-              rootCommit({ ...seedSpec(name), author: keel, committer: keel, sign }),
++              rootCommit({ ...seedSpec(name), author: keel, committer: keel }),
+             );
+             const tip = toCommitSha(root.oid);
+             yield* makeMain(tip, root.objects);
