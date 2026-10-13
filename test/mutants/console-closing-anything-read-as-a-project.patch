@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.named
+# why: whatever a refusal lists among its projects is read as a project's name
+diff --git a/apps/console/src/account/closing.ts b/apps/console/src/account/closing.ts
+index 60a5ccfb..cf119388 100644
+--- a/apps/console/src/account/closing.ts
++++ b/apps/console/src/account/closing.ts
+@@ -39,7 +39,7 @@ export function standingOf(refusal: {
+   nextActions?: unknown;
+ }): Standing {
+   const projects = Array.isArray(refusal.projects)
+-    ? refusal.projects.filter((name: unknown) => typeof name === "string")
++    ? refusal.projects.filter((name: unknown) => name !== null)
+     : [];
+   const orgs = Array.isArray(refusal.orgs)
+     ? refusal.orgs.flatMap((org: unknown): OrgStanding[] => {

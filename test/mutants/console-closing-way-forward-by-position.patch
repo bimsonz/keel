@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.named
+# why: every org is given the first way forward Keel listed, whichever org that action names
+diff --git a/apps/console/src/account/closing.ts b/apps/console/src/account/closing.ts
+index 60a5ccfb..51fbc384 100644
+--- a/apps/console/src/account/closing.ts
++++ b/apps/console/src/account/closing.ts
+@@ -26,7 +26,7 @@ const field = (given: unknown, name: string): unknown =>
+ function nextFor(actions: unknown, org: string): string | undefined {
+   if (!Array.isArray(actions)) return undefined;
+   const title = field(
+-    actions.find((action: unknown) => field(field(action, "args"), "organizationId") === org),
++    actions.at(0),
+     "title",
+   );
+   return typeof title === "string" ? title : undefined;

@@ -29,6 +29,7 @@ import {
 } from "./account.ts";
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
+import { Closing } from "./Closing.tsx";
 import { wayToFresh } from "./fresh.ts";
 import { Fork, NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
@@ -539,6 +540,7 @@ function Settings({
       <Passkeys account={account} who={who} />
       <Sponsored account={account} sponsorship={sponsorship} who={who} />
       <Sessions account={account} onSignedOut={() => go("/")} />
+      <Closing account={account} who={who} />
     </div>
   );
 }

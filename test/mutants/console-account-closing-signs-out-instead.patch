@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.deleted
+# why: deleting an account only signs its person out, and the account is still there
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 330fe146..1be6199e 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -452,7 +452,7 @@ export function createAccount(options: AccountOptions) {
+      * the session alone, and refuses a password or a token sent with it.
+      */
+     async deleteAccount(): Promise<void> {
+-      taken(await client.$fetch("/delete-user", { method: "POST", body: {} }));
++      taken(await client.signOut());
+     },
+ 
+     /** Claims a code that `keeltown login` is showing, for whoever is signed in here. Nothing is approved yet. */

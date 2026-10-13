@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.kept
+# why: the stand-in identity keeps a deleted person's handle in the case it was typed and no other
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 2889d486..0181d747 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -404,7 +404,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+   /** Refuses a kept handle as Keel refuses any held one, wherever Keel reads a handle before it is taken. */
+   const unkept = (name: string): void => {
+     const lowered = name.toLowerCase();
+-    if (kept.has(lowered))
++    if (kept.has(name))
+       throw refuse(
+         "NAME_TAKEN",
+         `"${lowered}" is taken: a handle is one person's, one agent's or one org's`,

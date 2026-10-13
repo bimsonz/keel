@@ -2,15 +2,15 @@
 # kills: account.cross-site, orgs.cross-site
 # why: the stand-in for Keel's identity runs with its origin check off, as Better Auth leaves it under a test runner, so a cross-site call is taken
 diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
-index 0899e9f..3ac5648 100644
+index 2889d486..dc7a6c1f 100644
 --- a/apps/console/test/fixtures/identity/standIn.ts
 +++ b/apps/console/test/fixtures/identity/standIn.ts
-@@ -224,7 +224,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+@@ -419,7 +419,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
      basePath: "/v1/auth",
      trustedOrigins: [origin],
      // Better Auth leaves its origin check off when it finds itself under a test runner. Keel runs with it on.
 -    advanced: { disableOriginCheck: false, disableCSRFCheck: false },
 +    advanced: { disableOriginCheck: true, disableCSRFCheck: true },
-     // How each session was signed in, written as the session is made and by nothing a request sends.
-     session: {
-       additionalFields: { signedInBy: { type: "string", required: false, input: false } },
+     // Keel's refusals of a deletion, in its order: the projects, then the orgs, each read before anything changes.
+     // Keel ends the person's sponsor links last; no page reads one of a person who is gone, and none is ended here.
+     // Their handle is kept, as Keel's row for it is.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.only-owner
+# why: the stand-in identity names an org another owner holds too as standing in the way of a deletion
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index c3373ced..c336e1de 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -593,7 +593,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+     return orgs
+       .filter((org) => {
+         const owners = members.filter((row) => row.organizationId === org.id && owns(row.role));
+-        return owners.length > 0 && owners.every((row) => row.userId === userId);
++        return owners.length > 0 && owners.some((row) => row.userId === userId);
+       })
+       .map((org) => ({ id: org.id, slug: org.slug }))
+       .toSorted((a, b) => a.slug.localeCompare(b.slug));

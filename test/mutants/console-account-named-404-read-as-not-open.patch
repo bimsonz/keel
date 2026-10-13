@@ -2,15 +2,15 @@
 # kills: sessions.not-theirs
 # why: Keel's answer that a session is not the asker's is read as Keel serving no sign-in at all, and its sentence is lost
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 07431fb1..fdb4ccc0 100644
+index 330fe146..93188bb2 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -193,7 +193,7 @@ function nextOf(given: unknown): string[] {
+@@ -205,7 +205,7 @@ function nextOf(given: unknown): string[] {
  function refusal(error: Failure): Error {
    // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
    // there, a session that is not the asker's among them, and is a refusal like any other.
 -  if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
 +  if (error.status === 404) return new NotOpen();
-   return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
- }
- 
+   return new Refused(
+     error.code ?? "",
+     error.message ?? UNSAID,

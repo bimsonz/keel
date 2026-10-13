@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.owned
+# why: the stand-in identity tells the owner of one project that they own projects, where Keel says a project
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index c3373ced..4c653bfc 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -378,7 +378,7 @@ const owns = (role: string): boolean =>
+ const ownsProjects = (projects: readonly string[]): APIError =>
+   new APIError("BAD_REQUEST", {
+     code: "OWNS_PROJECTS",
+-    message: `Your account owns ${projects.length === 1 ? "a project" : "projects"} (${projects.join(", ")}), and an account that owns one is not deleted here: email privacy@keel.town and we'll delete it`,
++    message: `Your account owns projects (${projects.join(", ")}), and an account that owns one is not deleted here: email privacy@keel.town and we'll delete it`,
+     projects,
+   });
+ 

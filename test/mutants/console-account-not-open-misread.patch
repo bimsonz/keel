@@ -2,14 +2,14 @@
 # kills: account.not-open
 # why: a Keel that serves no identity is not told apart from one that refused
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 07431fb1..56effa39 100644
+index 330fe146..385f2839 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -193,7 +193,6 @@ function nextOf(given: unknown): string[] {
+@@ -205,7 +205,6 @@ function nextOf(given: unknown): string[] {
  function refusal(error: Failure): Error {
    // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
    // there, a session that is not the asker's among them, and is a refusal like any other.
 -  if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
-   return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
- }
- 
+   return new Refused(
+     error.code ?? "",
+     error.message ?? UNSAID,

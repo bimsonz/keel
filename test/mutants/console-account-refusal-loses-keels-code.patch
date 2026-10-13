@@ -2,15 +2,15 @@
 # kills: account.fresh
 # why: a page is handed Keel's refusal without its code, so the settings page cannot tell that signing in again answers it and offers nothing
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 07431fb1..498b24ca 100644
+index 330fe146..3000db8d 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -194,7 +194,7 @@ function refusal(error: Failure): Error {
-   // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
+@@ -207,7 +207,7 @@ function refusal(error: Failure): Error {
    // there, a session that is not the asker's among them, and is a refusal like any other.
    if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
--  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
-+  return new Refused("", error.message ?? UNSAID, nextOf(error.nextActions));
- }
- 
- /** A result of Better Auth's client, opened: its data, or the refusal thrown. */
+   return new Refused(
+-    error.code ?? "",
++    "",
+     error.message ?? UNSAID,
+     nextOf(error.nextActions),
+     standingOf(error),

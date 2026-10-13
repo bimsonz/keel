@@ -51,6 +51,11 @@ export interface Identity {
    * which signs nobody in. `usedAt` is when it last signed its person in, where it has. Answers the passkey's id.
    */
   keyed(userId: string, name: string, usedAt?: Date): Promise<string>;
+  /**
+   * Signs every session of one person in by a passkey just now, as a touch of theirs would, where a test has no
+   * browser to make one.
+   */
+  touched(userId: string): Promise<void>;
   /** Whose a handle is here, as Keel says it of a namespace: a person's or an org's, by its account's id, or nobody's. */
   whose(handle: string): Promise<{ id: string; kind: "user" | "org" } | undefined>;
 }
@@ -76,6 +81,11 @@ export interface IdentityOptions {
    * by passkey alone, and says nothing of which ways in it offers: keel.town as it first served identity.
    */
   emailCodes?: boolean;
+  /**
+   * The names of the projects in a person's own namespace, in order, asked of whatever holds projects. Keel reads
+   * them from its own table; an identity told nothing knows of none.
+   */
+  projectsOf?: (userId: string) => readonly string[];
 }
 
 /**
@@ -93,6 +103,7 @@ const CHANGES_SIGN_IN: ReadonlySet<string> = new Set([
   "/change-email",
   "/email-otp/request-email-change",
   "/email-otp/change-email",
+  "/delete-user",
 ]);
 
 /** How a session is signed in, by the endpoint that makes it: Keel's `signInMethod`. */
@@ -221,13 +232,14 @@ async function freshSignIn(ctx: Parameters<typeof getSessionFromCtx>[0]): Promis
   const none = held === null;
   const first = none && ADDS_PASSKEY.has(ctx.path);
   if (first && typeof by === "string" && OWN_SIGN_INS.has(by) && recent) return;
+  const what = ctx.path === "/delete-user" ? "deleting your account" : "changing how you sign in";
   throw new APIError("FORBIDDEN", {
     code: "FRESH_SIGN_IN_REQUIRED",
     message: first
       ? "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes"
       : none
-        ? "Add a passkey first, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes"
-        : "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+        ? `Add a passkey first, then retry: ${what} needs a passkey sign-in from the last ten minutes`
+        : `Sign in again with your passkey, then retry: ${what} needs a passkey sign-in from the last ten minutes`,
   });
 }
 
@@ -355,8 +367,49 @@ function lastOwner(body: unknown): APIError {
   });
 }
 
+/** Whether a member row's roles, as Better Auth joins them, hold `owner`. */
+const owns = (role: string): boolean =>
+  role
+    .split(",")
+    .map((one) => one.trim())
+    .includes("owner");
+
+/** As Keel refuses an account that owns projects, each named: it deletes no project with an account. */
+const ownsProjects = (projects: readonly string[]): APIError =>
+  new APIError("BAD_REQUEST", {
+    code: "OWNS_PROJECTS",
+    message: `Your account owns ${projects.length === 1 ? "a project" : "projects"} (${projects.join(", ")}), and an account that owns one is not deleted here: email privacy@keel.town and we'll delete it`,
+    projects,
+  });
+
+/** As Keel refuses an org's one owner, with its way forward for each org. */
+const onlyOwner = (orgs: readonly { id: string; slug: string }[]): APIError =>
+  new APIError("BAD_REQUEST", {
+    code: "ONLY_OWNER",
+    message: `An org always has an owner: make another member an owner of ${orgs.map((org) => org.slug).join(", ")} before you delete your account`,
+    orgs,
+    nextActions: orgs.map((org) => ({
+      kind: "call",
+      title: "Make another member an owner first",
+      operationId: "ManageOwners",
+      args: { organizationId: org.id },
+    })),
+  });
+
 export function createIdentity(origin: string, options: IdentityOptions = {}): Identity {
   const emailCodes = options.emailCodes ?? true;
+  const projectsOf = options.projectsOf ?? (() => []);
+  /** The handles of the people whose accounts were deleted. Keel keeps each for good: it is never issued again. */
+  const kept = new Set<string>();
+  /** Refuses a kept handle as Keel refuses any held one, wherever Keel reads a handle before it is taken. */
+  const unkept = (name: string): void => {
+    const lowered = name.toLowerCase();
+    if (kept.has(lowered))
+      throw refuse(
+        "NAME_TAKEN",
+        `"${lowered}" is taken: a handle is one person's, one agent's or one org's`,
+      );
+  };
   const outbox: Sent[] = [];
   const requests: Request[] = [];
   const auth = betterAuth({
@@ -367,13 +420,45 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
     trustedOrigins: [origin],
     // Better Auth leaves its origin check off when it finds itself under a test runner. Keel runs with it on.
     advanced: { disableOriginCheck: false, disableCSRFCheck: false },
+    // Keel's refusals of a deletion, in its order: the projects, then the orgs, each read before anything changes.
+    // Keel ends the person's sponsor links last; no page reads one of a person who is gone, and none is ended here.
+    // Their handle is kept, as Keel's row for it is.
+    user: {
+      deleteUser: {
+        enabled: true,
+        beforeDelete: async (user) => {
+          const projects = projectsOf(user.id);
+          if (projects.length > 0) throw ownsProjects(projects);
+          const orgs = await soleOwnerOf(user.id);
+          if (orgs.length > 0) throw onlyOwner(orgs);
+        },
+        // oxlint-disable-next-line typescript/require-await -- the library's own signature
+        afterDelete: async (user) => {
+          const handle: unknown = Reflect.get(user, "username");
+          if (typeof handle === "string") kept.add(handle.toLowerCase());
+        },
+      },
+    },
     // How each session was signed in, written as the session is made and by nothing a request sends.
     session: {
       additionalFields: { signedInBy: { type: "string", required: false, input: false } },
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // Keel deletes an account on the session alone, and says so before it reads how fresh the session is.
+        if (
+          ctx.path === "/delete-user" &&
+          (ctx.body?.["password"] !== undefined || ctx.body?.["token"] !== undefined)
+        )
+          throw refuse(
+            "PASSKEY_ONLY",
+            "Keel deletes an account on a fresh passkey sign-in alone: send no password and no token",
+          );
         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
+        const chosen: unknown = ctx.body?.["username"];
+        if (ctx.path === "/update-user" && typeof chosen === "string") unkept(chosen);
+        const slug: unknown = ctx.body?.["slug"];
+        if (ctx.path === "/organization/create" && typeof slug === "string") unkept(slug);
         switch (ctx.path) {
           case "/organization/create":
             return claimable(ctx);
@@ -471,6 +556,7 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
                 code: "HANDLE_REQUIRED",
                 message: "Choose a handle to sign up with a passkey",
               });
+            unkept(context);
             return { id: crypto.randomUUID(), name: context };
           },
           afterVerification: async ({ ctx, user, context }) => {
@@ -516,6 +602,23 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
       username(),
     ],
   });
+  /** The orgs a person is the one owner of, whoever else is a member, by handle: Keel's `soleOwnerOf`. */
+  async function soleOwnerOf(userId: string): Promise<{ id: string; slug: string }[]> {
+    const { adapter } = await auth.$context;
+    const members = await adapter.findMany<{
+      organizationId: string;
+      userId: string;
+      role: string;
+    }>({ model: "member" });
+    const orgs = await adapter.findMany<{ id: string; slug: string }>({ model: "organization" });
+    return orgs
+      .filter((org) => {
+        const owners = members.filter((row) => row.organizationId === org.id && owns(row.role));
+        return owners.length > 0 && owners.every((row) => row.userId === userId);
+      })
+      .map((org) => ({ id: org.id, slug: org.slug }))
+      .toSorted((a, b) => a.slug.localeCompare(b.slug));
+  }
   return {
     outbox,
     requests,
@@ -541,6 +644,21 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
           model: "session",
           where: [{ field: "id", value: session.id }],
           update: { createdAt: made },
+        });
+      }
+    },
+    async touched(userId) {
+      const context = await auth.$context;
+      const sessions = await context.adapter.findMany<{ id: string }>({
+        model: "session",
+        where: [{ field: "userId", value: userId }],
+      });
+      for (const session of sessions) {
+        // oxlint-disable-next-line no-await-in-loop -- a handful, in a test
+        await context.adapter.update({
+          model: "session",
+          where: [{ field: "id", value: session.id }],
+          update: { createdAt: new Date(), signedInBy: "passkey" },
         });
       }
     },

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.typed
+# why: deleting an account is offered before its handle is typed whole
+diff --git a/apps/console/src/account/closing.ts b/apps/console/src/account/closing.ts
+index 60a5ccfb..b6b99075 100644
+--- a/apps/console/src/account/closing.ts
++++ b/apps/console/src/account/closing.ts
+@@ -55,5 +55,5 @@ export function standingOf(refusal: {
+ 
+ /** Whether deleting an account is offered: to someone with a handle, once they have typed it. */
+ export function mayClose(who: { handle?: string | undefined }, typed: string): boolean {
+-  return who.handle !== undefined && typed === who.handle;
++  return who.handle !== undefined && who.handle.startsWith(typed);
+ }

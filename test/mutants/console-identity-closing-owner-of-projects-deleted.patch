@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.owned
+# why: the stand-in identity deletes an account that owns projects, where Keel refuses and names each
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index c3373ced..3ea53587 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -417,7 +417,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+         enabled: true,
+         beforeDelete: async (user) => {
+           const projects = projectsOf(user.id);
+-          if (projects.length > 0) throw ownsProjects(projects);
+           const orgs = await soleOwnerOf(user.id);
+           if (orgs.length > 0) throw onlyOwner(orgs);
+         },

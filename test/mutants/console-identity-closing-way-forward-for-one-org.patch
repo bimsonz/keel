@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.only-owner
+# why: the stand-in identity gives a way forward for the first org it names and none for the rest
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index c3373ced..ac09513f 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -388,7 +388,7 @@ const onlyOwner = (orgs: readonly { id: string; slug: string }[]): APIError =>
+     code: "ONLY_OWNER",
+     message: `An org always has an owner: make another member an owner of ${orgs.map((org) => org.slug).join(", ")} before you delete your account`,
+     orgs,
+-    nextActions: orgs.map((org) => ({
++    nextActions: orgs.slice(0, 1).map((org) => ({
+       kind: "call",
+       title: "Make another member an owner first",
+       operationId: "ManageOwners",

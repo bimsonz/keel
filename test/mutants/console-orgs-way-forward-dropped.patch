@@ -2,15 +2,15 @@
 # kills: orgs.only-owner
 # why: the way forward Keel gave with a refusal is not handed on: the only owner is told no, and not how to go on
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 07431fb1..3dce76aa 100644
+index 330fe146..6cc9a282 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -194,7 +194,7 @@ function refusal(error: Failure): Error {
-   // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
-   // there, a session that is not the asker's among them, and is a refusal like any other.
-   if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
--  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
-+  return new Refused(error.code ?? "", error.message ?? UNSAID);
+@@ -209,7 +209,7 @@ function refusal(error: Failure): Error {
+   return new Refused(
+     error.code ?? "",
+     error.message ?? UNSAID,
+-    nextOf(error.nextActions),
++    [],
+     standingOf(error),
+   );
  }
- 
- /** A result of Better Auth's client, opened: its data, or the refusal thrown. */

@@ -2636,7 +2636,7 @@ expectEqual(
   "0",
 );
 await person.getByRole("button", { name: "Take this handle" }).click();
-await person.getByRole("heading", { name: "Your account" }).waitFor();
+await person.getByRole("heading", { name: "Your account", exact: true }).waitFor();
 expectEqual("account: signed up, and where they were going", whereOf(person), "/settings");
 expectEqual(
   "account: the frame says who is signed in",
@@ -2701,7 +2701,7 @@ const signInByCode = async (): Promise<void> => {
     .getByLabel("The code sent to ada@example.com")
     .fill(identity.outbox.at(-1)?.otp ?? "");
   await person.getByRole("button", { name: "Sign in", exact: true }).click();
-  await person.getByRole("heading", { name: "Your account" }).waitFor();
+  await person.getByRole("heading", { name: "Your account", exact: true }).waitFor();
 };
 
 // Sign out, then back in by a code sent to the same address.
@@ -2817,7 +2817,7 @@ await otherBrowser
   .getByLabel("The code sent to ada@example.com")
   .fill(identity.outbox.at(-1)?.otp ?? "");
 await otherBrowser.getByRole("button", { name: "Sign in", exact: true }).click();
-await otherBrowser.getByRole("heading", { name: "Your account" }).waitFor();
+await otherBrowser.getByRole("heading", { name: "Your account", exact: true }).waitFor();
 // Her settings, opened again in the first browser, list both: the other by what it called itself, with its End.
 await person.reload({ waitUntil: "domcontentloaded" });
 await sessionRows(person)
@@ -3851,7 +3851,7 @@ expectEqual(
 await newcomer.getByRole("button", { name: "Create your account with a passkey" }).click();
 await newcomer.waitForURL(`${built}/`);
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
-await newcomer.getByRole("heading", { name: "Your account" }).waitFor();
+await newcomer.getByRole("heading", { name: "Your account", exact: true }).waitFor();
 await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").first().waitFor();
 const usedBeforeSignIn = rowSaid(await passkeyRows(newcomer).first().innerText()).replace(
   /^.*?(?=added)/,
@@ -3879,7 +3879,7 @@ await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();
 await newcomer.waitForURL(`${built}/`);
 await newcomer.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("button", { name: "Sign in with a passkey" }).click();
-await newcomer.getByRole("heading", { name: "Your account" }).waitFor();
+await newcomer.getByRole("heading", { name: "Your account", exact: true }).waitFor();
 expectEqual(
   "passkey sign-up: signed back in with the same passkey",
   squash(await newcomer.locator("header").first().innerText()),
@@ -4399,6 +4399,171 @@ expectEqual(
   "/privacy Privacy Notice",
 );
 await readers.close();
+
+// Deleting an account, on a Keel with passkeys alone: whoever signs up there is signed in by their passkey just
+// now, which is the one sign-in Keel deletes an account on. Keel refuses while the account owns a project or is
+// an org's only owner, and names each. This identity is told a person's projects by the map here.
+const ownedHere = new Map<string, string[]>();
+const closingIdentity = createIdentity(built, {
+  emailCodes: false,
+  projectsOf: (id) => ownedHere.get(id) ?? [],
+});
+const leaving = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(leaving, { keel: open, identity: closingIdentity });
+const leaver = watch(await leaving.newPage(), "account, deleting it");
+const leaverDevice = await leaving.newCDPSession(leaver);
+await leaverDevice.send("WebAuthn.enable");
+await leaverDevice.send("WebAuthn.addVirtualAuthenticator", { options: DEVICE });
+await leaver.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await leaver.getByLabel("Handle").fill("hopper");
+await leaver.getByRole("button", { name: "Create your account with a passkey" }).click();
+await leaver.waitForURL(`${built}/`);
+await leaver.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await leaver.getByRole("heading", { name: "Your account", exact: true }).waitFor();
+const closing = leaver.getByRole("region", { name: "Delete your account" });
+const deleteIt = closing.getByRole("button", { name: "Delete your account" });
+const typedHandle = closing.getByLabel("Type hopper to delete your account");
+const waitsFor = async (typed: string): Promise<string> => {
+  await typedHandle.fill(typed, { timeout: 5000 }).catch(() => {});
+  return String(await deleteIt.isDisabled({ timeout: 5000 }).catch(() => "no button"));
+};
+expectEqual(
+  "closing: deleting an account waits for its handle to be typed, whole",
+  `${await waitsFor("hoppe")} ${await waitsFor("hopper")}`,
+  "true false",
+);
+const hopper = (await closingIdentity.whose("hopper"))?.id ?? "";
+const closingSaid = async (): Promise<string> =>
+  squash(
+    await closing
+      .getByRole("alert")
+      .innerText({ timeout: 5000 })
+      .catch(() => "no refusal"),
+  );
+const linkedIn = (list: string): Promise<string> =>
+  closing
+    .getByRole("list", { name: list })
+    .getByRole("link")
+    .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href")).join(" "));
+/** Asks for the deletion, and waits for what both answers reach: Keel's refusal, or the front page. */
+const askToDelete = async (): Promise<void> => {
+  await deleteIt.click({ timeout: 5000 }).catch(() => {});
+  await Promise.race([
+    closing.getByRole("alert").waitFor({ timeout: 10_000 }),
+    leaver.waitForURL(`${built}/`, { timeout: 10_000 }),
+  ]).catch(() => {});
+};
+// A name with nowhere to break: a hyphen would let it wrap by itself.
+const LONG_NAME = "aprojectwhosenameislongenoughtorunoffaphonesscreenifnothingbreaksitintolines";
+ownedHere.set(hopper, ["engine", LONG_NAME]);
+await askToDelete();
+await shot(leaver, "closing-owned");
+expectEqual(
+  "closing: an account that owns projects is told so in Keel's words, with each project linked to its page",
+  `${await closingSaid()} | ${await linkedIn("Projects your account owns")} | ${whereOf(leaver)}`,
+  `Your account owns projects (engine, ${LONG_NAME}), and an account that owns one is not deleted here: email privacy@keel.town and we'll delete it | /hopper/engine /hopper/${LONG_NAME} | /settings`,
+);
+await leaver.setViewportSize({ width: 390, height: 800 });
+expectEqual(
+  "closing: at a phone's width the refusal and the projects it names stay on the screen",
+  String(
+    await closing
+      .evaluate((section) =>
+        [section, ...section.querySelectorAll("*")].every(
+          (part) => part.getBoundingClientRect().right <= window.innerWidth,
+        ),
+      )
+      .catch(() => "no section"),
+  ),
+  "true",
+);
+await leaver.setViewportSize({ width: 1280, height: 900 });
+ownedHere.delete(hopper);
+const compilers = await leaver.evaluate(async () => {
+  const answer = await fetch("/v1/auth/organization/create", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Compilers", slug: "compilers" }),
+  });
+  const made: unknown = await answer.json();
+  return typeof made === "object" && made !== null && "id" in made ? String(made.id) : "";
+});
+await askToDelete();
+await closing
+  .getByRole("list", { name: "Orgs you are the only owner of" })
+  .waitFor({ timeout: 5000 })
+  .catch(() => {});
+await shot(leaver, "closing-only-owner");
+expectEqual(
+  "closing: an org's only owner is told so in Keel's words, with Keel's way forward for each org linked to its members and said once",
+  `${await closingSaid()} | ${squash(
+    await closing
+      .getByRole("list", { name: "Orgs you are the only owner of" })
+      .innerText({ timeout: 5000 })
+      .catch(() => "no list"),
+  )} | ${await linkedIn("Orgs you are the only owner of")} | ${await closing.getByRole("list", { name: "Ways forward Keel gave" }).count()}`,
+  "An org always has an owner: make another member an owner of compilers before you delete your account | compilers Make another member an owner first | /orgs/compilers/members | 0",
+);
+await leaver.evaluate(async (organizationId) => {
+  await fetch("/v1/auth/organization/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ organizationId }),
+  });
+}, compilers);
+// More than ten minutes after the passkey sign-in, Keel asks for another. The touch signs in, and that is all.
+await closingIdentity.age();
+await askToDelete();
+const signInToDelete = closing.getByRole("button", { name: SIGN_IN_AGAIN });
+await signInToDelete.waitFor({ timeout: 5000 }).catch(() => {});
+const staleSaid = await closingSaid();
+await signInToDelete.click({ timeout: 5000 }).catch(() => {});
+await Promise.race([
+  closing.getByText("You are signed in again with your passkey.").waitFor({ timeout: 10_000 }),
+  leaver.waitForURL(`${built}/`, { timeout: 10_000 }),
+]).catch(() => {});
+expectEqual(
+  "closing: a sign-in that is not fresh is told so in Keel's words, and the passkey touch signs in and deletes nothing",
+  `${staleSaid} | ${(await closingIdentity.whose("hopper")) === undefined ? "deleted" : "still there"} | ${whereOf(leaver)} | ${await closing.getByRole("alert").count()}`,
+  "Sign in again with your passkey, then retry: deleting your account needs a passkey sign-in from the last ten minutes | still there | /settings | 0",
+);
+await askToDelete();
+await leaver
+  .getByRole("link", { name: "Sign in" })
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => {});
+expectEqual(
+  "closing: the button deletes the account, and leaves a visitor at the front",
+  `${whereOf(leaver)} | ${(await closingIdentity.whose("hopper")) === undefined ? "deleted" : "still there"} | ${(await leaver.getByRole("link", { name: "Sign in" }).count()) > 0 ? "a visitor" : "signed in"}`,
+  "/ | deleted | a visitor",
+);
+// The handle of a deleted account is kept for good: a newcomer who asks for it is refused as for any held handle.
+await leaver.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await leaver
+  .getByLabel("Handle")
+  .fill("hopper", { timeout: 5000 })
+  .catch(() => {});
+await leaver
+  .getByRole("button", { name: "Create your account with a passkey" })
+  .click({ timeout: 5000 })
+  .catch(() => {});
+await Promise.race([
+  leaver.getByRole("alert").first().waitFor({ timeout: 10_000 }),
+  leaver.waitForURL(`${built}/`, { timeout: 10_000 }),
+]).catch(() => {});
+expectEqual(
+  "closing: the handle of a deleted account is not issued again, and the newcomer is told so in Keel's words",
+  `${whereOf(leaver)} | ${squash(
+    await leaver
+      .getByRole("alert")
+      .first()
+      .innerText({ timeout: 2000 })
+      .catch(() => "no refusal"),
+  )} | ${(await closingIdentity.whose("hopper")) === undefined ? "nobody's" : "issued again"}`,
+  `/signup | "hopper" is taken: a handle is one person's, one agent's or one org's | nobody's`,
+);
+await leaving.close();
 
 await browser.close();
 await new Promise<void>((resolve) => {

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.owned
+# why: a page is handed Keel's refusal to delete an account without the projects and orgs it named
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 330fe146..c0607f03 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -210,7 +210,6 @@ function refusal(error: Failure): Error {
+     error.code ?? "",
+     error.message ?? UNSAID,
+     nextOf(error.nextActions),
+-    standingOf(error),
+   );
+ }
+ 

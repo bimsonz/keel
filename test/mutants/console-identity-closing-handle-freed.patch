@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.kept
+# why: the stand-in identity frees a deleted person's handle, where Keel keeps it for good
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 2889d486..acb40945 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -435,7 +435,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+         // oxlint-disable-next-line typescript/require-await -- the library's own signature
+         afterDelete: async (user) => {
+           const handle: unknown = Reflect.get(user, "username");
+-          if (typeof handle === "string") kept.add(handle.toLowerCase());
+         },
+       },
+     },

@@ -11,6 +11,7 @@ import {
   organizationClient,
   usernameClient,
 } from "better-auth/client/plugins";
+import { NOTHING, type Standing, standingOf } from "./closing.ts";
 import { type Role, ac, roleOf, roles } from "./roles.ts";
 
 /** The user who is signed in. */
@@ -147,16 +148,24 @@ export class NotOpen extends Error {
 
 /**
  * Keel refused, and said why. `code` is Keel's, or Better Auth's own. `next` is the ways forward Keel gave with
- * the refusal, each by its title; most refusals come with none.
+ * the refusal, each by its title; most refusals come with none. `standing` is what Keel named in refusing to
+ * delete an account: the projects and the orgs in the way.
  */
 export class Refused extends Error {
   readonly code: string;
   readonly next: readonly string[];
-  constructor(code: string, message: string, next: readonly string[] = []) {
+  readonly standing: Standing;
+  constructor(
+    code: string,
+    message: string,
+    next: readonly string[] = [],
+    standing: Standing = NOTHING,
+  ) {
     super(message);
     this.name = "Refused";
     this.code = code;
     this.next = next;
+    this.standing = standing;
   }
 }
 
@@ -173,6 +182,9 @@ interface Failure {
   message?: string | undefined;
   /** Keel's NextActions, where it gave any with the refusal. */
   nextActions?: unknown;
+  /** What a refused deletion of an account names: the projects it owns, or the orgs it is the one owner of. */
+  projects?: unknown;
+  orgs?: unknown;
 }
 
 const UNSAID = "Keel refused, and did not say why";
@@ -194,7 +206,12 @@ function refusal(error: Failure): Error {
   // A route that is not served answers 404 and names no code. A 404 with a code is Keel saying what is not
   // there, a session that is not the asker's among them, and is a refusal like any other.
   if (error.status === 404 && (error.code ?? "") === "") return new NotOpen();
-  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
+  return new Refused(
+    error.code ?? "",
+    error.message ?? UNSAID,
+    nextOf(error.nextActions),
+    standingOf(error),
+  );
 }
 
 /** A result of Better Auth's client, opened: its data, or the refusal thrown. */
@@ -427,6 +444,15 @@ export function createAccount(options: AccountOptions) {
     /** Ends one of the user's own sessions, by the id Keel listed it under. Whoever was using it signs in again. */
     async endSession(id: string): Promise<void> {
       taken(await client.$fetch("/sessions/revoke", { method: "POST", body: { id } }));
+    },
+
+    /**
+     * Deletes the user's own account. Keel takes it from a passkey sign-in of the last ten minutes, and refuses
+     * while the account owns a project or is an org's one owner, naming each. The body is empty: Keel deletes on
+     * the session alone, and refuses a password or a token sent with it.
+     */
+    async deleteAccount(): Promise<void> {
+      taken(await client.$fetch("/delete-user", { method: "POST", body: {} }));
     },
 
     /** Claims a code that `keeltown login` is showing, for whoever is signed in here. Nothing is approved yet. */

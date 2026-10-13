@@ -2,15 +2,15 @@
 # kills: account.fresh
 # why: the stand-in for Keel's identity takes an account's first passkey from a sign-in of any age, where Keel takes it from one of the last ten minutes: the page's way back for someone refused would be tested against nothing
 diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
-index 6568eb1..d170e75 100644
+index c3373ced..aeb6feed 100644
 --- a/apps/console/test/fixtures/identity/standIn.ts
 +++ b/apps/console/test/fixtures/identity/standIn.ts
-@@ -134,7 +134,7 @@ async function freshSignIn(ctx: Parameters<typeof getSessionFromCtx>[0]): Promis
+@@ -231,7 +231,7 @@ async function freshSignIn(ctx: Parameters<typeof getSessionFromCtx>[0]): Promis
    });
    const none = held === null;
    const first = none && ADDS_PASSKEY.has(ctx.path);
 -  if (first && typeof by === "string" && OWN_SIGN_INS.has(by) && recent) return;
 +  if (first && typeof by === "string" && OWN_SIGN_INS.has(by)) return;
+   const what = ctx.path === "/delete-user" ? "deleting your account" : "changing how you sign in";
    throw new APIError("FORBIDDEN", {
      code: "FRESH_SIGN_IN_REQUIRED",
-     message: first

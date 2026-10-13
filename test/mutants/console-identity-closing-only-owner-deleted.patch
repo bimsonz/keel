@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.only-owner
+# why: the stand-in identity deletes an org's one owner, where Keel refuses and names each org
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 2889d486..cd575bd9 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -430,7 +430,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+           const projects = projectsOf(user.id);
+           if (projects.length > 0) throw ownsProjects(projects);
+           const orgs = await soleOwnerOf(user.id);
+-          if (orgs.length > 0) throw onlyOwner(orgs);
+         },
+         // oxlint-disable-next-line typescript/require-await -- the library's own signature
+         afterDelete: async (user) => {

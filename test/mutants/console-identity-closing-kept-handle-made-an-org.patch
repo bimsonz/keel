@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.kept
+# why: the stand-in identity lets an org be made with the handle of a deleted account
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index 2889d486..54980b0e 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -458,7 +458,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+         const chosen: unknown = ctx.body?.["username"];
+         if (ctx.path === "/update-user" && typeof chosen === "string") unkept(chosen);
+         const slug: unknown = ctx.body?.["slug"];
+-        if (ctx.path === "/organization/create" && typeof slug === "string") unkept(slug);
+         switch (ctx.path) {
+           case "/organization/create":
+             return claimable(ctx);

@@ -2,14 +2,14 @@
 # kills: account.fresh
 # why: the stand-in for Keel's identity takes a change to how an account signs in from any session, where Keel refuses one not signed in by a passkey in the last ten minutes: the page's handling of that refusal would be tested against nothing
 diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
-index 9102cb5..f7f7229 100644
+index 2889d486..0cda4ad3 100644
 --- a/apps/console/test/fixtures/identity/standIn.ts
 +++ b/apps/console/test/fixtures/identity/standIn.ts
-@@ -254,7 +254,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
-     },
-     hooks: {
-       before: createAuthMiddleware(async (ctx) => {
+@@ -454,7 +454,6 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
+             "PASSKEY_ONLY",
+             "Keel deletes an account on a fresh passkey sign-in alone: send no password and no token",
+           );
 -        if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
-         switch (ctx.path) {
-           case "/organization/create":
-             return claimable(ctx);
+         const chosen: unknown = ctx.body?.["username"];
+         if (ctx.path === "/update-user" && typeof chosen === "string") unkept(chosen);
+         const slug: unknown = ctx.body?.["slug"];

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/closing.test.ts
+# kills: closing.stale
+# why: the stand-in identity deletes an account from a sign-in that is not fresh, where Keel refuses
+diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
+index c3373ced..0fda9f53 100644
+--- a/apps/console/test/fixtures/identity/standIn.ts
++++ b/apps/console/test/fixtures/identity/standIn.ts
+@@ -103,7 +103,6 @@ const CHANGES_SIGN_IN: ReadonlySet<string> = new Set([
+   "/change-email",
+   "/email-otp/request-email-change",
+   "/email-otp/change-email",
+-  "/delete-user",
+ ]);
+ 
+ /** How a session is signed in, by the endpoint that makes it: Keel's `signInMethod`. */
