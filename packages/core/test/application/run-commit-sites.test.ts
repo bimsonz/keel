@@ -33,7 +33,7 @@ describe("who a use-case's commit names", () => {
         .filter(([, count]) => count > 0),
     );
     expect(sites).toEqual({
-      "coordination/change.ts": 7,
+      "coordination/change.ts": 8,
       "coordination/conflict-moves.ts": 1,
       "identity/invitations.ts": 1,
       "identity/session.ts": 1,
