@@ -1,8 +1,9 @@
 // How `scripts/prove-red.ts` decides whether a mutant went red: what it adds to
 // the mutant's command so that it runs only the tests the mutant claims to
 // kill, the baseline it takes before the patch is applied, the rule for red,
-// the sweep that takes the baselines alone, and how the script's arguments are
-// read. Pure: the script does the running and the patching, and hands both in.
+// which mutants one patched run is enough for, the sweep that takes the
+// baselines alone, and how the script's arguments are read. Pure: the script
+// does the running and the patching, and hands both in.
 
 const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 
@@ -30,6 +31,19 @@ export function filteredToClaims(command: string, kills: readonly string[]): str
 /** The fixed seeds every tagged mutant runs under. The baseline runs under the first. */
 export const SEEDS = [42, 1337, 20_261_014] as const;
 
+/**
+ * Whether a command runs in pool projects alone: it names at least one
+ * `--project`, and every one it names begins `pool:`. A command that names a
+ * Node project beside a pool one does not: its Node tests may draw from the
+ * seed, so each seed is another run of them.
+ */
+export function poolAlone(command: string): boolean {
+  const named = [...command.matchAll(/--project(?:=|\s+)(?:'([^']*)'|"([^"]*)"|(\S+))/g)].map(
+    ([, single, double, bare]) => single ?? double ?? bare ?? "",
+  );
+  return named.length > 0 && named.every((project) => project.startsWith("pool:"));
+}
+
 /** One run the prover asks for, in the tree as it stands. */
 export interface Run {
   readonly command: string;
@@ -55,6 +69,11 @@ export interface Mutant {
   readonly kills: readonly string[];
   /** Runs `body` with the patch applied, and reverts the patch whatever `body` does. */
   readonly mutated: <T>(body: () => T) => T;
+  /**
+   * The header's `# all-seeds`: the claimed tests draw from the seed although
+   * they run in a pool project, so one run is never the whole proof.
+   */
+  readonly allSeeds?: boolean;
 }
 
 export interface Proof {
@@ -176,25 +195,37 @@ export function prover(given: {
   readonly run: (run: Run) => Ran;
   /** Unseeded runs per tagged mutant, after the fixed seeds. */
   readonly unseeded: number;
+  /**
+   * `--all-seeds`: every tagged mutant takes every run. Without it, one whose
+   * command runs in pool projects alone takes one patched run, under the first
+   * seed: almost no pool test draws, so each further run of one would be a
+   * copy, and the one that does says so in its header.
+   */
+  readonly allSeeds: boolean;
 }): (mutant: Mutant) => Proof {
-  const { run, unseeded } = given;
+  const { run, unseeded, allSeeds } = given;
   const baseline = baselineTaker(run);
 
-  /** Red only if every claimed tag fails in every run: each fixed seed, then the unseeded runs. */
-  const tagged = ({ command, kills, mutated }: Mutant): Proof => {
+  /**
+   * Red only if every claimed tag fails in every run: each fixed seed, then
+   * the unseeded runs, or the first seed alone for a pool mutant run once.
+   */
+  const tagged = (mutant: Mutant): Proof => {
+    const { command, kills, mutated } = mutant;
     const filtered = filteredToClaims(command, kills);
     const fault = baselineFault(baseline(filtered, true), kills);
     if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
+    const once = !allSeeds && mutant.allSeeds !== true && poolAlone(command);
     return mutated(() => {
       let note = "no tests";
-      const runs = [
+      const every = [
         ...SEEDS.map((seed) => ({ label: `seed ${seed}`, seed })),
         ...Array.from({ length: unseeded }, (_, i) => ({
           label: `unseeded run ${i + 1}`,
           seed: undefined,
         })),
       ];
-      for (const { label, seed } of runs) {
+      for (const { label, seed } of once ? every.slice(0, 1) : every) {
         const ran = run({ command: filtered, seed, reported: true });
         if (ran.report === undefined)
           return {
@@ -225,7 +256,9 @@ export function prover(given: {
       return {
         verdict: "red",
         note,
-        detail: `${bracketed(kills)} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
+        detail: once
+          ? `${bracketed(kills)} failed under seed ${SEEDS[0]}, run once (a pool project)`
+          : `${bracketed(kills)} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
       };
     });
   };
@@ -311,6 +344,8 @@ export interface Asked {
   readonly dir: string | undefined;
   /** Take each baseline and apply nothing. */
   readonly baselineOnly: boolean;
+  /** Give every tagged patch every run, also one whose command names pool projects alone. */
+  readonly allSeeds: boolean;
 }
 
 /**
@@ -323,10 +358,12 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
   let unseeded = 2;
   let dir: string | undefined;
   let baselineOnly = false;
+  let allSeeds = false;
   for (let at = 0; at < argv.length; at += 1) {
     const arg = argv[at] ?? "";
     if (arg === "--") continue;
     if (arg === "--baseline-only") baselineOnly = true;
+    else if (arg === "--all-seeds") allSeeds = true;
     else if (arg === "--unseeded") {
       at += 1;
       unseeded = Number(argv[at] ?? "none");
@@ -339,5 +376,5 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
     } else if (arg.startsWith("--")) return { refused: `unknown option ${arg}` };
     else filter ??= arg;
   }
-  return { filter: filter ?? "", unseeded, dir, baselineOnly };
+  return { filter: filter ?? "", unseeded, dir, baselineOnly, allSeeds };
 }

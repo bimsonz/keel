@@ -36,12 +36,22 @@
 // of one run for each command, where a full proof takes six for each patch.
 // Exit 1 if any baseline is red, or any patch is stale or has no header.
 //
-// Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>] [--baseline-only]
+// A tagged patch whose command names pool projects alone (every `--project` it
+// names begins `pool:`) takes one patched run, under FC_SEED 42, after its
+// baseline. Almost no test in workerd draws from the seed, so the other runs
+// were copies of that one. A patch whose pool test does draw carries a
+// `# all-seeds` line and keeps every run; so does a patch that names a Node
+// project beside a pool one, and every other patch. `--all-seeds` gives every
+// patch every run.
+//
+// Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>] [--baseline-only] [--all-seeds]
 //   --unseeded N      unseeded runs per tagged patch (default 2)
 //   --dir             another patch directory (the runner's own controls live
 //                     in test/controls/prove-red: one must be reported a
 //                     survivor, the other BASELINE RED)
 //   --baseline-only   take every baseline, apply no patch
+//   --all-seeds       every seed and unseeded run for a patch that runs in pool
+//                     projects alone too (it takes one run, under seed 42)
 import { execSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -61,7 +71,7 @@ if ("refused" in asked) {
   console.error(asked.refused);
   process.exit(2);
 }
-const { filter, unseeded, baselineOnly } = asked;
+const { filter, unseeded, baselineOnly, allSeeds } = asked;
 const dir = resolve(root, asked.dir ?? "test/mutants");
 
 const patches = readdirSync(dir)
@@ -82,6 +92,7 @@ interface Header {
   readonly command: string | undefined;
   readonly kills: readonly string[];
   readonly regen: boolean;
+  readonly allSeeds: boolean;
 }
 
 function headerOf(path: string): Header {
@@ -92,7 +103,12 @@ function headerOf(path: string): Header {
     .flatMap((line) => line.slice("# kills:".length).split(","))
     .map((tag) => tag.trim())
     .filter((tag) => tag !== "");
-  return { command, kills, regen: lines.some((line) => line.trim() === "# regen") };
+  return {
+    command,
+    kills,
+    regen: lines.some((line) => line.trim() === "# regen"),
+    allSeeds: lines.some((line) => line.trim() === "# all-seeds"),
+  };
 }
 
 function regenerate(): void {
@@ -127,12 +143,14 @@ interface Usable {
   readonly command: string;
   readonly kills: readonly string[];
   readonly regen: boolean;
+  readonly allSeeds: boolean;
 }
 
 /** The patch, or nothing once it is reported as one that cannot be run. */
 function usable(name: string): Usable | undefined {
   const path = join(dir, name);
-  const { command, kills, regen } = headerOf(path);
+  const header = headerOf(path);
+  const { command } = header;
   if (command === undefined) {
     console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
     return undefined;
@@ -141,7 +159,7 @@ function usable(name: string): Usable | undefined {
     console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
     return undefined;
   }
-  return { name, path, command, kills, regen };
+  return { ...header, name, path, command };
 }
 
 /** Patches that survived, or that could not be run: in a sweep, only the second. */
@@ -166,7 +184,7 @@ try {
       } else console.log(`baseline green ${name} (${baseline.note})`);
     }
   } else {
-    const prove = prover({ run: numbered, unseeded });
+    const prove = prover({ run: numbered, unseeded, allSeeds });
     for (const name of patches) {
       const patch = usable(name);
       if (patch === undefined) {
@@ -185,7 +203,12 @@ try {
         }
       };
       const started = Date.now();
-      const { verdict, note, detail } = prove({ command, kills, mutated });
+      const { verdict, note, detail } = prove({
+        command,
+        kills,
+        mutated,
+        allSeeds: patch.allSeeds,
+      });
       const seconds = ((Date.now() - started) / 1000).toFixed(1);
       if (verdict === "baseline-red") {
         baselineRed.push(name);

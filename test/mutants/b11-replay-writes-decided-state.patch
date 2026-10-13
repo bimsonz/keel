@@ -1,6 +1,7 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t "over real RPC"
 # kills: b11.replay
 # why: the object writes the state the decision read, not the one evolve folds the events into, so state and log part ways
+# all-seeds
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
 index 29e615f..394566c 100644
 --- a/packages/core/src/application/coordination/change.ts

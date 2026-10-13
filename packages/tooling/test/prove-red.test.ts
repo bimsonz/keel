@@ -5,6 +5,7 @@ import {
   type Claim,
   claimedPattern,
   filteredToClaims,
+  poolAlone,
   prover,
   type Ran,
   type Run,
@@ -128,8 +129,11 @@ const statusesOf = (
   });
 };
 
-/** A prover over a tree, with a log of every run it asked for and a count of the patches it applied. */
-const stage = (tree: Tree) => {
+/**
+ * A prover over a tree, with a log of every run it asked for and a count of the
+ * patches it applied. `allSeeds` is the script's `--all-seeds`.
+ */
+const stage = (tree: Tree, allSeeds = false) => {
   const log: string[] = [];
   let patched = false;
   let applications = 0;
@@ -153,7 +157,7 @@ const stage = (tree: Tree) => {
     }
   };
   return {
-    prove: prover({ run, unseeded: 2 }),
+    prove: prover({ run, unseeded: 2, allSeeds }),
     run,
     mutated,
     log,
@@ -457,9 +461,142 @@ describe("prove:red's sweep of baselines", () => {
   });
 });
 
+/**
+ * A test in workerd almost never draws from the seed, so a second run of one
+ * is a copy of the first, at about a minute a run. A tagged mutant whose
+ * command names pool projects alone therefore takes one patched run. What must
+ * never follow from that is a mutant of a test that does draw, proved on one
+ * seed: every command that names a Node project keeps every run, and so does
+ * the pool mutant whose header says its test draws.
+ */
+
+const POOL = "pnpm vitest run --project pool:keel apps/keel/test/pool/x.test.ts";
+/** POOL as the runner narrows it for a mutant that claims `a.b`. */
+const POOL_FILTERED = `${POOL} -t '\\[a\\.b\\]'`;
+
+/** The runs of a kill that takes every seed: the baseline, each fixed seed, the two unseeded runs. */
+const everyRunOf = (filtered: string): string[] => [
+  `clean, seed 42: ${filtered}`,
+  `patched, seed 42: ${filtered}`,
+  `patched, seed 1337: ${filtered}`,
+  `patched, seed 20261014: ${filtered}`,
+  `patched, seed none: ${filtered}`,
+  `patched, seed none: ${filtered}`,
+];
+
+/** Tagged mutants that keep every run, with why. */
+const KEEPS_EVERY_RUN: readonly { readonly command: string; readonly allSeeds?: boolean }[] = [
+  { command: "pnpm vitest run --project unit x.test.ts" },
+  { command: "pnpm vitest run --project arch x.test.ts" },
+  // A Node project beside a pool one, in either order: its tests may draw.
+  { command: "pnpm vitest run --project unit --project pool:keel x.test.ts y.test.ts" },
+  { command: "pnpm vitest run --project pool:keel --project unit y.test.ts x.test.ts" },
+  // No project named: nothing says where it runs.
+  { command: "pnpm vitest run x.test.ts" },
+  // A pool test that draws from the seed, as its header's `# all-seeds` says.
+  { command: POOL, allSeeds: true },
+];
+
+describe("prove:red's one run for a pool mutant", () => {
+  it("[prove-red.pool-once] gives a mutant whose command names pool projects alone its baseline and one patched run, under seed 42", () => {
+    const tree = { tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true };
+
+    const kill = stage(tree);
+    expect(kill.prove({ command: POOL, kills: ["a.b"], mutated: kill.mutated })).toEqual({
+      verdict: "red",
+      note: "1 of 2 tests",
+      detail: "[a.b] failed under seed 42, run once (a pool project)",
+    });
+    expect(kill.log).toEqual([
+      `clean, seed 42: ${POOL_FILTERED}`,
+      `patched, seed 42: ${POOL_FILTERED}`,
+    ]);
+
+    // A miss is a survivor after that one run.
+    const miss = stage({ ...tree, killed: [] });
+    expect(miss.prove({ command: POOL, kills: ["a.b"], mutated: miss.mutated })).toEqual({
+      verdict: "survived",
+      note: "1 of 2 tests",
+      detail: "seed 42: [a.b] stayed green",
+    });
+    expect(miss.log).toHaveLength(2);
+
+    // A claimed test that already fails is no baseline here either, and the patch is never applied.
+    const broken = stage({ ...tree, broken: ["a.b"] });
+    expect(broken.prove({ command: POOL, kills: ["a.b"], mutated: broken.mutated })).toEqual({
+      verdict: "baseline-red",
+      note: "",
+      detail: "[a.b] fails without the mutant",
+    });
+    expect(broken.applications()).toBe(0);
+
+    // Under --all-seeds the same mutant takes every run, and its line says so.
+    const all = stage(tree, true);
+    expect(all.prove({ command: POOL, kills: ["a.b"], mutated: all.mutated })).toEqual({
+      verdict: "red",
+      note: "1 of 2 tests",
+      detail: "[a.b] failed under seeds 42, 1337, 20261014 and 2 unseeded run(s)",
+    });
+    expect(all.log).toEqual(everyRunOf(POOL_FILTERED));
+  });
+
+  it("[prove-red.pool-once-keeps-seeds] gives every other tagged mutant every fixed seed and the unseeded runs", () => {
+    for (const { command, allSeeds } of KEEPS_EVERY_RUN) {
+      const kept = stage({ tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true });
+      const mutant = { command, kills: ["a.b"], mutated: kept.mutated };
+      expect(kept.prove(allSeeds === undefined ? mutant : { ...mutant, allSeeds })).toEqual({
+        verdict: "red",
+        note: "1 of 2 tests",
+        detail: "[a.b] failed under seeds 42, 1337, 20261014 and 2 unseeded run(s)",
+      });
+      expect(kept.log).toEqual(everyRunOf(`${command} -t '\\[a\\.b\\]'`));
+    }
+  });
+
+  it("[prove-red.pool-project] counts a command as a pool one only when every project it names is a pool project, however it spells them", () => {
+    const pool = [
+      "pnpm vitest run --project pool:keel x.test.ts",
+      "pnpm exec vitest run --project=pool:keel x.test.ts",
+      "pnpm vitest run --project 'pool:*'",
+      'pnpm vitest run --project "pool:keel-verify" x.test.ts',
+      "pnpm vitest run --project='pool:console' x.test.ts",
+      "pnpm vitest run --project pool:keel --project pool:keel-verify x.test.ts",
+      "pnpm vitest run x.test.ts --project pool:keel",
+    ];
+    expect(pool.filter((command) => !poolAlone(command))).toEqual([]);
+
+    const other = [
+      "pnpm vitest run --project unit x.test.ts",
+      "pnpm vitest run --project arch x.test.ts",
+      "pnpm vitest run --project unit --project pool:keel x.test.ts",
+      "pnpm vitest run --project pool:keel --project unit x.test.ts",
+      // A project the reader missed would leave the pool one standing alone.
+      "pnpm vitest run --project=unit --project pool:keel x.test.ts",
+      "pnpm vitest run --project pool:keel --project=unit x.test.ts",
+      "pnpm vitest run --project 'unit' --project pool:keel x.test.ts",
+      'pnpm vitest run --project pool:keel --project "unit" x.test.ts',
+      // Every project but a pool one, and a Node project whose name or path holds the word.
+      "pnpm vitest run --project '!pool:keel' x.test.ts",
+      "pnpm vitest run --project unit-pool:keel x.test.ts",
+      "pnpm vitest run --project unit apps/keel/test/pool/x.test.ts",
+      // No project named.
+      "pnpm vitest run apps/keel/test/pool/x.test.ts",
+      "pnpm test:pool",
+      "pnpm guards",
+    ];
+    expect(other.filter((command) => poolAlone(command))).toEqual([]);
+  });
+});
+
 describe("prove:red's arguments", () => {
-  it("[prove-red.arguments] reads --baseline-only wherever it stands, never as the name filter, and refuses an option it does not know", () => {
-    const plain = { filter: "", unseeded: 2, dir: undefined, baselineOnly: false };
+  it("[prove-red.arguments] reads --baseline-only and --all-seeds wherever they stand, never as the name filter, and refuses an option it does not know", () => {
+    const plain = {
+      filter: "",
+      unseeded: 2,
+      dir: undefined,
+      baselineOnly: false,
+      allSeeds: false,
+    };
     expect(argumentsOf([])).toEqual(plain);
     expect(argumentsOf(["domain-"])).toEqual({ ...plain, filter: "domain-" });
     expect(argumentsOf(["--baseline-only"])).toEqual({ ...plain, baselineOnly: true });
@@ -478,12 +615,28 @@ describe("prove:red's arguments", () => {
       unseeded: 5,
       dir: "test/controls/prove-red",
       baselineOnly: false,
+      allSeeds: false,
     });
     expect(argumentsOf(["--dir", "x", "--baseline-only", "--unseeded", "0"])).toEqual({
       filter: "",
       unseeded: 0,
       dir: "x",
       baselineOnly: true,
+      allSeeds: false,
+    });
+
+    // --all-seeds is off unless asked for, takes no value, and stands beside the sweep's flag.
+    expect(argumentsOf(["--all-seeds"])).toEqual({ ...plain, allSeeds: true });
+    for (const argv of [
+      ["--all-seeds", "domain-"],
+      ["domain-", "--all-seeds"],
+    ])
+      expect(argumentsOf(argv)).toEqual({ ...plain, filter: "domain-", allSeeds: true });
+    expect(argumentsOf(["--baseline-only", "--all-seeds", "x"])).toEqual({
+      ...plain,
+      filter: "x",
+      baselineOnly: true,
+      allSeeds: true,
     });
 
     // A mistyped flag must not start a full proof.
@@ -491,6 +644,8 @@ describe("prove:red's arguments", () => {
     expect(argumentsOf(["domain-", "--baseline"])).toEqual({
       refused: "unknown option --baseline",
     });
+    // One run for a pool patch is the default, so there is no flag that asks for it.
+    expect(argumentsOf(["--pool-once"])).toEqual({ refused: "unknown option --pool-once" });
     for (const argv of [
       ["--unseeded"],
       ["--unseeded", "two"],
