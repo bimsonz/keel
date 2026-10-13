@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent } from "@keeltown/core/domain/identity";
+import {
+  type Agent,
+  type AgentKey,
+  agentIdOf,
+  givenHandle,
+  KeyThumbprint,
+} from "@keeltown/core/domain/identity";
 import {
   AgentId,
   idPattern,
@@ -46,6 +52,38 @@ function freshUserId(): UserId {
 }
 
 const agentId = freshAgentId();
+
+const BASE64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+const randomBase64url = (length: number): string =>
+  [...crypto.getRandomValues(new Uint8Array(length))].map((b) => BASE64URL[b % 64] ?? "A").join("");
+
+/** A fresh Ed25519 public key as an agent holds it: random, so no two cases share one. */
+export function freshAgentKey(addedAt: Instant = Instant(1_760_000_000_000)): AgentKey {
+  const random = randomBase64url;
+  return {
+    jkt: Schema.decodeUnknownSync(KeyThumbprint)(random(43)),
+    jwk: { kty: "OKP", crv: "Ed25519", x: random(43) },
+    addedAt,
+  };
+}
+
+/** An agent as signing up with `keys[0]` leaves it: its id and handle made from that key. */
+export function signedUpAgent(keys: readonly AgentKey[] = [freshAgentKey()]): Agent {
+  const [first] = keys;
+  if (first === undefined) throw new Error("an agent signs up with a key");
+  const id = agentIdOf(first.jkt);
+  return {
+    id,
+    handle: givenHandle(id),
+    name: givenHandle(id),
+    scopes: ["agent:work", "agent:read"],
+    keys,
+    state: "active",
+    revocationEpoch: 0,
+    createdAt: first.addedAt,
+  };
+}
 
 export function describeClockContract(adapter: string, make: LayerFactory<Clock>) {
   describe(`Clock contract: ${adapter}`, () => {
@@ -173,6 +211,54 @@ export function describeAgentDirectoryContract(
           expect(Option.map(found, (agent) => ["org" in agent, "sponsor" in agent])).toEqual(
             Option.some([false, false]),
           );
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[signup.directory] returns an agent that signed up by key exactly: its handle and keys, and no project or kind",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const agent = signedUpAgent();
+          yield* directory.upsertAccount(agent);
+          const found = yield* directory.findAgent(agent.id);
+          expect(found).toEqual(Option.some(agent));
+          expect(Option.map(found, (a) => ["projectId" in a, "kind" in a])).toEqual(
+            Option.some([false, false]),
+          );
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[signup.directory] an account's keys are exactly the ones it was last written with, oldest first",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const first = freshAgentKey(Instant(1_760_000_000_000));
+          const second = freshAgentKey(Instant(1_760_000_060_000));
+          const agent = signedUpAgent([first, second]);
+          yield* directory.upsertAccount(agent);
+          expect(Option.map(yield* directory.findAgent(agent.id), (a) => a.keys)).toEqual(
+            Option.some([first, second]),
+          );
+          yield* directory.upsertAccount({ ...agent, keys: [second], revocationEpoch: 1 });
+          expect(
+            Option.map(yield* directory.findAgent(agent.id), (a) => [a.keys, a.revocationEpoch]),
+          ).toEqual(Option.some([[second], 1]));
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[signup.directory] an agent enrolled by a person comes back with no handle and no keys",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const agent = { ...sampleAgent, id: freshAgentId() };
+          yield* directory.upsert(agent, {
+            clientId: `client-${agent.id}`,
+            agentId: agent.id,
+            secretHash: `sha256:${"a".repeat(64)}`,
+          });
+          expect(
+            Option.map(yield* directory.findAgent(agent.id), (a) => ["handle" in a, "keys" in a]),
+          ).toEqual(Option.some([false, false]));
         }).pipe(Effect.provide(make())),
     );
     it.effect("[a11e.synthetic] returns a synthetic agent, the load generator's, exactly", () =>

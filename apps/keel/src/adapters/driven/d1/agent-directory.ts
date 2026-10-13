@@ -1,14 +1,19 @@
-import { Agent } from "@keeltown/core/domain/identity";
+import { Agent, AgentKey } from "@keeltown/core/domain/identity";
 import { AgentId } from "@keeltown/core/kernel";
 import { AgentDirectory, type StoredCredential } from "@keeltown/core/ports";
 import { Effect, Layer, Option, Schema } from "effect";
 
-/** A row of `agents`, decoded into the domain's Agent. `scopes` is stored as JSON text. */
+/**
+ * A row of `agents`, decoded into the domain's Agent. `scopes` is stored as
+ * JSON text. An agent that signed up by key has a handle, an empty `project_id`
+ * and no kind.
+ */
 const AgentRow = Schema.Struct({
   id: Schema.String,
   project_id: Schema.String,
+  handle: Schema.NullOr(Schema.String),
   name: Schema.String,
-  kind: Schema.String,
+  kind: Schema.NullOr(Schema.String),
   scopes: Schema.String,
   namespace_id: Schema.NullOr(Schema.String),
   sponsor_user: Schema.NullOr(Schema.String),
@@ -17,17 +22,33 @@ const AgentRow = Schema.Struct({
   created_at: Schema.Number,
 });
 
+/** A row of `agent_keys`: one public key of one agent. `jwk` is stored as JSON text. */
+const KeyRow = Schema.Struct({
+  jkt: Schema.String,
+  jwk: Schema.String,
+  created_at: Schema.Number,
+});
+
 const decodeAgent = Schema.decodeUnknownSync(Agent);
 const decodeAgentId = Schema.decodeUnknownSync(AgentId);
+const decodeKeyRows = Schema.decodeUnknownSync(Schema.Array(KeyRow));
+const encodeKey = Schema.encodeSync(AgentKey);
 
-function toAgent(row: unknown): Agent {
+function toAgent(row: unknown, keyRows: unknown): Agent {
   const r = Schema.decodeUnknownSync(AgentRow)(row);
+  const keys = decodeKeyRows(keyRows).map((key) => ({
+    jkt: key.jkt,
+    jwk: JSON.parse(key.jwk),
+    addedAt: key.created_at,
+  }));
   return decodeAgent({
     id: r.id,
-    projectId: r.project_id,
+    ...(r.project_id === "" ? {} : { projectId: r.project_id }),
+    ...(r.handle === null ? {} : { handle: r.handle }),
     name: r.name,
-    kind: r.kind,
+    ...(r.kind === null ? {} : { kind: r.kind }),
     scopes: JSON.parse(r.scopes),
+    ...(keys.length === 0 ? {} : { keys }),
     ...(r.namespace_id === null ? {} : { org: r.namespace_id }),
     ...(r.sponsor_user === null ? {} : { sponsor: r.sponsor_user }),
     state: r.state,
@@ -57,10 +78,23 @@ export function AgentDirectoryD1(db: D1Database) {
   return Layer.succeed(
     AgentDirectory,
     AgentDirectory.of({
+      // One round trip for the row and its keys: the gate reads this on every request.
       findAgent: (agentId) =>
         Effect.promise(() =>
-          db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first(),
-        ).pipe(Effect.map((row) => (row === null ? Option.none() : Option.some(toAgent(row))))),
+          db.batch([
+            db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId),
+            db
+              .prepare(
+                "SELECT jkt, jwk, created_at FROM agent_keys WHERE agent_id = ? ORDER BY created_at, jkt",
+              )
+              .bind(agentId),
+          ]),
+        ).pipe(
+          Effect.map(([found, keys]) => {
+            const row = found?.results[0];
+            return row === undefined ? Option.none() : Option.some(toAgent(row, keys?.results));
+          }),
+        ),
       findCredential: (clientId) =>
         Effect.promise(() =>
           db
@@ -140,9 +174,9 @@ export function AgentDirectoryD1(db: D1Database) {
               )
               .bind(
                 agent.id,
-                agent.projectId,
+                agent.projectId ?? "",
                 agent.name,
-                agent.kind,
+                agent.kind ?? null,
                 JSON.stringify(agent.scopes),
                 agent.org ?? null,
                 agent.sponsor ?? null,
@@ -156,6 +190,37 @@ export function AgentDirectoryD1(db: D1Database) {
                  ON CONFLICT (client_id) DO UPDATE SET agent_id = excluded.agent_id, secret_hash = excluded.secret_hash`,
               )
               .bind(credential.clientId, credential.agentId, credential.secretHash),
+          ]),
+        ).pipe(Effect.asVoid),
+      // The keys are replaced whole, in the row's own transaction. A key another agent holds
+      // fails the batch: a key names one agent, and `agent_keys.jkt` is what holds that.
+      upsertAccount: (agent) =>
+        Effect.promise(() =>
+          db.batch([
+            db
+              .prepare(
+                `INSERT INTO agents (id, project_id, handle, name, kind, scopes, state, revocation_epoch, created_at) VALUES (?, '', ?, ?, NULL, ?, ?, ?, ?)
+                 ON CONFLICT (id) DO UPDATE SET handle = excluded.handle, name = excluded.name, scopes = excluded.scopes, state = excluded.state,
+                   revocation_epoch = excluded.revocation_epoch`,
+              )
+              .bind(
+                agent.id,
+                agent.handle ?? null,
+                agent.name,
+                JSON.stringify(agent.scopes),
+                agent.state,
+                agent.revocationEpoch,
+                agent.createdAt,
+              ),
+            db.prepare("DELETE FROM agent_keys WHERE agent_id = ?").bind(agent.id),
+            ...(agent.keys ?? []).map((key) => {
+              const encoded = encodeKey(key);
+              return db
+                .prepare(
+                  "INSERT INTO agent_keys (jkt, agent_id, jwk, created_at) VALUES (?, ?, ?, ?)",
+                )
+                .bind(encoded.jkt, agent.id, JSON.stringify(encoded.jwk), encoded.addedAt);
+            }),
           ]),
         ).pipe(Effect.asVoid),
     }),

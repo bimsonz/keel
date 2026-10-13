@@ -1,7 +1,7 @@
 import { type Credential, principalOf } from "@keeltown/core/application/identity";
 import { type AgentId, type ChangeId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
-  type AgentDirectory,
+  AgentDirectory,
   type Changes,
   type CodeHost,
   type Enrolments,
@@ -17,6 +17,7 @@ import {
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import type { AgentAccess } from "../adapters/driven/better-auth/agents.ts";
 import {
   AUTH_BASE_PATH,
   type AuthConfig,
@@ -194,7 +195,7 @@ export interface AuthOverrides {
 }
 
 /** Better Auth's config over the Worker's D1, with GitHub only once both of its secrets are set. */
-function identity(env: Env, overrides: AuthOverrides): AuthConfig {
+function identity(env: Env, overrides: AuthOverrides, agents: AgentAccess): AuthConfig {
   const { GITHUB_CLIENT_ID: clientId, GITHUB_CLIENT_SECRET: clientSecret } = env as Env & {
     readonly GITHUB_CLIENT_ID?: string;
     readonly GITHUB_CLIENT_SECRET?: string;
@@ -203,6 +204,7 @@ function identity(env: Env, overrides: AuthOverrides): AuthConfig {
     db: env.DB,
     secret: env.BETTER_AUTH_SECRET,
     host: env.KEEL_HOST,
+    agents,
     background: waitUntil,
     ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
@@ -216,7 +218,14 @@ export function makeIsolate(
   authOverrides: AuthOverrides = {},
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
-  const authConfig = identity(env, authOverrides);
+  const authConfig = identity(env, authOverrides, {
+    find: (agentId) =>
+      runtime.runPromise(
+        AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+          Effect.map(Option.getOrUndefined),
+        ),
+      ),
+  });
   const handlers = makeHandlers(
     makeRunner(runtime),
     signInMethods(authConfig),

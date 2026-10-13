@@ -91,6 +91,7 @@ export function makeAgentDirectoryMemory() {
         findCredential: (clientId) =>
           Effect.sync(() => Option.fromNullishOr(credentials.get(clientId))),
         upsert: (agent, credential) => Effect.sync(() => seed(agent, credential)),
+        upsertAccount: (agent) => Effect.sync(() => void agents.set(agent.id, agent)),
         standing: (agentId, standing, seq) =>
           Effect.sync(() => {
             const agent = agents.get(agentId);

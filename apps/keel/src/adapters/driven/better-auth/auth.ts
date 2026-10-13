@@ -4,9 +4,11 @@ import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/a
 import { bearer } from "better-auth/plugins/bearer";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { emailOTP } from "better-auth/plugins/email-otp";
+import { jwt } from "better-auth/plugins/jwt";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
+import { type AgentAccess, agentTokens, TOKEN_PATH } from "./agents.ts";
 import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
@@ -61,6 +63,9 @@ export const DISABLED_PATHS = [
  * declared with.
  */
 const DISABLED: ReadonlySet<string> = new Set(DISABLED_PATHS);
+
+/** How long a token-signing key signs before the next takes over, and how long its public half stays published after. */
+const TOKEN_KEY_SECONDS = 60 * 60 * 24 * 30;
 
 /**
  * What a user without a handle may do: set it, sign out, or sign in again. The
@@ -127,6 +132,8 @@ export interface AuthConfig {
   readonly sendOtp?: OtpSender;
   /** GitHub sign-in, only once its OAuth app exists. */
   readonly github?: { readonly clientId: string; readonly clientSecret: string };
+  /** Keel's agents, as the token endpoint reads them. */
+  readonly agents: AgentAccess;
   /**
    * Keeps the Worker alive for work Better Auth does after answering, such as
    * sending a code (it answers alike whether or not the address exists).
@@ -312,6 +319,12 @@ export function authOptions(config: AuthConfig) {
         }),
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        // A token request that names no resource is for Keel's own API. Left unnamed, the
+        // provider issues an opaque token it stores against a client row, and an agent has none.
+        if (ctx.path === TOKEN_PATH)
+          return ctx.body?.resource === undefined
+            ? { context: { ...ctx, body: { ...ctx.body, resource: origin } } }
+            : undefined;
         if (DISABLED.has(ctx.path))
           throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
@@ -401,6 +414,13 @@ export function authOptions(config: AuthConfig) {
         validateClient: (clientId) => clientId === DEVICE_CLIENT_ID,
       }),
       bearer(),
+      // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
+      // is never turned into a token: no answer carries one in a header.
+      jwt({
+        disableSettingJwtHeader: true,
+        jwks: { rotationInterval: TOKEN_KEY_SECONDS, gracePeriod: TOKEN_KEY_SECONDS },
+      }),
+      agentTokens({ origin, agents: config.agents }),
       passkey({
         rpID: config.host,
         rpName: "Keel",

@@ -27,6 +27,7 @@ export interface AgentStanding {
 export class AgentDirectory extends Context.Service<
   AgentDirectory,
   {
+    /** The agent, with its keys when it signed up by key. */
     readonly findAgent: (agentId: AgentId) => Effect.Effect<Option.Option<Agent>>;
     readonly findCredential: (clientId: string) => Effect.Effect<Option.Option<StoredCredential>>;
     /**
@@ -39,6 +40,11 @@ export class AgentDirectory extends Context.Service<
     ) => Effect.Effect<Option.Option<AgentId>>;
     /** Writes the projection of an agent and its credential. Its standing's seq is left alone. */
     readonly upsert: (agent: Agent, credential: StoredCredential) => Effect.Effect<void>;
+    /**
+     * Writes the projection of an agent that signed up by key: its row, and its
+     * keys, which become exactly `agent.keys`. Its standing's seq is left alone.
+     */
+    readonly upsertAccount: (agent: Agent) => Effect.Effect<void>;
     /**
      * Writes an agent's standing as the event at `seq` on its entity left it,
      * only if the row last took an earlier one: a late or repeated write (the
