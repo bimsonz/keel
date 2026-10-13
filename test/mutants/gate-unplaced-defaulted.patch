@@ -2,15 +2,15 @@
 # kills: gate.unplaced
 # why: an agent with no org or sponsor is admitted as an anonymous caller instead of refused by name, so a pre-tenancy agent silently loses its identity
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index d525ea77..96849735 100644
+index 1fc72a54..e3cb7f29 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -113,7 +113,7 @@ export const principalOf: (
-       case "Token": {
-         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
-         const agent = yield* admit(token);
--        if (agent.org === undefined) return yield* new AgentUnplaced({ agentId: agent.id });
-+        if (agent.org === undefined) return { principal: { _tag: "Anonymous" } };
-         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
-         const { org, sponsor: sponsorId } = agent;
-         const standing: AgentStanding =
+@@ -159,7 +159,7 @@ export const principalOf: (
+       const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+       const agent = yield* admit(token);
+       if (agent.org === undefined || agent.projectId === undefined)
+-        return yield* new AgentUnplaced({ agentId: agent.id });
++        return { principal: { _tag: "Anonymous" } };
+       if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
+       const { org, sponsor: sponsorId, projectId } = agent;
+       const standing: AgentStanding =

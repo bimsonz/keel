@@ -2,13 +2,13 @@
 # kills: gate.signed-in
 # why: a bearer session is admitted without how it was signed in, so no bearer session is ever fresh and a person on one can approve or pause nothing
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 4a8e747a..b100e453 100644
+index 86baabc6..47376da8 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -132,7 +132,7 @@ export async function gate(
+@@ -226,7 +226,7 @@ export async function gate(
      else {
        const user = await session(only(request.headers, "authorization"));
-       if (user === null) return refusal({ refused: "invalid" }, requestId);
+       if (user === null) return refused({ refused: "invalid" });
 -      credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
 +      credential = { _tag: "Session", userId: user.userId, signedIn: { by: null, at: 0 } };
      }

@@ -2,19 +2,19 @@
 # kills: gate.principal
 # why: a token that does not verify is served as an anonymous caller instead of refused, so a forged JWT reads whatever the public reads and nobody notices the bad credential
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 4a8e747a..50f4346a 100644
+index 86baabc6..d970d101 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -147,7 +147,12 @@ export async function gate(
+@@ -241,7 +241,12 @@ export async function gate(
        credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
    }
    const answer = await deps.admit(credential);
--  if (!("admitted" in answer)) return refusal(answer, requestId);
+-  if (!("admitted" in answer)) return refused(answer);
 +  if (!("admitted" in answer)) {
 +    const anonymous = await deps.admit({ _tag: "None" });
 +    return "admitted" in anonymous
-+      ? { admitted: anonymous.admitted, timing: "" }
-+      : refusal(answer, requestId);
++      ? { admitted: anonymous.admitted, timing: "", challenge: deps.challenge(door) }
++      : refused(answer);
 +  }
    return {
      admitted: answer.admitted,
