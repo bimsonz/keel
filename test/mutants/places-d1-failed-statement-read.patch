@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.d1-refused
+# why: A statement D1 reports as failed is read as if its rows were the places
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..0e50a980 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -31,8 +31,6 @@ const field = (from: unknown, name: string): unknown =>
+ /** The one statement of what `wrangler d1 execute --json` prints, when it succeeded. */
+ function statementOf(answer: unknown): unknown {
+   const statement: unknown = Array.isArray(answer) && answer.length === 1 ? answer[0] : undefined;
+-  if (field(statement, "success") !== true)
+-    throw new PlacesRefused("D1 did not answer the one statement");
+   return statement;
+ }
+ 

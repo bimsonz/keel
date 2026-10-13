@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.too-new
+# why: A place assigned a moment ago is judged, so a create in flight has its place given away under it
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..806e0329 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -109,7 +109,7 @@ export async function survey(
+   look: (place: Place) => Promise<Look>,
+ ): Promise<readonly Surveyed[]> {
+   const judged = places.filter(
+-    (place) => place.namespace === namespace && now - place.createdAt >= SETTLED_AFTER_MS,
++    (place) => place.namespace === namespace,
+   );
+   const looks = new Map<string, Look[]>(judged.map((place) => [place.id, []]));
+   // oxlint-disable no-await-in-loop -- one look after another: the passes are meant to be apart

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.release
+# why: Every surveyed place is offered for release, not only the empty ones
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..8cc1fe36 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -148,7 +148,6 @@ export async function release(
+   const kept: Place[] = [];
+   // oxlint-disable no-await-in-loop -- one place after another, each looked at just before it goes
+   for (const { place, standing } of surveyed) {
+-    if (standing !== "empty") continue;
+     const still =
+       witness !== undefined &&
+       (await look(witness)) === "project" &&

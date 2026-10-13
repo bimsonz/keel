@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.d1-refused
+# why: A row whose id is not a project id is taken as a place, and its id later reaches a statement
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..9b1ad301 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -46,7 +46,6 @@ export function placesFromD1(answer: unknown): readonly Place[] {
+     );
+     if (
+       typeof id !== "string" ||
+-      !PROJECT_ID.test(id) ||
+       typeof namespace !== "string" ||
+       namespace === "" ||
+       typeof name !== "string" ||

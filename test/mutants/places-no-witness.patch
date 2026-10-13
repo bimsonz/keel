@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.witness
+# why: An empty place is believed with no project of the namespace answering: a caller refused everything there finds every place empty
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..16b108f6 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -123,7 +123,7 @@ export async function survey(
+     if (!looks.has(place.id))
+       return { place, standing: place.namespace === namespace ? "too-new" : "elsewhere" };
+     if (every(place, "project")) return { place, standing: "project" };
+-    return { place, standing: witnessed && every(place, "none") ? "empty" : "untold" };
++    return { place, standing: every(place, "none") ? "empty" : "untold" };
+   });
+ }
+ 

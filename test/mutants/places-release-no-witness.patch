@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.release-witness
+# why: The project that answered the survey is not asked again before a place goes, so places are dropped after the caller stopped being able to read the namespace
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..fffb9eae 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -150,9 +150,7 @@ export async function release(
+   for (const { place, standing } of surveyed) {
+     if (standing !== "empty") continue;
+     const still =
+-      witness !== undefined &&
+-      (await look(witness)) === "project" &&
+-      (await look(place)) === "none";
++      witness !== undefined && (await look(place)) === "none";
+     if (still) {
+       await drop(place);
+       released.push(place);

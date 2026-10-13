@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/empty-places.test.ts
+# kills: places.statement
+# why: Any text is written into the DELETE as the id, so a malformed place deletes other rows
+diff --git a/scripts/lib/empty-places.ts b/scripts/lib/empty-places.ts
+index 81237b29..dce6cd0f 100644
+--- a/scripts/lib/empty-places.ts
++++ b/scripts/lib/empty-places.ts
+@@ -61,7 +61,6 @@ export function placesFromD1(answer: unknown): readonly Place[] {
+ 
+ /** The statement that gives a place back, by its project's id alone. */
+ export function releaseStatement(place: Place): string {
+-  if (!PROJECT_ID.test(place.id)) throw new PlacesRefused(`${place.id} is not a project id`);
+   return `DELETE FROM projects WHERE id = '${place.id}'`;
+ }
+ 
