@@ -6,7 +6,7 @@ import {
   type ProjectNameTaken,
 } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
-import { type NamespaceId, ProjectId } from "../../domain/kernel/index.ts";
+import { type NamespaceId, ProjectId, type RunRef } from "../../domain/kernel/index.ts";
 import {
   type ProjectRecord,
   ProjectNamespaces,
@@ -29,6 +29,8 @@ export interface NewProject {
   readonly name: string;
   /** Never a repo's name as the caller wrote it: `projectSource` reads that first. */
   readonly source: ProjectSource;
+  /** The run an agent creates it in, when its token named one. */
+  readonly run?: RunRef | undefined;
   readonly idempotencyKey: string;
 }
 
@@ -70,7 +72,13 @@ export const createProject: (
     return yield* new IdempotencyConflict({ idempotencyKey });
   yield* places.assign({ projectId, namespace, name });
   return yield* (yield* Projects)
-    .create(actor, { projectId, name, source: input.source, idempotencyKey })
+    .create(actor, {
+      projectId,
+      name,
+      source: input.source,
+      ...(input.run === undefined ? {} : { run: input.run }),
+      idempotencyKey,
+    })
     .pipe(
       Effect.tapError((refused) =>
         refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),

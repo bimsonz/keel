@@ -2,7 +2,7 @@ import { Context, type Effect } from "effect";
 import type { SubjectAnchors } from "../../domain/coordination/index.ts";
 import type { Actor, IdempotencyConflict, QuotaExceeded } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
-import type { Glob, Instant, ProjectId } from "../../domain/kernel/index.ts";
+import type { Glob, Instant, ProjectId, RunRef } from "../../domain/kernel/index.ts";
 import type { ImportRefused, RepoNotFound } from "./code-host.ts";
 import type { ImportTooLarge } from "./trunks.ts";
 
@@ -60,6 +60,8 @@ export interface CreateProjectInput {
   readonly name: string;
   /** Where trunk starts. */
   readonly source: ProjectSource;
+  /** The run an agent creates it in, when its token named one: the run its first event names. */
+  readonly run?: RunRef | undefined;
   readonly idempotencyKey: string;
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectIdFor } from "@keeltown/core/application/coordination";
 import { createProject as bootstrap, projectRepos } from "@keeltown/core/application/integration";
-import { type Actor, actorId } from "@keeltown/core/domain/identity";
+import { type Actor, actorId, eventActorOf } from "@keeltown/core/domain/identity";
 import { isId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
   type Clock,
@@ -85,7 +85,8 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
             bootstrap(
               {
                 ...input,
-                by: creatorOf(actor),
+                by: actorId(actor),
+                actor: eventActorOf(actor),
                 fingerprint: JSON.stringify([input.name, input.source]),
               },
               2,
@@ -117,12 +118,6 @@ const seedSource = Effect.gen(function* () {
 });
 
 const TEMPLATE = { _tag: "Template", repo: SOURCE.name } as const;
-
-/** The person creating a project: only a person does, as the Project object's adapter holds. */
-const creatorOf = (actor: Actor): UserId => {
-  if (actor._tag !== "User") throw new Error("a project is created by a person");
-  return actor.userId;
-};
 
 const creating = (actor: Actor, name: string, idempotencyKey: string) =>
   createProject(actor, { namespace: ORG, name, source: TEMPLATE, idempotencyKey });

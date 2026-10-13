@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectRepos } from "@keeltown/core/application/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
-import { type Instant, ProjectId, UserId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  agentActor,
+  type Instant,
+  ProjectId,
+  RunRef,
+  userActor,
+  UserId,
+} from "@keeltown/core/kernel";
 import {
   CodeHost,
   EventOutbox,
@@ -98,6 +106,7 @@ const creating = (
   name: "Seed app",
   source,
   by: creator,
+  actor: userActor(creator),
   idempotencyKey,
   fingerprint,
 });
@@ -155,6 +164,50 @@ describe("createProject", () => {
         expect(yield* projectEvents).toEqual(["ProjectCreated"]);
         const [created] = (yield* EventOutbox).log({ kind: "project", id: projectId });
         expect(created).toMatchObject({ actor: `user:${creator}`, payload: { by: creator } });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[run.own-project] an agent's project is created as the agent and in its run: the event's actor, its run and its `by`, and a replay answers the same project",
+    () => {
+      const { layer } = bootstrap();
+      const agentId = Schema.decodeUnknownSync(AgentId)("agt_01M4A00000000000000000000A");
+      const run = Schema.decodeUnknownSync(RunRef)({
+        id: "run_01M4R00000000000000000000A",
+        label: "run-c",
+      });
+      const byAgent = { ...creating(), by: agentId, actor: agentActor(agentId) };
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const project = yield* createProject({ ...byAgent, run }, POOL_TARGET);
+        const [created, ...others] = (yield* EventOutbox).log({ kind: "project", id: projectId });
+        expect(created).toMatchObject({
+          actor: `agent:${agentId}`,
+          run,
+          payload: { _tag: "ProjectCreated", by: agentId },
+        });
+        expect(others).toEqual([]);
+        expect(yield* createProject({ ...byAgent, run }, POOL_TARGET)).toEqual(project);
+        expect((yield* EventOutbox).log({ kind: "project", id: projectId })).toHaveLength(1);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[run.own-project] a creation in no run names none: a person's, and an agent's whose token named no run",
+    () => {
+      const { layer } = bootstrap();
+      const agentId = Schema.decodeUnknownSync(AgentId)("agt_01M4A00000000000000000000A");
+      return Effect.gen(function* () {
+        yield* seedSource;
+        yield* createProject(
+          { ...creating(), by: agentId, actor: agentActor(agentId) },
+          POOL_TARGET,
+        );
+        const [created] = (yield* EventOutbox).log({ kind: "project", id: projectId });
+        expect(created).toMatchObject({ actor: `agent:${agentId}`, payload: { by: agentId } });
+        expect(created).not.toHaveProperty("run");
       }).pipe(Effect.provide(layer));
     },
   );

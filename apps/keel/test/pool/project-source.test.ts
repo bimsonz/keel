@@ -8,8 +8,16 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { projectIdFor } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { makeId, type NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
-import { CodeHost, type RepoRef } from "@keeltown/core/ports";
+import { agentIdOf, runIdOf } from "@keeltown/core/domain/identity";
+import {
+  makeId,
+  type NamespaceId,
+  type ProjectId,
+  RunLabel,
+  type RunRef,
+  UserId,
+} from "@keeltown/core/kernel";
+import { CodeHost, EventOutbox, type RepoRef } from "@keeltown/core/ports";
 import { makeCodeHostMemory, makeTrunksMemory, makeWorkspacePoolMemory } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -20,6 +28,7 @@ import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { ProjectsRpc, type ProjectStub } from "../../src/adapters/driven/do-rpc/projects.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
+import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
 import {
   BASE,
   drainAfter,
@@ -29,6 +38,7 @@ import {
   seedOrg,
   seedUser,
   uniqueHandle,
+  worker,
 } from "./helpers.ts";
 
 const TEMPLATE = "fixture-forge-lite";
@@ -52,6 +62,49 @@ interface Creating {
   readonly source:
     | { readonly kind: "template"; readonly name: string }
     | { readonly kind: "fork"; readonly project: string };
+}
+
+const REGISTER = `${BASE}/v1/oauth/register`;
+
+/**
+ * An agent as it signs itself up through the Worker with a key and nothing
+ * else, which gives it a namespace of its own, and the tokens the token
+ * endpoint grants it: for a run, or naming none. No token names a project.
+ */
+async function keyAgent() {
+  const account = await newKey();
+  const registered = await worker(REGISTER, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "cf-connecting-ip": freshAddress(),
+      dpop: await proofBy(account, "POST", REGISTER),
+    },
+    body: JSON.stringify({
+      jwks: { keys: [account.publicJwk] },
+      token_endpoint_auth_method: "private_key_jwt",
+      grant_types: ["client_credentials"],
+    }),
+  });
+  if (registered.status !== 201)
+    throw new Error(`the sign-up answered ${registered.status}: ${await registered.text()}`);
+  const agentId = agentIdOf(account.key.jkt);
+  // What the agent's own object commits at sign-up is flushed before the case ends.
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
+  const token = async (run?: string) =>
+    (await granted(await requestToken(agentId, account, run === undefined ? {} : { run })))
+      .access_token;
+  return {
+    agentId,
+    handle: (await registered.json<{ handle: string }>()).handle,
+    /** A token that names no run. */
+    plain: () => token(),
+    /** A token for the run the label names, and the run as an event names it. */
+    lane: async (name: string): Promise<{ readonly token: string; readonly run: RunRef }> => {
+      const label = Schema.decodeUnknownSync(RunLabel)(name);
+      return { token: await token(name), run: { id: runIdOf(agentId, { label }), label } };
+    },
+  };
 }
 
 /** The template, as a request's source. */
@@ -83,6 +136,16 @@ const joins = async (userId: string, org: NamespaceId) => {
     .bind(ulid(), org, userId, new Date().toISOString())
     .run();
 };
+
+/** The project entity's events as its own object holds them, in `seq` order. */
+const logOf = (projectId: ProjectId) =>
+  runInDurableObject(
+    env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)),
+    (instance: ProjectDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "project", id: projectId })),
+      ),
+  );
 
 /**
  * The app over real Project DOs that share one in-memory code host. The host
@@ -388,5 +451,77 @@ describe("a new project's source", () => {
     await world.hold({ namespace: "keel-core", name: TEMPLATE }, "the template");
     const next = await world.create(owner.token, early);
     expect([next.status, next.body.name]).toEqual([201, early.name]);
+  });
+
+  it("[run.own-project] an agent makes a project in its own namespace with a run's token: it is placed there, and its first event names the agent and the run; a token that names no run names none; a namespace that is not its own is refused and nothing is made", async () => {
+    const world = sourceApp();
+    const agent = await keyAgent();
+    const lane = await agent.lane("run-c");
+    const own = { namespace: agent.handle, name: uniqueHandle("own"), source: FROM_TEMPLATE };
+    const asked = key();
+    const made = await world.create(lane.token, own, asked);
+    expect([made.status, made.body.namespace, made.body.name]).toEqual([
+      201,
+      { handle: agent.handle, kind: "agent" },
+      own.name,
+    ]);
+    expect(made.body.id).toBe(projectIdFor({ _tag: "Agent", agentId: agent.agentId }, asked));
+    expect(await placed(made.body.id)).toBe(true);
+    expect(await world.head(made.body.id)).toBe(await world.templateHead);
+    const events = await logOf(made.body.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "ProjectCreated",
+      actor: `agent:${agent.agentId}`,
+      run: lane.run,
+      payload: { by: agent.agentId, name: own.name },
+    });
+    // The same key again, from the same run, answers the same project and commits nothing more.
+    const again = await world.create(lane.token, own, asked);
+    expect([again.status, again.body.id]).toEqual([201, made.body.id]);
+    expect(await logOf(made.body.id)).toHaveLength(1);
+
+    // A token that names no run: the agent still creates, and the event names no run.
+    const plain = await world.create(await agent.plain(), {
+      ...own,
+      name: uniqueHandle("plain"),
+    });
+    expect(plain.status).toBe(201);
+    const [first] = await logOf(plain.body.id);
+    expect(first).toMatchObject({ actor: `agent:${agent.agentId}` });
+    expect(first).not.toHaveProperty("run");
+
+    // Where it holds nothing it makes nothing: an org it is no part of, and another agent's own namespace.
+    await maintainer();
+    const other = await keyAgent();
+    const elsewhere = { "an org": key(), "another agent's namespace": key() };
+    const refused = {
+      "an org": await world.create(
+        lane.token,
+        { ...own, namespace: "pool", name: uniqueHandle("no") },
+        elsewhere["an org"],
+      ),
+      "another agent's namespace": await world.create(
+        lane.token,
+        { ...own, namespace: other.handle, name: uniqueHandle("no") },
+        elsewhere["another agent's namespace"],
+      ),
+    };
+    // As the policy answers each: neither is the agent's own.
+    expect(
+      Object.fromEntries(
+        Object.entries(refused).map(([where, answer]) => [
+          where,
+          [answer.status, answer.body.code],
+        ]),
+      ),
+    ).toEqual({
+      "an org": [403, "auth.forbidden"],
+      "another agent's namespace": [403, "auth.forbidden"],
+    });
+    for (const asking of Object.values(elsewhere))
+      expect(await placed(projectIdFor({ _tag: "Agent", agentId: agent.agentId }, asking))).toBe(
+        false,
+      );
   });
 });

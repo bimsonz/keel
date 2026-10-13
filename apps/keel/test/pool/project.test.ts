@@ -86,6 +86,7 @@ async function projectUnderTest() {
         name: "Seed app",
         source: { _tag: "Template", repo: source },
         by: maintainer,
+        actor: `user:${maintainer}`,
         idempotencyKey: "create-1",
         fingerprint,
       }),

@@ -260,6 +260,14 @@ function linkActorOf(caller: Caller): Actor {
   throw new Error("a link's end ran for neither an agent nor a user");
 }
 
+/** Who creates a project: a person, or an agent in a namespace of its own, as the policy granted. */
+function creatorOf(caller: Caller): Actor {
+  const { principal } = caller;
+  if (principal._tag === "Agent") return { _tag: "Agent", agentId: principal.agentId };
+  if (principal._tag === "User") return { _tag: "User", userId: principal.userId };
+  throw new Error("a project's creation ran for neither an agent nor a user");
+}
+
 /** The project a read was granted, and who it reads as. */
 const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audience: Audience } => ({
   project: projectOf(caller).projectId,
@@ -935,17 +943,15 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         // import's URL and branch by Keel's own rules, and a project to fork, which is a second resource
         // named in the body, decided as a fork.
         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
-          // The policy lets an agent create in its own namespace, and the creation is still a person's:
-          // an agent is told it has not landed, where naming the acting person would be a defect.
-          if (caller.principal._tag !== "User")
-            return Promise.resolve(notImplemented(caller.requestId));
           const source = projectSource(input.source);
           if (source._tag === "Unknown") return Promise.resolve(sourceNotFound(caller, input));
           if (source._tag === "Refused") return Promise.resolve(sourceRefused(caller, source));
           return run(
             caller,
             Effect.gen(function* () {
-              const actor = yield* actorOf(caller);
+              // An agent's token names the run it creates in: the project's first event carries it.
+              const actor = creatorOf(caller);
+              const inRun = caller.token?.run;
               const target = caller.resource?._tag === "Namespace" ? caller.resource : undefined;
               if (target === undefined)
                 return yield* Effect.die(new Error("createProject ran without its namespace"));
@@ -964,6 +970,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 namespace: target.namespace,
                 name: input.name,
                 source,
+                ...(inRun === undefined ? {} : { run: inRun }),
                 idempotencyKey: input["idempotency-key"],
               }).pipe(
                 Effect.map((project) =>

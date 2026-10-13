@@ -33,9 +33,6 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
     Projects.of({
       create: (actor, input) =>
         Effect.gen(function* () {
-          // The policy lets only a person create a project: an agent here is a defect, not a refusal.
-          if (actor._tag !== "User")
-            return yield* Effect.die(new Error("a project is created by a person"));
           const fingerprint = yield* Effect.promise(() =>
             fingerprintOf({ name: input.name, source: input.source }),
           );
@@ -43,7 +40,9 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
             projectId: input.projectId,
             name: input.name,
             source: input.source,
-            by: actor.userId,
+            by: actorId(actor),
+            actor: eventActorOf(actor),
+            ...(input.run === undefined ? {} : { run: input.run }),
             idempotencyKey: input.idempotencyKey,
             fingerprint,
           });

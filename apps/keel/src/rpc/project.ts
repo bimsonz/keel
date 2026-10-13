@@ -8,7 +8,7 @@ import {
   Glob,
   InstantSchema,
   ProjectId,
-  UserId,
+  RunRef,
 } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
@@ -54,8 +54,10 @@ export const PutSettingsCommand = Schema.Struct({
  * Create the project this DO is named for. The isolate derives `projectId`
  * from the actor and the Idempotency-Key, so a retry reaches the same DO,
  * which replays by `idempotencyKey` and refuses another body (`fingerprint`)
- * with IdempotencyConflict. `by` is the person creating it; the commit's actor
- * is `user:<by>`. Trunk is made by `source`: Keel's own first commit for an
+ * with IdempotencyConflict. `by` is the id of who creates it, a person or an
+ * agent in a namespace of its own; `actor` is the same creator as the commit's
+ * envelope names it, and `run` the run an agent creates it in, when its token
+ * named one. Trunk is made by `source`: Keel's own first commit for an
  * empty project, a public Git repository imported once, another project's
  * trunk forked, or a template forked. Trunk is initialised at its first
  * head, with where it came from; staging is forked from trunk; the
@@ -75,7 +77,9 @@ export const CreateProjectCommand = Schema.Struct({
     Schema.TaggedStruct("Project", { projectId: ProjectId }),
     Schema.TaggedStruct("Template", { repo: Schema.NonEmptyString }),
   ]),
-  by: UserId,
+  by: Schema.NonEmptyString,
+  actor: Actor,
+  run: Schema.optional(RunRef),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });

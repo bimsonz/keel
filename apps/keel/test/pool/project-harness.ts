@@ -51,6 +51,7 @@ export async function project() {
       yield* (yield* CodeHostFixture).commit(SOURCE, "refs/heads/main", { "a.txt": "a" });
     }).pipe(Effect.provide(code.layer)),
   );
+  const creator = makeId("usr", ulid());
   ok(
     decodeExit(
       ProjectCodecs.createProject,
@@ -58,7 +59,8 @@ export async function project() {
         projectId,
         name: "Seed app",
         source: { _tag: "Template", repo: SOURCE.name },
-        by: makeId("usr", ulid()),
+        by: creator,
+        actor: `user:${creator}`,
         idempotencyKey: "create-1",
         fingerprint: "body-1",
       }),
