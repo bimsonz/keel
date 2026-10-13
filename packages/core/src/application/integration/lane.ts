@@ -181,6 +181,18 @@ const emptyLane = (laneId: string): Lane => ({
   infra: [],
 });
 
+/**
+ * How many changes the lane holds, as a reader is shown it: those queued, and
+ * the members of the batch in flight, which left the queue when it formed. A
+ * lane no change ever joined holds none.
+ */
+export const laneStanding = Effect.fn("integration/laneStanding")(function* (laneId: string) {
+  const store = yield* EntityStore;
+  const lane = laneOf(store, laneId);
+  const active = lane?.active === undefined ? undefined : batchOf(store, lane.active.batchId);
+  return { queued: lane?.queue.length ?? 0, inFlight: active?.members.length ?? 0 };
+});
+
 /** Whether the lane was destroyed: it then hears no event, forms no batch and takes no verdict. */
 export const laneDestroyed = (store: Store, laneId: string): boolean =>
   store.get(DESTROYED, laneId) !== undefined;

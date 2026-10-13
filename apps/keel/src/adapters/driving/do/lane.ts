@@ -3,6 +3,7 @@ import {
   destroyLane,
   laneHeard,
   laneProject,
+  laneStanding,
   laneStep,
   recordVerdict,
   reofferDue,
@@ -58,7 +59,7 @@ const laneIdOf = (name: string | undefined): string => {
  * verdict.
  * Repo-touching: callers place it with the deployment's `locationHint`.
  */
-export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<LaneRpc> {
+export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
   /** Consecutive failed steps, for the backoff; an evicted object starts again at 1 s. */
   private failures = 0;
 
@@ -72,6 +73,10 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
 
   private get laneId(): string {
     return laneIdOf(this.ctx.id.name);
+  }
+
+  async status() {
+    return this.answer(LaneCodecs.status, laneStanding(this.laneId));
   }
 
   async recordVerdict(command: unknown) {

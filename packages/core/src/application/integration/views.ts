@@ -1,11 +1,11 @@
 import { Effect, Option } from "effect";
 import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
-import { Trunks } from "../ports/index.ts";
+import { Lanes, Trunks } from "../ports/index.ts";
 
 /**
- * The integration read models reachable from the API: a project's trunk as
- * its Trunk DO holds it. The doorway has already authorised the read on the
- * project.
+ * The integration read models reachable from the API: a project's trunk and
+ * its lanes as their own objects hold them. The doorway has already
+ * authorised the read on the project.
  */
 
 export interface TrunkView {
@@ -29,4 +29,21 @@ export const readTrunk = (
       advancedAt: trunk.advancedAt,
       frozen: trunk.phase === "frozen",
     })),
+  );
+
+export interface LaneView {
+  /** The lane's id, as its events name it. */
+  readonly id: string;
+  readonly projectId: ProjectId;
+  /** Changes queued and not yet in a batch. */
+  readonly queued: number;
+  /** Changes in the batch in flight: formed, and not yet landed or sent back. */
+  readonly inFlight: number;
+}
+
+/** The project's lanes: one today. */
+export const readLanes = (projectId: ProjectId): Effect.Effect<readonly LaneView[], never, Lanes> =>
+  Effect.map(
+    Effect.flatMap(Lanes, (lanes) => lanes.view(projectId)),
+    (lanes) => lanes.map((lane) => ({ ...lane, projectId })),
   );

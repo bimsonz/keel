@@ -1,3 +1,4 @@
+import { mainLane } from "@keeltown/core/application/integration";
 import {
   CompositionRefused,
   type PromotionState,
@@ -383,14 +384,23 @@ export function makeTrunksMemory(
 /**
  * Who destroyed each project's lanes, and each report that a lane's KeelVerify
  * instance ended. `journal` records each destroy in order beside other
- * adapters'.
+ * adapters'. A project's one lane holds nothing until `hold` says how many
+ * changes it has queued and in flight.
  */
 export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
   const destroyed = new Map<ProjectId, string>();
   const ended: { readonly laneId: string; readonly instanceId: string }[] = [];
+  const held = new Map<ProjectId, { readonly queued: number; readonly inFlight: number }>();
   return {
     destroyed,
     ended,
+    /** What the project's lane is shown holding from here on. */
+    hold: (
+      projectId: ProjectId,
+      counts: { readonly queued: number; readonly inFlight: number },
+    ) => {
+      held.set(projectId, counts);
+    },
     layer: Layer.succeed(
       Lanes,
       Lanes.of({
@@ -399,6 +409,10 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
             if (!destroyed.has(projectId)) destroyed.set(projectId, by);
             options.journal?.push(`destroy lanes ${projectId}`);
           }),
+        view: (projectId) =>
+          Effect.sync(() => [
+            { id: mainLane(projectId), ...(held.get(projectId) ?? { queued: 0, inFlight: 0 }) },
+          ]),
         verificationEnded: (laneId, instanceId) =>
           Effect.sync(() => {
             ended.push({ laneId, instanceId });

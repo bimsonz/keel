@@ -14,6 +14,7 @@ import {
   PROJECTOR,
   type Projects,
   RepoServer,
+  type Lanes,
   type Trunks,
 } from "@keeltown/core/ports";
 import { waitUntil } from "cloudflare:workers";
@@ -64,6 +65,7 @@ import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
+import { LanesRpc } from "../adapters/driven/do-rpc/lanes.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
@@ -113,6 +115,8 @@ export function isolateLayer(
     overrides.projects ?? ProjectsRpc(project),
     // A project's view names what it was forked from, which its trunk keeps.
     overrides.trunks ?? TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
+    // A project's lanes, as their own objects count them.
+    overrides.lanes ?? LanesRpc(env.LANE, artifactsLocationHint(env)),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     AgentSignUpsRpc(agentSession),
     overrides.sessions ?? SessionsRpc(agentSession),
@@ -148,6 +152,8 @@ export interface IsolateOverrides {
   readonly projects?: Layer.Layer<Projects>;
   /** Pass the trunks the projects' own objects write, when those are in memory. */
   readonly trunks?: Layer.Layer<Trunks>;
+  /** Pass the lanes a test counts in memory. */
+  readonly lanes?: Layer.Layer<Lanes>;
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;

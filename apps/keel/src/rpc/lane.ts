@@ -29,7 +29,11 @@ export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 export const VerificationEndedCommand = Schema.Struct({ instanceId: Schema.NonEmptyString });
 export type VerificationEndedCommand = typeof VerificationEndedCommand.Type;
 
+/** How many changes a lane holds: queued, and in the batch in flight. */
+export const LaneStandingAnswer = Schema.Struct({ queued: Schema.Int, inFlight: Schema.Int });
+
 export const LaneCodecs = {
+  status: exitCodec(LaneStandingAnswer, Schema.Never),
   recordVerdict: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
   destroy: exitCodec(Schema.Void, Schema.Never),
   verificationEnded: exitCodec(Schema.Void, Schema.Never),
@@ -41,6 +45,12 @@ export const LaneCodecs = {
  * by a call.
  */
 export interface LaneRpc {
+  /**
+   * How many changes the lane holds, for a reader of its project: those
+   * queued, and the members of the batch in flight. A lane no change ever
+   * joined, and a destroyed one, answer zeros.
+   */
+  status(): Promise<ExitJson>;
   recordVerdict(command: typeof RecordVerdictCommand.Encoded): Promise<ExitJson>;
   /**
    * Stops the lane for good, when its project is deleted: it drops its queue

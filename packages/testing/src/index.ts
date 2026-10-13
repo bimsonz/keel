@@ -37,6 +37,7 @@ export * from "./contracts/verification.ts";
 export * from "./contracts/enrolments.ts";
 export * from "./contracts/sessions.ts";
 export * from "./contracts/org-usage.ts";
+export * from "./contracts/lanes.ts";
 export * from "./contracts/trunks.ts";
 export * from "./contracts/standings.ts";
 export * from "./contracts/sponsorships.ts";

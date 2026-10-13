@@ -101,6 +101,7 @@ describe("the queue consumer", () => {
         Lanes,
         Lanes.of({
           destroy: () => Effect.void,
+          view: () => Effect.die(new Error("the queue never reads a lane")),
           verificationEnded: (laneId, instanceId) =>
             instanceId.endsWith("1")
               ? Effect.die(new Error(`${laneId} is unreachable`))

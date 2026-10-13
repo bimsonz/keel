@@ -19,6 +19,7 @@ import {
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
 import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
+import { describeLanesContract } from "./contracts/lanes.ts";
 import { describeTrunksContract, type TrunksHarness } from "./contracts/trunks.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import {
@@ -532,7 +533,7 @@ export const PORTS = {
   >(memoryWorkspaceRefresherHarness, describeWorkspaceRefresherContract),
   RepoServer: port(memoryRepoServer, describeRepoServerContract),
   Trunks: harnessed<Trunks, TrunksHarness>(memoryTrunksHarness, describeTrunksContract),
-  Lanes: port(() => integration.makeLanesMemory().layer, pending("Lanes", ["destroy"])),
+  Lanes: port(() => integration.makeLanesMemory().layer, describeLanesContract),
   OrgUsage: harnessed<OrgUsage, OrgUsageHarness>(memoryOrgUsageHarness, describeOrgUsageContract),
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,

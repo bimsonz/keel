@@ -13,6 +13,7 @@ import {
   laneDestroyed,
   laneHeard,
   laneOf,
+  laneStanding,
   laneOfInstance,
   laneStep,
   projectRepos,
@@ -377,7 +378,67 @@ const toVerifying = (w: World) =>
     return { batchId: active.batchId, candidateId: active.candidateId, instanceId };
   });
 
+/** The stored batch with one more member, as a lane that batches several changes would hold it. */
+const withMember = (stored: unknown, member: ChangeId) => {
+  if (!isRecord(stored) || !Array.isArray(stored["members"])) throw new Error("no batch is stored");
+  return { ...stored, members: [...stored["members"], member] };
+};
+
 describe("the Lane", () => {
+  it.effect(
+    "[lane.status] a lane's two counts are of changes: those queued, and the members of the batch in flight, which left the queue when it formed and are in flight until the lane lets the batch go, landed or sent back; a lane no change ever joined holds none",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const seen: (readonly [string, { readonly queued: number; readonly inFlight: number }])[] =
+          [];
+        const look = (when: string) =>
+          Effect.map(laneStanding(LANE), (standing) => void seen.push([when, standing]));
+        yield* look("never used");
+        const base = yield* w.seeded;
+        for (const n of [1, 2, 3]) yield* queue(w, change(n));
+        yield* look("three queued");
+        const first = yield* toVerifying(w);
+        yield* look("the first verifying");
+        // A batch of two is two changes in flight, not one batch.
+        const store = yield* EntityStore;
+        const formed = store.get("batch", first.batchId);
+        store.put("batch", first.batchId, withMember(formed, change(9)));
+        yield* look("a batch of two");
+        if (formed !== undefined) store.put("batch", first.batchId, formed);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "land"),
+        );
+        yield* laneStep(LANE);
+        yield* look("green, waiting on trunk");
+        yield* advance(base, sha("d"), [change(1)]);
+        // The lane lets the landed batch go in its next step, which forms the next one.
+        yield* look("its landing heard");
+        const second = yield* toVerifying(w);
+        yield* look("the second verifying");
+        yield* recordVerdict(
+          LANE,
+          verdict(second.batchId, second.candidateId, second.instanceId, "bounce"),
+        );
+        yield* look("bounced");
+        yield* toVerifying(w);
+        yield* look("the third verifying");
+        expect(seen).toEqual([
+          ["never used", { queued: 0, inFlight: 0 }],
+          ["three queued", { queued: 3, inFlight: 0 }],
+          ["the first verifying", { queued: 2, inFlight: 1 }],
+          ["a batch of two", { queued: 2, inFlight: 2 }],
+          ["green, waiting on trunk", { queued: 2, inFlight: 1 }],
+          ["its landing heard", { queued: 2, inFlight: 1 }],
+          ["the second verifying", { queued: 1, inFlight: 1 }],
+          ["bounced", { queued: 1, inFlight: 0 }],
+          ["the third verifying", { queued: 0, inFlight: 1 }],
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
   it.effect(
     "[lane.fifo] batches the first queued change first, and the next only once it is done",
     () => {

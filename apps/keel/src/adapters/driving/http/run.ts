@@ -27,6 +27,7 @@ import type {
   ProjectAgents,
   Standings,
   TokenIssuer,
+  Lanes,
   Trunks,
   Users,
 } from "@keeltown/core/ports";
@@ -76,6 +77,7 @@ export type IsolateServices =
   | Namespaces
   | ProjectNamespaces
   | Trunks
+  | Lanes
   | OrgUsage
   | RepoServer;
 

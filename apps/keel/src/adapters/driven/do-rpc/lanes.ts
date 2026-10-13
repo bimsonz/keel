@@ -1,6 +1,6 @@
 import { mainLane } from "@keeltown/core/application/integration";
 import { Lanes } from "@keeltown/core/ports";
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { LaneCodecs, type LaneRpc } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
 
@@ -9,7 +9,7 @@ export interface DestroyableLanes {
   get(
     id: DurableObjectId,
     options?: { readonly locationHint?: DurableObjectLocationHint },
-  ): Pick<LaneRpc, "destroy" | "verificationEnded">;
+  ): Pick<LaneRpc, "destroy" | "verificationEnded" | "status">;
   idFromName(name: string): DurableObjectId;
 }
 
@@ -28,6 +28,11 @@ export function LanesRpc(
     Lanes.of({
       destroy: (projectId, by) =>
         callObject(LaneCodecs.destroy, () => lane(mainLane(projectId)).destroy(by)),
+      view: (projectId) =>
+        callObject(LaneCodecs.status, () => lane(mainLane(projectId)).status()).pipe(
+          Effect.map((standing) => [{ id: mainLane(projectId), ...standing }]),
+          Effect.orDie,
+        ),
       verificationEnded: (laneId, instanceId) =>
         callObject(LaneCodecs.verificationEnded, () =>
           lane(laneId).verificationEnded({ instanceId }),

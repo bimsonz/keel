@@ -2,7 +2,12 @@ import { env } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { type CommitSha, ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, Trunks } from "@keeltown/core/ports";
-import { makeCodeHostMemory, makeProjectsMemory, makeTrunksMemory } from "@keeltown/testing";
+import {
+  makeCodeHostMemory,
+  makeLanesMemory,
+  makeProjectsMemory,
+  makeTrunksMemory,
+} from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
@@ -11,8 +16,8 @@ import { BASE, type Fetch, seedAgent, seedForeignAgent, tokenFor, worker } from 
 /**
  * The repo read API through the real doorway and auth gate: its routes admit a
  * caller with no token, yet read a token that is presented. Trunks and settings
- * are in memory; agents and tokens are real. The trunk's own route goes
- * through the same doorway.
+ * are in memory; agents and tokens are real. The trunk's and the lanes'
+ * own routes go through the same doorway.
  */
 const project = Schema.decodeUnknownSync(ProjectId);
 const PRIVATE = project("prj_25R7GR504NN2N2MB7JTCFBPPQ8");
@@ -22,6 +27,7 @@ async function repoApp() {
   const codeHost = makeCodeHostMemory();
   const projects = makeProjectsMemory();
   const trunks = makeTrunksMemory();
+  const lanes = makeLanesMemory();
   const heads = new Map<ProjectId, CommitSha>();
   for (const [projectId, visibility] of [
     [PRIVATE, "private"],
@@ -45,6 +51,7 @@ async function repoApp() {
       }).pipe(Effect.provide(Layer.merge(codeHost.layer, trunks.layer))),
     );
     heads.set(projectId, head);
+    lanes.hold(projectId, { queued: 2, inFlight: 1 });
   }
   const { app } = makeIsolate(
     env,
@@ -52,6 +59,7 @@ async function repoApp() {
       codeHost: codeHost.layer,
       projects: projects.layer,
       trunks: trunks.layer,
+      lanes: lanes.layer,
     }),
   );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
@@ -62,6 +70,17 @@ const tree = (via: Fetch, projectId: string, authorization?: string) =>
   via(`${BASE}/v1/projects/${projectId}/repo/tree`, {
     headers: authorization === undefined ? {} : { authorization },
   }).then(async (r) => ({ status: r.status, body: await r.json<{ code?: string }>() }));
+
+const lanesOf = (via: Fetch, projectId: string, authorization?: string) =>
+  via(`${BASE}/v1/projects/${projectId}/lanes`, {
+    headers: authorization === undefined ? {} : { authorization },
+  }).then(async (r) => ({ status: r.status, body: await r.json<Record<string, unknown>>() }));
+
+/** The one page a project's lanes are, as `repoApp` holds them. */
+const page = (projectId: ProjectId) => ({
+  status: 200,
+  body: { items: [{ id: `lane:${projectId}:main`, projectId, queued: 2, inFlight: 1 }] },
+});
 
 const trunkOf = (via: Fetch, projectId: string, authorization?: string) =>
   via(`${BASE}/v1/projects/${projectId}/trunk`, {
@@ -120,6 +139,21 @@ describe("the repo read API's doorway", () => {
     });
     for (const authorization of [undefined, `Bearer ${other}`])
       expect(await trunkOf(via, PRIVATE, authorization)).toMatchObject({
+        status: 404,
+        body: { code: "resource.not_found" },
+      });
+  });
+
+  it("[views.lanes.wired] the lanes' route answers through the real doorway, decided on the project its path names: anyone reads a public project's lanes, a private one's are read by its own agent, and a stranger is told the project is missing", async () => {
+    const { via } = await repoApp();
+    const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    const other = await tokenFor(await seedForeignAgent());
+    expect(await lanesOf(via, PUBLIC)).toEqual(page(PUBLIC));
+    expect(await lanesOf(via, PRIVATE, `Bearer ${own}`)).toEqual(page(PRIVATE));
+    // A foreign agent asking for a public project is decided on that project, not on its own.
+    expect(await lanesOf(via, PUBLIC, `Bearer ${other}`)).toEqual(page(PUBLIC));
+    for (const authorization of [undefined, `Bearer ${other}`])
+      expect(await lanesOf(via, PRIVATE, authorization)).toMatchObject({
         status: 404,
         body: { code: "resource.not_found" },
       });

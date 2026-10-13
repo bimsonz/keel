@@ -1,6 +1,6 @@
 // The repo read API through the handler object: who may read a project's
 // code, and what each read answers, over in-memory trunks. And a project's
-// trunk as its Trunk DO holds it, read the same way.
+// trunk and lanes as their own objects hold them, read the same way.
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { Principal } from "@keeltown/core/domain/identity";
 import { AgentId, CommitSha, Instant, ProjectId } from "@keeltown/core/kernel";
@@ -30,6 +30,7 @@ import {
   makeProjectViewsMemory,
   makeTokenIssuerMemory,
   makeRepoServerMemory,
+  makeLanesMemory,
   makeTrunksMemory,
   makeUsersMemory,
   sampleOrgId,
@@ -62,6 +63,7 @@ const inbox = makeInboxMemory();
 const codeHost = makeCodeHostMemory();
 const projects = makeProjectsMemory();
 const trunks = makeTrunksMemory();
+const lanes = makeLanesMemory();
 const places = makeProjectNamespacesMemory();
 const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "forge" }] });
 const runtime = ManagedRuntime.make(
@@ -70,6 +72,7 @@ const runtime = ManagedRuntime.make(
     directory,
     projects.layer,
     trunks.layer,
+    lanes.layer,
     makeRepoServerMemory({ repos: new Map() }).layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
     makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
@@ -454,5 +457,48 @@ describe("a project's trunk", () => {
     const hidden = await handlers.Views_getTrunk(anonymous, { projectId: DIFFS });
     const missing = await handlers.Views_getTrunk(anonymous, { projectId: ELSEWHERE });
     expect([hidden.status, await bodyOf(hidden)]).toEqual([404, await bodyOf(missing)]);
+  });
+});
+
+describe("a project's lanes", () => {
+  it("[views.lanes] a project's lanes are one page holding its one lane, with what that lane counts queued and in flight, and no cursor; a cursor presented is not one Keel gave out", async () => {
+    const reader = agentOf(DIFFS);
+    const lane = { id: `lane:${DIFFS}:main`, projectId: DIFFS };
+    const empty = await handlers.Views_listLanes(reader, { projectId: DIFFS });
+    expect([empty.status, await bodyOf(empty)]).toEqual([
+      200,
+      { items: [{ ...lane, queued: 0, inFlight: 0 }] },
+    ]);
+    lanes.hold(DIFFS, { queued: 3, inFlight: 1 });
+    const busy = await handlers.Views_listLanes(reader, { projectId: DIFFS, limit: 1 });
+    expect([busy.status, await bodyOf(busy)]).toEqual([
+      200,
+      { items: [{ ...lane, queued: 3, inFlight: 1 }] },
+    ]);
+    const paged = await handlers.Views_listLanes(reader, { projectId: DIFFS, cursor: "c.1" });
+    expect([paged.status, await bodyOf(paged)]).toMatchObject([
+      400,
+      { issues: [{ path: ["cursor"] }] },
+    ]);
+  });
+
+  it("[views.lanes.path-project] the lanes read is decided on the project its path names, not the caller's own: a person of the org reads them, an agent is refused another project's by name, and a stranger learns nothing", async () => {
+    lanes.hold(PRIVATE, { queued: 2, inFlight: 0 });
+    const asMember = await handlers.Views_listLanes(member, { projectId: PRIVATE });
+    expect([asMember.status, await bodyOf(asMember)]).toEqual([
+      200,
+      { items: [{ id: `lane:${PRIVATE}:main`, projectId: PRIVATE, queued: 2, inFlight: 0 }] },
+    ]);
+    // An agent of DIFFS asks for PRIVATE's lanes: it is not answered its own project's, nor this one's.
+    const sibling = await handlers.Views_listLanes(agentOf(DIFFS), { projectId: PRIVATE });
+    expect([sibling.status, await bodyOf(sibling)]).toMatchObject([
+      403,
+      { code: "auth.forbidden", detail: "Refused: foreign-project." },
+    ]);
+    const hidden = await handlers.Views_listLanes(anonymous, { projectId: PRIVATE });
+    const missing = await handlers.Views_listLanes(anonymous, { projectId: ELSEWHERE });
+    expect([hidden.status, await bodyOf(hidden)]).toEqual([404, await bodyOf(missing)]);
+    // A public project's lanes are anyone's to read.
+    expect((await handlers.Views_listLanes(anonymous, { projectId: HISTORY })).status).toBe(200);
   });
 });

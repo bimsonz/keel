@@ -34,6 +34,7 @@ import {
   makeStandingsMemory,
   makeTokenIssuerMemory,
   makeRepoServerMemory,
+  makeLanesMemory,
   makeTrunksMemory,
   makeUsersMemory,
   sampleOrgId,
@@ -116,7 +117,6 @@ const STUBBED = [
   "Memory_listDecisions",
   "Memory_getDecision",
   "Views_getVerdict",
-  "Views_listLanes",
 ];
 
 /**
@@ -149,6 +149,7 @@ function grantedSurface() {
       directory,
       projects.layer,
       makeTrunksMemory().layer,
+      makeLanesMemory().layer,
       makeRepoServerMemory({ repos: new Map() }).layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
       makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),

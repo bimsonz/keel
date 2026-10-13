@@ -42,6 +42,7 @@ import {
   readRepoBlob,
   readRepoCommit,
   compareRepoCommits,
+  readLanes,
   readRepoTree,
   readTrunk,
 } from "@keeltown/core/application/integration";
@@ -145,7 +146,7 @@ import {
   treeOk,
 } from "./repo.ts";
 import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
-import { noTrunk, trunkOk } from "./integration-views.ts";
+import { lanesOk, noTrunk, trunkOk } from "./integration-views.ts";
 import {
   approveError,
   askError,
@@ -974,7 +975,14 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           );
         },
         Views_getVerdict: notYet,
-        Views_listLanes: notYet,
+        // One lane a project, so one page: no cursor is given out, and any presented is not Keel's.
+        Views_listLanes: (caller: Caller, input: Input<"Views_listLanes">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          if (input.cursor !== undefined)
+            return invalid(caller, [{ path: ["cursor"], message: "Not a cursor Keel gave out" }]);
+          return run(caller, Effect.map(readLanes(projectId.success), lanesOk));
+        },
         Views_getTrunk: (caller: Caller, input: Input<"Views_getTrunk">) => {
           const projectId = settingsProject(input.projectId);
           if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);

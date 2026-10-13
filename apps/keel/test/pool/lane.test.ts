@@ -31,6 +31,7 @@ import {
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
+  PORTS,
   suitePlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
@@ -210,7 +211,25 @@ const batchState = (
     ),
   );
 
+// The port's own suite, through the real object: a lane no change ever joined.
+PORTS.Lanes.contract("do-rpc", () => LanesRpc(env.LANE));
+
 describe("the Lane DO", () => {
+  it("[lane.do.status] through the real object and the port a lane is shown the changes it holds: the one whose batch formed in flight, the one behind it still queued", async () => {
+    const { stub, projectId, laneId, verification } = await lane();
+    const view = () =>
+      Effect.runPromise(
+        Effect.flatMap(Lanes, (lanes) => lanes.view(projectId)).pipe(
+          Effect.provide(LanesRpc(env.LANE)),
+        ),
+      );
+    expect(await view()).toEqual([{ id: laneId, queued: 0, inFlight: 0 }]);
+    await stub.receive([queued(laneId, 1), queued(laneId, 2)]);
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    expect(await view()).toEqual([{ id: laneId, queued: 1, inFlight: 1 }]);
+  });
+
   it("[lane.do.flow] a delivered ChangeQueued is batched by the lane's step; a fenced verdict is refused, and the right one lands through the Trunk", async () => {
     const { stub, laneId, verification, writer, pushCandidate } = await lane();
     const receipt = decodeExit(EventCodecs.receive, await stub.receive([queued(laneId, 1)]));
