@@ -20,6 +20,7 @@ export * from "./conflict-moves.ts";
 export * from "./code-host.ts";
 export * from "./decision-model.ts";
 export * from "./deployer.ts";
+export * from "./deps-builder.ts";
 export * from "./enrolments.ts";
 export * from "./sponsorships.ts";
 export * from "./invitations.ts";

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.kept
+# why: The kept files are added to whatever their place already held, so an earlier keep's files are installed from too
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..c79e4a42 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -218,7 +218,7 @@ export const DEPS_KEEP_SH = [
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C sed 's/  /  .\\//' "$i.lines" >"$i.sums" 2>/dev/null || { echo install-mismatch; return 1; }`,
+   '  sha256sum --quiet --strict -c "$i.sums" >/dev/null 2>&1 || { echo install-mismatch; return 1; }',
+-  '  rm -rf "$o" 2>/dev/null; mkdir -p "$o" 2>/dev/null || { echo keep-failed; return 1; }',
++  '  mkdir -p "$o" 2>/dev/null || { echo keep-failed; return 1; }',
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",
+   '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',

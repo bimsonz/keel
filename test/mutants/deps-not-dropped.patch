@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-in-place
+# why: The suite ends with the fetched deps still in the workspace, so the engine's snapshot of it holds them
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 97f9b415..8f727633 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -81,7 +81,6 @@ export const JS_TS_SUITE_COMMAND = [
+   'echo "KEEL_DURATION_MS $((end - start))"',
+   'echo "KEEL_TAIL $(tail -c 4096 $K/console.log | base64 -w0)"',
+   'if [ -s $K/report.json ]; then echo "KEEL_REPORT $(gzip -c $K/report.json | base64 -w0)"; else echo "KEEL_REPORT none"; fi',
+-  "keel_deps_drop /workspace",
+   "echo KEEL_END",
+   "exit 0",
+ ].join("\n");

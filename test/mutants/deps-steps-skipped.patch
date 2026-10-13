@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts
+# kills: deps.pool.steps
+# why: KeelVerify ensures no deps: neither deps step runs and every Tier 2 step abstains
+diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+index bdd7cbff..035dab48 100644
+--- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
++++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+@@ -99,7 +99,7 @@ export class KeelVerify extends CIWorkflow<Env> {
+                 { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
+                 durableReport(step),
+                 await runtime.runPromise(
+-                  ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
++                  Effect.succeed({ _tag: "DepsUnneeded" as const }),
+                 ),
+               ),
+             ),

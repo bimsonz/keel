@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.run-died
+# why: A step that dies once the draft is recorded tells the ledger nothing of the run: the conflict stays probing a probe that will get no more cells, in silence
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index effc8e35..fc0dbca7 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -472,9 +472,6 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+         (cause) => !Cause.hasInterruptsOnly(cause),
+         (cause) =>
+           failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
+-            Effect.flatMap((recorded) =>
+-              recorded._tag === "Refused" ? runFailedStep(call, steps) : Effect.succeed(recorded),
+-            ),
+             Effect.exit,
+             Effect.andThen(Effect.failCause(cause)),
+           ),

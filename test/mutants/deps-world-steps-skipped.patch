@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts
+# kills: deps.pool.world-steps
+# why: A world's check ensures no deps: neither deps step runs and every world's suite is n/a
+diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
+index 99e8a887..fba05758 100644
+--- a/apps/keel/src/adapters/driving/workflow/world-check.ts
++++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
+@@ -110,9 +110,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+         [...plans.values()].flatMap((plan) => (Result.isSuccess(plan) ? [plan.success] : [])),
+       );
+       // With no Tier 2 step to run, no deps are needed and neither deps step runs.
+-      const deps = await runtime.runPromise(
+-        ensureDeps(namespace, job.bundle, steps, depsSteps(step)),
+-      );
++      const deps = { _tag: "DepsUnneeded" as const };
+       const reports =
+         steps.length === 0
+           ? []

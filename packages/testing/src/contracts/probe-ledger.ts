@@ -277,6 +277,70 @@ export function describeProbeLedgerContract(
     );
 
     it.effect(
+      "[d22.run-failed] a drafted probe whose run failed is discarded as run-failed, once, and takes no cell after; before any draft there is no probe to say it of, and a probe already decided refuses it",
+      () => {
+        const harness = makeHarness();
+        const drafted = conflictOn();
+        const undrafted = conflictOn();
+        const decided = conflictOn();
+        return Effect.gen(function* () {
+          const ledger = yield* ProbeLedger;
+          for (const each of [drafted, undrafted, decided])
+            yield* harness.suspect(each.at, each.conflictId, each.suspect);
+          const early = yield* Effect.flip(
+            ledger.probeRunFailed(undrafted.at, undrafted.conflictId),
+          );
+          yield* ledger.probeDraftFailed(decided.at, {
+            conflictId: decided.conflictId,
+            attempts: 3,
+            reason: "worlds-unbuildable",
+          });
+          const over = yield* Effect.flip(ledger.probeRunFailed(decided.at, decided.conflictId));
+          const probing = yield* ledger.probeDrafted(drafted.at, {
+            conflictId: drafted.conflictId,
+            attempts: 1,
+            bundleHash: BUNDLE,
+          });
+          const probeId = probing.probe?.id;
+          if (probeId === undefined) throw new Error("the draft answers its probe");
+          const ended = yield* ledger.probeRunFailed(drafted.at, drafted.conflictId);
+          const again = yield* ledger.probeRunFailed(drafted.at, drafted.conflictId);
+          const late = yield* Effect.flip(
+            ledger.probeCellRan(drafted.at, {
+              conflictId: drafted.conflictId,
+              probeId,
+              world: "trunk",
+              run: 1,
+              outcome: "pass",
+              resultRef: "r2://probe/1/trunk",
+            }),
+          );
+
+          expect(early._tag).toBe("ProbeNotFound");
+          expect(
+            (yield* ledger.conflict(undrafted.at, undrafted.conflictId)).probe,
+          ).toBeUndefined();
+          expect(over._tag).toBe("ProbeStateRefused");
+          expect((yield* ledger.conflict(decided.at, decided.conflictId)).probe?.discarded).toBe(
+            "draft-failed",
+          );
+          expect(ended.probe).toMatchObject({ state: "discarded", discarded: "run-failed" });
+          // The project belongs to no namespace, so nobody is asked and the conflict stays open.
+          expect(ended.conflict.state).toBe("probing");
+          expect(again).toEqual(ended);
+          expect(late._tag).toBe("ProbeStateRefused");
+          const log = yield* harness.log(drafted.at, { kind: "probe", id: probeId });
+          expect(types(log)).toEqual(["ProbeDrafted", "ProbeDiscarded"]);
+          expect(log.at(-1)?.payload).toMatchObject({
+            reason: "run-failed",
+            conflictId: drafted.conflictId,
+          });
+          expect(log.at(-1)?.payload).not.toHaveProperty("detail");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
       "[b21.settle] an admitted probe proves its conflict, on the conflict's own entity and once, a probe that never discriminates dismisses it, and an unprovable one leaves it open with no escalation minted",
       () => {
         const harness = makeHarness();

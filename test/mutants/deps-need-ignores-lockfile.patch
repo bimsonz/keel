@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/deps-ensure.test.ts packages/testing/test/ports.test.ts
+# kills: deps.need.unlocked, deps.need.root-only, deps.need.property, deps.ensure.unlocked, deps-builder.need-unlocked
+# why: A candidate with no lockfile is answered as locked, on whatever else an install reads: a deps box is started for an install that cannot be frozen
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..020e02c8 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -179,7 +179,6 @@ export const installInputsOf = (
+     const [, path] = MANIFEST_LINE.exec(line) ?? [];
+     if (path !== undefined) listed.set(path, line);
+   }
+-  if (!listed.has(LOCKFILE)) return undefined;
+   const commands = new Set<string>();
+   const commandDirs: string[] = [];
+   for (const path of listed.keys()) {

@@ -22,9 +22,14 @@
     "bindings": [
       { "name": "VERIFIER", "class_name": "VerifierDO" },
       { "name": "SANDBOX", "class_name": "KeelSandbox" },
+      // One deps box per (namespace, install digest): it installs a candidate's dependencies and keeps them as parts.
+      { "name": "DEPSBOX", "class_name": "KeelDepsBox" },
     ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VerifierDO", "KeelSandbox"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["VerifierDO", "KeelSandbox"] },
+    { "tag": "v2", "new_sqlite_classes": ["KeelDepsBox"] },
+  ],
   // Tier 2 (ExecBox): a classic Sandbox container, so its instances are capped here; the account is shared.
   "containers": [
     {
@@ -33,10 +38,18 @@
       "instance_type": "standard-2",
       "max_instances": 10,
     },
+    // The deps box: the same image, with the registry reachable through its own outbound handler.
+    {
+      "class_name": "KeelDepsBox",
+      "image": "./containers/sandbox/Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 4,
+    },
   ],
   "r2_buckets": [
     { "binding": "BACKUP_BUCKET", "bucket_name": "keel-staging-sandbox-backups" },
-    // Candidate bundles, which keel writes. keel-verify only reads them (guard: readonly-bundles).
+    // Candidate bundles, which keel writes. keel-verify reads them, and writes only a deps build's
+    // parts and pointer, from the deps box alone (guard: readonly-bundles).
     { "binding": "BUNDLES", "bucket_name": "keel-staging-bundles" },
   ],
   // Tier 1: throwaway isolates for probes, pure checks and Wasm tools.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.ok, deps.build.terms
+# why: The install is not held to the lockfile, so what is built need not be what the install digest names
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index fc650e39..9eb12b55 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -403,7 +403,7 @@ export const depsBuildCommand = (
+     `rm -rf "$K/kept"; [ "$(cd "$W" && find . ! -type d 2>/dev/null | LC_ALL=C sort)" = "$(tail -n +2 "$K/inputs" | LC_ALL=C sed 's|^.\\{66\\}|./|' | LC_ALL=C sort)" ] || refuse keep-failed`,
+     'why=$(keel_deps_lock pnpm-lock.yaml) || refuse "$why"',
+     "start=$(date +%s)",
+-    `CI=1 timeout ${installSeconds} pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile --pm-on-fail=ignore --registry="\${KEEL_REGISTRY:-http://registry.npmjs.org/}" --store-dir "$K/store" >"$K/install.log" 2>&1`,
++    `CI=1 timeout ${installSeconds} pnpm install --ignore-scripts --ignore-pnpmfile --pm-on-fail=ignore --registry="\${KEEL_REGISTRY:-http://registry.npmjs.org/}" --store-dir "$K/store" >"$K/install.log" 2>&1`,
+     "code=$?; ms=$(( ($(date +%s) - start) * 1000 ))",
+     "[ $code -ne 124 ] || refuse install-timeout",
+     `err=$(LC_ALL=C sed -n 's/^\\[\\(ERR_PNPM_[A-Z0-9_]*\\)\\].*/\\1/p' "$K/install.log" 2>/dev/null | head -n 1 | cut -c1-80)`,

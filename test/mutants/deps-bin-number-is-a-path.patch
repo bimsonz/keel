@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-object, deps.inputs.bin-directory
+# why: A value that is not a string is read as the path it prints as: a bin of 7 names a file called 7
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..feda0fae 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -141,7 +141,7 @@ const commandsOf = (
+   }
+   const within = (targets: readonly unknown[]): string[] =>
+     targets.flatMap((target) => {
+-      const at = typeof target === "string" ? pathWithin(dir, target) : undefined;
++      const at = target === undefined || target === null ? undefined : pathWithin(dir, String(target));
+       return at === undefined ? [] : [at];
+     });
+   const bin = field(json, "bin");

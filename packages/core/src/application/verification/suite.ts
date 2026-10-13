@@ -16,7 +16,7 @@ import {
 
 /**
  * A project suite run in Tier 2, as its runner reports it on stdout, per the
- * shared runner protocol (`runner-output.ts`): after the hydration and lockfile
+ * shared runner protocol (`runner-output.ts`): after the hydration and deps
  * markers, between `KEEL_SUITE/1` and `KEEL_END`:
  *
  *   KEEL_EXIT <n>                            the test runner's exit code
@@ -125,7 +125,7 @@ export type SuiteJudgement = RunnerJudgement<SuiteEvidence>;
  * itself decides:
  * - `pass` needs exit 0, a successful report, at least one passing test and none failing (skips are allowed);
  * - `fail` needs a non-zero exit and a report that names a failure;
- * - everything else abstains: an infra failure (hydration, lockfile, a missing
+ * - everything else abstains: an infra failure (hydration, deps, a missing
  *   or unreadable report), no tests at all, or an exit code the report contradicts.
  *
  * The doorway decodes what the runner encoded: `report` is the report's JSON

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.scratch
+# why: The fetched bundle stays in the scratch through the install: the whole candidate, beside pnpm's store
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..4bebb541 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -391,7 +391,6 @@ export const depsBuildCommand = (
+     "addr=${url%%\\?*}",
+     '[ "$(sha256sum "$K/bundle.tgz" | cut -c1-64)" = "${addr##*/}" ] || refuse bundle-hash-mismatch',
+     'tar -xzf "$K/bundle.tgz" --strip-components=1 -C "$W" 2>/dev/null && keel_verify_bundle >/dev/null || refuse bundle-unverified',
+-    'rm -f "$K/bundle.tgz"',
+     'printf %s "${KEEL_INSTALL_INPUTS:-}" >"$K/inputs"',
+     'why=$(keel_deps_keep "$K/inputs" "${KEEL_INSTALL:-}" "$K/kept") || refuse "$why"',
+     'find "$W" -mindepth 1 -delete 2>/dev/null; cp -Rp "$K/kept/." "$W" 2>/dev/null || refuse keep-failed',

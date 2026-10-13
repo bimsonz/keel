@@ -2,15 +2,15 @@
 # kills: probe.workspace-gone
 # why: A workspace collected by its landing mid-read is a harness error, so S-1's usual timing (A lands while B is read) never drafts
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 9cdefd9..19a77ac 100644
+index d58d38d9..368aa49c 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -467,7 +467,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+@@ -588,7 +588,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
        );
        if (worlds._tag === "Built")
          planned = { sides, plan: plan.success, built: worlds.built, hunks: worlds.hunks };
--      else if (sameRepo(worlds.repo, call.staging))
-+      else
+-      else if (sameRepo(worlds.repo, call.staging)) {
++      else {
+         yield* recordHarnessError("worlds-unbuildable");
          return {
            outcome: "unreadable",
-           world: worlds.world,

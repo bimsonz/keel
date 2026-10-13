@@ -1,6 +1,7 @@
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  ensureDeps,
   readStoredPlan,
   recordWorldCheck,
   ResolvedPlan,
@@ -17,7 +18,7 @@ import { worldCheckRuntime } from "../../../composition/workflow.ts";
 import { WorldCheckJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
-import { namespaceStep, workflowSteps } from "./steps.ts";
+import { depsSteps, namespaceStep, workflowSteps } from "./steps.ts";
 
 const RECORD_RETRIES = {
   retries: { limit: 3, delay: "2 seconds", backoff: "constant" },
@@ -39,7 +40,9 @@ const RECORD_RETRIES = {
  * `resolveCheckPlans`): the Probe starts these the moment a party submits, so
  * a plan its Precheck has not compiled yet is waited for by event, up to five
  * minutes, never polled. Then `plan <check>` for each check with a plan,
- * every Tier 2 step those plans hold, each run once (the same step on the
+ * `deps-need` and `deps:<install digest>` when those plans hold a Tier 2 step
+ * (core's `ensureDeps`, on the world's bundle), every Tier 2 step they hold,
+ * each run once (the same step on the
  * same bundle answers the same for every check, and AB holds two), and
  * `record <check>`. A change that ends with no plan, a wait that runs out, or
  * a plan the store does not hold or holds corrupt makes its check n/a,
@@ -106,21 +109,29 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
       const steps = worldCheckRunSteps(
         [...plans.values()].flatMap((plan) => (Result.isSuccess(plan) ? [plan.success] : [])),
       );
+      // With no Tier 2 step to run, no deps are needed and neither deps step runs.
+      const deps = await runtime.runPromise(
+        ensureDeps(namespace, job.bundle, steps, depsSteps(step)),
+      );
       const reports =
         steps.length === 0
           ? []
           : await runtime.runPromise(
-              runJob(namespace, {
-                jobId: event.instanceId,
-                bundle: job.bundle,
-                fence: { batchId: event.instanceId, attempt: 1, chainEpoch: 0 },
-                steps,
-              }),
+              runJob(
+                namespace,
+                {
+                  jobId: event.instanceId,
+                  bundle: job.bundle,
+                  fence: { batchId: event.instanceId, attempt: 1, chainEpoch: 0 },
+                  steps,
+                },
+                deps,
+              ),
             );
       for (const { check } of job.checks) {
         const plan = plans.get(check) ?? Result.fail("no plan");
         const cell: WorldCheckOutcome = Result.isSuccess(plan)
-          ? worldCheckCell(plan.success, reports)
+          ? worldCheckCell(plan.success, reports, deps)
           : { outcome: "n/a", reason: plan.failure };
         // A refusal (the conflict moved on) is kept as the step's value: retrying never helps.
         await step.do(`record ${check}`, RECORD_RETRIES, async () =>

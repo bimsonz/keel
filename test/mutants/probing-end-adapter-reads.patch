@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-run-died
+# why: The RPC adapter reads the conflict where it should report the failed run, so the Subject DO is never told
+diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
+index 77b81576..f8b74109 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
+@@ -39,7 +39,7 @@ export function ProbeLedgerRpc(
+           at(ref).probeDraftFailed(Schema.encodeSync(ProbeDraftFailedCommand)(failed)),
+         ),
+       probeRunFailed: (ref, conflictId) =>
+-        callObject(SubjectCodecs.probeRunFailed, () => at(ref).probeRunFailed(conflictId)),
++        callObject(SubjectCodecs.probeRunFailed, () => at(ref).conflict(conflictId)),
+       probeCellRan: (ref, cell) =>
+         callObject(SubjectCodecs.probeCellRan, () =>
+           at(ref).probeCellRan(Schema.encodeSync(ProbeCellRanCommand)(cell)),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.need.utf8
+# why: U+007F is counted as two bytes where UTF-8 takes one
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..eeff0f9f 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -204,7 +204,7 @@ const utf8Bytes = (text: string): number => {
+   let bytes = 0;
+   for (const char of text) {
+     const point = char.codePointAt(0) ?? 0;
+-    bytes += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
++    bytes += point < 0x7f ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+   }
+   return bytes;
+ };

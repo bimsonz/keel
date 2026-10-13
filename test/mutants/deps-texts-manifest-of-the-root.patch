@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.manifest
+# why: The manifest lists only the root's files, so a workspace package's package.json is no install input
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..e601e9a6 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -90,7 +90,7 @@ export const bundleTexts = async (
+   const held = new Map(files.map((file) => [file.path, file.bytes]));
+   const decoder = new TextDecoder();
+   return {
+-    manifest: await manifestOf(files),
++    manifest: await manifestOf(files.filter((file) => !file.path.includes("/"))),
+     read: (path) => {
+       const text = held.get(path);
+       return text === undefined ? undefined : decoder.decode(text);

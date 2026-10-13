@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/deps-ensure.test.ts packages/testing/test/ports.test.ts
+# kills: deps.need.locked, deps.need.root-only, deps.need.digest, deps.need.property, deps.need.too-large, deps.need.utf8, deps-builder.need, deps-builder.need-commands, deps-builder.builds-once, deps.ensure.built
+# why: The digest is the sha256 of the whole manifest: an edit to any file at all is another deps bundle, and the box's keep, which hashes the inputs, refuses each one
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..3988fb07 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -235,7 +235,7 @@ export const depsNeedFrom = <E, R>(
+       _tag: "Unlocked",
+       reason: `install-inputs-too-large: an install of the candidate reads more files than a deps box is handed`,
+     });
+-  return Effect.map(sha256(inputs), (install): DepsNeed => ({ _tag: "Locked", install, inputs }));
++  return Effect.map(sha256(manifest), (install): DepsNeed => ({ _tag: "Locked", install, inputs }));
+ };
+ 
+ /** One part of a deps bundle's gzipped archive: its own sha256, which is its address, and its length. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deps-builder.test.ts
+# kills: deps-builder.build-threw
+# why: A call that never reached keel-verify does not say why
+diff --git a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+index c1b91868..fe4b604d 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+@@ -60,7 +60,7 @@ export const DepsBuilderRpc = (verifier: VerifierEntrypoint, signingKey: string)
+             );
+             const raw = yield* Effect.tryPromise({
+               try: () => verifier.buildDeps(encodeRequest({ namespace, need, bundleUrl })),
+-              catch: (error) => `keel-verify did not answer: ${describe(error)}`,
++              catch: () => `keel-verify did not answer`,
+             });
+             // The codec throws on what is no Exit at all: that is an answer that is not one too.
+             const exit = yield* Effect.try({

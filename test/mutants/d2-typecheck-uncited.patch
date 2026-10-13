@@ -2,15 +2,15 @@
 # kills: verify.type-errors-cited
 # why: A bounce never reads a typecheck's errors back from its evidence, so the remedy names nothing to fix
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index e8ff5df..7fd6db7 100644
+index a3da276f..8606ec87 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -160,8 +160,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -202,8 +202,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
          kind: "test",
          name: f.test === undefined ? f.file : `${f.file} > ${f.test}`,
        });
 -    for (const e of stored.value.errors ?? [])
 -      failures.push({ kind: "type", name: citeDiagnostic(e) });
-     if (stored.value.guard !== undefined)
-       failures.push({
-         kind: "guard",
+     // Every step that needed the refused dependencies stored the same refusal: it is cited once.
+     const refusal = stored.value.deps;
+     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;

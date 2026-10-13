@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.died
+# why: A failed run is reported of a conflict whose incomplete draft the ledger had just recorded: a step more, for a refusal
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index effc8e35..6d3fe231 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -473,7 +473,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+         (cause) =>
+           failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
+             Effect.flatMap((recorded) =>
+-              recorded._tag === "Refused" ? runFailedStep(call, steps) : Effect.succeed(recorded),
++              runFailedStep(call, steps),
+             ),
+             Effect.exit,
+             Effect.andThen(Effect.failCause(cause)),

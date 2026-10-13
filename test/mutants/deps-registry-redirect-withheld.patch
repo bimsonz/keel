@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.registry-redirect
+# why: A redirect from the registry is neither followed nor handed on: the box is told the registry failed, and cannot read where it pointed
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..2f3b1041 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -118,10 +118,13 @@ export async function passRegistry(request: Request): Promise<Response> {
+   const url = new URL(request.url);
+   const accept = request.headers.get("accept");
+   // The host is written here, never taken from the request: a path cannot name another.
+-  return fetch(`https://${REGISTRY_HOST}${url.pathname}${url.search}`, {
++  const response = await fetch(`https://${REGISTRY_HOST}${url.pathname}${url.search}`, {
+     headers: accept === null ? {} : { accept },
+     redirect: "manual",
+   });
++  return response.status >= 300 && response.status < 400
++    ? new Response("the registry redirected", { status: 502 })
++    : response;
+ }
+ 
+ /**

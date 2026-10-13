@@ -1,12 +1,12 @@
 # expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts -t bundle
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-index 019e7f5..793b98c 100644
+index b7b8d45d..e2753228 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-@@ -195,6 +195,6 @@ export class KeelSandbox extends CiSandbox {
- // property and bypass Container's registry setter, silently dropping both
- // handlers. The first matching glob wins, so the bundle hosts come before `*`.
+@@ -286,6 +286,6 @@ export class KeelSandbox extends CiSandbox {
+ // first matching glob wins, so the bundle hosts come before `*`.
  KeelSandbox.outboundByHost = {
+   [DEPS_HOST]: (request, env) => serveDepsPart(request, env),
 -  [BUNDLE_HOSTS]: (request, env, ctx) => serveBundle(request, env, ctx),
    "*": (request) => refuseEgress(request),
 +  [BUNDLE_HOSTS]: (request, env, ctx) => serveBundle(request, env, ctx),

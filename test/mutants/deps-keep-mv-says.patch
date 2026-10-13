@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.keep.quiet, deps.keep.failed, deps.build.keep-failed
+# why: What mv says of a file it could not move, the file's path with it, goes to the box's stderr
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..d576acf0 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -222,7 +222,7 @@ export const DEPS_KEEP_SH = [
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",
+   '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',
+-  '    mv -- "$p" "$o/$p" 2>/dev/null || { echo keep-failed; return 1; }',
++  '    mv -- "$p" "$o/$p" || { echo keep-failed; return 1; }',
+   '  done <"$i.lines"',
+   "}",
+ ].join("\n");

@@ -268,6 +268,30 @@ export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(funct
 });
 
 /**
+ * The Probe Workflow's run of the conflict's drafted probe ended before its matrix was
+ * complete (a step out of tries, a defect): the probe is discarded as
+ * run-failed, so the conflict never waits on cells that will not come. The
+ * machine fences it: no probe yet is ProbeNotFound, and a probe already
+ * admitted or discarded refuses. Once per conflict, as `probeDraftFailed`,
+ * and the conflict stays open here the same way (`escalateUnprovable`).
+ */
+export const probeRunFailed = Effect.fn("coordination/probeRunFailed")(function* (
+  projectId: ProjectId,
+  conflictId: ConflictId,
+) {
+  const probeId = probeIdOf(conflictId);
+  yield* ledgerCommit(
+    projectId,
+    conflictId,
+    probeRef(probeId),
+    `probe-run-failed:${conflictId}`,
+    "run-failed",
+    { _tag: "Probe", probeId, command: { _tag: "RunFailed" } },
+  );
+  return yield* conflictView(conflictId);
+});
+
+/**
  * One world-matrix cell of the conflict's probe: ProbeRan, and GuardAdmitted
  * or ProbeDiscarded when the cells decide it, with the conflict settled by
  * that decision in the same transaction. The machine fences it (the

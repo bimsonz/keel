@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.url.signed
+# why: Part URLs are signed for a host no box's handler answers
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..789d7dde 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -25,7 +25,7 @@ export class DepsRefused extends Error {
+ }
+ 
+ /** The virtual host a suite box fetches deps parts from, and a deps box puts them to. */
+-export const DEPS_HOST = "deps.keel.internal";
++export const DEPS_HOST = "deps.keel.test";
+ 
+ /**
+  * What a part URL's signature covers: the family, then whose part, which part,

@@ -45,7 +45,7 @@ export const suiteStdout = async (
   return [
     SUITE_PROTOCOL,
     "KEEL_HYDRATION ok",
-    "KEEL_LOCK ok",
+    "KEEL_DEPS ok",
     `KEEL_EXIT ${failed > 0 ? 1 : 0}`,
     "KEEL_DURATION_MS 4600",
     `KEEL_TAIL ${b64(new TextEncoder().encode(options.tail ?? `${tests - failed} passed`))}`,
@@ -60,7 +60,7 @@ export const typecheckStdout = async (exit: number, output: string): Promise<str
   [
     TYPECHECK_PROTOCOL,
     "KEEL_HYDRATION ok",
-    "KEEL_LOCK ok",
+    "KEEL_DEPS ok",
     "KEEL_TSCONFIG ok",
     `KEEL_EXIT ${exit}`,
     "KEEL_DURATION_MS 2100",

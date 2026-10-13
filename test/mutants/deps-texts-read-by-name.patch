@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.texts.read
+# why: A file is read by its name alone, so every package.json reads as one of them
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..b84ae406 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -87,7 +87,7 @@ export const bundleTexts = async (
+   bytes: Uint8Array,
+ ): Promise<{ readonly manifest: string; readonly read: (path: string) => string | undefined }> => {
+   const files = await readBundle(bytes);
+-  const held = new Map(files.map((file) => [file.path, file.bytes]));
++  const held = new Map(files.map((file) => [file.path.split("/").at(-1) ?? "", file.bytes]));
+   const decoder = new TextDecoder();
+   return {
+     manifest: await manifestOf(files),

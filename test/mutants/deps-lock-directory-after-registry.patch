@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.lock.local-first
+# why: A local directory is only named when nothing is off the registry, so the reason a build is refused for changes with where its resolutions stand
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..3ab33b0e 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -249,8 +249,8 @@ export const DEPS_KEEP_SH = [
+ export const DEPS_LOCK_SH = [
+   "keel_deps_lock() {",
+   '  [ -f "$1" ] || { echo no-lockfile; return 1; }',
+-  `  if grep -E "^[[:space:]]*[\\"']?resolution[\\"']?[[:space:]]*:" "$1" | tr -d "\\"'" | grep -qE 'type: *directory|directory: *[^,} ]'; then echo local-directory; return 1; fi`,
+   `  off=$(grep -E "^[[:space:]]*[\\"']?resolution[\\"']?[[:space:]]*:" "$1" | tr -d "\\"'" | sed 's|tarball: *https://registry\\.npmjs\\.org/[^,} ]*||g' | grep -E '(tarball|repo): *[^,} ]|type: *git|resolution:[^{]*$|[^}[:space:]][[:space:]]*$' | head -n 1)`,
++  `  if [ -z "$off" ] && grep -E "^[[:space:]]*[\\"']?resolution[\\"']?[[:space:]]*:" "$1" | tr -d "\\"'" | grep -qE 'type: *directory|directory: *[^,} ]'; then echo local-directory; return 1; fi`,
+   '  [ -n "$off" ] || return 0',
+   `  host=$(printf '%s\\n' "$off" | sed -E -n 's/.*(tarball|repo): *([^,} ]+).*/\\2/p' | sed -E 's|^[A-Za-z0-9+.-]+://||; s|^[^/@]*@||; s|[/:?#].*$||' | tr -cd 'A-Za-z0-9.-' | cut -c1-100)`,
+   '  echo "off-registry ${host:-unknown}"; return 1',

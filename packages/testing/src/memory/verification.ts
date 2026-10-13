@@ -30,6 +30,7 @@ import {
   type Transition,
   type DecisionResponse,
   DecisionModel,
+  DepsBuilder,
   FlowSpecSource,
   type GuardRefused,
   ObjectNotFound,
@@ -45,8 +46,14 @@ import {
   type WorldReadiness,
 } from "@keeltown/core/ports";
 import {
+  DEPS_TOOLCHAIN,
+  type DepsAnswer,
+  depsNeedFrom,
+  type DepsPointer,
   guardFileText,
+  type Locked,
   namespaceKey,
+  pointerServes,
   type ProbeFile,
   type ProbeRun,
   readGuardFile,
@@ -54,6 +61,7 @@ import {
 import { Effect, Layer, Result, Schema } from "effect";
 import type {
   AdmittedGuardsHarness,
+  DepsBuilderHarness,
   FlowSpecSourceHarness,
   ProbeRunnerHarness,
   ProbeStoreHarness,
@@ -120,17 +128,21 @@ export function makeVerifierRuntimeMemory(
 ) {
   const jobs: VerificationJob[] = [];
   const namespaces: NamespaceId[] = [];
+  const handed: DepsAnswer[] = [];
   return {
     jobs,
     /** The namespace each job was run for, in the order of `jobs`. */
     namespaces,
+    /** The deps each job was handed, in the order of `jobs`. */
+    handed,
     layer: Layer.succeed(
       VerifierRuntime,
       VerifierRuntime.of({
-        run: (namespace, job) =>
+        run: (namespace, job, deps) =>
           Effect.sync(() => {
             jobs.push(job);
             namespaces.push(namespace);
+            handed.push(deps);
             return job.steps.map((step) => ({
               stepId: step.id,
               outcome: outcome?.(step) ?? "pass",
@@ -536,6 +548,133 @@ export function makeProbeStoreMemory(): ProbeStoreHarness & {
             ? Effect.fail(new BundleMissing({ hash }))
             : Effect.succeed(files);
         },
+      }),
+    ),
+  };
+}
+
+const hexOf = async (bytes: Uint8Array): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.slice()))]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+/** Where a namespace's candidate bundle is kept: the key the R2 adapter keeps it at. */
+const bundleKeyOf = (namespace: NamespaceId, bundle: ContentHash) =>
+  namespaceKey(namespace, "bundles", bundle.slice("sha256:".length));
+
+/** One deps build the memory builder ran. */
+export interface DepsBuilt {
+  readonly namespace: NamespaceId;
+  readonly need: Locked;
+  readonly bundle: ContentHash;
+}
+
+/**
+ * DepsBuilder in memory: no container and no install. It is given bundles'
+ * manifests and files (`hold`, or `candidate` for one made from files), and a build is
+ * a count and a pointer: one pointer for a namespace's install digest, at the
+ * key the deps box's object keeps it at, answered again while it serves the
+ * need. Each build's one part is named after the count, so a test can tell
+ * one build from another. A digest told to fail (`failBuilds`) answers
+ * `DepsUnavailable` with the reason, and so does a build from a bundle that
+ * is not held.
+ */
+export function makeDepsBuilderMemory(): DepsBuilderHarness & {
+  /** Every build that ran, in order: a pointer that served ran none. */
+  readonly built: readonly DepsBuilt[];
+  /** Every call to `need` and to `build`, in order, whatever it answered. */
+  readonly asked: readonly string[];
+  /** The pointers kept, by their key. */
+  readonly pointers: ReadonlyMap<string, DepsPointer>;
+  /** Keeps `manifest` as the manifest of the namespace's bundle `bundle`, and `files` (path to text) as what it holds. */
+  readonly hold: (
+    namespace: NamespaceId,
+    bundle: ContentHash,
+    manifest: string,
+    files?: Readonly<Record<string, string>>,
+  ) => void;
+} {
+  const manifests = new Map<string, string>();
+  const texts = new Map<string, Readonly<Record<string, string>>>();
+  const pointers = new Map<string, DepsPointer>();
+  const failing = new Map<string, string>();
+  const built: DepsBuilt[] = [];
+  const asked: string[] = [];
+  const hold = (
+    namespace: NamespaceId,
+    bundle: ContentHash,
+    manifest: string,
+    files: Readonly<Record<string, string>> = {},
+  ) => {
+    manifests.set(bundleKeyOf(namespace, bundle), manifest);
+    texts.set(bundleKeyOf(namespace, bundle), files);
+  };
+  const build = (namespace: NamespaceId, need: Locked, bundle: ContentHash): DepsAnswer => {
+    asked.push(`build ${need.install}`);
+    const key = namespaceKey(namespace, "deps", need.install);
+    const kept = pointers.get(key);
+    if (kept !== undefined && pointerServes(kept, need))
+      return { _tag: "DepsReady", install: kept.install, parts: kept.parts };
+    const reason = failing.get(need.install);
+    if (reason !== undefined) return { _tag: "DepsUnavailable", reason };
+    if (!manifests.has(bundleKeyOf(namespace, bundle)))
+      return { _tag: "DepsUnavailable", reason: "bundle-unfetched" };
+    built.push({ namespace, need, bundle });
+    const pointer: DepsPointer = {
+      format: "keel.deps/1",
+      install: need.install,
+      toolchain: DEPS_TOOLCHAIN,
+      parts: [{ sha256: built.length.toString(16).padStart(64, "0"), bytes: 1024 }],
+      files: 1,
+      installMs: 0,
+    };
+    pointers.set(key, pointer);
+    return { _tag: "DepsReady", install: pointer.install, parts: pointer.parts };
+  };
+  return {
+    built,
+    asked,
+    pointers,
+    hold,
+    candidate: (namespace, files) =>
+      Effect.promise(async () => {
+        const encoder = new TextEncoder();
+        const lines = await Promise.all(
+          Object.entries(files)
+            .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            .map(async ([path, text]) => `${await hexOf(encoder.encode(text))}  ${path}\n`),
+        );
+        const manifest = lines.join("");
+        const bundle = Schema.decodeUnknownSync(ContentHash)(
+          `sha256:${await hexOf(encoder.encode(manifest))}`,
+        );
+        hold(namespace, bundle, manifest, files);
+        return bundle;
+      }),
+    failBuilds: (install, reason) => Effect.sync(() => void failing.set(install, reason)),
+    builds: (namespace, install) =>
+      Effect.sync(
+        () => built.filter((b) => b.namespace === namespace && b.need.install === install).length,
+      ),
+    layer: Layer.succeed(
+      DepsBuilder,
+      DepsBuilder.of({
+        need: (namespace, bundle) =>
+          Effect.suspend(() => {
+            asked.push(`need ${bundle}`);
+            const manifest = manifests.get(bundleKeyOf(namespace, bundle));
+            return manifest === undefined
+              ? Effect.fail(new BundleMissing({ hash: bundle }))
+              : depsNeedFrom(
+                  manifest,
+                  (path) => {
+                    const files = texts.get(bundleKeyOf(namespace, bundle)) ?? {};
+                    return Object.hasOwn(files, path) ? files[path] : undefined;
+                  },
+                  (text) => Effect.promise(() => hexOf(new TextEncoder().encode(text))),
+                );
+          }),
+        build: (namespace, need, bundle) => Effect.sync(() => build(namespace, need, bundle)),
       }),
     ),
   };

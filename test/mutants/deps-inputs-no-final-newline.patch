@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.text, deps.need.locked
+# why: The last line of the inputs is not ended, so the text is not the whole lines a box checks one by one and it hashes to another digest than the file written from it
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..87b73fad 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -196,7 +196,7 @@ export const installInputsOf = (
+       commandDirs.some((dir) => path.startsWith(`${dir}/`))
+     )
+       lines.push(line);
+-  return `${lines.join("\n")}\n`;
++  return lines.join("\n");
+ };
+ 
+ /** How many bytes `text` is as UTF-8. Core holds no encoder. */

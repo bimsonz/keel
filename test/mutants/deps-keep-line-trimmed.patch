@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.paths
+# why: Each line is trimmed as it is read, so a path that ends in a space names the file beside it
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..2364ef37 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -219,7 +219,7 @@ export const DEPS_KEEP_SH = [
+   `  LC_ALL=C sed 's/  /  .\\//' "$i.lines" >"$i.sums" 2>/dev/null || { echo install-mismatch; return 1; }`,
+   '  sha256sum --quiet --strict -c "$i.sums" >/dev/null 2>&1 || { echo install-mismatch; return 1; }',
+   '  rm -rf "$o" 2>/dev/null; mkdir -p "$o" 2>/dev/null || { echo keep-failed; return 1; }',
+-  "  while IFS= read -r line; do",
++  "  while read -r line; do",
+   "    p=${line#*  }",
+   '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',
+   '    mv -- "$p" "$o/$p" 2>/dev/null || { echo keep-failed; return 1; }',

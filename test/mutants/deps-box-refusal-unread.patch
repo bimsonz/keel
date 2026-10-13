@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.refusal-split
+# why: Every refusal of the box is unavailable: a candidate only its own change can mend parks for ever
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index 2d0a0506..fe1a711d 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -391,7 +391,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+     }
+     const report = parseDepsBuild(stdout);
+     // Only what the box itself refused is read for whose fault it was: output that is no report never is.
+-    if (report._tag === "refused") return stop(depsRefusal(report.reason));
++    if (report._tag === "refused") return refuse(report.reason);
+     if (report._tag !== "built") return refuse(report.reason);
+     // Another toolchain's node_modules is not what the pointer would say it is: nothing of it is kept.
+     if (report.toolchain !== DEPS_TOOLCHAIN)

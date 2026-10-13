@@ -9,6 +9,7 @@ import type {
   ChangePrecheck,
   Clock,
   CodeHost,
+  DepsBuilder,
   EvidenceStore,
   FlowSpecSource,
   Ids,
@@ -41,6 +42,7 @@ import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.
 import { SYNTAX_WASM } from "../adapters/driven/syntax/wasm.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
+import { DepsBuilderRpc } from "../adapters/driven/do-rpc/deps-builder.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
@@ -80,7 +82,8 @@ export function pushObservedRuntime(env: Env): ManagedRuntime.ManagedRuntime<Wor
 
 /**
  * KeelVerify's composition root, per run: the plan from the plan store
- * (ARCHIVE), Tier 2 steps through the CI engine's `runner`, guard steps on
+ * (ARCHIVE), Tier 2 steps through the CI engine's `runner` with the deps
+ * keel-verify's deps box builds from the candidate's bundle, guard steps on
  * keel-verify's VerifierDOs, evidence in ARCHIVE, verdicts to the Lane DO.
  * `durable` makes the runtime's own side effects Workflow steps, so a replay
  * returns what the first run stored.
@@ -94,6 +97,7 @@ export function keelVerifyRuntime(
   | EvidenceStore
   | BatchVerdicts
   | VerifierRuntime
+  | DepsBuilder
   | PlanStore
   | ProbeRunner
   | ProjectNamespaces,
@@ -117,6 +121,9 @@ export function keelVerifyRuntime(
       PlanStoreR2(env.ARCHIVE),
       ProjectNamespacesD1(env.DB),
       ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
+      DepsBuilderRpc(verifierEntrypoint(env.VERIFIER), env.BUNDLE_URL_SIGNING_KEY).pipe(
+        Layer.provide(BundleStoreR2(env.BUNDLES)),
+      ),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
@@ -261,7 +268,7 @@ export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServi
 /**
  * KeelWorldCheck's composition root, per run: plans from the plan store
  * (ARCHIVE), Tier 2 steps through the CI engine's `runner` on the world's
- * bundle, evidence in ARCHIVE, and each check recorded to the conflict's
+ * bundle with the deps keel-verify's deps box builds from it, evidence in ARCHIVE, and each check recorded to the conflict's
  * Subject DO. `step` makes the evidence writes Workflow steps, as KeelVerify's.
  */
 export function worldCheckRuntime(
@@ -272,6 +279,7 @@ export function worldCheckRuntime(
   | Ids
   | EvidenceStore
   | VerifierRuntime
+  | DepsBuilder
   | PlanStore
   | ProbeLedger
   | ProbeChanges
@@ -293,6 +301,9 @@ export function worldCheckRuntime(
       ProbeChangesRpc((changeId) =>
         env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)),
       ).pipe(Layer.provide(codeHostLayer(env))),
+      DepsBuilderRpc(verifierEntrypoint(env.VERIFIER), env.BUNDLE_URL_SIGNING_KEY).pipe(
+        Layer.provide(BundleStoreR2(env.BUNDLES)),
+      ),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,

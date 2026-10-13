@@ -2,11 +2,11 @@
 # kills: b21.probe-cells
 # why: the RPC adapter sends every probe cell as run 1, so runs 2 and 3 are answered as repeats and the probe never admits
 diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
-index ee6cbb9..1000865 100644
+index 77b81576..89cbcf14 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
-@@ -39,7 +39,7 @@ export function ProbeLedgerRpc(
-         ),
+@@ -42,7 +42,7 @@ export function ProbeLedgerRpc(
+         callObject(SubjectCodecs.probeRunFailed, () => at(ref).probeRunFailed(conflictId)),
        probeCellRan: (ref, cell) =>
          callObject(SubjectCodecs.probeCellRan, () =>
 -          at(ref).probeCellRan(Schema.encodeSync(ProbeCellRanCommand)(cell)),

@@ -1,11 +1,11 @@
 # expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-url.test.ts
 # kills: t5.bundle-url.other-namespace, t5.bundle-url.other-key, t5.bundle-url.unsigned, t5.bundle-url.tampered
 # why: A well-shaped signature is taken as good without being checked against the key
-diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
-index 46850588..6e4abebc 100644
---- a/packages/runner-protocol/src/bundle.ts
-+++ b/packages/runner-protocol/src/bundle.ts
-@@ -368,12 +368,7 @@ export const bundleUrlSigned = async (
+diff --git a/packages/runner-protocol/src/signed-url.ts b/packages/runner-protocol/src/signed-url.ts
+index b678ddd0..f2b5752b 100644
+--- a/packages/runner-protocol/src/signed-url.ts
++++ b/packages/runner-protocol/src/signed-url.ts
+@@ -59,10 +59,5 @@ export const urlSigned = async (
    const key = await crypto.subtle.importKey("spki", derOf(publicKey), { name: "Ed25519" }, false, [
      "verify",
    ]);
@@ -13,9 +13,7 @@ index 46850588..6e4abebc 100644
 -    "Ed25519",
 -    key,
 -    fromBase64(sig.replace(/-/g, "+").replace(/_/g, "/")),
--    signedText(namespace, sha256, expires),
+-    textAt(expires),
 -  );
 +  return true;
  };
- 
- /**

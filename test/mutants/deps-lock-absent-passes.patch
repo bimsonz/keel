@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.lock.no-lockfile, deps.build.no-lockfile
+# why: A candidate with no lockfile passes the check, and the install that follows is not a frozen one's
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..5fa3e9f3 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -248,7 +248,6 @@ export const DEPS_KEEP_SH = [
+  */
+ export const DEPS_LOCK_SH = [
+   "keel_deps_lock() {",
+-  '  [ -f "$1" ] || { echo no-lockfile; return 1; }',
+   `  if grep -E "^[[:space:]]*[\\"']?resolution[\\"']?[[:space:]]*:" "$1" | tr -d "\\"'" | grep -qE 'type: *directory|directory: *[^,} ]'; then echo local-directory; return 1; fi`,
+   `  off=$(grep -E "^[[:space:]]*[\\"']?resolution[\\"']?[[:space:]]*:" "$1" | tr -d "\\"'" | sed 's|tarball: *https://registry\\.npmjs\\.org/[^,} ]*||g' | grep -E '(tarball|repo): *[^,} ]|type: *git|resolution:[^{]*$|[^}[:space:]][[:space:]]*$' | head -n 1)`,
+   '  [ -n "$off" ] || return 0',

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.kept, deps.build.install-mismatch, deps.build.keep-failed, deps.build.no-lockfile
+# why: The box never keeps: it installs in the candidate's whole tree, whatever inputs and digest it was handed
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..65421925 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -393,9 +393,6 @@ export const depsBuildCommand = (
+     'tar -xzf "$K/bundle.tgz" --strip-components=1 -C "$W" 2>/dev/null && keel_verify_bundle >/dev/null || refuse bundle-unverified',
+     'rm -f "$K/bundle.tgz"',
+     'printf %s "${KEEL_INSTALL_INPUTS:-}" >"$K/inputs"',
+-    'why=$(keel_deps_keep "$K/inputs" "${KEEL_INSTALL:-}" "$K/kept") || refuse "$why"',
+-    'find "$W" -mindepth 1 -delete 2>/dev/null; cp -Rp "$K/kept/." "$W" 2>/dev/null || refuse keep-failed',
+-    `rm -rf "$K/kept"; [ "$(cd "$W" && find . ! -type d 2>/dev/null | LC_ALL=C sort)" = "$(tail -n +2 "$K/inputs" | LC_ALL=C sed 's|^.\\{66\\}|./|' | LC_ALL=C sort)" ] || refuse keep-failed`,
+     'why=$(keel_deps_lock pnpm-lock.yaml) || refuse "$why"',
+     "start=$(date +%s)",
+     `CI=1 timeout ${installSeconds} pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile --pm-on-fail=ignore --registry="\${KEEL_REGISTRY:-http://registry.npmjs.org/}" --store-dir "$K/store" >"$K/install.log" 2>&1`,

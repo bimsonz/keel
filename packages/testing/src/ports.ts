@@ -100,12 +100,14 @@ import {
   describeBatchVerdictsContract,
   describeBundleStoreContract,
   describeChangePrecheckContract,
+  describeDepsBuilderContract,
   describeEvidenceStoreContract,
   describeFlowSpecSourceContract,
   describePlanStoreContract,
   describeProbeRunnerContract,
   describeProbeStoreContract,
   describeVerifierRuntimeContract,
+  type DepsBuilderHarness,
   type FlowSpecSourceHarness,
   type PlanStoreHarness,
   type ProbeRunnerHarness,
@@ -145,6 +147,7 @@ import type {
   ChangePrecheck,
   Changes,
   AgentSignUps,
+  DepsBuilder,
   Enrolments,
   EventFeed,
   FlowSpecSource,
@@ -658,6 +661,10 @@ export const PORTS = {
   AdmittedGuards: harnessed<AdmittedGuards, AdmittedGuardsHarness>(
     verification.makeAdmittedGuardsMemory,
     describeAdmittedGuardsContract,
+  ),
+  DepsBuilder: harnessed<DepsBuilder, DepsBuilderHarness>(
+    verification.makeDepsBuilderMemory,
+    describeDepsBuilderContract,
   ),
   ProbeSources: harnessed<ProbeSources, ProbeSourcesHarness>(
     makeProbeSourcesMemory,

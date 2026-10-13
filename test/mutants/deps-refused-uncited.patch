@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.deps-refused-cited
+# why: A bounce for refused deps cites nothing: the verdict says fix what the evidence cites, and the evidence names no refusal
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index a3da276f..6e346b2d 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -205,7 +205,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+     for (const e of stored.value.errors ?? [])
+       failures.push({ kind: "type", name: citeDiagnostic(e) });
+     // Every step that needed the refused dependencies stored the same refusal: it is cited once.
+-    const refusal = stored.value.deps;
++    const refusal = undefined as typeof stored.value.deps;
+     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
+     if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
+       failures.push({ kind: "deps", name: depsName });

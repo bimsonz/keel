@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.other-need
+# why: A box builds for whoever asks, so one object serves two namespaces or two install digests and is no single-flight for either
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..c2a36a21 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -295,7 +295,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+     const { namespace, need } = request;
+     const asked: DepsBuilding = { namespace, install: need.install };
+     const owner = await this.ownerOr(asked);
+-    if (owner.namespace !== asked.namespace || owner.install !== asked.install)
++    if (false as boolean)
+       return unavailable(
+         `this deps box builds ${owner.install} for ${owner.namespace}, and was asked for ${asked.install} for ${asked.namespace}`,
+       );

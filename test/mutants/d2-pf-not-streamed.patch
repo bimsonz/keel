@@ -2,10 +2,10 @@
 # kills: pf.streams-json
 # why: The model is called synchronously, which times out at about 235 s for a reasoning model and cannot queue
 diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
-index 2125f23..284ae35 100644
+index e3491931..c5eaa6c7 100644
 --- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
 +++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
-@@ -118,7 +118,7 @@ async function complete(
+@@ -128,7 +128,7 @@ async function complete(
        ],
        response_format: { type: "json_schema", json_schema: call.outputSchema },
        max_tokens: MAX_TOKENS,
@@ -13,4 +13,4 @@ index 2125f23..284ae35 100644
 +      stream: false,
      });
    } catch (error) {
-     throw abstain(reasonOf(error));
+     throw refused(error);

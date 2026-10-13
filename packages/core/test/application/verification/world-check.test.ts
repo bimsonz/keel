@@ -2,6 +2,8 @@ import { Effect, Layer, Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   type CheckPlan,
+  type DepsAnswer,
+  depsStop,
   type ProbeParties,
   TIER2_STEP_IDS,
   trunkCheckPlan,
@@ -50,6 +52,9 @@ const report = (step: PlanStep, outcome: string): StepReport => ({
   tier: step.tier,
   durationMs: 1,
 });
+
+/** Deps that were ensured: every step asked its runner. */
+const READY: DepsAnswer = { _tag: "DepsReady", install: "a".repeat(64), parts: [] };
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const A = makeId("chg", ulid(1));
@@ -144,7 +149,7 @@ describe("world checks", () => {
           const reports = steps.flatMap((step, i) =>
             outcomes[i] === "missing" ? [] : [report(step, outcomes[i] ?? "pass")],
           );
-          const cell = worldCheckCell(PLAN, reports);
+          const cell = worldCheckCell(PLAN, reports, READY);
           const expected = outcomes.includes("fail")
             ? "fail"
             : outcomes.every((o) => o === "pass")
@@ -159,9 +164,48 @@ describe("world checks", () => {
 
   it("[world-check.cell] a plan with no step a world check can run is n/a, never a pass", () => {
     const plan: FlowPlan = { ...PLAN, steps: [] };
-    expect(worldCheckCell(plan, [])).toEqual({
+    expect(worldCheckCell(plan, [], READY)).toEqual({
       outcome: "n/a",
       reason: expect.stringMatching(/no Tier 2 step/),
+    });
+  });
+
+  it("[world-check.cell-deps] a world handed no deps bundle says why no step ran: a refused install fails the check with the refusal, never as a failed suite, and unavailable deps are n/a with theirs", () => {
+    const steps = worldCheckSteps(PLAN);
+    const cellOf = (deps: Exclude<DepsAnswer, { readonly _tag: "DepsReady" }>) =>
+      worldCheckCell(
+        PLAN,
+        steps.map((step) => depsStop(step, deps).report),
+        deps,
+      );
+    expect(
+      cellOf({ _tag: "DepsRefused", reason: "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE" }),
+    ).toEqual({
+      outcome: "fail",
+      reason:
+        "js-ts.suite, worker-app.typecheck did not run: deps-refused: install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE",
+    });
+    expect(cellOf({ _tag: "DepsUnavailable", reason: "upload-failed" })).toEqual({
+      outcome: "n/a",
+      reason: "js-ts.suite, worker-app.typecheck did not run: deps-unavailable: upload-failed",
+    });
+    expect(cellOf({ _tag: "DepsUnneeded" })).toEqual({
+      outcome: "n/a",
+      reason:
+        "js-ts.suite, worker-app.typecheck did not run: deps-unavailable: no deps were ensured for this step",
+    });
+    // With deps in place a failed step still reads as one, and a step with no report as one that did not run.
+    const [suite, typecheck] = steps;
+    if (suite === undefined || typecheck === undefined) throw new Error("the pack holds two steps");
+    expect(worldCheckCell(PLAN, [report(suite, "fail"), report(typecheck, "pass")], READY)).toEqual(
+      {
+        outcome: "fail",
+        reason: "js-ts.suite failed",
+      },
+    );
+    expect(worldCheckCell(PLAN, [report(typecheck, "abstain")], READY)).toEqual({
+      outcome: "n/a",
+      reason: "js-ts.suite did not run; worker-app.typecheck abstain",
     });
   });
 

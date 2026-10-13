@@ -1,6 +1,6 @@
 import { namespaceKey } from "@keeltown/core/application/verification";
 import { NamespaceId } from "@keeltown/core/kernel";
-import { bundleUrlSigned } from "@keeltown/runner-protocol";
+import { bundleUrlSigned, DEPS_HOST, depsPartUrlSigned } from "@keeltown/runner-protocol";
 import { Schema } from "effect";
 import { CiSandbox } from "./ci-sandbox.js";
 
@@ -11,7 +11,7 @@ type ExecOptions = Parameters<CiSandbox["execWithSessionToken"]>[2];
 /** The one host family a sandbox may reach: virtual, answered here, never on the internet. */
 export const BUNDLE_HOSTS = "*.keel.internal";
 
-/** A bundle's address on the host: `/<namespace id>/<sha256 hex>`, and nothing else. */
+/** An object's address on a host: `/<namespace id>/<sha256 hex>`, and nothing else. A bundle's and a deps part's alike. */
 const BUNDLE_PATH = /^\/([^/]+)\/([0-9a-f]{64})$/;
 
 const isNamespace = Schema.is(NamespaceId);
@@ -115,9 +115,10 @@ function measured(
  * nothing. The check needs only BUNDLE_URL_PUBLIC_KEY, which signs nothing,
  * so keel-verify still holds no secret.
  *
- * keel-verify only ever reads BUNDLES (guard: readonly-bundles), and no URL
- * or token for it exists outside this handler. Each read is logged as a
- * `BundleServed` once its body ends.
+ * A bundle is only ever read here: keel-verify writes nothing to BUNDLES but
+ * a deps build's parts and pointer, from the deps box alone (guard:
+ * readonly-bundles), and no URL or token for a bundle exists outside this
+ * handler. Each read is logged as a `BundleServed` once its body ends.
  */
 export async function serveBundle(
   request: Request,
@@ -167,6 +168,53 @@ export async function serveBundle(
   });
 }
 
+/**
+ * Answers `GET deps.keel.internal/<namespace id>/<sha256>?exp=…&sig=…` with
+ * that part of a deps bundle, read from BUNDLES at the namespace's own
+ * `deps-parts` key: a part kept for one namespace is not there under
+ * another's id.
+ *
+ * Nothing is read until the URL carries Keel's signature for exactly this
+ * namespace and part, still in date (403 otherwise). A part URL's signature
+ * names its family, so a bundle's signed URL opens no part and a part's opens
+ * no bundle. A suite box only reads here: anything but GET or HEAD is
+ * refused (405), so a suite, which runs a candidate's code, can never put a
+ * part where another run would fetch it. A HEAD asks R2 for the part's size
+ * alone, and no body is read for it.
+ */
+export async function serveDepsPart(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response("deps parts are read-only", { status: 405 });
+  const url = new URL(request.url);
+  const [, namespace, sha256] = BUNDLE_PATH.exec(url.pathname) ?? [];
+  if (namespace === undefined || sha256 === undefined || !isNamespace(namespace))
+    return new Response("not a namespace's deps part", { status: 400 });
+  const signed = await depsPartUrlSigned(
+    env.BUNDLE_URL_PUBLIC_KEY,
+    namespace,
+    sha256,
+    url.searchParams,
+    Math.floor(Date.now() / 1000),
+  );
+  if (!signed) return new Response("not a deps part URL Keel signed", { status: 403 });
+  const key = namespaceKey(namespace, "deps-parts", sha256);
+  if (request.method === "HEAD") return partAnswer(await env.BUNDLES.head(key), null);
+  const part = await env.BUNDLES.get(key);
+  return partAnswer(part, part === null ? null : part.body);
+}
+
+/** What a suite box is told of a deps part: not found, or its size and etag over `body`, which a HEAD leaves null. */
+const partAnswer = (part: R2Object | null, body: ReadableStream | null): Response =>
+  part === null
+    ? new Response("no such deps part", { status: 404 })
+    : new Response(body, {
+        headers: {
+          "content-type": "application/octet-stream",
+          "content-length": String(part.size),
+          etag: part.httpEtag,
+        },
+      });
+
 /** @cloudflare/ci's archive checkout (`curl … '<url>' | tar -xz …`) for a bundle host, capturing the bundle's hash. */
 const ARCHIVE_CHECKOUT =
   /https:\/\/[a-z0-9.-]+\.keel\.internal\/[A-Za-z0-9_]+\/([0-9a-f]{64})(?:\?[^' ]*)?'? \| tar -xz /;
@@ -188,8 +236,11 @@ export function refuseEgress(request: Request): Response {
  * Egress: the internet is off and the only allowed hosts are `*.keel.internal`.
  * Setting an allowlist puts the container in intercept-all mode, so every
  * outbound HTTP request (`interceptAllOutboundHttp`) and every HTTPS request
- * (`interceptOutboundHttps('*')`) reaches the handlers below; dependencies are
- * baked into the image, so no registry is reachable.
+ * (`interceptOutboundHttps('*')`) reaches the handlers below. Dependencies are
+ * fetched, never baked into the image and never installed here: a deps box
+ * (KeelDepsBox) built them, and a suite box reads their parts from
+ * `deps.keel.internal` by the signed URLs it is handed. So no registry is
+ * reachable from a suite box, and it can write nothing: both hosts only read.
  */
 export class KeelSandbox extends CiSandbox {
   override enableInternet = false;
@@ -229,9 +280,12 @@ export class KeelSandbox extends CiSandbox {
 }
 
 // Assigned, never declared as a static class field: a field would define an own
-// property and bypass Container's registry setter, silently dropping both
-// handlers. The first matching glob wins, so the bundle hosts come before `*`.
+// property and bypass Container's registry setter, silently dropping every
+// handler. An exact host wins over a glob, so the deps host is answered by its
+// own handler and every other `*.keel.internal` host by the bundle host's. The
+// first matching glob wins, so the bundle hosts come before `*`.
 KeelSandbox.outboundByHost = {
+  [DEPS_HOST]: (request, env) => serveDepsPart(request, env),
   [BUNDLE_HOSTS]: (request, env, ctx) => serveBundle(request, env, ctx),
   "*": (request) => refuseEgress(request),
 };

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.cell-refused, probe.discarded
+# why: The run is recorded as failed at a refused cell before the ledger is read: a probe its cells had already decided is told its run failed, and one still calibrating ends as drafted, not stale at the cell
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 96f5e3c6..4bd5ba96 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -753,6 +753,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+         continue;
+       }
+       // Refused: once the cells so far decide the probe, the rest have nothing to record.
++      yield* runFailedStep(call, steps);
+       const now = yield* readConflict(`decided ${cell.world}@${cell.run}`);
+       if (
+         now._tag === "Ok" &&

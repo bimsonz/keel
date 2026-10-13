@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.inside
+# why: An absolute path is moved: a file anywhere in the box is taken into the kept files
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..bd0edabc 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -214,7 +214,7 @@ export const DEPS_KEEP_SH = [
+   '  [ -f "$i" ] && [ "$(sha256sum "$i" 2>/dev/null | cut -c1-64)" = "$2" ] || { echo install-mismatch; return 1; }',
+   '  [ "$(head -n 1 "$i")" = keel.install/1 ] || { echo install-mismatch; return 1; }',
+   `  tail -n +2 "$i" >"$i.lines"; [ "$(tail -c 1 "$i.lines" | wc -l | tr -d ' ')" = 1 ] || { echo install-mismatch; return 1; }`,
+-  `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  [^/]' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
++  `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  .' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C sed 's/  /  .\\//' "$i.lines" >"$i.sums" 2>/dev/null || { echo install-mismatch; return 1; }`,
+   '  sha256sum --quiet --strict -c "$i.sums" >/dev/null 2>&1 || { echo install-mismatch; return 1; }',

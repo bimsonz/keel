@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.reads, deps.need.root-only, deps.need.property
+# why: A lockfile deeper in the tree is an input beside the root's: a file no install reads moves the digest
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..387e835c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -86,7 +86,7 @@ const isPackageFile = (path: string): boolean =>
+  * tree is another file: `packages/x/pnpm-lock.yaml` is not the lockfile.
+  */
+ const installReads = (path: string): boolean =>
+-  path === LOCKFILE || path === WORKSPACE_FILE || path === NPMRC || isPackageFile(path);
++  path.endsWith(LOCKFILE) || path === WORKSPACE_FILE || path === NPMRC || isPackageFile(path);
+ 
+ /**
+  * The path `target` names from the directory `dir` (`""` for the root), as a

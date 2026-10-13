@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: deps.pool.part-head
+# why: A HEAD of a part opens the part's body in R2 and never reads it: up to 32 MiB of stream is left open for a question its metadata answers
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index b7b8d45d..fafc496d 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -198,7 +198,7 @@ export async function serveDepsPart(request: Request, env: Env): Promise<Respons
+   );
+   if (!signed) return new Response("not a deps part URL Keel signed", { status: 403 });
+   const key = namespaceKey(namespace, "deps-parts", sha256);
+-  if (request.method === "HEAD") return partAnswer(await env.BUNDLES.head(key), null);
++  if (request.method === "HEAD") return partAnswer(await env.BUNDLES.get(key), null);
+   const part = await env.BUNDLES.get(key);
+   return partAnswer(part, part === null ? null : part.body);
+ }

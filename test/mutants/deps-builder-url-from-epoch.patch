@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deps-builder.test.ts
+# kills: deps-builder.build
+# why: The bundle URL expires thirty minutes after 1970: the deps box is refused its own candidate
+diff --git a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+index c1b91868..c6fe8619 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+@@ -56,7 +56,7 @@ export const DepsBuilderRpc = (verifier: VerifierEntrypoint, signingKey: string)
+           Effect.gen(function* () {
+             const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+             const bundleUrl = yield* Effect.promise(() =>
+-              signedBundleUrl(signingKey, namespace, bundle, now + BUNDLE_URL_TTL_SECONDS),
++              signedBundleUrl(signingKey, namespace, bundle, BUNDLE_URL_TTL_SECONDS),
+             );
+             const raw = yield* Effect.tryPromise({
+               try: () => verifier.buildDeps(encodeRequest({ namespace, need, bundleUrl })),

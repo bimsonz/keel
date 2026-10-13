@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.logged
+# why: A build's log line names the install digest as a lockfile's hash, so nothing that reads the log by `install` finds a build
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..485b255e 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -427,7 +427,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+       JSON.stringify({
+         event: "keel.deps.built",
+         namespace: owner.namespace,
+-        install: owner.install,
++        lockSha: owner.install,
+         ...what,
+         ms: Date.now() - started,
+       } satisfies DepsBuilt),

@@ -1,4 +1,6 @@
 import {
+  type DepsAnswer,
+  depsStop,
   JS_TS_SUITE,
   judgeSuite,
   judgeTypecheck,
@@ -18,11 +20,30 @@ import {
 import type { ContentHash, Json, NamespaceId } from "@keeltown/core/kernel";
 import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
-import { BUNDLE_URL_TTL_SECONDS, HYDRATE_SH, signedBundleUrl } from "@keeltown/runner-protocol";
+import {
+  BUNDLE_URL_TTL_SECONDS,
+  DEPS_DROP_SH,
+  DEPS_FETCH_SH,
+  HYDRATE_SH,
+  signedBundleUrl,
+  signedDepsPartUrl,
+} from "@keeltown/runner-protocol";
 import { Clock, Effect, Layer } from "effect";
 
-/** Where the ExecBox image bakes the pack's dependencies, with the sha256 of the lockfile they came from. */
-export const BAKED_DEPS = "/opt/forge-deps";
+/**
+ * Puts the step's deps bundle into the hydrated workspace from the parts'
+ * signed URLs in `$KEEL_DEPS_PARTS` (`keel_deps_fetch`), and says
+ * `KEEL_DEPS ok`. A bundle that cannot be put there stops the run as
+ * `KEEL_DEPS missing <why>`, with whatever was extracted removed. The list is
+ * expanded unquoted and a signed URL holds a `?`, so no glob may read it
+ * (`set -f`).
+ */
+export const DEPS_IN_PLACE = [
+  "set -f",
+  'why=$(keel_deps_fetch $K /workspace ${KEEL_DEPS_PARTS:-}) || { keel_deps_drop /workspace; echo "KEEL_DEPS missing $why"; echo KEEL_END; exit 0; }',
+  "set +f",
+  "echo KEEL_DEPS ok",
+].join("\n");
 
 /**
  * The js-ts suite command (POSIX sh). It always exits 0: a non-zero exit would
@@ -33,9 +54,13 @@ export const BAKED_DEPS = "/opt/forge-deps";
  *    mismatch is diagnosed (`KEEL_HYDRATION_DIFF`) and refetched once from
  *    `$KEEL_BUNDLE_URL`, accepted only by its content address
  *    (`KEEL_HYDRATION_RETRIED`); see HYDRATE_SH;
- * 2. the lockfile must match the baked dependencies, which are linked in;
+ * 2. the deps bundle built for the candidate's install digest is fetched
+ *    part by part, each checked against the hash its URL names, and untarred
+ *    into the workspace (DEPS_IN_PLACE);
  * 3. vitest runs with its JSON reporter; its console goes to a file, so test
- *    output can never forge a marker, and only a base64 tail is printed.
+ *    output can never forge a marker, and only a base64 tail is printed;
+ * 4. the fetched deps are removed (`keel_deps_drop`): the engine snapshots
+ *    the workspace of a runner that exits 0, and they are not a run's to keep.
  */
 export const JS_TS_SUITE_COMMAND = [
   "set -u",
@@ -43,11 +68,11 @@ export const JS_TS_SUITE_COMMAND = [
   `echo ${SUITE_PROTOCOL}`,
   'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
   HYDRATE_SH,
+  DEPS_FETCH_SH,
+  DEPS_DROP_SH,
   "cd /workspace 2>/dev/null || stop no-workspace",
   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
-  `if [ "$(sha256sum pnpm-lock.yaml 2>/dev/null | cut -c1-64)" != "$(cat ${BAKED_DEPS}/.lock-sha 2>/dev/null)" ]; then echo KEEL_LOCK diverged; echo KEEL_END; exit 0; fi`,
-  "echo KEEL_LOCK ok",
-  `ln -sfn ${BAKED_DEPS}/node_modules node_modules`,
+  DEPS_IN_PLACE,
   "start=$(date +%s%3N)",
   "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=$K/report.json >$K/console.log 2>&1",
   "code=$?",
@@ -56,14 +81,15 @@ export const JS_TS_SUITE_COMMAND = [
   'echo "KEEL_DURATION_MS $((end - start))"',
   'echo "KEEL_TAIL $(tail -c 4096 $K/console.log | base64 -w0)"',
   'if [ -s $K/report.json ]; then echo "KEEL_REPORT $(gzip -c $K/report.json | base64 -w0)"; else echo "KEEL_REPORT none"; fi',
+  "keel_deps_drop /workspace",
   "echo KEEL_END",
   "exit 0",
 ].join("\n");
 
 /**
  * The worker-app typecheck command (POSIX sh), per TYPECHECK_PROTOCOL. It
- * hydrates and links the baked dependencies exactly as the suite command does,
- * then runs the project's own TypeScript (`tsc --noEmit --pretty false`, so
+ * hydrates and fetches the deps bundle exactly as the suite command does, and
+ * removes it as that does, whichever way it ends. Between the two it runs the project's own TypeScript (`tsc --noEmit --pretty false`, so
  * each error is one `file(line,col): error TSnnnn: message` line). tsc's
  * output goes to a file and only its first TYPECHECK_OUTPUT_LIMIT bytes are
  * printed, gzipped and base64'd, so nothing it prints can forge a marker.
@@ -76,12 +102,12 @@ export const TYPECHECK_COMMAND = [
   `echo ${TYPECHECK_PROTOCOL}`,
   'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
   HYDRATE_SH,
+  DEPS_FETCH_SH,
+  DEPS_DROP_SH,
   "cd /workspace 2>/dev/null || stop no-workspace",
   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
-  `if [ "$(sha256sum pnpm-lock.yaml 2>/dev/null | cut -c1-64)" != "$(cat ${BAKED_DEPS}/.lock-sha 2>/dev/null)" ]; then echo KEEL_LOCK diverged; echo KEEL_END; exit 0; fi`,
-  "echo KEEL_LOCK ok",
-  `ln -sfn ${BAKED_DEPS}/node_modules node_modules`,
-  "if [ ! -f tsconfig.json ]; then echo KEEL_TSCONFIG none; echo KEEL_END; exit 0; fi",
+  DEPS_IN_PLACE,
+  "if [ ! -f tsconfig.json ]; then keel_deps_drop /workspace; echo KEEL_TSCONFIG none; echo KEEL_END; exit 0; fi",
   "echo KEEL_TSCONFIG ok",
   "start=$(date +%s%3N)",
   "node node_modules/typescript/bin/tsc --noEmit --pretty false >$K/tsc.log 2>&1",
@@ -91,6 +117,7 @@ export const TYPECHECK_COMMAND = [
   'echo "KEEL_DURATION_MS $((end - start))"',
   `echo "KEEL_OUTPUT_BYTES $(wc -c <$K/tsc.log | tr -d ' ')"`,
   `if [ -s $K/tsc.log ]; then echo "KEEL_OUTPUT $(head -c ${TYPECHECK_OUTPUT_LIMIT} $K/tsc.log | gzip -c | base64 -w0)"; else echo "KEEL_OUTPUT none"; fi`,
+  "keel_deps_drop /workspace",
   "echo KEEL_END",
   "exit 0",
 ].join("\n");
@@ -116,12 +143,17 @@ export interface SuiteRunnerOptions {
 
 /**
  * exec passes on only PATH, so HOME is given explicitly, with the signed URL
- * of the namespace's bundle for a hydration diagnosis and its one refetch;
- * nothing else is.
+ * of the namespace's bundle for a hydration diagnosis and its one refetch,
+ * and the signed URLs of its deps bundle's parts, in order and separated by
+ * spaces; nothing else is.
  */
-export const suiteEnv = (bundleUrl: string): SuiteRunnerOptions["env"] => ({
+export const suiteEnv = (
+  bundleUrl: string,
+  partUrls: readonly string[],
+): SuiteRunnerOptions["env"] => ({
   HOME: "/root",
   KEEL_BUNDLE_URL: bundleUrl,
+  KEEL_DEPS_PARTS: partUrls.join(" "),
 });
 
 export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
@@ -273,14 +305,17 @@ const abstained = (step: PlanStep): StepResult => ({
 /**
  * `VerifierRuntime` for Tier 2 steps, over the CI engine's runner. Each step
  * in TIER2_RUNNERS is one runner (a fresh sandbox hydrated from the job's
- * bundle, the namespace's); its in-band report is parsed and judged by that step's judge, and
- * the judgement's evidence is redacted and stored durably before the result
- * cites it. A runner the engine gave up on abstains, and so does any step this
- * runtime has no runner for.
+ * bundle, the namespace's, with the deps bundle its Workflow ensured); its
+ * in-band report is parsed and judged by that step's judge, and the
+ * judgement's evidence is redacted and stored durably before the result
+ * cites it. A step handed no deps bundle asks no runner: it stores why and
+ * answers as core's `depsStop` says, a fail for dependencies that were
+ * refused and an abstain for ones that are unavailable. A runner the engine
+ * gave up on abstains, and so does any step this runtime has no runner for.
  *
  * `literals` are secret values to redact wherever they appear (the account id).
- * `signingKey` signs the bundle URL each runner is handed, for its own bundle
- * and for a step's life.
+ * `signingKey` signs the URLs each runner is handed, its own bundle's and its
+ * deps parts', for a step's life.
  */
 export const SuiteRuntimeCi = (deps: {
   readonly runner: SuiteRunner;
@@ -292,39 +327,57 @@ export const SuiteRuntimeCi = (deps: {
     VerifierRuntime,
     Effect.gen(function* () {
       const evidence = yield* EvidenceStore;
-      const runStep = (namespace: NamespaceId, bundle: ContentHash) => (step: PlanStep) =>
-        Effect.gen(function* () {
-          const tier2 = TIER2_RUNNERS[step.id];
-          if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
-          const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
-          const url = yield* Effect.promise(() =>
-            signedBundleUrl(deps.signingKey, namespace, bundle, now + BUNDLE_URL_TTL_SECONDS),
-          );
-          const stdout = yield* Effect.tryPromise(() =>
-            deps.runner({
-              name: step.id,
-              command: tier2.command,
-              env: suiteEnv(url),
-              config: SUITE_CONFIG,
-              cloudflareCredentials: false,
-              sourceControlCredentials: false,
-            }),
-          ).pipe(
-            // A log over 300 kB arrives as a stream: never a well-formed report, so it reads as malformed.
-            Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
-            Effect.catch(() => Effect.succeed(undefined)),
-          );
-          if (stdout === undefined) return abstained(step);
-          const judged = yield* tier2.judge(step, stdout, deps.literals);
-          const resultRef = yield* deps.durable(
-            `${step.id}:evidence`,
-            evidence.put(namespace, judged.document),
-          );
-          const { failure: _failure, ...result } = judged.report;
-          return { ...result, resultRef } satisfies StepResult;
-        });
+      const runStep =
+        (namespace: NamespaceId, bundle: ContentHash, handed: DepsAnswer) => (step: PlanStep) =>
+          Effect.gen(function* () {
+            const tier2 = TIER2_RUNNERS[step.id];
+            if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+            if (handed._tag !== "DepsReady") {
+              const stop = depsStop(step, handed);
+              const stopRef = yield* deps.durable(
+                `${step.id}:evidence`,
+                evidence.put(namespace, redactJson({ ...stop.evidence }, deps.literals)),
+              );
+              return { ...stop.report, resultRef: stopRef } satisfies StepResult;
+            }
+            const expires =
+              Math.floor((yield* Clock.currentTimeMillis) / 1000) + BUNDLE_URL_TTL_SECONDS;
+            const url = yield* Effect.promise(() =>
+              signedBundleUrl(deps.signingKey, namespace, bundle, expires),
+            );
+            const parts = yield* Effect.promise(() =>
+              Promise.all(
+                handed.parts.map((part) =>
+                  signedDepsPartUrl(deps.signingKey, namespace, part.sha256, expires),
+                ),
+              ),
+            );
+            const stdout = yield* Effect.tryPromise(() =>
+              deps.runner({
+                name: step.id,
+                command: tier2.command,
+                env: suiteEnv(url, parts),
+                config: SUITE_CONFIG,
+                cloudflareCredentials: false,
+                sourceControlCredentials: false,
+              }),
+            ).pipe(
+              // A log over 300 kB arrives as a stream: never a well-formed report, so it reads as malformed.
+              Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
+              Effect.catch(() => Effect.succeed(undefined)),
+            );
+            if (stdout === undefined) return abstained(step);
+            const judged = yield* tier2.judge(step, stdout, deps.literals);
+            const resultRef = yield* deps.durable(
+              `${step.id}:evidence`,
+              evidence.put(namespace, judged.document),
+            );
+            const { failure: _failure, ...result } = judged.report;
+            return { ...result, resultRef } satisfies StepResult;
+          });
       return VerifierRuntime.of({
-        run: (namespace, job) => Effect.forEach(job.steps, runStep(namespace, job.bundle)),
+        run: (namespace, job, handed) =>
+          Effect.forEach(job.steps, runStep(namespace, job.bundle, handed)),
       });
     }),
   );

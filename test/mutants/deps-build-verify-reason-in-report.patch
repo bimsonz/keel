@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.bundle
+# why: What the tree's check says of a candidate's files is printed into the report, before the refusal
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..3094143b 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -390,7 +390,7 @@ export const depsBuildCommand = (
+     'curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o "$K/bundle.tgz" "$url" 2>/dev/null || refuse bundle-unfetched',
+     "addr=${url%%\\?*}",
+     '[ "$(sha256sum "$K/bundle.tgz" | cut -c1-64)" = "${addr##*/}" ] || refuse bundle-hash-mismatch',
+-    'tar -xzf "$K/bundle.tgz" --strip-components=1 -C "$W" 2>/dev/null && keel_verify_bundle >/dev/null || refuse bundle-unverified',
++    'tar -xzf "$K/bundle.tgz" --strip-components=1 -C "$W" 2>/dev/null && keel_verify_bundle || refuse bundle-unverified',
+     'rm -f "$K/bundle.tgz"',
+     'printf %s "${KEEL_INSTALL_INPUTS:-}" >"$K/inputs"',
+     'why=$(keel_deps_keep "$K/inputs" "${KEEL_INSTALL:-}" "$K/kept") || refuse "$why"',

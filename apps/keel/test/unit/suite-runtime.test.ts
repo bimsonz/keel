@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  type DepsAnswer,
+  depsRemedy,
   SUITE_PROTOCOL,
   TIER2_STEP_IDS,
   TYPECHECK_PROTOCOL,
@@ -7,8 +9,8 @@ import {
 import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
-import { VerifierRuntime } from "@keeltown/core/ports";
-import { bundleUrlSigned } from "@keeltown/runner-protocol";
+import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
+import { bundleUrlSigned, depsPartUrlSigned } from "@keeltown/runner-protocol";
 import {
   contractJob,
   makeBundleUrlKeys,
@@ -59,6 +61,13 @@ const job = (): VerificationJob => ({
 
 const typecheckJob = (): VerificationJob => ({ ...job(), steps: [typecheck] });
 
+/** A deps bundle of two parts, as the job's Workflow ensured it. */
+const PARTS = [
+  { sha256: "d".repeat(64), bytes: 10 },
+  { sha256: "e".repeat(64), bytes: 5 },
+];
+const READY: DepsAnswer = { _tag: "DepsReady", install: "1".repeat(64), parts: PARTS };
+
 /** The runtime over a runner the test scripts, with steps recorded instead of made durable. */
 const runtime = (runner: SuiteRunner) => {
   const calls: SuiteRunnerOptions[] = [];
@@ -89,11 +98,11 @@ PORTS.VerifierRuntime.contract("ci (scripted runner)", () => runtime(stdoutRunne
 
 describe("the Tier 2 suite runtime", () => {
   it.effect(
-    "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME and the bundle's signed URL in its env",
+    "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME, the bundle's signed URL and its deps parts' in its env",
     () =>
       Effect.gen(function* () {
         const rt = runtime(stdoutRunner(""));
-        yield* Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, job())).pipe(
+        yield* Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, job(), READY)).pipe(
           Effect.provide(rt.layer),
         );
         const [options] = rt.calls;
@@ -105,7 +114,11 @@ describe("the Tier 2 suite runtime", () => {
           cloudflareCredentials: false,
           sourceControlCredentials: false,
         });
-        expect(Object.keys(options.env).toSorted()).toEqual(["HOME", "KEEL_BUNDLE_URL"]);
+        expect(Object.keys(options.env).toSorted()).toEqual([
+          "HOME",
+          "KEEL_BUNDLE_URL",
+          "KEEL_DEPS_PARTS",
+        ]);
         expect(options.env.HOME).toBe("/root");
         // [t5.bundle-url.suite-env] The URL is the namespace's bundle, signed for it and good for thirty minutes from now (the test clock's zero).
         const url = new URL(options.env["KEEL_BUNDLE_URL"] ?? "");
@@ -202,7 +215,7 @@ describe("the Tier 2 suite runtime", () => {
       const stdout = yield* Effect.promise(() => runnerStdout(200, 0, "200 passed"));
       const rt = runtime(stdoutRunner(stdout));
       const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run(sampleNamespace, job()),
+        v.run(sampleNamespace, job(), READY),
       ).pipe(Effect.provide(rt.layer));
       expect(result).toMatchObject({
         stepId: step.id,
@@ -221,7 +234,7 @@ describe("the Tier 2 suite runtime", () => {
       const stdout = yield* Effect.promise(() => suiteStdout(5, 2));
       const rt = runtime(stdoutRunner(stdout));
       const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run(sampleNamespace, job()),
+        v.run(sampleNamespace, job(), READY),
       ).pipe(Effect.provide(rt.layer));
       expect(result?.outcome).toBe("fail");
       const [stored] = [...rt.store.documents.values()];
@@ -240,7 +253,7 @@ describe("the Tier 2 suite runtime", () => {
         );
         const rt = runtime(stdoutRunner(stdout));
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-          v.run(sampleNamespace, job()),
+          v.run(sampleNamespace, job(), READY),
         ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [document] = [...rt.store.documents.values()];
@@ -283,7 +296,7 @@ describe("the Tier 2 suite runtime", () => {
         );
         const rt = runtime(stdoutRunner(stdout));
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-          v.run(sampleNamespace, job()),
+          v.run(sampleNamespace, job(), READY),
         ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [document] = [...rt.store.documents.values()];
@@ -305,7 +318,7 @@ describe("the Tier 2 suite runtime", () => {
           stdoutRunner(""),
         ]) {
           const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-            v.run(sampleNamespace, job()),
+            v.run(sampleNamespace, job(), READY),
           ).pipe(Effect.provide(runtime(runner).layer));
           expect(result?.outcome).toBe("abstain");
         }
@@ -326,7 +339,7 @@ describe("the Tier 2 suite runtime", () => {
         ].join("\n");
         const rt = runtime(stdoutRunner(stdout));
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-          v.run(sampleNamespace, job()),
+          v.run(sampleNamespace, job(), READY),
         ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const [stored] = [...rt.store.documents.values()];
@@ -347,7 +360,7 @@ describe("the Tier 2 suite runtime", () => {
     Effect.gen(function* () {
       const rt = runtime(stdoutRunner(""));
       const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }),
+        v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }, READY),
       ).pipe(Effect.provide(rt.layer));
       expect(results.map((r) => r.outcome)).toEqual(["abstain"]);
       expect(rt.calls).toEqual([]);
@@ -369,7 +382,7 @@ describe("the Tier 2 typecheck", () => {
     expect(
       lines.indexOf('keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }'),
     ).toBeLessThan(tsc);
-    expect(lines.findIndex((l) => l.includes("KEEL_LOCK diverged"))).toBeLessThan(tsc);
+    expect(lines.findIndex((l) => l.includes("keel_deps_fetch $K /workspace"))).toBeLessThan(tsc);
     expect(lines.findIndex((l) => l.includes("KEEL_TSCONFIG none"))).toBeLessThan(tsc);
   });
 
@@ -380,7 +393,7 @@ describe("the Tier 2 typecheck", () => {
         const stdout = yield* Effect.promise(() => typecheckStdout(1, TSC_RED));
         const rt = runtime(stdoutRunner(stdout));
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-          v.run(sampleNamespace, typecheckJob()),
+          v.run(sampleNamespace, typecheckJob(), READY),
         ).pipe(Effect.provide(rt.layer));
         expect(rt.calls.map((c) => [c.name, c.command])).toEqual([
           [typecheck.id, TYPECHECK_COMMAND],
@@ -403,7 +416,7 @@ describe("the Tier 2 typecheck", () => {
     Effect.gen(function* () {
       const stdout = yield* Effect.promise(() => typecheckStdout(0, ""));
       const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run(sampleNamespace, typecheckJob()),
+        v.run(sampleNamespace, typecheckJob(), READY),
       ).pipe(Effect.provide(runtime(stdoutRunner(stdout)).layer));
       expect(result?.outcome).toBe("pass");
     }),
@@ -417,7 +430,7 @@ describe("the Tier 2 typecheck", () => {
         const stdout = yield* Effect.promise(() => typecheckStdout(1, leak));
         const rt = runtime(stdoutRunner(stdout));
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
-          v.run(sampleNamespace, typecheckJob()),
+          v.run(sampleNamespace, typecheckJob(), READY),
         ).pipe(Effect.provide(rt.layer));
         expect(result?.outcome).toBe("abstain");
         const stored = String([...rt.store.documents.values()][0]);
@@ -431,3 +444,151 @@ describe("the Tier 2 typecheck", () => {
       }),
   );
 });
+
+/** Both Tier 2 steps in one job. */
+const both = (): VerificationJob => ({ ...job(), steps: [step, typecheck] });
+
+/** Runs both Tier 2 steps handed `handed`, and reads back what each stored. */
+const handedTo = (handed: DepsAnswer) =>
+  Effect.gen(function* () {
+    const rt = runtime(stdoutRunner(""));
+    const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
+      v.run(sampleNamespace, both(), handed),
+    ).pipe(Effect.provide(rt.layer));
+    const stored = yield* Effect.forEach(results, (r) =>
+      Effect.flatMap(EvidenceStore, (s) =>
+        s.get(sampleNamespace, Schema.decodeUnknownSync(ContentHash)(r.resultRef)),
+      ),
+    ).pipe(Effect.provide(rt.layer));
+    return { rt, results, stored };
+  });
+
+describe("a Tier 2 step and the deps its Workflow ensured", () => {
+  it.effect(
+    "[suite-runtime.deps-parts] hands each runner its deps parts' URLs in order, each signed for the namespace's own part and for a step's life",
+    () =>
+      Effect.gen(function* () {
+        const rt = runtime(stdoutRunner(""));
+        yield* Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, both(), READY)).pipe(
+          Effect.provide(rt.layer),
+        );
+        expect(rt.calls).toHaveLength(2);
+        for (const options of rt.calls) {
+          const urls = (options.env["KEEL_DEPS_PARTS"] ?? "").split(" ").map((u) => new URL(u));
+          expect(urls.map((u) => `${u.origin}${u.pathname}`)).toEqual(
+            PARTS.map((part) => `https://deps.keel.internal/${X}/${part.sha256}`),
+          );
+          for (const [i, url] of urls.entries()) {
+            const part = PARTS[i]?.sha256 ?? "";
+            const signedFor = (namespace: string, sha256: string, now: number) =>
+              Effect.promise(() =>
+                depsPartUrlSigned(KEYS.publicKey, namespace, sha256, url.searchParams, now),
+              );
+            expect(url.searchParams.get("exp")).toBe("1800");
+            expect(yield* signedFor(X, part, 1_800)).toBe(true);
+            expect(yield* signedFor(X, part, 1_801)).toBe(false);
+            expect(yield* signedFor(Y, part, 0)).toBe(false);
+            expect(yield* signedFor(X, "f".repeat(64), 0)).toBe(false);
+          }
+        }
+      }),
+  );
+
+  it.effect(
+    "[suite-runtime.deps-refused] fails every Tier 2 step handed refused deps, asks no runner, and stores the reason with what to do",
+    () =>
+      Effect.gen(function* () {
+        const reason = "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE";
+        const { rt, results, stored } = yield* handedTo({ _tag: "DepsRefused", reason });
+        expect(rt.calls).toEqual([]);
+        expect(rt.steps).toEqual(["js-ts.suite:evidence", "worker-app.typecheck:evidence"]);
+        expect(results.map((r) => [r.stepId, r.outcome, r.durationMs])).toEqual([
+          ["js-ts.suite", "fail", 0],
+          ["worker-app.typecheck", "fail", 0],
+        ]);
+        expect(results.map((r) => r.evidenceClass)).toEqual([
+          step.evidenceCeiling,
+          typecheck.evidenceCeiling,
+        ]);
+        expect(stored).toEqual(
+          ["js-ts.suite", "worker-app.typecheck"].map((stepId) => ({
+            stepId,
+            outcome: "fail",
+            why: `deps-refused: ${reason}`,
+            tail: "",
+            deps: {
+              refused: reason,
+              remedy:
+                "the installer refused the lockfile (ERR_PNPM_OUTDATED_LOCKFILE): run pnpm install and commit the pnpm-lock.yaml it writes",
+            },
+          })),
+        );
+        expect(depsRemedy(reason)).toBe(
+          "the installer refused the lockfile (ERR_PNPM_OUTDATED_LOCKFILE): run pnpm install and commit the pnpm-lock.yaml it writes",
+        );
+      }),
+  );
+
+  it.effect(
+    "[suite-runtime.deps-unavailable] abstains every Tier 2 step handed unavailable deps, or none, asks no runner, and stores why",
+    () =>
+      Effect.gen(function* () {
+        const reason = "install-failed exit 1 ERR_PNPM_FETCH_503";
+        const down = yield* handedTo({ _tag: "DepsUnavailable", reason });
+        expect(down.rt.calls).toEqual([]);
+        expect(down.results.map((r) => [r.stepId, r.outcome])).toEqual([
+          ["js-ts.suite", "abstain"],
+          ["worker-app.typecheck", "abstain"],
+        ]);
+        expect(down.stored).toEqual(
+          ["js-ts.suite", "worker-app.typecheck"].map((stepId) => ({
+            stepId,
+            outcome: "abstain",
+            why: `deps-unavailable: ${reason}`,
+            tail: "",
+          })),
+        );
+        const none = yield* handedTo({ _tag: "DepsUnneeded" });
+        expect(none.rt.calls).toEqual([]);
+        expect(none.results.map((r) => r.outcome)).toEqual(["abstain", "abstain"]);
+        expect(none.stored.map((d) => Schema.decodeUnknownSync(Why)(d).why)).toEqual([
+          "deps-unavailable: no deps were ensured for this step",
+          "deps-unavailable: no deps were ensured for this step",
+        ]);
+      }),
+  );
+
+  it("[suite-runtime.deps-in-place] both commands fetch the deps after hydrating and before their tool, stop on a bundle that is not put there, and drop the deps before every end that follows", () => {
+    for (const [command, tool] of [
+      [JS_TS_SUITE_COMMAND, "node_modules/vitest/vitest.mjs run"],
+      [TYPECHECK_COMMAND, "node_modules/typescript/bin/tsc --noEmit"],
+    ] as const) {
+      const lines = command.split("\n");
+      const at = (text: string) => lines.findIndex((l) => l.includes(text));
+      expect(command).not.toContain("/opt/forge-deps");
+      expect(command).not.toContain("KEEL_LOCK");
+      expect(at("keel_deps_fetch() {")).toBeGreaterThan(-1);
+      expect(at("keel_deps_drop() {")).toBeGreaterThan(-1);
+      const fetch = lines.indexOf(
+        'why=$(keel_deps_fetch $K /workspace ${KEEL_DEPS_PARTS:-}) || { keel_deps_drop /workspace; echo "KEEL_DEPS missing $why"; echo KEEL_END; exit 0; }',
+      );
+      expect(fetch).toBeGreaterThan(at('keel_hydrate $K "${KEEL_BUNDLE_URL:-}"'));
+      // The parts' URLs hold a `?` and are expanded unquoted: no glob is read while they are.
+      expect(lines[fetch - 1]).toBe("set -f");
+      expect(lines[fetch + 1]).toBe("set +f");
+      expect(lines[fetch + 2]).toBe("echo KEEL_DEPS ok");
+      expect(fetch).toBeLessThan(at(tool));
+      // Every KEEL_END after the fetch has the deps dropped before it, on its own line or the same one.
+      const ends = lines.flatMap((l, i) => (i > fetch && l.includes("echo KEEL_END") ? [i] : []));
+      expect(ends.length).toBeGreaterThan(0);
+      for (const end of ends)
+        expect(
+          lines[end - 1] === "keel_deps_drop /workspace" ||
+            (lines[end] ?? "").includes("keel_deps_drop /workspace; "),
+        ).toBe(true);
+    }
+  });
+});
+
+/** The reason a stored evidence document gives. */
+const Why = Schema.Struct({ why: Schema.String });

@@ -9,7 +9,7 @@ export const GUARDS_ROOT = ".keel/guards/";
 /** The isolate's entry, written beside the world's files. */
 export const PROBE_ENTRY = "__keel_probe_entry.js";
 
-/** The lockfile a world's deps bundle is keyed by, as the container's `/opt/forge-deps` is. */
+/** The lockfile a world's deps bundle is keyed by: the one a deps box installs from. */
 export const LOCKFILE = "pnpm-lock.yaml";
 
 const PROBE_TEST = /\.test\.[cm]?[jt]s$/;

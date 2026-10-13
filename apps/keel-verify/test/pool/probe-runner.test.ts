@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { ProbeRunner, ProbeRunnerUnavailable } from "@keeltown/core/ports";
 import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
-import { probeWorkerFiles, Semaphore } from "@keeltown/runner-protocol";
+import { probeWorkerFiles, Semaphore, sha256Hex } from "@keeltown/runner-protocol";
 import { describeProbeRunnerContract } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -191,14 +191,44 @@ describe("the Tier 1 probe runner", () => {
     );
     // A pointer for the other lockfile that names a bundle installed from TINY_LOCK.
     const installed = await putBundle({ ...TINY_DEPS, "pnpm-lock.yaml": TINY_LOCK });
-    const { sha256Hex } = await import("@keeltown/runner-protocol");
     await env.BUNDLES.put(
-      `ns/${NAMESPACE}/deps/${await sha256Hex(new TextEncoder().encode(otherLock))}`,
+      `ns/${NAMESPACE}/probe-deps/${await sha256Hex(new TextEncoder().encode(otherLock))}`,
       installed.slice(7),
     );
     expect(await reasonOf(request(tinyProbe, unkeyed))).toContain(
       "was not installed from pnpm-lock.yaml",
     );
+  });
+
+  it("[deps.pool.probe-deps-slot] reads its hand-made deps pointer from probe-deps, and takes nothing kept under the same hash in the deps family for it", async () => {
+    const lock = `${TINY_LOCK}# a lockfile with something kept under its hash in each family\n`;
+    // Tier 1's pointer is made by hand and keyed by the lockfile's own sha256: the hex it is looked up under.
+    const hex = await sha256Hex(new TextEncoder().encode(lock));
+    const lockedWorld = await putBundle({ ...TINY_WORLD, "pnpm-lock.yaml": lock });
+    const tinyProbe = await putBundle(TINY_PROBE);
+    // A deps box keys its pointer by an install digest, so none of a box's own sits under a lockfile's hash.
+    // This one is put there by hand, in the shape a box writes: it is what a read of the wrong family would
+    // find, and it names a Tier 2 build's parts, which is no bundle's hash.
+    const inDeps = {
+      format: "keel.deps/1",
+      install: hex,
+      toolchain: "node v22.22.3 pnpm 11.18.0",
+      parts: [{ sha256: "f".repeat(64), bytes: 5 }],
+      files: 1,
+      installMs: 1,
+    };
+    await env.BUNDLES.put(`ns/${NAMESPACE}/deps/${hex}`, JSON.stringify(inDeps));
+    expect(await reasonOf(request(tinyProbe, lockedWorld))).toContain(
+      "lockfile-diverged: no deps bundle",
+    );
+    // With its own pointer in probe-deps the probe runs, and what was put in `deps` is as it was.
+    await putDeps(lock, TINY_DEPS);
+    expect((await answered(request(tinyProbe, lockedWorld))).run).toMatchObject({
+      _tag: "ran",
+      outcome: "pass",
+    });
+    const kept = await env.BUNDLES.get(`ns/${NAMESPACE}/deps/${hex}`);
+    expect(JSON.parse((await kept?.text()) ?? "null")).toEqual(inDeps);
   });
 
   it("[t5.pool.verifier-other-namespace] is unavailable for a probe and world kept for another namespace, and for a deps bundle another namespace installed", async () => {

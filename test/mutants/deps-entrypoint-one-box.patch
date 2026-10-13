@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.box-name, deps.pool.entrypoint
+# why: Every namespace with the same install digest is routed to one deps box
+diff --git a/apps/keel-verify/src/rpc/deps.ts b/apps/keel-verify/src/rpc/deps.ts
+index 04a122d7..0018a85c 100644
+--- a/apps/keel-verify/src/rpc/deps.ts
++++ b/apps/keel-verify/src/rpc/deps.ts
+@@ -47,7 +47,7 @@ export const DepsCodecs = {
+  * and no two namespaces ever share one, whatever they install.
+  */
+ export const depsBoxName = (request: DepsBuildRequest): string =>
+-  `deps:${request.namespace}:${request.need.install}`;
++  `deps:${request.need.install}`;
+ 
+ /**
+  * A KeelDepsBox in keel-verify: one per (namespace, install digest), with a

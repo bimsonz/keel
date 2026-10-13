@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { BUNDLE_HOSTS, KeelSandbox } from "../../src/adapters/driving/do/keel-sandbox.ts";
-import { signedUrl } from "./support/probes.ts";
+import { signedPartUrl, signedUrl } from "./support/probes.ts";
 
 const hash = "a".repeat(64);
 /** Two namespaces, by id: the bundle host serves each its own bundles and nothing of the other's. */
@@ -24,10 +24,30 @@ function handlerFor(host: string) {
   );
 }
 
-async function egress(url: string, init?: RequestInit) {
+async function egress(url: string, init?: RequestInit, bindings: typeof env = env) {
   const handler = handlerFor(new URL(url).hostname);
   if (handler === undefined) throw new Error(`no outbound handler for ${url}`);
-  return handler(new Request(url, init), env, { containerId: "test", className: "KeelSandbox" });
+  return handler(new Request(url, init), bindings, {
+    containerId: "test",
+    className: "KeelSandbox",
+  });
+}
+
+/** The pool's bindings, with the name of every call made of BUNDLES noted in `asked` before it is made. */
+function watching(asked: string[]): typeof env {
+  const bundles = new Proxy(env.BUNDLES, {
+    get(bucket, name) {
+      const member: unknown = Reflect.get(bucket, name);
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => {
+        asked.push(String(name));
+        return Reflect.apply(member, bucket, args);
+      };
+    },
+  });
+  return new Proxy(env, {
+    get: (bindings, name) => (name === "BUNDLES" ? bundles : Reflect.get(bindings, name)),
+  });
 }
 
 describe("KeelSandbox egress", () => {
@@ -54,7 +74,12 @@ describe("KeelSandbox egress", () => {
       interceptHttps: true,
       allowedHosts: [BUNDLE_HOSTS],
     });
-    expect(Object.keys(KeelSandbox.outboundByHost ?? {})).toEqual([BUNDLE_HOSTS, "*"]);
+    // No registry host, and no handler that writes: a suite box reads its bundle and its deps parts, and that is all.
+    expect(Object.keys(KeelSandbox.outboundByHost ?? {})).toEqual([
+      "deps.keel.internal",
+      BUNDLE_HOSTS,
+      "*",
+    ]);
   });
 
   it("serves a bundle from BUNDLES on the virtual host", async () => {
@@ -158,17 +183,154 @@ describe("KeelSandbox egress", () => {
     const other = "c".repeat(64);
     await env.BUNDLES.put(`ns/${X}/evidence/${other}`, "someone else's evidence");
     await env.BUNDLES.put(`ns/${X}/deps/${other}`, "a deps pointer");
+    await env.BUNDLES.put(`ns/${X}/deps-parts/${other}`, "a deps part");
+    await env.BUNDLES.put(`ns/${X}/probe-deps/${other}`, "a probe deps pointer");
     await env.BUNDLES.put(other, "a bare key");
     expect((await egress(await signedUrl(other, X))).status).toBe(404);
     expect((await egress(`https://bundles.keel.internal/${X}/evidence/${other}`)).status).toBe(400);
     expect((await egress(`https://bundles.keel.internal/${X}/deps/${other}`)).status).toBe(400);
+    expect((await egress(`https://bundles.keel.internal/${X}/deps-parts/${other}`)).status).toBe(
+      400,
+    );
     expect((await egress(`https://bundles.keel.internal/evidence/${other}`)).status).toBe(400);
     expect((await egress(`https://bundles.keel.internal/bundles/${other}`)).status).toBe(400);
+  });
+
+  it("[deps.pool.serve-other-namespace] serves a deps part to the namespace its URL was signed for, and to no other URL", async () => {
+    const part = "5".repeat(64);
+    await env.BUNDLES.put(`ns/${X}/deps-parts/${part}`, "a part of X's node_modules");
+    const held = new URL(await signedPartUrl(part, X));
+    expect(held.origin + held.pathname).toBe(`https://deps.keel.internal/${X}/${part}`);
+    const own = await egress(held.href);
+    expect(own.status).toBe(200);
+    expect(own.headers.get("content-length")).toBe("26");
+    expect(await own.text()).toBe("a part of X's node_modules");
+    const head = await egress(held.href, { method: "HEAD" });
+    expect([head.status, head.headers.get("content-length"), await head.text()]).toEqual([
+      200,
+      "26",
+      "",
+    ]);
+
+    // The same part under another namespace's id is not there, even on a URL keel signed for that namespace.
+    expect((await egress(await signedPartUrl(part, Y))).status).toBe(404);
+    // X's own signature opens nothing of Y's, and no other part of X's.
+    await env.BUNDLES.put(`ns/${Y}/deps-parts/${part}`, "a part of Y's node_modules");
+    const other = "6".repeat(64);
+    await env.BUNDLES.put(`ns/${X}/deps-parts/${other}`, "another part of X's");
+    expect((await egress(`https://deps.keel.internal/${Y}/${part}${held.search}`)).status).toBe(
+      403,
+    );
+    expect((await egress(`https://deps.keel.internal/${X}/${other}${held.search}`)).status).toBe(
+      403,
+    );
+
+    // No signature, half of one, one that is not keel's, and one out of date.
+    const address = `https://deps.keel.internal/${X}/${part}`;
+    const bare = await egress(address);
+    expect([bare.status, await bare.text()]).toEqual([403, "not a deps part URL Keel signed"]);
+    expect((await egress(`${address}?exp=${held.searchParams.get("exp")}`)).status).toBe(403);
+    expect((await egress(`${address}?sig=${held.searchParams.get("sig")}`)).status).toBe(403);
+    expect(
+      (await egress(`${address}?exp=${held.searchParams.get("exp")}&sig=${"A".repeat(86)}`)).status,
+    ).toBe(403);
+    expect((await egress(address, { method: "HEAD" })).status).toBe(403);
+    expect((await egress(await signedPartUrl(part, X, -1))).status).toBe(403);
+
+    // A bundle URL's signature is no part's, for the same namespace, hash and expiry: and a part's is no bundle's.
+    await env.BUNDLES.put(`ns/${X}/bundles/${part}`, "a bundle with a part's hash");
+    const bundle = new URL(await signedUrl(part, X));
+    expect((await egress(bundle.href)).status).toBe(200);
+    expect((await egress(`${address}${bundle.search}`)).status).toBe(403);
+    expect((await egress(`https://bundles.keel.internal/${X}/${part}${held.search}`)).status).toBe(
+      403,
+    );
+
+    // Only `/<namespace id>/<sha256>` is an address: not a bare hash, not the key, not another family.
+    for (const path of [
+      `/${part}`,
+      `/ns/${X}/deps-parts/${part}`,
+      `/${X}/deps-parts/${part}`,
+      `/${X}/${part}/`,
+      `/keel-verify/${part}`,
+    ])
+      expect({
+        path,
+        status: (await egress(`https://deps.keel.internal${path}${held.search}`)).status,
+      }).toEqual({ path, status: 400 });
+    // A part URL reads parts alone: the namespace's bundle and its pointer are not parts.
+    const bundleOnly = "7".repeat(64);
+    await env.BUNDLES.put(`ns/${X}/bundles/${bundleOnly}`, "a bundle");
+    await env.BUNDLES.put(`ns/${X}/deps/${bundleOnly}`, "a pointer");
+    expect((await egress(await signedPartUrl(bundleOnly, X))).status).toBe(404);
+  });
+
+  it("[deps.pool.part-head] answers a HEAD of a deps part with its size, and opens no body to learn it", async () => {
+    const part = "9".repeat(64);
+    await env.BUNDLES.put(`ns/${X}/deps-parts/${part}`, "a part nobody reads to learn its size");
+    const held = await signedPartUrl(part, X);
+    // R2's `head` answers what an object is and opens nothing; `get` opens its body, read or not.
+    const asked: string[] = [];
+    const head = await egress(held, { method: "HEAD" }, watching(asked));
+    expect([
+      head.status,
+      head.headers.get("content-length"),
+      head.headers.get("content-type"),
+      head.body,
+    ]).toEqual([200, "37", "application/octet-stream", null]);
+    expect(asked).toEqual(["head"]);
+
+    // A GET opens the part, and says the same of it.
+    const read: string[] = [];
+    const got = await egress(held, undefined, watching(read));
+    expect([got.status, got.headers.get("content-length"), await got.text()]).toEqual([
+      200,
+      "37",
+      "a part nobody reads to learn its size",
+    ]);
+    expect(read).toEqual(["get"]);
+    expect(got.headers.get("etag")).not.toBeNull();
+    expect(head.headers.get("etag")).toBe(got.headers.get("etag"));
+
+    // A part that is not kept is not found, by the same question.
+    const absent: string[] = [];
+    const missing = await egress(
+      await signedPartUrl("0".repeat(63) + "9", X),
+      { method: "HEAD" },
+      watching(absent),
+    );
+    expect(missing.status).toBe(404);
+    expect(absent).toEqual(["head"]);
+  });
+
+  it("[deps.pool.suite-box-cannot-write] refuses every write from a suite box, to the deps host and to the bundle host", async () => {
+    const part = "8".repeat(64);
+    const held = new URL(await signedPartUrl(part, X));
+    for (const [method, url] of [
+      // A deps box's own upload, as a suite box would try it.
+      ["PUT", `http://deps.keel.internal/${part}`],
+      ["PUT", `https://deps.keel.internal/${part}`],
+      // The address a suite box reads a part at, with the signature it holds.
+      ["PUT", held.href],
+      ["POST", held.href],
+      ["DELETE", held.href],
+      ["PUT", `https://bundles.keel.internal/${X}/${part}${held.search}`],
+    ] as const) {
+      const response = await egress(url, {
+        method,
+        ...(method === "DELETE" ? {} : { body: "what a suite would leave for the next run" }),
+      });
+      expect({ method, url, status: response.status }).toEqual({ method, url, status: 405 });
+    }
+    expect(await env.BUNDLES.head(`ns/${X}/deps-parts/${part}`)).toBeNull();
+    expect(await env.BUNDLES.head(`ns/${X}/bundles/${part}`)).toBeNull();
+    expect((await env.BUNDLES.list({ prefix: `ns/${X}/deps-parts/${part}` })).objects).toEqual([]);
   });
 
   it("denies every other host at once, over HTTP and HTTPS", async () => {
     for (const url of [
       "https://registry.npmjs.org/hono",
+      "http://registry.npmjs.org/hono",
       "http://example.com/",
       "https://api.cloudflare.com/client/v4",
       "https://keel.internal.evil.com/",

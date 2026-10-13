@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: d22.run-failed
+# why: A failed run commits under the failed draft's cause, so of a probe whose draft failed it is answered as a reused key, not as the machine's refusal
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 455a1001..8b5388d9 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -284,7 +284,7 @@ export const probeRunFailed = Effect.fn("coordination/probeRunFailed")(function*
+     projectId,
+     conflictId,
+     probeRef(probeId),
+-    `probe-run-failed:${conflictId}`,
++    `probe-draft-failed:${conflictId}`,
+     "run-failed",
+     { _tag: "Probe", probeId, command: { _tag: "RunFailed" } },
+   );

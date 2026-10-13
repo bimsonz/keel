@@ -1,3 +1,4 @@
+export { KeelDepsBox } from "./adapters/driving/do/keel-deps-box.ts";
 export { KeelSandbox } from "./adapters/driving/do/keel-sandbox.ts";
 export { VerifierDO } from "./adapters/driving/do/verifier.ts";
 export { KeelVerifyEntrypoint as default } from "./composition/entrypoint.ts";

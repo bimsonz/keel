@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.remedy.other
+# why: A remedy is whatever an object answers to by the reason's first word: a function, for constructor
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..e5832658 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -467,9 +467,7 @@ export const depsRemedy = (reason: string): string => {
+     return `the installer refused the lockfile (${code}): run pnpm install and commit the ${LOCKFILE} it writes`;
+   const word = firstWord(reason);
+   // Only a word of the table's own: `constructor` is no refusal, and an object answers to it.
+-  const own = Object.hasOwn(REFUSALS_OF_THE_CANDIDATE, word)
+-    ? REFUSALS_OF_THE_CANDIDATE[word]
+-    : undefined;
++  const own = REFUSALS_OF_THE_CANDIDATE[word];
+   return own ?? `change what the candidate installs, then commit its ${LOCKFILE}`;
+ };
+ 

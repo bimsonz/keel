@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.toolchain-switched
+# why: An install another pnpm made is packed, uploaded and reported as built with the image's toolchain
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index fc650e39..28c6c070 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -408,7 +408,7 @@ export const depsBuildCommand = (
+     "[ $code -ne 124 ] || refuse install-timeout",
+     `err=$(LC_ALL=C sed -n 's/^\\[\\(ERR_PNPM_[A-Z0-9_]*\\)\\].*/\\1/p' "$K/install.log" 2>/dev/null | head -n 1 | cut -c1-80)`,
+     '[ $code -eq 0 ] || refuse "install-failed exit $code${err:+ $err}"',
+-    `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "\${toolchain##* }" ] || refuse toolchain-switched`,
++    `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "\${toolchain##* }" ] || true`,
+     `keel_deps_pack "$W" "$K/parts" ${partBytes} >"$K/packed" || refuse "$(head -n 1 "$K/packed")"`,
+     "files=0; total=0; list=",
+     "while read -r kind a b; do",

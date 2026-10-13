@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.deps-refused-cited
+# why: A refusal is cited once for every Tier 2 step that stored it: the same line and the same remedy, twice or more
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index a3da276f..c5f79c3a 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -207,7 +207,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+     // Every step that needed the refused dependencies stored the same refusal: it is cited once.
+     const refusal = stored.value.deps;
+     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
+-    if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
++    if (depsName !== undefined)
+       failures.push({ kind: "deps", name: depsName });
+     if (stored.value.guard !== undefined)
+       failures.push({

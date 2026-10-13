@@ -13,7 +13,14 @@ const chars = (alphabet: string, minLength: number, maxLength: number) =>
 const namespaceArb = chars("0123456789ABCDEFGHJKMNPQRSTVWXYZ", 26, 26).map((ulid) =>
   Schema.decodeUnknownSync(NamespaceId)(`org_${ulid}`),
 );
-const familyArb = fc.constantFrom<KeyFamily>("bundles", "deps", "evidence", "plans");
+const familyArb = fc.constantFrom<KeyFamily>(
+  "bundles",
+  "deps",
+  "deps-parts",
+  "probe-deps",
+  "evidence",
+  "plans",
+);
 const hexArb = chars("0123456789abcdef", 1, 64);
 
 describe("the key of a namespace's object", () => {

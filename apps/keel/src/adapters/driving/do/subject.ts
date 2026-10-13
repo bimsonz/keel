@@ -5,6 +5,7 @@ import {
   probeCellRanAt,
   probeDrafted,
   probeDraftFailedAt,
+  probeRunFailedAt,
   resolveConflict,
   worldCheckRan,
 } from "@keeltown/core/application/coordination";
@@ -101,6 +102,14 @@ export class SubjectDO extends KeelObjectWith<SubjectServices> implements Subjec
       decoded(ProbeDraftFailedCommand, command).pipe(
         Effect.flatMap((failed) => probeDraftFailedAt(at, failed)),
       ),
+    );
+  }
+
+  async probeRunFailed(conflictId: string) {
+    const at = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.probeRunFailed,
+      decoded(ConflictId, conflictId).pipe(Effect.flatMap((id) => probeRunFailedAt(at, id))),
     );
   }
 

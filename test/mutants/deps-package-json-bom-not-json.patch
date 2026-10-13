@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-unparsed
+# why: A package.json saved with a byte-order mark, which pnpm reads, declares no command
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..c58eb500 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -135,7 +135,7 @@ const commandsOf = (
+   const dir = path === PACKAGE_FILE ? "" : path.slice(0, -PACKAGE_FILE.length - 1);
+   let json: unknown;
+   try {
+-    json = JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text);
++    json = JSON.parse(text.startsWith("\uFEFF") ? text : text);
+   } catch {
+     json = undefined;
+   }

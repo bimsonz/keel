@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.discarded
+# why: A failed run is reported of a probe the domain had already discarded: a step more, for a refusal
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 96f5e3c6..9f7100a5 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -770,7 +770,6 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+     const guard = guardOf(last.probe, parties);
+     if (guard === undefined) {
+       const state = last.probe?.state ?? "calibrating";
+-      if (state !== "calibrating") return { outcome: "drafted", probeId, state } satisfies ProbeEnd;
+       // Every cell is reported and none decided the probe: the ledger is told its run failed.
+       const failed = yield* runFailedStep(call, steps);
+       return {

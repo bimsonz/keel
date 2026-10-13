@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.kept
+# why: No directory is made for a file below the root, so a workspace package's package.json is never kept
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..bf9390eb 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -221,7 +221,6 @@ export const DEPS_KEEP_SH = [
+   '  rm -rf "$o" 2>/dev/null; mkdir -p "$o" 2>/dev/null || { echo keep-failed; return 1; }',
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",
+-  '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',
+   '    mv -- "$p" "$o/$p" 2>/dev/null || { echo keep-failed; return 1; }',
+   '  done <"$i.lines"',
+   "}",

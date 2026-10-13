@@ -88,10 +88,13 @@ async function fetchVerified(
 }
 
 /**
- * The world's deps bundle: the namespace's `deps/<lockfile sha256>` names a
- * bundle of that namespace by its hash, and that bundle carries the very
- * lockfile it was installed from. None for a world with no runtime
- * dependencies.
+ * The world's deps bundle: the namespace's `probe-deps/<lockfile sha256>`
+ * names a bundle of that namespace by its hash, and that bundle carries the
+ * very lockfile it was installed from. None for a world with no runtime
+ * dependencies. This pointer is made by hand (hoisted, production only, one
+ * readable bundle); the `deps` family holds another artifact for the same
+ * lockfile, the pointer a deps box writes to a Tier 2 build's parts, so the
+ * two never share a slot.
  */
 async function depsFor(
   env: Tier1Env,
@@ -101,7 +104,7 @@ async function depsFor(
   const need = await depsNeed(world);
   if (need._tag === "none") return undefined;
   if (need._tag === "unkeyed") throw new Unavailable(`lockfile-diverged: ${need.reason}`);
-  const pointerKey = namespaceKey(namespace, "deps", need.sha256);
+  const pointerKey = namespaceKey(namespace, "probe-deps", need.sha256);
   const pointer = await env.BUNDLES.get(pointerKey);
   if (pointer === null)
     throw new Unavailable(`lockfile-diverged: no deps bundle for ${LOCKFILE} ${need.sha256}`);

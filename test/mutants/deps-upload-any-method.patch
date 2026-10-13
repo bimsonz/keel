@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.upload-shape
+# why: The upload host takes any method at a part's address, a body kept by a GET or a POST included
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..472576a5 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -184,8 +184,6 @@ export async function uploadDepsPart(
+   env: Env,
+   ctx: { readonly containerId: string },
+ ): Promise<Response> {
+-  if (request.method !== "PUT")
+-    return new Response("a deps part is uploaded with PUT", { status: 405 });
+   const [, sha256] = PART_PATH.exec(new URL(request.url).pathname) ?? [];
+   if (sha256 === undefined) return new Response("not a part's address", { status: 400 });
+   const building = await buildingFor(env, ctx.containerId);

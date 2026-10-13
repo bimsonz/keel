@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.parks
+# why: Every failed install that names a code bounces: a registry's 503 tells each change in flight that its lockfile is wrong
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..cf3b1847 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -454,7 +454,7 @@ export const depsRefusal = (reason: string): DepsRefused | DepsUnavailable => {
+   const candidates =
+     code === undefined
+       ? Object.hasOwn(REFUSALS_OF_THE_CANDIDATE, firstWord(reason))
+-      : INSTALL_FAULTS_OF_THE_LOCKFILE.includes(code);
++      : true;
+   return candidates ? { _tag: "DepsRefused", reason } : { _tag: "DepsUnavailable", reason };
+ };
+ 

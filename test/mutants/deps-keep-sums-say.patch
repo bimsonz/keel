@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.quiet, deps.keep.absent
+# why: What sha256sum says of a listed file it could not read, the file's path with it, goes to the box's stderr
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..ae38e932 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -217,7 +217,7 @@ export const DEPS_KEEP_SH = [
+   `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  [^/]' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C sed 's/  /  .\\//' "$i.lines" >"$i.sums" 2>/dev/null || { echo install-mismatch; return 1; }`,
+-  '  sha256sum --quiet --strict -c "$i.sums" >/dev/null 2>&1 || { echo install-mismatch; return 1; }',
++  '  sha256sum --quiet --strict -c "$i.sums" >/dev/null || { echo install-mismatch; return 1; }',
+   '  rm -rf "$o" 2>/dev/null; mkdir -p "$o" 2>/dev/null || { echo keep-failed; return 1; }',
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",

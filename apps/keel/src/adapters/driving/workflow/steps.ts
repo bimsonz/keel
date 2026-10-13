@@ -1,6 +1,9 @@
 import type { WorkflowStep, WorkflowStepConfig } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  DepsAnswer,
+  DepsNeed,
+  type DepsSteps,
   describeNoNamespace,
   jobNamespace,
   type ProbeSteps,
@@ -77,6 +80,31 @@ const timedOut = (error: unknown) =>
  * replay answers what the first run kept; `waitFor` is `step.waitForEvent`,
  * and `sleep` is `step.sleep`.
  */
+/** A deps build may install for eight minutes, and its answer is data: only a call that threw is tried again. */
+const DEPS_BUILD_STEP = {
+  retries: { limit: 1, delay: "10 seconds", backoff: "constant" },
+  timeout: "15 minutes",
+} as const;
+
+/**
+ * The two durable steps `ensureDeps` runs, `deps-need` and `deps:<install>`,
+ * each keeping its value as JSON and decoding it on a replay.
+ */
+export const depsSteps = (step: WorkflowStep): DepsSteps => ({
+  need: (run) =>
+    Effect.promise(() =>
+      step.do("deps-need", async (): Promise<string> =>
+        JSON.stringify(Schema.encodeSync(DepsNeed)(await Effect.runPromise(run))),
+      ),
+    ).pipe(Effect.map((kept) => Schema.decodeUnknownSync(DepsNeed)(JSON.parse(kept)))),
+  build: (install, run) =>
+    Effect.promise(() =>
+      step.do(`deps:${install}`, DEPS_BUILD_STEP, async (): Promise<string> =>
+        JSON.stringify(Schema.encodeSync(DepsAnswer)(await Effect.runPromise(run))),
+      ),
+    ).pipe(Effect.map((kept) => Schema.decodeUnknownSync(DepsAnswer)(JSON.parse(kept)))),
+});
+
 export const workflowSteps = (step: WorkflowStep): ProbeSteps => ({
   step: <A, R>(name: string, effect: Effect.Effect<A, never, R>, policy: StepPolicy = "quick") =>
     Effect.flatMap(Effect.context<R>(), (services) =>

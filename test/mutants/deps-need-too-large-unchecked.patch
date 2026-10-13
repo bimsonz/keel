@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/deps-ensure.test.ts
+# kills: deps.need.too-large, deps.need.utf8, deps.ensure.too-large
+# why: Inputs longer than a box can be handed are locked: the deps box cannot be started with them in its environment, for every such candidate
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..850f201a 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -230,7 +230,7 @@ export const depsNeedFrom = <E, R>(
+       _tag: "Unlocked",
+       reason: `no-lockfile: the candidate has no ${LOCKFILE} at its root`,
+     });
+-  if (utf8Bytes(inputs) > INSTALL_INPUTS_MAX)
++  if (false)
+     return Effect.succeed({
+       _tag: "Unlocked",
+       reason: `install-inputs-too-large: an install of the candidate reads more files than a deps box is handed`,

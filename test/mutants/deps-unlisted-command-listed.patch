@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-unlisted, deps.need.digest, deps.need.property
+# why: A command the bundle does not hold is listed under a made-up hash: the box's keep finds no such file and refuses every candidate that builds its commands later
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..3aea58bd 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -196,6 +196,7 @@ export const installInputsOf = (
+       commandDirs.some((dir) => path.startsWith(`${dir}/`))
+     )
+       lines.push(line);
++  for (const file of commands) if (!listed.has(file)) lines.push(`${"0".repeat(64)}  ${file}`);
+   return `${lines.join("\n")}\n`;
+ };
+ 

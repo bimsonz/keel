@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.inputs
+# why: Core writes inputs in a format the box's keep does not read, so every build Keel asks for is refused
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..30a8bbc6 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -64,7 +64,7 @@ const NPMRC = ".npmrc";
+ const PACKAGE_FILE = "package.json";
+ 
+ /** The first line of the text an install digest is the sha256 of. */
+-export const INSTALL_INPUTS_FORMAT = "keel.install/1";
++export const INSTALL_INPUTS_FORMAT = "keel.install/2";
+ 
+ /**
+  * The longest install inputs a deps box is handed, in bytes of UTF-8: about

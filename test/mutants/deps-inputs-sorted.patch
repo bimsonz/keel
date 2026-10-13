@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.text, deps.inputs.bin-once, deps.need.property
+# why: The inputs are put in path order rather than left in the manifest's: the order is then core's own rule, to be kept in step with whatever writes a manifest
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..fb496aa2 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -189,7 +189,7 @@ export const installInputsOf = (
+     commandDirs.push(...declared.dirs);
+   }
+   const lines = [INSTALL_INPUTS_FORMAT];
+-  for (const [path, line] of listed)
++  for (const [path, line] of [...listed].toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+     if (
+       installReads(path) ||
+       commands.has(path) ||

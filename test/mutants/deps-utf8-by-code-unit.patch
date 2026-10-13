@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.need.utf8
+# why: A character outside the basic plane is counted by its first surrogate, as three bytes where UTF-8 takes four
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..7d9e4079 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -203,7 +203,7 @@ export const installInputsOf = (
+ const utf8Bytes = (text: string): number => {
+   let bytes = 0;
+   for (const char of text) {
+-    const point = char.codePointAt(0) ?? 0;
++    const point = char.charCodeAt(0);
+     bytes += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
+   }
+   return bytes;

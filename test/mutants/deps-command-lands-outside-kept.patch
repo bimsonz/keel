@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-outside, deps.need.property
+# why: A nested package's target is taken wherever in the candidate it lands, so long as it is not the package's own directory: a sibling's file, or the root's, no command of this package to pnpm, is an input
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..2603a7b9 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -111,7 +111,7 @@ const pathWithin = (dir: string, target: string): string | undefined => {
+   }
+   const at = segments.join("/");
+   if (dir === "") return at === "" ? undefined : at;
+-  return at.startsWith(`${dir}/`) ? at : undefined;
++  return at === dir ? undefined : at;
+ };
+ 
+ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

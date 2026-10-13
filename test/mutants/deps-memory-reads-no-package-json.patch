@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: deps-builder.need-commands
+# why: An adapter that reads no package.json out of the bundle: no command is an input, and it answers another digest than an adapter that reads them
+diff --git a/packages/testing/src/memory/verification.ts b/packages/testing/src/memory/verification.ts
+index 4a9b59a5..48644988 100644
+--- a/packages/testing/src/memory/verification.ts
++++ b/packages/testing/src/memory/verification.ts
+@@ -665,7 +665,7 @@ export function makeDepsBuilderMemory(): DepsBuilderHarness & {
+                   manifest,
+                   (path) => {
+                     const files = texts.get(bundleKeyOf(namespace, bundle)) ?? {};
+-                    return Object.hasOwn(files, path) ? files[path] : undefined;
++                    return undefined;
+                   },
+                   (text) => Effect.promise(() => hexOf(new TextEncoder().encode(text))),
+                 );

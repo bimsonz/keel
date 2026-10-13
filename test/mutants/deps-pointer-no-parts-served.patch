@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.pointer-no-parts
+# why: A stored pointer that names no part decodes as a pointer, so the box answers it as a bundle and a suite is handed nothing to untar
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..c63a9631 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -255,7 +255,7 @@ export const DepsPointer = Schema.Struct({
+   format: Schema.Literal("keel.deps/1"),
+   install: Sha256Hex,
+   toolchain: Schema.String,
+-  parts: Schema.Array(DepsPart).check(Schema.isMinLength(1)),
++  parts: Schema.Array(DepsPart),
+   /** How many regular files and symlinks the archive holds. */
+   files: Schema.Int,
+   installMs: Schema.Int,

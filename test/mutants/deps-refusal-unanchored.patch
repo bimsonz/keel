@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.parks
+# why: A listed code is read out of a longer reason: one that only begins as a listed code does, or sits in other words, bounces
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..826b5255 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -419,7 +419,7 @@ export const INSTALL_FAULTS_OF_THE_LOCKFILE: readonly string[] = [
+ ];
+ 
+ /** An install that failed, as the deps box reports it with the installer's own code: `install-failed exit <n> <code>`. */
+-const INSTALL_FAILED = /^install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)$/;
++const INSTALL_FAILED = /install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)/;
+ 
+ /**
+  * The deps box's refusals that only a change to the candidate ends, by their

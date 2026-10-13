@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.pointer.format
+# why: A stored pointer that names no install digest decodes as one
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..1942e531 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -253,7 +253,7 @@ export type DepsPart = typeof DepsPart.Type;
+  */
+ export const DepsPointer = Schema.Struct({
+   format: Schema.Literal("keel.deps/1"),
+-  install: Sha256Hex,
++  install: Schema.optional(Sha256Hex),
+   toolchain: Schema.String,
+   parts: Schema.Array(DepsPart).check(Schema.isMinLength(1)),
+   /** How many regular files and symlinks the archive holds. */

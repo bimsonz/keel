@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-parts
+# why: A runner is handed its deps parts' URLs with no signature and no expiry: the box's fetch of every part is refused
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 97f9b415..e10f5718 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -348,7 +348,9 @@ export const SuiteRuntimeCi = (deps: {
+             const parts = yield* Effect.promise(() =>
+               Promise.all(
+                 handed.parts.map((part) =>
+-                  signedDepsPartUrl(deps.signingKey, namespace, part.sha256, expires),
++                  signedDepsPartUrl(deps.signingKey, namespace, part.sha256, expires).then(
++                    (url) => url.split("?")[0] ?? url,
++                  ),
+                 ),
+               ),
+             );

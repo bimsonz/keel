@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.install
+# why: The command is started with a sixth name, KEEL_LOCK_SHA, given no value: a name the box's environment is not meant to hold at all
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..bf2ca4fd 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -377,6 +377,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+         KEEL_INSTALL: need.install,
+         KEEL_INSTALL_INPUTS: need.inputs,
+         KEEL_DEPS_UPLOAD: `http://${DEPS_HOST}`,
++        KEEL_LOCK_SHA: undefined,
+       });
+     } catch (error) {
+       return refuse(`box-failed: ${describeError(error)}`);

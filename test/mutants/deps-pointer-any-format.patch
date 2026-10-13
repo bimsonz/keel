@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.pointer.format
+# why: A pointer of any format decodes as keel.deps/1
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..39335434 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -252,7 +252,7 @@ export type DepsPart = typeof DepsPart.Type;
+  * there, and one that names no part is no pointer.
+  */
+ export const DepsPointer = Schema.Struct({
+-  format: Schema.Literal("keel.deps/1"),
++  format: Schema.String,
+   install: Sha256Hex,
+   toolchain: Schema.String,
+   parts: Schema.Array(DepsPart).check(Schema.isMinLength(1)),

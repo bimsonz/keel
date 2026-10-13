@@ -3,6 +3,10 @@ import { VerifierUnavailable } from "@keeltown/core/domain/verification";
 import { Exit, Schema } from "effect";
 import { worldReady } from "../adapters/driving/do/tier1/run-probe.ts";
 import {
+  type DepsAnswerJson,
+  depsBoxName,
+  DepsBuildRequest,
+  DepsCodecs,
   encodeExit,
   ProbeRunRequest,
   VerifierCodecs,
@@ -12,12 +16,15 @@ import {
 
 const decodeProbeRun = Schema.decodeUnknownExit(ProbeRunRequest);
 const decodeWorldReady = Schema.decodeUnknownExit(WorldReadyRequest);
+const decodeDepsBuild = Schema.decodeUnknownExit(DepsBuildRequest);
 
 /**
  * keel-verify's front door, which keel reaches over its VERIFIER service
- * binding: /healthz, `runProbe`, which routes a probe run to the VerifierDO
- * for its (namespace, probe, world), and `worldReady`, which answers from the
- * bundle store whether a probe could run against a world at all.
+ * binding: /healthz; `runProbe`, which routes a probe run to the VerifierDO
+ * for its (namespace, probe, world); `worldReady`, which answers from the
+ * bundle store whether a probe could run against a world at all; and
+ * `buildDeps`, which routes a deps build to the KeelDepsBox for its
+ * (namespace, install digest).
  */
 export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
@@ -49,5 +56,18 @@ export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
       VerifierCodecs.worldReady,
       Exit.succeed(await worldReady(this.env, decoded.value)),
     );
+  }
+
+  async buildDeps(request: unknown) {
+    const decoded = decodeDepsBuild(request);
+    if (Exit.isFailure(decoded))
+      return encodeExit(
+        DepsCodecs.build,
+        Exit.succeed<DepsAnswerJson>({
+          _tag: "DepsUnavailable",
+          reason: "the deps build request did not decode",
+        }),
+      );
+    return this.env.DEPSBOX.getByName(depsBoxName(decoded.value)).build(request);
   }
 }

@@ -367,6 +367,41 @@ describe("Probe", () => {
     await drainOutbox(namespace);
   });
 
+  it("[d22.pool.probe-run-died] a step that runs out of tries once the draft is recorded ends the instance errored, with the probe's run recorded as failed and the conflict escalated", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    const namespace = poolNamespace();
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.mockStepResult({ name: "trunk" }, kept(sha("0")));
+      await m.mockStepResult(
+        { name: "ab" },
+        kept({ candidateId: makeId("cnd", ulid()), at: 1_791_709_200_000 }),
+      );
+      await m.mockStepResult({ name: "worlds" }, BUILT);
+      await m.mockStepResult({ name: "draft" }, admittedDraft);
+      // The draft is recorded on the real Subject DO; the step after it dies on its first try and
+      // on its one retry. Neither record is mocked: `incomplete` is refused and `run-failed` lands.
+      await m.mockStepError({ name: "trunk plan" }, new Error("the code host fell over"));
+      await m.disableRetryDelays();
+    });
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("errored");
+    const discards = await discardsOf(s.projectId, s.conflictId);
+    expect(discards).toMatchObject([{ reason: "run-failed", conflictId: s.conflictId }]);
+    expect(discards[0]).not.toHaveProperty("detail");
+    const probeId = await probeIdOf(s.projectId, s.conflictId);
+    expect(await logOf(s.projectId, { kind: "probe", id: probeId })).toEqual([
+      "ProbeDrafted",
+      "ProbeDiscarded",
+    ]);
+    expect(await conflictStateOf(s.projectId, s.conflictId)).toBe("escalated");
+    await drainOutbox(subjectOf(s.projectId));
+    await drainOutbox(namespace);
+  });
+
   it("[d22.pool.probe-rate-limited] a model rate-limited for two drafts is waited out, 30 s and then 120 s, and the third draft is admitted", async () => {
     const s = await suspected();
     const id = `probe-${s.conflictId}`;

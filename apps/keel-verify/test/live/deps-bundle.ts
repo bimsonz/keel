@@ -1,9 +1,10 @@
 // A world's deps bundle, where the Tier 1 runner looks for it: a hoisted,
 // production-only install from the world's own pnpm lockfile, written as an
 // ordinary content-addressed bundle of node_modules plus that lockfile, and
-// named by the lockfile's sha256 (the namespace's `deps/<sha256>` holds the
-// bundle's hex). A deps bundle is one namespace's: a world of another
-// namespace with the same lockfile does not find it.
+// named by the lockfile's sha256 (the namespace's `probe-deps/<sha256>` holds
+// the bundle's hex). A deps bundle is one namespace's: a world of another
+// namespace with the same lockfile does not find it. The `deps` family is not
+// this one: it holds the pointer a deps box writes to a Tier 2 build's parts.
 // Probe isolates never install from npm; this script is where npm is read.
 //
 //   node apps/keel-verify/test/live/deps-bundle.ts <dir>             build, check and describe it
@@ -158,7 +159,7 @@ if (upload) {
   const namespace = harnessNamespace();
   const [bundleKey, pointerKey] = [
     namespaceKey(namespace, "bundles", hex),
-    namespaceKey(namespace, "deps", need.sha256),
+    namespaceKey(namespace, "probe-deps", need.sha256),
   ];
   put(bundleKey, join(out, "bundle.tgz"), "application/gzip");
   put(pointerKey, join(out, "pointer"), "text/plain");

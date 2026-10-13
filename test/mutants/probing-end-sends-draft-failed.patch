@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: d22.run-failed
+# why: The failed run is sent to the probe as a failed draft, which a drafted probe refuses: nothing is discarded and the conflict stays probing
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 455a1001..b2a3f2de 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -286,7 +286,7 @@ export const probeRunFailed = Effect.fn("coordination/probeRunFailed")(function*
+     probeRef(probeId),
+     `probe-run-failed:${conflictId}`,
+     "run-failed",
+-    { _tag: "Probe", probeId, command: { _tag: "RunFailed" } },
++    { _tag: "Probe", probeId, command: { _tag: "DraftFailed", conflictId } },
+   );
+   return yield* conflictView(conflictId);
+ });

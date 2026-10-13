@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/deps-ensure.test.ts
+# kills: deps.ensure.built, deps.ensure.replay
+# why: The build is asked for outside its durable step, so every replay of the Workflow asks the builder again
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..924e4d0e 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -555,5 +555,5 @@ export const ensureDeps = (
+       return { _tag: "DepsRefused", reason: need.reason } satisfies DepsAnswer;
+     if (need._tag === "NeedUnread")
+       return { _tag: "DepsUnavailable", reason: need.reason } satisfies DepsAnswer;
+-    return yield* steps.build(need.install, builder.build(namespace, need, bundle));
++    return yield* builder.build(namespace, need, bundle);
+   });

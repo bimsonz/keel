@@ -36,7 +36,7 @@ const stdout = (fields: Record<string, string>, extra: readonly string[] = []) =
 
 const ran = (exit: number, output = "H4sI"): Record<string, string> => ({
   KEEL_HYDRATION: "ok",
-  KEEL_LOCK: "ok",
+  KEEL_DEPS: "ok",
   KEEL_TSCONFIG: "ok",
   KEEL_EXIT: String(exit),
   KEEL_DURATION_MS: "2100",
@@ -96,19 +96,29 @@ describe("the typecheck runner's report", () => {
     ).toMatchObject({ _tag: "ran", rehydrated: "hash-mismatch" });
   });
 
-  it("[typecheck.reads] reads the stops: hydration, the lockfile and no tsconfig", () => {
+  it("[typecheck.reads] reads the stops: hydration, missing deps and no tsconfig", () => {
     expect(parseTypecheckOutput(stdout({ KEEL_HYDRATION: "failed hash-mismatch" }))).toEqual({
       _tag: "hydration-failed",
       reason: "hash-mismatch",
     });
-    expect(parseTypecheckOutput(stdout({ KEEL_HYDRATION: "ok", KEEL_LOCK: "diverged" }))).toEqual({
-      _tag: "lockfile-diverged",
-    });
+    expect(
+      parseTypecheckOutput(stdout({ KEEL_HYDRATION: "ok", KEEL_DEPS: "missing fetch-failed" })),
+    ).toEqual({ _tag: "deps-missing", reason: "fetch-failed" });
     expect(
       parseTypecheckOutput(
-        stdout({ KEEL_HYDRATION: "ok", KEEL_LOCK: "ok", KEEL_TSCONFIG: "none" }),
+        stdout({ KEEL_HYDRATION: "ok", KEEL_DEPS: "ok", KEEL_TSCONFIG: "none" }),
       ),
     ).toEqual({ _tag: "no-tsconfig" });
+    // Missing deps stop the run before it looks for a tsconfig.
+    expect(
+      parseTypecheckOutput(
+        stdout({ KEEL_HYDRATION: "ok", KEEL_DEPS: "missing no-parts", KEEL_TSCONFIG: "none" }),
+      ),
+    ).toEqual({ _tag: "deps-missing", reason: "no-parts" });
+    expect(parseTypecheckOutput(stdout({ KEEL_HYDRATION: "ok", KEEL_TSCONFIG: "none" }))).toEqual({
+      _tag: "malformed",
+      reason: "no KEEL_DEPS",
+    });
   });
 
   it("[typecheck.reads] calls anything else malformed", () => {
@@ -274,9 +284,9 @@ describe("judging a typecheck", () => {
     expect(
       judge({ _tag: "hydration-failed", reason: "hash-mismatch" }, undefined).report,
     ).toMatchObject({ outcome: "abstain", failure: "unavailable" });
-    expect(judge({ _tag: "lockfile-diverged" }, undefined).evidence.why).toMatch(
-      /^lockfile-diverged/,
-    );
+    const missing = judge({ _tag: "deps-missing", reason: "part-hash-mismatch" }, undefined);
+    expect(missing.report).toMatchObject({ outcome: "abstain", failure: "unavailable" });
+    expect(missing.evidence.why).toBe("deps-unavailable: part-hash-mismatch");
     expect(judge(output(1), undefined).evidence.why).toBe("tsc's output did not decode");
   });
 

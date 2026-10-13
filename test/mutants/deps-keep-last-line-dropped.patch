@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.keep.unterminated, deps.build.install-mismatch
+# why: A list whose last line has no newline is taken: that line's file is hashed and never moved, so an install runs without a file its digest covers
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..99ae06b4 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -213,7 +213,7 @@ export const DEPS_KEEP_SH = [
+   "  i=$1; o=$3",
+   '  [ -f "$i" ] && [ "$(sha256sum "$i" 2>/dev/null | cut -c1-64)" = "$2" ] || { echo install-mismatch; return 1; }',
+   '  [ "$(head -n 1 "$i")" = keel.install/1 ] || { echo install-mismatch; return 1; }',
+-  `  tail -n +2 "$i" >"$i.lines"; [ "$(tail -c 1 "$i.lines" | wc -l | tr -d ' ')" = 1 ] || { echo install-mismatch; return 1; }`,
++  `  tail -n +2 "$i" >"$i.lines"`,
+   `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  [^/]' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C sed 's/  /  .\\//' "$i.lines" >"$i.sums" 2>/dev/null || { echo install-mismatch; return 1; }`,

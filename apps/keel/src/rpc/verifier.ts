@@ -60,12 +60,16 @@ export const VerifierCodecs = {
 
 /**
  * keel-verify's default export, as far as keel calls it: `runProbe` routes a
- * run to the VerifierDO for its (probe, world), and `worldReady` answers from
- * the bundle store whether a probe could run against a world at all.
+ * run to the VerifierDO for its (probe, world), `worldReady` answers from
+ * the bundle store whether a probe could run against a world at all, and
+ * `buildDeps` routes a deps build to the deps box for its (namespace, install
+ * digest).
  */
 export interface VerifierEntrypoint {
   /** Answers the run's Exit as JSON (`VerifierCodecs.runProbe`), which the caller decodes. */
   runProbe(request: unknown): Promise<unknown>;
   /** Answers the readiness's Exit as JSON (`VerifierCodecs.worldReady`), which the caller decodes. */
   worldReady(request: unknown): Promise<unknown>;
+  /** Answers the build's Exit as JSON (`DepsCodecs.build`), which the caller decodes. */
+  buildDeps(request: unknown): Promise<unknown>;
 }

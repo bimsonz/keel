@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-unparsed, deps.inputs.bin-unread, deps.need.property
+# why: A package.json that is not JSON, or cannot be read, throws out of the need: a candidate with one broken manifest gets a defect where it should get a need
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..fe21eba2 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -137,7 +137,7 @@ const commandsOf = (
+   try {
+     json = JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text);
+   } catch {
+-    json = undefined;
++    throw new Error(`${path} is not JSON`);
+   }
+   const within = (targets: readonly unknown[]): string[] =>
+     targets.flatMap((target) => {

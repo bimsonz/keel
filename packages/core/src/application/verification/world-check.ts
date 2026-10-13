@@ -19,6 +19,7 @@ import {
   type StepReport,
 } from "../../domain/verification/index.ts";
 import { FlowSpecSource, PlanStore, ProbeLedger, type RepoRef } from "../ports/index.ts";
+import { type DepsAnswer, depsStop } from "./deps.ts";
 import { flowSetup } from "./flow-spec.ts";
 import { TIER2_STEP_IDS } from "./packs.ts";
 import { type ProbeParties, worldChecks } from "./probe-conflict.ts";
@@ -121,29 +122,43 @@ export interface WorldCheckOutcome {
 /**
  * One check's cell from its steps' reports, each read as the verdict reads it
  * (`coerce`): fail when any step fails, pass when every step passes, and n/a,
- * saying why, when the plan holds no such step or a step gave no answer.
+ * saying why, when the plan holds no such step or a step gave no answer. A
+ * world handed no deps bundle asked no runner, so its cell gives the reason
+ * its steps stopped for (`depsStop`): a refused install never reads as a
+ * failed suite.
  */
 export const worldCheckCell = (
   plan: FlowPlan,
   reports: readonly StepReport[],
+  deps: DepsAnswer,
 ): WorldCheckOutcome => {
   const steps = worldCheckSteps(plan);
-  if (steps.length === 0)
+  const [first] = steps;
+  if (first === undefined)
     return { outcome: "n/a", reason: "the plan holds no Tier 2 step Keel can run" };
+  const stop = deps._tag === "DepsReady" ? undefined : depsStop(first, deps).evidence.why;
   const results = steps.map((step) => {
     const report = reports.find((r) => r.stepId === step.id);
     return { step, report, result: report === undefined ? undefined : coerce(plan, report) };
   });
   const failed = results.filter((r) => r.result?.outcome === "fail").map((r) => r.step.id);
-  if (failed.length > 0) return { outcome: "fail", reason: `${failed.join(", ")} failed` };
+  if (failed.length > 0)
+    return {
+      outcome: "fail",
+      reason: `${failed.join(", ")} ${stop === undefined ? "failed" : `did not run: ${stop}`}`,
+    };
   if (results.every((r) => r.result?.outcome === "pass")) return { outcome: "pass" };
-  const silent = results
-    .filter((r) => r.result?.outcome !== "pass")
-    .map((r) =>
-      r.report === undefined
-        ? `${r.step.id} did not run`
-        : `${r.step.id} ${r.result?.outcome ?? "abstain"}${r.report.failure === undefined ? "" : ` (${r.report.failure})`}`,
-    );
+  const quiet = results.filter((r) => r.result?.outcome !== "pass");
+  if (stop !== undefined)
+    return {
+      outcome: "n/a",
+      reason: `${quiet.map((r) => r.step.id).join(", ")} did not run: ${stop}`,
+    };
+  const silent = quiet.map((r) =>
+    r.report === undefined
+      ? `${r.step.id} did not run`
+      : `${r.step.id} ${r.result?.outcome ?? "abstain"}${r.report.failure === undefined ? "" : ` (${r.report.failure})`}`,
+  );
   return { outcome: "n/a", reason: silent.join("; ") };
 };
 

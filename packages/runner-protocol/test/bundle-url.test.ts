@@ -126,6 +126,10 @@ describe("a signed bundle URL", () => {
           expect(
             await bundleUrlSigned(publicKey, askedNamespace, askedSha256, query, EXPIRES + skew),
           ).toBe(same && skew <= 0);
+          // And asked for exactly what was signed, every time: good until it expires.
+          expect(await bundleUrlSigned(publicKey, namespace, sha256, query, EXPIRES + skew)).toBe(
+            skew <= 0,
+          );
         },
       ),
     );

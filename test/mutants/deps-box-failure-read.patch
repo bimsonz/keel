@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.refusal-split
+# why: A box that fell over is read for whose fault it was: an error that says a refusal's word bounces the candidate
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index 2d0a0506..34965ee4 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -387,7 +387,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+         KEEL_DEPS_UPLOAD: `http://${DEPS_HOST}`,
+       });
+     } catch (error) {
+-      return refuse(`box-failed: ${describeError(error)}`);
++      return stop(depsRefusal(describeError(error)));
+     }
+     const report = parseDepsBuild(stdout);
+     // Only what the box itself refused is read for whose fault it was: output that is no report never is.

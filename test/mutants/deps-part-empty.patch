@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.pointer.format
+# why: A part of no bytes decodes
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..66e7be36 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -241,7 +241,7 @@ export const depsNeedFrom = <E, R>(
+ /** One part of a deps bundle's gzipped archive: its own sha256, which is its address, and its length. */
+ export const DepsPart = Schema.Struct({
+   sha256: Sha256Hex,
+-  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
++  bytes: Schema.Int,
+ });
+ export type DepsPart = typeof DepsPart.Type;
+ 

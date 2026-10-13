@@ -174,6 +174,10 @@ interface Options {
   readonly undeclared?: boolean;
   /** What recording a failed draft dies with, in place of reaching the ledger. */
   readonly recordDies?: Error;
+  /** What recording a failed run dies with, in place of reaching the ledger. */
+  readonly runRecordDies?: Error;
+  /** A cell the ledger answers without keeping it, so its run is never complete. */
+  readonly cellUnkept?: { readonly world: World; readonly run: number };
 }
 
 /**
@@ -217,15 +221,28 @@ function probeWorld(options: Options = {}) {
   const matrix = options.matrix ?? DISCRIMINATING;
   let modelCalls = 0;
   let stored = 0;
-  const recordDies = options.recordDies;
+  const { recordDies, runRecordDies, cellUnkept } = options;
   const ledgerLayer =
-    recordDies === undefined
+    recordDies === undefined && runRecordDies === undefined && cellUnkept === undefined
       ? ledger.layer
       : Layer.effect(
           ProbeLedger,
           Effect.gen(function* () {
             const inner = yield* ProbeLedger;
-            return ProbeLedger.of({ ...inner, probeDraftFailed: () => Effect.die(recordDies) });
+            const cellRan: typeof inner.probeCellRan = (ref, cell) =>
+              cell.world === cellUnkept?.world && cell.run === cellUnkept.run
+                ? Effect.orDie(inner.conflict(ref, cell.conflictId))
+                : inner.probeCellRan(ref, cell);
+            return ProbeLedger.of({
+              ...inner,
+              probeCellRan: cellRan,
+              ...(recordDies === undefined
+                ? {}
+                : { probeDraftFailed: () => Effect.die(recordDies) }),
+              ...(runRecordDies === undefined
+                ? {}
+                : { probeRunFailed: () => Effect.die(runRecordDies) }),
+            });
           }),
         ).pipe(Layer.provide(ledger.layer));
   const layer = Layer.mergeAll(
@@ -422,6 +439,22 @@ function probeWorld(options: Options = {}) {
           attempts: 0,
           reason: "party-gone",
         });
+      }).pipe(Effect.provide(ledger.layer), Effect.orDie),
+    /** Reports a cell of the conflict's probe from outside the program, so the program's own report of that cell contradicts it. */
+    cellElsewhere: (world: World, run: number, outcome: ProbeOutcome) =>
+      Effect.gen(function* () {
+        const held = yield* ProbeLedger;
+        const probe = (yield* held.conflict(at, conflictId)).probe;
+        yield* probe === undefined
+          ? Effect.die(new Error("the conflict has no probe"))
+          : held.probeCellRan(at, {
+              conflictId,
+              probeId: probe.id,
+              world,
+              run,
+              outcome,
+              resultRef: "r2://probe/elsewhere",
+            });
       }).pipe(Effect.provide(ledger.layer), Effect.orDie),
   };
 }
@@ -1022,6 +1055,123 @@ describe("probeConflict", () => {
   );
 
   it.effect(
+    "[probe.run-died] a step that dies once the draft is recorded is refused its record of an incomplete draft, records the probe's run as failed, and the instance fails with that same defect",
+    () => {
+      const defect = new Error("the world checks fell over");
+      const w = probeWorld();
+      // The program dies as soon as the ledger has kept the draft.
+      const s = memorySteps({ after: { drafted: Effect.die(defect) } });
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.hasDies(exit.cause)).toBe(true);
+        expect(Cause.squash(exit.cause)).toBe(defect);
+        expect(s.ran.slice(-3)).toEqual(["drafted", "incomplete", "run-failed"]);
+        const discards = yield* w.discards();
+        expect(discards).toMatchObject([{ reason: "run-failed", conflictId: w.conflictId }]);
+        expect(discards[0]).not.toHaveProperty("detail");
+        expect((yield* w.view()).probe).toMatchObject({
+          state: "discarded",
+          discarded: "run-failed",
+        });
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.run-died-decided] a step that dies once the probe is admitted changes nothing of it: both records are refused, and the instance fails with that same defect",
+    () => {
+      const defect = new Error("the code host fell over");
+      const w = probeWorld();
+      // The guard's commit is kept, and the program dies after it.
+      const s = memorySteps({ after: { guard: Effect.die(defect) } });
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.squash(exit.cause)).toBe(defect);
+        expect(s.ran.slice(-3)).toEqual(["guard", "incomplete", "run-failed"]);
+        expect(JSON.parse(s.kept.get("run-failed") ?? "null")).toMatchObject({ _tag: "Refused" });
+        expect(yield* w.discards()).toEqual([]);
+        const view = yield* w.view();
+        expect(view.probe?.state).toBe("admitted");
+        expect(view.conflict.state).toBe("proven");
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.run-died-record] a record of the failed run that dies too changes nothing: the instance fails with the first defect, not the record's",
+    () => {
+      const defect = new Error("the world checks fell over");
+      const w = probeWorld({ runRecordDies: new Error("the ledger is gone") });
+      const s = memorySteps({ after: { drafted: Effect.die(defect) } });
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.squash(exit.cause)).toBe(defect);
+        expect(s.ran.at(-1)).toBe("incomplete");
+        expect(yield* w.discards()).toEqual([]);
+        expect((yield* w.view()).probe?.state).toBe("calibrating");
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.cell-refused] a cell the ledger refuses of a probe still calibrating ends the probe's run: it is recorded as failed, and the instance ends stale at that cell",
+    () => {
+      const w = probeWorld();
+      // As soon as the ledger has kept the draft, B's first cell is reported from elsewhere as a pass.
+      const s = memorySteps({
+        after: { drafted: Effect.suspend(() => w.cellElsewhere("B", 1, "pass")) },
+      });
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toMatchObject({ outcome: "stale", step: "cell B@1" });
+        if (end.outcome !== "stale") return;
+        expect(end.reason).toContain("cell-contradicts");
+        expect(s.ran.slice(-3)).toEqual(["cell B@1", "decided B@1", "run-failed"]);
+        expect(s.ran).not.toContain("guard");
+        const discards = yield* w.discards();
+        expect(discards).toMatchObject([{ reason: "run-failed", conflictId: w.conflictId }]);
+        expect((yield* w.view()).probe).toMatchObject({
+          state: "discarded",
+          discarded: "run-failed",
+        });
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.undecided] every cell reported and the probe still calibrating ends the probe's run: it is recorded as failed, and the instance ends drafted with the probe discarded",
+    () => {
+      // The ledger answers one cell of the third run without keeping it: two complete runs decide nothing.
+      const w = probeWorld({ cellUnkept: { world: "trunk", run: 3 } });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toMatchObject({ outcome: "drafted", state: "discarded" });
+        expect(s.ran.filter((name) => name.startsWith("cell "))).toHaveLength(15);
+        expect(s.ran.at(-1)).toBe("run-failed");
+        expect(s.ran).not.toContain("guard");
+        const discards = yield* w.discards();
+        expect(discards).toMatchObject([{ reason: "run-failed", conflictId: w.conflictId }]);
+        expect((yield* w.view()).probe).toMatchObject({
+          state: "discarded",
+          discarded: "run-failed",
+        });
+      });
+    },
+  );
+
+  it.effect(
     "[probe.interrupted] an interruption is neither a failure nor a defect: nothing is recorded, and the conflict stays suspected",
     () => {
       const w = probeWorld();
@@ -1179,6 +1329,7 @@ describe("probeConflict", () => {
         if (end.outcome !== "drafted") return;
         expect(s.ran).toContain("drafted");
         expect(s.ran).not.toContain("guard");
+        expect(s.ran).not.toContain("run-failed");
         const probeLog = yield* w.log({ kind: "probe", id: end.probeId });
         expect(types(probeLog)).toContain("ProbeDiscarded");
         expect(types(probeLog)).not.toContain("GuardAdmitted");

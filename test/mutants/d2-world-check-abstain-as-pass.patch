@@ -2,15 +2,15 @@
 # kills: world-check.cell
 # why: A check passes when any step passes, so a suite that never ran beside a green typecheck reads green
 diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
-index d617f1f..139b9c4 100644
+index 911b8ff3..16fc1f5c 100644
 --- a/packages/core/src/application/verification/world-check.ts
 +++ b/packages/core/src/application/verification/world-check.ts
-@@ -106,7 +106,7 @@ export const worldCheckCell = (
-   });
-   const failed = results.filter((r) => r.result?.outcome === "fail").map((r) => r.step.id);
-   if (failed.length > 0) return { outcome: "fail", reason: `${failed.join(", ")} failed` };
+@@ -147,7 +147,7 @@ export const worldCheckCell = (
+       outcome: "fail",
+       reason: `${failed.join(", ")} ${stop === undefined ? "failed" : `did not run: ${stop}`}`,
+     };
 -  if (results.every((r) => r.result?.outcome === "pass")) return { outcome: "pass" };
 +  if (results.some((r) => r.result?.outcome === "pass")) return { outcome: "pass" };
-   const silent = results
-     .filter((r) => r.result?.outcome !== "pass")
-     .map((r) =>
+   const quiet = results.filter((r) => r.result?.outcome !== "pass");
+   if (stop !== undefined)
+     return {

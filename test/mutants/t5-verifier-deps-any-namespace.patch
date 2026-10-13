@@ -2,15 +2,15 @@
 # kills: t5.pool.verifier-other-namespace
 # why: Every namespace's world reads one namespace's deps pointer (the pool's own), so a namespace with no deps bundle is told a foreign one is unreadable rather than that it has none
 diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
-index ee4bb08d..60833eee 100644
+index 7724c2cc..efee71bd 100644
 --- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
-@@ -101,7 +101,7 @@ async function depsFor(
+@@ -104,7 +104,7 @@ async function depsFor(
    const need = await depsNeed(world);
    if (need._tag === "none") return undefined;
    if (need._tag === "unkeyed") throw new Unavailable(`lockfile-diverged: ${need.reason}`);
--  const pointerKey = namespaceKey(namespace, "deps", need.sha256);
-+  const pointerKey = namespaceKey("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0", "deps", need.sha256);
+-  const pointerKey = namespaceKey(namespace, "probe-deps", need.sha256);
++  const pointerKey = namespaceKey("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0", "probe-deps", need.sha256);
    const pointer = await env.BUNDLES.get(pointerKey);
    if (pointer === null)
      throw new Unavailable(`lockfile-diverged: no deps bundle for ${LOCKFILE} ${need.sha256}`);

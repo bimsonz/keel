@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.pack-failed, deps.build.install
+# why: A pack that failed is read as a pack of no parts, and reported as built
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index fc650e39..cdcf214e 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -409,7 +409,7 @@ export const depsBuildCommand = (
+     `err=$(LC_ALL=C sed -n 's/^\\[\\(ERR_PNPM_[A-Z0-9_]*\\)\\].*/\\1/p' "$K/install.log" 2>/dev/null | head -n 1 | cut -c1-80)`,
+     '[ $code -eq 0 ] || refuse "install-failed exit $code${err:+ $err}"',
+     `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "\${toolchain##* }" ] || refuse toolchain-switched`,
+-    `keel_deps_pack "$W" "$K/parts" ${partBytes} >"$K/packed" || refuse "$(head -n 1 "$K/packed")"`,
++    `keel_deps_pack "$W" "$K/parts" ${partBytes} >"$K/packed" || true`,
+     "files=0; total=0; list=",
+     "while read -r kind a b; do",
+     "  case $kind in",

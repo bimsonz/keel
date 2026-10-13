@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.leftover
+# why: What find says of an earlier build's file it could not delete goes to the box's stderr
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..47f0c1fb 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -385,7 +385,7 @@ export const depsBuildCommand = (
+     'refuse() { echo "KEEL_BUILD refused $1"; echo KEEL_END; exit 0; }',
+     `toolchain=$(cat ${path("toolchainFile", paths.toolchainFile)} 2>/dev/null); echo "KEEL_TOOLCHAIN $toolchain"`,
+     'rm -rf "$K"; mkdir -p "$K" "$W" && cd "$W" || refuse no-workspace',
+-    'find "$W" -mindepth 1 -delete 2>/dev/null',
++    'find "$W" -mindepth 1 -delete',
+     'case "${KEEL_BUNDLE_URL:-}" in https://*) url=http://${KEEL_BUNDLE_URL#https://} ;; *) url=${KEEL_BUNDLE_URL:-} ;; esac',
+     'curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o "$K/bundle.tgz" "$url" 2>/dev/null || refuse bundle-unfetched',
+     "addr=${url%%\\?*}",

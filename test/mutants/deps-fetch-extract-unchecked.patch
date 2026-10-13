@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.sh.extract-failed
+# why: Parts that are no archive together are fetched without a word: the suite runs with no deps and no reason
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..289bf805 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -157,7 +157,7 @@ export const DEPS_FETCH_SH = [
+   "  [ $# -gt 0 ] || { echo no-parts; return 1; }",
+   '  i=0; for url in "$@"; do i=$((i + 1)); curl --connect-timeout 10 --max-time 300 --fail --silent --show-error -o "$s/$(printf %04d $i)" "$url" 2>/dev/null || { echo fetch-failed; return 1; }; done',
+   '  i=0; for url in "$@"; do i=$((i + 1)); addr=${url%%\\?*}; [ "$(sha256sum "$s/$(printf %04d $i)" | cut -c1-64)" = "${addr##*/}" ] || { echo part-hash-mismatch; return 1; }; done',
+-  '  { i=0; for url in "$@"; do i=$((i + 1)); cat "$s/$(printf %04d $i)"; done; } | tar -xzf - -C "$dir" 2>/dev/null || { echo extract-failed; return 1; }',
++  '  { i=0; for url in "$@"; do i=$((i + 1)); cat "$s/$(printf %04d $i)"; done; } | tar -xzf - -C "$dir" 2>/dev/null || true',
+   '  rm -rf "$s"',
+   "}",
+ ].join("\n");

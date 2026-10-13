@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.other-settings-rebuilt
+# why: A namespace keeps one deps pointer whatever the install digest, so two candidates that differ in a settings file build over each other's pointer and each is installed again every time the other has built
+diff --git a/packages/core/src/application/verification/namespace-keys.ts b/packages/core/src/application/verification/namespace-keys.ts
+index 31262aac..a712381d 100644
+--- a/packages/core/src/application/verification/namespace-keys.ts
++++ b/packages/core/src/application/verification/namespace-keys.ts
+@@ -16,4 +16,4 @@ export type KeyFamily = "bundles" | "deps" | "deps-parts" | "probe-deps" | "evid
+  * any other way can read across namespaces (guard: r2-namespace-keys).
+  */
+ export const namespaceKey = (namespace: NamespaceId, family: KeyFamily, hex: string): string =>
+-  `ns/${namespace}/${family}/${hex}`;
++  `ns/${namespace}/${family}/${family === "deps" ? "kept" : hex}`;

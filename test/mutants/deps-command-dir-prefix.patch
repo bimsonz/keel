@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-directory, deps.need.property
+# why: A directories.bin of bin takes every path that starts so: bin2/c and binary are inputs no install reads
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..3440abb0 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -193,7 +193,7 @@ export const installInputsOf = (
+     if (
+       installReads(path) ||
+       commands.has(path) ||
+-      commandDirs.some((dir) => path.startsWith(`${dir}/`))
++      commandDirs.some((dir) => path.startsWith(dir))
+     )
+       lines.push(line);
+   return `${lines.join("\n")}\n`;

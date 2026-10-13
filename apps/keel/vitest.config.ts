@@ -5,7 +5,12 @@ import { makeBundleUrlKeys } from "@keeltown/testing/bundle-url-keys";
 import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
 import { Exit } from "effect";
 import { defineProject } from "vitest/config";
-import { encodeExit, VerifierCodecs } from "../keel-verify/src/rpc/index.ts";
+import {
+  type DepsAnswerJson,
+  DepsCodecs,
+  encodeExit,
+  VerifierCodecs,
+} from "../keel-verify/src/rpc/index.ts";
 
 /** A fresh Ed25519 signing key per test run, in the JWK form the KEEL_SIGNING_KEY secret holds. */
 async function testSigningKey(): Promise<string> {
@@ -31,6 +36,28 @@ const worldReadiness = {
       }),
     ),
   ),
+};
+
+/**
+ * The fake keel-verify's answers to `buildDeps`, in keel-verify's own
+ * encoding. A candidate with a `refused/package.json` is refused as an
+ * install its lockfile is behind, one with an `unavailable/package.json` is
+ * unavailable, and any other is ready with one part, for the install digest
+ * it was asked for.
+ */
+const depsAnswer = (answer: DepsAnswerJson) =>
+  JSON.stringify(encodeExit(DepsCodecs.build, Exit.succeed(answer)));
+const depsAnswers = {
+  ready: depsAnswer({
+    _tag: "DepsReady",
+    install: "0".repeat(64),
+    parts: [{ sha256: "7".repeat(64), bytes: 4321 }],
+  }),
+  refused: depsAnswer({
+    _tag: "DepsRefused",
+    reason: "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE",
+  }),
+  unavailable: depsAnswer({ _tag: "DepsUnavailable", reason: "upload-failed" }),
 };
 
 /** The fake Artifacts namespace, typechecked as TypeScript and served as plain JavaScript. */
@@ -85,6 +112,14 @@ export default defineProject({
                 `    return request.worldBundle === "sha256:" + "d".repeat(64)`,
                 `      ? ${worldReadiness.unready}`,
                 `      : ${worldReadiness.ready};`,
+                `  }`,
+                `  buildDeps(request) {`,
+                `    const inputs = String(request?.need?.inputs);`,
+                `    if (inputs.includes("  refused/package.json\\n")) return ${depsAnswers.refused};`,
+                `    if (inputs.includes("  unavailable/package.json\\n")) return ${depsAnswers.unavailable};`,
+                `    const ready = ${depsAnswers.ready};`,
+                `    ready.value.install = request.need.install;`,
+                `    return ready;`,
                 `  }`,
                 `}`,
               ].join("\n"),

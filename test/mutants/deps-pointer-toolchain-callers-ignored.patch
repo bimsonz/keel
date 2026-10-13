@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.pointer.serves, deps.pointer.toolchain
+# why: The toolchain a caller names is not the one compared: a pointer is held to this file's constant whatever image the box is built from
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..d76b7af0 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -274,7 +274,7 @@ export const pointerServes = (
+   pointer: DepsPointer,
+   need: Locked,
+   toolchain: string = DEPS_TOOLCHAIN,
+-): boolean => pointer.install === need.install && pointer.toolchain === toolchain;
++): boolean => pointer.install === need.install && pointer.toolchain === DEPS_TOOLCHAIN;
+ 
+ /** The deps bundle is there: its parts, in the order they are untarred. */
+ export const DepsReady = Schema.TaggedStruct("DepsReady", {

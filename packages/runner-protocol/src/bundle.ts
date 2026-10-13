@@ -1,3 +1,5 @@
+import { signedUrl, urlSigned } from "./signed-url.ts";
+
 /**
  * Candidate bundles: the one format in which source reaches a runner. A bundle
  * is a gzipped ustar archive with a single top directory (the sandbox's archive
@@ -302,13 +304,6 @@ const bundleUrl = (namespace: string, hash: string): string => {
  */
 export const BUNDLE_URL_TTL_SECONDS = 30 * 60;
 
-const fromBase64 = (text: string): Uint8Array<ArrayBuffer> =>
-  Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
-
-/** A key as Terraform gives it: PEM, or the bare base64 of its DER. */
-const derOf = (key: string): Uint8Array<ArrayBuffer> =>
-  fromBase64(key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, ""));
-
 /** What a bundle URL's signature covers: whose bundle, which bundle, and when the URL stops being good. */
 const signedText = (namespace: string, sha256: string, expires: number): Uint8Array<ArrayBuffer> =>
   new TextEncoder().encode(`${namespace}|${sha256}|${expires}`).slice();
@@ -327,23 +322,12 @@ export const signedBundleUrl = async (
   expires: number,
 ): Promise<string> => {
   const url = bundleUrl(namespace, hash);
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    derOf(signingKey),
-    { name: "Ed25519" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "Ed25519",
-    key,
+  return signedUrl(
+    signingKey,
+    url,
+    expires,
     signedText(namespace, url.slice(url.lastIndexOf("/") + 1), expires),
   );
-  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-  return `${url}?exp=${expires}&sig=${sig}`;
 };
 
 /**
@@ -353,28 +337,14 @@ export const signedBundleUrl = async (
  * another namespace, bundle or expiry is refused alike. It needs only the
  * public key (SPKI), which signs nothing.
  */
-export const bundleUrlSigned = async (
+export const bundleUrlSigned = (
   publicKey: string,
   namespace: string,
   sha256: string,
   query: URLSearchParams,
   now: number,
-): Promise<boolean> => {
-  const [exp, sig] = [query.get("exp"), query.get("sig")];
-  if (exp === null || !/^[0-9]{1,12}$/.test(exp)) return false;
-  if (sig === null || !/^[A-Za-z0-9_-]{86}$/.test(sig)) return false;
-  const expires = Number(exp);
-  if (expires < now) return false;
-  const key = await crypto.subtle.importKey("spki", derOf(publicKey), { name: "Ed25519" }, false, [
-    "verify",
-  ]);
-  return crypto.subtle.verify(
-    "Ed25519",
-    key,
-    fromBase64(sig.replace(/-/g, "+").replace(/_/g, "/")),
-    signedText(namespace, sha256, expires),
-  );
-};
+): Promise<boolean> =>
+  urlSigned(publicKey, query, now, (expires) => signedText(namespace, sha256, expires));
 
 /**
  * A POSIX sh function, `keel_verify_bundle`, that checks the working directory
@@ -383,11 +353,19 @@ export const bundleUrlSigned = async (
  * match; otherwise it prints one reason (`no-manifest`, `hash-mismatch` or
  * `count-<found>-of-<listed>`) and returns 1. Runners call it before running
  * anything, so a partial extraction never runs a subset of the tests.
+ *
+ * Each listed path is hashed with `./` before it: `sha256sum -c` reads a
+ * listed `-` as its standard input, and a candidate may hold a file named so.
+ * The manifest so rewritten goes to a temporary file outside the tree, whole
+ * before any of it is checked, and is removed again: a `sed` that stopped
+ * part way is a `hash-mismatch`, where one piped to the check would leave the
+ * lines after it unchecked. So is a temporary file that could not be made.
  */
 export const VERIFY_BUNDLE_SH = [
   "keel_verify_bundle() {",
   `  [ -f ${BUNDLE_MANIFEST} ] || { echo no-manifest; return 1; }`,
-  `  sha256sum --quiet --strict -c ${BUNDLE_MANIFEST} >/dev/null 2>&1 || { echo hash-mismatch; return 1; }`,
+  `  sums=$(mktemp 2>/dev/null) && LC_ALL=C sed 's/  /  .\\//' ${BUNDLE_MANIFEST} >"$sums" 2>/dev/null && sha256sum --quiet --strict -c "$sums" >/dev/null 2>&1 || { rm -f "$sums"; echo hash-mismatch; return 1; }`,
+  '  rm -f "$sums"',
   `  found=$(find . -type f ! -path ./${BUNDLE_MANIFEST} | wc -l | tr -d ' ')`,
   `  listed=$(wc -l < ${BUNDLE_MANIFEST} | tr -d ' ')`,
   '  [ "$found" -eq "$listed" ] || { echo "count-$found-of-$listed"; return 1; }',

@@ -17,7 +17,7 @@ import { MAX_FAILING } from "./suite.ts";
 /**
  * The worker-app typecheck run in Tier 2, as its runner reports it on stdout,
  * per the shared runner protocol (`runner-output.ts`): after the hydration and
- * lockfile markers, between `KEEL_TYPECHECK/1` and `KEEL_END`:
+ * deps markers, between `KEEL_TYPECHECK/1` and `KEEL_END`:
  *
  *   KEEL_TSCONFIG ok | none                  the candidate has a tsconfig.json at its root
  *   KEEL_EXIT <n>                            tsc's exit code

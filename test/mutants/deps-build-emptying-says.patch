@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.leftover
+# why: What find says of a file of the candidate's it could not delete goes to the box's stderr
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..c1f238cb 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -394,7 +394,7 @@ export const depsBuildCommand = (
+     'rm -f "$K/bundle.tgz"',
+     'printf %s "${KEEL_INSTALL_INPUTS:-}" >"$K/inputs"',
+     'why=$(keel_deps_keep "$K/inputs" "${KEEL_INSTALL:-}" "$K/kept") || refuse "$why"',
+-    'find "$W" -mindepth 1 -delete 2>/dev/null; cp -Rp "$K/kept/." "$W" 2>/dev/null || refuse keep-failed',
++    'find "$W" -mindepth 1 -delete; cp -Rp "$K/kept/." "$W" 2>/dev/null || refuse keep-failed',
+     `rm -rf "$K/kept"; [ "$(cd "$W" && find . ! -type d 2>/dev/null | LC_ALL=C sort)" = "$(tail -n +2 "$K/inputs" | LC_ALL=C sed 's|^.\\{66\\}|./|' | LC_ALL=C sort)" ] || refuse keep-failed`,
+     'why=$(keel_deps_lock pnpm-lock.yaml) || refuse "$why"',
+     "start=$(date +%s)",

@@ -147,7 +147,7 @@ const put = async (files: readonly BundleFile[]): Promise<ContentHash> => {
 const requireDeps = async (world: readonly BundleFile[]) => {
   const need = await depsNeed(world);
   if (need._tag !== "lockfile") return;
-  const key = namespaceKey(namespace, "deps", need.sha256);
+  const key = namespaceKey(namespace, "probe-deps", need.sha256);
   if (!(await has(key)))
     throw new Error(
       `no ${key} in the bucket: run deps-bundle.ts fixtures/forge-lite --upload first`,

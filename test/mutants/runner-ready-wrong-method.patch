@@ -2,15 +2,15 @@
 # kills: probe-runner.entrypoint
 # why: The readiness question is sent to runProbe, which decodes no such request, so no world is ever answered for.
 diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-index 34fcf874..8f7ab81c 100644
+index 1e137210..0f439149 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-@@ -25,7 +25,7 @@ export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
-       return answer;
-     };
+@@ -27,7 +27,7 @@ export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
    };
--  return { runProbe: method("runProbe"), worldReady: method("worldReady") };
-+  return { runProbe: method("runProbe"), worldReady: method("runProbe") };
+   return {
+     runProbe: method("runProbe"),
+-    worldReady: method("worldReady"),
++    worldReady: method("runProbe"),
+     buildDeps: method("buildDeps"),
+   };
  };
- 
- const didNotAnswer = (error: unknown) =>

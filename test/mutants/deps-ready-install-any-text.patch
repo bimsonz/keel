@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.answer.data
+# why: A kept answer whose install digest is no sha256 decodes as ready deps
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..65968e62 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -278,7 +278,7 @@ export const pointerServes = (
+ 
+ /** The deps bundle is there: its parts, in the order they are untarred. */
+ export const DepsReady = Schema.TaggedStruct("DepsReady", {
+-  install: Sha256Hex,
++  install: Schema.String,
+   parts: Schema.Array(DepsPart),
+ });
+ export type DepsReady = typeof DepsReady.Type;

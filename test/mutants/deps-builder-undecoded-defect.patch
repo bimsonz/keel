@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deps-builder.test.ts
+# kills: deps-builder.build-not-an-answer
+# why: An answer that is no Exit at all is a defect of the build step: the Workflow retries and then fails where the change should park
+diff --git a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+index c1b91868..be71ea6c 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/deps-builder.ts
+@@ -63,10 +63,7 @@ export const DepsBuilderRpc = (verifier: VerifierEntrypoint, signingKey: string)
+               catch: (error) => `keel-verify did not answer: ${describe(error)}`,
+             });
+             // The codec throws on what is no Exit at all: that is an answer that is not one too.
+-            const exit = yield* Effect.try({
+-              try: () => decodeExit(DepsCodecs.build, raw),
+-              catch: () => NOT_AN_ANSWER,
+-            });
++            const exit = decodeExit(DepsCodecs.build, raw);
+             return Exit.isSuccess(exit) ? exit.value : yield* Effect.fail(NOT_AN_ANSWER);
+           }).pipe(
+             Effect.catch((reason) => Effect.succeed({ _tag: "DepsUnavailable" as const, reason })),

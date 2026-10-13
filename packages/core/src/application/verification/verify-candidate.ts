@@ -22,6 +22,7 @@ import {
   Ids,
   VerifierRuntime,
 } from "../ports/index.ts";
+import type { DepsAnswer } from "./deps.ts";
 import { citeDiagnostic } from "./typecheck.ts";
 
 /**
@@ -31,13 +32,18 @@ import { citeDiagnostic } from "./typecheck.ts";
  * id kept by its step, and recording is idempotent by instance.
  */
 
-/** The results of every step in the job. An unavailable verifier abstains every step; it never passes one. */
+/**
+ * The results of every step in the job, each Tier 2 step handed the deps its
+ * Workflow ensured. An unavailable verifier abstains every step; it never
+ * passes one.
+ */
 export const runJob = Effect.fn("verification/runJob")(function* (
   namespace: NamespaceId,
   job: VerificationJob,
+  deps: DepsAnswer,
 ) {
   const runtime = yield* VerifierRuntime;
-  return yield* runtime.run(namespace, job).pipe(
+  return yield* runtime.run(namespace, job, deps).pipe(
     Effect.catchTag("VerifierUnavailable", () =>
       Effect.succeed(
         job.steps.map((step): StepReport => ({
@@ -72,9 +78,13 @@ export type SettledVerdict = typeof SettledVerdict.Type;
 /** How many failures (tests, type errors and guards) a verdict cites by name. */
 export const CITED_FAILURES = 20;
 
-/** A failure a verdict cites: a failing test, an error the typecheck named, or a guard whose probe failed. */
+/**
+ * A failure a verdict cites: a failing test, an error the typecheck named, a
+ * guard whose probe failed, or dependencies that could not be installed, with
+ * what to do about them.
+ */
 interface Cited {
-  readonly kind: "test" | "type" | "guard";
+  readonly kind: "test" | "type" | "guard" | "deps";
   readonly name: string;
 }
 
@@ -82,6 +92,7 @@ const CITED_AS: Record<Cited["kind"], { readonly plural: string; readonly line: 
   test: { plural: "failing tests", line: "failed" },
   type: { plural: "type errors", line: "type error" },
   guard: { plural: "guarded behaviour", line: "guard failed" },
+  deps: { plural: "dependencies", line: "dependencies refused" },
 };
 
 /** A bounce's remedy, naming what failed when the evidence names anything. */
@@ -95,7 +106,10 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
   const tests = cited.filter((c) => c.kind === "test").map((c) => c.name);
   const types = cited.filter((c) => c.kind === "type").map((c) => c.name);
   const guards = cited.filter((c) => c.kind === "guard").map((c) => c.name);
-  const kinds = (["test", "type", "guard"] as const).filter((k) => cited.some((c) => c.kind === k));
+  const deps = cited.filter((c) => c.kind === "deps").map((c) => c.name);
+  const kinds = (["test", "type", "guard", "deps"] as const).filter((k) =>
+    cited.some((c) => c.kind === k),
+  );
   const phrases = kinds.map((k) => CITED_AS[k].plural);
   const what = `the ${
     phrases.length === 1
@@ -112,12 +126,18 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
       ...(tests.length === 0 ? {} : { failingTests: tests }),
       ...(types.length === 0 ? {} : { typeErrors: types }),
       ...(guards.length === 0 ? {} : { failingGuards: guards }),
+      ...(deps.length === 0 ? {} : { depsRefused: deps }),
     },
   };
 };
 
-/** What a failing step stored that names its failures: a suite's tests, a typecheck's errors, a guard's probe. */
+/**
+ * What a failing step stored that names its failures: a suite's tests, a
+ * typecheck's errors, a guard's probe, or the dependencies it was refused
+ * (`depsStop`).
+ */
 const StoredFailures = Schema.Struct({
+  deps: Schema.optional(Schema.Struct({ refused: Schema.String, remedy: Schema.String })),
   guard: Schema.optional(Schema.Struct({ predicate: Schema.String, probe: Schema.String })),
   reason: Schema.optional(Schema.String),
   failing: Schema.optional(
@@ -144,8 +164,8 @@ const describe = (r: StepResult): string =>
 /**
  * Coerces the runner's reports against the plan, takes `verdict/1`, and cites
  * the evidence the outcome rests on: one line per result, then the failing
- * tests and type errors by name, read back from the evidence each failing step
- * stored. `failingTests` names them all, type errors as `file:line:col TScode
+ * tests and type errors by name, and dependencies that were refused with what
+ * to do about them, read back from the evidence each failing step stored. `failingTests` names them all, type errors as `file:line:col TScode
  * message`, since the lane attributes a bounce from the first. A fail whose
  * evidence is not stored still stands: the verdict cites `evidence missing`
  * and an ops error is logged, so a lost document never wedges the lane.
@@ -184,6 +204,11 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
       });
     for (const e of stored.value.errors ?? [])
       failures.push({ kind: "type", name: citeDiagnostic(e) });
+    // Every step that needed the refused dependencies stored the same refusal: it is cited once.
+    const refusal = stored.value.deps;
+    const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
+    if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
+      failures.push({ kind: "deps", name: depsName });
     if (stored.value.guard !== undefined)
       failures.push({
         kind: "guard",

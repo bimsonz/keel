@@ -70,7 +70,7 @@ describe("keel-verify's worldReady", () => {
     const world = await putBundle({ ...TINY_WORLD, "pnpm-lock.yaml": otherLock }, NAMESPACE);
     const installed = await putBundle({ ...TINY_DEPS, "pnpm-lock.yaml": TINY_LOCK }, NAMESPACE);
     const lock = await sha256Hex(new TextEncoder().encode(otherLock));
-    await env.BUNDLES.put(`ns/${NAMESPACE}/deps/${lock}`, installed.slice("sha256:".length));
+    await env.BUNDLES.put(`ns/${NAMESPACE}/probe-deps/${lock}`, installed.slice("sha256:".length));
     expect(await readiness(world, NAMESPACE)).toEqual({
       _tag: "Unready",
       reason: `lockfile-diverged: deps bundle ${installed.slice("sha256:".length)} was not installed from pnpm-lock.yaml ${lock}`,

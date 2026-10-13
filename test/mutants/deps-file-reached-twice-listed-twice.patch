@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-once
+# why: A file is listed once for each way it is reached: the box's keep moves the file at its first line and fails at its second
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..9d4f09e2 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -195,7 +195,7 @@ export const installInputsOf = (
+       commands.has(path) ||
+       commandDirs.some((dir) => path.startsWith(`${dir}/`))
+     )
+-      lines.push(line);
++      lines.push(...[installReads(path), commands.has(path), commandDirs.some((dir) => path.startsWith(`${dir}/`))].flatMap((reached) => (reached ? [line] : [])));
+   return `${lines.join("\n")}\n`;
+ };
+ 

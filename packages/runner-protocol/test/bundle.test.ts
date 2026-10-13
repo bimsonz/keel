@@ -112,18 +112,41 @@ describe("candidate bundles", () => {
   });
 });
 
-/** Runs `keel_verify_bundle` in `dir`, as a runner does before it runs anything. */
-const verify = (dir: string): { ok: boolean; reason: string } => {
+/** Runs `keel_verify_bundle` in `dir`, as a runner does before it runs anything, under `env` too. */
+const verify = (dir: string, env: NodeJS.ProcessEnv = {}): { ok: boolean; reason: string } => {
   try {
     execFileSync("sh", ["-c", `${VERIFY_BUNDLE_SH}\nkeel_verify_bundle`], {
       cwd: dir,
       encoding: "utf8",
+      env: { ...process.env, ...env },
     });
     return { ok: true, reason: "" };
   } catch (error) {
     const stdout = error instanceof Error && "stdout" in error ? error.stdout : "";
     return { ok: false, reason: String(stdout).trim() };
   }
+};
+
+/** A PATH on which each tool named is a script of these lines, with the machine's own at `$OWN`. */
+const standIns = (tools: Readonly<Record<string, readonly string[]>>): NodeJS.ProcessEnv => {
+  const bin = mkdtempSync(join(tmpdir(), "keel-bundle-bin-"));
+  dirs.push(bin);
+  for (const [tool, lines] of Object.entries(tools)) {
+    const own = execFileSync("sh", ["-c", `command -v ${tool}`], { encoding: "utf8" }).trim();
+    writeFileSync(join(bin, tool), ["#!/bin/sh", `OWN="${own}"`, ...lines, ""].join("\n"));
+    chmodSync(join(bin, tool), 0o755);
+  }
+  return { PATH: `${bin}:${process.env["PATH"]}` };
+};
+
+/** A sed that writes the first line as it should, then dies. */
+const STOPPED = ['"$OWN" "$@" | head -n 1', "exit 1"];
+
+/** An empty directory of a case's own. */
+const emptyDir = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "keel-bundle-tmp-"));
+  dirs.push(dir);
+  return dir;
 };
 
 describe("verifying an extracted bundle", () => {
@@ -156,6 +179,51 @@ describe("verifying an extracted bundle", () => {
     const dir = extract(await writeBundle(files));
     writeFileSync(join(dir, "src/injected.ts"), "x\n");
     expect(verify(dir)).toEqual({ ok: false, reason: "count-4-of-3" });
+  });
+
+  it("[bundle.verify-whole] refuses a tree whose manifest was not rewritten whole: a sed that stops part way has left the lines after it unchecked", async () => {
+    const bundle = await writeBundle(files);
+    // Piped to the check, a sed's status is lost and the check passes on the one line it wrote.
+    const dying = standIns({ sed: STOPPED });
+    // The tree as extracted, and one whose file listed last has other bytes.
+    const changed = extract(bundle);
+    appendFileSync(join(changed, "test/a.test.ts"), "tampered\n");
+    expect([verify(extract(bundle), dying), verify(changed, dying)]).toEqual([
+      { ok: false, reason: "hash-mismatch" },
+      { ok: false, reason: "hash-mismatch" },
+    ]);
+    // The same stand-in with nothing wrong with it passes the tree: the refusal is the status's.
+    expect(verify(extract(bundle), standIns({ sed: ['exec "$OWN" "$@"'] }))).toEqual({
+      ok: true,
+      reason: "",
+    });
+  });
+
+  it("[bundle.verify-tidy] leaves nothing behind it, and refuses a tree it had nowhere to write the rewritten manifest for", async () => {
+    const bundle = await writeBundle(files);
+    const changed = extract(bundle);
+    appendFileSync(join(changed, "src/a.ts"), "tampered\n");
+    // A tree that verifies, one that does not, and one whose sed died. Each run's mktemp makes
+    // its file in a directory of the case's own (BSD's takes no TMPDIR), and says it was asked.
+    for (const [dir, sed, ok] of [
+      [extract(bundle), undefined, true],
+      [changed, undefined, false],
+      [extract(bundle), STOPPED, false],
+    ] as const) {
+      const made = emptyDir();
+      const asked = join(emptyDir(), "asked");
+      const mktemp = [`echo asked >>"${asked}"`, `exec "$OWN" "${made}/sums.XXXXXX"`];
+      const before = walk(dir).toSorted();
+      expect(verify(dir, standIns(sed === undefined ? { mktemp } : { mktemp, sed })).ok).toBe(ok);
+      expect(readFileSync(asked, "utf8")).toBe("asked\n");
+      expect(readdirSync(made)).toEqual([]);
+      expect(walk(dir).toSorted()).toEqual(before);
+    }
+    // No temporary file to be had: the tree is not shown to match, so it does not.
+    expect(verify(extract(bundle), standIns({ mktemp: ["exit 1"] }))).toEqual({
+      ok: false,
+      reason: "hash-mismatch",
+    });
   });
 
   it("[bundle.verify-partial] refuses what a truncated download extracts to", async () => {

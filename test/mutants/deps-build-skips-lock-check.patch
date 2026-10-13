@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.build.registry-only, deps.build.local-directory, deps.build.no-lockfile
+# why: The deps box's command never calls the lockfile check: it installs whatever lockfile was kept, or none
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..fb934708 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -396,7 +396,6 @@ export const depsBuildCommand = (
+     'why=$(keel_deps_keep "$K/inputs" "${KEEL_INSTALL:-}" "$K/kept") || refuse "$why"',
+     'find "$W" -mindepth 1 -delete 2>/dev/null; cp -Rp "$K/kept/." "$W" 2>/dev/null || refuse keep-failed',
+     `rm -rf "$K/kept"; [ "$(cd "$W" && find . ! -type d 2>/dev/null | LC_ALL=C sort)" = "$(tail -n +2 "$K/inputs" | LC_ALL=C sed 's|^.\\{66\\}|./|' | LC_ALL=C sort)" ] || refuse keep-failed`,
+-    'why=$(keel_deps_lock pnpm-lock.yaml) || refuse "$why"',
+     "start=$(date +%s)",
+     `CI=1 timeout ${installSeconds} pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile --pm-on-fail=ignore --registry="\${KEEL_REGISTRY:-http://registry.npmjs.org/}" --store-dir "$K/store" >"$K/install.log" 2>&1`,
+     "code=$?; ms=$(( ($(date +%s) - start) * 1000 ))",

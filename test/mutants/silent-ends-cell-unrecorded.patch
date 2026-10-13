@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.cell-refused
+# why: A cell the ledger refuses of a probe still calibrating tells the ledger nothing of the run: the conflict stays probing a probe that will get no more cells, in silence
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 96f5e3c6..ce45c755 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -763,7 +763,6 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+         break;
+       }
+       // Still calibrating, and it will get no more cells: the ledger is told its run failed.
+-      yield* runFailedStep(call, steps);
+       return { outcome: "stale", step: name, reason: ran.reason } satisfies ProbeEnd;
+     }
+ 

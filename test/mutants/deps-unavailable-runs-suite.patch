@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-unavailable
+# why: A Tier 2 step handed unavailable deps, or none, goes on to its runner with no deps bundle to give it
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 97f9b415..26c9f1d2 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -332,7 +332,7 @@ export const SuiteRuntimeCi = (deps: {
+           Effect.gen(function* () {
+             const tier2 = TIER2_RUNNERS[step.id];
+             if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+-            if (handed._tag !== "DepsReady") {
++            if (handed._tag === "DepsRefused") {
+               const stop = depsStop(step, handed);
+               const stopRef = yield* deps.durable(
+                 `${step.id}:evidence`,

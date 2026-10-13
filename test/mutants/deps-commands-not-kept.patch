@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.bin-string, deps.inputs.bin-object, deps.inputs.bin-nested, deps.inputs.bin-unparsed, deps.inputs.bin-unread, deps.need.locked, deps.need.digest, deps.need.property, deps-builder.need-commands
+# why: A file a package.json names as a bin is no input: an edit to a command's first line is served the shim written for the old one
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..5fe515fb 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -192,7 +192,7 @@ export const installInputsOf = (
+   for (const [path, line] of listed)
+     if (
+       installReads(path) ||
+-      commands.has(path) ||
++      false ||
+       commandDirs.some((dir) => path.startsWith(`${dir}/`))
+     )
+       lines.push(line);

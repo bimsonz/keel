@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.reads, deps.need.property
+# why: A package's own .npmrc or pnpm-workspace.yaml is taken for the root's: a file no install reads moves the digest
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..a454daa8 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -86,7 +86,7 @@ const isPackageFile = (path: string): boolean =>
+  * tree is another file: `packages/x/pnpm-lock.yaml` is not the lockfile.
+  */
+ const installReads = (path: string): boolean =>
+-  path === LOCKFILE || path === WORKSPACE_FILE || path === NPMRC || isPackageFile(path);
++  path === LOCKFILE || path.endsWith(WORKSPACE_FILE) || path.endsWith(NPMRC) || isPackageFile(path);
+ 
+ /**
+  * The path `target` names from the directory `dir` (`""` for the root), as a

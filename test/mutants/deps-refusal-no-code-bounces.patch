@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.parks, deps.remedy.other
+# why: A failed install that names no code bounces: a connection the registry refused or cut short reads as the candidate's own fault
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..2d1c74e8 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -427,6 +427,7 @@ const INSTALL_FAILED = /^install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)$/;
+  * `install-inputs-too-large` are also `depsNeedFrom`'s, before any box.
+  */
+ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
++  "install-failed": "run pnpm install",
+   "no-lockfile": `commit a ${LOCKFILE} at the repository's root (run pnpm install): dependencies are installed only from a frozen lockfile`,
+   "install-inputs-too-large": `an install of this repository reads more ${PACKAGE_FILE} and command files than one build is handed: keep fewer of them`,
+   "local-directory": `the lockfile installs a directory of the repository's own (a file: or injected dependency), which is not installed: depend on it as a workspace package or from the registry`,

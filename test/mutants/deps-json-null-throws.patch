@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-unparsed, deps.inputs.bin-directory
+# why: A package.json that is the JSON null, or whose directories is null, throws rather than declaring nothing
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..e98e4b75 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -115,7 +115,7 @@ const pathWithin = (dir: string, target: string): string | undefined => {
+ };
+ 
+ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+-  typeof value === "object" && value !== null;
++  typeof value === "object";
+ 
+ /** What a parsed JSON value holds under `name`. Only an object holds anything. */
+ const field = (of: unknown, name: string): unknown => (isRecord(of) ? of[name] : undefined);

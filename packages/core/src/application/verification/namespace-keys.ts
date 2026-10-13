@@ -1,7 +1,12 @@
 import type { NamespaceId } from "../../domain/kernel/index.ts";
 
-/** The families of objects Keel keeps in R2 for a namespace: candidate, world and probe bundles, deps bundles by lockfile, evidence documents and compiled plans. */
-export type KeyFamily = "bundles" | "deps" | "evidence" | "plans";
+/**
+ * The families of objects Keel keeps in R2 for a namespace: candidate, world
+ * and probe bundles; a deps bundle's pointer by its lockfile (`deps`) and its
+ * parts each by their own hash (`deps-parts`); Tier 1's hand-made probe deps
+ * pointer (`probe-deps`); evidence documents and compiled plans.
+ */
+export type KeyFamily = "bundles" | "deps" | "deps-parts" | "probe-deps" | "evidence" | "plans";
 
 /**
  * The one place an R2 key for a namespace's object is built:

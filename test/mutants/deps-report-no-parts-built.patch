@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.no-parts
+# why: A report that says ok and names no part reads as built, so the box writes a pointer to nothing and answers a bundle of no part
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..ad9bfa07 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -357,7 +357,7 @@ export const parseDepsBuild = (stdout: string): DepsBuildOutput => {
+   const installMs = fields.get("KEEL_INSTALL_MS");
+   if (installMs === undefined || !COUNT.test(installMs)) return malformed("bad KEEL_INSTALL_MS");
+   const parts: DepsPart[] = [];
+-  for (const item of (fields.get("KEEL_PARTS") ?? "").split(",")) {
++  for (const item of (fields.get("KEEL_PARTS") ?? "").split(",").filter((each) => each !== "")) {
+     const [, sha256, size] = PART.exec(item) ?? [];
+     const bytes = Number(size);
+     if (sha256 === undefined || !Number.isSafeInteger(bytes) || bytes > DEPS_PART_BYTES)

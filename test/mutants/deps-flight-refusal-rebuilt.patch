@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.flight-answer
+# why: A caller that joined a build takes only a bundle from it: when the build is refused the caller goes round and starts an install of its own, so N callers of a failing build run N installs
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..7547ae1a 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -317,7 +317,11 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+       }
+       // The object builds for one digest, so the build in flight is this caller's too.
+       const flight = this.depsFlight;
+-      if (flight !== undefined) return flight.answer;
++      if (flight !== undefined) {
++        const answer = await flight.answer;
++        if (answer._tag === "DepsReady") return answer;
++        continue;
++      }
+       // A build ended while the pointer was being read: what it wrote may serve.
+       if (this.depsSettled !== settled) continue;
+       return this.launch(asked, request);

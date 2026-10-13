@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/deps-ensure.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.text, deps.inputs.reads, deps.need.digest, deps.need.property, deps-builder.need, deps-builder.side-by-side, deps.ensure.pointer
+# why: .npmrc is no input: deps installed under one .npmrc are served to a candidate with another
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..a500094c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -86,7 +86,7 @@ const isPackageFile = (path: string): boolean =>
+  * tree is another file: `packages/x/pnpm-lock.yaml` is not the lockfile.
+  */
+ const installReads = (path: string): boolean =>
+-  path === LOCKFILE || path === WORKSPACE_FILE || path === NPMRC || isPackageFile(path);
++  path === LOCKFILE || path === WORKSPACE_FILE || isPackageFile(path);
+ 
+ /**
+  * The path `target` names from the directory `dir` (`""` for the root), as a

@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts
+# kills: deps.pool.world-steps
+# why: The Workflow never tells the cell what deps its world was handed: a refused install is recorded as a failed suite
+diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
+index 99e8a887..6e5faccd 100644
+--- a/apps/keel/src/adapters/driving/workflow/world-check.ts
++++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
+@@ -131,7 +131,11 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+       for (const { check } of job.checks) {
+         const plan = plans.get(check) ?? Result.fail("no plan");
+         const cell: WorldCheckOutcome = Result.isSuccess(plan)
+-          ? worldCheckCell(plan.success, reports, deps)
++          ? worldCheckCell(plan.success, reports, {
++              _tag: "DepsReady",
++              install: "" as never,
++              parts: [],
++            })
+           : { outcome: "n/a", reason: plan.failure };
+         // A refusal (the conflict moved on) is kept as the step's value: retrying never helps.
+         await step.do(`record ${check}`, RECORD_RETRIES, async () =>

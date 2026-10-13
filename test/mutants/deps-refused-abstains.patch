@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts apps/keel/test/unit/suite-runtime.test.ts apps/keel/test/unit/verify-candidate.test.ts
+# kills: deps.stop.refused, suite-runtime.deps-refused, verify.deps-refused-cited
+# why: Refused deps abstain: a candidate only its own change can mend parks for a retry instead of bouncing on the first round
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..767c1dcb 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -490,7 +490,7 @@ export const depsStop = (
+   deps: DepsUnavailable | DepsRefused | DepsUnneeded,
+ ): { readonly report: StepResult; readonly evidence: DepsStopEvidence } => {
+   const refused = deps._tag === "DepsRefused";
+-  const outcome = refused ? "fail" : "abstain";
++  const outcome = "abstain";
+   const reason = deps._tag === "DepsUnneeded" ? "no deps were ensured for this step" : deps.reason;
+   return {
+     report: {

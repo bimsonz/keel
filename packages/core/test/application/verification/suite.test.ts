@@ -33,7 +33,7 @@ const stdout = (fields: Record<string, string>, extra: readonly string[] = []) =
 
 const ran = (exit: number, report = "H4sI"): Record<string, string> => ({
   KEEL_HYDRATION: "ok",
-  KEEL_LOCK: "ok",
+  KEEL_DEPS: "ok",
   KEEL_EXIT: String(exit),
   KEEL_DURATION_MS: "4321",
   KEEL_TAIL: b64("tail"),
@@ -115,9 +115,34 @@ describe("the suite runner's report", () => {
     expect(
       parseSuiteOutput(stdout({ KEEL_HYDRATION_DIFF: "not base64!", KEEL_HYDRATION: "failed x" })),
     ).toEqual({ _tag: "hydration-failed", reason: "x" });
-    expect(parseSuiteOutput(stdout({ KEEL_HYDRATION: "ok", KEEL_LOCK: "diverged" }))._tag).toBe(
-      "lockfile-diverged",
+  });
+
+  it("[runner.deps-marker] reads deps that did not arrive as a stop with the box's reason, and goes ahead only on ok", () => {
+    for (const reason of ["part-hash-mismatch", "fetch-failed", "no-parts", "extract-failed"])
+      expect(
+        parseSuiteOutput(stdout({ KEEL_HYDRATION: "ok", KEEL_DEPS: `missing ${reason}` })),
+      ).toEqual({ _tag: "deps-missing", reason });
+    // The run's own markers after it change nothing: nothing ran on missing deps.
+    expect(parseSuiteOutput(stdout({ ...ran(0), KEEL_DEPS: "missing fetch-failed" }))).toEqual({
+      _tag: "deps-missing",
+      reason: "fetch-failed",
+    });
+    // A workspace that did not hydrate is that stop, whatever the deps marker says.
+    expect(
+      parseSuiteOutput(stdout({ KEEL_HYDRATION: "failed hash-mismatch", KEEL_DEPS: "ok" })),
+    ).toEqual({ _tag: "hydration-failed", reason: "hash-mismatch" });
+    const unmarked = Object.fromEntries(
+      Object.entries(ran(0)).filter(([name]) => name !== "KEEL_DEPS"),
     );
+    expect(parseSuiteOutput(stdout(unmarked))).toEqual({
+      _tag: "malformed",
+      reason: "no KEEL_DEPS",
+    });
+    for (const value of ["", "missing", "diverged", "OK", "ok "])
+      expect(parseSuiteOutput(stdout({ ...ran(0), KEEL_DEPS: value }))).toEqual({
+        _tag: "malformed",
+        reason: "bad KEEL_DEPS",
+      });
   });
 
   it("calls anything else malformed: nothing, a missing marker, a duplicate, a forged value", () => {
@@ -198,9 +223,19 @@ describe("judging a suite run", () => {
     for (const o of [
       { _tag: "malformed", reason: "x" },
       { _tag: "hydration-failed", reason: "count-3-of-4" },
-      { _tag: "lockfile-diverged" },
+      { _tag: "deps-missing", reason: "part-hash-mismatch" },
     ] satisfies SuiteOutput[])
       expect(judge(o, report(pass(10))).report.outcome).toBe("abstain");
+  });
+
+  it("[runner.deps-unavailable] abstains as unavailable on missing deps, with the reason, whatever report came with it", () => {
+    const j = judge({ _tag: "deps-missing", reason: "part-hash-mismatch" }, report(pass(10)));
+    expect(j.report).toMatchObject({ outcome: "abstain", failure: "unavailable", durationMs: 0 });
+    expect(j.evidence).toMatchObject({
+      outcome: "abstain",
+      why: "deps-unavailable: part-hash-mismatch",
+      failing: [],
+    });
   });
 
   it("keeps a failed hydration's diagnosis in its evidence, and only there", () => {

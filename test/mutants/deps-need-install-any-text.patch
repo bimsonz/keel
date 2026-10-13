@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.need.data
+# why: A kept need whose digest is no sha256 decodes: its text goes into a step's name and a pointer's key unchecked
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..1ea222f1 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -47,7 +47,7 @@ const Sha256Hex = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
+  * only files of it a deps box installs from, and their sha256, the install
+  * digest that names its deps bundle.
+  */
+-export const Locked = Schema.TaggedStruct("Locked", { install: Sha256Hex, inputs: Schema.String });
++export const Locked = Schema.TaggedStruct("Locked", { install: Schema.String, inputs: Schema.String });
+ export type Locked = typeof Locked.Type;
+ 
+ /** A candidate no deps bundle can be built for, and why. */

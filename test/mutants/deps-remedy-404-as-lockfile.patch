@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.remedy.install
+# why: A package the registry does not have is told to run pnpm install, which fails the same way: the remedy never says to correct the name or version
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..688fd502 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -461,7 +461,7 @@ export const depsRefusal = (reason: string): DepsRefused | DepsUnavailable => {
+ /** What to do about a `DepsRefused`, by its reason. */
+ export const depsRemedy = (reason: string): string => {
+   const [, code] = INSTALL_FAILED.exec(reason) ?? [];
+-  if (code === "ERR_PNPM_FETCH_404")
++  if (code === "ERR_PNPM_FETCH_4040")
+     return `the lockfile names a package or a version the registry does not have: correct it, run pnpm install and commit the ${LOCKFILE}`;
+   if (code !== undefined)
+     return `the installer refused the lockfile (${code}): run pnpm install and commit the ${LOCKFILE} it writes`;

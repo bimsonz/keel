@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.bin-nested, deps.inputs.bin-unread, deps.need.property, deps-builder.need-commands
+# why: Every package.json is read as the root's text: a nested package declares the root's commands and none of its own
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..ffd54b1f 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -184,7 +184,7 @@ export const installInputsOf = (
+   const commandDirs: string[] = [];
+   for (const path of listed.keys()) {
+     if (!isPackageFile(path)) continue;
+-    const declared = commandsOf(path, read(path) ?? "");
++    const declared = commandsOf(path, read(PACKAGE_FILE) ?? "");
+     for (const file of declared.files) commands.add(file);
+     commandDirs.push(...declared.dirs);
+   }

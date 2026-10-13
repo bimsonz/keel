@@ -8,6 +8,7 @@ import {
   type VerificationJob,
 } from "../../domain/verification/index.ts";
 import { EvidenceStore, Ids, PlanStore, ProbeRunner, VerifierRuntime } from "../ports/index.ts";
+import type { DepsAnswer } from "./deps.ts";
 import { withGuards } from "./guard-step.ts";
 import { storedPlanText } from "./plan-codec.ts";
 import type { StepRunner } from "./run-plan.ts";
@@ -117,19 +118,21 @@ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport 
  * a conflict's matrix. A guard step runs the probe its plan pins against the
  * candidate (`withGuards`) in one durable step, so a replay never runs the
  * probe again and reads the same duration. Every other step is a one-step job
- * on the VerifierRuntime, whose Tier 2 runners are durable themselves; a step
- * it has no runner for abstains there.
+ * on the VerifierRuntime, whose Tier 2 runners are durable themselves and are
+ * handed `deps`, what the Workflow ensured for the candidate; a step it has
+ * no runner for abstains there.
  */
 export const candidateRunner =
   (
     namespace: NamespaceId,
     job: Omit<VerificationJob, "steps">,
     durable: DurableReport,
+    deps: DepsAnswer,
   ): StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> =>
   (step, world) => {
     if (world !== undefined) return Effect.succeed(abstainUnrun(step, world));
     const asJob: StepRunner<VerifierRuntime> = (s) =>
-      runJob(namespace, { ...job, steps: [s] }).pipe(
+      runJob(namespace, { ...job, steps: [s] }, deps).pipe(
         Effect.map((reports): StepReport => reports[0] ?? abstainUnrun(s, undefined)),
       );
     if (step.guards === undefined) return asJob(step, undefined);

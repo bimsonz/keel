@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: deps.pool.serve-other-namespace
+# why: The deps host asks whether a URL is signed before it knows its first segment is a namespace's id: any text a signature was once made over is tried as one, which is how a part's signature reads as a bundle's at the function's level
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index 624d47ec..d4daa196 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -187,7 +187,7 @@ export async function serveDepsPart(request: Request, env: Env): Promise<Respons
+     return new Response("deps parts are read-only", { status: 405 });
+   const url = new URL(request.url);
+   const [, namespace, sha256] = BUNDLE_PATH.exec(url.pathname) ?? [];
+-  if (namespace === undefined || sha256 === undefined || !isNamespace(namespace))
++  if (namespace === undefined || sha256 === undefined)
+     return new Response("not a namespace's deps part", { status: 400 });
+   const signed = await depsPartUrlSigned(
+     env.BUNDLE_URL_PUBLIC_KEY,

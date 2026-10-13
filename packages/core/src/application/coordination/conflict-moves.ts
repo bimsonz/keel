@@ -39,6 +39,7 @@ import {
   ledgerStep,
   probeCellRan,
   probeDraftFailed,
+  probeRunFailed,
   storedConflict,
   viewOf,
 } from "./probe-ledger.ts";
@@ -137,6 +138,16 @@ export const probeDraftFailedAt = Effect.fn("coordination/probeDraftFailedAt")(f
   yield* probeDraftFailed(at.projectId, failed);
   yield* escalateUnprovable(at, failed.conflictId);
   return yield* conflictView(failed.conflictId);
+});
+
+/** `probeRunFailed`, then the escalation an unprovable conflict needs: what the Subject DO runs. */
+export const probeRunFailedAt = Effect.fn("coordination/probeRunFailedAt")(function* (
+  at: SubjectRef,
+  conflictId: ConflictId,
+) {
+  yield* probeRunFailed(at.projectId, conflictId);
+  yield* escalateUnprovable(at, conflictId);
+  return yield* conflictView(conflictId);
 });
 
 /** `probeCellRan`, then the escalation an unprovable conflict needs: what the Subject DO runs. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.reads, deps.need.property
+# why: Any file whose name ends in package.json is taken for one: xpackage.json is an input and is read for commands
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..d33c897e 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -77,7 +77,7 @@ export const INSTALL_INPUTS_MAX = 64 * 1024;
+ const MANIFEST_LINE = /^[0-9a-f]{64} {2}(.+)$/s;
+ 
+ const isPackageFile = (path: string): boolean =>
+-  path === PACKAGE_FILE || path.endsWith(`/${PACKAGE_FILE}`);
++  path === PACKAGE_FILE || path.endsWith(PACKAGE_FILE);
+ 
+ /**
+  * Whether an install reads the file at `path`, a path from the candidate's

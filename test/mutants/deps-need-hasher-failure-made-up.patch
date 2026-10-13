@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.need.locked
+# why: A hasher that fails names the candidate's bundle by a made-up digest, the same for every candidate it fails for
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..578ff67c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -235,7 +235,7 @@ export const depsNeedFrom = <E, R>(
+       _tag: "Unlocked",
+       reason: `install-inputs-too-large: an install of the candidate reads more files than a deps box is handed`,
+     });
+-  return Effect.map(sha256(inputs), (install): DepsNeed => ({ _tag: "Locked", install, inputs }));
++  return Effect.map(Effect.orElseSucceed(sha256(inputs), () => "0".repeat(64)), (install): DepsNeed => ({ _tag: "Locked", install, inputs }));
+ };
+ 
+ /** One part of a deps bundle's gzipped archive: its own sha256, which is its address, and its length. */

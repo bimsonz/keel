@@ -141,6 +141,7 @@ export type FromRunner = typeof FromRunner.Type;
 export const RunnerMessage = Schema.Union([ToRunner, FromRunner]);
 export type RunnerMessage = typeof RunnerMessage.Type;
 export * from "./bundle.ts";
+export * from "./deps.ts";
 export * from "./tier1/probe-worker.ts";
 export * from "./tier1/semaphore.ts";
 export * from "./tier1/vitest-module.ts";

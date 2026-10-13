@@ -2,20 +2,22 @@
 # kills: bundle.verify-partial, bundle.verify-extra
 # why: Bundle verification reports a mismatch but returns success, so a partial extraction runs its tests
 diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
-index d0bddad..cb1a420 100644
+index 525e74a5..7029ab65 100644
 --- a/packages/runner-protocol/src/bundle.ts
 +++ b/packages/runner-protocol/src/bundle.ts
-@@ -180,10 +180,10 @@ export const bundleUrl = (hash: string): string => {
+@@ -363,12 +363,12 @@ export const bundleUrlSigned = (
   */
  export const VERIFY_BUNDLE_SH = [
    "keel_verify_bundle() {",
 -  `  [ -f ${BUNDLE_MANIFEST} ] || { echo no-manifest; return 1; }`,
--  `  sha256sum --quiet --strict -c ${BUNDLE_MANIFEST} >/dev/null 2>&1 || { echo hash-mismatch; return 1; }`,
+-  `  sums=$(mktemp 2>/dev/null) && LC_ALL=C sed 's/  /  .\\//' ${BUNDLE_MANIFEST} >"$sums" 2>/dev/null && sha256sum --quiet --strict -c "$sums" >/dev/null 2>&1 || { rm -f "$sums"; echo hash-mismatch; return 1; }`,
 +  `  [ -f ${BUNDLE_MANIFEST} ] || { echo no-manifest; return 0; }`,
-+  `  sha256sum --quiet --strict -c ${BUNDLE_MANIFEST} >/dev/null 2>&1 || { echo hash-mismatch; return 0; }`,
++  `  sums=$(mktemp 2>/dev/null) && LC_ALL=C sed 's/  /  .\\//' ${BUNDLE_MANIFEST} >"$sums" 2>/dev/null && sha256sum --quiet --strict -c "$sums" >/dev/null 2>&1 || { rm -f "$sums"; echo hash-mismatch; return 0; }`,
+   '  rm -f "$sums"',
    `  found=$(find . -type f ! -path ./${BUNDLE_MANIFEST} | wc -l | tr -d ' ')`,
    `  listed=$(wc -l < ${BUNDLE_MANIFEST} | tr -d ' ')`,
 -  '  [ "$found" -eq "$listed" ] || { echo "count-$found-of-$listed"; return 1; }',
 +  '  [ "$found" -eq "$listed" ] || { echo "count-$found-of-$listed"; return 0; }',
    "}",
  ].join("\n");
+ 

@@ -14,7 +14,7 @@ const encodeReadyRequest = Schema.encodeSync(WorldReadyRequest);
 /**
  * keel-verify's entrypoint behind the VERIFIER service binding, which
  * wrangler types as a plain Fetcher though RPC reaches its methods. A binding
- * that serves no `runProbe` or no `worldReady` stops the composition.
+ * that does not serve every method keel calls stops the composition.
  */
 export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
   const method = (name: keyof VerifierEntrypoint) => {
@@ -25,7 +25,11 @@ export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
       return answer;
     };
   };
-  return { runProbe: method("runProbe"), worldReady: method("worldReady") };
+  return {
+    runProbe: method("runProbe"),
+    worldReady: method("worldReady"),
+    buildDeps: method("buildDeps"),
+  };
 };
 
 const didNotAnswer = (error: unknown) =>

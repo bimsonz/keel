@@ -1,6 +1,11 @@
 import { env, exports } from "cloudflare:workers";
 import type { ContentHash } from "@keeltown/core/kernel";
-import { sha256Hex, signedBundleUrl, writeBundle } from "@keeltown/runner-protocol";
+import {
+  sha256Hex,
+  signedBundleUrl,
+  signedDepsPartUrl,
+  writeBundle,
+} from "@keeltown/runner-protocol";
 import { decodeExit, VerifierCodecs } from "../../../src/rpc/index.ts";
 
 const enc = new TextEncoder();
@@ -20,6 +25,23 @@ export const signedUrl = (hex: string, namespace: string = NAMESPACE, ttl = 600)
     Math.floor(Date.now() / 1000) + ttl,
   );
 
+/**
+ * The URL keel hands a suite box for one part of a namespace's deps bundle
+ * (the part's sha256 hex), signed with the pool's key and good for `ttl`
+ * seconds from now.
+ */
+export const signedPartUrl = (
+  hex: string,
+  namespace: string = NAMESPACE,
+  ttl = 600,
+): Promise<string> =>
+  signedDepsPartUrl(
+    env.TEST_BUNDLE_URL_SIGNING_KEY,
+    namespace,
+    hex,
+    Math.floor(Date.now() / 1000) + ttl,
+  );
+
 /** Stores files as a content-addressed bundle among a namespace's bundles, at the key keel's BundleStore writes. */
 export async function putBundle(
   files: Record<string, string>,
@@ -34,7 +56,7 @@ export async function putBundle(
   return `sha256:${hex}` as ContentHash;
 }
 
-/** Points a namespace's `deps/<lockfile sha256>` at a deps bundle of that namespace, as the deps-bundle script does. */
+/** Points a namespace's `probe-deps/<lockfile sha256>` at a deps bundle of that namespace, as the deps-bundle script does. */
 export async function putDeps(
   lockfile: string,
   files: Record<string, string>,
@@ -42,7 +64,7 @@ export async function putDeps(
 ): Promise<void> {
   const bundle = await putBundle({ ...files, "pnpm-lock.yaml": lockfile }, namespace);
   await env.BUNDLES.put(
-    `ns/${namespace}/deps/${await sha256Hex(enc.encode(lockfile))}`,
+    `ns/${namespace}/probe-deps/${await sha256Hex(enc.encode(lockfile))}`,
     bundle.slice("sha256:".length),
   );
 }

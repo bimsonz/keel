@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-directory, deps.need.property
+# why: A target that lands on a nested package's own directory is kept, as pnpm keeps it: a directories.bin of . or of ../x in packages/x takes every file of that package as a command, and a whole package is in the key
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..eacebbe9 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -111,7 +111,7 @@ const pathWithin = (dir: string, target: string): string | undefined => {
+   }
+   const at = segments.join("/");
+   if (dir === "") return at === "" ? undefined : at;
+-  return at.startsWith(`${dir}/`) ? at : undefined;
++  return at === dir || at.startsWith(`${dir}/`) ? at : undefined;
+ };
+ 
+ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

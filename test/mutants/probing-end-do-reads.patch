@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-run-died
+# why: The Subject DO answers a failed run with the conflict as it stands and commits nothing
+diff --git a/apps/keel/src/adapters/driving/do/subject.ts b/apps/keel/src/adapters/driving/do/subject.ts
+index 7406df4b..2eaaffd2 100644
+--- a/apps/keel/src/adapters/driving/do/subject.ts
++++ b/apps/keel/src/adapters/driving/do/subject.ts
+@@ -109,7 +109,7 @@ export class SubjectDO extends KeelObjectWith<SubjectServices> implements Subjec
+     const at = subjectOf(this.ctx.id.name);
+     return this.answer(
+       SubjectCodecs.probeRunFailed,
+-      decoded(ConflictId, conflictId).pipe(Effect.flatMap((id) => probeRunFailedAt(at, id))),
++      decoded(ConflictId, conflictId).pipe(Effect.flatMap(conflictView)),
+     );
+   }
+ 

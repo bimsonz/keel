@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-directory, deps.need.digest, deps.need.property
+# why: directories.bin declares no command: the files pnpm links from it are outside the digest
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..9b4a98b6 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -147,7 +147,7 @@ const commandsOf = (
+   const bin = field(json, "bin");
+   return {
+     files: within(typeof bin === "object" && bin !== null ? Object.values(bin) : [bin]),
+-    dirs: within([field(field(json, "directories"), "bin")]),
++    dirs: [],
+   };
+ };
+ 

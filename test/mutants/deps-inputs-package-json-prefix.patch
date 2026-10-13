@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.reads, deps.need.property
+# why: A path that only holds the name package.json (package.json.bak, a directory called package.json) is taken for one
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..6ba35e9c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -77,7 +77,7 @@ export const INSTALL_INPUTS_MAX = 64 * 1024;
+ const MANIFEST_LINE = /^[0-9a-f]{64} {2}(.+)$/s;
+ 
+ const isPackageFile = (path: string): boolean =>
+-  path === PACKAGE_FILE || path.endsWith(`/${PACKAGE_FILE}`);
++  path.startsWith(PACKAGE_FILE) || path.includes(`/${PACKAGE_FILE}`);
+ 
+ /**
+  * Whether an install reads the file at `path`, a path from the candidate's

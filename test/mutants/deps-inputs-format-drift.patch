@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.text, deps.need.locked, deps-builder.need, deps-builder.need-commands
+# why: Core names the inputs' format otherwise than the box's keep reads it: every digest moves and every build is refused install-mismatch
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..30a8bbc6 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -64,7 +64,7 @@ const NPMRC = ".npmrc";
+ const PACKAGE_FILE = "package.json";
+ 
+ /** The first line of the text an install digest is the sha256 of. */
+-export const INSTALL_INPUTS_FORMAT = "keel.install/1";
++export const INSTALL_INPUTS_FORMAT = "keel.install/2";
+ 
+ /**
+  * The longest install inputs a deps box is handed, in bytes of UTF-8: about

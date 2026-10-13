@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.text, deps.inputs.reads, deps.inputs.bin-nested, deps.need.digest, deps.need.property, deps-builder.need, deps-builder.need-commands, deps-builder.side-by-side
+# why: Only the root's package.json is an input: a workspace package's dependencies and commands are outside the digest
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..bbe85ca9 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -77,7 +77,7 @@ export const INSTALL_INPUTS_MAX = 64 * 1024;
+ const MANIFEST_LINE = /^[0-9a-f]{64} {2}(.+)$/s;
+ 
+ const isPackageFile = (path: string): boolean =>
+-  path === PACKAGE_FILE || path.endsWith(`/${PACKAGE_FILE}`);
++  path === PACKAGE_FILE;
+ 
+ /**
+  * Whether an install reads the file at `path`, a path from the candidate's

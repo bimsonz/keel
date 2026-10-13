@@ -2,14 +2,17 @@
 # kills: probe.died
 # why: A step out of tries or a defect fails the instance with nothing recorded: the conflict stays suspected in silence
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 8289f601..382557b0 100644
+index effc8e35..8a0ad258 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -421,10 +421,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+@@ -471,13 +471,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
        Effect.catchCauseIf(
          (cause) => !Cause.hasInterruptsOnly(cause),
          (cause) =>
 -          failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
+-            Effect.flatMap((recorded) =>
+-              recorded._tag === "Refused" ? runFailedStep(call, steps) : Effect.succeed(recorded),
+-            ),
 -            Effect.exit,
 -            Effect.andThen(Effect.failCause(cause)),
 -          ),

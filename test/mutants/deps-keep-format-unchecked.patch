@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.format
+# why: The first line is dropped whatever it says, so inputs of another format, or a list whose first file goes unread, are kept from
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..ef04bd05 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -212,7 +212,6 @@ export const DEPS_KEEP_SH = [
+   "keel_deps_keep() {",
+   "  i=$1; o=$3",
+   '  [ -f "$i" ] && [ "$(sha256sum "$i" 2>/dev/null | cut -c1-64)" = "$2" ] || { echo install-mismatch; return 1; }',
+-  '  [ "$(head -n 1 "$i")" = keel.install/1 ] || { echo install-mismatch; return 1; }',
+   `  tail -n +2 "$i" >"$i.lines"; [ "$(tail -c 1 "$i.lines" | wc -l | tr -d ' ')" = 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  [^/]' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,

@@ -2,6 +2,7 @@ import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
   candidateRunner,
+  ensureDeps,
   readStoredPlan,
   recordBatchVerdict,
   ResolvedPlan,
@@ -16,7 +17,7 @@ import { durableReport, keelVerifyRuntime } from "../../../composition/workflow.
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
-import { namespaceStep } from "./steps.ts";
+import { depsSteps, namespaceStep } from "./steps.ts";
 
 const RECORD_RETRIES = {
   retries: { limit: 3, delay: "2 seconds", backoff: "constant" },
@@ -33,8 +34,10 @@ const RECORD_RETRIES = {
  * Steps: `namespace` (the project's namespace, which must be the one the
  * payload names: the bundle, the plan and the evidence are all kept under
  * it), `plan` (the payload, and the plan Precheck compiled and stored under
- * the job's `planHash`), then the plan's own steps as `runPlan`
- * reaches them: a Tier 2 step is its runner's step (which persists its raw
+ * the job's `planHash`), then, for a plan with a Tier 2 step, `deps-need` and
+ * `deps:<install digest>` (core's `ensureDeps`: the candidate's dependencies,
+ * built once for the namespace and that digest, or why there are none), then
+ * the plan's own steps as `runPlan` reaches them: a Tier 2 step is its runner's step (which persists its raw
  * logs, so a runner may hold nothing secret) and `<step>:evidence`, a guard
  * step is `guard <step>`; then `verdict` and `record`. A plan the store does
  * not hold, or holds corrupt, runs nothing and settles park: the lane is
@@ -95,6 +98,9 @@ export class KeelVerify extends CIWorkflow<Env> {
                 namespace,
                 { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
                 durableReport(step),
+                await runtime.runPromise(
+                  ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
+                ),
               ),
             ),
           )

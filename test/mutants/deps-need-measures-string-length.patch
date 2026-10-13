@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.need.utf8
+# why: The inputs are measured in UTF-16 units: paths outside ASCII pass a limit their bytes are over
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..8d0caf54 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -230,7 +230,7 @@ export const depsNeedFrom = <E, R>(
+       _tag: "Unlocked",
+       reason: `no-lockfile: the candidate has no ${LOCKFILE} at its root`,
+     });
+-  if (utf8Bytes(inputs) > INSTALL_INPUTS_MAX)
++  if (inputs.length > INSTALL_INPUTS_MAX)
+     return Effect.succeed({
+       _tag: "Unlocked",
+       reason: `install-inputs-too-large: an install of the candidate reads more files than a deps box is handed`,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.parks, deps.refusal.lockfile
+# why: A tarball whose hash did not match bounces, though a download cut short reads the same
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..fa22324c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -416,6 +416,7 @@ export const INSTALL_FAULTS_OF_THE_LOCKFILE: readonly string[] = [
+   "ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY",
+   "ERR_PNPM_LOCKFILE_CONFIG_MISMATCH",
+   "ERR_PNPM_FETCH_404",
++  "ERR_PNPM_TARBALL_INTEGRITY",
+ ];
+ 
+ /** An install that failed, as the deps box reports it with the installer's own code: `install-failed exit <n> <code>`. */

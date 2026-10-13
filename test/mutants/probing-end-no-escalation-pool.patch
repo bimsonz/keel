@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-run-died
+# why: A probe discarded as run-failed leaves its conflict probing with nobody asked: the unprovable conflict is never put to a person
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 4d2c3239..33689eee 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -146,7 +146,6 @@ export const probeRunFailedAt = Effect.fn("coordination/probeRunFailedAt")(funct
+   conflictId: ConflictId,
+ ) {
+   yield* probeRunFailed(at.projectId, conflictId);
+-  yield* escalateUnprovable(at, conflictId);
+   return yield* conflictView(conflictId);
+ });
+ 

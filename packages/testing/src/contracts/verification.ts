@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  type DepsNeed,
   type GuardFile,
   type ProbeFile,
   storedPlanText,
@@ -29,6 +30,7 @@ import {
   BatchVerdicts,
   BundleStore,
   ChangePrecheck,
+  DepsBuilder,
   type PrecheckCall,
   EvidenceStore,
   FlowSpecSource,
@@ -505,6 +507,279 @@ export function describeProbeRunnerContract(adapter: string, make: () => ProbeRu
   });
 }
 
+/** A DepsBuilder, and what its suite needs beside it: candidates to build from, a build that fails, and a count. */
+export interface DepsBuilderHarness {
+  readonly layer: Layer.Layer<DepsBuilder>;
+  /** Keeps a candidate bundle of these files (path to text) for `namespace`, and answers its address. */
+  readonly candidate: (
+    namespace: NamespaceId,
+    files: Readonly<Record<string, string>>,
+  ) => Effect.Effect<ContentHash>;
+  /** Makes every build for this install digest end refused with `reason`, as a deps box that cannot make it does. */
+  readonly failBuilds: (install: string, reason: string) => Effect.Effect<void>;
+  /** How many builds have run for the namespace's install digest. A pointer that served ran none. */
+  readonly builds: (namespace: NamespaceId, install: string) => Effect.Effect<number>;
+}
+
+const hexOf = async (text: string) =>
+  (await sha256(new TextEncoder().encode(text))).slice("sha256:".length);
+
+/** A candidate's files on a fresh lockfile, so no two tests share a deps bundle. */
+const candidateFiles = (settings: Readonly<Record<string, string>> = {}) => ({
+  ...settings,
+  "package.json": '{"name":"candidate"}\n',
+  "pnpm-lock.yaml": `lockfileVersion: '9.0'\n# ${random(8)}\n`,
+  "src/a.ts": "export const a = 1;\n",
+});
+
+/** A candidate of these files kept for the sample namespace, and what it needs. */
+const keptCandidate = (harness: DepsBuilderHarness, files: Readonly<Record<string, string>>) =>
+  Effect.gen(function* () {
+    const bundle = yield* harness.candidate(sampleNamespace, files);
+    const need = yield* (yield* DepsBuilder).need(sampleNamespace, bundle);
+    if (need._tag !== "Locked") throw new Error(`the candidate is unlocked: ${need.reason}`);
+    return { bundle, need };
+  });
+
+export function describeDepsBuilderContract(adapter: string, make: () => DepsBuilderHarness) {
+  describe(`DepsBuilder contract: ${adapter}`, () => {
+    it.effect(
+      "[deps-builder.need] answers what a kept candidate needs: the files an install reads, each with its sha256 in path order, and the sha256 of that text",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const files = {
+            ...candidateFiles(),
+            ".npmrc": "auto-install-peers=true\n",
+            "packages/x/package.json": '{"name":"x"}\n',
+            "packages/x/pnpm-lock.yaml": "not the lockfile\n",
+          };
+          const bundle = yield* harness.candidate(sampleNamespace, files);
+          const line = (path: keyof typeof files) =>
+            Effect.promise(async () => `${await hexOf(files[path])}  ${path}\n`);
+          // Written out, never taken from core: the lockfile, the settings file and both package.json, and no other file.
+          const inputs = [
+            "keel.install/1\n",
+            yield* line(".npmrc"),
+            yield* line("package.json"),
+            yield* line("packages/x/package.json"),
+            yield* line("pnpm-lock.yaml"),
+          ].join("");
+          expect(yield* (yield* DepsBuilder).need(sampleNamespace, bundle)).toEqual({
+            _tag: "Locked",
+            install: yield* Effect.promise(() => hexOf(inputs)),
+            inputs,
+          } satisfies DepsNeed);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.need-commands] reads each package.json of the bundle for the commands it declares: a bin's file the bundle holds is an install input, and a file none declares is not",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const files = {
+            ...candidateFiles(),
+            "cli.js": "#!/usr/bin/env node\n",
+            "package.json": '{"name":"candidate","bin":"./cli.js"}\n',
+            "packages/x/bin/x.js": "#!/usr/bin/env node\nconsole.log('x');\n",
+            "packages/x/package.json": '{"name":"x","bin":{"x":"bin/x.js"}}\n',
+            "packages/x/src/index.js": "export const x = 1;\n",
+          };
+          const { need } = yield* keptCandidate(harness, files);
+          // Written out, never taken from core: with `over`, the bytes one of the files holds instead.
+          const needing = (over: Readonly<Record<string, string>> = {}) =>
+            Effect.promise(async () => {
+              const line = async (path: keyof typeof files) =>
+                `${await hexOf(over[path] ?? files[path])}  ${path}\n`;
+              const inputs = [
+                "keel.install/1\n",
+                await line("cli.js"),
+                await line("package.json"),
+                await line("packages/x/bin/x.js"),
+                await line("packages/x/package.json"),
+                await line("pnpm-lock.yaml"),
+              ].join("");
+              return { _tag: "Locked", install: await hexOf(inputs), inputs } satisfies DepsNeed;
+            });
+          expect(need).toEqual(yield* needing());
+          // An edit to a command's file is another digest: pnpm reads the file to write its shim.
+          const shebang = { "packages/x/bin/x.js": "#!/usr/bin/env bun\nconsole.log('x');\n" };
+          const edited = yield* keptCandidate(harness, { ...files, ...shebang });
+          expect(edited.need).toEqual(yield* needing(shebang));
+          // An edit to a file no package.json declares is the same need.
+          const source = yield* keptCandidate(harness, {
+            ...files,
+            "packages/x/src/index.js": "export const x = 2;\n",
+          });
+          expect(source.need).toEqual(need);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.need-unlocked] answers a kept candidate with no lockfile at its root as Unlocked, with the reason",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const bundle = yield* harness.candidate(sampleNamespace, {
+            "package.json": '{"name":"candidate"}\n',
+            "packages/x/pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+          });
+          expect(yield* (yield* DepsBuilder).need(sampleNamespace, bundle)).toEqual({
+            _tag: "Unlocked",
+            reason: "no-lockfile: the candidate has no pnpm-lock.yaml at its root",
+          } satisfies DepsNeed);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.missing] fails BundleMissing for a bundle it does not keep, and for one kept for another namespace",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const unkept = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
+          expect(yield* Effect.flip(builder.need(sampleNamespace, unkept))).toMatchObject({
+            _tag: "BundleMissing",
+            hash: unkept,
+          });
+          const bundle = yield* harness.candidate(sampleNamespace, candidateFiles());
+          expect(yield* Effect.flip(builder.need(otherNamespace, bundle))).toMatchObject({
+            _tag: "BundleMissing",
+            hash: bundle,
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.builds-once] builds an install digest's deps once: the same need is answered the same parts again, from any bundle whose install reads the same files",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const files = candidateFiles();
+          const { bundle, need } = yield* keptCandidate(harness, files);
+          const first = yield* builder.build(sampleNamespace, need, bundle);
+          if (first._tag !== "DepsReady") throw new Error(`not built: ${JSON.stringify(first)}`);
+          expect(first.install).toBe(need.install);
+          expect(first.parts.length).toBeGreaterThan(0);
+          for (const part of first.parts) {
+            expect(part.sha256).toMatch(/^[0-9a-f]{64}$/);
+            expect(part.bytes).toBeGreaterThan(0);
+          }
+          expect(yield* builder.build(sampleNamespace, need, bundle)).toEqual(first);
+          // Another candidate with the same install inputs: other source, the same deps.
+          const edited = yield* keptCandidate(harness, {
+            ...files,
+            "src/a.ts": "export const a = 2;\n",
+          });
+          expect(edited.bundle).not.toBe(bundle);
+          expect(edited.need).toEqual(need);
+          expect(yield* builder.build(sampleNamespace, edited.need, edited.bundle)).toEqual(first);
+          expect(yield* harness.builds(sampleNamespace, need.install)).toBe(1);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.side-by-side] a candidate whose settings file or package.json is another, absent or new has its own deps beside the others: each is built once, and none over another",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const files = candidateFiles();
+          const candidates = [
+            yield* keptCandidate(harness, files),
+            yield* keptCandidate(harness, { ...files, ".npmrc": "hoist=false\n" }),
+            yield* keptCandidate(harness, {
+              ...files,
+              "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+            }),
+            yield* keptCandidate(harness, {
+              ...files,
+              "package.json": '{"name":"candidate","bin":"cli.js"}\n',
+            }),
+            yield* keptCandidate(harness, {
+              ...files,
+              "packages/x/package.json": '{"name":"x"}\n',
+            }),
+          ];
+          expect(new Set(candidates.map((c) => c.need.install)).size).toBe(candidates.length);
+          const firsts = [];
+          for (const candidate of candidates)
+            firsts.push(yield* builder.build(sampleNamespace, candidate.need, candidate.bundle));
+          expect(new Set(firsts.map((answer) => JSON.stringify(answer))).size).toBe(
+            candidates.length,
+          );
+          // Every one is still served what it was first answered: no build wrote over another's.
+          for (const [n, candidate] of candidates.entries()) {
+            expect(firsts[n]?._tag).toBe("DepsReady");
+            expect(yield* builder.build(sampleNamespace, candidate.need, candidate.bundle)).toEqual(
+              firsts[n],
+            );
+            expect(yield* harness.builds(sampleNamespace, candidate.need.install)).toBe(1);
+          }
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.namespaces-apart] deps built for one namespace are not another's: it runs its own build for the same install digest",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const files = candidateFiles();
+          const { bundle, need } = yield* keptCandidate(harness, files);
+          yield* builder.build(sampleNamespace, need, bundle);
+          expect(yield* harness.builds(otherNamespace, need.install)).toBe(0);
+          const theirs = yield* harness.candidate(otherNamespace, files);
+          const answer = yield* builder.build(otherNamespace, need, theirs);
+          expect(answer._tag).toBe("DepsReady");
+          expect(yield* harness.builds(otherNamespace, need.install)).toBe(1);
+          expect(yield* harness.builds(sampleNamespace, need.install)).toBe(1);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.unavailable] answers a build that cannot be made as DepsUnavailable with its reason, and keeps nothing of it",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const { bundle, need } = yield* keptCandidate(harness, candidateFiles());
+          const reason = `install-failed ${random(4)}`;
+          yield* harness.failBuilds(need.install, reason);
+          const refused = { _tag: "DepsUnavailable", reason };
+          expect(yield* builder.build(sampleNamespace, need, bundle)).toEqual(refused);
+          // No pointer came of it: the next call is refused again, never served.
+          expect(yield* builder.build(sampleNamespace, need, bundle)).toEqual(refused);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[deps-builder.unavailable] a build from a bundle the namespace does not keep is unavailable, and builds nothing",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const builder = yield* DepsBuilder;
+          const { need } = yield* keptCandidate(harness, candidateFiles());
+          const unkept = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
+          const answer = yield* builder.build(sampleNamespace, need, unkept);
+          expect(answer._tag).toBe("DepsUnavailable");
+          expect(yield* harness.builds(sampleNamespace, need.install)).toBe(0);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+  });
+}
+
 const probeStep: PlanStep = {
   id: "contract.probe",
   kind: "probe",
@@ -534,7 +809,7 @@ export function describeVerifierRuntimeContract(
         Effect.gen(function* () {
           const runtime = yield* VerifierRuntime;
           const job = contractJob();
-          const results = yield* runtime.run(sampleNamespace, job);
+          const results = yield* runtime.run(sampleNamespace, job, { _tag: "DepsUnneeded" });
           expect(results.map((r) => r.stepId)).toEqual(job.steps.map((s) => s.id));
           for (const [i, r] of results.entries()) {
             const step = job.steps[i];

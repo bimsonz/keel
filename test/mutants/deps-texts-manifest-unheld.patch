@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.manifest
+# why: A bundle whose files are not the ones its manifest lists is read all the same, so a need is worked out from bytes no manifest vouches for
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 525e74a5..c01e8af6 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -275,8 +275,6 @@ export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
+     files.push({ path, bytes: e.bytes, ...((e.mode & 0o111) === 0 ? {} : { executable: true }) });
+   }
+   if (manifest === undefined) throw new BundleUnreadable(`no ${BUNDLE_MANIFEST}`);
+-  if (manifest !== (await manifestOf(files)))
+-    throw new BundleUnreadable("the files are not the ones the manifest lists");
+   return files;
+ };
+ 

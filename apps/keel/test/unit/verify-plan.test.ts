@@ -53,12 +53,19 @@ const ran = (outcome: "pass" | "fail" | "n/a") => ({
   observations: ["[probe] scripted"],
 });
 
+/** The deps the candidate's Workflow ensured, which the runner hands on to every Tier 2 job. */
+const HANDED = {
+  _tag: "DepsReady",
+  install: "1".repeat(64),
+  parts: [{ sha256: "d".repeat(64), bytes: 10 }],
+} as const;
+
 /** Runs the plan on the candidate runner, over memory adapters; reports what each runner was asked. */
 const runOn = (plan: FlowPlan, probe: "pass" | "fail") => {
   const runtime = makeVerifierRuntimeMemory();
   const probes = makeProbeRunnerMemory(() => ran(probe));
   const durable = recordingDurable();
-  return runPlan(plan, candidateRunner(sampleNamespace, job, durable.durable)).pipe(
+  return runPlan(plan, candidateRunner(sampleNamespace, job, durable.durable, HANDED)).pipe(
     Effect.provide(Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer)),
     Effect.map((reports) => ({ reports, runtime, probes, durable })),
   );
@@ -182,6 +189,7 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
           sampleNamespace,
           job,
           recordingDurable().durable,
+          HANDED,
         )(step, "A").pipe(
           Effect.provide(
             Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer),

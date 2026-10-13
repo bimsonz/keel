@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts
+# kills: deps.pool.steps
+# why: The deps build keeps its answer under one name whatever was installed: nothing ties the kept answer to the install it was for
+diff --git a/apps/keel/src/adapters/driving/workflow/steps.ts b/apps/keel/src/adapters/driving/workflow/steps.ts
+index a66f0613..f389449d 100644
+--- a/apps/keel/src/adapters/driving/workflow/steps.ts
++++ b/apps/keel/src/adapters/driving/workflow/steps.ts
+@@ -99,7 +99,7 @@ export const depsSteps = (step: WorkflowStep): DepsSteps => ({
+     ).pipe(Effect.map((kept) => Schema.decodeUnknownSync(DepsNeed)(JSON.parse(kept)))),
+   build: (install, run) =>
+     Effect.promise(() =>
+-      step.do(`deps:${install}`, DEPS_BUILD_STEP, async (): Promise<string> =>
++      step.do("deps-build", DEPS_BUILD_STEP, async (): Promise<string> =>
+         JSON.stringify(Schema.encodeSync(DepsAnswer)(await Effect.runPromise(run))),
+       ),
+     ).pipe(Effect.map((kept) => Schema.decodeUnknownSync(DepsAnswer)(JSON.parse(kept)))),

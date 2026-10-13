@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-back, deps.need.property
+# why: A target is resolved on its own and then put under its package's directory, so it is refused at its first climb: ../x/cli.js in packages/x, which pnpm links as packages/x/cli.js, is no command and the bundle lacks its shim
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..6e8b99ea 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -104,14 +104,13 @@ const installReads = (path: string): boolean =>
+  */
+ const pathWithin = (dir: string, target: string): string | undefined => {
+   const segments: string[] = [];
+-  for (const segment of `${dir}/${target}`.split("/")) {
++  for (const segment of target.split("/")) {
+     if (segment === "" || segment === ".") continue;
+     if (segment !== "..") segments.push(segment);
+     else if (segments.pop() === undefined) return undefined;
+   }
+-  const at = segments.join("/");
+-  if (dir === "") return at === "" ? undefined : at;
+-  return at.startsWith(`${dir}/`) ? at : undefined;
++  if (segments.length === 0) return undefined;
++  return dir === "" ? segments.join("/") : `${dir}/${segments.join("/")}`;
+ };
+ 
+ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>

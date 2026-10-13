@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-unread
+# why: Every file of the candidate is read for a bin: any JSON file with that key declares commands, and the whole bundle is read to find a need
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..ef2069ce 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -183,7 +183,6 @@ export const installInputsOf = (
+   const commands = new Set<string>();
+   const commandDirs: string[] = [];
+   for (const path of listed.keys()) {
+-    if (!isPackageFile(path)) continue;
+     const declared = commandsOf(path, read(path) ?? "");
+     for (const file of declared.files) commands.add(file);
+     commandDirs.push(...declared.dirs);

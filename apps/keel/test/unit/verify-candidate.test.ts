@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  type DepsRefused,
+  type DepsUnavailable,
+  depsStop,
   recordBatchVerdict,
   runJob,
   settleVerdict,
@@ -100,7 +103,7 @@ const verify = (
     scriptedRuntime(outcome).pipe(Layer.provide(evidence)),
   );
   return Effect.gen(function* () {
-    const results = yield* runJob(sampleNamespace, job);
+    const results = yield* runJob(sampleNamespace, job, { _tag: "DepsUnneeded" });
     const settled = yield* settleVerdict(sampleNamespace, SUITE, results);
     yield* recordBatchVerdict({
       laneId: "lane:prj:default",
@@ -319,6 +322,60 @@ describe("a worker app's verdict", () => {
       return yield* settleVerdict(sampleNamespace, plan, reports);
     }).pipe(Effect.provide(Layer.merge(store.layer, makeIdsMemory().layer)));
   };
+
+  /** Settles the plan with every step handed these deps, each storing what a step handed no bundle stores. */
+  const settleStopped = (deps: DepsUnavailable | DepsRefused) => {
+    const store = makeEvidenceStoreMemory();
+    return Effect.gen(function* () {
+      const evidence = yield* EvidenceStore;
+      const reports: StepReport[] = [];
+      for (const s of plan.steps) {
+        const stop = depsStop(s, deps);
+        const resultRef = yield* evidence.put(sampleNamespace, { ...stop.evidence });
+        reports.push({ ...stop.report, resultRef });
+      }
+      return yield* settleVerdict(sampleNamespace, plan, reports);
+    }).pipe(Effect.provide(Layer.merge(store.layer, makeIdsMemory().layer)));
+  };
+
+  it.effect(
+    "[verify.deps-refused-cited] refused dependencies bounce on the first round, cited once with what to do however many steps stored the refusal",
+    () =>
+      Effect.gen(function* () {
+        expect(plan.steps.map((s) => s.tier.tier)).toEqual([2, 2]);
+        const settled = yield* settleStopped({
+          _tag: "DepsRefused",
+          reason: "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE",
+        });
+        const cited =
+          "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE: the installer refused the lockfile (ERR_PNPM_OUTDATED_LOCKFILE): run pnpm install and commit the pnpm-lock.yaml it writes";
+        expect(settled.outcome).toBe("bounce");
+        expect(settled.failingTests).toEqual([cited]);
+        expect(settled.evidence.filter((line) => line.includes("refused"))).toEqual([
+          `dependencies refused: ${cited}`,
+        ]);
+        expect(settled.nextActions).toEqual([
+          {
+            kind: "call",
+            title: `Fix the dependencies, push, then submit again: ${cited}`,
+            operationId: "submit",
+            args: { depsRefused: [cited] },
+          },
+        ]);
+      }),
+  );
+
+  it.effect(
+    "[verify.deps-unavailable-uncited] unavailable dependencies never bounce: the verdict cites no failure and asks nothing of the agent",
+    () =>
+      Effect.gen(function* () {
+        const settled = yield* settleStopped({ _tag: "DepsUnavailable", reason: "upload-failed" });
+        expect(settled.outcome).toBe("park");
+        expect(settled.failingTests).toEqual([]);
+        expect(settled.evidence.filter((line) => line.includes("refused"))).toEqual([]);
+        expect(settled.nextActions).toEqual([]);
+      }),
+  );
 
   it.effect(
     "[verify.type-errors-cited] a failing typecheck bounces, citing each type error in the evidence, failingTests and the remedy",

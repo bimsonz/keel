@@ -16,6 +16,7 @@ import { evidenceKey, EvidenceStoreR2 } from "../../src/adapters/driven/r2/evide
 import { PlanStoreR2, planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { type KeelVerifyJob, keelVerifyParams } from "../../src/rpc/index.ts";
 import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import { bundled, mockDepsReady } from "./deps-ready.ts";
 import { OTHER_ORG, placeProject, POOL_ORG } from "./helpers.ts";
 
 /** The project every job in this file is for, placed in org `pool` before any instance runs. */
@@ -66,6 +67,7 @@ const runWith = async (
 ) => {
   await using instance = await introspectWorkflowInstance(env.CI_WORKFLOW, id);
   await instance.modify(async (m) => {
+    await mockDepsReady(m);
     for (const [name, result] of Object.entries(mocks)) await m.mockStepResult({ name }, result);
     await m.mockStepResult({ name: "record" }, "recorded");
   });
@@ -297,5 +299,146 @@ describe("KeelVerify", () => {
     );
     expect(verdict.outcome).toBe("park");
     expect(verdict.evidence[0]).toContain("stored corrupt");
+  });
+});
+
+const sha256 = async (text: string): Promise<string> =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+const PACKAGE_JSON = '{"name":"candidate"}\n';
+const LOCK_YAML = "lockfileVersion: '9.0'\n";
+
+/**
+ * Runs a job with both deps steps real: `deps-need` reads the bundle from
+ * BUNDLES and `deps:<install>` asks the pool's keel-verify over the VERIFIER
+ * binding. The suite's runner step is mocked only when a stdout is given, so
+ * a job whose deps are not ready completes only if no runner was asked.
+ */
+const runDeps = async (id: string, bundle: ContentHash, stdout?: string) => {
+  await using instance = await introspectWorkflowInstance(env.CI_WORKFLOW, id);
+  await instance.modify(async (m) => {
+    if (stdout !== undefined) await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
+    await m.mockStepResult({ name: "record" }, "recorded");
+  });
+  await env.CI_WORKFLOW.create({
+    id,
+    params: keelVerifyParams(job({ bundle, planHash: (await stored(SUITE)).planHash })),
+  });
+  const need: unknown = JSON.parse(String(await instance.waitForStepResult({ name: "deps-need" })));
+  const install = Schema.decodeUnknownOption(Schema.Struct({ install: Schema.String }))(need);
+  const built: unknown =
+    install._tag === "None"
+      ? undefined
+      : JSON.parse(
+          String(await instance.waitForStepResult({ name: `deps:${install.value.install}` })),
+        );
+  const verdict = await instance.waitForStepResult({ name: "verdict" });
+  await instance.waitForStatus("complete");
+  return {
+    need,
+    built,
+    verdict: Schema.decodeUnknownSync(SettledVerdict)(JSON.parse(String(verdict))),
+  };
+};
+
+/** What the suite step stored for a verdict that cites its evidence first. */
+const storedEvidence = async (verdict: SettledVerdict): Promise<unknown> => {
+  const ref = /evidence sha256:([0-9a-f]{64})/.exec(verdict.evidence[0] ?? "")?.[1];
+  if (ref === undefined)
+    throw new Error(`no evidence cited in ${JSON.stringify(verdict.evidence)}`);
+  const evidence = await env.ARCHIVE.get(
+    evidenceKey(POOL_ORG, Schema.decodeUnknownSync(ContentHash)(`sha256:${ref}`)),
+  );
+  return evidence === null ? null : await evidence.json();
+};
+
+/**
+ * The deps steps through the real Workflow: the candidate's bundle read from
+ * BUNDLES, and the build asked of the pool's keel-verify, which answers by
+ * what the candidate holds (apps/keel/vitest.config.ts).
+ */
+describe("KeelVerify ensuring a candidate's deps", () => {
+  it("[deps.pool.steps] reads the need from the candidate's bundle, keeps keel-verify's answer under the install digest, and only then runs the suite", async () => {
+    const bundle = await bundled({ "package.json": PACKAGE_JSON, "pnpm-lock.yaml": LOCK_YAML });
+    const ran = await runDeps("keel-verify-deps-ready", bundle, await suiteStdout(200, 0));
+    const inputs = `keel.install/1\n${await sha256(PACKAGE_JSON)}  package.json\n${await sha256(LOCK_YAML)}  pnpm-lock.yaml\n`;
+    const install = await sha256(inputs);
+    expect(ran.need).toEqual({ _tag: "Locked", install, inputs });
+    expect(ran.built).toEqual({
+      _tag: "DepsReady",
+      install,
+      parts: [{ sha256: "7".repeat(64), bytes: 4321 }],
+    });
+    expect(ran.verdict.outcome).toBe("land");
+  });
+
+  it("[deps.pool.steps-unavailable] unavailable deps ask no runner and park the candidate, the step storing why", async () => {
+    const bundle = await bundled({
+      "package.json": PACKAGE_JSON,
+      "pnpm-lock.yaml": LOCK_YAML,
+      "unavailable/package.json": PACKAGE_JSON,
+    });
+    const ran = await runDeps("keel-verify-deps-unavailable", bundle);
+    expect(ran.built).toEqual({ _tag: "DepsUnavailable", reason: "upload-failed" });
+    expect(ran.verdict.outcome).toBe("park");
+    expect(ran.verdict.nextActions).toEqual([]);
+    expect(await storedEvidence(ran.verdict)).toEqual({
+      stepId: SUITE_STEP,
+      outcome: "abstain",
+      why: "deps-unavailable: upload-failed",
+      tail: "",
+    });
+  });
+
+  it("[deps.pool.steps-refused] refused deps ask no runner and bounce the candidate on its first round, citing the refusal once with what to do", async () => {
+    const bundle = await bundled({
+      "package.json": PACKAGE_JSON,
+      "pnpm-lock.yaml": LOCK_YAML,
+      "refused/package.json": PACKAGE_JSON,
+    });
+    const ran = await runDeps("keel-verify-deps-refused", bundle);
+    const reason = "install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE";
+    const cited = `${reason}: the installer refused the lockfile (ERR_PNPM_OUTDATED_LOCKFILE): run pnpm install and commit the pnpm-lock.yaml it writes`;
+    expect(ran.built).toEqual({ _tag: "DepsRefused", reason });
+    expect(ran.verdict.outcome).toBe("bounce");
+    expect(ran.verdict.evidence.filter((line) => line.includes("refused"))).toEqual([
+      `dependencies refused: ${cited}`,
+    ]);
+    expect(ran.verdict.nextActions).toEqual([
+      expect.objectContaining({
+        kind: "call",
+        operationId: "submit",
+        args: { depsRefused: [cited] },
+      }),
+    ]);
+  });
+
+  it("[deps.pool.steps-unlocked] a candidate with no lockfile bounces without a build: keel-verify is never asked", async () => {
+    const bundle = await bundled({ "package.json": PACKAGE_JSON });
+    const ran = await runDeps("keel-verify-deps-unlocked", bundle);
+    expect(ran.need).toEqual({
+      _tag: "Unlocked",
+      reason: "no-lockfile: the candidate has no pnpm-lock.yaml at its root",
+    });
+    expect(ran.built).toBeUndefined();
+    expect(ran.verdict.outcome).toBe("bounce");
+    expect(ran.verdict.evidence).toContain(
+      "dependencies refused: no-lockfile: the candidate has no pnpm-lock.yaml at its root: commit a pnpm-lock.yaml at the repository's root (run pnpm install): dependencies are installed only from a frozen lockfile",
+    );
+  });
+
+  it("[deps.pool.steps-unread] a candidate whose bundle is not kept for the job's namespace parks, saying which bundle", async () => {
+    const bundle = Schema.decodeUnknownSync(ContentHash)(`sha256:${"e".repeat(64)}`);
+    const ran = await runDeps("keel-verify-deps-unread", bundle);
+    const reason = `bundle-missing: the candidate bundle ${bundle} is not kept for ${POOL_ORG}`;
+    expect(ran.need).toEqual({ _tag: "NeedUnread", reason });
+    expect(ran.built).toBeUndefined();
+    expect(ran.verdict.outcome).toBe("park");
+    expect(await storedEvidence(ran.verdict)).toMatchObject({
+      outcome: "abstain",
+      why: `deps-unavailable: ${reason}`,
+    });
   });
 });

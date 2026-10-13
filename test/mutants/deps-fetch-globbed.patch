@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-in-place
+# why: The parts' URLs are expanded with globs on: a signed URL's ? can match a file in the candidate's workspace
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 97f9b415..87351bcc 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -39,7 +39,6 @@ import { Clock, Effect, Layer } from "effect";
+  * (`set -f`).
+  */
+ export const DEPS_IN_PLACE = [
+-  "set -f",
+   'why=$(keel_deps_fetch $K /workspace ${KEEL_DEPS_PARTS:-}) || { keel_deps_drop /workspace; echo "KEEL_DEPS missing $why"; echo KEEL_END; exit 0; }',
+   "set +f",
+   "echo KEEL_DEPS ok",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-outside, deps.need.property
+# why: A target that climbs above the candidate's root is read from the root instead: ../cli.js in the root package names the root's own cli.js, and ../../../packages/x/cli.js from packages/x comes back into its package, neither of which pnpm links
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..60236c57 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -107,7 +107,7 @@ const pathWithin = (dir: string, target: string): string | undefined => {
+   for (const segment of `${dir}/${target}`.split("/")) {
+     if (segment === "" || segment === ".") continue;
+     if (segment !== "..") segments.push(segment);
+-    else if (segments.pop() === undefined) return undefined;
++    else segments.pop();
+   }
+   const at = segments.join("/");
+   if (dir === "") return at === "" ? undefined : at;

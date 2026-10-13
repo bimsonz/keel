@@ -253,5 +253,51 @@ export function describeConflictMovesContract(
         }).pipe(Effect.provide(harness.layer));
       },
     );
+
+    it.effect(
+      "[d22.run-failed-escalates] a conflict whose drafted probe's run failed is put to a person by Keel itself, once: ConflictEscalated unprovable, and its escalation in the project's namespace; in a project that belongs to none it stays probing",
+      () => {
+        const harness = makeHarness();
+        const placed = conflictOn();
+        const unplaced = conflictOn();
+        const namespace = makeId("org", ulid());
+        const escalationId = escalationIdOf(placed.conflictId);
+        return Effect.gen(function* () {
+          const ledger = yield* ProbeLedger;
+          yield* harness.place(placed.at.projectId, namespace);
+          for (const each of [placed, unplaced]) {
+            yield* harness.suspect(each.at, each.conflictId, each.suspect);
+            yield* ledger.probeDrafted(each.at, {
+              conflictId: each.conflictId,
+              attempts: 1,
+              bundleHash: BUNDLE,
+            });
+          }
+          const first = yield* ledger.probeRunFailed(placed.at, placed.conflictId);
+          const again = yield* ledger.probeRunFailed(placed.at, placed.conflictId);
+          const open = yield* ledger.probeRunFailed(unplaced.at, unplaced.conflictId);
+          yield* harness.settled(placed.at, namespace);
+          const escalations = yield* Escalations;
+          const asked = yield* escalations.get(escalationId);
+          const log = yield* harness.log(placed.at, { kind: "conflict", id: placed.conflictId });
+
+          expect(first.probe).toMatchObject({ state: "discarded", discarded: "run-failed" });
+          expect(first.conflict).toMatchObject({ state: "escalated", escalationId });
+          expect(again).toEqual(first);
+          expect(escalated(log)).toHaveLength(1);
+          expect(escalated(log)[0]?.payload).toMatchObject({ escalationId, reason: "unprovable" });
+          expect(escalated(log)[0]?.actor).toBeUndefined();
+          expect(asked).toMatchObject({
+            namespace,
+            project: placed.at.projectId,
+            escalation: { state: "open", category: "unprovable-conflict" },
+          });
+          expect(open.conflict.state).toBe("probing");
+          expect(
+            (yield* Effect.flip(escalations.get(escalationIdOf(unplaced.conflictId))))._tag,
+          ).toBe("EscalationNotFound");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
   });
 }

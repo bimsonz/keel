@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.single-flight, deps.pool.pointer-after-parts, deps.pool.pointer-no-parts, deps.pool.pointer-reused, deps.pool.other-toolchain-rebuilt, deps.pool.other-settings-rebuilt
+# why: A build's pointer is written under another family than the one a build reads its pointer from, so no build is ever reused and every caller installs again
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..cbb8f539 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -405,7 +405,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+       installMs: report.installMs,
+     };
+     await this.env.BUNDLES.put(
+-      namespaceKey(namespace, "deps", need.install),
++      namespaceKey(namespace, "probe-deps", need.install),
+       JSON.stringify(pointer),
+     );
+     this.log(owner, started, {

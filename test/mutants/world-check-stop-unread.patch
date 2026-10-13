@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts
+# kills: world-check.cell-deps
+# why: A world's cell never says why no step ran: refused deps read as a failed suite and unavailable ones as steps that abstained
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index 911b8ff3..a0979822 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -136,7 +136,7 @@ export const worldCheckCell = (
+   const [first] = steps;
+   if (first === undefined)
+     return { outcome: "n/a", reason: "the plan holds no Tier 2 step Keel can run" };
+-  const stop = deps._tag === "DepsReady" ? undefined : depsStop(first, deps).evidence.why;
++  const stop = undefined;
+   const results = steps.map((step) => {
+     const report = reports.find((r) => r.stepId === step.id);
+     return { step, report, result: report === undefined ? undefined : coerce(plan, report) };

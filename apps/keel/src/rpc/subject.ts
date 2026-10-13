@@ -97,6 +97,7 @@ export const SubjectCodecs = {
   ),
   probeDrafted: exitCodec(ConflictView, LedgerRefusal),
   probeDraftFailed: exitCodec(ConflictView, LedgerRefusal),
+  probeRunFailed: exitCodec(ConflictView, LedgerRefusal),
   probeCellRan: exitCodec(ConflictView, LedgerRefusal),
   worldCheckRan: exitCodec(ConflictView, LedgerRefusal),
 };
@@ -104,7 +105,7 @@ export const SubjectCodecs = {
 /**
  * The Subject DO (`subj:<project>:<key>`): premises, tenets, decisions, fallout, semantic and precedent conflicts,
  * and each conflict's probe. A change relies on a subject through its own Change DO, which subscribes the subject;
- * there is no rely here. The Probe Workflow reports its facts through the four probe methods; a probe that
+ * there is no rely here. The Probe Workflow reports its facts through the five probe methods; a probe that
  * leaves its conflict unprovable has the subject raise an escalation in the project's namespace before the method answers.
  */
 export interface SubjectRpc extends EventReceiverRpc {
@@ -113,6 +114,8 @@ export interface SubjectRpc extends EventReceiverRpc {
   resolve(command: typeof ResolveCommand.Encoded): Promise<ExitJson>;
   probeDrafted(command: typeof ProbeDraftedCommand.Encoded): Promise<ExitJson>;
   probeDraftFailed(command: typeof ProbeDraftFailedCommand.Encoded): Promise<ExitJson>;
+  /** The drafted probe's run ended before its matrix was complete. */
+  probeRunFailed(conflictId: string): Promise<ExitJson>;
   probeCellRan(command: typeof ProbeCellRanCommand.Encoded): Promise<ExitJson>;
   worldCheckRan(command: typeof WorldCheckRanCommand.Encoded): Promise<ExitJson>;
 }

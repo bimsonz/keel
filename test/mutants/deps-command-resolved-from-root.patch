@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/ports.test.ts
+# kills: deps.inputs.bin-nested, deps.inputs.bin-back, deps.inputs.bin-directory, deps.need.property, deps-builder.need-commands
+# why: Every package.json's commands are read as paths from the candidate's root: a nested package's bin names the root's file of that name, or none
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..087e47a2 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -132,7 +132,7 @@ const commandsOf = (
+   path: string,
+   text: string,
+ ): { readonly files: readonly string[]; readonly dirs: readonly string[] } => {
+-  const dir = path === PACKAGE_FILE ? "" : path.slice(0, -PACKAGE_FILE.length - 1);
++  const dir = "";
+   let json: unknown;
+   try {
+     json = JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text);

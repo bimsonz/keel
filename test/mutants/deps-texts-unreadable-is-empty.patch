@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.manifest
+# why: A bundle that cannot be read is read as one of no files: a truncated bundle is a candidate with no lockfile, not an error
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..64275035 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -86,7 +86,7 @@ export const depsPartUrlSigned = (
+ export const bundleTexts = async (
+   bytes: Uint8Array,
+ ): Promise<{ readonly manifest: string; readonly read: (path: string) => string | undefined }> => {
+-  const files = await readBundle(bytes);
++  const files = await readBundle(bytes).catch(() => []);
+   const held = new Map(files.map((file) => [file.path, file.bytes]));
+   const decoder = new TextDecoder();
+   return {

@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.entrypoint
+# why: A request with no install inputs decodes, so a box is started with nothing to keep and nothing to check its digest against
+diff --git a/apps/keel-verify/src/rpc/deps.ts b/apps/keel-verify/src/rpc/deps.ts
+index 04a122d7..389c7c4a 100644
+--- a/apps/keel-verify/src/rpc/deps.ts
++++ b/apps/keel-verify/src/rpc/deps.ts
+@@ -19,7 +19,10 @@ const DepsPart = Schema.Struct({
+  */
+ export const DepsBuildRequest = Schema.Struct({
+   namespace: NamespaceId,
+-  need: Schema.TaggedStruct("Locked", { install: Sha256Hex, inputs: Schema.String }),
++  need: Schema.TaggedStruct("Locked", {
++    install: Sha256Hex,
++    inputs: Schema.optional(Schema.String),
++  }),
+   bundleUrl: Schema.String,
+ });
+ export type DepsBuildRequest = typeof DepsBuildRequest.Type;

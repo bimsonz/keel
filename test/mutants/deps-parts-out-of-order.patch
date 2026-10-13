@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-parts
+# why: A runner is handed its deps parts last first: the bundle is put together in the wrong order and does not verify
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 97f9b415..be86fdfa 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -347,7 +347,7 @@ export const SuiteRuntimeCi = (deps: {
+             );
+             const parts = yield* Effect.promise(() =>
+               Promise.all(
+-                handed.parts.map((part) =>
++                handed.parts.toReversed().map((part) =>
+                   signedDepsPartUrl(deps.signingKey, namespace, part.sha256, expires),
+                 ),
+               ),

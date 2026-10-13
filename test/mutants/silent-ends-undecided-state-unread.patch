@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.undecided
+# why: The instance ends saying its probe is still calibrating when the ledger has just discarded it as a failed run
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 96f5e3c6..ef7efb4c 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -776,7 +776,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+       return {
+         outcome: "drafted",
+         probeId,
+-        state: failed._tag === "Ok" ? (failed.value.probe?.state ?? state) : state,
++        state,
+       } satisfies ProbeEnd;
+     }
+     const guardCommit = yield* steps.step(

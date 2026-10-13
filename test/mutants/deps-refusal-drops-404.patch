@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.lockfile
+# why: A lockfile naming a package the registry does not have parks for a retry that can never install it
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..02926d7d 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -415,7 +415,6 @@ export const INSTALL_FAULTS_OF_THE_LOCKFILE: readonly string[] = [
+   "ERR_PNPM_LOCKFILE_BREAKING_CHANGE",
+   "ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY",
+   "ERR_PNPM_LOCKFILE_CONFIG_MISMATCH",
+-  "ERR_PNPM_FETCH_404",
+ ];
+ 
+ /** An install that failed, as the deps box reports it with the installer's own code: `install-failed exit <n> <code>`. */

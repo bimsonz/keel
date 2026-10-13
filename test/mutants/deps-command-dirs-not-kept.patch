@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-directory, deps.need.digest, deps.need.property
+# why: The files under a directories.bin are no inputs, though pnpm links each of them as a command
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..749bc2ac 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -193,7 +193,7 @@ export const installInputsOf = (
+     if (
+       installReads(path) ||
+       commands.has(path) ||
+-      commandDirs.some((dir) => path.startsWith(`${dir}/`))
++      false
+     )
+       lines.push(line);
+   return `${lines.join("\n")}\n`;

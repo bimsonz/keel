@@ -11,7 +11,7 @@ import { type CredentialScan, leaked } from "./redact.ts";
  *   KEEL_HYDRATION ok | failed <reason>     the workspace matched the bundle manifest
  *   KEEL_HYDRATION_RETRIED <reason>          the first extract failed for <reason>; one verified refetch hydrated
  *   KEEL_HYDRATION_DIFF <base64>             after a failed extract only: what differed, and a second fetch
- *   KEEL_LOCK ok | diverged                  the lockfile matched the baked dependencies
+ *   KEEL_DEPS ok | missing <why>             the deps bundle's parts were fetched, checked and untarred
  *
  * Values are base64 on one line, so nothing a project prints can forge a marker.
  */
@@ -25,7 +25,8 @@ export type RunnerStop =
       /** What the runner found wrong, base64; the doorway decodes it into the evidence. */
       readonly diagnosis?: string;
     }
-  | { readonly _tag: "lockfile-diverged" };
+  /** The step's deps bundle did not reach the workspace whole: a part unfetched, or not the part its URL names. */
+  | { readonly _tag: "deps-missing"; readonly reason: string };
 
 /** How a run that went ahead hydrated. */
 export interface Hydrated {
@@ -38,22 +39,19 @@ export interface Hydrated {
 export const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /**
- * Reads a runner's stdout up to its own markers: exactly one `protocol` report,
- * each marker once, hydrated and on the baked dependencies. `noun` names the
- * report in why it is malformed. A run that went ahead comes back `open`, with
- * its markers for the protocol to read.
+ * Reads the markers of one in-band report: the `KEEL_<NAME> <value>` lines
+ * between the one `protocol` line and the last `KEEL_END`, each marker at
+ * most once. Any other line is the box's own printing and is ignored. `noun`
+ * names the report in why it is malformed. The deps box's report is read the
+ * same way (`deps.ts`).
  */
-export const openRunnerOutput = (
+export const readMarkers = (
   stdout: string,
   protocol: string,
   noun: string,
 ):
-  | RunnerStop
-  | {
-      readonly _tag: "open";
-      readonly fields: ReadonlyMap<string, string>;
-      readonly hydrated: Hydrated;
-    } => {
+  | { readonly _tag: "malformed"; readonly reason: string }
+  | { readonly _tag: "markers"; readonly fields: ReadonlyMap<string, string> } => {
   const lines = stdout.split("\n").filter((l) => l.length > 0);
   const begin = lines.indexOf(protocol);
   const end = lines.lastIndexOf("KEEL_END");
@@ -71,6 +69,29 @@ export const openRunnerOutput = (
   }
   if (lines.filter((l) => l === protocol).length !== 1)
     return { _tag: "malformed", reason: `more than one ${noun} report` };
+  return { _tag: "markers", fields };
+};
+
+/**
+ * Reads a runner's stdout up to its own markers: exactly one `protocol` report,
+ * each marker once, hydrated and with its deps in place. `noun` names the
+ * report in why it is malformed. A run that went ahead comes back `open`, with
+ * its markers for the protocol to read.
+ */
+export const openRunnerOutput = (
+  stdout: string,
+  protocol: string,
+  noun: string,
+):
+  | RunnerStop
+  | {
+      readonly _tag: "open";
+      readonly fields: ReadonlyMap<string, string>;
+      readonly hydrated: Hydrated;
+    } => {
+  const read = readMarkers(stdout, protocol, noun);
+  if (read._tag === "malformed") return read;
+  const { fields } = read;
   const hydration = fields.get("KEEL_HYDRATION");
   if (hydration === undefined) return { _tag: "malformed", reason: "no KEEL_HYDRATION" };
   const diagnosis = fields.get("KEEL_HYDRATION_DIFF");
@@ -84,9 +105,11 @@ export const openRunnerOutput = (
     };
   const retried = fields.get("KEEL_HYDRATION_RETRIED");
   const hydrated = retried === undefined ? {} : { rehydrated: retried, ...diagnosed };
-  const lock = fields.get("KEEL_LOCK");
-  if (lock === "diverged") return { _tag: "lockfile-diverged" };
-  if (lock !== "ok") return { _tag: "malformed", reason: "no KEEL_LOCK" };
+  const deps = fields.get("KEEL_DEPS");
+  if (deps === undefined) return { _tag: "malformed", reason: "no KEEL_DEPS" };
+  if (deps.startsWith("missing "))
+    return { _tag: "deps-missing", reason: deps.slice("missing ".length) };
+  if (deps !== "ok") return { _tag: "malformed", reason: "bad KEEL_DEPS" };
   return { _tag: "open", fields, hydrated };
 };
 
@@ -130,7 +153,7 @@ export const stopped = (
     return { failure: "schema", why: `the runner's output is malformed: ${stop.reason}` };
   if (stop._tag === "hydration-failed")
     return { failure: "unavailable", why: `hydration-failed: ${stop.reason}` };
-  return { failure: "unavailable", why: "lockfile-diverged: the baked dependencies do not match" };
+  return { failure: "unavailable", why: `deps-unavailable: ${stop.reason}` };
 };
 
 /**

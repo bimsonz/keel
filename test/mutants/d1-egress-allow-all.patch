@@ -1,12 +1,12 @@
 # expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
 # why: KeelSandbox passes every non-bundle host through to the internet instead of refusing it
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-index 019e7f5..5dfd194 100644
+index b7b8d45d..3afdce59 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-@@ -196,5 +196,5 @@ export class KeelSandbox extends CiSandbox {
- // handlers. The first matching glob wins, so the bundle hosts come before `*`.
+@@ -287,5 +287,5 @@ export class KeelSandbox extends CiSandbox {
  KeelSandbox.outboundByHost = {
+   [DEPS_HOST]: (request, env) => serveDepsPart(request, env),
    [BUNDLE_HOSTS]: (request, env, ctx) => serveBundle(request, env, ctx),
 -  "*": (request) => refuseEgress(request),
 +  "*": (request) => fetch(request),

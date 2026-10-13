@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.refusal.candidate, deps.remedy.candidate
+# why: A refusal that ends its first word with a colon, as no-lockfile's does, parks and loses its remedy
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..8dcd1257 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -438,7 +438,7 @@ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
+ };
+ 
+ /** The first word of a reason: up to its first space or colon. */
+-const firstWord = (reason: string): string => /^[^ :]*/.exec(reason)?.[0] ?? "";
++const firstWord = (reason: string): string => /^[^ ]*/.exec(reason)?.[0] ?? "";
+ 
+ /**
+  * Whose a deps box's refusal is, by its reason. The candidate's own, which

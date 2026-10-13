@@ -49,6 +49,9 @@ function verifier(
         if (exit === "throw") throw new Error("Network connection lost.");
         return encodeVerifierExit(KeelVerifyCodecs.worldReady, exit);
       },
+      buildDeps: async (): Promise<unknown> => {
+        throw new Error("no probe run builds deps");
+      },
     },
   };
 }
@@ -206,10 +209,15 @@ describe("ProbeRunner over keel-verify's runProbe", () => {
         calls.push(r);
         return "ready";
       },
+      buildDeps: async (r: unknown) => {
+        calls.push(r);
+        return "built";
+      },
     };
     expect(await verifierEntrypoint(binding).runProbe("r")).toBe("answered");
     expect(await verifierEntrypoint(binding).worldReady("w")).toBe("ready");
-    expect(calls).toEqual(["r", "w"]);
+    expect(await verifierEntrypoint(binding).buildDeps("d")).toBe("built");
+    expect(calls).toEqual(["r", "w", "d"]);
     expect(() => verifierEntrypoint({ fetch: binding.fetch, connect: binding.connect })).toThrow(
       /serves no runProbe/,
     );

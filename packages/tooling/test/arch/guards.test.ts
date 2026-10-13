@@ -45,6 +45,8 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   "readonly-bundles": [
     /used for something other than get, head or list/,
     /BUNDLES is destructured/,
+    /BUNDLES\.put outside keel-deps-box\.ts/,
+    /BUNDLES\.put writes a key that is not namespaceKey/,
   ],
   "xstate-test-only": [/imports xstate; xstate is a test-only/, /imports @xstate\/inspect/],
   "r2-namespace-keys": [

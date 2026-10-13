@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts packages/testing/test/deps-ensure.test.ts
+# kills: deps-builder.side-by-side, deps.ensure.pointer
+# why: The memory builder keeps one pointer for a namespace whatever the digest: a build for another digest writes over the first's
+diff --git a/packages/testing/src/memory/verification.ts b/packages/testing/src/memory/verification.ts
+index 4a9b59a5..d482acf4 100644
+--- a/packages/testing/src/memory/verification.ts
++++ b/packages/testing/src/memory/verification.ts
+@@ -607,7 +607,7 @@ export function makeDepsBuilderMemory(): DepsBuilderHarness & {
+   };
+   const build = (namespace: NamespaceId, need: Locked, bundle: ContentHash): DepsAnswer => {
+     asked.push(`build ${need.install}`);
+-    const key = namespaceKey(namespace, "deps", need.install);
++    const key = namespaceKey(namespace, "deps", "latest");
+     const kept = pointers.get(key);
+     if (kept !== undefined && pointerServes(kept, need))
+       return { _tag: "DepsReady", install: kept.install, parts: kept.parts };

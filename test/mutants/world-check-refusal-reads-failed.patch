@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts
+# kills: world-check.cell-deps
+# why: A world whose install was refused reads as one whose suite failed: nobody can tell a lockfile fault from a red test
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index 911b8ff3..59fd75eb 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -145,7 +145,7 @@ export const worldCheckCell = (
+   if (failed.length > 0)
+     return {
+       outcome: "fail",
+-      reason: `${failed.join(", ")} ${stop === undefined ? "failed" : `did not run: ${stop}`}`,
++      reason: `${failed.join(", ")} failed`,
+     };
+   if (results.every((r) => r.result?.outcome === "pass")) return { outcome: "pass" };
+   const quiet = results.filter((r) => r.result?.outcome !== "pass");

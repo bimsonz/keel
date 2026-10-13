@@ -2,15 +2,15 @@
 # kills: probe.moved-on
 # why: A conflict no longer suspected is drafted again, so a decided conflict is probed twice
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 6d7658d..162a0c0 100644
+index d58d38d9..f114cb41 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -365,7 +365,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+@@ -445,7 +445,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
          step: "conflict",
          reason: `conflict ${call.conflictId} is not on ${call.key}: ${first.reason}`,
        } satisfies ProbeEnd;
 -    if (first.value.conflict.state !== "suspected")
 +    if (first.value.conflict.state === "resolved")
        return { outcome: "moved-on", state: first.value.conflict.state } satisfies ProbeEnd;
-     const read = partiesOf(first.value.conflict);
-     if (Result.isFailure(read)) return yield* failDraft("no-propositions", 0);
+     return yield* probeSuspected(call, steps, first.value.conflict).pipe(
+       // A step out of tries, or a defect: say why the conflict has no probe, then fail as it was

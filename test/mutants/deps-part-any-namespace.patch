@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+# kills: deps.pool.serve-other-namespace
+# why: The deps host serves a part whichever namespace keeps it, so a suite box reads another namespace's part under its own id
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index b7b8d45d..22d06871 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -199,7 +199,8 @@ export async function serveDepsPart(request: Request, env: Env): Promise<Respons
+   if (!signed) return new Response("not a deps part URL Keel signed", { status: 403 });
+   const key = namespaceKey(namespace, "deps-parts", sha256);
+   if (request.method === "HEAD") return partAnswer(await env.BUNDLES.head(key), null);
+-  const part = await env.BUNDLES.get(key);
++  const found = (await env.BUNDLES.list()).objects.find((o) => o.key.endsWith(`/deps-parts/${sha256}`));
++  const part = found === undefined ? null : await env.BUNDLES.get(found.key);
+   return partAnswer(part, part === null ? null : part.body);
+ }
+ 

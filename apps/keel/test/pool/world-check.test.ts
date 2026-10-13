@@ -18,6 +18,7 @@ import {
 } from "../../src/rpc/index.ts";
 import { suiteStdout } from "../support-suite-stdout.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
+import { bundled, mockDepsReady } from "./deps-ready.ts";
 import { forgetOwed, OTHER_ORG, POOL_ORG } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 import {
@@ -120,11 +121,13 @@ const Cell = Schema.Struct({
 });
 
 /** Runs one world's checks through the real Workflow and the real CI engine, the suite's runner step mocked. */
-async function runWorld(job: WorldCheckJob, stdout?: string) {
+async function runWorld(job: WorldCheckJob, stdout?: string, deps: "ready" | "real" = "ready") {
   const id = `world-${job.conflictId}-${job.world}`;
   await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
   if (stdout !== undefined)
     await instance.modify(async (m) => {
+      // Mocked ready unless the case runs the deps steps themselves.
+      if (deps === "ready") await mockDepsReady(m);
       await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
     });
   await env.WORLD_CHECK.create({ id, params: worldCheckParams(job) });
@@ -203,6 +206,49 @@ describe("KeelWorldCheck", () => {
     ]);
   });
 
+  it("[deps.pool.world-steps] a world's check ensures the world's own deps before its suite: ready deps run it, and refused or unavailable ones ask no runner", async () => {
+    const files = {
+      "package.json": '{"name":"world"}\n',
+      "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+    };
+    const planHash = await stored();
+    const cellOf = async (extra: Readonly<Record<string, string>>, stdout?: string) => {
+      const s = await suspected();
+      await drafted(s.projectId, s.conflictId);
+      const bundle = await bundled({ ...files, ...extra });
+      await runWorld(
+        {
+          ...jobOf(s, "trunk", [{ check: "suite:trunk", plan: { _tag: "Planned", planHash } }]),
+          bundle,
+        },
+        stdout,
+        "real",
+      );
+      return recorded(s);
+    };
+    expect(await cellOf({}, await suiteStdout(200, 0))).toEqual([
+      { world: "trunk", check: "suite:trunk", run: 1, outcome: "pass" },
+    ]);
+    expect(await cellOf({ "refused/package.json": "{}\n" })).toEqual([
+      {
+        world: "trunk",
+        check: "suite:trunk",
+        run: 1,
+        outcome: "fail",
+        reason: `${SUITE_STEP} did not run: deps-refused: install-failed exit 1 ERR_PNPM_OUTDATED_LOCKFILE`,
+      },
+    ]);
+    expect(await cellOf({ "unavailable/package.json": "{}\n" })).toEqual([
+      {
+        world: "trunk",
+        check: "suite:trunk",
+        run: 1,
+        outcome: "n/a",
+        reason: `${SUITE_STEP} did not run: deps-unavailable: upload-failed`,
+      },
+    ]);
+  });
+
   it("[d22.pool.world-check-unplanned] a check with no plan is recorded n/a with why, and runs nothing", async () => {
     const s = await suspected();
     await drafted(s.projectId, s.conflictId);
@@ -235,6 +281,7 @@ describe("KeelWorldCheck", () => {
     await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
     const stdout = await suiteStdout(200, 0);
     await instance.modify(async (m) => {
+      await mockDepsReady(m);
       await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
     });
     await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
@@ -278,6 +325,7 @@ describe("KeelWorldCheck", () => {
     await instance.modify(async (m) => {
       // The first read is kept as Waiting: the plan compiled right after it answered.
       await m.mockStepResult({ name: `plan of suite:${s.A} 1` }, kept({ _tag: "Waiting" }));
+      await mockDepsReady(m);
       await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
     });
     await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });

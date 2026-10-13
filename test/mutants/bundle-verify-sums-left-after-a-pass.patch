@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle.test.ts
+# kills: bundle.verify-tidy
+# why: a tree that verifies leaves its rewritten manifest in the box's temporary files, one a run
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 525e74a5..8c12ddb4 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -365,7 +365,6 @@ export const VERIFY_BUNDLE_SH = [
+   "keel_verify_bundle() {",
+   `  [ -f ${BUNDLE_MANIFEST} ] || { echo no-manifest; return 1; }`,
+   `  sums=$(mktemp 2>/dev/null) && LC_ALL=C sed 's/  /  .\\//' ${BUNDLE_MANIFEST} >"$sums" 2>/dev/null && sha256sum --quiet --strict -c "$sums" >/dev/null 2>&1 || { rm -f "$sums"; echo hash-mismatch; return 1; }`,
+-  '  rm -f "$sums"',
+   `  found=$(find . -type f ! -path ./${BUNDLE_MANIFEST} | wc -l | tr -d ' ')`,
+   `  listed=$(wc -l < ${BUNDLE_MANIFEST} | tr -d ' ')`,
+   '  [ "$found" -eq "$listed" ] || { echo "count-$found-of-$listed"; return 1; }',

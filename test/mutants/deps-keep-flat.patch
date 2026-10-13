@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts
+# kills: deps.keep.kept
+# why: Every file is kept at the top by its name alone, so a package's package.json overwrites the root's
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..03ef28b3 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -222,7 +222,7 @@ export const DEPS_KEEP_SH = [
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",
+   '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',
+-  '    mv -- "$p" "$o/$p" 2>/dev/null || { echo keep-failed; return 1; }',
++  '    mv -- "$p" "$o/${p##*/}" 2>/dev/null || { echo keep-failed; return 1; }',
+   '  done <"$i.lines"',
+   "}",
+ ].join("\n");

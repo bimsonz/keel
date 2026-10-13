@@ -93,6 +93,11 @@ export class ProbeLedger extends Context.Service<
       at: SubjectRef,
       failed: FailedDraft,
     ) => Effect.Effect<ConflictView, LedgerRefusal>;
+    /** The drafted probe's run ended before its matrix was complete: the probe is discarded as run-failed. */
+    readonly probeRunFailed: (
+      at: SubjectRef,
+      conflictId: ConflictId,
+    ) => Effect.Effect<ConflictView, LedgerRefusal>;
     /** One world-matrix cell of the conflict's probe. */
     readonly probeCellRan: (
       at: SubjectRef,

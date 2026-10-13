@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.registry-redirect
+# why: The Worker follows a redirect the registry answers with, so it fetches from whatever host the redirect names, for a box that may reach none but the registry: a second request leaves, to that host, and the box is handed that host's answer
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..f8be6f15 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -120,7 +120,6 @@ export async function passRegistry(request: Request): Promise<Response> {
+   // The host is written here, never taken from the request: a path cannot name another.
+   return fetch(`https://${REGISTRY_HOST}${url.pathname}${url.search}`, {
+     headers: accept === null ? {} : { accept },
+-    redirect: "manual",
+   });
+ }
+ 

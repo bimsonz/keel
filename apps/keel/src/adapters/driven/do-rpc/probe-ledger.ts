@@ -15,6 +15,7 @@ export interface ProbeLedgerStub {
   conflict(conflictId: string): Promise<unknown>;
   probeDrafted(command: typeof ProbeDraftedCommand.Encoded): Promise<unknown>;
   probeDraftFailed(command: typeof ProbeDraftFailedCommand.Encoded): Promise<unknown>;
+  probeRunFailed(conflictId: string): Promise<unknown>;
   probeCellRan(command: typeof ProbeCellRanCommand.Encoded): Promise<unknown>;
   worldCheckRan(command: typeof WorldCheckRanCommand.Encoded): Promise<unknown>;
 }
@@ -37,6 +38,8 @@ export function ProbeLedgerRpc(
         callObject(SubjectCodecs.probeDraftFailed, () =>
           at(ref).probeDraftFailed(Schema.encodeSync(ProbeDraftFailedCommand)(failed)),
         ),
+      probeRunFailed: (ref, conflictId) =>
+        callObject(SubjectCodecs.probeRunFailed, () => at(ref).probeRunFailed(conflictId)),
       probeCellRan: (ref, cell) =>
         callObject(SubjectCodecs.probeCellRan, () =>
           at(ref).probeCellRan(Schema.encodeSync(ProbeCellRanCommand)(cell)),

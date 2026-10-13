@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts packages/testing/test/deps-ensure.test.ts packages/testing/test/ports.test.ts
+# kills: deps.need.unlocked, deps.need.root-only, deps.need.property, deps.ensure.unlocked, deps-builder.need-unlocked
+# why: The reason a step abstains with no longer says what is missing or where
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..e2a0414b 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -228,7 +228,7 @@ export const depsNeedFrom = <E, R>(
+   if (inputs === undefined)
+     return Effect.succeed({
+       _tag: "Unlocked",
+-      reason: `no-lockfile: the candidate has no ${LOCKFILE} at its root`,
++      reason: "no-lockfile",
+     });
+   if (utf8Bytes(inputs) > INSTALL_INPUTS_MAX)
+     return Effect.succeed({

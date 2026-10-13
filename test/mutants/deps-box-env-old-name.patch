@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/deps-box.test.ts
+# kills: deps.pool.install
+# why: The command is handed the install digest under the lockfile hash's old name, so the box's script finds no KEEL_INSTALL to check its inputs against
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+index cc8e6931..6f103722 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-deps-box.ts
+@@ -374,7 +374,7 @@ export class KeelDepsBox extends Sandbox<Env> implements DepsBoxRpc {
+       stdout = await this.install({
+         HOME: "/root",
+         KEEL_BUNDLE_URL: request.bundleUrl,
+-        KEEL_INSTALL: need.install,
++        KEEL_LOCK_SHA: need.install,
+         KEEL_INSTALL_INPUTS: need.inputs,
+         KEEL_DEPS_UPLOAD: `http://${DEPS_HOST}`,
+       });

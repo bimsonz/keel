@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/deps-ensure.test.ts
+# kills: deps.ensure.bundle-missing, deps.ensure.bundle-unreadable
+# why: A bundle Keel lost or cannot read bounces the candidate, telling an agent to change what it installs
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index fd393147..7ec074de 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -554,6 +554,6 @@ export const ensureDeps = (
+     if (need._tag === "Unlocked")
+       return { _tag: "DepsRefused", reason: need.reason } satisfies DepsAnswer;
+     if (need._tag === "NeedUnread")
+-      return { _tag: "DepsUnavailable", reason: need.reason } satisfies DepsAnswer;
++      return { _tag: "DepsRefused", reason: need.reason } satisfies DepsAnswer;
+     return yield* steps.build(need.install, builder.build(namespace, need, bundle));
+   });

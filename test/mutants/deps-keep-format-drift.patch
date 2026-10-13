@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.keep.kept, deps.build.inputs
+# why: The box reads a format core does not write, so every build core asks for is refused
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..c81898e2 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -212,7 +212,7 @@ export const DEPS_KEEP_SH = [
+   "keel_deps_keep() {",
+   "  i=$1; o=$3",
+   '  [ -f "$i" ] && [ "$(sha256sum "$i" 2>/dev/null | cut -c1-64)" = "$2" ] || { echo install-mismatch; return 1; }',
+-  '  [ "$(head -n 1 "$i")" = keel.install/1 ] || { echo install-mismatch; return 1; }',
++  '  [ "$(head -n 1 "$i")" = keel.install/2 ] || { echo install-mismatch; return 1; }',
+   `  tail -n +2 "$i" >"$i.lines"; [ "$(tail -c 1 "$i.lines" | wc -l | tr -d ' ')" = 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qvE '^[0-9a-f]{64}  [^/]' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,
+   `  LC_ALL=C grep -qE '^[0-9a-f]{64}  (.*/)?\\.\\.(/|$)' "$i.lines" 2>/dev/null; [ $? -eq 1 ] || { echo install-mismatch; return 1; }`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.lines
+# why: A line with any run of hex digits and of spaces before a path is read as a manifest line: a file is listed under a hash that is none
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..fa76f900 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -74,7 +74,7 @@ export const INSTALL_INPUTS_FORMAT = "keel.install/1";
+ export const INSTALL_INPUTS_MAX = 64 * 1024;
+ 
+ /** One line of a bundle's manifest: `<sha256 hex>  <path>`. */
+-const MANIFEST_LINE = /^[0-9a-f]{64} {2}(.+)$/s;
++const MANIFEST_LINE = /^[0-9a-f]* +(.+)$/s;
+ 
+ const isPackageFile = (path: string): boolean =>
+   path === PACKAGE_FILE || path.endsWith(`/${PACKAGE_FILE}`);

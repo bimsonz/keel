@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-url.test.ts
+# kills: deps.texts.read
+# why: A path the bundle does not hold reads as an empty file, so a package.json that is not there declares no commands instead of being absent
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..a050c565 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -93,7 +93,7 @@ export const bundleTexts = async (
+     manifest: await manifestOf(files),
+     read: (path) => {
+       const text = held.get(path);
+-      return text === undefined ? undefined : decoder.decode(text);
++      return decoder.decode(text);
+     },
+   };
+ };

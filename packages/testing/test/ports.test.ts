@@ -38,6 +38,7 @@ const CONTRACT_PORTS = [
   "ProbeRunner",
   "ProbeStore",
   "AdmittedGuards",
+  "DepsBuilder",
   "ProbeSources",
   "NoopWorlds",
   "SyntaxSource",

@@ -114,9 +114,9 @@ try {
   const before = keelVerifyVersion();
   const built = s1Worlds();
   const need = await depsNeed(built.trunk);
-  if (need._tag === "lockfile" && !(await has(namespaceKey(namespace, "deps", need.sha256))))
+  if (need._tag === "lockfile" && !(await has(namespaceKey(namespace, "probe-deps", need.sha256))))
     throw new Error(
-      `no ${namespaceKey(namespace, "deps", need.sha256)}: run deps-bundle.ts fixtures/forge-lite --upload first`,
+      `no ${namespaceKey(namespace, "probe-deps", need.sha256)}: run deps-bundle.ts fixtures/forge-lite --upload first`,
     );
   // A-noop is the driver's to build, per draft, from the recipe the slots name: it gets A's files.
   const worlds: Record<string, string> = {};

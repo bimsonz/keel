@@ -2,15 +2,15 @@
 # kills: probe.interrupted
 # why: An interrupted instance records an incomplete draft, as if it had failed
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 8289f601..8a1cd964 100644
+index effc8e35..0ecdd9b2 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -419,7 +419,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
-       // it, the first cause is the one that comes out; a conflict that already has its probe
-       // refuses it. An interruption is neither a failure nor a defect, and records nothing.
+@@ -469,7 +469,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+       // machine refuses that in turn of a probe already decided or of a conflict with none.
+       // An interruption is neither a failure nor a defect, and records nothing.
        Effect.catchCauseIf(
 -        (cause) => !Cause.hasInterruptsOnly(cause),
 +        () => true,
          (cause) =>
            failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
-             Effect.exit,
+             Effect.flatMap((recorded) =>

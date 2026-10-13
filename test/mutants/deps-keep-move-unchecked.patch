@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/deps-sh.test.ts packages/runner-protocol/test/deps-build.test.ts
+# kills: deps.keep.failed, deps.build.keep-failed
+# why: A move that fails is not named: the keep goes on, and when it ends on the failure the box refuses with no reason
+diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
+index bb60317b..473fed4f 100644
+--- a/packages/runner-protocol/src/deps.ts
++++ b/packages/runner-protocol/src/deps.ts
+@@ -222,7 +222,7 @@ export const DEPS_KEEP_SH = [
+   "  while IFS= read -r line; do",
+   "    p=${line#*  }",
+   '    case $p in */*) mkdir -p "$o/${p%/*}" 2>/dev/null || { echo keep-failed; return 1; } ;; esac',
+-  '    mv -- "$p" "$o/$p" 2>/dev/null || { echo keep-failed; return 1; }',
++  '    mv -- "$p" "$o/$p" 2>/dev/null',
+   '  done <"$i.lines"',
+   "}",
+ ].join("\n");

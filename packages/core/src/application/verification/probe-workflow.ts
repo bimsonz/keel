@@ -135,12 +135,19 @@ export type ProbeEnd =
       readonly guardId: GuardId;
       readonly guardCommit: CommitSha;
     }
-  /** Drafted with its cells; the domain discarded the probe, or has not decided it. */
+  /**
+   * Drafted with its cells, and no guard: the domain discarded the probe, or
+   * no cell decided it and its run was recorded as failed.
+   */
   | { readonly outcome: "drafted"; readonly probeId: ProbeId; readonly state: Probe["state"] }
   | { readonly outcome: "draft-failed"; readonly reason: DraftFailure; readonly attempts: number }
   /** The conflict is no longer suspected: nothing to draft. */
   | { readonly outcome: "moved-on"; readonly state: ConflictState }
-  /** The ledger refused a fact: the conflict moved on while this instance ran. */
+  /**
+   * The ledger refused a fact: the conflict moved on while this instance ran,
+   * or it refused a cell of a probe still calibrating, whose run was then
+   * recorded as failed.
+   */
   | { readonly outcome: "stale"; readonly step: string; readonly reason: string }
   /** A world's commit could not be read where it must be: a harness error, never a cell. */
   | {
@@ -418,6 +425,18 @@ const failureStep = (
   );
 
 /**
+ * Records, in the step `run-failed`, that the conflict's drafted probe will
+ * get no more cells: the ledger's answer, or its refusal.
+ */
+const runFailedStep = (call: ProbeCall, steps: ProbeSteps) =>
+  ProbeLedger.use((ledger) =>
+    steps.step(
+      "run-failed",
+      answer(ledger.probeRunFailed(subjectOf(call), call.conflictId), describeRefusal),
+    ),
+  );
+
+/**
  * The Probe Workflow's program, one durable step at a time: read the conflict and its parties (A holds the
  * premise, B makes the effect); wait for each party's submission, up to
  * PROBE_SUBMISSION_WAIT_MS in all; plan the worlds from trunk's head (a
@@ -432,8 +451,12 @@ const failureStep = (
  * Once the conflict has been read as suspected, no end leaves it suspected in
  * silence: a harness error records why there is no probe before the instance
  * fails with it, and so, on a best effort, does a step out of tries or a
- * defect, which then fails as it was going to. Only a refused first read of
- * the conflict records nothing: there is no conflict to record it on.
+ * defect, which then fails as it was going to. Nor does such an end leave it
+ * probing: once the draft is recorded the ledger refuses that record, and the
+ * probe's run is recorded as failed in its place. So is the run of a probe
+ * still calibrating when the ledger refuses one of its cells, or when every
+ * cell is reported and none decided it. Only a refused first read of the
+ * conflict records nothing: there is no conflict to record it on.
  */
 export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
   Effect.gen(function* () {
@@ -449,12 +472,17 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
     return yield* probeSuspected(call, steps, first.value.conflict).pipe(
       // A step out of tries, or a defect: say why the conflict has no probe, then fail as it was
       // going to. The record is a best effort in a step of its own name, so whatever becomes of
-      // it, the first cause is the one that comes out; a conflict that already has its probe
-      // refuses it. An interruption is neither a failure nor a defect, and records nothing.
+      // it, the first cause is the one that comes out. A conflict that already has its probe
+      // refuses it: what failed was that probe's run, which the ledger is told next, and its
+      // machine refuses that in turn of a probe already decided or of a conflict with none.
+      // An interruption is neither a failure nor a defect, and records nothing.
       Effect.catchCauseIf(
         (cause) => !Cause.hasInterruptsOnly(cause),
         (cause) =>
           failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
+            Effect.flatMap((recorded) =>
+              recorded._tag === "Refused" ? runFailedStep(call, steps) : Effect.succeed(recorded),
+            ),
             Effect.exit,
             Effect.andThen(Effect.failCause(cause)),
           ),
@@ -733,16 +761,23 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
         last = now.value;
         break;
       }
+      // Still calibrating, and it will get no more cells: the ledger is told its run failed.
+      yield* runFailedStep(call, steps);
       return { outcome: "stale", step: name, reason: ran.reason } satisfies ProbeEnd;
     }
 
     const guard = guardOf(last.probe, parties);
-    if (guard === undefined)
+    if (guard === undefined) {
+      const state = last.probe?.state ?? "calibrating";
+      if (state !== "calibrating") return { outcome: "drafted", probeId, state } satisfies ProbeEnd;
+      // Every cell is reported and none decided the probe: the ledger is told its run failed.
+      const failed = yield* runFailedStep(call, steps);
       return {
         outcome: "drafted",
         probeId,
-        state: last.probe?.state ?? "calibrating",
+        state: failed._tag === "Ok" ? (failed.value.probe?.state ?? state) : state,
       } satisfies ProbeEnd;
+    }
     const guardCommit = yield* steps.step(
       "guard",
       guards.admit(call.projectId, guard, report.files),

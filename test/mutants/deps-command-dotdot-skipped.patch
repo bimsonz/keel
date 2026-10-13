@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/deps.test.ts
+# kills: deps.inputs.bin-string, deps.inputs.bin-back, deps.inputs.bin-outside, deps.inputs.bin-directory, deps.need.property
+# why: A .. in a target is passed over: a/../x names a/x, a target that lands outside its package names a file inside it, and ../x/cli.js from packages/x names packages/x/x/cli.js
+diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
+index 188004ad..09e6949c 100644
+--- a/packages/core/src/application/verification/deps.ts
++++ b/packages/core/src/application/verification/deps.ts
+@@ -105,7 +105,7 @@ const installReads = (path: string): boolean =>
+ const pathWithin = (dir: string, target: string): string | undefined => {
+   const segments: string[] = [];
+   for (const segment of `${dir}/${target}`.split("/")) {
+-    if (segment === "" || segment === ".") continue;
++    if (segment === "" || segment === "." || segment === "..") continue;
+     if (segment !== "..") segments.push(segment);
+     else if (segments.pop() === undefined) return undefined;
+   }
