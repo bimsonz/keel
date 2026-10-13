@@ -4,6 +4,7 @@ import { Instant, makeId } from "../../../src/domain/kernel/index.ts";
 import {
   admit,
   type ConflictCommand,
+  decideProbe,
   type DraftFailure,
   evolveProbe,
   MAX_DRAFT_ATTEMPTS,
@@ -203,9 +204,14 @@ describe("the Probe → Guard machine", { timeout: PROPERTY_TIMEOUT }, () => {
               p.command.command._tag !== "Record" ||
               events.length === 0
             )
+              // No other command admits a guard, and each discards for its own reason alone: drafts that failed, or a run that did.
               return (
                 admitted === undefined &&
-                (discarded === undefined || discarded.reason === "draft-failed")
+                (discarded === undefined ||
+                  discarded.reason ===
+                    (p.command._tag === "Probe" && p.command.command._tag === "RunFailed"
+                      ? "run-failed"
+                      : "draft-failed"))
               );
             const cell = p.command.command;
             const admission = admit([
@@ -348,11 +354,14 @@ const folds = (from: Folded | undefined, event: ProbeEvent): Folded | "illegal" 
       return calibrating && event.probeId === from.id && matrixSays(from.cells) === "admitted"
         ? { ...from, state: "admitted", ended: event.guardId }
         : "illegal";
-    case "ProbeDiscarded":
-      // And it cannot discard one for a reason the matrix does not give.
-      return calibrating && event.probeId === from.id && matrixSays(from.cells) === event.reason
+    case "ProbeDiscarded": {
+      // And it cannot discard one for a reason the matrix does not give. A run that failed is no reason of the matrix's: it ends a probe whose matrix has decided nothing.
+      const says = matrixSays(from.cells);
+      const reasoned = event.reason === "run-failed" ? says === "pending" : says === event.reason;
+      return calibrating && event.probeId === from.id && reasoned
         ? { ...from, state: "discarded", ended: event.reason }
         : "illegal";
+    }
     case "GuardRetired":
       return from.state === "admitted" && event.guardId === from.ended
         ? { ...from, state: "retired", ended: `${from.ended} by ${event.decisionId}` }
@@ -367,8 +376,8 @@ const folds = (from: Folded | undefined, event: ProbeEvent): Folded | "illegal" 
 /**
  * Each event in every form the fold could tell apart: another probe's and
  * another conflict's, a cell with another answer, an admission of another
- * guard, a discard for each reason with and without its conflict, and a
- * retirement of another guard.
+ * guard, a discard for each reason (a failed run among them) with and without
+ * its conflict, and a retirement of another guard.
  */
 const probeForms = (event: ProbeEvent): readonly ProbeEvent[] => {
   switch (event._tag) {
@@ -390,7 +399,7 @@ const probeForms = (event: ProbeEvent): readonly ProbeEvent[] => {
       ];
     case "ProbeDiscarded": {
       const { conflictId: _conflict, detail: _detail, ...bare } = event;
-      return (["non-discriminating", "unstable", "draft-failed"] as const).flatMap(
+      return (["non-discriminating", "unstable", "draft-failed", "run-failed"] as const).flatMap(
         (reason): ProbeEvent[] => [
           { ...bare, reason },
           { ...bare, reason, conflictId: CONFLICT },
@@ -436,7 +445,7 @@ describe("the Probe → Guard fold", { timeout: PROPERTY_TIMEOUT }, () => {
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 2262, refused: 1973, rows: 26 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 3731, refused: 3397, rows: 41 });
   });
 });
 
@@ -593,5 +602,99 @@ describe("drafting a probe", () => {
     expect(MAX_DRAFT_ATTEMPTS).toBe(4);
     expect(tagsOf(drive([suspect, draft(4)]).results[1])).toEqual(["ProbeDrafted"]);
     expect(tagsOf(drive([suspect, draft(5)]).results[1])).toEqual([]);
+  });
+});
+
+describe("a probe whose run failed", () => {
+  it("[probe.run-failed] a failed run discards a probe exactly while it calibrates for a conflict probing it: one discard, no guard, the cells kept, and nothing more is taken; before a draft and once decided it is refused", () => {
+    const failed = P({ _tag: "RunFailed" });
+    const matrix = [...runOf(1), ...runOf(2), ...runOf(3)];
+    /** The probe's own log of a played script, at the times it was played, through the wire and replayed. */
+    const replayed = (played: ReturnType<typeof drive>) =>
+      comparableProbe(
+        replayProbe(
+          throughTheWire(
+            ProbeEvent,
+            played.results.flatMap((r, i) =>
+              eventsIn(r)
+                .filter(foldsIntoProbe)
+                .map((payload) => ({ at: Instant(T0 + i + 1), payload })),
+            ),
+          ),
+        ),
+      );
+    // With any part of the matrix recorded, short of the cell that decides it.
+    const recorded = Array.from({ length: matrix.length }, (_, cells) => cells);
+    const ends = recorded.map((cells) => {
+      const calibrating = [suspect, draft(), ...matrix.slice(0, cells)];
+      const played = drive([...calibrating, failed, failed, record(3, "A-noop"), failed]);
+      const probe = played.state?.probe;
+      return {
+        cells,
+        events: eventsIn(played.results[calibrating.length] ?? Result.succeed([])),
+        state: probe?.state,
+        discarded: probe?.discarded,
+        kept: probe?.cells.length,
+        guard: probe?.guardId,
+        conflict: played.state?.conflict?.state,
+        after: played.results.slice(-3).map((r) => Result.isFailure(r) && r.failure._tag),
+        replays: replayed(played) === comparableProbe(probe),
+      };
+    });
+    expect(ends).toEqual(
+      recorded.map((cells) => ({
+        cells,
+        events: [
+          { _tag: "ProbeDiscarded", probeId: PROBE, reason: "run-failed", conflictId: CONFLICT },
+        ],
+        state: "discarded",
+        discarded: "run-failed",
+        kept: cells,
+        guard: undefined,
+        conflict: "probing",
+        after: ["ProbeStateRefused", "ProbeStateRefused", "ProbeStateRefused"],
+        replays: true,
+      })),
+    );
+    // Before a draft there is no probe to fail, and a decided probe's run is over.
+    const refusals = [
+      [failed],
+      [suspect, failed],
+      [suspect, P({ _tag: "DraftFailed", conflictId: CONFLICT }), failed],
+      [suspect, draft(), ...matrix, failed],
+      [suspect, draft(), ...runOf(1, "pass"), ...runOf(2, "pass"), ...runOf(3, "pass"), failed],
+    ].map((script) => {
+      const played = drive(script);
+      const last = played.results.at(-1);
+      return {
+        probe: played.state?.probe?.state ?? "none",
+        ended: played.state?.probe?.discarded,
+        refused: last !== undefined && Result.isFailure(last) && last.failure._tag,
+      };
+    });
+    expect(refusals).toEqual([
+      { probe: "none", ended: undefined, refused: "ProbeNotFound" },
+      { probe: "none", ended: undefined, refused: "ProbeNotFound" },
+      { probe: "discarded", ended: "draft-failed", refused: "ProbeStateRefused" },
+      { probe: "admitted", ended: undefined, refused: "ProbeStateRefused" },
+      { probe: "discarded", ended: "non-discriminating", refused: "ProbeStateRefused" },
+    ]);
+    // The probe's conflict must be probing it: with no conflict, or one probing another probe, the run's end is refused.
+    const calibrating = drive([suspect, draft(), ...runOf(1)]).state;
+    const conflict = calibrating?.conflict;
+    if (calibrating?.probe === undefined || conflict === undefined)
+      throw new Error("no calibrating probe");
+    const ANOTHER_PROBE = makeId("prb", `${"0".repeat(25)}2`);
+    const reasons = [undefined, { ...conflict, probeId: ANOTHER_PROBE }, conflict].map((held) => {
+      const decided = decideProbe(
+        calibrating.probe,
+        { _tag: "RunFailed" },
+        { now: T0, probeId: PROBE, ...(held === undefined ? {} : { conflict: held }) },
+      );
+      return Result.isFailure(decided)
+        ? "reason" in decided.failure && decided.failure.reason
+        : decided.success.length;
+    });
+    expect(reasons).toEqual(["conflict-not-probing", "conflict-not-probing", 1]);
   });
 });

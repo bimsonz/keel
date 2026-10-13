@@ -63,6 +63,12 @@ export type ProbeCommand =
       readonly resultRef: string;
       readonly guardId: GuardId;
     }
+  /**
+   * The probe's run ended before its matrix was complete: the Workflow or a
+   * world died after the draft was recorded. The probe is discarded
+   * `run-failed`, and its conflict is unprovable.
+   */
+  | { readonly _tag: "RunFailed" }
   /** A superseding Decision retires the guard. */
   | { readonly _tag: "Retire"; readonly decisionId: DecisionId };
 
@@ -244,6 +250,19 @@ export const decideProbe = (
         }
       }
     }
+    case "RunFailed": {
+      if (probe.state !== "calibrating") return refuse();
+      const conflict = facts.conflict;
+      if (conflict?.state !== "probing" || conflict.probeId !== probe.id)
+        return refuse("conflict-not-probing");
+      return Result.succeed([
+        ProbeDiscarded.make({
+          probeId: probe.id,
+          reason: "run-failed",
+          conflictId: probe.conflictId,
+        }),
+      ]);
+    }
     case "Retire":
       return probe.state === "admitted" && probe.guardId !== undefined
         ? Result.succeed([
@@ -317,6 +336,13 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
         : illegal(probe, event);
     case "ProbeDiscarded": {
       const admission = admit(probe.cells);
+      // A run that failed ends a probe whose matrix has decided nothing.
+      if (event.reason === "run-failed")
+        return probe.state === "calibrating" &&
+          event.probeId === probe.id &&
+          admission._tag === "pending"
+          ? { ...probe, state: "discarded", discarded: event.reason }
+          : illegal(probe, event);
       return probe.state === "calibrating" &&
         event.probeId === probe.id &&
         admission._tag === "rejected" &&

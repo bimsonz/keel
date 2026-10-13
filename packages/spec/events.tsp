@@ -958,7 +958,9 @@ model WorldCheckCounts {
 model ProbeDiscarded {
   _tag: "ProbeDiscarded";
   probeId: ProbeId;
-  reason: "non-discriminating" | "unstable" | "draft-failed";
+
+  /** `run-failed`: the probe's run ended before its matrix was complete, so it decided nothing and its conflict is unprovable. */
+  reason: "non-discriminating" | "unstable" | "draft-failed" | "run-failed";
 
   /** Always set (optional only so older events decode): a probe whose drafts all failed begins with this event. */
   conflictId?: ConflictId;

@@ -33,7 +33,17 @@ export const MAX_DRAFT_ATTEMPTS = 4;
 export const ProbeState = Schema.Literals(["calibrating", "admitted", "discarded", "retired"]);
 export type ProbeState = typeof ProbeState.Type;
 
-export const DiscardReason = Schema.Literals(["non-discriminating", "unstable", "draft-failed"]);
+/**
+ * Why a probe was discarded: its matrix gave the same answer in every world,
+ * or answers that differ between runs; every draft failed; or its run ended
+ * before the matrix was complete (`run-failed`), so it decided nothing.
+ */
+export const DiscardReason = Schema.Literals([
+  "non-discriminating",
+  "unstable",
+  "draft-failed",
+  "run-failed",
+]);
 export type DiscardReason = typeof DiscardReason.Type;
 
 /** A probe, and once admitted the guard it becomes (state-machines.md § Probe → Guard). */

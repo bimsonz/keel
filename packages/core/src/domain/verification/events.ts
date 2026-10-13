@@ -106,7 +106,8 @@ export type DraftFailure = typeof DraftFailure.Type;
 
 export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
   probeId: ProbeId,
-  reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed"]),
+  /** `run-failed`: the probe's run ended before its matrix was complete. */
+  reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed", "run-failed"]),
   /**
    * Optional only so older events still decode. Always set: a probe whose
    * drafts all failed begins with this event, and it is the only one naming its conflict.

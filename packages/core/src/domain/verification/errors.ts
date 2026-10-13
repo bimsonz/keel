@@ -107,7 +107,7 @@ export class FlowSpecInvalid extends Schema.TaggedError<FlowSpecInvalid>()("Flow
 /** A decision model or platform function gave no usable answer: timeout, rate limit, schema failure or truncation. Becomes `abstain`. */
 export class ModelAbstained extends Schema.TaggedError<ModelAbstained>()("ModelAbstained", {
   reason: Schema.Literals(["timeout", "rate-limited", "schema", "truncated", "unavailable"]),
-  /** Deterministic text of what was wrong, a repair's only input: the parser's message, or the token limit. */
+  /** Text of what was wrong, a repair's only input: the parser's message, the token limit, or an AI error's text. */
   detail: Schema.optional(Schema.String),
 }) {}
 

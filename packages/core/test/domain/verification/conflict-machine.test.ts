@@ -957,3 +957,57 @@ describe("a ruling's side", () => {
     );
   });
 });
+
+describe("a conflict whose probe's run failed", () => {
+  it("[conflict.run-failed-unprovable] a probing conflict whose probe's run failed settles to Escalated as unprovable and nowhere else, and not without an escalation", () => {
+    const failed = P({ _tag: "RunFailed" });
+    const matrix = cells(3);
+    const bare: ConflictCommand = { _tag: "Settle" };
+    const named: ConflictCommand = { _tag: "Settle", escalationId: ESCALATION };
+    const recorded = Array.from({ length: matrix.length }, (_, n) => n);
+    const settled = recorded.map((n) => {
+      const before = drive([C(suspectSemantic), draft, ...matrix.slice(0, n), failed]);
+      const unnamed = drive([C(suspectSemantic), draft, ...matrix.slice(0, n), failed, C(bare)]);
+      const escalated = drive([C(suspectSemantic), draft, ...matrix.slice(0, n), failed, C(named)]);
+      return {
+        cells: n,
+        probe: before.state?.probe?.discarded,
+        before: before.state?.conflict?.state,
+        table: [conflictOracle(before.state, bare), conflictOracle(before.state, named)],
+        unnamed: failureReason(unnamed.results.at(-1)),
+        stays: unnamed.state?.conflict?.state,
+        events: eventsIn(escalated.results.at(-1) ?? Result.succeed([])),
+        after: escalated.state?.conflict?.state,
+        escalation: escalated.state?.conflict?.escalationId,
+      };
+    });
+    expect(settled).toEqual(
+      recorded.map((n) => ({
+        cells: n,
+        probe: "run-failed",
+        before: "probing",
+        table: ["refused", "escalated"],
+        unnamed: "escalation-required",
+        stays: "probing",
+        events: [
+          {
+            _tag: "ConflictEscalated",
+            conflictId: CONFLICT,
+            escalationId: ESCALATION,
+            reason: "unprovable",
+          },
+        ],
+        after: "escalated",
+        escalation: ESCALATION,
+      })),
+    );
+    // A failed run is the end of a probe that was drafted: on a conflict still suspected, such a probe settles nothing.
+    const suspected = drive([C(suspectSemantic)]).state?.conflict;
+    const probe = drive([C(suspectSemantic), draft, failed]).state?.probe;
+    if (suspected === undefined || probe === undefined) throw new Error("no failed run to read");
+    const early = decideConflict(suspected, named, { now: T0, conflictId: CONFLICT, probe });
+    expect(Result.isFailure(early) && "reason" in early.failure && early.failure.reason).toBe(
+      "probe-pending",
+    );
+  });
+});

@@ -309,7 +309,9 @@ export const KINDS = [
   "Record",
   "Retire",
 ] as const;
-export type Kind = (typeof KINDS)[number];
+/** Every command tried in each state: the kinds a step draws, and a probe's run failing, which no step draws, so no plan's path moves. */
+export const EVERY = [...KINDS, "RunFailed"] as const;
+export type Kind = (typeof EVERY)[number];
 
 const toConflict = (command: ConflictCommand): LedgerCommand => ({ _tag: "Conflict", command });
 const toProbe = (command: ProbeCommand): LedgerCommand => ({ _tag: "Probe", command });
@@ -386,6 +388,8 @@ export const build = (
     }
     case "Retire":
       return toProbe({ _tag: "Retire", decisionId: DECISION });
+    case "RunFailed":
+      return toProbe({ _tag: "RunFailed" });
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -430,7 +434,7 @@ export const run = memo((plan: Plan): readonly Record_[] =>
       start: T0,
       dt: () => 1,
       facts: (now) => ({ now }),
-      every: (state, step) => KINDS.map((k) => build(k, state, plan, step)),
+      every: (state, step) => EVERY.map((k) => build(k, state, plan, step)),
       choose: (state, step) => choose(state, plan, step),
     },
     plan.steps,
@@ -508,7 +512,11 @@ export const conflictOracle = (
       if (probe.state === "admitted") return "proven";
       if (probe.state === "discarded" && probe.discarded === "non-discriminating")
         return "dismissed";
-      if (probe.state === "discarded" && probe.discarded === "unstable")
+      // Unstable, or a run that ended before the matrix was complete: unprovable either way.
+      if (
+        probe.state === "discarded" &&
+        (probe.discarded === "unstable" || probe.discarded === "run-failed")
+      )
         return command.escalationId === undefined ? "refused" : "escalated";
       return "refused";
     case "proven":
@@ -552,6 +560,11 @@ export const probeOracle = (
   }
   switch (probe.state) {
     case "calibrating": {
+      // A run that failed ends the probe wherever its matrix has got to.
+      if (command._tag === "RunFailed")
+        return conflict?.state === "probing" && conflict.probeId === probe.id
+          ? "discarded"
+          : "refused";
       if (command._tag !== "Record") return "refused";
       if (conflict?.state !== "probing" || conflict.probeId !== probe.id) return "refused";
       if (command.run < 1 || command.run > ADMISSION_RUNS) return "refused";
@@ -649,7 +662,7 @@ export const ledgerTour = (): readonly Fold<Ledger, LedgerEvent>[] => {
     facts: (now) => ({ now }),
     moves: (state) =>
       TOUR_PLANS.flatMap((plan) =>
-        KINDS.flatMap((kind) =>
+        EVERY.flatMap((kind) =>
           TOUR_STEPS.map((step) => ({ command: build(kind, state, plan, step), dt: 1 })),
         ),
       ),

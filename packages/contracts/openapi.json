@@ -16099,8 +16099,10 @@
             "enum": [
               "non-discriminating",
               "unstable",
-              "draft-failed"
-            ]
+              "draft-failed",
+              "run-failed"
+            ],
+            "description": "`run-failed`: the probe's run ended before its matrix was complete, so it decided nothing and its conflict is unprovable."
           },
           "conflictId": {
             "allOf": [

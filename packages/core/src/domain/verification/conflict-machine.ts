@@ -278,6 +278,7 @@ export const decideConflict = (
         ]);
       const unprovable =
         (probe.state === "discarded" && probe.discarded === "unstable" && drafted) ||
+        (probe.state === "discarded" && probe.discarded === "run-failed" && drafted) ||
         (probe.state === "discarded" && probe.discarded === "draft-failed" && !drafted);
       if (!unprovable) return refuse("probe-pending", awaitProbe);
       return command.escalationId === undefined
