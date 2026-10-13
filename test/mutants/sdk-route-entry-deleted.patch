@@ -2,16 +2,33 @@
 # kills: sdk.routes-total
 # why: an operation drops out of the route table, so the SDK cannot call it and nothing says so
 diff --git a/packages/sdk/src/routes.ts b/packages/sdk/src/routes.ts
-index c3bd44f4..7146859e 100644
+index 51a3eaed..b55f4554 100644
 --- a/packages/sdk/src/routes.ts
 +++ b/packages/sdk/src/routes.ts
-@@ -109,11 +109,6 @@ export const ROUTES = {
+@@ -113,11 +113,6 @@ export const ROUTES = {
+     query: ["ref", "cursor", "limit"],
+   },
+   Repo_getCommit: { method: "GET", path: "/projects/{projectId}/repo/commits/{sha}" },
+-  Repo_compare: {
+-    method: "GET",
+-    path: "/projects/{projectId}/repo/compare",
+-    query: ["base", "head"],
+-  },
+   Sessions_openSession: { method: "POST", path: "/sessions", headers: ["idempotency-key"] },
+   Changes_listChanges: {
+     method: "GET",
+@@ -136,16 +131,6 @@ export const ROUTES = {
    },
    nearby: { method: "GET", path: "/changes/{changeId}/nearby" },
    adopt: { method: "POST", path: "/changes/{changeId}/adopt", headers: ["idempotency-key"] },
 -  rebase: {
 -    method: "POST",
 -    path: "/changes/{changeId}/rebase",
+-    headers: ["keel-lease", "idempotency-key"],
+-  },
+-  commit: {
+-    method: "POST",
+-    path: "/changes/{changeId}/commits",
 -    headers: ["keel-lease", "idempotency-key"],
 -  },
    Workspaces_refreshWorkspaceToken: {
