@@ -158,6 +158,9 @@ describe("the HTTP source", () => {
 
 type Who = Role | "stranger" | "visitor";
 
+/** The people the stand-in Keel knows by a session, each of whom has their own namespace. */
+const PEOPLE: ReadonlySet<string> = new Set(["owner", "maintainer", "member", "stranger"]);
+
 /**
  * The page reading the stand-in Keel as `who`. The browser's part is played here: it sends the session's cookie
  * to its own origin, and says which page a request that changes something came from. What the page's own code
@@ -173,6 +176,8 @@ function reading(
   const keel = createFakeKeel({
     visibility,
     ahead,
+    // Each person signed in has a namespace of their own, at a handle that is their session's name.
+    whose: (handle) => (PEOPLE.has(handle) ? { id: handle, kind: "user" } : undefined),
     sessions: { owner: "owner", maintainer: "maintainer", member: "member", stranger: "stranger" },
     ...put,
   });
@@ -193,6 +198,28 @@ function reading(
       )[0] ?? "";
   return { keel, serve, fromThePage, question, directory: createHttpDirectory({ fetch: serve }) };
 }
+
+/** What Keel answered a start: the project's address and who may read it, or its refusal as a page is handed it. */
+const started = (
+  directory: ReturnType<typeof reading>["directory"],
+  asked: Parameters<ReturnType<typeof reading>["directory"]["createProject"]>[0],
+  key: string,
+) =>
+  directory.createProject(asked, key).then(
+    (made) => `${made.namespace.handle}/${made.name} ${made.visibility} ${made.viewer?.role}`,
+    (error: unknown) =>
+      error instanceof KeelRefused
+        ? { status: error.status, code: error.code, said: error.message, next: [...error.next] }
+        : String(error),
+  );
+const PRIVATE_SOURCE = {
+  status: 403,
+  code: "auth.forbidden",
+  said: "Refused: private-source.",
+  next: [
+    "A private project forks only into its own namespace; ask whoever maintains it to make it public",
+  ],
+};
 
 /** The project as `who` is shown it, with a playhead on it. */
 async function opened(
@@ -472,6 +499,130 @@ describe("who the page reads as", () => {
       message: "Idempotency-Key console:new:the-same was used for a different project.",
       next: ["Call again with a fresh Idempotency-Key"],
     });
+  });
+
+  it("[fork.call] forks a project by Keel's own operation, naming the source by Keel's id for it, and the fork is private whoever may read its source", async () => {
+    // Someone signed in who is no member reads a public project, and forks it into their own namespace.
+    const r = reading("stranger", "public");
+    const source = await r.directory.findProject("acme", "demo");
+    expect(source).toMatchObject({ visibility: "public" });
+    const asked = {
+      namespace: "stranger",
+      name: "demo",
+      source: { kind: "fork", project: source?.id ?? "" },
+    } as const;
+    expect(await started(r.directory, asked, "console:new:fork-one")).toBe(
+      "stranger/demo private owner",
+    );
+    const sent = r.fromThePage.filter((request) => request.method === "POST");
+    expect(sent.map((request) => new URL(request.url).pathname)).toEqual(["/v1/projects"]);
+    expect(await sent[0]?.json()).toEqual(asked);
+    expect(sent[0]?.headers.get("authorization")).toBeNull();
+    // The fork is found at its own address by whoever made it, and the source is as it was.
+    expect(await r.directory.findProject("stranger", "demo")).toMatchObject({
+      visibility: "private",
+    });
+    expect(await r.directory.findProject("acme", "demo")).toMatchObject({ id: source?.id });
+  });
+
+  it("[fork.private] forks a private project only into its own namespace, and says Keel's rule with its way forward anywhere else", async () => {
+    const r = reading("member");
+    const source = await r.directory.findProject("acme", "demo");
+    expect(source).toMatchObject({ visibility: "private" });
+    const fork = { kind: "fork", project: source?.id ?? "" } as const;
+    // Into the reader's own namespace: refused, though they may read the source and make projects there.
+    expect(
+      await started(
+        r.directory,
+        { namespace: "member", name: "demo", source: fork },
+        "console:new:f1",
+      ),
+    ).toEqual(PRIVATE_SOURCE);
+    expect(await r.directory.findProject("member", "demo")).toBeNull();
+    // Into its own namespace, under a name that namespace does not have: made, and private.
+    expect(
+      await started(
+        r.directory,
+        { namespace: "acme", name: "demo-2", source: fork },
+        "console:new:f2",
+      ),
+    ).toBe("acme/demo-2 private member");
+    // Under the name the source has there: Keel's answer for a name taken, as for any start.
+    expect(
+      await started(
+        r.directory,
+        { namespace: "acme", name: "Demo", source: fork },
+        "console:new:f3",
+      ),
+    ).toMatchObject({ status: 409, code: "project.name_taken", next: ["Choose another name"] });
+    // The fork made is its maker's to fork again, into its own namespace, and no other.
+    const again = await r.directory.findProject("acme", "demo-2");
+    expect(
+      await started(
+        r.directory,
+        { namespace: "member", name: "mine", source: { kind: "fork", project: again?.id ?? "" } },
+        "console:new:f4",
+      ),
+    ).toEqual(PRIVATE_SOURCE);
+  });
+
+  it("[fork.unseen] answers a source its reader is not read as no project at all, after saying whether the namespace is theirs to make one in", async () => {
+    // A private project, to someone who is no member: Keel has no such project, into their own namespace too.
+    const stranger = reading("stranger");
+    const member = reading("member");
+    const id = (await member.directory.findProject("acme", "demo"))?.id ?? "";
+    expect(id).toMatch(/^prj_/);
+    const fork = { kind: "fork", project: id } as const;
+    expect(
+      await started(
+        stranger.directory,
+        { namespace: "stranger", name: "demo", source: fork },
+        "console:new:u1",
+      ),
+    ).toMatchObject({ status: 404, code: "resource.not_found", next: [] });
+    // The namespace is decided first: one they are no member of is refused as that, whatever the source.
+    expect(
+      await started(
+        stranger.directory,
+        { namespace: "acme", name: "demo-2", source: fork },
+        "console:new:u2",
+      ),
+    ).toEqual({
+      status: 403,
+      code: "auth.forbidden",
+      said: "Refused: role.",
+      next: ["Ask a member: this needs that role"],
+    });
+    // An id Keel has no project under, and something that is no id of Keel's.
+    expect(
+      await started(
+        member.directory,
+        {
+          namespace: "acme",
+          name: "demo-3",
+          source: { kind: "fork", project: "prj_00000000000000000000000000" },
+        },
+        "console:new:u3",
+      ),
+    ).toMatchObject({ status: 404, code: "resource.not_found" });
+    expect(
+      await started(
+        member.directory,
+        { namespace: "acme", name: "demo-3", source: { kind: "fork", project: "acme/demo" } },
+        "console:new:u4",
+      ),
+    ).toMatchObject({ status: 400, code: "request.invalid" });
+    // A visitor forks nothing.
+    expect(
+      await started(
+        reading("visitor", "public").directory,
+        { namespace: "acme", name: "demo-2", source: fork },
+        "console:new:u5",
+      ),
+    ).toMatchObject({ status: 401, code: "auth.required" });
+    expect((await member.directory.listProjects()).map((project) => project.name)).toEqual([
+      "demo",
+    ]);
   });
 
   it("[http.namespace] finds a project under its own namespace and under no other", async () => {

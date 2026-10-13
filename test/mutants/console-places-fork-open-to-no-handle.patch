@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.fork
+# why: someone who has chosen no handle is shown the fork's form, which Keel refuses to anyone without one
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 001762e2..a8ae38aa 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -168,7 +168,6 @@ export function sentFrom(
+   const above =
+     place.at === "new-org" ||
+     place.at === "new-project" ||
+-    place.at === "fork" ||
+     place.at === "namespace" ||
+     place.at === "org" ||
+     place.at === "invite";

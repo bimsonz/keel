@@ -146,6 +146,9 @@ const again = (title: string): NextAction => ({
 });
 
 /** The one public repository the stand-in can import: every other address is told as nothing there. */
+/** Keel's id for a project, as its contract has it: what a fork names its source by. */
+const PROJECT_ID = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
+
 export const PUBLIC_REPOSITORY = "https://git.example/acme/forge-lite";
 
 /** How long an agent's code is good for. */
@@ -580,13 +583,15 @@ export function createFakeKeel(
         const source = fields(JSON.stringify(body.get("source") ?? null));
         const kind = source.get("kind");
         const address = source.get("url");
+        const forked = source.get("project");
         if (
           key.length < 8 ||
           typeof handle !== "string" ||
           typeof name !== "string" ||
           name === "" ||
-          (kind !== "empty" && kind !== "import") ||
-          (kind === "import" && typeof address !== "string")
+          (kind !== "empty" && kind !== "import" && kind !== "fork") ||
+          (kind === "import" && typeof address !== "string") ||
+          (kind === "fork" && (typeof forked !== "string" || !PROJECT_ID.test(forked)))
         )
           return problem(400, "request.invalid");
         // Whose the namespace is: the project's own, where any member may make one, or the reader's own handle.
@@ -602,6 +607,29 @@ export function createFakeKeel(
                 [{ kind: "escalate", title: "Ask a member: this needs that role" }],
                 "Refused: role.",
               );
+        }
+        // The project to fork is a second thing the body names, decided as Keel's `fork` decides it
+        // (`authorize.ts`), after the namespace: one this reader is not read is no project at all, and a
+        // private one forks only into its own namespace. A fork is made private, whatever its source is.
+        if (kind === "fork") {
+          const theirs = [...made.values()].find(
+            (one) => one.view.id === forked && one.by === reader.id,
+          )?.view;
+          const from = forked === project.id ? (visible ? project : undefined) : theirs;
+          if (from === undefined) return gone();
+          if (from.visibility === "private" && from.namespace.handle !== handle)
+            return problem(
+              403,
+              "auth.forbidden",
+              [
+                {
+                  kind: "escalate",
+                  title:
+                    "A private project forks only into its own namespace; ask whoever maintains it to make it public",
+                },
+              ],
+              "Refused: private-source.",
+            );
         }
         if (typeof address === "string" && !address.startsWith("https://"))
           return problem(

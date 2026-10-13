@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.unseen
+# why: the stand-in takes anything for a project's id, where Keel refuses a source that is not one as a request it cannot read
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index c5c97023..d652e325 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -591,7 +591,7 @@ export function createFakeKeel(
+           name === "" ||
+           (kind !== "empty" && kind !== "import" && kind !== "fork") ||
+           (kind === "import" && typeof address !== "string") ||
+-          (kind === "fork" && (typeof forked !== "string" || !PROJECT_ID.test(forked)))
++          (kind === "fork" && typeof forked !== "string")
+         )
+           return problem(400, "request.invalid");
+         // Whose the namespace is: the project's own, where any member may make one, or the reader's own handle.

@@ -1,13 +1,18 @@
 // Making a project: what a person asks Keel for. Keel starts a project one of
-// four ways; the form offers two, empty or from a public Git repository. A
-// fork starts from its source's own page, and the template kind is interim.
+// four ways; the form at `/new` offers two, empty or from a public Git
+// repository. A fork is asked for from its source's own address, where the
+// same form names the source; the template kind is interim.
 // Whether a name is free, whether a repository can be imported and who may
 // make a project in a namespace are Keel's to say: nothing here decides them.
 
 import type { CreateProjectRequest } from "../contract/keel/index.ts";
 
 /** How the form says a project starts. `ref` is a branch, and blank for the repository's default. */
-export type Start = { kind: "empty" } | { kind: "import"; url: string; ref: string };
+export type Start =
+  | { kind: "empty" }
+  | { kind: "import"; url: string; ref: string }
+  /** A fork of the project Keel has under this id: Keel names a fork's source by its id, and by nothing else. */
+  | { kind: "fork"; project: string };
 
 /** What is sent to Keel: the owner, the name as typed with no space round it, and the start. */
 export function requestOf(namespace: string, name: string, start: Start): CreateProjectRequest {
@@ -18,16 +23,22 @@ export function requestOf(namespace: string, name: string, start: Start): Create
     source:
       start.kind === "empty"
         ? { kind: "empty" }
-        : { kind: "import", url: start.url.trim(), ...(ref === "" ? {} : { ref }) },
+        : start.kind === "fork"
+          ? { kind: "fork", project: start.project }
+          : { kind: "import", url: start.url.trim(), ...(ref === "" ? {} : { ref }) },
   };
 }
 
-/** Whether there is enough to ask Keel with: an owner, a name, and a repository where one is to be imported. */
+/**
+ * Whether there is enough to ask Keel with: an owner, a name, a repository where one is to be imported, and
+ * the project where one is to be forked.
+ */
 export function ready(asked: CreateProjectRequest): boolean {
   return (
     asked.namespace !== "" &&
     asked.name !== "" &&
-    (asked.source.kind !== "import" || asked.source.url !== "")
+    (asked.source.kind !== "import" || asked.source.url !== "") &&
+    (asked.source.kind !== "fork" || asked.source.project !== "")
   );
 }
 

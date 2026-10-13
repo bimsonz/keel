@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.fork
+# why: a fork is asked for as a project started from nothing, so the person is given an empty project under the source's name
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 122f8328..cecb200d 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -24,7 +24,7 @@ export function requestOf(namespace: string, name: string, start: Start): Create
+       start.kind === "empty"
+         ? { kind: "empty" }
+         : start.kind === "fork"
+-          ? { kind: "fork", project: start.project }
++          ? { kind: "empty" }
+           : { kind: "import", url: start.url.trim(), ...(ref === "" ? {} : { ref }) },
+   };
+ }

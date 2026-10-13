@@ -2,10 +2,10 @@
 # kills: places.namespace
 # why: a reserved first segment on its own is read as a namespace's own page, so /login or /settings would be drawn as a handle's
 diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
-index 74d91a2..2de59ec 100644
+index 001762e2..6a3eb515 100644
 --- a/apps/console/src/places.ts
 +++ b/apps/console/src/places.ts
-@@ -40,8 +40,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
+@@ -46,8 +46,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
    // One segment that is no reserved word is a handle, and the address is that namespace's own page.
    if (
      segment !== undefined &&
@@ -14,4 +14,4 @@ index 74d91a2..2de59ec 100644
 +    second === undefined
    )
      return { at: "namespace", handle: segment };
-   switch (segment) {
+   // A project's own address with `fork` after it is the form that forks it: no page of a project has that name.

@@ -2,15 +2,15 @@
 # kills: new.ready
 # why: the form asks Keel to import a repository before an address has been given
 diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
-index 47d64cef..197dd4d4 100644
+index 122f8328..ed1d54cf 100644
 --- a/apps/console/src/account/starting.ts
 +++ b/apps/console/src/account/starting.ts
-@@ -27,7 +27,7 @@ export function ready(asked: CreateProjectRequest): boolean {
+@@ -37,7 +37,7 @@ export function ready(asked: CreateProjectRequest): boolean {
    return (
      asked.namespace !== "" &&
      asked.name !== "" &&
--    (asked.source.kind !== "import" || asked.source.url !== "")
-+    true
+-    (asked.source.kind !== "import" || asked.source.url !== "") &&
++    true &&
+     (asked.source.kind !== "fork" || asked.source.project !== "")
    );
  }
- 

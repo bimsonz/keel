@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.fork
+# why: an address under a reserved first segment is read as a project's fork, so a page of an org's or of /new is taken for one
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 001762e2..6cbffe9c 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -54,8 +54,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
+   if (
+     segment !== undefined &&
+     second !== undefined &&
+-    third === "fork" &&
+-    !RESERVED_SEGMENTS.some((word) => word === segment)
++    third === "fork"
+   )
+     return { at: "fork", namespace: segment, project: second };
+   switch (segment) {

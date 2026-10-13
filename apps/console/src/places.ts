@@ -17,6 +17,8 @@ export type Place =
   | { at: "new-org" }
   /** Making a project. `owner` is the namespace the link here named, where it named one. */
   | { at: "new-project"; owner?: string }
+  /** Forking a project, at the project's own address with `fork` after it, as a code host has it. */
+  | { at: "fork"; namespace: string; project: string }
   /** A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. */
   | { at: "namespace"; handle: string }
   /** An org's members and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
@@ -48,6 +50,14 @@ export function placeOf(pathname: string, search = ""): Place | null {
     !RESERVED_SEGMENTS.some((word) => word === segment)
   )
     return { at: "namespace", handle: segment };
+  // A project's own address with `fork` after it is the form that forks it: no page of a project has that name.
+  if (
+    segment !== undefined &&
+    second !== undefined &&
+    third === "fork" &&
+    !RESERVED_SEGMENTS.some((word) => word === segment)
+  )
+    return { at: "fork", namespace: segment, project: second };
   switch (segment) {
     case "new": {
       if (second === undefined) {
@@ -90,6 +100,8 @@ function pathOf(place: Place): string[] {
       return ["new", "org"];
     case "new-project":
       return ["new"];
+    case "fork":
+      return [place.namespace, place.project, "fork"];
     case "namespace":
       return [place.handle];
     case "org":
@@ -156,6 +168,7 @@ export function sentFrom(
   const above =
     place.at === "new-org" ||
     place.at === "new-project" ||
+    place.at === "fork" ||
     place.at === "namespace" ||
     place.at === "org" ||
     place.at === "invite";

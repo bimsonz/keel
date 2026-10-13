@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.call
+# why: the stand-in makes a fork public, where Keel makes every fork private whoever may read its source
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index c5c97023..467f36bf 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -671,7 +671,7 @@ export function createFakeKeel(
+           namespace:
+             handle === project.namespace.handle ? project.namespace : { handle, kind: "user" },
+           name: name.toLowerCase(),
+-          visibility: "private",
++          visibility: kind === "fork" ? "public" : "private",
+           createdAt: new Date(now()).toISOString(),
+           viewer: { role: reader.role ?? "owner" },
+         };

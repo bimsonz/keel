@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.unseen
+# why: the stand-in decides a fork of a project its reader is not read, and so says the project is there
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index c5c97023..0010865f 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -615,7 +615,7 @@ export function createFakeKeel(
+           const theirs = [...made.values()].find(
+             (one) => one.view.id === forked && one.by === reader.id,
+           )?.view;
+-          const from = forked === project.id ? (visible ? project : undefined) : theirs;
++          const from = forked === project.id ? project : theirs;
+           if (from === undefined) return gone();
+           if (from.visibility === "private" && from.namespace.handle !== handle)
+             return problem(

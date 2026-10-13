@@ -22,6 +22,19 @@ describe("making a project: what is asked of Keel", () => {
     ).toEqual({ kind: "import", url: "https://git.example/a/b", ref: "main" });
   });
 
+  it("[new.fork] asks for a fork by Keel's id for its source, under the name as typed, and has nothing to ask until there is a source", () => {
+    const source = "prj_01JF0RKSOURCE0000000000000";
+    expect(requestOf("ada", " Demo ", { kind: "fork", project: source })).toEqual({
+      namespace: "ada",
+      name: "Demo",
+      source: { kind: "fork", project: source },
+    });
+    expect(ready(requestOf("ada", "demo", { kind: "fork", project: source }))).toBe(true);
+    expect(ready(requestOf("ada", "demo", { kind: "fork", project: "" }))).toBe(false);
+    expect(ready(requestOf("ada", " ", { kind: "fork", project: source }))).toBe(false);
+    expect(ready(requestOf("", "demo", { kind: "fork", project: source }))).toBe(false);
+  });
+
   it("[new.ready] has nothing to ask until there is an owner, a name, and an address where a repository is to be imported", () => {
     expect(ready(requestOf("ada", "notes", { kind: "empty" }))).toBe(true);
     expect(ready(requestOf("ada", "   ", { kind: "empty" }))).toBe(false);

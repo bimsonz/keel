@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.call
+# why: the stand-in refuses a fork as a start it does not know, where Keel makes one
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index c5c97023..b064903b 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -589,7 +589,7 @@ export function createFakeKeel(
+           typeof handle !== "string" ||
+           typeof name !== "string" ||
+           name === "" ||
+-          (kind !== "empty" && kind !== "import" && kind !== "fork") ||
++          (kind !== "empty" && kind !== "import") ||
+           (kind === "import" && typeof address !== "string") ||
+           (kind === "fork" && (typeof forked !== "string" || !PROJECT_ID.test(forked)))
+         )

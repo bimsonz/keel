@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.fork
+# why: a visitor is left on the fork's address, where nothing is drawn for them, and is not sent to sign in
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 001762e2..dbfe51d8 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -160,7 +160,8 @@ export function sentFrom(
+     place.at === "login" ||
+     place.at === "signup" ||
+     place.at === "namespace" ||
+-    place.at === "sponsor";
++    place.at === "sponsor" ||
++    place.at === "fork";
+   if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
+   if (place.at === "login") return nextOf(here.search);
+   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);

@@ -1677,7 +1677,8 @@ const readerOf = async (request: Request): Promise<Reader> => {
   const who = await asThem.who().catch(() => null);
   if (who === null) return null;
   // A person's own namespace has nobody in it but them: Keel reads them as its owner, and anyone else as no member.
-  return who.handle === NAMESPACE.handle ? { role: "owner" } : {};
+  // Keel knows a reader by their account: whose a namespace is, and whose a project it made is, turn on it.
+  return who.handle === NAMESPACE.handle ? { role: "owner", id: who.id } : { id: who.id };
 };
 
 // Two Keels, alike but for who may read the project: on one its org has made it public, on the other it has not.
@@ -2232,6 +2233,21 @@ expectEqual(
   "visitor: the frame's way in comes back to the page it was on",
   `${new URL(wayIn, built).pathname} ${new URL(wayIn, built).searchParams.get("next")}`,
   "/login /ada/demo/escalations/E-1",
+);
+// A public project's frame offers its fork to a visitor too. Its form is for someone signed in, so a visitor
+// goes by the sign-in page and comes back to it.
+const wayToFork =
+  (await visitor
+    .getByRole("link", { name: "Fork", exact: true })
+    .first()
+    .getAttribute("href", { timeout: 5_000 })
+    .catch(() => null)) ?? "no way to fork";
+await visitor.goto(`${built}/ada/demo/fork`, { waitUntil: "domcontentloaded" });
+await visitor.waitForURL(/\/login/, { timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "visitor: a public project's frame offers its fork, and the form sends a visitor to sign in and back to it",
+  `${wayToFork} | ${new URL(visitor.url()).pathname}${new URL(visitor.url()).search}`,
+  "/ada/demo/fork | /login?next=%2Fada%2Fdemo%2Ffork",
 );
 
 // A handle's own page. Whose a handle is, Keel says to anyone who asks, and the page is worded from that: a
@@ -3129,7 +3145,7 @@ expectEqual(
 expectEqual(
   "member: the frame names the org, the project and who is reading",
   squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "",
-  "Keel / ada / demo private Live ada",
+  "Keel / ada / demo private Fork Live ada",
 );
 // Beside the project's name, the org's projects; beside the org's, the reader's orgs: a code host's frame.
 await person.getByRole("button", { name: "Switch project" }).click();
@@ -3251,6 +3267,38 @@ expectEqual(
   await waitingSaid(guest),
   "1 | 0 listed",
 );
+// She may fork it. A public project is forked by anyone signed in, into a namespace of theirs: Keel is asked
+// for a fork by its own id for the source, and what it makes is private, though its source is not.
+const forksOfOpen = (): Call[] =>
+  open.calls.filter((call) => call.method === "POST" && call.path === "/v1/projects");
+await guest.goto(`${built}/ada/demo/fork`, { waitUntil: "domcontentloaded" });
+await guest
+  .getByRole("heading", { level: 1, name: "Fork ada/demo" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const publicId: string = await guest.evaluate(async () => {
+  const answer: { id?: string } = await (await fetch("/v1/namespaces/ada/projects/demo")).json();
+  return answer.id ?? "no id";
+});
+const ownerOfFork = await guest
+  .getByLabel("Owner")
+  .inputValue({ timeout: 5_000 })
+  .catch(() => "no owner");
+const forksBefore = forksOfOpen().length;
+await guest
+  .getByRole("button", { name: "Fork the project" })
+  .click({ timeout: 5_000 })
+  .catch(() => undefined);
+await guest.waitForURL(`${built}/grace/demo`, { timeout: 10_000 }).catch(() => undefined);
+await guest
+  .getByRole("navigation", { name: "Project" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fork: someone signed in who is no member forks a public project into their own account, by Keel's id for it, and lands on the fork, which is private",
+  `${ownerOfFork} | ${pathOf(guest)} | ${(forksOfOpen().at(-1)?.body ?? "nothing sent").replace(publicId, "{the source's id}")} | ${forksOfOpen().length - forksBefore} asked | ${await guest.getByText("private", { exact: true }).count()} private`,
+  'grace | /grace/demo | {"namespace":"grace","name":"demo","source":{"kind":"fork","project":"{the source\'s id}"}} | 1 asked | 1 private',
+);
 await visiting.close();
 await second.close();
 
@@ -3368,7 +3416,7 @@ await person
 expectEqual(
   "settings: made public, the page and the frame say what Keel answered",
   `${await readersSaid()} | ${await frameSaid()}`,
-  "public Anyone reads its code and its log, signed in or not. | Keel / ada / demo public Live ada",
+  "public Anyone reads its code and its log, signed in or not. | Keel / ada / demo public Fork Live ada",
 );
 const replaced = shut.calls.filter((call) => call.method === "PUT");
 expectEqual(
@@ -3414,7 +3462,7 @@ await publishing.waitFor();
 expectEqual(
   "settings: one click makes it private again",
   `${await readersSaid()} | ${await frameSaid()} | ${shut.calls.filter((call) => call.method === "PUT").length}`,
-  "private Only ada reads it. | Keel / ada / demo private Live ada | 2",
+  "private Only ada reads it. | Keel / ada / demo private Fork Live ada | 2",
 );
 expectEqual(
   "settings: and a visitor is told of it what they are told of a project that is not there",
@@ -3524,6 +3572,77 @@ expectEqual(
         : "not a link",
     ),
   "/new?owner=ada",
+);
+// ── A fork, at the project's own address ──
+// A project's frame has the way to fork it. The form there is the one that makes a project, with the source
+// named: it starts under the source's name, and offers no other way to start.
+const forkIt = person.getByRole("button", { name: "Fork the project" });
+await person.goto(`${built}/ada/demo`, { waitUntil: "domcontentloaded" });
+await person
+  .getByRole("navigation", { name: "Project" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fork: a project's frame has the way to fork it, at the project's own address",
+  (await person
+    .getByRole("link", { name: "Fork", exact: true })
+    .first()
+    .getAttribute("href", { timeout: 5_000 })
+    .catch(() => null)) ?? "no way to fork",
+  "/ada/demo/fork",
+);
+await person.goto(`${built}/ada/demo/fork`, { waitUntil: "domcontentloaded" });
+await person
+  .getByRole("heading", { level: 1, name: "Fork ada/demo" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await shot(person, "fork");
+expectEqual(
+  "fork: the form names the project forked, starts under its name, says the fork starts private, and offers no other start",
+  `${squash(await person.getByRole("heading", { level: 1 }).first().innerText())} | ${await person
+    .getByLabel("Name")
+    .inputValue({ timeout: 5_000 })
+    .catch(
+      () => "no name",
+    )} | ${await person.getByText(/It starts private/).count()} | ${await person.locator('input[name="start"]').count()} starts`,
+  "Fork ada/demo | demo | 1 | 0 starts",
+);
+// Under the name its source has in that namespace, Keel refuses it as it refuses any name taken, and the
+// reader stays on the form.
+const beforeFork = creates().length;
+await forkIt.click({ timeout: 5_000 }).catch(() => undefined);
+expectEqual(
+  "fork: Keel's refusal of a fork is said in its words, with its way forward, and nothing is made",
+  `${await refusedOn(person)} | ${pathOf(person)}`,
+  'The org already has a project named "demo", in some case. Choose another name | /ada/demo/fork',
+);
+// Under a name of its own it is made, in the source's own namespace, which is where a private project forks.
+await person
+  .getByLabel("Name")
+  .fill("demo-fork", { timeout: 5_000 })
+  .catch(() => undefined);
+await forkIt.click({ timeout: 5_000 }).catch(() => undefined);
+await person.waitForURL(`${built}/ada/demo-fork`, { timeout: 10_000 }).catch(() => undefined);
+await person
+  .getByRole("navigation", { name: "Project" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fork: Keel is asked for a fork of the project by its own id, under a key made for the attempt, and the reader lands on the fork",
+  `${pathOf(person)} | ${(creates().at(-1)?.body ?? "nothing sent").replace(/prj_[0-9A-Z]{26}/, "{id}")} | ${creates().length - beforeFork} asked | ${/^console:new:[0-9a-f-]{36}$/.test(creates().at(-1)?.idempotencyKey ?? "")} | ${creates().at(-1)?.authorization === ""}`,
+  '/ada/demo-fork | {"namespace":"ada","name":"demo-fork","source":{"kind":"fork","project":"{id}"}} | 2 asked | true | true',
+);
+// A project Keel does not read this person has no fork to offer: it is told as no project, as it is anywhere.
+await person.goto(`${built}/ada/none/fork`, { waitUntil: "domcontentloaded" });
+await person
+  .getByRole("heading", { level: 1 })
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "fork: a project that is not there has no fork, and is said to be none",
+  `${squash(await person.getByRole("heading", { level: 1 }).first().innerText())} | ${await forkIt.count()} forms`,
+  "There is no project ada/none here | 0 forms",
 );
 // A visitor is sent to sign in, and back to the form.
 const outside = await browser.newContext({ viewport: { width: 1280, height: 900 } });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: fork.private
+# why: the stand-in forks a private project into any namespace its reader may make one in, where Keel keeps it to its own
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index c5c97023..994d2fe4 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -617,7 +617,7 @@ export function createFakeKeel(
+           )?.view;
+           const from = forked === project.id ? (visible ? project : undefined) : theirs;
+           if (from === undefined) return gone();
+-          if (from.visibility === "private" && from.namespace.handle !== handle)
++          if (from.visibility === "private" && from.namespace.handle === "")
+             return problem(
+               403,
+               "auth.forbidden",

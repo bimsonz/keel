@@ -109,6 +109,26 @@ describe("the pages above every project", () => {
     expect(sentFrom({ at: "new-project" }, { is: "user", handle: "ada" }, bare)).toBeNull();
   });
 
+  it("[places.fork] has forking a project at the project's own address with fork after it, for someone signed in who has a handle", () => {
+    expect(placeOf("/acme/demo/fork")).toEqual({ at: "fork", namespace: "acme", project: "demo" });
+    expect(hrefOf({ at: "fork", namespace: "acme", project: "demo" })).toBe("/acme/demo/fork");
+    // Nothing else under a project is the form, and nothing under a reserved first segment is a project.
+    for (const address of [
+      "/acme/demo/forks",
+      "/acme/demo/fork/again",
+      "/acme/demo",
+      "/new/demo/fork",
+    ])
+      expect(placeOf(address)).not.toMatchObject({ at: "fork" });
+    expect(placeOf("/orgs/demo/fork")).toBeNull();
+    // A visitor signs in first and comes back to the form; someone with no handle chooses one first.
+    const fork = { at: "fork", namespace: "acme", project: "demo" } as const;
+    const here = { pathname: "/acme/demo/fork", search: "" };
+    expect(sentFrom(fork, { is: "visitor" }, here)).toBe("/login?next=%2Facme%2Fdemo%2Ffork");
+    expect(sentFrom(fork, { is: "user" }, here)).toBe("/signup?next=%2Facme%2Fdemo%2Ffork");
+    expect(sentFrom(fork, { is: "user", handle: "ada" }, here)).toBeNull();
+  });
+
   it("[places.sent] sends a visitor to sign in and back to the page they asked for, an invitation included", () => {
     const visitor = { is: "visitor" } as const;
     expect(sentFrom({ at: "invite", id: "inv_1" }, visitor, at("/invite/inv_1"))).toBe(

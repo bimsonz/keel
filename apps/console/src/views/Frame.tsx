@@ -252,6 +252,15 @@ export function Frame({
             )}
           </div>
           <span className="flex items-center gap-4">
+            {/* A project Keel read this reader may be forked by them: Keel says into where. A visitor signs in first. */}
+            {project !== "" && visibility !== undefined && reader !== undefined && (
+              <a
+                href={hrefOf({ at: "fork", namespace, project })}
+                className="text-sm text-kumo-default hover:underline"
+              >
+                Fork
+              </a>
+            )}
             <Source source={source} />
             {reader !== undefined && <ReaderLink reader={reader} />}
           </span>

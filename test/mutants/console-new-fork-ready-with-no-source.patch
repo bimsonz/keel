@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.fork
+# why: the form asks Keel for a fork before it has the project to fork
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 122f8328..05a783dc 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -38,7 +38,7 @@ export function ready(asked: CreateProjectRequest): boolean {
+     asked.namespace !== "" &&
+     asked.name !== "" &&
+     (asked.source.kind !== "import" || asked.source.url !== "") &&
+-    (asked.source.kind !== "fork" || asked.source.project !== "")
++    true
+   );
+ }
+ 
