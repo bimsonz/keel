@@ -1,14 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
 # kills: project.source-unknown
-# why: a name that is no template and no project's trunk is forked as a template, so any repo in the core namespace is copied by guessing its name
+# why: a name that is no template is forked as one, so any repo in the core namespace is copied by guessing its name
 diff --git a/packages/core/src/application/integration/project-source.ts b/packages/core/src/application/integration/project-source.ts
-index 40b17f4..bc3be49 100644
+index ceb46162..77d4a89a 100644
 --- a/packages/core/src/application/integration/project-source.ts
 +++ b/packages/core/src/application/integration/project-source.ts
-@@ -45,5 +45,5 @@ export const projectSource = (source: string): ProjectSource | UnknownSource =>
-   const projectId = decodeProjectId(`prj_${source.slice("prj-".length).toUpperCase()}`);
-   return Option.isSome(projectId) && projectRepos(projectId.value).trunk.name === source
-     ? { _tag: "Project", projectId: projectId.value }
--    : UNKNOWN;
-+    : { _tag: "Template", repo: source };
- };
+@@ -132,7 +132,7 @@ export const projectSource = (
+ ): ProjectSource | UnknownSource | RefusedSource => {
+   if (source.kind === "empty") return { _tag: "Empty" };
+   if (source.kind === "template")
+-    return PROJECT_TEMPLATES.has(source.name) ? { _tag: "Template", repo: source.name } : UNKNOWN;
++    return PROJECT_TEMPLATES.has(source.name) ? { _tag: "Template", repo: source.name } : { _tag: "Template", repo: source.name };
+   if (source.kind === "fork")
+     return Option.match(decodeProjectId(source.project), {
+       onNone: () => UNKNOWN,

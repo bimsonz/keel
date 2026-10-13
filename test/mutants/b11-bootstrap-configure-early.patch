@@ -2,13 +2,13 @@
 # kills: b11.bootstrap-order
 # why: the pool is configured before trunk is synced, so it forks a mirror that is still empty
 diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
-index b1d28ea..205b932 100644
+index 6177185e..b474cdcf 100644
 --- a/packages/core/src/application/integration/create-project.ts
 +++ b/packages/core/src/application/integration/create-project.ts
-@@ -112,8 +112,8 @@ export const createProject: (
-   const trunks = yield* Trunks;
-   // A retry names the same head (trunk was forked once), so only a trunk moved by someone else refuses.
-   yield* Effect.orDie(trunks.initialize(projectId, head, command.by));
+@@ -216,8 +216,8 @@ export const createProject: (
+       .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
+   if (!(yield* exists(repos.mirror)))
+     yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
 -  yield* trunks.sync(projectId);
    yield* (yield* WorkspacePool).configure(projectId, { source: repos.mirror, target: poolTarget });
 +  yield* trunks.sync(projectId);

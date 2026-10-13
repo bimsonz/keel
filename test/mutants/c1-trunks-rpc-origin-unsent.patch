@@ -2,7 +2,7 @@
 # kills: trunk.do.origin
 # why: The port names every trunk's start as empty, whatever origin its caller gave
 diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
-index 116f81eb..c4d0f80f 100644
+index 3734aae1..6a9a61cd 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
 @@ -28,7 +28,7 @@ export function TrunksRpc(
@@ -11,6 +11,6 @@ index 116f81eb..c4d0f80f 100644
          callObject(TrunkCodecs.initialize, () =>
 -          trunk(projectId).initialize(head, by, encodeOrigin(origin)),
 +          trunk(projectId).initialize(head, by, { kind: "empty" }),
-         ).pipe(Effect.asVoid),
-       origin: (projectId) =>
-         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+         ).pipe(
+           Effect.asVoid,
+           Effect.catchTag("ImportTooLarge", (large) => Effect.fail(new ImportTooLarge(large))),

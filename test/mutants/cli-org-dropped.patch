@@ -2,14 +2,14 @@
 # kills: cli.session
 # why: project create sends no namespace, so every project the CLI makes is refused (or lands wherever a default puts it)
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 3dfc161..0305bce 100644
+index c6d22bc5..6cc88d01 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -176,7 +176,6 @@ async function dispatch(
+@@ -210,7 +210,6 @@ async function dispatch(
      case "project create":
        return client.createProject(
          {
 -          namespace: required(values.namespace, "namespace"),
            name: required(values.name, "name"),
-           source: required(values.source, "source"),
+           source: sourceOf(values),
          },

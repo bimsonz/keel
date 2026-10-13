@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/integration/project-source.test.ts
+# kills: project.source-fork
+# why: a project's id with something after it is taken for the project, so a fork is decided on a project its request did not name
+diff --git a/packages/core/src/application/integration/project-source.ts b/packages/core/src/application/integration/project-source.ts
+index ceb46162..1b81e25d 100644
+--- a/packages/core/src/application/integration/project-source.ts
++++ b/packages/core/src/application/integration/project-source.ts
+@@ -134,7 +134,7 @@ export const projectSource = (
+   if (source.kind === "template")
+     return PROJECT_TEMPLATES.has(source.name) ? { _tag: "Template", repo: source.name } : UNKNOWN;
+   if (source.kind === "fork")
+-    return Option.match(decodeProjectId(source.project), {
++    return Option.match(decodeProjectId(source.project.slice(0, 30)), {
+       onNone: () => UNKNOWN,
+       onSome: (projectId): ProjectSource => ({ _tag: "Project", projectId }),
+     });

@@ -2,22 +2,22 @@
 # kills: trunk.do.no-org
 # why: Through the real object and D1: a trunk is initialized before its project's place is asked for, so a project no org holds is left with a trunk
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index f4e7f68..82a2530 100644
+index cee77cfe..0068e1e4 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -193,7 +193,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
-   head: CommitSha,
+@@ -204,7 +204,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
    by: string,
+   origin: TrunkOrigin,
  ) {
 -  const org = yield* orgOf(projectId);
-   const committed = yield* promote(projectId, { _tag: "Initialize", head, by }, "initialize", head);
+   if (origin.kind !== "empty" && origin.commit !== head)
+     return yield* Effect.die(
+       new Error(`trunk ${projectId} starts at ${head}, and its origin names ${origin.commit}`),
+@@ -224,6 +223,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+     "initialize",
+     head,
+   ).pipe(Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }));
++  const org = yield* orgOf(projectId);
    const trunk = trunkOf(yield* EntityStore, projectId);
    if (trunk === undefined)
-@@ -206,6 +205,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
-       phase: trunk.phase,
-       command: "Initialize",
-     });
-+  const org = yield* orgOf(projectId);
-   const bytes = yield* (yield* TrunkWriter).historyBytes(head);
-   yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
-   return trunk;
+     return yield* Effect.die(

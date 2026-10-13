@@ -1,16 +1,20 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/operator.test.ts -t "a11b.source"
-# kills: a11b.source
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: project.source-absent
 # why: a missing source answers 404 with no next action
 diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
-index f03a226..e0bf52d 100644
+index 8ca67339..b6a7dc1e 100644
 --- a/apps/keel/src/adapters/driving/http/operator.ts
 +++ b/apps/keel/src/adapters/driving/http/operator.ts
-@@ -68,7 +68,7 @@ export function createProjectError(
+@@ -239,11 +239,7 @@ export function createProjectError(
          status: 404,
          body: problem(404, "resource.not_found", caller.requestId, {
            detail: `No source repo ${error.repo.name} in namespace ${error.repo.namespace}.`,
 -          nextActions: [
-+          nextActions: [] || [
-             {
-               kind: "call",
-               title: `Create or push the source repo ${error.repo.name}, then create the project again`,
+-            again(
+-              `Create or push the source repo ${error.repo.name}, then create the project again`,
+-            ),
+-          ],
++          nextActions: [],
+         }),
+       };
+     case "ImportRefused": {

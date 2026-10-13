@@ -2,18 +2,27 @@
 # kills: project.create-heals
 # why: the Project DO is made before the project's place is taken, so trunk is initialized with no place and a taken name is found only once a second project exists
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index 29b1b34..6c7c68c 100644
+index 2da55a30..7d97ccab 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
-@@ -69,9 +69,10 @@ export const createProject: (
+@@ -68,14 +68,14 @@ export const createProject: (
    const placed = yield* places.byId(projectId);
    if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
      return yield* new IdempotencyConflict({ idempotencyKey });
--  yield* places.assign({ projectId, namespace, name });
-   const source = sourceRepo(input.source);
--  return yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
-+  const project = yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
-+  yield* places.assign({ projectId, namespace, name });
++  const project = yield* (yield* Projects).create(actor, {
++    projectId,
++    name,
++    source: input.source,
++    idempotencyKey,
++  });
+   yield* places.assign({ projectId, namespace, name });
+-  return yield* (yield* Projects)
+-    .create(actor, { projectId, name, source: input.source, idempotencyKey })
+-    .pipe(
+-      Effect.tapError((refused) =>
+-        refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),
+-      ),
+-    );
 +  return project;
  });
  

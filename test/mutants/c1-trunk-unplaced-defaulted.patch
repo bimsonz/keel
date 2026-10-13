@@ -2,18 +2,18 @@
 # kills: trunk.no-org, trunk.no-org-init
 # why: A project with no place is counted against a made-up org, so its trunk is initialized and pushed with nobody's quota bounding it
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 8690d5f6..57f88f84 100644
+index cee77cfe..b2b3ed15 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -19,6 +19,7 @@ import type {
-   CommitSha,
+@@ -21,6 +21,7 @@ import type {
    EntityRef,
    EventEnvelope,
+   Instant,
 +  NamespaceId,
    ProjectId,
  } from "../../domain/kernel/index.ts";
  import {
-@@ -112,9 +113,7 @@ export const PACK_OVERHEAD_BYTES = 32;
+@@ -116,9 +117,7 @@ export const PACK_OVERHEAD_BYTES = 32;
  const orgOf = (projectId: ProjectId) =>
    projectNamespace(projectId).pipe(
      Effect.catchTag("ProjectUnplaced", () =>
