@@ -1,5 +1,5 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/d1-unavailable.test.ts
-# kills: d1.away-mount
+# kills: d1.away-mount, d1.away-token
 # why: Better Auth's own 503 is passed on as it is, a body that is no problem and names no wait
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
 index ae697c0d..e960dc82 100644

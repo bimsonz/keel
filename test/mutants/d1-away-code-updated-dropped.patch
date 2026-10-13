@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/d1-unavailable.test.ts
+# kills: d1.unavailable-list
+# why: what D1 says while it restarts after Cloudflare updates its code is not in the list, so a request that meets the restart is answered 500
+diff --git a/apps/keel/src/adapters/driven/d1/unavailable.ts b/apps/keel/src/adapters/driven/d1/unavailable.ts
+index 2c2e176d..5f944359 100644
+--- a/apps/keel/src/adapters/driven/d1/unavailable.ts
++++ b/apps/keel/src/adapters/driven/d1/unavailable.ts
+@@ -5,7 +5,6 @@
+  * Keel's own defect and has no place here.
+  */
+ export const D1_AWAY = [
+-  "D1 DB reset because its code was updated.",
+   "Network connection lost.",
+   "Replica disconnected from primary.",
+   "Internal error in D1 DB storage caused object to be reset.",
