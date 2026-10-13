@@ -2,13 +2,13 @@
 # kills: b12.envelope-project
 # why: commit() drops the spec's project, so no event says which project it belongs to and nothing is labelled
 diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
-index eafc51b..c4aef86 100644
+index 022dee2b..c0dd0b2c 100644
 --- a/packages/core/src/application/ports/event-outbox.ts
 +++ b/packages/core/src/application/ports/event-outbox.ts
-@@ -236,7 +236,6 @@ export function envelopesFor(
-       dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
+@@ -279,7 +279,6 @@ export function envelopesFor(
        ...(spec.causation === undefined ? {} : { causation: spec.causation }),
        ...(spec.actor === undefined ? {} : { actor: spec.actor }),
+       ...(spec.run === undefined ? {} : { run: spec.run }),
 -      ...(spec.project === undefined ? {} : { project: spec.project }),
        affected: draft.affected ?? [],
        notified: subscribers(type, { entity, affected: draft.affected ?? [] }),

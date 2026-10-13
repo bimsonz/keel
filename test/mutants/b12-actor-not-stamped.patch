@@ -2,14 +2,14 @@
 # kills: b12.no-self-loop
 # why: commit() drops the command's actor from the envelopes, so no receiver can tell an agent's own events apart
 diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
-index eafc51b..5f95d4f 100644
+index 022dee2b..b0f88d24 100644
 --- a/packages/core/src/application/ports/event-outbox.ts
 +++ b/packages/core/src/application/ports/event-outbox.ts
-@@ -235,7 +235,6 @@ export function envelopesFor(
+@@ -277,7 +277,6 @@ export function envelopesFor(
        at,
        dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
        ...(spec.causation === undefined ? {} : { causation: spec.causation }),
 -      ...(spec.actor === undefined ? {} : { actor: spec.actor }),
+       ...(spec.run === undefined ? {} : { run: spec.run }),
        ...(spec.project === undefined ? {} : { project: spec.project }),
        affected: draft.affected ?? [],
-       notified: subscribers(type, { entity, affected: draft.affected ?? [] }),

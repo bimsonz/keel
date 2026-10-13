@@ -2,14 +2,14 @@
 # kills: t35.resolve-escalate
 # why: a party's escalate is committed under no name, so the log does not say who escalated and the agent is notified of its own move
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 23f9e41..14c7cc7 100644
+index 90996504..31846c56 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -209,7 +209,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+@@ -210,7 +210,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
        cause: command.idempotencyKey,
        fingerprint,
        project: at.projectId,
--      actor: agentActor(command.agentId),
+-      ...byAgent(command.agentId, command.run),
      },
      conflictMove(conflictId, escalate),
    ).pipe(
