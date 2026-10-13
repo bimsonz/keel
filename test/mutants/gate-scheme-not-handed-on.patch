@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.agent-token
+# why: every agent token is handed on as presented under the DPoP scheme, so the check cannot refuse a key-bound token sent as a plain bearer
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+index 7fd2d651..47b8a579 100644
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -191,7 +191,7 @@ export async function gate(
+       const answer = await deps.agentToken(
+         {
+           token,
+-          scheme,
++          scheme: "DPoP",
+           proof: request.headers.get("dpop") ?? undefined,
+           method: request.method,
+           // Keel's own origin, never the request's Host: a proof is for the address Keel answers on.
