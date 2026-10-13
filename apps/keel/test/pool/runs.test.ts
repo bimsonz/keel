@@ -430,3 +430,24 @@ describe("an agent's two runs, each with its own token", () => {
     expect(asNone.frames).toEqual([[agent.forAll]]);
   });
 });
+
+describe("an agent asks for a project in its own namespace", () => {
+  it("[run.own-project-held] until an agent can make a project, asking for one in its own namespace answers a problem that says so, never a defect", async () => {
+    const agent = await keyAgent();
+    const me = await asAgent(agent.a.token, "/v1/agents/me");
+    const { handle } = (await me.json<{ result: { agent: { handle: string } } }>()).result.agent;
+    const response = await asAgent(agent.a.token, "/v1/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": `create-${ulid()}` },
+      body: JSON.stringify({
+        namespace: handle,
+        name: `own-${ulid().toLowerCase()}`,
+        source: { kind: "empty" },
+      }),
+    });
+    expect([response.status, (await response.json<{ code: string }>()).code]).toEqual([
+      503,
+      "service.not_implemented",
+    ]);
+  });
+});

@@ -935,6 +935,10 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         // import's URL and branch by Keel's own rules, and a project to fork, which is a second resource
         // named in the body, decided as a fork.
         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
+          // The policy lets an agent create in its own namespace, and the creation is still a person's:
+          // an agent is told it has not landed, where naming the acting person would be a defect.
+          if (caller.principal._tag !== "User")
+            return Promise.resolve(notImplemented(caller.requestId));
           const source = projectSource(input.source);
           if (source._tag === "Unknown") return Promise.resolve(sourceNotFound(caller, input));
           if (source._tag === "Refused") return Promise.resolve(sourceRefused(caller, source));

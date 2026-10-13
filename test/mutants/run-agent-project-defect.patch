@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.own-project-held
+# why: an agent the policy lets create in its own namespace reaches a handler that names the acting person, and is answered a defect
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index cfbb3038..15236436 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -935,8 +935,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
+           // The policy lets an agent create in its own namespace, and the creation is still a person's:
+           // an agent is told it has not landed, where naming the acting person would be a defect.
+-          if (caller.principal._tag !== "User")
+-            return Promise.resolve(notImplemented(caller.requestId));
+           const source = projectSource(input.source);
+           if (source._tag === "Unknown") return Promise.resolve(sourceNotFound(caller, input));
+           if (source._tag === "Refused") return Promise.resolve(sourceRefused(caller, source));
