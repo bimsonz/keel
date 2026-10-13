@@ -54,6 +54,7 @@ const change = (from: readonly string[] | null | undefined, to?: string): Rule =
 /** The first rule whose field the payload has names the entity the envelope must carry. */
 const RULES: Record<EventType, Rule[]> = {
   AgentEnrolled: [{ kind: "agent", idField: "agentId", from: null, to: "active" }],
+  AgentSignedUp: [{ kind: "agent", idField: "agentId", from: null, to: "active" }],
   AgentSuspended: [{ kind: "agent", idField: "agentId", from: ["active"], to: "suspended" }],
   AgentReinstated: [{ kind: "agent", idField: "agentId", from: ["suspended"], to: "active" }],
   AgentRevoked: [

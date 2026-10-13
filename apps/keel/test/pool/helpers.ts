@@ -122,7 +122,7 @@ export async function seedAgent(
     ...(placed ? { org: POOL_ORG, sponsor: POOL_SPONSOR } : {}),
     ...overrides,
   };
-  if (placed && agent.org !== undefined) {
+  if (placed && agent.org !== undefined && agent.projectId !== undefined) {
     await placeProject(agent.projectId, agent.org);
     await establishProject(agent.projectId);
   }

@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { AgentId, NamespaceId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
 import { AgentKind, Scope } from "./agent.ts";
+import { PresentedKey } from "./agent-key.ts";
 import { Handle, Role } from "./tenancy.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
@@ -13,6 +14,17 @@ export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   org: Schema.optional(NamespaceId),
   /** The user who minted the agent's credential: its sponsor, accountable for it. */
   sponsor: Schema.optional(UserId),
+});
+/**
+ * An agent signed itself up with a key: no person, no project. Its
+ * id and handle are made from that key.
+ */
+export const AgentSignedUp = Schema.TaggedStruct("AgentSignedUp", {
+  agentId: AgentId,
+  handle: Handle,
+  /** What the agent calls itself: a label, never an address. */
+  name: Schema.optional(Schema.NonEmptyString),
+  key: PresentedKey,
 });
 export const AgentSuspended = Schema.TaggedStruct("AgentSuspended", {
   agentId: AgentId,
@@ -46,6 +58,7 @@ export const AgentUnsponsored = Schema.TaggedStruct("AgentUnsponsored", {
 /** The events of one agent, which the AgentSession DO commits. */
 export const AgentEvent = Schema.Union([
   AgentEnrolled,
+  AgentSignedUp,
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
@@ -114,6 +127,7 @@ export const OrgDeleted = Schema.TaggedStruct("OrgDeleted", {
 
 export const IdentityEvent = Schema.Union([
   AgentEnrolled,
+  AgentSignedUp,
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,

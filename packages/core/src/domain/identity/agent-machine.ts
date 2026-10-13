@@ -12,18 +12,24 @@ import {
   type UserId,
 } from "../kernel/index.ts";
 import type { Agent, AgentKind, Scope } from "./agent.ts";
+import type { PresentedKey } from "./agent-key.ts";
 import { AgentNotKnown, AgentStateRefused } from "./errors.ts";
 import {
   AgentEnrolled,
   type AgentEvent,
   AgentReinstated,
   AgentRevoked,
+  AgentSignedUp,
   AgentSponsored,
   AgentSuspended,
   AgentUnsponsored,
 } from "./events.ts";
+import type { Handle } from "./tenancy.ts";
 
-/** An operator's command on an agent; the doorway checks the `operator` scope. */
+/** What an agent that signs up by key may do, until an org it is invited into says otherwise. */
+const SIGNED_UP_SCOPES: readonly Scope[] = ["agent:work", "agent:read"];
+
+/** A command on an agent: its own sign-up, a person's enrolment of it, or a move on its standing. */
 export type AgentCommand =
   | {
       readonly _tag: "Enroll";
@@ -34,6 +40,13 @@ export type AgentCommand =
       readonly org?: NamespaceId;
       /** The user minting the credential, who becomes the agent's sponsor. */
       readonly sponsor?: UserId;
+    }
+  | {
+      /** The agent signs itself up: `handle` and the agent's id are made from `key` by the doorway. */
+      readonly _tag: "SignUp";
+      readonly handle: Handle;
+      readonly key: PresentedKey;
+      readonly name?: string;
     }
   | { readonly _tag: "Suspend"; readonly reason: string; readonly by: string }
   | { readonly _tag: "Reinstate"; readonly by: string }
@@ -74,8 +87,9 @@ export const decideAgent = (
   facts: AgentFacts,
 ): Decision => {
   if (state === undefined) {
-    return command._tag === "Enroll"
-      ? Result.succeed([
+    switch (command._tag) {
+      case "Enroll":
+        return Result.succeed([
           AgentEnrolled.make({
             agentId: facts.agentId,
             projectId: command.projectId,
@@ -85,8 +99,19 @@ export const decideAgent = (
             ...(command.org === undefined ? {} : { org: command.org }),
             ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
           }),
-        ])
-      : Result.fail(new AgentNotKnown({ agentId: facts.agentId }));
+        ]);
+      case "SignUp":
+        return Result.succeed([
+          AgentSignedUp.make({
+            agentId: facts.agentId,
+            handle: command.handle,
+            ...(command.name === undefined ? {} : { name: command.name }),
+            key: command.key,
+          }),
+        ]);
+      default:
+        return Result.fail(new AgentNotKnown({ agentId: facts.agentId }));
+    }
   }
   const agent = state;
   const refuse = (reason?: AgentStateRefused["reason"]): Decision =>
@@ -101,6 +126,11 @@ export const decideAgent = (
   switch (command._tag) {
     case "Enroll":
       return refuse();
+    case "SignUp":
+      // The same key again is the same account, so nothing is committed. Another key never joins this way.
+      return agent.state !== "revoked" && agent.keys?.some((key) => key.jkt === command.key.jkt)
+        ? Result.succeed([])
+        : refuse();
     case "Suspend":
       return agent.state === "active"
         ? Result.succeed([
@@ -161,8 +191,9 @@ const illegal = (state: Agent | undefined, event: AgentEvent): never => {
 export const evolveAgent = (state: Agent | undefined, committed: Committed<AgentEvent>): Agent => {
   const event = committed.payload;
   if (state === undefined) {
-    return event._tag === "AgentEnrolled"
-      ? {
+    switch (event._tag) {
+      case "AgentEnrolled":
+        return {
           id: event.agentId,
           projectId: event.projectId,
           name: event.name,
@@ -173,13 +204,27 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
           state: "active",
           revocationEpoch: 0,
           createdAt: committed.at,
-        }
-      : illegal(state, event);
+        };
+      case "AgentSignedUp":
+        return {
+          id: event.agentId,
+          handle: event.handle,
+          name: event.name ?? event.handle,
+          scopes: SIGNED_UP_SCOPES,
+          keys: [{ ...event.key, addedAt: committed.at }],
+          state: "active",
+          revocationEpoch: 0,
+          createdAt: committed.at,
+        };
+      default:
+        return illegal(state, event);
+    }
   }
   const agent = state;
   if (event.agentId !== agent.id) return illegal(agent, event);
   switch (event._tag) {
     case "AgentEnrolled":
+    case "AgentSignedUp":
       return illegal(agent, event);
     case "AgentSuspended":
       return agent.state === "active" ? { ...agent, state: "suspended" } : illegal(agent, event);

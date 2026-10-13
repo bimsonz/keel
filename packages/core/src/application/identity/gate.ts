@@ -113,9 +113,10 @@ export const principalOf: (
       case "Token": {
         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
         const agent = yield* admit(token);
-        if (agent.org === undefined) return yield* new AgentUnplaced({ agentId: agent.id });
+        if (agent.org === undefined || agent.projectId === undefined)
+          return yield* new AgentUnplaced({ agentId: agent.id });
         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
-        const { org, sponsor: sponsorId } = agent;
+        const { org, sponsor: sponsorId, projectId } = agent;
         const standing: AgentStanding =
           sponsorId === undefined
             ? { _tag: "None" }
@@ -128,7 +129,7 @@ export const principalOf: (
             _tag: "Agent",
             agentId: agent.id,
             org,
-            projectId: agent.projectId,
+            projectId,
             scopes: token.scopes,
             paused: agent.state === "suspended",
             standing,

@@ -485,12 +485,12 @@ stateDiagram-v2
 
 ## Agent
 
-Owner: AgentSession DO. Kinds: interactive, hosted, human.
+Owner: AgentSession DO. An agent is made one of two ways: it signs itself up with a key (`AgentSignedUp`: its id and handle are made from the key, and it has no project and no kind), or a person enrols it in a project (`AgentEnrolled`: kinds interactive, hosted, human, synthetic). Signing up again with the same key commits nothing; another key never joins an agent that way.
 
 <!-- chart:agent — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
-  [*] --> Active: AgentEnrolled
+  [*] --> Active: AgentEnrolled / AgentSignedUp
   Active --> Suspended: AgentSuspended
   Active --> Revoked: AgentRevoked
   Active --> Active: AgentSponsored

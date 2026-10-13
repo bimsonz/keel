@@ -74,8 +74,10 @@ export const exchangeToken: (
   const agentId = yield* directory.verifyCredential(request.clientId, request.clientSecret);
   if (Option.isNone(agentId)) return yield* new CredentialRejected();
   const agent = yield* directory.findAgent(agentId.value);
-  // A credential whose agent has gone is as good as a wrong secret.
-  if (Option.isNone(agent)) return yield* new CredentialRejected();
+  // A credential whose agent has gone is as good as a wrong secret. So is one for an agent with
+  // no project: only an agent a person enrolled in a project holds a client secret.
+  if (Option.isNone(agent) || agent.value.projectId === undefined)
+    return yield* new CredentialRejected();
   const reason = whyNotAdmitted(agent.value);
   if (reason !== null) return yield* new AgentNotAdmitted({ agentId: agent.value.id, reason });
   const held = new Set(agent.value.scopes);
@@ -83,11 +85,11 @@ export const exchangeToken: (
   const missing = scopes.filter((scope) => !held.has(scope));
   if (missing.length > 0) return yield* new ScopeNotGranted({ requested: missing });
   const issuer = yield* TokenIssuer;
-  const { org, sponsor } = agent.value;
+  const { org, sponsor, projectId } = agent.value;
   const token = yield* issuer.issue(
     {
       agentId: agent.value.id,
-      projectId: agent.value.projectId,
+      projectId,
       scopes,
       revocationEpoch: agent.value.revocationEpoch,
       ...(org === undefined ? {} : { org }),

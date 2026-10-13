@@ -46,13 +46,16 @@ const enrolled = (sponsor: UserId = userId()) =>
     return { agent, principal: principalOf(agent) };
   });
 
-const principalOf = (agent: Agent): AgentToken => ({
-  agentId: agent.id,
-  projectId: agent.projectId,
-  scopes: agent.scopes,
-  revocationEpoch: agent.revocationEpoch,
-  ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
-});
+const principalOf = (agent: Agent): AgentToken => {
+  if (agent.projectId === undefined) throw new Error(`${agent.id} was enrolled with no project`);
+  return {
+    agentId: agent.id,
+    projectId: agent.projectId,
+    scopes: agent.scopes,
+    revocationEpoch: agent.revocationEpoch,
+    ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+  };
+};
 
 const asking = (overrides: Partial<OpenSessionInput> = {}): OpenSessionInput => ({
   harness: "claude-code",

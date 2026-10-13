@@ -161,7 +161,11 @@ const agentProject = (id: unknown) =>
         Effect.flatMap(
           Option.match({
             onNone: () => Effect.succeed(MISSING),
-            onSome: (agent) => projectResource(agent.projectId, agent.sponsor),
+            // A move on an agent is decided on the project a person enrolled it in; one that signed up by key has none.
+            onSome: (agent) =>
+              agent.projectId === undefined
+                ? Effect.succeed(MISSING)
+                : projectResource(agent.projectId, agent.sponsor),
           }),
         ),
       ),

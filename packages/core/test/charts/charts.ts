@@ -250,7 +250,7 @@ const a = to("agent");
 export const agentChart: Chart = {
   id: "agent",
   initial: "active",
-  meta: { createdBy: "AgentEnrolled", section: "Agent" },
+  meta: { createdBy: "AgentEnrolled / AgentSignedUp", section: "Agent" },
   states: {
     active: {
       on: {

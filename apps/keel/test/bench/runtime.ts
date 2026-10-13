@@ -41,7 +41,7 @@ const runtime = ManagedRuntime.make(layer);
 const { token } = await runtime.runPromise(
   TokenIssuer.use((issuer) =>
     issuer.issue(
-      { agentId: agent.id, projectId: agent.projectId, scopes: agent.scopes, revocationEpoch: 0 },
+      { agentId: agent.id, projectId: sampleProjectId, scopes: agent.scopes, revocationEpoch: 0 },
       3600,
     ),
   ),
@@ -50,7 +50,7 @@ const { token } = await runtime.runPromise(
 const request = TokenIssuer.use((issuer) => issuer.verify(token)).pipe(Effect.flatMap(admit));
 const bare = admit({
   agentId: agent.id,
-  projectId: agent.projectId,
+  projectId: sampleProjectId,
   scopes: agent.scopes,
   revocationEpoch: 0,
 });

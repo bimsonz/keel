@@ -7,6 +7,8 @@ import {
   type SessionId,
   UserId,
 } from "../kernel/index.ts";
+import { AgentKey } from "./agent-key.ts";
+import { Handle } from "./tenancy.ts";
 
 /**
  * `interactive`: an agent a person drives; `hosted`: one Keel's operator runs;
@@ -31,11 +33,19 @@ export type AgentState = typeof AgentState.Type;
 /** An agent as Keel knows it. Its source of truth is the AgentSession DO; D1 holds a projection. */
 export const Agent = Schema.Struct({
   id: AgentId,
-  /** The one project the agent is enrolled in. Multi-project enrolment later is additive. */
-  projectId: ProjectId,
+  /**
+   * The one project an agent enrolled by a person works in. An agent that
+   * signed up by key has none: each of its tokens names the project.
+   */
+  projectId: Schema.optional(ProjectId),
+  /** The handle it was given at sign-up, made from its key. An agent enrolled by a person has none. */
+  handle: Schema.optional(Handle),
   name: Schema.NonEmptyString,
-  kind: AgentKind,
+  /** How an enrolment described the agent. An agent that signed up by key declares its harness per run instead. */
+  kind: Schema.optional(AgentKind),
   scopes: Schema.Array(Scope),
+  /** The public keys it may prove itself with: at least one for an agent that signed up by key. */
+  keys: Schema.optional(Schema.Array(AgentKey)),
   /** The agent's org. Optional only for agents enrolled before tenancy. */
   org: Schema.optional(NamespaceId),
   /**

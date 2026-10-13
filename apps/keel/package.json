@@ -14,6 +14,7 @@
     "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@cloudflare/ci": "catalog:",
     "@hono/zod-validator": "catalog:",

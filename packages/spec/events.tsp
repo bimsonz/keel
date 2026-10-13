@@ -667,6 +667,39 @@ model AgentEnrolled {
   sponsor?: UserId;
 }
 
+/** A public key an agent may sign with, as a JWK: Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`). */
+model PublicJwk {
+  kty: "OKP" | "EC";
+  crv: "Ed25519" | "P-256";
+
+  @minLength(1)
+  x: string;
+
+  @minLength(1)
+  y?: string;
+}
+
+/** A key as an agent presented it, with the RFC 7638 thumbprint Keel computed for it. */
+model PresentedKey {
+  @pattern("^[A-Za-z0-9_-]{43}$")
+  jkt: string;
+
+  jwk: PublicJwk;
+}
+
+/** An agent signed itself up with a key: no person, no project. Its id and handle are made from that key. */
+model AgentSignedUp {
+  _tag: "AgentSignedUp";
+  agentId: AgentId;
+  handle: Handle;
+
+  /** What the agent calls itself: a label, never an address. */
+  @minLength(1)
+  name?: string;
+
+  key: PresentedKey;
+}
+
 model AgentSuspended {
   _tag: "AgentSuspended";
   agentId: AgentId;
@@ -1547,6 +1580,7 @@ model DeploymentRolledBack {
 union KeelEvent {
   // Identity
   AgentEnrolled,
+  AgentSignedUp,
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,

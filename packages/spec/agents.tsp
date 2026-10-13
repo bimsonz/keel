@@ -26,11 +26,16 @@ union AgentState {
 model AgentProfile {
   id: AgentId;
 
-  /** The one project the agent is enrolled in. */
-  projectId: ProjectId;
+  /** The one project an agent enrolled by a person works in. An agent that signed up by key has none: each of its tokens names the project. */
+  projectId?: ProjectId;
+
+  /** The handle it was given at sign-up, made from its key, and its namespace's name. An agent enrolled by a person has none. */
+  handle?: Handle;
 
   name: string;
-  kind: AgentKind;
+
+  /** How an enrolment described the agent. Absent for an agent that signed up by key. */
+  kind?: AgentKind;
   scopes: RecordedScope[];
 
   /** The namespace the agent works in: its project's. Absent only for agents enrolled before tenancy. */

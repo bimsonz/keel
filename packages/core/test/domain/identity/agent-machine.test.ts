@@ -5,8 +5,11 @@ import {
   Agent,
   type AgentCommand,
   AgentEvent,
+  agentIdOf,
   decideAgent,
   evolveAgent,
+  givenHandle,
+  KeyThumbprint,
   type AgentToken,
   replayAgent,
 } from "../../../src/domain/identity/index.ts";
@@ -51,10 +54,23 @@ const OTHER = makeId("usr", "2".repeat(26));
 const STRANGER = makeId("usr", "3".repeat(26));
 const ELSEWHERE = makeId("agt", "9".repeat(26));
 
+/** A key an agent signs up with, and the id and handle Keel makes from it. */
+const thumbprint = Schema.decodeUnknownSync(KeyThumbprint);
+const KEY = {
+  jkt: thumbprint("A".repeat(43)),
+  jwk: { kty: "OKP", crv: "Ed25519", x: "x".repeat(43) },
+} as const;
+const OTHER_KEY = {
+  jkt: thumbprint("B".repeat(43)),
+  jwk: { kty: "EC", crv: "P-256", x: "x".repeat(43), y: "y".repeat(43) },
+} as const;
+const HANDLE = givenHandle(agentIdOf(KEY.jkt));
+
 type Kind = AgentCommand["_tag"];
 type Key = "none" | Agent["state"];
 const KINDS: readonly Kind[] = [
   "Enroll",
+  "SignUp",
   "Suspend",
   "Reinstate",
   "Revoke",
@@ -62,7 +78,7 @@ const KINDS: readonly Kind[] = [
   "EndSponsorship",
 ];
 const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
-  none: ["Enroll"],
+  none: ["Enroll", "SignUp"],
   active: ["Suspend", "Suspend", "Revoke", "Sponsor", "EndSponsorship"],
   suspended: ["Reinstate", "Reinstate", "Revoke", "EndSponsorship"],
   revoked: KINDS,
@@ -91,6 +107,8 @@ const build = (kind: Kind): AgentCommand => {
         kind: "hosted",
         scopes: ["agent:work"],
       };
+    case "SignUp":
+      return { _tag: "SignUp", handle: HANDLE, key: KEY };
     case "Suspend":
       return { _tag: "Suspend", reason: "runaway retries", by: "operator:zb" };
     case "Reinstate":
@@ -134,10 +152,16 @@ const run = memo((steps: readonly Step[]) =>
 
 /** The docs' table (state-machines.md § Agent), typed independently of `decideAgent`. */
 const oracle = (before: Agent | undefined, command: AgentCommand): Key | "refused" => {
-  if (before === undefined) return command._tag === "Enroll" ? "active" : "refused";
+  if (before === undefined)
+    return command._tag === "Enroll" || command._tag === "SignUp" ? "active" : "refused";
   switch (command._tag) {
     case "Enroll":
       return "refused";
+    case "SignUp":
+      // The same key again is the same account: nothing changes. A revoked agent takes nothing.
+      return before.state !== "revoked" && before.keys?.some((k) => k.jkt === command.key.jkt)
+        ? before.state
+        : "refused";
     case "Suspend":
       return before.state === "active" ? "suspended" : "refused";
     case "Reinstate":
@@ -173,6 +197,8 @@ const linked = (model: Linked, command: AgentCommand): Linked | "refused" => {
   if (model.state === "revoked") return "refused";
   switch (command._tag) {
     case "Enroll":
+    // An agent a person enrolled holds no key, so a sign-up under its id is another key's.
+    case "SignUp":
       return "refused";
     case "Suspend":
       return model.state === "active" ? { ...model, state: "suspended" } : "refused";
@@ -291,6 +317,8 @@ const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" 
   if (event.agentId !== AGENT) return "illegal";
   switch (event._tag) {
     case "AgentEnrolled":
+    // An agent that is there already was enrolled or signed up once: neither happens to it again.
+    case "AgentSignedUp":
       return "illegal";
     case "AgentSuspended":
       return from.state === "active" ? { ...from, state: "suspended" } : "illegal";
@@ -720,7 +748,54 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
       REACHED.map(({ is }) => shown(is)),
     );
   });
+
+  it("[agent.sign-up] signing up by key makes an active agent with its handle and key and no project; the same key again changes nothing", () => {
+    const signUp = build("SignUp");
+    const { state, results } = drive([signUp, signUp]);
+    const [first, again] = results.map((r) => eventsOf(r ?? Result.succeed([])));
+    expect(first?.map((e) => e._tag)).toEqual(["AgentSignedUp"]);
+    expect(again).toEqual([]);
+    expect(state).toMatchObject({
+      id: AGENT,
+      handle: HANDLE,
+      name: HANDLE,
+      scopes: ["agent:work", "agent:read"],
+      state: "active",
+      revocationEpoch: 0,
+      keys: [{ ...KEY, addedAt: T0 }],
+    });
+    expect(state !== undefined && ("projectId" in state || "kind" in state)).toBe(false);
+    expect(
+      comparable(replayAgent(throughTheWire([{ at: T0, payload: first?.[0] ?? never() }]))),
+    ).toBe(comparable(state));
+  });
+
+  it("[agent.sign-up] a key signs up as one agent only: another key, an enrolled agent and a revoked one are refused", () => {
+    const signUp = build("SignUp");
+    const otherKey: AgentCommand = { _tag: "SignUp", handle: HANDLE, key: OTHER_KEY };
+    expect(failureTag(drive([signUp, otherKey]).results[1] ?? Result.succeed([]))).toBe(
+      "AgentStateRefused",
+    );
+    expect(failureTag(drive([build("Enroll"), signUp]).results[1] ?? Result.succeed([]))).toBe(
+      "AgentStateRefused",
+    );
+    expect(
+      failureTag(drive([signUp, build("Revoke"), signUp]).results[2] ?? Result.succeed([])),
+    ).toBe("AgentStateRefused");
+    expect(failureTag(drive([signUp, build("Enroll")]).results[1] ?? Result.succeed([]))).toBe(
+      "AgentStateRefused",
+    );
+  });
+
+  it("[agent.sign-up] a name the agent gives is kept beside its handle", () => {
+    const named: AgentCommand = { _tag: "SignUp", handle: HANDLE, key: KEY, name: "builder" };
+    expect(drive([named]).state).toMatchObject({ handle: HANDLE, name: "builder" });
+  });
 });
+
+const never = (): never => {
+  throw new Error("the sign-up committed no event");
+};
 
 // The chart checks the machine; it never drives it.
 

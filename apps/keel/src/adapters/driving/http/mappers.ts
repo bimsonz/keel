@@ -31,9 +31,10 @@ function iso(ms: number): string {
 export function agentProfile(agent: Agent) {
   return {
     id: agent.id,
-    projectId: agent.projectId,
+    ...(agent.projectId === undefined ? {} : { projectId: agent.projectId }),
+    ...(agent.handle === undefined ? {} : { handle: agent.handle }),
     name: agent.name,
-    kind: agent.kind,
+    ...(agent.kind === undefined ? {} : { kind: agent.kind }),
     scopes: [...agent.scopes],
     ...(agent.org === undefined ? {} : { namespace: agent.org }),
     ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),

@@ -31,6 +31,8 @@ type EventType = (
  */
 export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AgentEnrolled: "members",
+  // An agent's handle and its key are public, as a person's username is.
+  AgentSignedUp: "public",
   AgentSuspended: "members",
   AgentReinstated: "members",
   AgentRevoked: "members",

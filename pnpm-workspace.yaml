@@ -89,6 +89,8 @@ catalog:
   # Identity: Keel's users, sessions, orgs and device grant, and the console's client for them. They move together.
   better-auth: 1.7.7
   "@better-auth/passkey": 1.7.7
+  # The authorization server for agents: signed token requests, key-bound tokens, the published key.
+  "@better-auth/oauth-provider": 1.7.7
   # The console's browser checks (apps/console/scripts): run by hand, never in CI.
   playwright: 1.64.0
 

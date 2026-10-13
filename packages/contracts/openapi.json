@@ -7782,9 +7782,7 @@
         "type": "object",
         "required": [
           "id",
-          "projectId",
           "name",
-          "kind",
           "scopes",
           "revocationEpoch",
           "createdAt"
@@ -7799,13 +7797,26 @@
                 "$ref": "#/components/schemas/ProjectId"
               }
             ],
-            "description": "The one project the agent is enrolled in."
+            "description": "The one project an agent enrolled by a person works in. An agent that signed up by key has none: each of its tokens names the project."
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The handle it was given at sign-up, made from its key, and its namespace's name. An agent enrolled by a person has none."
           },
           "name": {
             "type": "string"
           },
           "kind": {
-            "$ref": "#/components/schemas/AgentKind"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentKind"
+              }
+            ],
+            "description": "How an enrolment described the agent. Absent for an agent that signed up by key."
           },
           "scopes": {
             "type": "array",
@@ -7904,6 +7915,41 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "AgentSignedUp": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "handle",
+          "key"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentSignedUp"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "handle": {
+            "$ref": "#/components/schemas/Handle"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the agent calls itself: a label, never an address."
+          },
+          "key": {
+            "$ref": "#/components/schemas/PresentedKey"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent signed itself up with a key: no person, no project. Its id and handle are made from that key."
       },
       "AgentSponsored": {
         "type": "object",
@@ -12294,6 +12340,9 @@
             "$ref": "#/components/schemas/AgentEnrolled"
           },
           {
+            "$ref": "#/components/schemas/AgentSignedUp"
+          },
+          {
             "$ref": "#/components/schemas/AgentSuspended"
           },
           {
@@ -15471,6 +15520,26 @@
           "not": {}
         }
       },
+      "PresentedKey": {
+        "type": "object",
+        "required": [
+          "jkt",
+          "jwk"
+        ],
+        "properties": {
+          "jkt": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "jwk": {
+            "$ref": "#/components/schemas/PublicJwk"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A key as an agent presented it, with the RFC 7638 thumbprint Keel computed for it."
+      },
       "PreviewDeployed": {
         "type": "object",
         "required": [
@@ -16356,6 +16425,42 @@
           "not": {}
         },
         "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
+      },
+      "PublicJwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x"
+        ],
+        "properties": {
+          "kty": {
+            "type": "string",
+            "enum": [
+              "OKP",
+              "EC"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "enum": [
+              "Ed25519",
+              "P-256"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "minLength": 1
+          },
+          "y": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A public key an agent may sign with, as a JWK: Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`)."
       },
       "PushRefusedReason": {
         "type": "string",

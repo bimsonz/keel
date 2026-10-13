@@ -272,10 +272,10 @@ async function enrol(
     return kept;
   }
   const enrolled = await by.enrolAgent(request, { idempotencyKey: key(role) });
-  console.log(`ok   ${role}: ${enrolled.agent.id} in ${enrolled.agent.projectId}`);
+  console.log(`ok   ${role}: ${enrolled.agent.id} in ${request.projectId}`);
   return {
     agentId: enrolled.agent.id,
-    projectId: enrolled.agent.projectId,
+    projectId: request.projectId,
     clientId: enrolled.clientId,
     clientSecret: enrolled.clientSecret,
   };

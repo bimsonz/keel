@@ -81,6 +81,7 @@ export const openSession: (
 > = Effect.fn("identity/openSession")(function* (agentId: AgentId, command: OpenSessionCommand) {
   const enrolled = (yield* EntityStore).get(AGENT, agentId);
   if (enrolled === undefined) return yield* new AgentNotKnown({ agentId });
+  const { projectId } = decodeAgent(enrolled);
   const sessionId: SessionId = yield* (yield* Ids).next("ses");
   const committed = yield* commit<Session, AgentNotAdmitted | IdempotencyConflict>(
     {
@@ -88,7 +89,8 @@ export const openSession: (
       cause: `session:${command.idempotencyKey}`,
       fingerprint: command.fingerprint,
       actor: agentActor(agentId),
-      project: decodeAgent(enrolled).projectId,
+      // An agent that signed up by key has no project of its own, so its session names none.
+      ...(projectId === undefined ? {} : { project: projectId }),
     },
     (tx) => {
       const prior = tx.store.get(SESSION.opened, command.idempotencyKey);

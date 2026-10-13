@@ -11,6 +11,7 @@ export type { EntityKind, EntityRef };
 export const EVENT_TYPES = [
   // identity
   "AgentEnrolled",
+  "AgentSignedUp",
   "AgentSuspended",
   "AgentReinstated",
   "AgentRevoked",
