@@ -2,12 +2,12 @@
 # kills: tenancy.whoami
 # why: an agent's profile names its namespace under org, a field the contract no longer has, so an agent asking who it is cannot read which namespace it works in
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index 96d5476..2bc55da 100644
+index d826dbdb..2f65087c 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -35,7 +35,7 @@ export function agentProfile(agent: Agent) {
+@@ -37,7 +37,7 @@ export function agentProfile(agent: Agent) {
      name: agent.name,
-     kind: agent.kind,
+     ...(agent.kind === undefined ? {} : { kind: agent.kind }),
      scopes: [...agent.scopes],
 -    ...(agent.org === undefined ? {} : { namespace: agent.org }),
 +    ...(agent.org === undefined ? {} : { org: agent.org }),

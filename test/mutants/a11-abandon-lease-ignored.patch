@@ -2,13 +2,19 @@
 # kills: a11.abandon-stale, a11.abandon-authority
 # why: a sent lease is ignored and the agent withdraws as a maintainer, so a stale or made-up lease ends the change
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f605812..7db17af8 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -156,7 +156,7 @@
+@@ -186,12 +186,7 @@ const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | un
      case "Agent":
        return lease === undefined
          ? undefined
--        : { _tag: "Lease", leaseId: lease, agentId: by.token.agentId };
+-        : {
+-            _tag: "Lease",
+-            leaseId: lease,
+-            agentId: by.token.agentId,
+-            ...(by.token.run === undefined ? {} : { run: by.token.run }),
+-          };
 +        : { _tag: "Maintainer", by: by.token.agentId, projectId: by.token.projectId };
      case "Maintainer":
        return { _tag: "Maintainer", by: by.userId, projectId: by.projectId };

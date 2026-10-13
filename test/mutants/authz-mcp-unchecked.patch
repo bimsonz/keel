@@ -2,14 +2,31 @@
 # kills: authz.mcp
 # why: a bearer the gate refuses is served over MCP as an anonymous caller instead of a 401
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 4e86121c..a73e44c1 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -63,7 +63,7 @@
-         });
-         const gated = await gate(presented, crypto.randomUUID(), deps, { cookies: false });
-         if (gated instanceof Response)
--          throw new OAuthError(OAuthErrorCode.InvalidToken, "The bearer token is not admitted");
-+          return { token, clientId: "anonymous", scopes: [], expiresAt: Math.floor(Date.now() / 1000) + 60, extra: {} };
-         const { principal } = gated.admitted;
-         return {
-           token,
+@@ -77,12 +77,9 @@ export function makeMcpEndpoint(
+     if (presented === null)
+       return unauthenticated(deps.challenge("mcp"), "A bearer token is required");
+     const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
+-    if (gated instanceof Response)
+-      return unauthenticated(
+-        gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),
+-        "The token is not admitted",
+-      );
+-    const { principal } = gated.admitted;
++    const admitted =
++      gated instanceof Response ? { principal: { _tag: "Anonymous" as const } } : gated.admitted;
++    const { principal } = admitted;
+     const authInfo: AuthInfo = {
+       token: presented.token,
+       clientId:
+@@ -94,7 +91,7 @@ export function makeMcpEndpoint(
+       scopes: principal._tag === "Agent" ? [...principal.scopes] : [],
+       // Keel's own expiry is enforced by the gate; the SDK requires a value.
+       expiresAt: Math.floor(Date.now() / 1000) + 60,
+-      extra: { [ADMITTED]: gated.admitted },
++      extra: { [ADMITTED]: admitted },
+     };
+     return mcp.fetch(request, { authInfo });
+   };

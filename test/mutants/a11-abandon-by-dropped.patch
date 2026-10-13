@@ -2,11 +2,12 @@
 # kills: a11.abandon-authority
 # why: a maintainer's withdrawal names no one, so ChangeWithdrawn cannot say who ended the change
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f605812..75e44e1e 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -158,7 +158,7 @@
-         ? undefined
-         : { _tag: "Lease", leaseId: lease, agentId: by.token.agentId };
+@@ -193,7 +193,7 @@ const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | un
+             ...(by.token.run === undefined ? {} : { run: by.token.run }),
+           };
      case "Maintainer":
 -      return { _tag: "Maintainer", by: by.userId, projectId: by.projectId };
 +      return { _tag: "Maintainer", projectId: by.projectId };
