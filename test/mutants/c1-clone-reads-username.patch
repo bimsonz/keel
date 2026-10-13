@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.credential"
+# kills: clone.credential
+# why: the Basic username is read as the token, so a token given as the password opens nothing
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..1fc27d44 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -17,7 +17,7 @@ function basicPassword(header: string): string | null {
+       Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
+     );
+     const colon = pair.indexOf(":");
+-    return colon < 0 ? null : pair.slice(colon + 1);
++    return colon < 0 ? null : pair.slice(0, colon);
+   } catch {
+     return null;
+   }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.wired"
+# kills: clone.wired
+# why: a clone is served the project's staging repo, whose head no verdict has landed
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..cf259980 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -69,7 +69,7 @@ export function cloneAccess(
+     const { principal } = gated.admitted;
+     const resource = await run(projectByName(namespace, project));
+     if (resource._tag === "Project" && Result.isSuccess(decideEach(principal, resource)))
+-      return { kind: "granted", repo: projectRepos(resource.projectId).trunk };
++      return { kind: "granted", repo: projectRepos(resource.projectId).staging };
+     return { kind: principal._tag === "Anonymous" ? "unauthenticated" : "not-found" };
+   };
+ }

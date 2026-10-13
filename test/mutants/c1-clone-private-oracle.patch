@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.private"
+# kills: clone.private
+# why: a caller who may not read a private project is asked for a credential again where a missing project is not found, which tells the two apart
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..857de3dc 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -70,6 +70,11 @@ export function cloneAccess(
+     const resource = await run(projectByName(namespace, project));
+     if (resource._tag === "Project" && Result.isSuccess(decideEach(principal, resource)))
+       return { kind: "granted", repo: projectRepos(resource.projectId).trunk };
+-    return { kind: principal._tag === "Anonymous" ? "unauthenticated" : "not-found" };
++    return {
++      kind:
++        principal._tag === "Anonymous" || resource._tag === "Project"
++          ? "unauthenticated"
++          : "not-found",
++    };
+   };
+ }

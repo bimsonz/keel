@@ -6,6 +6,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { registerRoutes } from "../../../generated/http/app.gen.ts";
 import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
 import { type AuthMount, registerAuth, TOKEN_WINDOW_SECONDS } from "./auth-mount.ts";
+import { type GitClone, registerGitClone } from "./git-clone.ts";
 import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
@@ -29,6 +30,8 @@ export interface AppOptions {
   readonly streams: InboxStreams;
   /** Keel's allowed-signers file, as it reads now: the keys its commits verify against. */
   readonly signers: () => string;
+  /** The clone URL, `/<namespace>/<project>.git`: who may fetch a project, and its host's answer. */
+  readonly git: GitClone;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
   readonly rethrowContractDrift: boolean;
 }
@@ -39,13 +42,15 @@ export const DOCUMENT_PATH = "/v1/openapi.json";
 /** The spec's `Auth_exchangeToken`: open to anyone, so each address is limited ahead of it. */
 const TOKEN_PATH = "/v1/oauth/token";
 
-/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
+/** The HTTP doorway: middleware, the clone URL, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
 
   // Middleware first: Hono applies it only to routes registered after it.
   app.use(requestId());
   app.use(secureHeaders());
+  // Ahead of the 1 MiB limit: a fetch's negotiation has its own cap, and a clone URL is no /v1 operation.
+  registerGitClone(app, options.git);
   app.use(
     bodyLimit({
       maxSize: 1024 * 1024,

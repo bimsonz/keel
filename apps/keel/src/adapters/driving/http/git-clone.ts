@@ -13,12 +13,25 @@ export const MAX_UPLOAD_PACK_REQUEST_BYTES = 8 * 1024 * 1024;
 /**
  * Whether the caller may fetch `org/project`, and which repo that is.
  * `unauthenticated` asks the git client for a credential; `not-found` is a
- * repo the caller cannot see, missing or not.
+ * repo the caller cannot see, missing or not; `unavailable` is a credential
+ * that could not be checked just now.
  */
 export type CloneAccess =
   | { readonly kind: "granted"; readonly repo: RepoRef }
   | { readonly kind: "unauthenticated" }
-  | { readonly kind: "not-found" };
+  | { readonly kind: "not-found" }
+  | { readonly kind: "unavailable" };
+
+/**
+ * What a git client is asked for. Stock git answers Basic and nothing else,
+ * and shows a person only its own prompt, so the realm says what goes in it.
+ */
+export const CLONE_CHALLENGE = 'Basic realm="Keel: any username, a Keel token as the password"';
+
+/** What a 401 says to whoever reads the response: which tokens open a private project. */
+export const CLONE_CREDENTIAL =
+  "Authentication required. Give any username, and as the password a Keel token: " +
+  "a person's session token (what the keeltown CLI reads from KEEL_SESSION) or an agent's access token.";
 
 /** What the git routes need of the application. */
 export interface GitClone {
@@ -118,8 +131,10 @@ async function serve(
 ): Promise<Response> {
   const access = await git.access(request, org, repo.slice(0, -".git".length));
   if (access.kind === "unauthenticated")
-    return text(401, "Authentication required.", { "WWW-Authenticate": 'Basic realm="Keel"' });
+    return text(401, CLONE_CREDENTIAL, { "WWW-Authenticate": CLONE_CHALLENGE });
   if (access.kind === "not-found") return notFound();
+  if (access.kind === "unavailable")
+    return text(503, "Keel could not check this credential just now. Try again.");
   const body = service === "negotiate" ? await negotiation(request) : null;
   if (body instanceof Response) return body;
   const answer = await git.uploadPack(access.repo, {

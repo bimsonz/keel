@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.credential"
+# kills: clone.credential
+# why: a credential the gate refuses is read as nobody's, so a bad or revoked token still fetches whatever anyone may
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..b0b37cb3 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -63,7 +63,11 @@ export function cloneAccess(
+ ): GitClone["access"] {
+   return async (request, namespace, project): Promise<CloneAccess> => {
+     // The gate's own refusal is never shown to a git client, so the id it is given names nothing.
+-    const gated = await gate(credentialOf(request), crypto.randomUUID());
++    const presented = await gate(credentialOf(request), crypto.randomUUID());
++    const gated =
++      presented instanceof Response && presented.status !== 503
++        ? await gate(new Request(request.url), crypto.randomUUID())
++        : presented;
+     if (gated instanceof Response)
+       return { kind: gated.status === 503 ? "unavailable" : "unauthenticated" };
+     const { principal } = gated.admitted;

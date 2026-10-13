@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.private"
+# kills: clone.private
+# why: a private project answers not found to a request with no credential, so stock git is never asked for one and no member can clone it
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..66332978 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -70,6 +70,6 @@ export function cloneAccess(
+     const resource = await run(projectByName(namespace, project));
+     if (resource._tag === "Project" && Result.isSuccess(decideEach(principal, resource)))
+       return { kind: "granted", repo: projectRepos(resource.projectId).trunk };
+-    return { kind: principal._tag === "Anonymous" ? "unauthenticated" : "not-found" };
++    return { kind: "not-found" };
+   };
+ }

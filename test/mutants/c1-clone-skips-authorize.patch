@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.private"
+# kills: clone.private
+# why: a project that is found is served to anyone, whatever the policy says of the caller
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..b99591b5 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -68,7 +68,7 @@ export function cloneAccess(
+       return { kind: gated.status === 503 ? "unavailable" : "unauthenticated" };
+     const { principal } = gated.admitted;
+     const resource = await run(projectByName(namespace, project));
+-    if (resource._tag === "Project" && Result.isSuccess(decideEach(principal, resource)))
++    if (resource._tag === "Project")
+       return { kind: "granted", repo: projectRepos(resource.projectId).trunk };
+     return { kind: principal._tag === "Anonymous" ? "unauthenticated" : "not-found" };
+   };

@@ -25,6 +25,10 @@ S-0 (`e2e/src/s0.ts`) runs the conflict, failure and landing cases as one scenar
 
 Not yet in `v0.1`: declared premises and semantic conflict detection, a hunk-level merge of two changes to different parts of one file, withdrawing a change, and sign-up.
 
+## Clone a project
+
+`git clone https://keel.town/<namespace>/<project>.git` fetches a project's trunk with stock git. A public project needs no credential. For a private one git asks for a username and a password: give any username, and as the password a Keel token, either a person's session token (the one the `keeltown` CLI reads from `KEEL_SESSION`) or an agent's access token. The address is read-only: a change lands through Keel (declare it, push to its own workspace, submit it), never by a push to trunk.
+
 ## Layout
 
 | Path | What it is |

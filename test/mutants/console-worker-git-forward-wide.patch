@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts -t "handler.git-forward"
+# kills: handler.git-forward
+# why: any path with a git suffix somewhere in it is handed to Keel, so places in the page under a project are no longer the page's
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index b2148e1c..27f06fb8 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -32,7 +32,7 @@ export interface Env {
+  * git's smart HTTP asks under it. Nothing shorter, longer or deeper is one:
+  * every other path under a project is a place in the page.
+  */
+-const GIT = /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pack)$/;
++const GIT = /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack)/;
+ 
+ export interface Console {
+   fetch(request: Request, env: Env): Promise<Response>;

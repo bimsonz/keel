@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.wired"
+# kills: clone.wired
+# why: the clone URL's routes are built and never registered, so a fetch gets the API's 404 (or, behind the console, the page)
+diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
+index 84fa827f..2b05b50c 100644
+--- a/apps/keel/src/adapters/driving/http/app.ts
++++ b/apps/keel/src/adapters/driving/http/app.ts
+@@ -49,8 +49,6 @@ export function makeApp(options: AppOptions) {
+   // Middleware first: Hono applies it only to routes registered after it.
+   app.use(requestId());
+   app.use(secureHeaders());
+-  // Ahead of the 1 MiB limit: a fetch's negotiation has its own cap, and a clone URL is no /v1 operation.
+-  registerGitClone(app, options.git);
+   app.use(
+     bodyLimit({
+       maxSize: 1024 * 1024,

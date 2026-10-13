@@ -2,15 +2,15 @@
 # kills: clone.refusals
 # why: a caller without a credential is never asked for one, so git cannot authenticate
 diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
-index 7f5e8e1..5cca3d4 100644
+index 34f084b8..f74913d3 100644
 --- a/apps/keel/src/adapters/driving/http/git-clone.ts
 +++ b/apps/keel/src/adapters/driving/http/git-clone.ts
-@@ -118,7 +118,7 @@ async function serve(
+@@ -131,7 +131,7 @@ async function serve(
  ): Promise<Response> {
    const access = await git.access(request, org, repo.slice(0, -".git".length));
    if (access.kind === "unauthenticated")
--    return text(401, "Authentication required.", { "WWW-Authenticate": 'Basic realm="Keel"' });
-+    return text(401, "Authentication required.");
+-    return text(401, CLONE_CREDENTIAL, { "WWW-Authenticate": CLONE_CHALLENGE });
++    return text(401, CLONE_CREDENTIAL);
    if (access.kind === "not-found") return notFound();
-   const body = service === "negotiate" ? await negotiation(request) : null;
-   if (body instanceof Response) return body;
+   if (access.kind === "unavailable")
+     return text(503, "Keel could not check this credential just now. Try again.");

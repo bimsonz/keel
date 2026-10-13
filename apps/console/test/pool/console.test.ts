@@ -3,8 +3,9 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 // The console's Worker as it is deployed: its own wrangler config, and the
-// built page as its assets. Nothing is added to the config for the test, so
-// what the Worker is bound to here is what it is bound to in production.
+// built page as its assets. Nothing is added to the config for the test but a
+// stand-in for Keel's Worker, so what the Worker is bound to here is what it
+// is bound to in production.
 
 const CONSOLE = "https://keel-console.localhost";
 
@@ -35,10 +36,47 @@ describe("the console's Worker", () => {
     expect(await response.text()).toContain('<div id="root"');
   });
 
-  it("[console.no-credential] is bound to its own files and nothing else, and holds no secret", () => {
+  it("[console.no-credential] is bound to its own files and to Keel's Worker, and holds no secret", () => {
     // The test pool binds a few things of its own to run the tests through. They are not the Worker's.
     const own = Object.keys(env).filter((name) => !name.startsWith("__VITEST_POOL_WORKERS_"));
-    expect(own.toSorted()).toEqual(["ASSETS", "KEEL_HOST"]);
+    expect(own.toSorted()).toEqual(["ASSETS", "KEEL", "KEEL_HOST"]);
+  });
+
+  it("[console.git-forward] a clone address's git paths reach Keel as they came, past the page", async () => {
+    const advertised = await SELF.fetch(
+      `${CONSOLE}/acme/forge.git/info/refs?service=git-upload-pack`,
+      { headers: { authorization: "Basic Z2l0OnRva2Vu" } },
+    );
+    expect(await advertised.json()).toEqual({
+      keel: "GET /acme/forge.git/info/refs?service=git-upload-pack",
+      authorization: "Basic Z2l0OnRva2Vu",
+      body: "",
+    });
+    const negotiated = await SELF.fetch(`${CONSOLE}/acme/forge.git/git-upload-pack`, {
+      method: "POST",
+      body: "0009done\n",
+    });
+    expect(await negotiated.json()).toEqual({
+      keel: "POST /acme/forge.git/git-upload-pack",
+      authorization: null,
+      body: "0009done\n",
+    });
+    const pushed = await SELF.fetch(`${CONSOLE}/acme/forge.git/git-receive-pack`, {
+      method: "POST",
+      body: "0000",
+    });
+    expect(await pushed.json()).toMatchObject({ keel: "POST /acme/forge.git/git-receive-pack" });
+  });
+
+  it.each([
+    "/acme/forge.git",
+    "/acme/forge.git/info/refs/x",
+    "/a/acme/forge.git/info/refs",
+    "/acme/forge.git/blob/trunk/info/refs",
+  ])("[console.git-forward] %s is no clone address: it is the page", async (path) => {
+    const response = await SELF.fetch(`${CONSOLE}${path}?service=git-upload-pack`);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toContain('<div id="root"');
   });
 
   it("[console.no-proxy] reads nothing of Keel for anyone: where its proxy was is the page, whatever key is shown", async () => {

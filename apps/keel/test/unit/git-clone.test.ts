@@ -16,7 +16,10 @@ import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import { Hono } from "hono";
 import { RepoServerArtifacts } from "../../src/adapters/driven/artifacts/repo-server.ts";
+import { cloneAccess } from "../../src/adapters/driving/http/clone-access.ts";
 import {
+  CLONE_CHALLENGE,
+  CLONE_CREDENTIAL,
   type CloneAccess,
   type GitClone,
   MAX_UPLOAD_PACK_REQUEST_BYTES,
@@ -351,11 +354,26 @@ describe("the clone URL", () => {
     expect(packed).toHaveLength(1);
   });
 
+  it("[clone.unchecked] a credential the gate could not check is told to try again: it is not asked for again, and nothing is looked up", async () => {
+    const access = cloneAccess(
+      () => Promise.resolve(new Response("later", { status: 503 })),
+      () => Promise.reject(new Error("nothing is looked up")),
+    );
+    expect(await access(new Request(`https://keel.test${REFS}`), "acme", "forge")).toEqual({
+      kind: "unavailable",
+    });
+    const later = routes({ kind: "unavailable" });
+    const answered = await later.app.request(REFS);
+    expect([answered.status, answered.headers.get("www-authenticate")]).toEqual([503, null]);
+    expect(later.packed).toEqual([]);
+  });
+
   it("[clone.refusals] no credential asks git for one; a repo the caller cannot see and one the host lacks read the same", async () => {
     const anonymous = routes({ kind: "unauthenticated" });
     const challenged = await anonymous.app.request(REFS);
     expect(challenged.status).toBe(401);
-    expect(challenged.headers.get("www-authenticate")).toBe('Basic realm="Keel"');
+    expect(challenged.headers.get("www-authenticate")).toBe(CLONE_CHALLENGE);
+    expect(await challenged.text()).toBe(`${CLONE_CREDENTIAL}\n`);
     expect(anonymous.packed).toEqual([]);
 
     const hidden = await routes({ kind: "not-found" }).app.request(REFS);

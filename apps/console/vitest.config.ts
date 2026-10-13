@@ -4,9 +4,31 @@ import { defineProject } from "vitest/config";
 export default defineProject({
   plugins: [
     cloudflareTest({
-      // The Worker's own config, and nothing added to it: it is bound to its files and holds no secret.
+      // The Worker's own config: it is bound to its files and to Keel's Worker, and holds no secret.
       wrangler: { configPath: "./wrangler.jsonc" },
       remoteBindings: false,
+      // Keel is another deployable: the tests bind KEEL to a stand-in that says what reached it.
+      miniflare: {
+        workers: [
+          {
+            name: "keel",
+            modules: true,
+            compatibilityDate: "2026-10-01",
+            script: [
+              `export default {`,
+              `  async fetch(request) {`,
+              `    const { pathname, search } = new URL(request.url);`,
+              `    return Response.json({`,
+              `      keel: request.method + " " + pathname + search,`,
+              `      authorization: request.headers.get("authorization"),`,
+              `      body: await request.text(),`,
+              `    });`,
+              `  },`,
+              `};`,
+            ].join("\n"),
+          },
+        ],
+      },
     }),
   ],
   test: {

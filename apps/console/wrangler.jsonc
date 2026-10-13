@@ -15,11 +15,21 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // Only this reaches the Worker's code. Everything else is a file or the page.
-    "run_worker_first": ["/healthz"],
+    // Only these reach the Worker's code: its health check, and the three git paths of a clone
+    // address. A `*` here matches across segments, so the Worker checks the path's shape itself.
+    // Everything else is a file or the page.
+    "run_worker_first": [
+      "/healthz",
+      "/*.git/info/refs",
+      "/*.git/git-upload-pack",
+      "/*.git/git-receive-pack",
+    ],
   },
-  // No binding to Keel and no secret: the page reads Keel itself, on this host under /v1, as whoever is
-  // signed in. scripts/guard-build.ts fails the build if this file names a credential again.
+  // Keel's Worker, for a clone address alone (/<namespace>/<project>.git): no route can name that
+  // path, so this Worker hands a git client's request on as it came, and adds nothing to it.
+  "services": [{ "binding": "KEEL", "service": "keel" }],
+  // No secret: the page reads Keel itself, on this host under /v1, as whoever is signed in.
+  // scripts/guard-build.ts fails the build if this file names a credential again.
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
     "KEEL_HOST": "keel-console.localhost",

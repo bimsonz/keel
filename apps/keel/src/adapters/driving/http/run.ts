@@ -19,6 +19,7 @@ import type {
   ProjectNamespaces,
   Projects,
   ProjectViews,
+  RepoServer,
   Sessions,
   Sponsorships,
   Standings,
@@ -61,7 +62,8 @@ export type IsolateServices =
   | Namespaces
   | ProjectNamespaces
   | Trunks
-  | OrgUsage;
+  | OrgUsage
+  | RepoServer;
 
 /**
  * One line a request that hit a defect, found by its request id: the defect's

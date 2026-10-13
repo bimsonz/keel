@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/clone.test.ts -t "clone.credential"
+# kills: clone.credential
+# why: the browser's session cookie is passed to the gate, so a request that carries no git credential fetches as whoever is signed in
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..b81f1e17 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -40,6 +40,8 @@ function credentialOf(request: Request): Request {
+     const proof = request.headers.get("dpop");
+     if (!basic && proof !== null) headers.set("dpop", proof);
+   }
++  const cookie = request.headers.get("cookie");
++  if (cookie !== null) headers.set("cookie", cookie);
+   return new Request(request.url, { method: "GET", headers });
+ }
+ 

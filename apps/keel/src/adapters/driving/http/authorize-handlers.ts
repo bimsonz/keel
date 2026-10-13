@@ -229,7 +229,7 @@ const namespaceNamed = (handle: string) =>
   );
 
 /** A project by its namespace's handle and its own name, as `/<namespace>/<project>` names it. */
-const projectByName = (handle: string, name: string) =>
+export const projectByName = (handle: string, name: string) =>
   Namespaces.use((namespaces) => namespaces.byHandle(handle)).pipe(
     Effect.flatMap(
       Option.match({

@@ -13,11 +13,13 @@ import {
   type Notifier,
   PROJECTOR,
   type Projects,
+  RepoServer,
   type Trunks,
 } from "@keeltown/core/ports";
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { RepoServerArtifacts } from "../adapters/driven/artifacts/repo-server.ts";
 import {
   resourceChallenge,
   verifyAgentToken,
@@ -63,6 +65,7 @@ import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
+import { cloneAccess } from "../adapters/driving/http/clone-access.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
 import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
@@ -90,6 +93,8 @@ export function isolateLayer(
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
   const directory = AgentDirectoryD1(env.DB);
+  // The repo read API reads trunks, which live in the core namespace alone.
+  const codeHost = overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS });
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
@@ -114,8 +119,9 @@ export function isolateLayer(
     ProjectNamespacesD1(env.DB),
     // A namespace's own limits, read where a project is made.
     OrgUsageRpc(env.ORG_USAGE),
-    // The repo read API reads trunks, which live in the core namespace alone.
-    overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
+    codeHost,
+    // The clone URL serves a trunk through its host's own git remote, with a read token per request.
+    overrides.repoServer ?? RepoServerArtifacts().pipe(Layer.provide(codeHost)),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
       Layer.provide(ClockLive),
     ),
@@ -136,6 +142,8 @@ export interface IsolateOverrides {
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;
+  /** Pass the server of the code host's own repos, when that host is in memory. */
+  readonly repoServer?: Layer.Layer<RepoServer>;
   readonly sessions?: Layer.Layer<Sessions>;
   readonly standings?: Layer.Layer<Standings>;
   readonly sponsorships?: Layer.Layer<Sponsorships>;
@@ -347,6 +355,15 @@ export function makeIsolate(
       protectedResource: (resource) => protectedResourceDocument(auth(), origin, resource),
     },
     streams: inboxStreams(env, runtime),
+    git: {
+      access: cloneAccess(boundGate, (effect) => runtime.runPromise(effect)),
+      uploadPack: (repo, request) =>
+        runtime.runPromise(
+          RepoServer.use((server) => server.uploadPack(repo, request)).pipe(
+            Effect.catchTag("RepoNotFound", () => Effect.succeed(null)),
+          ),
+        ),
+    },
     signers: () => signersFile({ host: env.KEEL_HOST, signers: env.KEEL_COMMIT_SIGNERS }),
     rethrowContractDrift: env.KEEL_ENV === "test",
   });

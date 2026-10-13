@@ -2,7 +2,7 @@
 # kills: console.spa
 # why: a path that is not a file is a 404, so no address in a project opens
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index 422d19c..1462f16 100644
+index c305fa4e..f5b972be 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
 @@ -14,7 +14,6 @@
@@ -10,6 +10,6 @@ index 422d19c..1462f16 100644
      "directory": "./dist",
      "binding": "ASSETS",
 -    "not_found_handling": "single-page-application",
-     // Only this reaches the Worker's code. Everything else is a file or the page.
-     "run_worker_first": ["/healthz"],
-   },
+     // Only these reach the Worker's code: its health check, and the three git paths of a clone
+     // address. A `*` here matches across segments, so the Worker checks the path's shape itself.
+     // Everything else is a file or the page.

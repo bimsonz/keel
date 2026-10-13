@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.unchecked"
+# kills: clone.unchecked
+# why: a credential that could not be checked is asked for again, which tells git a good token is bad
+diff --git a/apps/keel/src/adapters/driving/http/clone-access.ts b/apps/keel/src/adapters/driving/http/clone-access.ts
+index 0c31a683..0bc6b9df 100644
+--- a/apps/keel/src/adapters/driving/http/clone-access.ts
++++ b/apps/keel/src/adapters/driving/http/clone-access.ts
+@@ -65,7 +65,7 @@ export function cloneAccess(
+     // The gate's own refusal is never shown to a git client, so the id it is given names nothing.
+     const gated = await gate(credentialOf(request), crypto.randomUUID());
+     if (gated instanceof Response)
+-      return { kind: gated.status === 503 ? "unavailable" : "unauthenticated" };
++      return { kind: "unauthenticated" };
+     const { principal } = gated.admitted;
+     const resource = await run(projectByName(namespace, project));
+     if (resource._tag === "Project" && Result.isSuccess(decideEach(principal, resource)))

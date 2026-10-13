@@ -3,10 +3,11 @@
 // be in what is deployed, and neither must the controls that play one back.
 // This reads the build and fails if any of them is.
 //
-// The console also holds no credential and has no way to Keel of its own: its
-// page reads /v1 on its own origin, as whoever is signed in. So this fails,
-// too, if the build, the Worker's code or its config names a credential the
-// console once held, or a path it once read or ruled through.
+// The console also holds no credential and reads nothing of Keel for anyone:
+// its page reads /v1 on its own origin, as whoever is signed in, and all its
+// Worker passes on is a git client's fetch of a clone address, as it came. So
+// this fails, too, if the build, the Worker's code or its config names a
+// credential the console once held, or a path it once read or ruled through.
 //
 //   node scripts/guard-build.ts [dist]
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -96,7 +97,7 @@ if (found.length > 0) {
 }
 if (held.length > 0) {
   console.error(
-    `guard-build: the console holds no credential and has no way to Keel of its own, and something of one is back.\n  ${held.join("\n  ")}`,
+    `guard-build: the console holds no credential and reads nothing of Keel for anyone, and something of one is back.\n  ${held.join("\n  ")}`,
   );
   process.exit(1);
 }
