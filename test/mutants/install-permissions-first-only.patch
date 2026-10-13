@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.permissions
+# why: only the first missing permission is named, so a person fixes the token once for each failed build
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..fc57ae80 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -82,7 +82,7 @@ export function missingPermissions(
+   probes: readonly { permission: string; status: number }[],
+ ): string[] {
+   return [
+-    ...new Set(probes.filter((p) => p.status === 401 || p.status === 403).map((p) => p.permission)),
++    ...new Set(probes.filter((p) => p.status === 401 || p.status === 403).map((p) => p.permission).slice(0, 1)),
+   ];
+ }
+ 

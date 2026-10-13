@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.keys-made
+# why: the key that signs commits is the key that signs bundle URLs, so one leak is both
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..c76705a4 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -180,7 +180,7 @@ export function generateKeys(now: Date): GeneratedKeys {
+   const day = now.toISOString().slice(0, 10);
+   const tokens = generateKeyPairSync("ed25519");
+   const bundles = generateKeyPairSync("ed25519");
+-  const commits = generateKeyPairSync("ed25519");
++  const commits = bundles;
+   const commitsPublic = commits.publicKey.export({ format: "jwk" }).x;
+   if (commitsPublic === undefined) throw new Error("Ed25519 did not export a public key");
+   return {

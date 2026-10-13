@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.permissions
+# why: a thing that is not there yet reads as a missing permission, so a new account is told its token is wrong
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..a94a502a 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -82,7 +82,7 @@ export function missingPermissions(
+   probes: readonly { permission: string; status: number }[],
+ ): string[] {
+   return [
+-    ...new Set(probes.filter((p) => p.status === 401 || p.status === 403).map((p) => p.permission)),
++    ...new Set(probes.filter((p) => p.status >= 400).map((p) => p.permission)),
+   ];
+ }
+ 

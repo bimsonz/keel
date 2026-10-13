@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.stores
+# why: a binding kind nobody taught the install passes, and the deploy of whoever presses the button fails on a store nothing created
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..0a2ef8a7 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -300,7 +300,7 @@ export function storesOf(configs: readonly { source: string; config: Json }[]):
+       .filter((key) => !NEEDS_NOTHING.has(key) && !STORE_KEYS.has(key))
+       .map((key) => `${source}: ${key}`),
+   );
+-  if (untaught.length > 0)
++  if (untaught.length > 99)
+     throw new Error(
+       `the install does not know how to provide ${untaught.join(", ")}. Teach scripts/lib/install.ts what the binding needs on a new account (a store to ensure, or nothing), so the Deploy to Cloudflare button keeps working.`,
+     );

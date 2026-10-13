@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.render
+# why: every Worker keeps its committed localhost for a host, so no cookie, passkey or MCP request matches the site's address
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..945467cb 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -358,7 +358,6 @@ export function renderInstall(source: string, text: string, values: InstallValue
+     set(["secrets_store_secrets", index, "store_id"], values.secretsStoreId);
+   }
+   const vars = isObject(committed["vars"]) ? committed["vars"] : {};
+-  set(["vars", "KEEL_HOST"], values.host);
+   if ("BUNDLE_URL_PUBLIC_KEY" in vars)
+     set(["vars", "BUNDLE_URL_PUBLIC_KEY"], values.bundleUrlPublicKey);
+   if ("KEEL_COMMIT_SIGNERS" in vars) set(["vars", "KEEL_COMMIT_SIGNERS"], values.commitSigners);

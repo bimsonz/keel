@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.keys
+# why: a second commit key is made when keel holds one and its signers are no longer shown, and trunk's commits stop verifying
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..46ce2198 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -137,7 +137,8 @@ export function keyState(
+       : []),
+     ...(holdsNoSigner(shown.commitSigners) ? ["keel's KEEL_COMMIT_SIGNERS"] : []),
+   ];
+-  if (unshown.length > 0)
++  if (unshown.length > 0) return "generate";
++  if (unshown.length > 99)
+     return {
+       refuse: `keel holds its keys, but ${unshown.join(" and ")} ${unshown.length === 1 ? "is" : "are"} no longer set, and a public half cannot be read back from a secret. Set ${unshown.length === 1 ? "it" : "them"} again from the key's own public half; the install will not make a second key.`,
+     };

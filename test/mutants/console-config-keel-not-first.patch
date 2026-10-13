@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts -t "console.keel-first"
+# kills: console.keel-first
+# why: Keel's API is not run through the Worker first, so the assets answer it with the page and the forward never runs
+diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
+index f64d95bb..3b8ba43d 100644
+--- a/apps/console/wrangler.jsonc
++++ b/apps/console/wrangler.jsonc
+@@ -23,7 +23,6 @@
+       "/*.git/info/refs",
+       "/*.git/git-upload-pack",
+       "/*.git/git-receive-pack",
+-      "/v1/*",
+       "/mcp",
+       "/mcp/*",
+       "/start",

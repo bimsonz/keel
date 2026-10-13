@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.render
+# why: a config that still holds a sentinel id is handed to wrangler, which deploys a Worker bound to a database that names nothing
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..0822cb14 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -363,7 +363,7 @@ export function renderInstall(source: string, text: string, values: InstallValue
+     set(["vars", "BUNDLE_URL_PUBLIC_KEY"], values.bundleUrlPublicKey);
+   if ("KEEL_COMMIT_SIGNERS" in vars) set(["vars", "KEEL_COMMIT_SIGNERS"], values.commitSigners);
+   const leftover = SENTINEL.exec(JSON.stringify(parseConfig(rendered, source)));
+-  if (leftover !== null)
++  if (leftover === undefined)
+     throw new Error(
+       `${source}: sentinel ${leftover[0]} survives rendering. Refusing to deploy a config that names nothing.`,
+     );

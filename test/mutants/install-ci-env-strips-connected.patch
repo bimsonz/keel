@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.ci-env
+# why: the connected Worker loses the name its build gave it, so a renamed console deploys beside the Worker the build is connected to
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..51738265 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -70,7 +70,6 @@ export function ciEnvFor(
+   connected: string,
+   env: Readonly<Record<string, string | undefined>>,
+ ): Record<string, string | undefined> {
+-  if (app === connected) return { ...env };
+   return Object.fromEntries(Object.entries(env).filter(([name]) => !CI_NAME_VARIABLES.has(name)));
+ }
+ 

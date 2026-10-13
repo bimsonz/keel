@@ -1,11 +1,11 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/bindings.test.ts -t Service
 diff --git a/apps/keel/wrangler.jsonc b/apps/keel/wrangler.jsonc
-index 8b5e8c2..1cbf83b 100644
+index 51301316..97673466 100644
 --- a/apps/keel/wrangler.jsonc
 +++ b/apps/keel/wrangler.jsonc
-@@ -112,5 +112,5 @@
+@@ -147,5 +147,5 @@
+   ],
    "ai": { "binding": "AI" },
-   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "keel_staging_metrics" }],
    // RPC into keel-verify, for Tier 1 probes, pure checks and Wasm tools.
 -  "services": [{ "binding": "VERIFIER", "service": "keel-verify" }],
 +  "services": [{ "binding": "VERIFIER", "service": "keel-verifier" }],

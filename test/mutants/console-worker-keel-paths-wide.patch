@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts -t "handler.keel-paths"
+# kills: handler.keel-paths
+# why: any path that begins like one of Keel's is handed to Keel, so the page of a handle such as starter or mcpx is no longer the page's
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index e7ec738a..b5c0b663 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -45,7 +45,7 @@ const GIT = /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pac
+  * A handle that only begins with one of those words (`/starter`, `/mcpx`,
+  * `/v1`) is a place in the page.
+  */
+-const KEELS = /^\/(?:v1\/|mcp\/|\.well-known\/|(?:mcp|start|llms\.txt)$)/;
++const KEELS = /^\/(?:v1|mcp|\.well-known|start|llms\.txt)/;
+ 
+ export interface Console {
+   fetch(request: Request, env: Env): Promise<Response>;

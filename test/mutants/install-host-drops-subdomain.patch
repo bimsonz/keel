@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.host
+# why: the site's host leaves out the account's subdomain, so Keel checks every request against an address that is not its own
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..c5556365 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -54,7 +54,7 @@ export const CONFIG_OF: Readonly<Record<App, { dir: string; file: string }>> = {
+ export function siteHost(consoleName: string, subdomain: string): string {
+   if (consoleName === "" || subdomain === "")
+     throw new Error("a workers.dev address needs the Worker's name and the account's subdomain");
+-  return `${consoleName}.${subdomain}.workers.dev`;
++  return `${consoleName}.workers.dev`;
+ }
+ 
+ /** What Workers Builds sets so that every `wrangler deploy` in a build lands on the connected Worker. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.ci-env
+# why: keel-verify and keel deploy with the build's own Worker name still set, so wrangler puts all three Workers on the connected one
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..74a0ce2d 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -71,7 +71,7 @@ export function ciEnvFor(
+   env: Readonly<Record<string, string | undefined>>,
+ ): Record<string, string | undefined> {
+   if (app === connected) return { ...env };
+-  return Object.fromEntries(Object.entries(env).filter(([name]) => !CI_NAME_VARIABLES.has(name)));
++  return { ...env };
+ }
+ 
+ /**

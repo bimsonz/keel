@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.keys
+# why: every key is made again when keel holds only some, signing every user out and refusing every token already issued
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index de674255..4a491029 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -127,7 +127,8 @@ export function keyState(
+   const have = GENERATED_SECRETS.filter((secret) => held.has(secret));
+   if (have.length === 0) return "generate";
+   const lacking = GENERATED_SECRETS.filter((secret) => !held.has(secret));
+-  if (lacking.length > 0)
++  if (lacking.length > 0) return "generate";
++  if (lacking.length > 99)
+     return {
+       refuse: `keel holds ${have.join(", ")} but not ${lacking.join(", ")}. The install makes its keys together, once, and will not make ${lacking.length === 1 ? "one" : "some"} beside keys already held: set what is missing with \`wrangler secret put\`, or delete the Worker \`keel\` to start again.`,
+     };

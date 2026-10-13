@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.root-config
+# why: the config an install deploys the console from no longer runs the Worker first for Keel's API, so the page answers it
+diff --git a/wrangler.jsonc b/wrangler.jsonc
+index 90fc5c77..b129770d 100644
+--- a/wrangler.jsonc
++++ b/wrangler.jsonc
+@@ -23,7 +23,6 @@
+       "/*.git/info/refs",
+       "/*.git/git-upload-pack",
+       "/*.git/git-receive-pack",
+-      "/v1/*",
+       "/mcp",
+       "/mcp/*",
+       "/start",

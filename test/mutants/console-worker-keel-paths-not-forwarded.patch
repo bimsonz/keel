@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts -t "handler.keel-paths"
+# kills: handler.keel-paths
+# why: Keel's own paths are the page, so a site with no routes answers its API, its MCP endpoint and its front door with HTML
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index e7ec738a..122ab721 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -56,7 +56,7 @@ export function createConsole(): Console {
+     async fetch(request, env) {
+       const { pathname } = new URL(request.url);
+       if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
+-      if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
++      if (GIT.test(pathname)) return env.KEEL.fetch(request);
+       return env.ASSETS.fetch(request);
+     },
+   };

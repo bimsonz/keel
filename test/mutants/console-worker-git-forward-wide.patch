@@ -2,15 +2,15 @@
 # kills: handler.git-forward
 # why: any path with a git suffix somewhere in it is handed to Keel, so places in the page under a project are no longer the page's
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index b2148e1c..27f06fb8 100644
+index e7ec738a..8a8deb05 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -32,7 +32,7 @@ export interface Env {
+@@ -37,7 +37,7 @@ export interface Env {
   * git's smart HTTP asks under it. Nothing shorter, longer or deeper is one:
   * every other path under a project is a place in the page.
   */
 -const GIT = /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pack)$/;
 +const GIT = /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack)/;
  
- export interface Console {
-   fetch(request: Request, env: Env): Promise<Response>;
+ /**
+  * Keel's own paths, the ones a site's routes name: everything under `/v1/`,
