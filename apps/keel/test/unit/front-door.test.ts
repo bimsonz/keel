@@ -147,9 +147,13 @@ describe("the front door is read from the published document", () => {
       issuer: `${ORIGIN}/v1/auth`,
       metadata: `${ORIGIN}/.well-known/oauth-authorization-server`,
     });
-    // Asked again once there is a project: the same request, by the two fields that name the work.
+    // Asked again once there is a project: the same request spelled out whole, with the model's words.
     const again = stepOf("work-token");
-    expect([again.url, names(again.body)]).toEqual([token.url, ["project", "run"]]);
+    expect({ ...again, id: token.id, title: token.title }).toEqual(token);
+    expect(names(again.body)).toEqual(
+      expect.arrayContaining(["client_assertion", "project", "run"]),
+    );
+    expect(again.say).toContain("refused, `invalid_dpop_proof`");
     // The MCP tools are the operations tagged `mcp`, each by its id.
     const tagged = Object.values(openApiDocument.paths).flatMap((item) =>
       Object.values(item).flatMap((operation) => {

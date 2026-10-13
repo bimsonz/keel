@@ -1,14 +1,14 @@
 import { oauthProviderAuthServerMetadata } from "@better-auth/oauth-provider";
 import { oauthProviderResourceClient } from "@better-auth/oauth-provider/resource-client";
-import { AGENT_SCOPES, CLOSED_PATHS } from "./agents.ts";
+import { AGENT_SCOPES } from "./agents.ts";
 import { AUTH_BASE_PATH, type KeelAuth } from "./auth.ts";
 import { KEY_ALGORITHMS } from "./key-proofs.ts";
 
 /**
  * What an arriving agent reads to find its way in: the two discovery documents
- * OAuth clients look for at an origin's root. Both are the provider's own. Keel
- * re-serves them because Better Auth answers under `/v1/auth`, and takes out of
- * the first every route it has closed, so the document names only what answers.
+ * OAuth clients look for at an origin's root. Keel serves them itself because
+ * Better Auth answers under `/v1/auth`, and because the provider's own first
+ * document says more than Keel takes.
  */
 
 interface MetadataApi {
@@ -23,30 +23,48 @@ function metadataApi(api: object): MetadataApi {
 }
 
 /**
- * The authorization server's document (RFC 8414): the provider's own, with its
- * issuer, token endpoint, key location and what a token request may be signed
- * with. Three things are Keel's: a field naming a route Keel does not serve is
- * left out; `registration_endpoint`, which the provider always points at its
- * own closed route, names where an agent signs up with its key; and
- * `service_documentation` names the page that walks an arriving agent in.
+ * What the provider's document says that is true of Keel's server as it
+ * stands: where it is, where a token is asked for, where its keys are, its
+ * scopes and its one grant. `response_types_supported` is there because RFC
+ * 8414 requires the field; it is empty, since Keel has no authorization
+ * endpoint.
+ */
+const PROVIDED = [
+  "issuer",
+  "token_endpoint",
+  "jwks_uri",
+  "scopes_supported",
+  "response_types_supported",
+  "grant_types_supported",
+] as const;
+
+/**
+ * The authorization server's document (RFC 8414). It names what Keel takes and
+ * nothing more. The provider's own lists every method and algorithm the
+ * library knows, for endpoints Keel does not serve and clients it has none of,
+ * so each field is chosen here by name and no default of the library's reaches
+ * a reader. An agent authenticates with a request its key signed and with
+ * nothing else, and a key is Ed25519 or P-256: those are the algorithms of a
+ * signed request and of a proof. `registration_endpoint` names where an agent
+ * signs up with its key, and `service_documentation` the page that walks an
+ * arriving agent in.
  */
 export async function authorizationServerDocument(
   auth: KeelAuth,
-  where: { readonly origin: string; readonly signUpUrl: string; readonly startUrl: string },
+  where: { readonly signUpUrl: string; readonly startUrl: string },
   request: Request,
 ): Promise<Response> {
   const answer = await oauthProviderAuthServerMetadata({ api: metadataApi(auth.api) })(request);
-  const provided: unknown = await answer.json();
-  const closed = new Set<string>(
-    CLOSED_PATHS.map((path) => `${where.origin}${AUTH_BASE_PATH}${path}`),
-  );
-  const served = Object.fromEntries(
-    Object.entries(Object(provided)).filter(
-      ([, value]) => !(typeof value === "string" && closed.has(value)),
-    ),
-  );
+  const provided: object = Object(await answer.json());
   return Response.json(
-    { ...served, registration_endpoint: where.signUpUrl, service_documentation: where.startUrl },
+    {
+      ...Object.fromEntries(PROVIDED.map((name) => [name, Reflect.get(provided, name)])),
+      token_endpoint_auth_methods_supported: ["private_key_jwt"],
+      token_endpoint_auth_signing_alg_values_supported: [...KEY_ALGORITHMS],
+      dpop_signing_alg_values_supported: [...KEY_ALGORITHMS],
+      registration_endpoint: where.signUpUrl,
+      service_documentation: where.startUrl,
+    },
     { status: answer.status, headers: CACHED },
   );
 }

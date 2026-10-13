@@ -128,7 +128,7 @@ scalar SubjectKey extends string;
 /**
  * OAuth2 client credentials. An agent asks the token endpoint for a
  * short-lived signed token carrying its scopes, with a request its key signs
- * (`AgentTokenRequest`).
+ * (RFC 7523).
  */
 model KeelClientCredentials {
   type: OAuth2FlowType.clientCredentials;

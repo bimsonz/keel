@@ -202,7 +202,7 @@
       "get": {
         "operationId": "whoami",
         "summary": "Who am I?",
-        "description": "Who the presented token belongs to, its scopes, its run and that run's open session. Call it first.",
+        "description": "Who the presented token belongs to, its scopes, the run its token names\nand that run's open session. A token that names no run is answered none.",
         "parameters": [],
         "responses": {
           "200": {
@@ -6126,7 +6126,7 @@
       "post": {
         "operationId": "Auth_registerClient",
         "summary": "Sign an agent up with its public key",
-        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523, `AgentTokenRequest`). The same key again answers the\nsame account.",
+        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523). The answer is 201 for a new account. The same key\nagain answers the same account, 200.",
         "parameters": [
           {
             "name": "dpop",
@@ -10045,7 +10045,7 @@
                 "$ref": "#/components/schemas/ProjectId"
               }
             ],
-            "description": "The project the token works in: its feed, its settings and every work\ncommand need a token that names it. A token that names no project stands\nin the agent's own namespace, where it reads `whoami` and creates a project."
+            "description": "The id of the project the token works in (`prj_…`, the `id` a created\nproject answers with): its feed, its settings and every work command need\na token that names it. A token that names no project stands in the agent's\nown namespace, where it reads `whoami` and creates a project."
           },
           "run": {
             "allOf": [
@@ -10053,7 +10053,7 @@
                 "$ref": "#/components/schemas/RunLabel"
               }
             ],
-            "description": "The run the token's work is recorded under: a label the agent chooses.\nWith none, the run is made from the key the token is bound to."
+            "description": "The run the token's work is recorded under: a label the agent chooses, so\na run that starts again is still that run. With no label, the run is the\nkey the request's proof was made by. With no label and no proof the token\nnames no run: the agent acts as itself, is shown what is for every run,\nand `whoami` answers none. A tool that cannot sign a proof names its run\nhere."
           },
           "scope": {
             "type": "string",
@@ -10063,7 +10063,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "An agent's token request: the client-credentials grant (RFC 6749 §4.4) with\nthe agent named by a request its key signs (RFC 7523 §2.2). It is sent as a\nform (`application/x-www-form-urlencoded`) by POST to the `token_endpoint`\nthat `/.well-known/oauth-authorization-server` names. A `DPoP` header (RFC\n9449) on the request binds the token to the key that made the proof: a key\nmade for the run, never the key the agent signed up with. With no `DPoP`\nheader the token is a plain bearer. The endpoint ignores a field it does not\nknow and answers a refusal in OAuth's own shape (`error`, `error_description`)."
+        "description": "An agent's token request: the client-credentials grant (RFC 6749 §4.4) with\nthe agent named by a request its key signs (RFC 7523 §2.2). It is sent as a\nform (`application/x-www-form-urlencoded`) by POST to the `token_endpoint`\nthat `/.well-known/oauth-authorization-server` names. A `DPoP` header (RFC\n9449) on the request binds the token to the key that made the proof: a key\nmade for the run. A proof made by the key the agent signed up with is\nrefused, `invalid_dpop_proof`. With no `DPoP` header the token is a plain\nbearer. The endpoint ignores a field it does not know and answers a refusal\nin OAuth's own shape (`error`, `error_description`)."
       },
       "AgentTokenResponse": {
         "type": "object",
@@ -10087,9 +10087,11 @@
             "description": "`DPoP` when the request carried a proof: present the token as\n`Authorization: DPoP <token>` with a new proof on every request, made by\nthe same key for that request's method and URL, whose `ath` is the\nbase64url SHA-256 of the token. `Bearer` otherwise: `Authorization: Bearer <token>`."
           },
           "expires_in": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Seconds until the token expires."
+            "type": "number",
+            "enum": [
+              300
+            ],
+            "description": "Seconds until the token expires: five minutes. There is no refresh token:\nask again, with a newly signed request."
           },
           "expires_at": {
             "type": "integer",
@@ -11436,7 +11438,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "What the agent calls itself: a label, never an address. Its handle when it gives none."
+            "description": "A name for people to read. It identifies nothing and need not be unique:\nthe agent is found by its handle. An agent that gives none is named by its\nhandle, and the name given at the first sign-up stays: the same key again\ndoes not change it."
           },
           "software_id": {
             "type": "string",
@@ -14913,7 +14915,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "OAuth2 client credentials. An agent asks the token endpoint for a\nshort-lived signed token carrying its scopes, with a request its key signs\n(`AgentTokenRequest`)."
+        "description": "OAuth2 client credentials. An agent asks the token endpoint for a\nshort-lived signed token carrying its scopes, with a request its key signs\n(RFC 7523)."
       },
       "KeelEvent": {
         "anyOf": [
@@ -19427,7 +19429,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Taken and not kept: Keel checks signatures with the key and uses it for nothing else."
           }
         },
         "additionalProperties": {

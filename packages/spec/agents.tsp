@@ -157,7 +157,10 @@ model SponsoredAgents {
 @tag("Agents")
 @route("/agents")
 interface Agents {
-  /** Who the presented token belongs to, its scopes, its run and that run's open session. Call it first. */
+  /**
+   * Who the presented token belongs to, its scopes, the run its token names
+   * and that run's open session. A token that names no run is answered none.
+   */
   @summary("Who am I?")
   @tag("mcp")
   @operationId("whoami")

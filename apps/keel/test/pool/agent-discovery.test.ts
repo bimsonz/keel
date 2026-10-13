@@ -47,6 +47,21 @@ const answers = async (url: string): Promise<boolean> => {
   return false;
 };
 
+/** A token request as a client with no signed request sends it: its status, its OAuth error, and whether it was given a token. */
+const asked = async (form: Record<string, string>, headers: Record<string, string> = {}) => {
+  const response = await worker(TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "cf-connecting-ip": freshAddress(),
+      ...headers,
+    },
+    body: new URLSearchParams({ grant_type: "client_credentials", ...form }),
+  });
+  const body = await response.json<Record<string, unknown>>();
+  return [response.status, body["error"], "access_token" in body];
+};
+
 describe("what an arriving agent reads to find its way in", () => {
   it("[wellknown.documents] the authorization server's document names the issuer of Keel's tokens, where to sign up and where to ask for one", async () => {
     for (const path of AUTHORIZATION_SERVER) {
@@ -63,6 +78,39 @@ describe("what an arriving agent reads to find its way in", () => {
         expect.arrayContaining(["EdDSA", "ES256"]),
       );
     }
+  });
+
+  it("[wellknown.takes] the authorization server's document says what Keel takes and nothing more: these fields and no other, one way for a client to name itself, and the two algorithms a key signs with", async () => {
+    for (const path of AUTHORIZATION_SERVER)
+      expect(await document(path)).toEqual({
+        issuer: ISSUER,
+        token_endpoint: TOKEN_ENDPOINT,
+        jwks_uri: `${ISSUER}/jwks`,
+        scopes_supported: ["agent:work", "agent:read"],
+        response_types_supported: [],
+        grant_types_supported: ["client_credentials"],
+        token_endpoint_auth_methods_supported: ["private_key_jwt"],
+        token_endpoint_auth_signing_alg_values_supported: ["EdDSA", "ES256"],
+        dpop_signing_alg_values_supported: ["EdDSA", "ES256"],
+        registration_endpoint: `${BASE}/v1/oauth/register`,
+        service_documentation: `${BASE}/start`,
+      });
+  });
+
+  it("[wellknown.refuses] the ways of naming a client that the document leaves out are refused by the endpoint it names: a secret in the form, a secret in a Basic header and no authentication at all get no token, where a request the agent's key signed gets one", async () => {
+    const account = await newKey();
+    const agent = await seedKeyAgent(account);
+    const secret = "a-secret-no-agent-was-ever-given";
+    expect({
+      post: await asked({ client_id: agent.id, client_secret: secret }),
+      basic: await asked({}, { authorization: `Basic ${btoa(`${agent.id}:${secret}`)}` }),
+      none: await asked({ client_id: agent.id }),
+    }).toEqual({
+      post: [400, "invalid_client", false],
+      basic: [401, "invalid_client", false],
+      none: [400, "invalid_client", false],
+    });
+    expect((await granted(await requestToken(agent.id, account))).token_type).toBe("Bearer");
   });
 
   it("[wellknown.documents] every route of Keel's the document names is one Keel serves", async () => {

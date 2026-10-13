@@ -362,7 +362,7 @@ export function makeIsolate(
       authorizationServer: (request) =>
         authorizationServerDocument(
           auth(),
-          { origin, signUpUrl: `${origin}${REGISTER_PATH}`, startUrl: `${origin}${START_PATH}` },
+          { signUpUrl: `${origin}${REGISTER_PATH}`, startUrl: `${origin}${START_PATH}` },
           request,
         ),
       protectedResource: (resource) =>

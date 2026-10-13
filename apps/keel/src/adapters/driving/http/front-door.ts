@@ -270,7 +270,7 @@ export const WALK = [
     id: "work-token",
     title: "Ask for a token that names the project and a run",
     model: "AgentTokenRequest",
-    only: ["project", "run"],
+    names: ["project", "run"],
   },
   {
     id: "declare",
@@ -353,19 +353,20 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
     id: string,
     title: string,
     name: string,
-    only?: readonly string[],
+    names: readonly string[] = [],
   ): DoorStep => {
     const request = model(document, name);
     const say = text(request["description"]);
     const body = fieldsOf(document, request, 0);
     const answer = model(document, TOKEN_ANSWER);
-    for (const field of only ?? [])
+    // A title that speaks of a field is held to the model: the request is spelled out whole each time it is asked.
+    for (const field of names)
       if (!body.some((sent) => sent.name === field))
         throw new Error(`${name} has no field \`${field}\``);
     return {
       id,
       title,
-      ...(say === undefined || only !== undefined ? {} : { say: flat(say) }),
+      ...(say === undefined ? {} : { say: flat(say) }),
       method: "POST",
       url: `${origin}${tokenUrl}`,
       contentType: "application/x-www-form-urlencoded",
@@ -373,7 +374,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
         { name: "content-type", required: true, value: "application/x-www-form-urlencoded" },
         { name: "dpop", required: false },
       ],
-      body: only === undefined ? body : body.filter((sent) => only.includes(sent.name)),
+      body,
       answer: {
         status: [200],
         keep: TOKEN_KEEPS.map((path) => kept(document, answer, path, TOKEN_ANSWER)),
@@ -391,7 +392,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
         entry.id,
         entry.title,
         entry.model,
-        "only" in entry ? entry.only : undefined,
+        "names" in entry ? entry.names : undefined,
       );
     const described = model(document, entry.model);
     const say = text(described["description"]);

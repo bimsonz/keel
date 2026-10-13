@@ -43,9 +43,10 @@ model OAuthError {
  * form (`application/x-www-form-urlencoded`) by POST to the `token_endpoint`
  * that `/.well-known/oauth-authorization-server` names. A `DPoP` header (RFC
  * 9449) on the request binds the token to the key that made the proof: a key
- * made for the run, never the key the agent signed up with. With no `DPoP`
- * header the token is a plain bearer. The endpoint ignores a field it does not
- * know and answers a refusal in OAuth's own shape (`error`, `error_description`).
+ * made for the run. A proof made by the key the agent signed up with is
+ * refused, `invalid_dpop_proof`. With no `DPoP` header the token is a plain
+ * bearer. The endpoint ignores a field it does not know and answers a refusal
+ * in OAuth's own shape (`error`, `error_description`).
  */
 model AgentTokenRequest {
   grant_type: "client_credentials";
@@ -70,15 +71,20 @@ model AgentTokenRequest {
   resource?: string;
 
   /**
-   * The project the token works in: its feed, its settings and every work
-   * command need a token that names it. A token that names no project stands
-   * in the agent's own namespace, where it reads `whoami` and creates a project.
+   * The id of the project the token works in (`prj_…`, the `id` a created
+   * project answers with): its feed, its settings and every work command need
+   * a token that names it. A token that names no project stands in the agent's
+   * own namespace, where it reads `whoami` and creates a project.
    */
   project?: ProjectId;
 
   /**
-   * The run the token's work is recorded under: a label the agent chooses.
-   * With none, the run is made from the key the token is bound to.
+   * The run the token's work is recorded under: a label the agent chooses, so
+   * a run that starts again is still that run. With no label, the run is the
+   * key the request's proof was made by. With no label and no proof the token
+   * names no run: the agent acts as itself, is shown what is for every run,
+   * and `whoami` answers none. A tool that cannot sign a proof names its run
+   * here.
    */
   run?: RunLabel;
 
@@ -98,8 +104,11 @@ model AgentTokenResponse {
    */
   token_type: "DPoP" | "Bearer";
 
-  /** Seconds until the token expires. */
-  expires_in: int32;
+  /**
+   * Seconds until the token expires: five minutes. There is no refresh token:
+   * ask again, with a newly signed request.
+   */
+  expires_in: 300;
 
   /** When it expires, in seconds since the epoch: the token's own `exp`. */
   expires_at: int64;
@@ -127,6 +136,8 @@ model RegistrationJwk {
   kid?: string;
   use?: "sig";
   alg?: "EdDSA" | "ES256";
+
+  /** Taken and not kept: Keel checks signatures with the key and uses it for nothing else. */
   key_ops?: string[];
 }
 
@@ -150,7 +161,12 @@ model ClientRegistrationRequest {
 
   grant_types?: "client_credentials"[];
 
-  /** What the agent calls itself: a label, never an address. Its handle when it gives none. */
+  /**
+   * A name for people to read. It identifies nothing and need not be unique:
+   * the agent is found by its handle. An agent that gives none is named by its
+   * handle, and the name given at the first sign-up stays: the same key again
+   * does not change it.
+   */
   @minLength(1)
   @maxLength(100)
   client_name?: string;
@@ -197,8 +213,8 @@ interface Auth {
    * request, so nobody registers a key they do not hold. The answer's
    * `client_id` is the agent; it then asks the token endpoint named in
    * `/.well-known/oauth-authorization-server` for a token with a request signed
-   * by the key (RFC 7523, `AgentTokenRequest`). The same key again answers the
-   * same account.
+   * by the key (RFC 7523). The answer is 201 for a new account. The same key
+   * again answers the same account, 200.
    */
   @summary("Sign an agent up with its public key")
   @useAuth(NoAuth)
