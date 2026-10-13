@@ -1,4 +1,4 @@
-import type { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   CodeHost,
@@ -8,15 +8,21 @@ import {
   TrunkWriter,
 } from "@keeltown/core/ports";
 import {
+  type GitObject,
   type GitRemote,
   PackTooLarge as GitPackTooLarge,
+  receivePack,
   ReceivePackBusy,
   type RelayMove,
   relay,
   relayPack,
+  rootCommit,
   uploadPackBytes,
+  writePack,
+  ZERO_OID,
 } from "@keeltown/gitcore";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
+import { type CommitSigningConfig, commitSigner, keelCommitter } from "./commit-signing.ts";
 
 export const MAIN = "refs/heads/main";
 
@@ -25,6 +31,18 @@ export const TOKEN_TTL_SECONDS = 60;
 
 /** How many times a target that moved under a relay is read again before the sync gives up. */
 const STALE_RETRIES = 3;
+
+/** How many times making trunk's main is sent again while trunk answers busy. */
+const BUSY_RETRIES = 3;
+
+const toCommitSha = Schema.decodeUnknownSync(CommitSha);
+
+/** What Keel's first commit to an empty project holds: a README that names the project. */
+export const seedSpec = (name: string) => ({
+  path: "README.md",
+  content: `# ${name}\n`,
+  message: `Start ${name}`,
+});
 
 /** Over the cap is the one expected failure of a relay; anything else from git is a defect. */
 export const tooLarge =
@@ -43,15 +61,21 @@ export const tooLarge =
 /**
  * TrunkWriter over GitCore and the code host. A promotion relays the
  * candidate's own pack from staging into trunk, so the commit the verdict
- * covered lands byte for byte. Tokens are minted per call and never leave
- * this adapter; remotes carry the account id, so neither is ever put in an
- * error or a log.
+ * covered lands byte for byte. The first commit of an empty project is
+ * Keel's own, signed with the deployment's key: no key, or one the signers
+ * file does not vouch for at that time, is a defect before anything is
+ * pushed. Tokens are minted per call and never leave this adapter; remotes
+ * carry the account id, so neither is ever put in an error or a log.
  */
-export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging: RepoRef }) =>
+export const TrunkWriterGitCore = (
+  { trunk, staging }: { trunk: RepoRef; staging: RepoRef },
+  signing: CommitSigningConfig,
+) =>
   Layer.effect(
     TrunkWriter,
     Effect.gen(function* () {
       const host = yield* CodeHost;
+      const signerAt = commitSigner(signing);
 
       const remoteOf = (repo: RepoRef, access: "read" | "write") =>
         Effect.gen(function* () {
@@ -88,8 +112,51 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
           );
         });
 
+      /**
+       * Makes trunk's main at `tip` as a new ref, sending `objects` (none
+       * for a commit trunk already holds). A main already at `tip` is a
+       * retry; a main anywhere else is a defect, and is never moved.
+       */
+      const makeMain = (tip: CommitSha, objects: readonly GitObject[]) =>
+        Effect.gen(function* () {
+          const held = yield* headOf(trunk);
+          if (held === tip) return "held" as const;
+          if (held !== null)
+            return yield* Effect.die(new Error("trunk already has a main, at another commit"));
+          const target = yield* remoteOf(trunk, "write");
+          const pack = yield* Effect.promise(() => writePack(objects));
+          for (let attempt = 0; attempt <= BUSY_RETRIES; attempt += 1) {
+            const outcome = yield* Effect.promise(() =>
+              receivePack(target, [{ ref: MAIN, old: ZERO_OID, new: tip }], pack),
+            );
+            if (outcome.kind === "applied") return "made" as const;
+            // Another push holds trunk: back off briefly, then send the same pack again.
+            if (outcome.kind === "busy") {
+              yield* Effect.sleep(50 * 2 ** attempt);
+              continue;
+            }
+            // A racing attempt of the same bootstrap may have made it first.
+            if (outcome.kind === "rejected" && (yield* headOf(trunk)) === tip)
+              return "held" as const;
+            return yield* Effect.die(new Error(`making trunk's main was ${outcome.kind}`));
+          }
+          return yield* Effect.die(new Error("trunk stayed busy while its main was made"));
+        }).pipe(Effect.catchTag("RepoNotFound", Effect.die));
+
       return TrunkWriter.of({
         head: trunkHead.pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+        adopt: (commit) => Effect.asVoid(makeMain(commit, [])),
+        seed: (name, at) =>
+          Effect.gen(function* () {
+            const keel = keelCommitter(signing.host, at);
+            const sign = yield* Effect.promise(() => signerAt(keel.time));
+            const root = yield* Effect.promise(() =>
+              rootCommit({ ...seedSpec(name), author: keel, committer: keel, sign }),
+            );
+            const tip = toCommitSha(root.oid);
+            yield* makeMain(tip, root.objects);
+            return tip;
+          }),
         push: (from, to) =>
           Effect.gen(function* () {
             const source = yield* remoteOf(staging, "read");

@@ -10,5 +10,6 @@ export * from "./merge-text.ts";
 export * from "./objects.ts";
 export * from "./pack-write.ts";
 export * from "./push.ts";
+export * from "./root.ts";
 export * from "./sshsig.ts";
 export * from "./transfer.ts";

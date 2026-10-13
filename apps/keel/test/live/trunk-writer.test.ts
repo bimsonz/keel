@@ -16,6 +16,8 @@ const NAMESPACE = "keel-ws-00";
 const host = CodeHostArtifacts({ [NAMESPACE]: env.WORKSPACES });
 const fixture = artifactsFixture(NAMESPACE, env.WORKSPACES);
 const MAIN = "refs/heads/main";
+/** These cases seed nothing, so the writer needs no signing key. */
+const UNSIGNED = { host: "keel.test", signingKey: undefined, signers: "[]" };
 
 afterAll(async () => {
   await Promise.all(fixture.made.map((repo) => env.WORKSPACES.delete(repo.name)));
@@ -44,7 +46,7 @@ it("[sync.live] relays trunk into an empty repo, then each new head, keeping com
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging: trunk }).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED).pipe(Layer.provide(host)),
             host,
             fixture.layer,
           ),
@@ -89,7 +91,7 @@ it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuse
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging }).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging }, UNSIGNED).pipe(Layer.provide(host)),
             host,
             fixture.layer,
           ),
@@ -134,7 +136,7 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging }).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging }, UNSIGNED).pipe(Layer.provide(host)),
             host,
             fixture.layer,
           ),

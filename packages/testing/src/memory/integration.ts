@@ -10,6 +10,7 @@ import {
   ContentHash,
   type NamespaceId,
   type ProjectId,
+  type Instant,
 } from "@keeltown/core/kernel";
 import {
   BatchVerification,
@@ -98,13 +99,18 @@ const overTheCap = (bytes: number) =>
     limit: RECEIVE_PACK_CAP_BYTES,
   });
 
+/** The commit a memory TrunkWriter answers as an empty trunk's first, whatever the name and the time. */
+export const MEMORY_SEED = Schema.decodeUnknownSync(CommitSha)("5eed".repeat(10));
+
 /**
  * One head. A push from anything but the head is refused, as a fenced writer
- * must refuse it. `sync` copies the head into each target's main, which
+ * must refuse it. `adopt` and `seed` set the head and are recorded. `sync` copies the head into each target's main, which
  * `synced` reads back (undefined: never synced).
  */
 export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
+  const adopted: CommitSha[] = [];
+  const seeds: { readonly name: string; readonly at: Instant }[] = [];
   let dropping = 0;
   const weights = new Map<CommitSha, number>();
   const histories = new Map<CommitSha, number>();
@@ -113,6 +119,10 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
   const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   return {
     head: () => current,
+    /** Every commit trunk's main was made at with `adopt`, in order. */
+    adopted: (): readonly CommitSha[] => [...adopted],
+    /** Every first commit asked for with `seed`, in order; each answered `MEMORY_SEED`. */
+    seeds: (): readonly { readonly name: string; readonly at: Instant }[] => [...seeds],
     synced: (repo: RepoRef) => targets.get(repoKey(repo)),
     /** Every push asked for, in order, whatever came of it. */
     pushes: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...pushes],
@@ -143,6 +153,17 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
       TrunkWriter,
       TrunkWriter.of({
         head: Effect.sync(() => current),
+        adopt: (commit) =>
+          Effect.sync(() => {
+            adopted.push(commit);
+            current = commit;
+          }),
+        seed: (name, at) =>
+          Effect.sync(() => {
+            seeds.push({ name, at });
+            current = MEMORY_SEED;
+            return MEMORY_SEED;
+          }),
         push: (from, to) =>
           Effect.suspend((): Effect.Effect<void, PackTooLarge | UnexpectedHead> => {
             pushes.push({ from, to });

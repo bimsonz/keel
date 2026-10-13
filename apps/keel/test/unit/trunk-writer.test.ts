@@ -3,10 +3,18 @@
 // trunk's head reads now. Artifacts' own compare-and-swap is proven live
 // ([trunkwriter.live]); this proves what the adapter asks it to compare.
 import { describe, expect, it } from "@effect/vitest";
-import { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha, Instant } from "@keeltown/core/kernel";
 import { CodeHost, type RepoRef, StagingWriter, TrunkWriter } from "@keeltown/core/ports";
+import {
+  importSshSigningKey,
+  rootCommit,
+  sshSignature,
+  writePack,
+  ZERO_OID,
+} from "@keeltown/gitcore";
 import { makeCodeHostMemory } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
 import { StagingWriterGitCore } from "../../src/adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
@@ -17,6 +25,10 @@ const TRUNK: RepoRef = { namespace: "memory", name: "prj" };
 const STAGING: RepoRef = { namespace: "memory", name: "prj-staging" };
 const FROM = sha("a");
 const TO = sha("b");
+const MAIN = "refs/heads/main";
+const HOST = "keel.test";
+/** A deployment with no signing key: enough for a writer that seeds nothing. */
+const UNSIGNED = { host: HOST, signingKey: undefined, signers: "[]" };
 
 /** Trunk and staging in memory, trunk's main at a commit that is not FROM, and every minted token recorded. */
 function host() {
@@ -34,7 +46,9 @@ function host() {
       }),
     ),
   ).pipe(Layer.provide(code.layer));
-  const layer = TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }).pipe(Layer.provide(spied));
+  const layer = TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED).pipe(
+    Layer.provide(spied),
+  );
   const stagingLayer = StagingWriterGitCore({ trunk: TRUNK, staging: STAGING }).pipe(
     Layer.provide(spied),
   );
@@ -282,6 +296,133 @@ describe("StagingWriter.fastForward", () => {
           ),
         );
         expect(refused).toMatchObject({ _tag: "PushRejected", reason: "stale" });
+      }),
+  );
+});
+
+/** An empty trunk in memory, its writer signing with a fresh key, and the recording server its pushes reach. */
+const emptyTrunk = (replies: Reply[]) =>
+  Effect.gen(function* () {
+    const keys = yield* Effect.promise(() => makeCommitSigningKeys());
+    const server = gitServer(replies);
+    vi.stubGlobal("fetch", server.fetch);
+    const code = makeCodeHostMemory();
+    yield* Effect.flatMap(CodeHost, (h) => h.create(TRUNK)).pipe(Effect.provide(code.layer));
+    const layer = TrunkWriterGitCore(
+      { trunk: TRUNK, staging: STAGING },
+      { host: HOST, signingKey: keys.signingKey, signers: keys.signers },
+    ).pipe(Layer.provide(code.layer));
+    /** Trunk's main as the memory host holds it: the recording server takes pushes and moves nothing. */
+    const setMain = (to: CommitSha) => {
+      code.repos.get("memory/prj")?.refs.set(MAIN, to);
+    };
+    return { keys, server, layer, setMain };
+  });
+
+/** Keel's first commit for `name` at `at`, built here from the key itself. */
+const firstCommit = (signingKey: string, name: string, at: number) =>
+  Effect.promise(async () => {
+    const key = await importSshSigningKey(signingKey);
+    const keel = { name: "Keel", email: `keel@${HOST}`, time: Math.floor(at / 1000) };
+    return rootCommit({
+      path: "README.md",
+      content: `# ${name}\n`,
+      message: `Start ${name}`,
+      author: keel,
+      committer: keel,
+      sign: (unsigned) => sshSignature(key, unsigned),
+    });
+  });
+
+describe("TrunkWriter.seed and adopt", () => {
+  const AT = Instant(1_760_000_000_999);
+
+  it.effect(
+    "[project.start-empty] seeds an empty trunk with Keel's signed first commit, made of the name and the time alone, and a retry finds it",
+    () =>
+      Effect.gen(function* () {
+        const { keys, server, layer, setMain } = yield* emptyTrunk(["ok"]);
+        const seed = Effect.flatMap(TrunkWriter, (w) => w.seed("forge", AT)).pipe(
+          Effect.provide(layer),
+        );
+        const seeded = yield* seed;
+        const expected = yield* firstCommit(keys.signingKey, "forge", AT);
+        expect(seeded).toBe(expected.oid);
+        expect(
+          server.requests.map(({ service, repo, lines }) => ({ service, repo, lines })),
+        ).toEqual([
+          {
+            service: "receive-pack",
+            repo: "memory/prj.git",
+            lines: [`${ZERO_OID} ${expected.oid} ${MAIN}`],
+          },
+        ]);
+        // The pack is the blob, the tree and the commit, and nothing else.
+        const pack = yield* Effect.promise(() => writePack(expected.objects));
+        expect(server.received).toEqual([pack.length]);
+        // A retry of the same bootstrap writes the same commit, finds it there and sends nothing.
+        setMain(seeded);
+        expect(yield* seed).toBe(seeded);
+        expect(server.requests).toHaveLength(1);
+      }),
+  );
+
+  it.effect(
+    "[project.start-empty] never seeds over a main that holds something else, and never unsigned",
+    () =>
+      Effect.gen(function* () {
+        const { server, layer, setMain } = yield* emptyTrunk([]);
+        setMain(FROM);
+        const over = yield* Effect.exit(
+          Effect.flatMap(TrunkWriter, (w) => w.seed("forge", AT)).pipe(Effect.provide(layer)),
+        );
+        expect(Exit.isFailure(over) ? Cause.pretty(over.cause) : "").toContain(
+          "trunk already has a main, at another commit",
+        );
+        const code = makeCodeHostMemory();
+        yield* Effect.flatMap(CodeHost, (h) => h.create(TRUNK)).pipe(Effect.provide(code.layer));
+        const keyless = yield* Effect.exit(
+          Effect.flatMap(TrunkWriter, (w) => w.seed("forge", AT)).pipe(
+            Effect.provide(
+              TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED).pipe(
+                Layer.provide(code.layer),
+              ),
+            ),
+          ),
+        );
+        expect(Exit.isFailure(keyless) ? Cause.pretty(keyless.cause) : "").toContain(
+          "KEEL_COMMIT_SIGNING_KEY is not set",
+        );
+        expect(server.requests).toEqual([]);
+      }),
+  );
+
+  // Live, not on the test clock: the busy retry sleeps for real.
+  it.live(
+    "[trunkwriter.adopt] makes main at a commit trunk holds with no object sent and no old value, and leaves a main that exists",
+    () =>
+      Effect.gen(function* () {
+        const { server, layer, setMain } = yield* emptyTrunk(["busy", "ok"]);
+        const adopt = (commit: CommitSha) =>
+          Effect.flatMap(TrunkWriter, (w) => w.adopt(commit)).pipe(Effect.provide(layer));
+        yield* adopt(TO);
+        const empty = yield* Effect.promise(() => writePack([]));
+        // Trunk was busy once: the same ref-only push was sent again.
+        expect(server.requests.map(({ service, lines }) => ({ service, lines }))).toEqual([
+          { service: "receive-pack", lines: [`${ZERO_OID} ${TO} ${MAIN}`] },
+          { service: "receive-pack", lines: [`${ZERO_OID} ${TO} ${MAIN}`] },
+        ]);
+        expect(server.received).toEqual([empty.length, empty.length]);
+        // Already there: a retry, and nothing is sent.
+        setMain(TO);
+        yield* adopt(TO);
+        expect(server.requests).toHaveLength(2);
+        // At another commit: a defect, and main is never moved.
+        const moved = yield* Effect.exit(adopt(FROM));
+        expect(Exit.isFailure(moved) ? Cause.pretty(moved.cause) : "").toContain(
+          "trunk already has a main, at another commit",
+        );
+        expect(server.requests).toHaveLength(2);
       }),
   );
 });

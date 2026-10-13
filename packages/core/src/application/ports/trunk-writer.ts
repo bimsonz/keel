@@ -1,6 +1,6 @@
 import { Context, type Effect, Schema } from "effect";
 import type { PushRejected, UnexpectedHead } from "../../domain/integration/index.ts";
-import type { CommitSha } from "../../domain/kernel/index.ts";
+import type { CommitSha, Instant } from "../../domain/kernel/index.ts";
 import type { RepoNotFound, RepoRef } from "./code-host.ts";
 
 /**
@@ -22,6 +22,22 @@ export class TrunkWriter extends Context.Service<
   TrunkWriter,
   {
     readonly head: Effect.Effect<CommitSha>;
+    /**
+     * Makes trunk's main at `commit`, a commit trunk already holds under
+     * another branch (an import brings its one branch under its own name).
+     * No object is sent, and the push names no old value, so a main that
+     * exists is never moved: one already at `commit` is a retry and is left
+     * alone, and one anywhere else is a defect.
+     */
+    readonly adopt: (commit: CommitSha) => Effect.Effect<void>;
+    /**
+     * Writes an empty trunk's first commit: a README naming the project,
+     * authored and committed by Keel at `at`, and signed as every commit
+     * Keel writes is. The commit is made of `name` and `at` alone, so a
+     * retry writes the same one: a main that already holds it is left alone,
+     * and a main at anything else is a defect. Answers the commit.
+     */
+    readonly seed: (name: string, at: Instant) => Effect.Effect<CommitSha>;
     /**
      * Moves trunk's main `from → to`, `from` being the WAL's old value, sent
      * explicitly whatever trunk's head reads now. `to` is a commit in staging

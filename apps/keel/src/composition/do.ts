@@ -175,7 +175,7 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
     const host = codeHostLayer(env);
     return Layer.mergeAll(
       host,
-      TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(host)),
+      TrunkWriterGitCore(projectRepos(projectId()), commitSigning(env)).pipe(Layer.provide(host)),
       OrgUsageRpc(env.ORG_USAGE),
       ProjectNamespacesD1(env.DB),
     );
