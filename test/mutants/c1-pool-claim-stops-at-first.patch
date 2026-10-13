@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.claim-gives-up-next
+# why: a claim whose first workspace could not follow trunk refuses, with another ready workspace it never tried
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 4128ad30..3a3efdb4 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -144,7 +144,8 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     if (candidate === undefined) continue;
+     if (candidate.baseSha !== head) {
+       tried.add(candidate.id);
+-      if ((yield* refreshOne(project, candidate.id, head)) !== "advanced") continue;
++      if ((yield* refreshOne(project, candidate.id, head)) !== "advanced")
++        return yield* new PoolExhausted({ retryAfterMs: 5_000 });
+     }
+     const now = yield* (yield* Clock).now;
+     yield* commit(

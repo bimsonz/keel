@@ -18,8 +18,9 @@ import { PORTS } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { WorkspacePoolRpc } from "../../src/adapters/driven/do-rpc/workspace-pool.ts";
-import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import {
+  POOL_CLAIM,
   POOL_REFILL,
   POOL_REFRESH,
   type WorkspacePoolDO,
@@ -324,12 +325,13 @@ describe("the WorkspacePool DO", () => {
 
   it("[pool.do.refresh-push-ignored] through the real object, a refresh's push reported after its workspace was granted is ignored, and the holder's own push is recorded", async () => {
     const projectId = freshProject();
-    const followed = await stock(projectId, 1);
+    const followed = await stock(projectId, 1, true);
     const stub = poolStub(projectId);
+    valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
     const head = commitSha("e");
     followed.head = head;
-    valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
-    // The refill forks behind trunk, and the refresh relays trunk's head onto the fork.
+    // The pool is one short. Its refill forks behind trunk, and the refresh relays trunk's head onto the fork.
+    await stub.configure({ source: followed.source, target: 1 });
     await runDurableObjectAlarm(stub);
     await vi.waitFor(async () => {
       expect(followed.relays).toHaveLength(1);
@@ -353,13 +355,14 @@ describe("the WorkspacePool DO", () => {
 
   it("[pool.do.refresh-after-refill] a refill from a mirror that lags trunk arms a refresh: the workspace it forked is brought to trunk's head before anyone is granted it", async () => {
     const projectId = freshProject();
-    const followed = await stock(projectId, 1);
+    const followed = await stock(projectId, 1, true);
     const stub = poolStub(projectId);
-    // Trunk is ahead of the mirror the pool forks from.
+    const first = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    // Trunk moves ahead of the mirror the pool forks from.
     const head = commitSha("d");
     followed.head = head;
-    const first = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
     // The grant left the pool short: its refill forks from the mirror, behind trunk.
+    await stub.configure({ source: followed.source, target: 1 });
     await runDurableObjectAlarm(stub);
     await vi.waitFor(async () => {
       expect(followed.relays).toHaveLength(1);
@@ -450,5 +453,130 @@ describe("the WorkspacePool DO", () => {
     expect(Exit.isFailure(refused) ? JSON.stringify(refused.cause) : "granted").toContain(
       "PoolExhausted",
     );
+  });
+
+  it("[pool.do.claim-at-head] through the real object, a claim that arrives before the pool has heard of a landing is granted at trunk's head, and nothing stays armed after it", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 2, true);
+    const stub = poolStub(projectId);
+    // Trunk has moved and no landing was delivered: both workspaces are behind it.
+    const head = commitSha("a");
+    followed.head = head;
+    const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(grant.baseSha).toBe(head);
+    expect(followed.relays).toEqual([
+      { workspace: grant.repo.name, from: expect.any(String), to: head },
+    ]);
+    expect(await statusOf(projectId)).toMatchObject({ ready: 1, granted: 1, refreshing: 0 });
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+  });
+
+  it("[pool.do.claim-guarded] while a claim relays trunk into its workspace a deadline of the claim's own stands, for an object that dies there, and it is withdrawn once the claim has its workspace", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 1, true);
+    const stub = poolStub(projectId);
+    const head = commitSha("b");
+    followed.head = head;
+    followed.held = true;
+    const before = Date.now();
+    // Not awaited here: the claim does not return while its relay is held.
+    const claim = stub.grant(holder());
+    try {
+      await vi.waitFor(() => expect(followed.relays).toHaveLength(1), WAIT);
+      expect(await statusOf(projectId)).toMatchObject({ ready: 0, refreshing: 1 });
+      const armed = (await alarmsOf(projectId)).armed.find((a) => a.reason === POOL_CLAIM);
+      expect(armed?.at).toBeGreaterThanOrEqual(before + 120_000);
+    } finally {
+      // Whatever was found, the relay is let go, so the claim returns.
+      followed.held = false;
+    }
+    expect(valueOf(WorkspacePoolCodecs.grant, await claim).baseSha).toBe(head);
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+  });
+
+  it("[pool.do.claim-overlap] a claim that ends while another is still being served leaves the claims' deadline standing: it is withdrawn when the last of them has ended", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 2, true);
+    const stub = poolStub(projectId);
+    const first = holder();
+    const held = valueOf(WorkspacePoolCodecs.grant, await stub.grant(first));
+    const claimArmed = async () =>
+      (await alarmsOf(projectId)).armed.find((a) => a.reason === POOL_CLAIM);
+    await vi.waitFor(async () => expect(await claimArmed()).toBeUndefined(), WAIT);
+    // A second claim is being served: it waits on trunk for its head, and may yet relay.
+    followed.head = commitSha("f");
+    followed.headHeld = true;
+    const second = stub.grant(holder());
+    try {
+      await vi.waitFor(async () => expect(await claimArmed()).toBeDefined(), WAIT);
+      // The first holder asks again, and is answered at once with what it holds.
+      const again = valueOf(WorkspacePoolCodecs.grant, await stub.grant(first));
+      expect(again.workspaceId).toBe(held.workspaceId);
+      expect(await statusOf(projectId)).toMatchObject({ refreshing: 0 });
+      expect(await claimArmed()).toBeDefined();
+    } finally {
+      followed.headHeld = false;
+    }
+    expect(valueOf(WorkspacePoolCodecs.grant, await second).baseSha).toBe(followed.head);
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+  });
+
+  it("[pool.do.claim-deadline] a claim's deadline that comes due is answered by a refresh pass: with the workspace still mid-relay, the pass keeps itself armed until it is settled", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 1, true);
+    const stub = poolStub(projectId);
+    followed.head = commitSha("c");
+    followed.held = true;
+    const claim = stub.grant(holder());
+    try {
+      await vi.waitFor(() => expect(followed.relays).toHaveLength(1), WAIT);
+      expect(await refreshArmed(projectId)).toBeUndefined();
+      // The deadline comes due, as it would for an object that died under the relay.
+      await runInDurableObject(stub, (_instance: WorkspacePoolDO, state) =>
+        scheduleAlarm(state.storage, { kind: "deadline", reason: POOL_CLAIM, at: Date.now() }),
+      );
+      await runDurableObjectAlarm(stub);
+      await vi.waitFor(async () => expect(await refreshArmed(projectId)).toBeDefined(), WAIT);
+    } finally {
+      followed.held = false;
+    }
+    expect(valueOf(WorkspacePoolCodecs.grant, await claim).baseSha).toBe(followed.head);
+    // The workspace is its holder's now: the pass finds nothing left to settle and withdraws.
+    await vi.waitFor(
+      async () => {
+        await runDurableObjectAlarm(stub);
+        expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null });
+      },
+      { timeout: 20_000, interval: 250 },
+    );
+  });
+
+  it("[pool.do.claim-collects] a claim that gives a workspace up arms its collection: the claim answers PoolExhausted, never the workspace, and the workspace's repo is deleted", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 1, true);
+    const stub = poolStub(projectId);
+    followed.head = commitSha("d");
+    // What the workspace lacks is over the relay's cap: it can never follow trunk.
+    followed.answer = "too-large";
+    const refused = decodeExit(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(Exit.isFailure(refused) ? JSON.stringify(refused.cause) : "granted").toContain(
+      "PoolExhausted",
+    );
+    expect(followed.relays).toHaveLength(1);
+    const given = followed.relays[0]?.workspace ?? "";
+    await vi.waitFor(async () => {
+      await runDurableObjectAlarm(stub);
+      expect(await statusOf(projectId)).toMatchObject({ ready: 0, collecting: 0 });
+      expect(await exists(given)).toBe(false);
+    }, WAIT);
   });
 });

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.claim-prefers-fresh
+# why: a claim takes the workspace that has waited longest even when a younger one is already at trunk's head, and relays for nothing
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 4128ad30..d0a87b2b 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -140,7 +140,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     }
+     const head = yield* trunks.head(project);
+     // Chosen after the read: what was ready before it may have been taken since.
+-    const candidate = oldestReadyAt(store, head) ?? oldestReady(store, tried);
++    const candidate = oldestReady(store, tried);
+     if (candidate === undefined) continue;
+     if (candidate.baseSha !== head) {
+       tried.add(candidate.id);

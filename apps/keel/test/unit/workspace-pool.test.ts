@@ -24,12 +24,14 @@ import {
   ProjectId,
   type WorkspaceId,
 } from "@keeltown/core/kernel";
-import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
+import { Clock, CodeHost, EntityStore, EventOutbox, Trunks } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeIdsMemory,
+  makeTrunksMemory,
+  makeWorkspaceRefresherMemory,
 } from "@keeltown/testing";
 import { Clock as EffectClock, Deferred, Effect, Fiber, Layer, Schema } from "effect";
 
@@ -53,7 +55,12 @@ const yieldingClock = Layer.succeed(
   }),
 );
 
-/** The pool's ports, with an optional gate every fork waits on. */
+/**
+ * The pool's ports, with an optional gate every fork waits on. Trunk here is
+ * the mirror itself: its head is the mirror's main, so no workspace is ever
+ * behind it and a grant relays nothing (`workspace-pool-refresh.test.ts`
+ * holds what a grant does when one is).
+ */
 function pool(options: { readonly forkGate?: Deferred.Deferred<void> } = {}) {
   const host = makeCodeHostMemory();
   const outbox = makeEventOutboxMemory();
@@ -72,7 +79,25 @@ function pool(options: { readonly forkGate?: Deferred.Deferred<void> } = {}) {
             });
           }),
         ).pipe(Layer.provideMerge(host.layer));
-  return Layer.mergeAll(gated, outbox.layer, makeIdsMemory().layer, yieldingClock);
+  const trunks = Layer.effect(
+    Trunks,
+    Effect.gen(function* () {
+      const inner = yield* Trunks;
+      const code = yield* CodeHost;
+      return Trunks.of({
+        ...inner,
+        head: () => code.head(MIRROR, "refs/heads/main").pipe(Effect.orDie),
+      });
+    }),
+  ).pipe(Layer.provide(makeTrunksMemory().layer), Layer.provide(gated));
+  return Layer.mergeAll(
+    gated,
+    outbox.layer,
+    makeIdsMemory().layer,
+    yieldingClock,
+    trunks,
+    makeWorkspaceRefresherMemory(host, () => MIRROR).layer,
+  );
 }
 
 /** The mirror the pool forks from, with one commit on main. */

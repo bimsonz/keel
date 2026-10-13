@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.claim-none-ready
+# why: a pool with no ready workspace asks trunk for its head before refusing, so a project with no trunk yet answers a defect
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 4128ad30..b5660527 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -129,6 +129,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+         repo: slot.repo,
+       } satisfies WorkspaceGrant;
+     }
++    const head = yield* trunks.head(project);
+     if (oldestReady(store, tried) === undefined) {
+       return yield* new PoolExhausted({
+         // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
+@@ -138,7 +139,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+             : 15_000,
+       });
+     }
+-    const head = yield* trunks.head(project);
+     // Chosen after the read: what was ready before it may have been taken since.
+     const candidate = oldestReadyAt(store, head) ?? oldestReady(store, tried);
+     if (candidate === undefined) continue;

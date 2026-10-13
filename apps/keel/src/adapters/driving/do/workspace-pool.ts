@@ -36,6 +36,8 @@ import { KeelObject, type Reaction } from "./keel-object.ts";
 export const POOL_REFILL = "pool refill";
 export const POOL_COLLECT = "pool collect";
 export const POOL_REFRESH = "pool refresh";
+/** A claim's own: when a workspace it may have left mid-relay is settled. */
+export const POOL_CLAIM = "pool claim";
 /** How long a failed fork or deletion waits before the next try. */
 const RETRY_MS = 10_000;
 
@@ -53,7 +55,8 @@ const decodeProject = Schema.decodeUnknownSync(ProjectId);
  * refreshes are named deadlines, armed when there is work and never re-armed
  * without it. A refresh brings the ready workspaces up to trunk's head: it is
  * armed when a change lands, and when a refill leaves a workspace behind
- * trunk (the mirror it forks from can lag).
+ * trunk (the mirror it forks from can lag). A claim that arrives before it
+ * brings the workspace it takes to trunk's head itself.
  * Repo-touching: callers place it with the deployment's `locationHint`.
  */
 export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
@@ -62,6 +65,8 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
   private landed = false;
   /** Refresh passes in a row that failed or left a workspace behind; the next waits longer for each. */
   private refreshFailures = 0;
+  /** The claims being served now: each may be relaying trunk into the workspace it takes. */
+  private claims = 0;
 
   /** The project this pool serves, from the object's name; stamped on every event it commits. */
   private get project(): ProjectId {
@@ -71,14 +76,40 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     return decodeProject(name.slice("pool:".length));
   }
 
+  /**
+   * A claim, and what follows it. A claim may relay trunk into the workspace
+   * it takes, and the object can die under that relay as under a pass's. So
+   * a deadline of the claim's own is armed first, for when a workspace left
+   * mid-relay may be settled; a pass then settles it. It is the claims' and
+   * not the refresh's, so a pass that ends while a claim is still being
+   * served withdraws nothing of it. Once no claim is being served and no
+   * workspace is mid-relay it is withdrawn. A workspace the claim gave up is
+   * collected, and the refill forks what the pool lacks.
+   */
   async grant(holder: string) {
     const project = this.project;
+    const storage = this.ctx.storage;
     const program = decodeHolder(holder).pipe(
       Effect.orDie,
       Effect.flatMap((h) => grantWorkspace(project, h)),
       Effect.provide(this.services),
     );
-    const answer = await this.answer(WorkspacePoolCodecs.grant, program);
+    // Counted before the first await, so a claim ending meanwhile does not withdraw this one's deadline.
+    this.claims += 1;
+    await scheduleAlarm(storage, {
+      kind: "deadline",
+      reason: POOL_CLAIM,
+      at: Date.now() + STUCK_REFRESH_MS + 1_000,
+    });
+    const answer = await this.answer(WorkspacePoolCodecs.grant, program).finally(() => {
+      this.claims -= 1;
+    });
+    const status = await this.runtime.runPromise(poolStatus());
+    if (this.claims === 0 && status.refreshing === 0) await cancelAlarm(storage, POOL_CLAIM);
+    const collecting = armedAlarms(storage).some((armed) => armed.reason === POOL_COLLECT);
+    if (status.collecting > 0 && !collecting) {
+      await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
+    }
     await this.refillIfShort();
     return answer;
   }
@@ -208,7 +239,8 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
       }
       return;
     }
-    if (request.reason === POOL_REFRESH) return this.refresh();
+    // A claim's deadline came due: the object died under its relay, or a relay is still out. A pass settles what it left.
+    if (request.reason === POOL_REFRESH || request.reason === POOL_CLAIM) return this.refresh();
     if (request.reason === POOL_COLLECT) {
       const report = await this.runtime.runPromise(
         collectWorkspaces(this.project).pipe(Effect.provide(this.services)),

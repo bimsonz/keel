@@ -109,8 +109,15 @@ const readyInOrder = (store: Store): readonly Slot[] =>
     .filter(isReady)
     .toSorted((a, b) => a.since - b.since || (a.id < b.id ? -1 : 1));
 
-/** The ready slot that has waited longest, so the pool hands out in fork order. */
-export const oldestReady = (store: Store): Slot | undefined => readyInOrder(store)[0];
+/** The ready slot that has waited longest and is not one of `besides`, so the pool hands out in fork order. */
+export const oldestReady = (
+  store: Store,
+  besides: ReadonlySet<string> = new Set(),
+): Slot | undefined => readyInOrder(store).find((s) => !besides.has(s.id));
+
+/** The ready slot whose main is at `head` that has waited longest: one a claim takes as it stands. */
+export const oldestReadyAt = (store: Store, head: CommitSha): Slot | undefined =>
+  readyInOrder(store).find((s) => s.baseSha === head);
 
 /** The ready slots whose main is not at `head`, the one that has waited longest first. */
 export const readyBehind = (store: Store, head: CommitSha): readonly Slot[] =>

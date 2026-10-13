@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.claim-deadline"
+# kills: pool.do.claim-deadline
+# why: a claim's deadline that comes due is not answered by a pass, so what the claim left mid-relay is never settled
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2b6ddc3c..9de3b3c5 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -240,7 +240,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       return;
+     }
+     // A claim's deadline came due: the object died under its relay, or a relay is still out. A pass settles what it left.
+-    if (request.reason === POOL_REFRESH || request.reason === POOL_CLAIM) return this.refresh();
++    if (request.reason === POOL_REFRESH) return this.refresh();
+     if (request.reason === POOL_COLLECT) {
+       const report = await this.runtime.runPromise(
+         collectWorkspaces(this.project).pipe(Effect.provide(this.services)),

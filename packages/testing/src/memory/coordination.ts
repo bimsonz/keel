@@ -73,8 +73,10 @@ const MEMORY_TRUNK_HEAD = CommitSha.make("7".repeat(40));
  * Grants workspaces up to `capacity`, then refuses with PoolExhausted. A
  * holder's second grant returns its workspace again with a new token, as the
  * real pool does; every grant's base is `baseSha`, and a push observed at
- * that commit is not the holder's. Once destroyed it grants
- * nothing, and what it had granted is released as withdrawn.
+ * that commit is not the holder's. It knows no trunk: the real pool grants
+ * at trunk's head, and a test that needs a base to be one names it here.
+ * Once destroyed it grants nothing, and what it had granted is released as
+ * withdrawn.
  */
 export function makeWorkspacePoolMemory(
   options: {

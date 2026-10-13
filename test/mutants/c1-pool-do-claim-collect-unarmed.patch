@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.claim-collects"
+# kills: pool.do.claim-collects
+# why: a workspace a claim gave up is never collected: its repo stays until something else arms the collection
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2b6ddc3c..74291a8e 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -107,9 +107,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     const status = await this.runtime.runPromise(poolStatus());
+     if (this.claims === 0 && status.refreshing === 0) await cancelAlarm(storage, POOL_CLAIM);
+     const collecting = armedAlarms(storage).some((armed) => armed.reason === POOL_COLLECT);
+-    if (status.collecting > 0 && !collecting) {
+-      await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
+-    }
+     await this.refillIfShort();
+     return answer;
+   }

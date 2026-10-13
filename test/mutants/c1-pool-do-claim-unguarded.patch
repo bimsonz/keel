@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.claim-guarded"
+# kills: pool.do.claim-guarded
+# why: a claim relays with no deadline armed, so a workspace the object died relaying into is never settled
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2b6ddc3c..576aa3a3 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -96,11 +96,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     );
+     // Counted before the first await, so a claim ending meanwhile does not withdraw this one's deadline.
+     this.claims += 1;
+-    await scheduleAlarm(storage, {
+-      kind: "deadline",
+-      reason: POOL_CLAIM,
+-      at: Date.now() + STUCK_REFRESH_MS + 1_000,
+-    });
+     const answer = await this.answer(WorkspacePoolCodecs.grant, program).finally(() => {
+       this.claims -= 1;
+     });

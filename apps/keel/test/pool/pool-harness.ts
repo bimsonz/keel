@@ -9,7 +9,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import type { CommitSha, NamespaceId, ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, Trunks, WorkspaceRefresher } from "@keeltown/core/ports";
+import { CodeHost, PackTooLarge, Trunks, WorkspaceRefresher } from "@keeltown/core/ports";
 import { makeProjectNamespacesMemory } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import type { WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
@@ -29,14 +29,18 @@ export function placedIn(projectId: ProjectId, org: NamespaceId = POOL_ORG) {
 
 /** What a pool's object follows in a test: the trunk it asks for a head, and the refresher it relays through. */
 export interface Followed {
+  /** The mirror the pool forks from. */
+  readonly source: { readonly namespace: string; readonly name: string };
   /** Trunk's head, as the project's Trunk DO would answer. Unset, it is the mirror's: no workspace is ever behind. */
   head: CommitSha | undefined;
   /** Each relay the pool asked for, in order. */
   readonly relays: { workspace: string; from: string; to: string }[];
   /** While true, a relay waits before it answers. */
   held: boolean;
-  /** How a relay answers: the workspace moved, or it stayed busy and nothing moved. */
-  answer: "advanced" | "busy";
+  /** While true, trunk waits before it answers for its head. */
+  headHeld: boolean;
+  /** How a relay answers: the workspace moved, it stayed busy and nothing moved, or what it lacks is over the relay's cap. */
+  answer: "advanced" | "busy" | "too-large";
 }
 
 /** Any Trunks method but `head`. */
@@ -53,18 +57,34 @@ export async function followTrunk(
   projectId: string,
   source: { readonly namespace: string; readonly name: string },
 ): Promise<Followed> {
-  const followed: Followed = { head: undefined, relays: [], held: false, answer: "advanced" };
+  const followed: Followed = {
+    source,
+    head: undefined,
+    relays: [],
+    held: false,
+    headHeld: false,
+    answer: "advanced",
+  };
   const host = codeHostLayer(env);
   const trunks = Layer.succeed(
     Trunks,
     Trunks.of({
       head: () =>
-        followed.head === undefined
-          ? Effect.flatMap(CodeHost, (code) => code.head(source, "refs/heads/main")).pipe(
-              Effect.provide(host),
-              Effect.orDie,
-            )
-          : Effect.succeed(followed.head),
+        Effect.promise(async () => {
+          // Waited out on the object's own timer, as a held relay is.
+          while (followed.headHeld) await new Promise((resolve) => setTimeout(resolve, 20));
+        }).pipe(
+          Effect.andThen(
+            Effect.suspend(() =>
+              followed.head === undefined
+                ? Effect.flatMap(CodeHost, (code) => code.head(source, "refs/heads/main")).pipe(
+                    Effect.provide(host),
+                    Effect.orDie,
+                  )
+                : Effect.succeed(followed.head),
+            ),
+          ),
+        ),
       initialize: unused,
       origin: unused,
       adopt: unused,
@@ -85,6 +105,10 @@ export async function followTrunk(
           });
           if (followed.answer === "busy")
             return yield* Effect.fail(new PushRejected({ reason: "busy" }));
+          if (followed.answer === "too-large")
+            return yield* Effect.fail(
+              new PackTooLarge({ repo: workspace, bytes: 70_000_000, limit: 62_914_560 }),
+            );
           return "advanced" as const;
         }),
     }),

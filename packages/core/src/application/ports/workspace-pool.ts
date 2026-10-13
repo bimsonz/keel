@@ -14,7 +14,8 @@ import type { RepoRef } from "./code-host.ts";
  * A workspace handed to its holder. `remote` and `token` go to the holder
  * only: the remote's host carries the account id, and the write token (≤ 2 h)
  * is minted per grant and never stored. `baseSha` is the workspace's head when
- * it was granted: the change's base, which Precheck diffs against. `repo`
+ * it was granted, which is trunk's head as its Trunk recorded it while the
+ * claim was served: the change's base, which Precheck diffs against. `repo`
  * names the workspace's repo on the code host, for `hasCommit` and
  * `diffTrees`; it is never logged next to the remote.
  */
@@ -51,8 +52,11 @@ export class WorkspacePool extends Context.Service<
   WorkspacePool,
   {
     /**
-     * Idempotent per holder: a retried grant for the same holder returns the
-     * same workspace with a freshly minted token. No ready workspace → PoolExhausted.
+     * A workspace at trunk's head: every landing recorded before the claim
+     * arrived is in it. Idempotent per holder: a retried grant for the same
+     * holder returns the same workspace, where it stands, with a freshly
+     * minted token. No ready workspace, or none that could be brought to
+     * trunk's head → PoolExhausted; never a workspace behind trunk.
      */
     readonly grant: (
       projectId: ProjectId,

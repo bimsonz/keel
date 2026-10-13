@@ -38,6 +38,7 @@ import {
   isDestroyed,
   isReady,
   oldestReady,
+  oldestReadyAt,
   type PoolSettings,
   putSettings,
   putSlot,
@@ -73,14 +74,34 @@ const handout = (slot: Slot) =>
     : Effect.succeed({ remote: slot.remote, baseSha: slot.baseSha });
 
 /**
- * Grants a ready workspace to `holder`, or the one it already holds: a retry
- * re-mints the token for the same workspace. The choice is re-checked inside
- * the transaction, so concurrent grants never share a workspace; the loser
- * takes the next ready one. A workspace being refreshed is not ready: trunk
- * is being written into it, so it is never handed out mid-relay. The write
- * token is minted after the commit and never stored. Every pool commit is
- * stamped with the pool's `project`. A destroyed pool grants nothing, not
- * even a holder's own workspace again.
+ * Grants `holder` a ready workspace whose main is at trunk's head, or the one
+ * it already holds: a retry re-mints the token for the same workspace, where
+ * it stands (a held workspace's main is its agent's, and is never moved).
+ *
+ * Trunk's head is the Trunk DO's own (`Trunks.head`), read while the claim is
+ * served: every landing recorded before the claim arrived is in the workspace
+ * it is given. A ready workspace already at that head is taken as it stands,
+ * the one that has waited longest first. With none there, the ready workspace
+ * that has waited longest is brought to it first, as a refresh pass would
+ * (`refreshOne`): the passes follow a landing a workspace at a time, and a
+ * claim that arrives before them is not handed the base they have yet to
+ * move. A workspace that could not be brought there is not tried again by
+ * this grant, so each is relayed into once at most, and a claim that can
+ * bring none answers PoolExhausted: it never answers a stale base. A pool
+ * with no ready workspace does not ask trunk.
+ *
+ * The choice is re-checked inside the transaction, so concurrent grants never
+ * share a workspace; the loser takes the next. A workspace being refreshed is
+ * not ready: trunk is being written into it, by a pass or by another claim,
+ * so it is never handed out mid-relay. The write token is minted after the
+ * commit and never stored. Every pool commit is stamped with the pool's
+ * `project`. A destroyed pool grants nothing, not even a holder's own
+ * workspace again.
+ *
+ * A pass and a claim each read trunk's head. It only moves forward, so a
+ * later read is never behind an earlier one; and should an answer ever be
+ * delivered late enough to name a head a workspace is already past, the relay
+ * refuses a move that is not forward and the workspace is left where it is.
  */
 export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function* (
   project: ProjectId,
@@ -88,7 +109,10 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
 ) {
   const store = yield* EntityStore;
   const host = yield* CodeHost;
-  // Each lost race leaves one ready slot fewer, so the loop ends; the bound catches a slot that can never be granted.
+  const trunks = yield* Trunks;
+  /** The workspaces this grant could not bring to trunk's head. */
+  const tried = new Set<WorkspaceId>();
+  // Each pass grants, loses a ready slot to another grant, or tries one more: the loop ends. The bound catches a slot that can never be granted.
   for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
     if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
     const held = heldBy(store, holder);
@@ -105,12 +129,22 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
         repo: slot.repo,
       } satisfies WorkspaceGrant;
     }
-    const candidate = oldestReady(store);
-    if (candidate === undefined) {
+    if (oldestReady(store, tried) === undefined) {
       return yield* new PoolExhausted({
-        // One being forked or refreshed is ready within seconds.
-        retryAfterMs: countIn(store, "forking") + countIn(store, "refreshing") > 0 ? 5_000 : 15_000,
+        // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
+        retryAfterMs:
+          countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0
+            ? 5_000
+            : 15_000,
       });
+    }
+    const head = yield* trunks.head(project);
+    // Chosen after the read: what was ready before it may have been taken since.
+    const candidate = oldestReadyAt(store, head) ?? oldestReady(store, tried);
+    if (candidate === undefined) continue;
+    if (candidate.baseSha !== head) {
+      tried.add(candidate.id);
+      if ((yield* refreshOne(project, candidate.id, head)) !== "advanced") continue;
     }
     const now = yield* (yield* Clock).now;
     yield* commit(
@@ -119,7 +153,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
         const chosen = slotOf(tx.store, candidate.id);
         if (
           !isReady(chosen) ||
-          chosen.baseSha === undefined ||
+          chosen.baseSha !== head ||
           heldBy(tx.store, holder) !== undefined ||
           isDestroyed(tx.store)
         ) {
@@ -136,7 +170,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
               workspaceId: chosen.id,
               holder,
               expiresAt,
-              baseSha: chosen.baseSha,
+              baseSha: head,
             }),
           ],
         });
@@ -427,13 +461,13 @@ const settleRefresh = (project: ProjectId, id: WorkspaceId) =>
   });
 
 /**
- * Refreshes one slot. It is claimed first (`ready` to `refreshing`, checked
- * again inside the transaction, so one granted meanwhile is left to its
- * holder), then trunk is relayed into its main, and only once the relay has
- * answered is the new base recorded: `baseSha` never names a commit the
- * workspace's main was not seen at. No event is committed, as a workspace
- * nobody holds has nobody to tell, and `WorkspaceGranted.baseSha` announces
- * the base when it is handed out.
+ * Refreshes one slot, for a pass or for a claim. It is claimed first (`ready`
+ * to `refreshing`, checked again inside the transaction, so one granted or
+ * claimed by another relay meanwhile is left alone), then trunk is relayed
+ * into its main, and only once the relay has answered is the new base
+ * recorded: `baseSha` never names a commit the workspace's main was not seen
+ * at. No event is committed, as a workspace nobody holds has nobody to tell,
+ * and `WorkspaceGranted.baseSha` announces the base when it is handed out.
  */
 const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
   Effect.gen(function* () {
@@ -488,8 +522,9 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
  * starts from it and not from wherever trunk stood when its workspace was
  * forked. Trunk's head is the Trunk DO's own (`Trunks.head`). The ready
  * workspaces behind it are refreshed one at a time, the one that has waited
- * longest first: while one is mid-relay the others stay grantable, since a
- * workspace behind trunk beats none. A granted workspace is never touched.
+ * longest first: while one is mid-relay the others stay ready, and a claim
+ * that comes for one before its turn brings it to trunk's head itself
+ * (`grantWorkspace`). A granted workspace is never touched.
  *
  * A slot a dead pass left refreshing is settled first, once it has been so
  * for `STUCK_REFRESH_MS`, by reading its main back. A pool with no ready

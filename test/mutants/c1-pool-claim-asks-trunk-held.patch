@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.claim-held
+# why: a holder asking again waits on trunk for a head its own workspace has no use for, and fails when trunk does not answer
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 4128ad30..229e9826 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -115,6 +115,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+   // Each pass grants, loses a ready slot to another grant, or tries one more: the loop ends. The bound catches a slot that can never be granted.
+   for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
+     if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
++    const head = yield* trunks.head(project);
+     const held = heldBy(store, holder);
+     const slot = held === undefined ? undefined : slotOf(store, held);
+     if (slot !== undefined) {
+@@ -138,7 +139,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+             : 15_000,
+       });
+     }
+-    const head = yield* trunks.head(project);
+     // Chosen after the read: what was ready before it may have been taken since.
+     const candidate = oldestReadyAt(store, head) ?? oldestReady(store, tried);
+     if (candidate === undefined) continue;

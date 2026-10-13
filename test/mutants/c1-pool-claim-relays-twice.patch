@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.claim-kept
+# why: a claim forgets which workspace it could not bring to trunk, and relays into the same one again
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 4128ad30..1a75edee 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -143,7 +143,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     const candidate = oldestReadyAt(store, head) ?? oldestReady(store, tried);
+     if (candidate === undefined) continue;
+     if (candidate.baseSha !== head) {
+-      tried.add(candidate.id);
+       if ((yield* refreshOne(project, candidate.id, head)) !== "advanced") continue;
+     }
+     const now = yield* (yield* Clock).now;
