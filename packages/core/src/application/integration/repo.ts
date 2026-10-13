@@ -26,6 +26,8 @@ const BINARY_PROBE_BYTES = 8000;
 /** A commit's diff serves the text of at most this many files, and at most this many bytes in all. */
 export const MAX_DIFF_FILES = 300;
 export const MAX_DIFF_BYTES = 8 * 1024 * 1024;
+/** A compare lists at most this many changed files; past it, the answer says it is truncated. */
+export const MAX_COMPARE_FILES = 1000;
 export const DEFAULT_COMMIT_PAGE = 30;
 export const MAX_COMMIT_PAGE = 100;
 
@@ -234,4 +236,35 @@ export const readRepoCommit = (
             .pipe(Effect.catchTag("ObjectNotFound", Effect.die));
     const files = yield* withSides(repo, changes);
     return { commit, ...(base === undefined ? {} : { base }), files };
+  }).pipe(Effect.catchTag("RepoNotFound", projectMissing(projectId)));
+
+export interface RepoCompareView {
+  readonly base: CommitSha;
+  readonly head: CommitSha;
+  readonly files: readonly RepoFileView[];
+  /** More files differ than the MAX_COMPARE_FILES listed. */
+  readonly truncated: boolean;
+}
+
+/**
+ * The files that differ from `base` to `head` (each a branch, a full ref or a
+ * commit id; `head` absent is `main`), with their text within the diff's caps.
+ * Both are read from the project's trunk alone, so a commit only another repo
+ * holds is a ref that names nothing.
+ */
+export const compareRepoCommits = (
+  projectId: ProjectId,
+  input: { readonly base: string; readonly head?: string },
+): Effect.Effect<RepoCompareView, ProjectNotFound | RefNotFound, CodeHost> =>
+  Effect.gen(function* () {
+    const repo = trunkOf(projectId);
+    const host = yield* CodeHost;
+    const base = yield* resolve(repo, input.base);
+    const head = yield* resolve(repo, input.head);
+    const changes = yield* host
+      .diffTrees(repo, base, head)
+      .pipe(Effect.catchTag("ObjectNotFound", Effect.die));
+    const listed = changes.slice(0, MAX_COMPARE_FILES);
+    const files = yield* withSides(repo, listed);
+    return { base, head, files, truncated: changes.length > listed.length };
   }).pipe(Effect.catchTag("RepoNotFound", projectMissing(projectId)));

@@ -132,6 +132,18 @@ model RepoCommitDiff {
 
 model RepoCommitPage is Page<RepoCommit>;
 
+/** Two trunk commits and the files that differ from `base` to `head`, with their text on each side. */
+model RepoCompare {
+  base: CommitSha;
+  head: CommitSha;
+
+  /** In diff order; at most 1,000. Text is served within the same caps as a commit's diff. */
+  files: RepoFileChange[];
+
+  /** More than 1,000 files differ, and only the first 1,000 are listed. */
+  truncated: boolean;
+}
+
 /**
  * A project's code, read-only: its trunk, as a code host shows it. An agent
  * reads its own project; an observer or an operator reads any. Without a
@@ -177,4 +189,19 @@ interface Repo {
   @route("/commits/{sha}")
   @get
   getCommit(@path projectId: ProjectId, @path sha: CommitSha): RepoCommitDiff | NotFound | StandardErrors;
+
+  /**
+   * What changed on trunk from `base` to `head` (`main` when absent): for an agent whose change
+   * bounced, what trunk did since its base, without a clone. Both are read from the project's
+   * trunk alone; a commit it does not hold is 404 `repo.ref_not_found`.
+   */
+  @summary("Compare two commits")
+  @useAuth(NoAuth | AgentRead | SessionAuth)
+  @route("/compare")
+  @get
+  compare(
+    @path projectId: ProjectId,
+    @query base: RepoRefName,
+    @query head?: RepoRefName,
+  ): RepoCompare | NotFound | StandardErrors;
 }

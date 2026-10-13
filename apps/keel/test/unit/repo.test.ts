@@ -351,6 +351,50 @@ describe("the repo read API", () => {
     expect(served("many/000.txt")).toBe(true);
   });
 
+  it("[repo.compare] the files that differ from base to head, with their text; head absent is main", async () => {
+    const base = await commit(DIFFS, { "a.txt": "one\n", "keep.txt": "same\n" });
+    const head = await commit(DIFFS, { "a.txt": "two\n", "keep.txt": "same\n", "b.txt": "new\n" });
+    const body = await bodyOf<{ base: string; head: string; files: unknown[]; truncated: boolean }>(
+      handlers.Repo_compare(member, { projectId: DIFFS, base }),
+    );
+    expect(body).toMatchObject({ base, head, truncated: false });
+    expect(body.files).toEqual([
+      expect.objectContaining({
+        path: "a.txt",
+        status: "modified",
+        before: "one\n",
+        after: "two\n",
+      }),
+      expect.objectContaining({ path: "b.txt", status: "added", before: null, after: "new\n" }),
+    ]);
+  });
+
+  it("[repo.compare-elsewhere] a commit only another project's trunk holds is 404 repo.ref_not_found, as base or as head", async () => {
+    const mine = await commit(DIFFS, { "mine.txt": "mine\n" });
+    const theirs = await commit(PRIVATE, { "secret.txt": "theirs\n" });
+    const answers = await Promise.all(
+      [{ base: theirs }, { base: mine, head: theirs }].map(async (sides) => {
+        const answer = await handlers.Repo_compare(member, { projectId: DIFFS, ...sides });
+        return [answer.status, (await bodyOf<{ code: string }>(answer)).code];
+      }),
+    );
+    expect(answers).toEqual([
+      [404, "repo.ref_not_found"],
+      [404, "repo.ref_not_found"],
+    ]);
+  });
+
+  it("[repo.compare-truncated] past 1,000 changed files the list stops and says it is truncated", async () => {
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 1001; i += 1) files[`n/${String(i).padStart(4, "0")}.txt`] = `${i}\n`;
+    const base = await commit(HISTORY, { seed: "s\n" });
+    await commit(HISTORY, files);
+    const body = await bodyOf<{ files: unknown[]; truncated: boolean }>(
+      handlers.Repo_compare(member, { projectId: HISTORY, base }),
+    );
+    expect([body.files.length, body.truncated]).toEqual([1000, true]);
+  });
+
   it("[repo.change-id] a commit names the change it landed from its Change-Id trailer, and nothing without one", () => {
     const who = { name: "a1", email: "a1@keel.invalid", at: Instant(Date.UTC(2026, 9, 11)) };
     const sha = Schema.decodeUnknownSync(CommitSha)("a".repeat(40));

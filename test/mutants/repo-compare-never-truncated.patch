@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/repo.test.ts
+# kills: repo.compare-truncated
+# why: A compare past 1,000 files says nothing was left out
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index 97d22a36..a1ce23fd 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -266,5 +266,5 @@ export const compareRepoCommits = (
+       .pipe(Effect.catchTag("ObjectNotFound", Effect.die));
+     const listed = changes.slice(0, MAX_COMPARE_FILES);
+     const files = yield* withSides(repo, listed);
+-    return { base, head, files, truncated: changes.length > listed.length };
++    return { base, head, files, truncated: false };
+   }).pipe(Effect.catchTag("RepoNotFound", projectMissing(projectId)));

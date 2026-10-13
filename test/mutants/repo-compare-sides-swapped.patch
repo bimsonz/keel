@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/repo.test.ts
+# kills: repo.compare
+# why: Base and head are diffed the wrong way round
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index 97d22a36..7ff6cfa8 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -262,7 +262,7 @@ export const compareRepoCommits = (
+     const base = yield* resolve(repo, input.base);
+     const head = yield* resolve(repo, input.head);
+     const changes = yield* host
+-      .diffTrees(repo, base, head)
++      .diffTrees(repo, head, base)
+       .pipe(Effect.catchTag("ObjectNotFound", Effect.die));
+     const listed = changes.slice(0, MAX_COMPARE_FILES);
+     const files = yield* withSides(repo, listed);

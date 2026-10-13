@@ -138,6 +138,7 @@ export const SPEC_ACTIONS = {
   Repo_getBlob: rule("Project", "read"),
   Repo_listCommits: rule("Project", "read"),
   Repo_getCommit: rule("Project", "read"),
+  Repo_compare: rule("Project", "read"),
   Repo_getTree: rule("Project", "read"),
   Agents_getAgent: rule("Agent", "read"),
 

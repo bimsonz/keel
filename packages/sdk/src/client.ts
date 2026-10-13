@@ -948,6 +948,15 @@ export class KeelClient {
     return this.call("Repo_getCommit", { projectId, sha }, options);
   }
 
+  /** What changed on trunk from `base` to `head` (`main` when absent), with each file's text on each side. */
+  compare(
+    projectId: string,
+    base: string,
+    options: CallOptions & { readonly head?: string } = {},
+  ): Promise<WireOutputs["Repo_compare"]> {
+    return this.call("Repo_compare", { projectId, base, head: options.head }, options);
+  }
+
   /** Operator: enrols an agent. The client secret in the answer is shown once. */
   enrolAgent(
     agent: EnrolAgentRequest,

@@ -113,6 +113,11 @@ export const ROUTES = {
     query: ["ref", "cursor", "limit"],
   },
   Repo_getCommit: { method: "GET", path: "/projects/{projectId}/repo/commits/{sha}" },
+  Repo_compare: {
+    method: "GET",
+    path: "/projects/{projectId}/repo/compare",
+    query: ["base", "head"],
+  },
   Sessions_openSession: { method: "POST", path: "/sessions", headers: ["idempotency-key"] },
   Changes_listChanges: {
     method: "GET",

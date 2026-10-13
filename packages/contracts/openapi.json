@@ -7732,6 +7732,155 @@
         ]
       }
     },
+    "/projects/{projectId}/repo/compare": {
+      "get": {
+        "operationId": "Repo_compare",
+        "summary": "Compare two commits",
+        "description": "What changed on trunk from `base` to `head` (`main` when absent): for an agent whose change\nbounced, what trunk did since its base, without a clone. Both are read from the project's\ntrunk alone; a commit it does not hold is 404 `repo.ref_not_found`.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "base",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RepoRefName"
+            },
+            "explode": false
+          },
+          {
+            "name": "head",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RepoRefName"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCompare"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Repo"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects/{projectId}/repo/tree": {
       "get": {
         "operationId": "Repo_getTree",
@@ -19680,6 +19829,38 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "RepoCompare": {
+        "type": "object",
+        "required": [
+          "base",
+          "head",
+          "files",
+          "truncated"
+        ],
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "head": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepoFileChange"
+            },
+            "description": "In diff order; at most 1,000. Text is served within the same caps as a commit's diff."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More than 1,000 files differ, and only the first 1,000 are listed."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Two trunk commits and the files that differ from `base` to `head`, with their text on each side."
       },
       "RepoEntry": {
         "type": "object",

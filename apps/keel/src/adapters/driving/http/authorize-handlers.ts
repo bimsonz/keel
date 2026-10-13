@@ -324,6 +324,7 @@ export const RESOLVERS: Resolvers = {
   Repo_getBlob: (input) => projectNamed(input.projectId),
   Repo_listCommits: (input) => projectNamed(input.projectId),
   Repo_getCommit: (input) => projectNamed(input.projectId),
+  Repo_compare: (input) => projectNamed(input.projectId),
   Views_getTrunk: (input) => projectNamed(input.projectId),
   Views_listLanes: ownProject,
   Views_getCandidate: ownProject,

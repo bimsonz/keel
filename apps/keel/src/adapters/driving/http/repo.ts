@@ -2,6 +2,8 @@ import type { ProjectNotFound } from "@keeltown/core/domain/integration";
 import type {
   RepoBlobView,
   RepoCommitDiffView,
+  RepoCompareView,
+  RepoFileView,
   RepoCommitPage,
   RepoTreeView,
 } from "@keeltown/core/application/integration";
@@ -16,6 +18,7 @@ import type {
 import { Option, Result, Schema } from "effect";
 import type {
   Repo_getBlobResult,
+  Repo_compareResult,
   Repo_getCommitResult,
   Repo_getTreeResult,
   Repo_listCommitsResult,
@@ -142,6 +145,20 @@ export function commitsOk(
   };
 }
 
+/** One changed file as the wire shows it: its text on each side, null where that side has none. */
+const wireFile = (f: RepoFileView) => ({
+  path: f.path,
+  status: f.change,
+  ...(f.oldOid === undefined ? {} : { oldSha: f.oldOid }),
+  ...(f.newOid === undefined ? {} : { newSha: f.newOid }),
+  ...(f.oldMode === undefined ? {} : { oldMode: f.oldMode }),
+  ...(f.newMode === undefined ? {} : { newMode: f.newMode }),
+  binary: f.binary,
+  truncated: f.truncated,
+  before: text(f.before),
+  after: text(f.after),
+});
+
 export function commitOk(
   view: RepoCommitDiffView,
 ): Extract<Repo_getCommitResult, { readonly status: 200 }> {
@@ -150,18 +167,21 @@ export function commitOk(
     body: {
       commit: wireCommit(view.commit),
       ...(view.base === undefined ? {} : { base: view.base }),
-      files: view.files.map((f) => ({
-        path: f.path,
-        status: f.change,
-        ...(f.oldOid === undefined ? {} : { oldSha: f.oldOid }),
-        ...(f.newOid === undefined ? {} : { newSha: f.newOid }),
-        ...(f.oldMode === undefined ? {} : { oldMode: f.oldMode }),
-        ...(f.newMode === undefined ? {} : { newMode: f.newMode }),
-        binary: f.binary,
-        truncated: f.truncated,
-        before: text(f.before),
-        after: text(f.after),
-      })),
+      files: view.files.map(wireFile),
+    },
+  };
+}
+
+export function compareOk(
+  view: RepoCompareView,
+): Extract<Repo_compareResult, { readonly status: 200 }> {
+  return {
+    status: 200,
+    body: {
+      base: view.base,
+      head: view.head,
+      files: view.files.map(wireFile),
+      truncated: view.truncated,
     },
   };
 }

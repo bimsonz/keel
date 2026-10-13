@@ -93,6 +93,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Repo_getBlob: (c) => c.blob("prj_1", "README.md"),
   Repo_listCommits: (c) => c.commits("prj_1"),
   Repo_getCommit: (c) => c.commit("prj_1", SAMPLE["sha"] ?? ""),
+  Repo_compare: (c) => c.compare("prj_1", "main"),
   Operator_createProject: (c) =>
     c.createProject({ namespace: "keel", name: "p", source: { kind: "empty" } }),
   Operator_listProjects: (c) => c.projects({ limit: 3 }),
@@ -132,6 +133,7 @@ const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<u
   Repo_getTree: (c) => c.tree("prj_1", { ref: "main", path: "src" }),
   Repo_getBlob: (c) => c.blob("prj_1", "README.md", { ref: "main" }),
   Repo_listCommits: (c) => c.commits("prj_1", { ref: "main", cursor: "c1", limit: 5 }),
+  Repo_compare: (c) => c.compare("prj_1", "main", { head: "feature" }),
   Changes_listChanges: (c) =>
     c.changes({ state: "working", project: "prj_1", cursor: "c1", limit: 5 }),
   Conflicts_listConflicts: (c) =>

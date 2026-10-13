@@ -41,6 +41,7 @@ import {
   projectSource,
   readRepoBlob,
   readRepoCommit,
+  compareRepoCommits,
   readRepoTree,
 } from "@keeltown/core/application/integration";
 import {
@@ -135,6 +136,7 @@ import { piggyback } from "./piggyback.ts";
 import {
   blobOk,
   commitOk,
+  compareOk,
   commitParam,
   commitsFrom,
   commitsOk,
@@ -956,6 +958,17 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             readRepoCommit(projectId.success, sha.success).pipe(
               Effect.match({ onSuccess: commitOk, onFailure: (e) => repoError(caller, e) }),
             ),
+          );
+        },
+        Repo_compare: (caller: Caller, input: Input<"Repo_compare">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          return run(
+            caller,
+            compareRepoCommits(projectId.success, {
+              base: input.base,
+              ...(input.head === undefined ? {} : { head: input.head }),
+            }).pipe(Effect.match({ onSuccess: compareOk, onFailure: (e) => repoError(caller, e) })),
           );
         },
         Views_getVerdict: notYet,
