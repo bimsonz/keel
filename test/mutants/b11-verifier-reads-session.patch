@@ -2,23 +2,22 @@
 # kills: b11.gate-no-hop
 # why: the request gate runs whoami, so every authenticated request calls the agent's AgentSession DO
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index d525ea77..3613a568 100644
+index 75dc530c..143ad646 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -9,7 +9,7 @@ import {
-   TokenRejected,
- } from "../../domain/identity/index.ts";
- import { AgentId, UserId } from "../../domain/kernel/index.ts";
--import { AgentDirectory, Memberships, TokenIssuer, Users } from "../ports/index.ts";
-+import { AgentDirectory, Memberships, Sessions, TokenIssuer, Users } from "../ports/index.ts";
- 
- /**
-  * How and when a session was signed in: `by` is the method as the sign-in
-@@ -113,6 +113,7 @@ export const principalOf: (
-       case "Token": {
-         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
-         const agent = yield* admit(token);
-+        yield* Sessions.use((sessions) => sessions.current(agent.id));
-         if (agent.org === undefined) return yield* new AgentUnplaced({ agentId: agent.id });
-         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
-         const { org, sponsor: sponsorId } = agent;
+@@ -15,6 +15,7 @@ import {
+   Memberships,
+   NamespaceAgents,
+   ProjectNamespaces,
++  Sessions,
+   TokenIssuer,
+   Users,
+ } from "../ports/index.ts";
+@@ -172,6 +173,7 @@ export const principalOf: (
+     case "Token": {
+       const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+       const agent = yield* admit(token);
++      yield* Sessions.use((sessions) => sessions.current(agent.id));
+       if (agent.org === undefined || agent.projectId === undefined)
+         return yield* new AgentUnplaced({ agentId: agent.id });
+       if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
