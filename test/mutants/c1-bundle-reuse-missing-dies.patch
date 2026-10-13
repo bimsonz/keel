@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.reuse-foreign"
+# kills: bundles.reuse-foreign
+# why: a last bundle that is gone, or is no bundle, kills the step, where it should cost reads and nothing else
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 162592fb..0a09011b 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -137,7 +137,6 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
+               Effect.flatMap((bytes) =>
+                 Effect.tryPromise(async () => holdingOf(await readBundle(bytes))),
+               ),
+-              Effect.catch(() => Effect.succeed(NOTHING_HELD)),
+             );
+       return CandidateBundles.of({
+         bundle: (namespace, staging, commit, from) =>

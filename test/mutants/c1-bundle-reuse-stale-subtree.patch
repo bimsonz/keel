@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.reuse-same-bytes"
+# kills: bundles.reuse-same-bytes
+# why: a directory's id is derived without its files' modes, so a subtree whose derived id is not its own is taken whole: a file whose mode alone changed keeps its old one
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 162592fb..4b9d0632 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -49,7 +49,7 @@ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
+   const blobAt = async (f: BundleFile): Promise<TreeEntry> => {
+     const oid = await hashObject("blob", f.bytes);
+     blobs.set(oid, f.bytes);
+-    return { name: f.path, mode: f.executable === true ? MODE_EXEC : MODE_FILE, oid };
++    return { name: f.path, mode: MODE_FILE, oid };
+   };
+   const treeOf = async (under: readonly BundleFile[]): Promise<string> => {
+     const here: Promise<TreeEntry>[] = [];

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.bundle-from-last"
+# kills: lane.bundle-from-last
+# why: the Lane never names its last bundle, so no candidate takes anything from the one before
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f3840bab..40dc489b 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -768,7 +768,7 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
+           }),
+         )
+       : yield* Effect.result(
+-          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha, lane.lastBundle),
++          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha),
+         );
+   if (Result.isSuccess(bundled)) {
+     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({

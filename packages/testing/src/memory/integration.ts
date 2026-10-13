@@ -383,22 +383,26 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
 /**
  * Bundles by address only: a commit's bundle is `sha256:` of the staging repo
  * and the commit, so one commit always has one address. `refuse` lists commits
- * whose tree the bundle format cannot carry. `bundled` records each call, and
- * `namespaces` the namespace each was bundled for.
+ * whose tree the bundle format cannot carry. `bundled` records each call,
+ * `namespaces` the namespace each was bundled for, and `froms` the bundle each
+ * was told to take unchanged files from.
  */
 export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly string[] } = {}) {
   const bundled: CommitSha[] = [];
   const namespaces: NamespaceId[] = [];
+  const froms: (ContentHash | undefined)[] = [];
   return {
     bundled,
     namespaces,
+    froms,
     layer: Layer.succeed(
       CandidateBundles,
       CandidateBundles.of({
-        bundle: (namespace, staging, commit) =>
+        bundle: (namespace, staging, commit, from) =>
           Effect.gen(function* () {
             bundled.push(commit);
             namespaces.push(namespace);
+            froms.push(from);
             if (options.refuse?.includes(commit) === true)
               return yield* new BundleRefused({ reason: `symlink in ${commit}` });
             const digest = yield* Effect.promise(() =>

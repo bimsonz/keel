@@ -2,15 +2,15 @@
 # kills: bundles.candidate
 # why: Executables are bundled as plain files, so a candidate's scripts lose their mode in the sandbox
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-index aa7fe89..54dbeb4 100644
+index 162592fb..3284c9a9 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -31,7 +31,7 @@ async function filesOf(reader: ObjectReader, tree: string, prefix: string): Prom
-           `${path} has mode ${e.mode}: a bundle carries regular files only`,
-         );
-       if (path === BUNDLE_MANIFEST) throw new Unbundlable(path, `${BUNDLE_MANIFEST} is reserved`);
--      return [{ path, bytes: await reader.readBlob(e.oid), executable: e.mode === MODE_EXEC }];
-+      return [{ path, bytes: await reader.readBlob(e.oid), executable: false }];
+@@ -108,7 +108,7 @@ async function filesOf(
+         {
+           path: unreserved(path),
+           bytes: held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
+-          executable: e.mode === MODE_EXEC,
++          executable: false,
+         },
+       ];
      }),
-   );
-   return nested.flat();

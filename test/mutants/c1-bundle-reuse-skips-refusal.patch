@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.refuses"
+# kills: bundles.refuses
+# why: an entry whose id the last bundle holds is taken before its mode is looked at, so a symlink or a submodule is bundled as a file
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 162592fb..bb669185 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -99,7 +99,7 @@ async function filesOf(
+     (await reader.readTree(tree)).map(async (e): Promise<BundleFile[]> => {
+       const path = under(e.name);
+       if (e.mode === MODE_TREE) return filesOf(reader, held, e.oid, path);
+-      if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC)
++      if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC && !held.blobs.has(e.oid))
+         throw new Unbundlable(
+           path,
+           `${path} has mode ${e.mode}: a bundle carries regular files only`,

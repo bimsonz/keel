@@ -143,6 +143,8 @@ export const Lane = Schema.Struct({
   infra: Schema.Array(Schema.Struct({ changeId: ChangeId, reasons: Schema.Array(Schema.String) })),
   /** Trunk's head as the last TrunkAdvanced heard named it: no batch forms on a staging main anywhere else. */
   trunkHead: Schema.optional(CommitSha),
+  /** The last candidate bundle this lane stored: the next takes from it what did not change. */
+  lastBundle: Schema.optional(ContentHash),
 });
 export type Lane = typeof Lane.Type;
 
@@ -766,12 +768,13 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
           }),
         )
       : yield* Effect.result(
-          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha),
+          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha, lane.lastBundle),
         );
   if (Result.isSuccess(bundled)) {
     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
       ...now,
       active: { ...active, bundle: bundled.success },
+      lastBundle: bundled.success,
     }));
     return;
   }

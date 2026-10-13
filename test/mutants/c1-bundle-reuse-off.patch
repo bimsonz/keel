@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.reuse-reads"
+# kills: bundles.reuse-reads
+# why: the last bundle is never looked at, so every candidate of a large tree reads the whole tree again
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 162592fb..ee39a081 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -144,7 +144,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
+           Effect.acquireUseRelease(
+             Effect.promise(() => open(staging)),
+             (reader) =>
+-              heldIn(namespace, from).pipe(
++              heldIn(namespace, undefined).pipe(
+                 Effect.flatMap((held) =>
+                   Effect.tryPromise({
+                     try: async () =>

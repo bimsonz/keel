@@ -2,12 +2,13 @@
 // read object by object, written with the runner protocol's bundle writer and
 // stored content-addressed.
 import { describe, expect, it } from "@effect/vitest";
-import { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha, ContentHash } from "@keeltown/core/kernel";
 import { BundleStore, CandidateBundles } from "@keeltown/core/ports";
 import {
   decodeCommit,
   decodeTree,
   type GitObject,
+  hashObject,
   MissingObject,
   type ObjectReader,
 } from "@keeltown/gitcore";
@@ -21,28 +22,61 @@ import {
   sampleNamespace,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
+import * as fc from "fast-check";
 import { CandidateBundlesGitCore } from "../../src/adapters/driven/gitcore/candidate-bundles.ts";
+
+// prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
+const seed = process.env["FC_SEED"];
+fc.configureGlobal({ numRuns: 200, ...(seed === undefined ? {} : { seed: Number(seed) }) });
 
 const STAGING = { namespace: "keel-core", name: "prj-staging" };
 const text = (s: string) => new TextEncoder().encode(s);
+const sha = Schema.decodeUnknownSync(CommitSha);
 
-/** A repo holding one commit of `files`, read the way the binding reads: one object at a time. */
-async function repoOf(files: FixtureFiles) {
-  const { tree, objects } = await buildTree(files);
-  const commit = await buildCommit(tree, []);
-  const all = new Map<string, GitObject>([...objects, [commit.oid, commit.object]]);
+/**
+ * A repo holding one commit of each tree, read the way the binding reads: one
+ * object at a time. `reads` counts each kind of read, and `taken()` answers
+ * the reads since it was last asked.
+ */
+async function repoOf(first: FixtureFiles, ...more: FixtureFiles[]) {
+  const all = new Map<string, GitObject>();
+  const commits: CommitSha[] = [];
+  for (const files of [first, ...more]) {
+    // oxlint-disable-next-line no-await-in-loop -- a handful of trees, built one after another
+    const { tree, objects } = await buildTree(files);
+    // oxlint-disable-next-line no-await-in-loop -- as above
+    const commit = await buildCommit(tree, []);
+    for (const [oid, object] of objects) all.set(oid, object);
+    all.set(commit.oid, commit.object);
+    commits.push(sha(commit.oid));
+  }
   const read = (oid: string) => {
     const o = all.get(oid);
     if (o === undefined) throw new MissingObject(oid);
     return o.body;
   };
+  const reads = { commits: 0, trees: 0, blobs: 0 };
   const reader: ObjectReader & Disposable = {
-    readTree: async (oid) => decodeTree(read(oid)),
-    readBlob: async (oid) => read(oid),
-    readCommit: async (oid) => decodeCommit(read(oid)),
+    readTree: async (oid) => {
+      reads.trees += 1;
+      return decodeTree(read(oid));
+    },
+    readBlob: async (oid) => {
+      reads.blobs += 1;
+      return read(oid);
+    },
+    readCommit: async (oid) => {
+      reads.commits += 1;
+      return decodeCommit(read(oid));
+    },
     [Symbol.dispose]: () => undefined,
   };
-  return { commit: Schema.decodeUnknownSync(CommitSha)(commit.oid), reader };
+  const taken = () => {
+    const since = { ...reads };
+    Object.assign(reads, { commits: 0, trees: 0, blobs: 0 });
+    return since;
+  };
+  return { commit: sha(commits[0]), commits, reader, taken };
 }
 
 const bundling = (reader: ObjectReader & Disposable) => {
@@ -50,6 +84,101 @@ const bundling = (reader: ObjectReader & Disposable) => {
   const layer = CandidateBundlesGitCore(async () => reader).pipe(Layer.provide(store.layer));
   return Layer.merge(layer, store.layer);
 };
+
+const nth = <T>(items: readonly T[], at: number): T => {
+  const found = items[at];
+  if (found === undefined) throw new Error(`nothing at ${at}`);
+  return found;
+};
+
+/** A commit's bundle as it is stored, taking what it can from `from` when one is named. */
+const bundled = (commit: CommitSha, from?: ContentHash) =>
+  Effect.gen(function* () {
+    const hash = yield* (yield* CandidateBundles).bundle(sampleNamespace, STAGING, commit, from);
+    const bytes = yield* (yield* BundleStore).get(sampleNamespace, hash).pipe(Effect.orDie);
+    return { hash, bytes };
+  });
+
+// A tree as the property edits it: regular files by path, no path under another file's.
+interface Entry {
+  readonly data: string;
+  readonly exec: boolean;
+}
+type Tree = ReadonlyMap<string, Entry>;
+type Edit =
+  | { readonly kind: "put"; readonly path: string; readonly entry: Entry }
+  | { readonly kind: "delete"; readonly at: number }
+  | { readonly kind: "rename"; readonly at: number; readonly to: string }
+  | { readonly kind: "flip"; readonly at: number }
+  | { readonly kind: "rewrite"; readonly at: number; readonly data: string };
+
+/** `tree` with a file at `path`: a directory there, or a file where one of its directories must be, gives way. */
+const placed = (tree: Tree, path: string, entry: Entry): Tree => {
+  const next = new Map(
+    [...tree].filter(
+      ([at]) => at !== path && !at.startsWith(`${path}/`) && !path.startsWith(`${at}/`),
+    ),
+  );
+  next.set(path, entry);
+  return next;
+};
+
+/** One edit: a file added or replaced, deleted, renamed, its mode flipped, or rewritten where it is. */
+const edited = (tree: Tree, edit: Edit): Tree => {
+  if (edit.kind === "put") return placed(tree, edit.path, edit.entry);
+  const path = [...tree.keys()][edit.at % Math.max(tree.size, 1)];
+  const was = path === undefined ? undefined : tree.get(path);
+  if (path === undefined || was === undefined) return tree;
+  if (edit.kind === "flip") return placed(tree, path, { ...was, exec: !was.exec });
+  if (edit.kind === "rewrite") return placed(tree, path, { ...was, data: edit.data });
+  const without = new Map([...tree].filter(([at]) => at !== path));
+  return edit.kind === "delete" ? without : placed(without, edit.to, was);
+};
+
+const fileOf = (entry: Entry): FixtureFiles[string] => ({
+  mode: entry.exec ? "100755" : "100644",
+  data: entry.data,
+});
+const fixtureOf = (tree: Tree): FixtureFiles =>
+  Object.fromEntries([...tree].map(([path, entry]) => [path, fileOf(entry)]));
+
+// Few names and few contents, so paths collide, directories nest and one blob turns up in many places.
+const pathArb = fc
+  .array(fc.constantFrom("a", "b", "c", "lib", "src"), { minLength: 1, maxLength: 3 })
+  .map((segments) => segments.join("/"));
+const dataArb = fc.constantFrom("", "one\n", "two\n", "three\n", "#!/bin/sh\n");
+const entryArb = fc.record({ data: dataArb, exec: fc.boolean() });
+const NO_FILES: Tree = new Map();
+const treeArb = fc
+  .array(fc.tuple(pathArb, entryArb), { maxLength: 8 })
+  .map((files) => files.reduce((tree, [path, entry]) => placed(tree, path, entry), NO_FILES));
+const editArb: fc.Arbitrary<Edit> = fc.oneof(
+  fc.record({ kind: fc.constant("put" as const), path: pathArb, entry: entryArb }),
+  fc.record({ kind: fc.constant("delete" as const), at: fc.nat() }),
+  fc.record({ kind: fc.constant("rename" as const), at: fc.nat(), to: pathArb }),
+  fc.record({ kind: fc.constant("flip" as const), at: fc.nat() }),
+  fc.record({ kind: fc.constant("rewrite" as const), at: fc.nat(), data: dataArb }),
+);
+const treeOf = (files: Readonly<Record<string, Entry>>): Tree => new Map(Object.entries(files));
+const SCRIPT: Entry = { data: "#!/bin/sh\n", exec: true };
+const ONE: Entry = { data: "one\n", exec: false };
+const TWO: Entry = { data: "two\n", exec: false };
+/** The cases a random run may not reach, pinned: each is a tree and the edits made to it. */
+const PINNED: [Tree, Edit[]][] = [
+  // Only a mode changes, under a directory whose files are otherwise the last bundle's.
+  [treeOf({ "lib/run": SCRIPT, "lib/a": ONE, b: TWO }), [{ kind: "flip", at: 0 }]],
+  [treeOf({ "lib/run": { ...SCRIPT, exec: false }, "lib/a": ONE }), [{ kind: "flip", at: 0 }]],
+  // A file rewritten where it is, its path and its neighbours unchanged.
+  [treeOf({ "src/a": ONE, "src/b": TWO }), [{ kind: "rewrite", at: 0, data: "three\n" }]],
+  // A file becomes a directory, and a directory a file.
+  [treeOf({ a: ONE, b: TWO }), [{ kind: "put", path: "a/b", entry: TWO }]],
+  [treeOf({ "a/b": ONE, "a/c/d": TWO }), [{ kind: "put", path: "a", entry: SCRIPT }]],
+  // A file moves to a new directory, and one is deleted.
+  [treeOf({ "lib/a": ONE, "lib/b": TWO }), [{ kind: "rename", at: 0, to: "src/c/a" }]],
+  [treeOf({ "lib/a": ONE, "lib/b": TWO, c: ONE }), [{ kind: "delete", at: 1 }]],
+  // Nothing changes at all.
+  [treeOf({ "lib/a": ONE, b: SCRIPT }), [{ kind: "rewrite", at: 0, data: "one\n" }]],
+];
 
 describe("CandidateBundles over gitcore", () => {
   it.effect(
@@ -104,6 +233,152 @@ describe("CandidateBundles over gitcore", () => {
             Effect.flatMap(CandidateBundles, (b) =>
               b.bundle(sampleNamespace, STAGING, commit),
             ).pipe(Effect.provide(bundling(reader))),
+          );
+          expect(error).toMatchObject({
+            _tag: "BundleRefused",
+            reason: expect.stringContaining(path),
+            path,
+          });
+        }
+      }),
+  );
+
+  it("[bundles.reuse-same-bytes] a bundle that takes from the last one is, byte for byte, the bundle read whole", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        treeArb,
+        fc.array(editArb, { minLength: 1, maxLength: 4 }),
+        async (before, edits) => {
+          const after = edits.reduce(edited, before);
+          const { commits, reader } = await repoOf(fixtureOf(before), fixtureOf(after));
+          const whole = await Effect.runPromise(
+            bundled(nth(commits, 1)).pipe(Effect.provide(bundling(reader))),
+          );
+          const reused = await Effect.runPromise(
+            Effect.gen(function* () {
+              const last = yield* bundled(nth(commits, 0));
+              return yield* bundled(nth(commits, 1), last.hash);
+            }).pipe(Effect.provide(bundling(reader))),
+          );
+          expect(reused.hash).toBe(whole.hash);
+          expect(reused.bytes).toEqual(whole.bytes);
+        },
+      ),
+      { examples: PINNED },
+    );
+  });
+
+  it.effect(
+    "[bundles.reuse-reads] taking from the last bundle, an unchanged tree costs one read of its commit, an edit the trees on its path and its one blob, and a moved directory its parent alone",
+    () =>
+      Effect.gen(function* () {
+        const rest: FixtureFiles = {
+          "README.md": "keel\n",
+          "bin/run.sh": { mode: "100755", data: "#!/bin/sh\necho ok\n" },
+          "src/a/b.ts": "export const b = 1;\n",
+          "src/a/c.ts": "export const c = 1;\n",
+          "src/d.ts": "export const d = 1;\n",
+        };
+        const before = { ...rest, "docs/guide/intro.md": "# intro\n" };
+        const { commits, reader, taken } = yield* Effect.promise(() =>
+          repoOf(
+            before,
+            { ...before, "src/a/b.ts": "export const b = 2;\n" },
+            { ...rest, "manual/guide/intro.md": "# intro\n" },
+          ),
+        );
+        const program = Effect.gen(function* () {
+          const last = yield* bundled(nth(commits, 0));
+          const whole = taken();
+          const again = yield* bundled(nth(commits, 0), last.hash);
+          const unchanged = taken();
+          yield* bundled(nth(commits, 1), last.hash);
+          const edit = taken();
+          yield* bundled(nth(commits, 2), last.hash);
+          const move = taken();
+          return { whole, unchanged, edit, move, same: again.hash === last.hash };
+        });
+        expect(yield* program.pipe(Effect.provide(bundling(reader)))).toEqual({
+          // Six trees (the root, bin, docs, docs/guide, src, src/a) and six files.
+          whole: { commits: 1, trees: 6, blobs: 6 },
+          unchanged: { commits: 1, trees: 0, blobs: 0 },
+          // The root, src and src/a, and the one file that changed.
+          edit: { commits: 1, trees: 3, blobs: 1 },
+          // The root alone: manual is the tree docs was, under another name.
+          move: { commits: 1, trees: 1, blobs: 0 },
+          same: true,
+        });
+      }),
+  );
+
+  it.effect(
+    "[bundles.reuse-foreign] a `from` that is another namespace's, another tree's, missing or no bundle at all costs the whole read and changes nothing",
+    () =>
+      Effect.gen(function* () {
+        const { commits, reader, taken } = yield* Effect.promise(() =>
+          repoOf(
+            { "README.md": "keel\n", "src/a.ts": "export const a = 1;\n" },
+            { LICENSE: "all of it\n", "lib/z.rb": "puts 1\n" },
+          ),
+        );
+        const expected = yield* Effect.promise(() =>
+          writeBundle([
+            { path: "README.md", bytes: text("keel\n") },
+            { path: "src/a.ts", bytes: text("export const a = 1;\n") },
+          ]),
+        );
+        const program = Effect.gen(function* () {
+          const store = yield* BundleStore;
+          const commit = nth(commits, 0);
+          // This very tree's bundle, held for another namespace: here its address names nothing.
+          const theirs = yield* store.put(otherNamespace, expected);
+          const fromTheirs = { ...(yield* bundled(commit, theirs)), reads: taken() };
+          const other = yield* bundled(nth(commits, 1));
+          taken();
+          const fromOther = { ...(yield* bundled(commit, other.hash)), reads: taken() };
+          const missing = Schema.decodeUnknownSync(ContentHash)(`sha256:${"0".repeat(64)}`);
+          const fromMissing = { ...(yield* bundled(commit, missing)), reads: taken() };
+          const junk = yield* store.put(sampleNamespace, text("not a bundle"));
+          const fromJunk = { ...(yield* bundled(commit, junk)), reads: taken() };
+          return { theirs, results: [fromTheirs, fromOther, fromMissing, fromJunk] };
+        });
+        const { theirs, results } = yield* program.pipe(Effect.provide(bundling(reader)));
+        for (const result of results)
+          expect(result).toEqual({
+            hash: theirs,
+            bytes: expected,
+            reads: { commits: 1, trees: 2, blobs: 2 },
+          });
+      }),
+  );
+
+  it.effect(
+    "[bundles.refuses] taking from the last bundle, an entry the format cannot carry is still refused by its path, though the bundle holds its id",
+    () =>
+      Effect.gen(function* () {
+        const before: FixtureFiles = {
+          "README.md": "keel\n",
+          "lib/a.txt": "b.txt",
+          "lib/b.txt": "plain\n",
+        };
+        const readme = yield* Effect.promise(() => hashObject("blob", text("keel\n")));
+        for (const [path, odd] of [
+          // A symlink added under a directory otherwise unchanged.
+          ["lib/odd", { mode: "120000", data: "../README.md" }],
+          // Its target, as text, is a file the last bundle holds: one blob id for both.
+          ["lib/odd", { mode: "120000", data: "b.txt" }],
+          // A submodule whose commit id is a held file's blob id.
+          ["lib/odd", { mode: "160000", data: readme }],
+          [".keel-bundle.sha256", "planted\n"],
+        ] as const) {
+          const { commits, reader } = yield* Effect.promise(() =>
+            repoOf(before, { ...before, [path]: odd }),
+          );
+          const error = yield* Effect.flip(
+            Effect.gen(function* () {
+              const last = yield* bundled(nth(commits, 0));
+              return yield* bundled(nth(commits, 1), last.hash);
+            }).pipe(Effect.provide(bundling(reader))),
           );
           expect(error).toMatchObject({
             _tag: "BundleRefused",

@@ -1,0 +1,39 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.reuse-same-bytes"
+# kills: bundles.reuse-same-bytes
+# why: a file is taken from the last bundle by its path, without comparing ids: a file rewritten where it is keeps its old bytes
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index 162592fb..0d5896c6 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -38,9 +38,10 @@ class Unbundlable extends Error {
+ interface Held {
+   readonly blobs: ReadonlyMap<string, Uint8Array>;
+   readonly trees: ReadonlyMap<string, readonly BundleFile[]>;
++  readonly paths: ReadonlyMap<string, Uint8Array>;
+ }
+ 
+-const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map() };
++const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map(), paths: new Map() };
+ 
+ /** Hashes a bundle's files as git blobs, and derives each directory's tree id from its files. */
+ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
+@@ -71,7 +72,8 @@ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
+     return oid;
+   };
+   await treeOf(files);
+-  return { blobs, trees };
++  const paths = new Map(files.map((f): [string, Uint8Array] => [f.path, f.bytes]));
++  return { blobs, trees, paths };
+ }
+ 
+ /** `path`, refused when it is where the bundle keeps its own manifest. */
+@@ -107,7 +109,8 @@ async function filesOf(
+       return [
+         {
+           path: unreserved(path),
+-          bytes: held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
++          bytes:
++            held.paths.get(path) ?? held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
+           executable: e.mode === MODE_EXEC,
+         },
+       ];

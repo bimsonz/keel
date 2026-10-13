@@ -1143,6 +1143,56 @@ describe("the Lane", () => {
   });
 
   it.effect(
+    "[lane.bundle-from-last] a bundle is told to take from the lane's last one, and a step retried after it died names the same",
+    () => {
+      const made = makeCandidateBundlesMemory();
+      const step = { dies: false };
+      const w = world({
+        bundles: Layer.effect(
+          CandidateBundles,
+          Effect.gen(function* () {
+            const inner = yield* CandidateBundles;
+            return CandidateBundles.of({
+              // The bundle is made and stored, and the step may be killed before the Lane notes it.
+              bundle: (namespace, staging, commit, from) =>
+                inner
+                  .bundle(namespace, staging, commit, from)
+                  .pipe(
+                    Effect.flatMap((hash) =>
+                      step.dies
+                        ? Effect.die(new Error("the step was killed"))
+                        : Effect.succeed(hash),
+                    ),
+                  ),
+            });
+          }),
+        ).pipe(Layer.provide(made.layer)),
+      });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        const last = (yield* inFlight).bundle;
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "bounce"),
+        );
+        yield* advance(base, base, []);
+        yield* queue(w, change(2));
+        step.dies = true;
+        expect(Exit.isFailure(yield* Effect.exit(laneStep(LANE)))).toBe(true);
+        step.dies = false;
+        yield* toVerifying(w);
+        expect(last).toBeDefined();
+        // The first has none to take from; the second names the first's, and so does its retry.
+        expect(made.froms).toEqual([undefined, last, last]);
+        // The next will name the second's.
+        expect(laneOf(yield* EntityStore, LANE)?.lastBundle).toBe((yield* inFlight).bundle);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     `[lane.infra-limit] the third infra failure in a row bounces the change with every reason and a remedy, instead of looping`,
     () => {
       const w = world();
