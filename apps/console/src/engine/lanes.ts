@@ -42,7 +42,14 @@ import {
 export type Tone = "plain" | "suspected" | "proven" | "person" | "pass";
 
 export type GraphNode = { id: string } & (
-  | { kind: "agent"; label: string; agentClass: AgentClass; harness: string }
+  | {
+      kind: "agent";
+      label: string;
+      agentClass: AgentClass;
+      harness: string;
+      /** What the agent called the run it holds the change under, where it named one. */
+      run?: string;
+    }
   | {
       kind: "change";
       changeId: string;
@@ -409,6 +416,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
         label: by.name,
         agentClass: by.class,
         harness: by.harness,
+        ...(change.run?.label === undefined ? {} : { run: change.run.label }),
       });
       edges.push({
         id: `${agentNode}>${changeNode}`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/agents.test.ts
+# kills: agents.no-sponsor
+# why: who stands behind an agent is written beside its name wherever the log's enrolment names it, on the agents' list and on its page: the one thing of an agent these pages never show
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 57ef1c4b..4cb8cd9c 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -552,7 +552,7 @@ export class World {
+         if (event.payload.kind === "human") break;
+         this.agents.set(event.payload.agentId, {
+           id: event.payload.agentId,
+-          name: event.payload.name,
++          name: `${event.payload.name} (${event.payload.sponsor ?? ""})`,
+           class: CLASS_OF[event.payload.kind],
+           // The harness is the session's to say (SessionOpened).
+           harness: "",

@@ -3,6 +3,7 @@
 // are where the one is turned into the other.
 
 import { type AnchorHTMLAttributes, type ReactNode, createContext, useContext } from "react";
+import type { HeldUnder } from "../engine/holder.ts";
 import { type Names, namesIn } from "../engine/lists.ts";
 import { useSelected } from "../engine/react.tsx";
 import type { ChangeTab, ConflictTab } from "../route.ts";
@@ -62,6 +63,28 @@ export function EscalationLink({ id, children, ...rest }: { id: string } & Ancho
   return (
     <Link to={{ at: "escalation", name }} {...rest}>
       {children}
+    </Link>
+  );
+}
+
+/** The agent that holds a change: its page in this project. */
+export function HolderLink({ held, children, ...rest }: { held: HeldUnder } & Anchor) {
+  return (
+    <Link to={{ at: "agent", name: held.agent }} {...rest}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * The run a change is held under: its place on its agent's page. The label is the agent's own word for the
+ * run, so it is quoted. Nothing where the holder's token named no run.
+ */
+export function RunLink({ held, ...rest }: { held: HeldUnder } & Omit<Anchor, "children">) {
+  if (held.run === undefined) return null;
+  return (
+    <Link to={{ at: "agent", name: held.agent }} section={held.run.anchor} {...rest}>
+      {held.run.label === undefined ? "in a run it gave no name" : `in its run “${held.run.label}”`}
     </Link>
   );
 }

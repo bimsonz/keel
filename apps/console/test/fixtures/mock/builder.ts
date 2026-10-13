@@ -12,7 +12,7 @@ import type { LandedFile, Landing } from "../repo.ts";
 import { type Rng, ulidAt } from "../prng.ts";
 import { funnelFrames } from "./funnel.ts";
 import type { ScriptedEvent } from "./scripted.ts";
-import type { ProbeSource } from "../../../src/contract/keel/index.ts";
+import type { ProbeSource, RunRef } from "../../../src/contract/keel/index.ts";
 import type { ChangeDiff, VerdictReasons } from "../../../src/source/types.ts";
 
 type EventInput = {
@@ -26,6 +26,8 @@ type EventInput = {
     /** The short name Keel's Projector gives what this event creates. */
     label?: string;
     actor?: string;
+    /** The run the actor's token named, as Keel writes it on the entry. */
+    run?: RunRef;
   };
 }[EventType];
 
@@ -96,7 +98,18 @@ function increment(id: string): string {
 /** The project Keel's own agents belong to: the operators it enrols. */
 export const PLATFORM_PROJECT = "prj_0SYSTEM0000000000000000000";
 
+/** The entries of a change that an agent's own command commits. Keel names the agent on each, and its run. */
+const COMMANDED: ReadonlySet<string> = new Set([
+  "IntentDeclared",
+  "IntentRevised",
+  "ChangeSubmitted",
+]);
+
 export class ScriptBuilder {
+  /** Who holds each change, by the change: the agent that declared it. */
+  readonly #holders = new Map<string, string>();
+  /** The run each agent's token names, for the agents whose token names one. */
+  readonly #runs = new Map<string, RunRef>();
   readonly #epochMs: number;
   readonly #epoch: string;
   readonly #ids: Rng;
@@ -182,15 +195,36 @@ export class ScriptBuilder {
     return `${prefix}_${ulidAt(this.#epochMs + this.#now, this.#ids)}`;
   }
 
+  /**
+   * The run an agent's token names from here on. One that signed itself up names a run in its token; one a
+   * member enrolled exchanges a secret for a token that names none, and is given none here.
+   */
+  runOf(agentId: string, run: RunRef): this {
+    this.#runs.set(agentId, run);
+    return this;
+  }
+
   /** Record one event at the current instant. Its id, `seq` and `at` are assigned when the log is built. */
   emit(input: EventInput): AnyEvent {
-    const { causation, label, actor, type, entity, payload } = input;
+    const { causation, label, type, entity, payload } = input;
+    if (input.type === "IntentDeclared")
+      this.#holders.set(input.payload.changeId, input.payload.agentId);
+    // What an agent's command commits is the agent's, as Keel writes it on the entry: who, and under which run.
+    const holder =
+      input.actor === undefined && COMMANDED.has(type) ? this.#holders.get(entity.id) : undefined;
+    const actor = input.actor ?? (holder === undefined ? undefined : `agent:${holder}`);
+    const run = input.run ?? (holder === undefined ? undefined : this.#runs.get(holder));
     const scripted = {
       type,
       entity,
-      payload: { _tag: type, ...payload },
+      payload: {
+        _tag: type,
+        ...payload,
+        ...(type === "IntentDeclared" && run !== undefined ? { run } : {}),
+      },
       ...(label === undefined ? {} : { label }),
       ...(actor === undefined ? {} : { actor }),
+      ...(run === undefined ? {} : { run }),
       ...(this.project === undefined ? {} : { project: this.project }),
       eventId: "",
       seq: 0,

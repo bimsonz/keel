@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/agents.test.ts
+# kills: agents.enrolled
+# why: an agent the log enrolled is shown with no name until its card is read, and for good where there is no card to read
+diff --git a/apps/console/src/engine/agents.ts b/apps/console/src/engine/agents.ts
+index 7327c387..7eadfaf4 100644
+--- a/apps/console/src/engine/agents.ts
++++ b/apps/console/src/engine/agents.ts
+@@ -36,7 +36,7 @@ export interface AgentShown {
+ 
+ export function agentShown(world: World, cards: Cards, agentId: string): AgentShown {
+   const card = cards.get(agentId) ?? undefined;
+-  const label = card?.name ?? world.agents.get(agentId)?.name;
++  const label = card?.name;
+   return {
+     id: agentId,
+     name: addressOf(cards, agentId),

@@ -803,13 +803,21 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
       <NamespacePages
         account={account}
         directory={directory}
+        sponsorship={sponsorship}
         who={reader.who}
         handle={handle}
         tab={tab}
       />
     );
   else if (reader.is === "visitor" && place.at === "namespace")
-    page = <NamespacePublic directory={directory} handle={place.handle} signedIn={false} />;
+    page = (
+      <NamespacePublic
+        directory={directory}
+        sponsorship={sponsorship}
+        handle={place.handle}
+        signedIn={false}
+      />
+    );
   else if (reader.is === "user" && place.at === "invite")
     page = <Invite account={account} who={reader.who} id={place.id} />;
   else if (place.at === "sponsor" && (reader.is === "user" || reader.is === "visitor"))

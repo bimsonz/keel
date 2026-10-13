@@ -12,6 +12,7 @@ import type {
   Move,
   ProbeDiscard,
   PushRefusedReason,
+  RunRef,
   SuspectEffect,
   SuspectPremise,
 } from "../contract/keel/index.ts";
@@ -53,6 +54,33 @@ export interface AgentEntry {
   messages: number;
 }
 
+/**
+ * One run of an agent, as the log names it on what the run committed: Keel's id for it, and the label the
+ * agent gave it, which is the agent's own word and nobody else's.
+ */
+export interface RunEntry {
+  id: string;
+  label?: string;
+  firstAt: string;
+  lastAt: string;
+  /** The entries of the log this run committed. */
+  entries: number;
+}
+
+/**
+ * What a project's log says of one agent's work in it. Keel names the agent on every entry its command
+ * committed, and the run where its token named one. The log names it by its id alone: an agent's sign-up is in
+ * no project's log, so its handle and its name are its card's to give. Who stands behind it is not kept.
+ */
+export interface WorkEntry {
+  agentId: string;
+  /** When it last wrote here. Absent where the log only names it as a change's holder. */
+  lastAt?: string;
+  runs: Map<string, RunEntry>;
+  /** The entries it committed with a token that named no run. */
+  unnamed: number;
+}
+
 export interface SubjectEntry {
   id: string;
   key: string;
@@ -89,6 +117,8 @@ export interface ChangeEntry {
   batchId?: string;
   workspaceId?: string;
   commit?: string;
+  /** The run that holds the change, where its holder's token named one. Whoever adopts the change replaces it. */
+  run?: RunRef;
   declaredAt: string;
   declaredT: number;
   submittedAt?: string;
@@ -323,6 +353,9 @@ export interface TrunkEntry {
   audits: { head: string; outcome: "green" | "red"; t: number }[];
 }
 
+/** How an entry of the log names the agent whose command committed it: `agent:<AgentId>`. */
+const BY_AGENT = "agent:";
+
 /** `human` is the operator or a sponsor, never an agent, so it has no class. */
 const CLASS_OF: Record<Exclude<AgentKind, "human">, AgentClass> = {
   interactive: "real",
@@ -366,6 +399,8 @@ export class World {
   readonly batches = new Map<string, BatchEntry>();
   /** Session id to agent id. */
   readonly sessions = new Map<string, string>();
+  /** Each agent the log names as having written here or as holding a change, by its id. */
+  readonly work = new Map<string, WorkEntry>();
   /**
    * What Keel last told a change about a conflict, keyed `conflictId/changeId`: a bounce that cites it, or a note
    * of it. Kept beside the conflict, as Keel keeps it: the change's event and the conflict's come in no fixed order.
@@ -459,8 +494,58 @@ export class World {
     }
   }
 
+  /** The agent's work in this project, made on the first word the log has of it. */
+  #workOf(agentId: string): WorkEntry {
+    let work = this.work.get(agentId);
+    if (work === undefined) {
+      work = { agentId, runs: new Map(), unnamed: 0 };
+      this.work.set(agentId, work);
+    }
+    return work;
+  }
+
+  /**
+   * Counts an entry to the agent whose command committed it, and to the run its token named. Keel names both
+   * on the entry itself; an entry a person or the platform committed is nobody's work here.
+   */
+  #wrote(event: AnyEvent): void {
+    if (event.actor?.startsWith(BY_AGENT) !== true) return;
+    const work = this.#workOf(event.actor.slice(BY_AGENT.length));
+    work.lastAt = event.at;
+    if (event.run === undefined) {
+      work.unnamed += 1;
+      return;
+    }
+    const run = this.#runOf(work, event.run, event.at);
+    run.lastAt = event.at;
+    run.entries += 1;
+  }
+
+  /** A run as its agent's work has it, made on the first entry that names it. */
+  #runOf(work: WorkEntry, named: RunRef, at: string): RunEntry {
+    let run = work.runs.get(named.id);
+    if (run === undefined) {
+      run = {
+        id: named.id,
+        ...(named.label === undefined ? {} : { label: named.label }),
+        firstAt: at,
+        lastAt: at,
+        entries: 0,
+      };
+      work.runs.set(named.id, run);
+    }
+    return run;
+  }
+
+  /** A change's holder, and the run it holds the change under, are an agent and a run of this project. */
+  #holds(agentId: string, run: RunRef | undefined, at: string): void {
+    const work = this.#workOf(agentId);
+    if (run !== undefined) this.#runOf(work, run, at);
+  }
+
   apply(event: AnyEvent, t: number): void {
     this.version += 1;
+    this.#wrote(event);
     const p = event.payload;
     switch (event.type) {
       case "AgentEnrolled": {
@@ -526,7 +611,9 @@ export class World {
           noted: [],
           alternatives: [],
           precedents: [],
+          ...(event.payload.run === undefined ? {} : { run: event.payload.run }),
         });
+        this.#holds(event.payload.agentId, event.payload.run, event.at);
         break;
       }
       case "PreflightIssued": {
@@ -761,6 +848,12 @@ export class World {
       case "ChangeAdopted": {
         const change = this.#change(event.payload.changeId, "working");
         if (change !== undefined) change.agentId = event.payload.agentId;
+        // Whoever adopts a change holds it from then on: under the run its token named, or under none.
+        if (change !== undefined) {
+          if (event.payload.run === undefined) delete change.run;
+          else change.run = event.payload.run;
+        }
+        this.#holds(event.payload.agentId, event.payload.run, event.at);
         break;
       }
       case "ChangeWithdrawn": {

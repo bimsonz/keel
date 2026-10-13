@@ -10,6 +10,7 @@ import { KeelRefused } from "../../../src/source/types.ts";
 import {
   SESSION_COOKIE,
   SPONSOR_CODE_FOR_MS,
+  SPONSOR_HELD,
   createFakeKeel,
 } from "../../fixtures/mock/fakeKeel.ts";
 
@@ -191,8 +192,8 @@ describe("standing behind an agent", () => {
     const gone = { status: 404, code: "resource.not_found" };
     expect(await tried("ada", AGENT.id, "spn_wrong", worded)).toEqual({
       ...gone,
-      said: "No agent is asking for a sponsor with that code.",
-      next: ["Ask the agent to ask again, and approve with its new code"],
+      said: "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.",
+      next: ["Ask the agent for a new link, and approve with it"],
     });
     expect(await tried("ada", "agt_nobody", code)).toEqual(gone);
     // A code that has run out is that answer too.
@@ -206,14 +207,15 @@ describe("standing behind an agent", () => {
     // says nothing of the agent now having a sponsor.
     expect(await tried("ada", AGENT.id, again.code)).toEqual(gone);
     expect(await tried("ada", AGENT.id, "spn_wrong")).toEqual(gone);
-    // Only a live request's own code is told that somebody stands behind the agent already.
-    const late = k.fake.askSponsor(AGENT.id);
-    expect(await tried("ada", AGENT.id, late.code, worded)).toEqual({
-      status: 409,
-      code: "agent.state_refused",
-      said: `${AGENT.id} already has a sponsor, and an agent has one.`,
-      next: ["End the link the agent has first"],
+    // Keel gives an agent somebody stands behind no new code: it is the agent that is told it has a sponsor.
+    // So no approval is ever told so, the sponsor's own second one included, and nobody is told to end a link.
+    expect(() => k.fake.askSponsor(AGENT.id)).toThrow(SPONSOR_HELD);
+    expect(await tried("ada", AGENT.id, again.code, worded)).toEqual({
+      ...gone,
+      said: "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.",
+      next: ["Ask the agent for a new link, and approve with it"],
     });
+    expect(k.fake.sponsorOf(AGENT.id)).toBe("ada");
   });
 
   it("[sponsor.touch-first] sends the approval only after the passkey touch, as whoever touched", async () => {

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.agents
+# why: an agent's card is asked of Keel again on every reading of the page, where it is to be asked for once
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 60ff415a..bcfb1044 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -336,7 +336,6 @@ export class Player {
+     if (find === undefined) return;
+     for (const agentId of agentIds) {
+       const asked = `card:${agentId}`;
+-      if (this.#requested.has(asked)) continue;
+       this.#requested.add(asked);
+       void this.#fetch(async () => {
+         this.cards.set(agentId, await find(agentId));

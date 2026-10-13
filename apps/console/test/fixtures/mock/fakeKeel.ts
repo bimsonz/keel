@@ -205,25 +205,17 @@ const noSuchRequest = (): Response =>
   problem(
     404,
     "resource.not_found",
-    [{ kind: "escalate", title: "Ask the agent to ask again, and approve with its new code" }],
-    "No agent is asking for a sponsor with that code.",
+    [{ kind: "escalate", title: "Ask the agent for a new link, and approve with it" }],
+    "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one.",
   );
 
-/** Keel's answer to a link asked for an agent that has a sponsor: `stateRefused`, `sponsor-held`. */
-const sponsorHeld = (agentId: string): Response =>
-  problem(
-    409,
-    "agent.state_refused",
-    [
-      {
-        kind: "call",
-        title: "End the link the agent has first",
-        operationId: "Agents_endSponsorship",
-        args: { agentId },
-      },
-    ],
-    `${agentId} already has a sponsor, and an agent has one.`,
-  );
+/**
+ * What Keel says to an agent that asks for a sponsor while it has one (`stateRefused`, `sponsor-held`). Keel
+ * tells the agent itself, with the end of its link as the way forward, and gives it no code. So no approval ever
+ * meets it: a person who approves an agent somebody stands behind holds a code that is spent, and reads the one
+ * answer of a code that is no good. That is the sponsor's own second approval too.
+ */
+export const SPONSOR_HELD = "already has a sponsor, and an agent has one.";
 
 /** Keel's refusal of someone who lacks a role, with the way forward it gives: `authorize.ts`, `lacksRole`. */
 const lacks = (role: string): Response =>
@@ -273,8 +265,13 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
-    /** The agents Keel knows by id, each as anyone may see it. */
+    /** The agents Keel knows by id beside the ones its log enrols, each as anyone may see it. */
     agents?: readonly AgentCard[];
+    /**
+     * The agents of the log that signed themselves up, by the name the log has, each with its handle: Keel's card
+     * of one has its handle, its namespace is its own, and no project's log holds an enrolment of it.
+     */
+    signedUp?: Record<string, string>;
     /** The sessions, by their cookie's value, signed in by a passkey in the last ten minutes. Every other is stale. */
     freshly?: readonly string[];
     /**
@@ -356,7 +353,21 @@ export function createFakeKeel(
     state: ruled === undefined ? "open" : "ruled",
   });
 
-  const agents = new Map((options.agents ?? []).map((agent) => [agent.id, agent]));
+  /**
+   * Keel's card of each agent that works in the project, as it reads anyone. One a member enrolled has the kind
+   * it was enrolled as and the namespace it works in. One that signed itself up has its handle and neither of
+   * those, and no project's log holds an enrolment of it: `keyed` is those agents, by id.
+   */
+  const keyed = new Map<string, string>();
+  const working = log.events.flatMap((event): AgentCard[] => {
+    if (event.type !== "AgentEnrolled" || event.payload.kind === "human") return [];
+    const { agentId: id, name, kind } = event.payload;
+    const handle = options.signedUp?.[name];
+    if (handle === undefined) return [{ id, name, kind, namespace: project.namespace.handle }];
+    keyed.set(id, handle);
+    return [{ id, name, handle }];
+  });
+  const agents = new Map([...working, ...(options.agents ?? [])].map((agent) => [agent.id, agent]));
   /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
@@ -381,8 +392,8 @@ export function createFakeKeel(
     events: () => log.events,
     project,
     askSponsor(agentId) {
-      // A new request replaces the last. Keel refuses the ask of an agent that has a sponsor; here it is let
-      // through, so a test reaches the approval's own refusal of one: a link made while a request was live.
+      // Keel refuses the ask of an agent that has a sponsor, and tells the agent. A new request replaces the last.
+      if (behind.has(agentId)) throw new Error(`${agentId} ${SPONSOR_HELD}`);
       const code = `spn_${crypto.randomUUID().replaceAll("-", "")}`;
       const until = now() + SPONSOR_CODE_FOR_MS;
       asks.set(agentId, { code, until });
@@ -449,7 +460,6 @@ export function createFakeKeel(
           now() > asked.until
         )
           return noSuchRequest();
-        if (behind.has(agentId)) return sponsorHeld(agentId);
         asks.delete(agentId);
         behind.set(agentId, reader.id ?? "");
         return Response.json(profileOf(known));
@@ -508,6 +518,10 @@ export function createFakeKeel(
         const handle = decodeURIComponent(whose[1] ?? "");
         const known = await options.whose?.(handle);
         if (known !== undefined) return Response.json({ handle, ...known } satisfies NamespaceView);
+        // An agent's handle is its own namespace, under the agent's own id.
+        const its = [...keyed].find(([, held]) => held === handle)?.[0];
+        if (its !== undefined)
+          return Response.json({ id: its, handle, kind: "agent" } satisfies NamespaceView);
         if (handle !== project.namespace.handle) return gone();
         return Response.json({
           id: FIXTURE_IDS[project.namespace.kind],
@@ -609,6 +623,7 @@ export function createFakeKeel(
           // With no project named, someone signed in is read every project Keel may read them: this one as its
           // member, its public part where it is public, and nothing of it otherwise.
           .filter((event) => member || (visible && !MEMBERS_ONLY.has(event.type)))
+          .filter((event) => event.type !== "AgentEnrolled" || !keyed.has(event.payload.agentId))
           .map(
             ({
               eventId,
@@ -619,6 +634,7 @@ export function createFakeKeel(
               payload,
               label,
               actor,
+              run,
               project: stamped,
             }): Omit<EventRecord, "payload"> & { payload: AnyEvent["payload"] } => ({
               eventId,
@@ -629,6 +645,7 @@ export function createFakeKeel(
               payload: unpriced(payload),
               ...(label === undefined ? {} : { label }),
               ...(actor === undefined ? {} : { actor }),
+              ...(run === undefined ? {} : { run }),
               ...(stamped === undefined ? {} : { project: stamped }),
             }),
           );

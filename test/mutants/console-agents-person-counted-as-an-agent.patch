@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/agents.test.ts
+# kills: agents.rows
+# why: an entry a person committed is counted as an agent's work, so the project's agents gain a row for somebody who is no agent
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 57ef1c4b..657c9178 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -509,7 +509,7 @@ export class World {
+    * on the entry itself; an entry a person or the platform committed is nobody's work here.
+    */
+   #wrote(event: AnyEvent): void {
+-    if (event.actor?.startsWith(BY_AGENT) !== true) return;
++    if (event.actor === undefined) return;
+     const work = this.#workOf(event.actor.slice(BY_AGENT.length));
+     work.lastAt = event.at;
+     if (event.run === undefined) {

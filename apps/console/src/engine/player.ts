@@ -4,9 +4,10 @@
 // tail. The story never runs past a question nobody has answered.
 
 import type { AnyEvent } from "../contract/events.ts";
-import type { Lattice, ProbeSource } from "../contract/keel/index.ts";
+import type { AgentCard, Lattice, ProbeSource } from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
 import type {
+  KeelAgents,
   KeelCommands,
   KeelSettings,
   KeelEventSource,
@@ -23,8 +24,9 @@ export type ConsoleSource = KeelEventSource &
   KeelResources &
   KeelRepository &
   KeelCommands &
-  // A fixture's source holds no settings: only Keel does.
-  Partial<KeelSettings> & {
+  // A fixture's source holds no settings and no agent's card: only Keel does.
+  Partial<KeelSettings> &
+  Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;
   };
@@ -35,6 +37,10 @@ export class Player {
   readonly source: ConsoleSource;
   readonly probes = new Map<string, ProbeSource>();
   readonly diffs = new Map<string, ChangeDiff>();
+  /** Keel's public card of each agent asked for, by its id: null where Keel knows none by that id. */
+  readonly cards = new Map<string, AgentCard | null>();
+  /** The handles Keel has been asked about for an agent's page, and has answered, whoever's each turned out to be. */
+  readonly sought = new Set<string>();
   /** What Keel was asked for beside the log and would not give, by the id of the thing it was asked about. */
   readonly refused = new Set<string>();
   readonly verdicts = new Map<string, VerdictReasons>();
@@ -319,6 +325,42 @@ export class Player {
       },
       () => this.refused.add(probeId),
     );
+  }
+
+  /**
+   * Read Keel's public card of each of these agents, once each: the ones the log names by an id alone.
+   * Called by the agents' pages for the rows they show: a swarm's log names hundreds.
+   */
+  wantCards(agentIds: readonly string[]): void {
+    const find = this.source.findAgent?.bind(this.source);
+    if (find === undefined) return;
+    for (const agentId of agentIds) {
+      const asked = `card:${agentId}`;
+      if (this.#requested.has(asked)) continue;
+      this.#requested.add(asked);
+      void this.#fetch(async () => {
+        this.cards.set(agentId, await find(agentId));
+      });
+    }
+  }
+
+  /**
+   * Ask Keel whose a handle is, once, and for its card where it is an agent's. Called when an agent's page is
+   * opened at a handle: the log names an agent by its id alone, so only Keel can say which one the handle is.
+   */
+  wantAgentAt(handle: string): void {
+    const asked = `handle:${handle}`;
+    if (this.#requested.has(asked)) return;
+    this.#requested.add(asked);
+    const find = this.source.findAgentAt?.bind(this.source);
+    void this.#fetch(async () => {
+      try {
+        const card = find === undefined ? null : await find(handle);
+        if (card !== null) this.cards.set(card.id, card);
+      } finally {
+        this.sought.add(handle);
+      }
+    });
   }
 
   /** Ask Keel which open questions it lists to this reader, once. Called when a question's page is opened. */

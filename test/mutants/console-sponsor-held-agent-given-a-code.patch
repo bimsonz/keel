@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
+# kills: sponsor.refused
+# why: the stand-in for Keel gives an agent somebody stands behind a new code, which Keel refuses: an approval could then meet an agent that has a sponsor, which no approval on Keel does
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 032b8838..e007b7c1 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -393,7 +393,6 @@ export function createFakeKeel(
+     project,
+     askSponsor(agentId) {
+       // Keel refuses the ask of an agent that has a sponsor, and tells the agent. A new request replaces the last.
+-      if (behind.has(agentId)) throw new Error(`${agentId} ${SPONSOR_HELD}`);
+       const code = `spn_${crypto.randomUUID().replaceAll("-", "")}`;
+       const until = now() + SPONSOR_CODE_FOR_MS;
+       asks.set(agentId, { code, until });

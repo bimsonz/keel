@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/agents.test.ts
+# kills: agents.rows
+# why: a change that has landed or was withdrawn is listed among the changes its agent holds that may still land
+diff --git a/apps/console/src/engine/agents.ts b/apps/console/src/engine/agents.ts
+index 7327c387..467c476d 100644
+--- a/apps/console/src/engine/agents.ts
++++ b/apps/console/src/engine/agents.ts
+@@ -81,7 +81,6 @@ export function agentsOf(world: World, cards: Cards): AgentRow[] {
+         ...agentShown(world, cards, work.agentId),
+         runs: work.runs.size,
+         holds: changes
+-          .filter((change) => !SETTLED.has(FILTER_OF_CHANGE[change.state]))
+           .map((change) => ({
+             id: change.id,
+             label: change.label,

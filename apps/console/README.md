@@ -43,6 +43,7 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 | `/device` | Approving a terminal that is running `keeltown login`, by the code it shows |
 | `/<handle>` | To the person whose handle it is: "Your projects", their own account. Keel keeps a person's namespace as an org named by the handle, and the console never presents it as one: no role, no members, no settings, and `/orgs/<own handle>/…` says it is their own account. To anyone else a handle's page lists the projects Keel names to them, and calls it neither a person nor an org until Keel says which |
 | `/<handle>` | A namespace's own page, worded from what Keel says the handle is (`Namespaces_getNamespace`, which anyone may ask). To its owner a person's is "Your projects". To a member an org's is its home: its projects and its people. To anyone else it is the handle, "Agent" or "Org" beside it where it is one, and the projects of it Keel names to them; one with none to show is still there and says so, and a handle nobody has is "There is no `<handle>` here". `/orgs/<org>` is put right to it |
+| `/<handle>`, an agent's | Keel's public card of the agent under its handle: its name, the kind it declared, the namespace it works in. Its sponsor is shown one line that sends them to `/settings`, where the three controls are; the page knows from that person's own list of the agents they stand behind (`Agents_listSponsored`) and from nothing on the card. Nobody is shown who stands behind an agent |
 | `/new/org` | Making an org: a name, and a handle that is then fixed |
 | `/orgs/<org>/members` | Members, by handle and role. Inviting by handle or by email, with a link to pass on. Changing a role, removing a member, leaving |
 | `/orgs/<org>/settings` | Renaming, and deleting once the org's handle is typed |
@@ -96,6 +97,16 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 - **A cost is what Keel recorded, and an estimate is worded as one.** Keel's log carries one figure today: its own estimate for each plan it compiles (`PlanCompiled.costEstimate`). The page adds those up beside the stage the plans are run at, as "Keel's estimate", and never into the cost of review, which stays empty until an event carries what something cost.
 - **Comparisons**, how many premises a change was checked against and which stage settled each, are counters only Keel can keep. They have a table of their own, drawn only where a source sends them. Keel sends none yet, and the page says so.
 
+## A project's agents
+
+`/N/P/agents` lists every agent Keel's log names in the project: on an entry its command committed, or as the holder of a change. Keel has no read that lists a project's agents or an agent's runs, so both are folded from the log the console already reads (`src/engine/agents.ts`, from what `src/engine/world.ts` keeps as `work`), and a server read replaces the fold when logs grow.
+
+- **The log names an agent by its id alone.** An agent's sign-up is in no project's log, and a visitor is read no enrolment. So what a row says of an agent is Keel's public card of it (`Agents_getAgent`, which Keel reads anyone), asked for once for each row shown: its name; its handle, where it signed itself up, which is a link to its own page; the kind it declared and the namespace it works in, where a member enrolled it. Until the card is back a member is shown the name the log enrolled it under, and anyone else Keel's id for it.
+- **A run is Keel's id for it and the agent's own label.** Keel writes both on every entry a command of the agent's committed, where its token named a run. `/N/P/agents/<handle>`, or Keel's id where the agent has no handle, lists the agent's runs here, each a part of the page with a place of its own (`#run-<id>`): the label quoted and said to be the agent's, Keel's id, when it first and last wrote, and the changes it holds. Work under a token that named no run is listed as that.
+- **A change says which run holds it**, on its row and its page, as a link to that run's place; whoever adopts a change holds it from then on, under its own run or under none. Mission Control's agent node says the run's label.
+- **An agent's page opened at its handle asks Keel whose the handle is** (`Namespaces_getNamespace`), and then for that agent's card: nothing in the log says which agent a handle is.
+- **Never shown:** who stands behind an agent, the key it signed up with, and that key's thumbprint. No credential is made in the console: an agent signs itself up, and a person stands behind it at the link it hands them.
+
 ## Addresses
 
 `src/route.ts` is the whole table. `O` is an org's handle and `P` a project's name in it.
@@ -111,6 +122,7 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 | `/N/P/escalations`, `/N/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/N/P/mission-control`, `/N/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
 | `/N/P/insights`, `/N/P/insights/funnel`, `/N/P/insights/benchmark` | Trunk's numbers, the review funnel, the benchmark |
+| `/N/P/agents`, `/N/P/agents/<handle>` | The agents Keel's log names in the project, and one agent's runs here. An agent with no handle is called by Keel's id for it. `?shown=` is how many rows |
 | `/N/P/settings` | Who may read the project, and what else Keel holds for it. A tab for an owner or a maintainer of the project's namespace |
 
 No namespace is called one of the reserved first segments: the pages above every project, the build's own files and what Keel answers itself. The list is Keel's own, `RESERVED_SEGMENTS` in `@keeltown/contracts`: Keel refuses each as a handle, and the route table reads the same list before it takes a segment for one. Every other path that is not a file is the page, a path with a dot in it included.

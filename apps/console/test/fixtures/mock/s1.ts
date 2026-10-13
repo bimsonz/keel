@@ -38,6 +38,8 @@ export type S1Ruling = "no-cache" | "invalidate" | "allow-stale";
 /** The changes' numbers, as Keel's Projector gives them: in the order they were declared. */
 const NUMBER_B = "#1";
 const NUMBER_A = "#2";
+/** The run Agent A's token names: Keel's id for it, and the label the agent gave. */
+export const RUN_A = { id: "run_0000000000000000000000ACDE", label: "collab-revocation" } as const;
 
 /** What a person can choose. */
 export const S1_CHOICES: EscalationOption[] = [
@@ -341,6 +343,8 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       scopes: ["agent:work", "agent:read"],
     },
   });
+  // Agent A's token names a run, and Agent B's names none: the two ways Keel's log has an agent's work.
+  b.runOf(agentA, RUN_A);
   const sessionA = b.at(16).id("ses");
   b.emit({
     type: "SessionOpened",

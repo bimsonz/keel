@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/agents.test.ts
+# kills: agents.adopted-bare
+# why: a change adopted with a token that named no run is still said to be held under the run that held it before, which Keel says it never is
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 57ef1c4b..79bcd9e4 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -850,8 +850,7 @@ export class World {
+         if (change !== undefined) change.agentId = event.payload.agentId;
+         // Whoever adopts a change holds it from then on: under the run its token named, or under none.
+         if (change !== undefined) {
+-          if (event.payload.run === undefined) delete change.run;
+-          else change.run = event.payload.run;
++          if (event.payload.run !== undefined) change.run = event.payload.run;
+         }
+         this.#holds(event.payload.agentId, event.payload.run, event.at);
+         break;

@@ -130,12 +130,12 @@ expectEqual(
       ),
     )
   ).join(" "),
-  "/acme/demo /acme/demo/changes /acme/demo/conflicts /acme/demo/escalations /acme/demo/mission-control /acme/demo/insights",
+  "/acme/demo /acme/demo/changes /acme/demo/conflicts /acme/demo/escalations /acme/demo/mission-control /acme/demo/agents /acme/demo/insights",
 );
 expectEqual(
   "frame: what is open, counted on the tabs",
   (await tabs.allInnerTexts()).map(squash).join(" | "),
-  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights",
+  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Agents | Insights",
 );
 // A question is a thing in Escalations, not its list: the tab is marked as where the reader is, and not as the page.
 expectEqual(
@@ -245,7 +245,7 @@ expectEqual("trunk red", await stat("Trunk red"), "0");
 expectEqual(
   "frame: nothing is left open",
   (await tabs.allInnerTexts()).map(squash).join(" | "),
-  "Code | Changes | Conflicts | Escalations | Mission Control | Insights",
+  "Code | Changes | Conflicts | Escalations | Mission Control | Agents | Insights",
 );
 
 // The conflict is settled, and is found where settled conflicts are listed. Its matrix is still the probe's record.
@@ -882,7 +882,7 @@ expectEqual(
 // An address that names nothing says so, inside the project's frame, with the way back.
 await page.goto(at("/nowhere", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
-expectEqual("missing: the frame is still there", String(await tabs.count()), "6");
+expectEqual("missing: the frame is still there", String(await tabs.count()), "7");
 await page.getByRole("link", { name: "Go to the project's code" }).click();
 await page.locator(".a-prose h2").first().waitFor();
 expectEqual("missing: the way back is the project's code", pathOf(page), "/acme/demo");
@@ -1302,6 +1302,146 @@ expectEqual(
   "100",
 );
 
+// ── Agents: who Keel's log names as having written here, and each one's runs ──
+// Scenario 1 at the question. Agent B declared #1 under a token that named no run, and Agent A declared #2 under
+// the run it called collab-revocation. A fixture has no cards, so each is named as the log enrolled it.
+const AGENTS = "Agents, the one that wrote last first";
+/** Each row of the agents' list: its name, what it says beside Keel's id and the time, and what it holds. */
+const agentRows = (shown: Page): Promise<string> =>
+  shown
+    .getByRole("list", { name: AGENTS })
+    .getByRole("listitem")
+    .evaluateAll((rows) =>
+      rows
+        .map((row) =>
+          [
+            row.querySelector(".a-list-title")?.textContent ?? "",
+            [...row.querySelectorAll(".a-list-title + div > *")]
+              .filter((part) => !part.matches("span.a-mono") && part.querySelector("time") === null)
+              .map((part) => part.textContent ?? "")
+              .join(", "),
+            [...row.querySelectorAll(".a-chip")].map((chip) => chip.textContent ?? "").join(" "),
+          ].join(" | "),
+        )
+        .join(" || "),
+    );
+await page.goto(at("/agents", "scenario=s1&t=470&ruling=live&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("heading", { level: 1, name: "Agents" }).waitFor();
+expectEqual(
+  "agents: one row for each agent the log names, with its runs here and the changes it holds",
+  await agentRows(page),
+  "Agent A | 1 run here | #2 1 change || Agent B | no run named | #1 1 change",
+);
+expectEqual(
+  "agents: the tab is where the reader is, and the page says how an agent joins and makes no credential",
+  `${await tabs.filter({ hasText: "Agents" }).getAttribute("aria-current")} | ${await page.getByText("No credential is made here.").count()} | ${await page
+    .getByRole("button")
+    .filter({ hasText: /credential|enrol|mint/i })
+    .count()} buttons`,
+  "page | 1 | 0 buttons",
+);
+// An agent's own page in the project: its runs, each a part of the page with a place of its own.
+await page.getByRole("list", { name: AGENTS }).getByRole("link", { name: "Agent A" }).click();
+await page.getByRole("heading", { level: 1 }).waitFor();
+const runsOn = async (shown: Page): Promise<string> =>
+  (
+    await shown.locator("section.a-panel").evaluateAll((sections) =>
+      sections.map((section) =>
+        [
+          section.id,
+          section.querySelector("h2")?.textContent ?? "",
+          [...section.querySelectorAll("header p > span")]
+            .filter((part) => part.querySelector("time") === null)
+            .map((part) => part.textContent ?? "")
+            .join(", "),
+          [...section.querySelectorAll("li")]
+            .map((held) => (held.textContent ?? "").replaceAll(/\s+/g, " ").trim())
+            .join("; "),
+        ].join(" | "),
+      ),
+    )
+  ).join(" || ");
+expectEqual(
+  "agent: its run is named in its own words and said to be its own, with Keel's id for it and the change it holds",
+  `${squash(await page.getByRole("heading", { level: 1 }).innerText())} | ${await runsOn(page)}`,
+  "Agent A | run-run_0000000000000000000000ACDE | “collab-revocation” | as the agent named it, run_0000000000000000000000ACDE, 2 entries of the log | #2Owners can revoke collaborators, effective immediatelyparked",
+);
+await page.goBack();
+await page.getByRole("list", { name: AGENTS }).getByRole("link", { name: "Agent B" }).click();
+await page.getByRole("heading", { level: 1, name: "Agent B" }).waitFor();
+expectEqual(
+  "agent: work under a token that named no run is listed as that, and under no run",
+  `${await runsOn(page)} | ${await page.getByText("Work under a token that named no run: 2 entries of the log.").count()}`,
+  " | No run named |  | #1Speed up permission checksparked | 1",
+);
+// A change says which run holds it, on its row and on its page, and each is a link to that run's place.
+await page.goto(at("/changes?state=parked", "scenario=s1&t=470&ruling=live&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("list", { name: "Changes, newest first" }).waitFor();
+const runLinks = (shown: Page): Promise<string> =>
+  shown
+    .getByRole("link", { name: /^in (its run|a run)/ })
+    .evaluateAll((links) =>
+      links
+        .map((link) =>
+          link instanceof HTMLAnchorElement
+            ? `${link.textContent ?? ""} -> ${new URL(link.href).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")}${new URL(link.href).hash}`
+            : "not a link",
+        )
+        .join(" || "),
+    );
+expectEqual(
+  "changes: the row of a change held under a run says which, and links to it; one held under none says nothing",
+  await runLinks(page),
+  "in its run “collab-revocation” -> /acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE",
+);
+await page.goto(at("/changes/2", "scenario=s1&t=470&ruling=live&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("heading", { level: 1 }).waitFor();
+expectEqual(
+  "change: its page says which run holds it, and its agent's name is a link to the agent's page here",
+  `${await runLinks(page)} | ${await page
+    .getByRole("link", { name: /Agent A/ })
+    .first()
+    .evaluate((link) =>
+      link instanceof HTMLAnchorElement
+        ? new URL(link.href).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")
+        : "not a link",
+    )}`,
+  "in its run “collab-revocation” -> /acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE | /acme/demo/agents/{agent}",
+);
+await page.getByRole("link", { name: /^in its run/ }).click();
+await page.getByRole("heading", { level: 1, name: "Agent A" }).waitFor();
+expectEqual(
+  "change: the link to its run lands on the agent's page with the run's place in the address",
+  `${new URL(page.url()).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")}${new URL(page.url()).hash} | ${await page.locator("#run-run_0000000000000000000000ACDE").count()}`,
+  "/acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE | 1",
+);
+// A name the log gives no agent is said to be that, and nothing is made up for it.
+await page.goto(at("/agents/nobody", "scenario=s1&t=470&ruling=live&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("heading", { level: 1 }).first().waitFor();
+expectEqual(
+  "agent: a name the log gives no agent is told as that",
+  `${await page.getByText("Keel's log names no agent nobody in this project").count()} | ${await page.locator("section.a-panel").count()} runs`,
+  "1 | 0 runs",
+);
+// Mission Control's agent node says the run its change is held under, where the agent named one.
+await page.goto(at("/mission-control", "scenario=s1&t=470&ruling=live&play=0"), {
+  waitUntil: "networkidle",
+});
+await graphDrawn(page);
+expectEqual(
+  "mission control: an agent beside its change says the run it named, and one that named none says none",
+  `${await page.getByText("run “collab-revocation”").count()} | ${await page.getByText(/run “/).count()}`,
+  "1 | 1",
+);
+
 // Insights: trunk's numbers with what each means, the review funnel, and the benchmark where a run was sealed.
 await page.goto(at("/insights", "scenario=swarm&t=95&play=0"), { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "Trunk" }).waitFor();
@@ -1453,7 +1593,7 @@ await narrow.goto(at("/escalations/E-1", "scenario=s1&t=472&ruling=live"), {
 await narrow
   .getByRole("heading", { name: "May permission checks be cached within a session?" })
   .waitFor();
-expectEqual("narrow: the same frame, with every tab", String(await tabsOf(narrow).count()), "6");
+expectEqual("narrow: the same frame, with every tab", String(await tabsOf(narrow).count()), "7");
 expectEqual(
   "narrow: a question's page stays within the screen",
   String(await overflowOf(narrow)),
@@ -1614,13 +1754,13 @@ async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<
 }
 
 const OPEN_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Agents | Insights";
 /**
  * The tabs as someone who is no member of the project's org is shown them: Keel reads a project's questions to
  * its members alone, so none is counted for anyone else.
  */
 const PUBLIC_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations | Mission Control | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations | Mission Control | Agents | Insights";
 const QUESTION_ASKED = /May permission checks be cached within a session\?/;
 /** The home's first part for someone signed in: the questions Keel has put to them. */
 const waitingOn = (shown: Page) => shown.getByRole("region", { name: "Waiting for you" });
@@ -2114,6 +2254,91 @@ expectEqual(
   "visitor: the page sent Keel no credential, and the browser had none to send",
   `${visitorSent.filter((request) => request.authorization !== undefined).length} ${open.calls.filter((call) => call.authorization !== "").length} ${(await street.cookies()).length}`,
   "0 0 0",
+);
+
+// ── A visitor, on a project whose agents Keel names to anyone by their cards ──
+// The log names an agent by its id, and a visitor is read no enrolment. What they are shown of each agent is
+// Keel's card of it: Agent A signed itself up, so it has a handle, and Agent B was enrolled, so it has the kind
+// it declared and the namespace it works in.
+const staffed = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  readerOf,
+  whose: whoseHandle,
+  ahead: AHEAD,
+  signedUp: { "Agent A": "tidy-otter" },
+});
+const staffSent: Sent[] = [];
+await asDeployed(street, { keel: staffed, sent: staffSent });
+await visitor.goto(`${built}/ada/demo/agents`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { level: 1, name: "Agents" }).waitFor();
+// Each name arrives with its agent's card: both are waited for, or ten seconds, and the check says which.
+await visitor
+  .getByRole("list", { name: AGENTS })
+  .getByText("declared as interactive")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "visitor: a project's agents are named from Keel's cards: a handle where one signed itself up, a declared kind where one was enrolled",
+  await agentRows(visitor),
+  "Agent A | tidy-otter, 1 run here | #2 1 change || Agent B | declared as interactive, no run named | #1 1 change",
+);
+expectEqual(
+  "visitor: an agent's handle is a link to its own page, and its name to its page in the project, at its handle",
+  (
+    await visitor
+      .getByRole("list", { name: AGENTS })
+      .getByRole("listitem")
+      .first()
+      .getByRole("link")
+      .evaluateAll((links) =>
+        links.map((link) =>
+          link instanceof HTMLAnchorElement ? new URL(link.href).pathname : "not a link",
+        ),
+      )
+  )
+    .slice(0, 2)
+    .join(" "),
+  "/ada/demo/agents/tidy-otter /tidy-otter",
+);
+// An agent's page opened cold at its handle: the log has only its id, so Keel is asked whose the handle is.
+const beforeTheHandle = staffSent.length;
+await visitor.goto(`${built}/ada/demo/agents/tidy-otter`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { level: 1 }).first().waitFor();
+await visitor
+  .getByRole("heading", { level: 1, name: "Agent A" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "visitor: an agent's page opened at its handle finds the agent, with its run and the change it holds",
+  `${squash(await visitor.getByRole("heading", { level: 1 }).first().innerText())} | ${await runsOn(visitor)}`,
+  "Agent A | run-run_0000000000000000000000ACDE | “collab-revocation” | as the agent named it, run_0000000000000000000000ACDE, 2 entries of the log | #2Owners can revoke collaborators, effective immediatelyparked",
+);
+expectEqual(
+  "visitor: for an agent at a handle Keel is asked whose the handle is and for that agent's card, and nothing else of agents",
+  [
+    ...new Set(
+      staffSent
+        .slice(beforeTheHandle)
+        .map((request) => request.path.replace(/\/v1\/agents\/agt_[0-9A-Z]+$/, "/v1/agents/{id}"))
+        .filter((path) => path.startsWith("/v1/agents") || path === "/v1/namespaces/tidy-otter"),
+    ),
+  ]
+    .toSorted()
+    .join(" "),
+  "/v1/agents/{id} /v1/namespaces/tidy-otter",
+);
+// The agent's own page, at its handle: Keel's card, and nothing of who stands behind it.
+await visitor.goto(`${built}/tidy-otter`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { level: 1 }).first().waitFor();
+await visitor
+  .getByRole("region", { name: "Agent" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "visitor: an agent's own page shows Keel's card of it, and no line about standing behind it",
+  `${squash(await visitor.locator("main header").first().innerText())} | ${(await visitor.getByRole("region", { name: "Agent" }).count()) === 0 ? "no card" : squash(await visitor.getByRole("region", { name: "Agent" }).innerText())} | ${await visitor.getByText(/stand behind/i).count()}`,
+  "tidy-otter Agent | Agent Name Agent A | 0",
 );
 
 // ── A visitor, on a project its org has kept private ──
@@ -3014,7 +3239,7 @@ await countedPublic(passer);
 expectEqual(
   "settings: a visitor now reads the project, and is offered no settings",
   `${await filesOn(passer)} | ${await tabsOf(passer).count()} tabs`,
-  "src | package.json | README.md | 6 tabs",
+  "src | package.json | README.md | 7 tabs",
 );
 await passer.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
 await passer.getByRole("heading", { level: 1, name: "Settings" }).waitFor();
@@ -3217,11 +3442,26 @@ const BETA = {
   kind: "hosted",
   namespace: "acme",
 } as const;
-const GAMMA = { id: "agt_000000000000000000000GAMMA", name: "gamma", kind: "interactive" } as const;
+// Gamma has a handle, which is its own namespace, and so has epsilon, behind which nobody stands.
+const GAMMA = {
+  id: "agt_000000000000000000000GAMMA",
+  name: "gamma",
+  kind: "interactive",
+  handle: "gamma-otter",
+} as const;
+const EPSILON = {
+  id: "agt_0000000000000000000EPSN0N",
+  name: "epsilon",
+  handle: "epsilon-heron",
+} as const;
 const sponsoring = createFakeKeel({
   namespace: NAMESPACE,
-  agents: [BETA, GAMMA],
+  agents: [BETA, GAMMA, EPSILON],
   readerOf: async (request) => passkeysAlone.reads(request),
+  whose: (handle) =>
+    [GAMMA, EPSILON]
+      .filter((agent) => agent.handle === handle)
+      .map((agent) => ({ id: agent.id, kind: "agent" as const }))[0],
 });
 // The route put on last is the one that answers: from here this context's Keel is the one with the agents.
 const sentForAnAgent: Sent[] = [];
@@ -3326,7 +3566,7 @@ await newcomer
 expectEqual(
   "sponsor: a code that is no longer good is refused in what Keel said, with Keel's way forward and none of the page's own, and no second try",
   `${(await newcomer.getByRole("alert").count()) === 0 ? "no refusal" : squash(await newcomer.getByRole("alert").innerText())} | ${await standBehind(newcomer, GAMMA).count()} button | ${await newcomer.getByText("Ask the agent for a new link.").count()} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"}`,
-  "No agent is asking for a sponsor with that code. Ask the agent to ask again, and approve with its new code | 0 button | 0 | nobody",
+  "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one. Ask the agent for a new link, and approve with it | 0 button | 0 | nobody",
 );
 // A link that is not whole asks Keel nothing. It is opened over the page that is up, as a second link would be:
 // only the fragment changes and nothing is loaded, and it is taken out of the address all the same.
@@ -3360,6 +3600,48 @@ expectEqual(
   "sponsor: a visitor's one tap signs them in and stands them behind the agent, and the frame says who they are",
   `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(GAMMA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(GAMMA.id))} | ${squash(await newcomer.locator("header").first().innerText())}`,
   "You stand behind gamma | turing | Keel turing",
+);
+
+// The sponsor's own second approval. Keel gave the agent one code and the approval spent it, and Keel gives an
+// agent somebody stands behind no other: opened again, the link is a code that is no good and is told as that.
+// Nobody is told the agent has a sponsor, or to end a link.
+await newcomer.goto(linkTo(GAMMA, forGamma.code), { waitUntil: "domcontentloaded" });
+await sponsorPage(newcomer, GAMMA);
+if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+await newcomer
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sponsor: the sponsor's own second approval is told as a code that is no good, with nothing of a link to end",
+  `${(await newcomer.getByRole("alert").count()) === 0 ? "no refusal" : squash(await newcomer.getByRole("alert").innerText())} | ${await newcomer.getByText(/already has a sponsor|End the link/).count()} | ${sponsoring.sponsorOf(GAMMA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(GAMMA.id))}`,
+  "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one. Ask the agent for a new link, and approve with it | 0 | turing",
+);
+// An agent's own page, at its handle. Its sponsor is shown one line that sends them to their settings, known
+// from their own list of the agents they stand behind. Of an agent they do not stand behind it says nothing.
+const aboutAgent = async (shown: Page, handle: string): Promise<string> => {
+  await shown.goto(`${built}/${handle}`, { waitUntil: "domcontentloaded" });
+  await shown.getByRole("heading", { level: 1 }).first().waitFor();
+  await shown
+    .getByRole("region", { name: "Agent" })
+    .getByText("Name")
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+  await shown.waitForTimeout(400);
+  const about = shown.getByRole("region", { name: "Agent" });
+  if ((await about.count()) === 0) return "no card";
+  const settings = about.getByRole("link", { name: /in your settings/ });
+  return `${squash(await about.innerText())} | ${(await settings.count()) === 0 ? "no link" : await settings.evaluate((to) => (to instanceof HTMLAnchorElement ? new URL(to.href).pathname : "not a link"))}`;
+};
+expectEqual(
+  "agent's own page: its sponsor is told they stand behind it and sent to their settings, where the controls are",
+  await aboutAgent(newcomer, GAMMA.handle),
+  "Agent Name gamma Declared as interactive You stand behind this agent. Pause it, unpause it or end the link in your settings | /settings",
+);
+expectEqual(
+  "agent's own page: someone who does not stand behind the agent is shown its card and no such line, and no control",
+  `${await aboutAgent(newcomer, EPSILON.handle)} | ${await newcomer.getByRole("button", { name: /Pause|Unpause|End/ }).count()} controls`,
+  "Agent Name epsilon | no link | 0 controls",
 );
 
 // ── The agents a person stands behind, on their settings ──

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.agents
+# why: the stand-in for Keel publishes no entry's run, so every page of an agent's runs would be tested against a log that names none
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 032b8838..ab3c336b 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -645,7 +645,6 @@ export function createFakeKeel(
+               payload: unpriced(payload),
+               ...(label === undefined ? {} : { label }),
+               ...(actor === undefined ? {} : { actor }),
+-              ...(run === undefined ? {} : { run }),
+               ...(stamped === undefined ? {} : { project: stamped }),
+             }),
+           );

@@ -315,6 +315,14 @@ export interface AlternativeRow extends IntentRow {
   next: string[];
 }
 
+/** The agent a change is held by and the run it is held under, as a page links to them. */
+export interface HeldUnder {
+  /** What an address calls the agent that holds the change. */
+  agent: string;
+  /** Absent where the holder's token named no run. `label` is the agent's own word for the run. */
+  run?: { id: string; label?: string; anchor: string };
+}
+
 export interface ChangePageState {
   change: {
     /** True where the project has verification switched off: its verdict or its landing was not verified. */
@@ -330,6 +338,8 @@ export interface ChangePageState {
     laneLabel?: string;
   };
   agent: { label: string; class: ShownClass; harness: string; model: string };
+  /** Its holder's page in this project, and the run it is held under. */
+  held: HeldUnder;
   session: { id: string; messages: number };
   intent: {
     goal: string;

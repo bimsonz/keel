@@ -3,6 +3,7 @@
 // other. Whose the handle is (a person's, an agent's or an org's) is Keel's to say, and the page is worded
 // from its answer.
 
+import { AgentAbout } from "./AgentAbout.tsx";
 import { isOwn } from "./accounts.ts";
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
@@ -14,7 +15,7 @@ import type {
   NamespaceView,
   ProjectView,
 } from "../contract/keel/index.ts";
-import type { KeelDirectory } from "../source/types.ts";
+import type { KeelDirectory, KeelSponsorship } from "../source/types.ts";
 import {
   type Account,
   type Closed,
@@ -575,10 +576,12 @@ function OrgSettings({
  */
 export function NamespacePublic({
   directory,
+  sponsorship,
   handle,
   signedIn,
 }: {
   directory: KeelDirectory;
+  sponsorship: KeelSponsorship;
   handle: string;
   signedIn: boolean;
 }) {
@@ -615,6 +618,10 @@ export function NamespacePublic({
           </span>
         )}
       </header>
+      {/* An agent's handle is its own namespace: its page is what Keel shows anyone of the agent. */}
+      {namespace.kind === "agent" && (
+        <AgentAbout sponsorship={sponsorship} agentId={namespace.id} signedIn={signedIn} />
+      )}
       <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
         <h2 className="a-h">Projects</h2>
         {projects.length === 0 ? (
@@ -685,12 +692,14 @@ function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab:
 export function NamespacePages({
   account,
   directory,
+  sponsorship,
   who,
   handle,
   tab,
 }: {
   account: Account;
   directory: KeelDirectory;
+  sponsorship: KeelSponsorship;
   who: Who;
   handle: string;
   tab: OrgTab;
@@ -700,7 +709,9 @@ export function NamespacePages({
   if (isOwn({ handle }, who)) return <Own directory={directory} who={who} tab={tab} />;
   if (held === undefined) return null;
   if (held === null && tab === "home")
-    return <NamespacePublic directory={directory} handle={handle} signedIn />;
+    return (
+      <NamespacePublic directory={directory} sponsorship={sponsorship} handle={handle} signedIn />
+    );
   if (held === null)
     return (
       <Card

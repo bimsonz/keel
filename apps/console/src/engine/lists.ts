@@ -12,6 +12,7 @@
 
 import type { EscalationCategory } from "../contract/events.ts";
 import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
+import { type Cards, type HeldUnder, heldUnder } from "./holder.ts";
 import { subjectOf } from "./lanes.ts";
 import type { ChangeEntry, ConflictEntry, EscalationEntry, World } from "./world.ts";
 
@@ -68,6 +69,8 @@ export interface ChangeRow extends Named {
   state: ChangeState;
   agent: string;
   agentClass: ShownClass;
+  /** Its holder's page in this project, and the run it is held under. */
+  held: HeldUnder;
   /** The key of the subject it is about, when it has said or shown one. */
   subject?: string;
   declaredAt: string;
@@ -234,6 +237,7 @@ export function changesOf(
   world: World,
   filter: ChangeFilter,
   shown = PAGE,
+  cards: Cards = new Map(),
 ): Listing<ChangeRow, ChangeFilter> {
   const names = namesIn(world);
   return listing(
@@ -255,6 +259,7 @@ export function changesOf(
         // An agent Keel has not named to this reader is one all the same.
         agent: by?.name ?? "an agent",
         agentClass: by?.class ?? "unnamed",
+        held: heldUnder(cards, change),
         ...(subject === undefined ? {} : { subject }),
         declaredAt: change.declaredAt,
         unverified: change.unverified,

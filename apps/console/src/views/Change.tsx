@@ -15,7 +15,14 @@ import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
-import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "./links.tsx";
+import {
+  ChangeLink,
+  ConflictLink,
+  EscalationLink,
+  HolderLink,
+  RunLink,
+  SubjectLink,
+} from "./links.tsx";
 import {
   AgentTag,
   ClassTag,
@@ -280,11 +287,14 @@ export function Change({
         }
         meta={
           <>
-            <AgentTag
-              label={state.agent.label}
-              agentClass={state.agent.class}
-              harness={state.agent.harness}
-            />
+            <HolderLink held={state.held} className="a-link-quiet">
+              <AgentTag
+                label={state.agent.label}
+                agentClass={state.agent.class}
+                harness={state.agent.harness}
+              />
+            </HolderLink>
+            <RunLink held={state.held} className="a-link-quiet" />
             <span>
               declared{" "}
               <time className="a-num text-kumo-default">{dateTime(change.declaredAt)}</time>

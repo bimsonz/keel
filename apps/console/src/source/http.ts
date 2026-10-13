@@ -52,6 +52,7 @@ import type {
 import { type KeelRepository, RepoRefused } from "./repository.ts";
 import {
   type ChangeDiff,
+  type KeelAgents,
   type KeelCommands,
   type KeelDirectory,
   type KeelSponsorship,
@@ -76,7 +77,8 @@ export type HttpSource = KeelEventSource &
   KeelResources &
   KeelRepository &
   KeelCommands &
-  KeelSettings;
+  KeelSettings &
+  KeelAgents;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 
@@ -413,6 +415,14 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       if (!response.ok) throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
       const view: VerdictView = await response.json();
       return view;
+    },
+    // An agent's card is Keel's one read of it, whoever asks and from whichever page.
+    findAgent: (agentId, signal) => createHttpSponsorship(options).findAgent(agentId, signal),
+    async findAgentAt(handle, signal) {
+      const whose = await createHttpDirectory(options).findNamespace(handle, signal);
+      return whose === null || whose.kind !== "agent"
+        ? null
+        : createHttpSponsorship(options).findAgent(whose.id, signal);
     },
     // Keel decides who may answer: the person a question was put to first, and a maintainer of the project's
     // namespace (`sponsorOrMaintain`). The buttons are offered to a maintainer, and to whoever Keel lists the

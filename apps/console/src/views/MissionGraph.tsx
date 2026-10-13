@@ -83,6 +83,7 @@ function Body({ node }: { node: GraphNode }) {
             <div className="truncate text-[13px] text-kumo-subtle">
               {CLASS_WORD[node.agentClass]}
               {node.harness !== "" && ` · ${node.harness}`}
+              {node.run !== undefined && ` · run “${node.run}”`}
             </div>
           </div>
         </div>

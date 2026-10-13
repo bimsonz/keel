@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.agents
+# why: the stand-in for Keel reads out an enrolment of an agent that signed itself up, which no project's log holds: a member would be shown a name Keel's log never gives
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 032b8838..a7e2a680 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -623,7 +623,6 @@ export function createFakeKeel(
+           // With no project named, someone signed in is read every project Keel may read them: this one as its
+           // member, its public part where it is public, and nothing of it otherwise.
+           .filter((event) => member || (visible && !MEMBERS_ONLY.has(event.type)))
+-          .filter((event) => event.type !== "AgentEnrolled" || !keyed.has(event.payload.agentId))
+           .map(
+             ({
+               eventId,

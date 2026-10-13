@@ -2,6 +2,7 @@
 // world and the same instant always give the same picture.
 
 import { shownAgent } from "./audience.ts";
+import { type Cards, heldUnder } from "./holder.ts";
 import type { ConflictDetail, ConflictSide, Lattice, ProbeSource } from "../contract/keel/index.ts";
 import type { Predicate } from "../contract/mfp.ts";
 import type { FlowNode, StepSpec } from "../contract/provisional.ts";
@@ -36,6 +37,8 @@ export interface Resources {
   lattices: ReadonlyMap<string, Lattice>;
   /** What Keel was asked for and would not give, by the id of the thing it was asked about. */
   refused: ReadonlySet<string>;
+  /** Keel's card of each agent asked for. Absent where none has been. */
+  cards?: Cards;
 }
 
 export interface TrunkStats {
@@ -621,6 +624,7 @@ export function changePageOf(
         : { laneLabel: change.laneId.replace("lane-", "Lane ") }),
     },
     agent: { ...shownAgent(by), model: by?.model ?? "" },
+    held: heldUnder(resources.cards ?? new Map(), change),
     session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },
     intent: {
       goal: change.goal,

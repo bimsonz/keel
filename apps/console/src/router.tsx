@@ -154,17 +154,19 @@ export function Anchor({
   );
 }
 
-/** A link to a place in the project: an anchor with the place's own address. */
+/** A link to a place in the project: an anchor with the place's own address, and a part of that page where one is named. */
 export function Link({
   to,
+  section,
   children,
   ...rest
-}: { to: Route; ref?: Ref<HTMLAnchorElement>; children: ReactNode } & Omit<
+}: { to: Route; section?: string; ref?: Ref<HTMLAnchorElement>; children: ReactNode } & Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,
   "href" | "children"
 >) {
+  const place = useWhere().to(to);
   return (
-    <Anchor {...rest} href={useWhere().to(to)}>
+    <Anchor {...rest} href={section === undefined ? place : `${place}#${section}`}>
       {children}
     </Anchor>
   );

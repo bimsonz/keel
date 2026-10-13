@@ -14,7 +14,14 @@ import {
   Row,
   Rows,
 } from "../views/List.tsx";
-import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
+import {
+  ChangeLink,
+  ConflictLink,
+  EscalationLink,
+  HolderLink,
+  RunLink,
+  SubjectLink,
+} from "../views/links.tsx";
 import { AgentMark, Unverified, agentLine, dateTime } from "../views/parts.tsx";
 
 const FILTERS: { id: ChangeFilter; label: string }[] = [
@@ -49,7 +56,10 @@ const EMPTY: Record<ChangeFilter, [string, string]> = {
 };
 
 export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: number }) {
-  const list = useSelected((world) => changesOf(world, filter, shown), [filter, shown]);
+  const list = useSelected(
+    (world, from) => changesOf(world, filter, shown, from.cards),
+    [filter, shown],
+  );
   const any = Object.values(list.counts).some((count) => count > 0);
   const [title, body] = any
     ? EMPTY[filter]
@@ -81,10 +91,14 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
                   <span>
                     declared <time className="a-num">{dateTime(row.declaredAt)}</time> by
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <HolderLink
+                    held={row.held}
+                    className="a-link-quiet inline-flex items-center gap-1.5"
+                  >
                     <AgentMark agentClass={row.agentClass} size={12} />
                     {agentLine(row.agent, row.agentClass)}
-                  </span>
+                  </HolderLink>
+                  <RunLink held={row.held} className="a-link-quiet" />
                   {row.subject !== undefined && (
                     <SubjectLink subject={row.subject} className="a-mono a-link-quiet">
                       {row.subject}

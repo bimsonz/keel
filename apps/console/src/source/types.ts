@@ -152,14 +152,23 @@ export interface KeelCommands {
   readAsked?(signal?: AbortSignal): Promise<void>;
 }
 
+/** Keel's public card of an agent, which it reads anyone by the agent's id: never who stands behind it. */
+export interface KeelAgents {
+  /** Null where Keel knows no agent by that id. */
+  findAgent(agentId: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
+  /**
+   * The card of the agent whose handle this is. An agent's handle is its own namespace, so Keel is asked whose
+   * the handle is, and then for that agent's card. Null where the handle is nobody's, or is not an agent's.
+   */
+  findAgentAt?(handle: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
+}
+
 /** Keel refused something, and said why. `next` is the ways forward it gave, each by its title. */
 /**
  * Standing behind an agent: Keel's public card of one, and a person's approval of the code it showed them.
  * The approval is the signed-in person's, and Keel takes it only from a passkey sign-in of the last ten minutes.
  */
-export interface KeelSponsorship {
-  /** Who an agent is, as Keel shows anyone: never who stands behind it. Null where Keel knows none by that id. */
-  findAgent(agentId: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
+export interface KeelSponsorship extends KeelAgents {
   /** Stands behind the agent with the code it showed. The code rides in the body of this one call, and nowhere else. */
   approve(agentId: string, code: string): Promise<void>;
   /** The agents Keel names the reader the sponsor of, oldest first: `GET /v1/agents/sponsored`. */

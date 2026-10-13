@@ -1,15 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsor.test.ts
 # kills: sponsor.refused
-# why: the stand-in for Keel tells a code that is no good that the agent has a sponsor, where Keel answers every such code alike and says nothing of the agent: the page would be tested against an answer Keel never gives
+# why: the stand-in for Keel tells an approval that the agent has a sponsor, where Keel answers every code that is no good alike and says nothing of the agent: the page would be tested against an answer Keel never gives
 diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
-index 2c0f390..82ed294 100644
+index 032b8838..9f588211 100644
 --- a/apps/console/test/fixtures/mock/fakeKeel.ts
 +++ b/apps/console/test/fixtures/mock/fakeKeel.ts
-@@ -406,6 +406,7 @@ export function createFakeKeel(
+@@ -450,6 +450,8 @@ export function createFakeKeel(
          if (reader.fresh !== true) return staleSignIn();
          const agentId = decodeURIComponent(link[1] ?? "");
          const known = agents.get(agentId);
-+        if (behind.has(agentId)) return sponsorHeld(agentId);
++        if (behind.has(agentId))
++          return problem(409, "agent.state_refused", [], `${agentId} ${SPONSOR_HELD}`);
          const asked = asks.get(agentId);
          // A code that is wrong, used or run out, and an agent that is not there, are one answer, and it comes
          // before anything the agent's own standing would say: a code that is no good learns nothing of an agent.
