@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionDeclined without the check `wal !== undefined`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..adf865de 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -483,10 +483,7 @@ export const evolvePromotion = (
+ 
+     case "PromotionDeclined": {
+       if (event.reason === "frozen") {
+-        return trunk.phase === "frozen" &&
+-          wal !== undefined &&
+-          wal.batches.some((b) => b.batchId === event.batchId)
+-          ? {
++        return trunk.phase === "frozen" && wal.batches.some((b) => b.batchId === event.batchId) ? {
+               ...trunk,
+               wal: { ...wal, batches: wal.batches.filter((b) => b.batchId !== event.batchId) },
+             }

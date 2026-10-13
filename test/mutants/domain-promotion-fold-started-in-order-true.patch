@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold's `inOrder` for PromotionStarted is always true, so it takes an event that check refused.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..0bfe684d 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -520,8 +520,7 @@ export const evolvePromotion = (
+       // The group is the front of the queue, in order: FIFO, with the declined already gone.
+       const front = trunk.queue.slice(0, event.batches.length);
+       const inOrder =
+-        front.length === event.batches.length &&
+-        front.every((b, i) => b.batchId === event.batches[i]);
++true;
+       if (
+         trunk.phase !== "debouncing" ||
+         event.old !== trunk.head ||

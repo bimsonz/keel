@@ -37,10 +37,13 @@ export interface FoldTable<S, E, F> {
   /**
    * Whether a committed event is worth folding into a row, in all its forms.
    * Defaults to every event. A machine whose tour commits thousands narrows it
-   * to the events that name something the row holds, and one of each kind.
+   * to the events that name something the row holds, and one of each kind. A
+   * string says why the event meets the row, and `most` counts each reason
+   * apart: the many events met for one reason cannot crowd out the one met for
+   * another.
    */
-  readonly meets?: (state: S | undefined, event: E) => boolean;
-  /** At most this many events of each kind meet a row: the first in the tour's order. */
+  readonly meets?: (state: S | undefined, event: E) => boolean | string;
+  /** At most this many events of each kind meet a row for each reason: the first in the tour's order. */
   readonly most?: number;
 }
 
@@ -73,10 +76,12 @@ export const foldCases = <S, E extends { readonly _tag: string }, F>(
     const events = new Map<string, E>();
     const met = new Map<string, number>();
     for (const event of committed.values()) {
-      if (t.meets !== undefined && !t.meets(state, event)) continue;
-      const count = met.get(event._tag) ?? 0;
+      const why = t.meets === undefined ? true : t.meets(state, event);
+      if (why === false) continue;
+      const reason = `${event._tag} ${String(why)}`;
+      const count = met.get(reason) ?? 0;
       if (t.most !== undefined && count >= t.most) continue;
-      met.set(event._tag, count + 1);
+      met.set(reason, count + 1);
       for (const form of t.forms(event)) events.set(canonicalJson(asJson(form)), form);
     }
     for (const [printed, event] of events)

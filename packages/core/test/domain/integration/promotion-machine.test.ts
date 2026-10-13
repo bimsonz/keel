@@ -14,6 +14,7 @@ import {
   type MemberCommit,
   type PendingGroup,
   type PromotionCommand,
+  PromotionFrozen,
   replayPromotion,
   Trunk,
   TrunkEvent,
@@ -34,8 +35,9 @@ import {
 import { promotionChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
-import { assertReaching } from "../../support/reach.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Fold, type Machine, tour } from "../../support/machine.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -1328,6 +1330,324 @@ describe("the verified flag", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(mixed.verified.map((e) => e?.verified)).toEqual([true, false, undefined]);
     expect(mixed.advanced).toMatchObject({ _tag: "TrunkAdvanced", verified: false });
     expect(carry(["absent", true]).advanced).not.toHaveProperty("verified");
+  });
+});
+
+/** A batch as the table knows it: its id and its members, in order. */
+interface Slot {
+  readonly batchId: BatchId;
+  readonly members: readonly ChangeId[];
+}
+
+/** What the fold's table is about: the phase, the head and its height, who waits, and the group being pushed. */
+interface FoldedTrunk {
+  readonly phase: Trunk["phase"];
+  readonly head: CommitSha;
+  readonly height?: number;
+  readonly queue: readonly Slot[];
+  readonly group?: {
+    readonly id: string;
+    readonly old: CommitSha;
+    readonly batches: readonly Slot[];
+    readonly composed?: CommitSha;
+  };
+  readonly solo: boolean;
+  readonly frozen: boolean;
+  readonly promoted: number;
+}
+
+const slotOf = (b: Slot): Slot => ({ batchId: b.batchId, members: b.members });
+const holds = (slots: readonly Slot[], batchId: BatchId): boolean =>
+  slots.some((s) => s.batchId === batchId);
+const less = (slots: readonly Slot[], batchId: BatchId): readonly Slot[] =>
+  slots.filter((s) => s.batchId !== batchId);
+/** The phase a trunk rests in once nothing is being pushed. */
+const rests = (queue: readonly Slot[]): Trunk["phase"] =>
+  queue.length === 0 ? "idle" : "debouncing";
+
+/** The fold's from-table (state-machines.md § Promotion), typed apart from `evolvePromotion`. */
+const trunkFolds = (from: FoldedTrunk | undefined, event: TrunkEvent): FoldedTrunk | "illegal" => {
+  if (from === undefined)
+    return event._tag === "TrunkInitialized"
+      ? {
+          phase: "idle",
+          head: event.head,
+          height: 0,
+          queue: [],
+          solo: false,
+          frozen: false,
+          promoted: 0,
+        }
+      : "illegal";
+  const { group } = from;
+  switch (event._tag) {
+    case "TrunkInitialized":
+      return "illegal";
+    case "BatchVerified":
+      if (event.members === undefined || event.base === undefined) return "illegal";
+      if (holds(from.queue, event.batchId)) return "illegal";
+      return {
+        ...from,
+        queue: [...from.queue, { batchId: event.batchId, members: event.members }],
+        phase: from.phase === "idle" ? "debouncing" : from.phase,
+      };
+    case "PromotionDeclined": {
+      if (event.reason === "frozen")
+        return from.phase === "frozen" && group !== undefined && holds(group.batches, event.batchId)
+          ? { ...from, group: { ...group, batches: less(group.batches, event.batchId) } }
+          : "illegal";
+      if (event.reason === "commutation-failed") {
+        if (from.phase !== "debouncing" || !holds(from.queue, event.batchId)) return "illegal";
+        const queue = less(from.queue, event.batchId);
+        return { ...from, queue, phase: rests(queue) };
+      }
+      // The push was refused: only a composed group has pushed anything.
+      if (from.phase !== "promoting" || group?.composed === undefined) return "illegal";
+      if (!holds(group.batches, event.batchId)) return "illegal";
+      const batches = less(group.batches, event.batchId);
+      const { group: _ended, ...ended } = from;
+      const left: FoldedTrunk =
+        batches.length > 0
+          ? { ...from, group: { ...group, batches } }
+          : { ...ended, phase: rests(from.queue) };
+      return event.reason === "pack-too-large" && event.reverify.length > 0
+        ? { ...left, solo: true }
+        : left;
+    }
+    case "PromotionStarted": {
+      const front = from.queue.slice(0, event.batches.length);
+      const fifo =
+        event.batches.length > 0 && front.map((s) => s.batchId).join() === event.batches.join();
+      return from.phase === "debouncing" && event.old === from.head && fifo
+        ? {
+            ...from,
+            phase: "promoting",
+            queue: from.queue.slice(front.length),
+            group: { id: event.groupId, old: event.old, batches: front },
+          }
+        : "illegal";
+    }
+    case "PromotionComposed":
+      return from.phase === "promoting" &&
+        group !== undefined &&
+        group.id === event.groupId &&
+        group.composed === undefined &&
+        event.commits.map((c) => c.changeId).join() ===
+          group.batches.flatMap((s) => s.members).join()
+        ? { ...from, group: { ...group, composed: event.sha } }
+        : "illegal";
+    case "TrunkAdvanced": {
+      const lands =
+        from.phase === "promoting" &&
+        group !== undefined &&
+        group.id === event.groupId &&
+        group.old === event.from &&
+        group.composed === event.to &&
+        event.landings.map((l) => l.changeId).join() ===
+          group.batches.flatMap((s) => s.members).join();
+      const next =
+        event.height === undefined || from.height === undefined || event.height === from.height + 1;
+      if (!lands || !next) return "illegal";
+      const { group: _landed, height: _before, ...landed } = from;
+      return {
+        ...landed,
+        solo: false,
+        head: event.to,
+        promoted: from.promoted + event.landings.length,
+        phase: rests(from.queue),
+        ...(event.height === undefined ? {} : { height: event.height }),
+      };
+    }
+    case "PromotionFrozen":
+      return (from.phase === "debouncing" && event.expected === from.head) ||
+        (from.phase === "promoting" && group !== undefined && group.id === event.groupId)
+        ? { ...from, phase: "frozen", frozen: true }
+        : "illegal";
+    case "PromotionResumed": {
+      if (from.phase !== "frozen" || (group !== undefined && group.batches.length > 0))
+        return "illegal";
+      const { group: _dropped, ...resumed } = from;
+      return { ...resumed, frozen: false, head: event.head ?? from.head, phase: rests(from.queue) };
+    }
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+const DECLINES = ["commutation-failed", "frozen", "pack-too-large", "repo-bytes-quota"] as const;
+/** A batch no trunk of the tour ever holds. */
+const STRAY_BATCH = makeId("bat", ulid(999_999));
+
+/** An event in every form the trunk's fold could tell apart. */
+const trunkForms = (event: TrunkEvent): readonly TrunkEvent[] => {
+  switch (event._tag) {
+    case "BatchVerified":
+      return [event, { ...event, members: undefined }, { ...event, base: undefined }];
+    case "PromotionDeclined":
+      return DECLINES.flatMap((reason) => [
+        { ...event, reason, reverify: [] },
+        { ...event, reason, reverify: [makeId("chg", ulid(1))] },
+        { ...event, reason, reverify: [], batchId: STRAY_BATCH },
+      ]);
+    case "PromotionStarted":
+      return [
+        event,
+        { ...event, old: STRAY },
+        { ...event, batches: [] },
+        { ...event, batches: event.batches.toReversed() },
+        { ...event, batches: event.batches.slice(1) },
+        { ...event, batches: [...event.batches, STRAY_BATCH] },
+      ];
+    case "PromotionComposed":
+      return [
+        event,
+        { ...event, groupId: "another-group" },
+        { ...event, commits: event.commits.slice(1) },
+        { ...event, commits: event.commits.toReversed() },
+      ];
+    case "TrunkAdvanced":
+      return [
+        event,
+        { ...event, groupId: "another-group" },
+        { ...event, from: STRAY },
+        { ...event, to: STRAY },
+        { ...event, landings: event.landings.slice(1) },
+        { ...event, height: undefined },
+        { ...event, height: (event.height ?? 1) + 1 },
+      ];
+    case "PromotionFrozen":
+      return [event, { ...event, expected: STRAY }, { ...event, groupId: "another-group" }];
+    case "PromotionResumed":
+      return [event, { ...event, head: undefined }, { ...event, head: STRAY }];
+    default:
+      return [event];
+  }
+};
+
+/** What an event names of a trunk: batches, a group, and, for a freeze, the head it expected. */
+const namedBy = (
+  event: TrunkEvent,
+): { readonly batches: readonly BatchId[]; readonly group?: string; readonly head?: CommitSha } => {
+  switch (event._tag) {
+    case "BatchVerified":
+    case "PromotionDeclined":
+      return { batches: [event.batchId] };
+    case "PromotionStarted":
+      return { batches: event.batches, group: event.groupId };
+    case "PromotionComposed":
+      return { batches: [], group: event.groupId };
+    case "TrunkAdvanced":
+      return { batches: [], group: event.groupId };
+    case "PromotionFrozen":
+      return { batches: [], group: event.groupId, head: event.expected };
+    default:
+      return { batches: [] };
+  }
+};
+
+/** What an event names of this trunk: its group, a batch it holds or its head; or that it names nothing at all. */
+const concerns = (trunk: Trunk, event: TrunkEvent): string | false => {
+  const named = namedBy(event);
+  if (named.batches.length === 0 && named.group === undefined) return "nothing named";
+  if (named.group !== undefined && named.group === trunk.wal?.groupId) return "its group";
+  const held = [...trunk.queue, ...(trunk.wal?.batches ?? [])].map((b) => b.batchId);
+  if (named.batches.some((id) => held.includes(id))) return "its batch";
+  return named.head === trunk.head ? "its head" : false;
+};
+
+/**
+ * One state stands for each shape a trunk takes: its phase, how many wait, how far the group
+ * got and how many batches it holds, and whether it is solo and frozen.
+ */
+const shapeOf = (t: Trunk | undefined): string =>
+  t === undefined
+    ? "none"
+    : [
+        t.phase,
+        Math.min(t.queue.length, 2),
+        t.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
+        Math.min(t.wal?.batches.length ?? 0, 2),
+        t.solo === true,
+        t.frozen !== undefined,
+      ].join("|");
+
+/**
+ * One fold past the tour. The fold freezes a group whether or not it was composed, and the
+ * machine freezes only a composed one, so no run reaches a trunk frozen on a group it never
+ * composed. The fold does, in one event, and what it must refuse from there is its table's too.
+ */
+const frozenUncomposed = (
+  walked: readonly Fold<Trunk, TrunkEvent>[],
+): readonly Fold<Trunk, TrunkEvent>[] => {
+  const started = new Map<string, Trunk>();
+  for (const { after } of walked)
+    if (after.phase === "promoting" && after.wal?.composed === undefined)
+      started.set(shapeOf(after), started.get(shapeOf(after)) ?? after);
+  return [...started.values()].map((before) => {
+    const event = PromotionFrozen.make({
+      projectId: PROJECT,
+      groupId: before.wal?.groupId ?? "",
+      expected: before.head,
+      observed: STRAY,
+      reason: "readback-mismatch",
+    });
+    return { before, event, after: evolvePromotion(before, { at: T0, payload: event }) };
+  });
+};
+
+describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[promotion.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const toured = promotionTour();
+    const walked = [...toured, ...frozenUncomposed(toured)];
+    const kinds = new Map<string, TrunkEvent>();
+    for (const { event } of walked) if (!kinds.has(event._tag)) kinds.set(event._tag, event);
+    const firsts = new Set(kinds.values());
+    const cases = foldCases<Trunk, TrunkEvent, FoldedTrunk>({
+      evolve: evolvePromotion,
+      walked,
+      summary: (t) => ({
+        phase: t.phase,
+        head: t.head,
+        ...(t.height === undefined ? {} : { height: t.height }),
+        queue: t.queue.map(slotOf),
+        ...(t.wal === undefined
+          ? {}
+          : {
+              group: {
+                id: t.wal.groupId,
+                old: t.wal.old,
+                batches: t.wal.batches.map(slotOf),
+                ...(t.wal.composed === undefined ? {} : { composed: t.wal.composed }),
+              },
+            }),
+        solo: t.solo === true,
+        frozen: t.frozen !== undefined,
+        promoted: t.promoted.length,
+      }),
+      shown: (f) => canonicalJson(asJson(f)),
+      row: shapeOf,
+      // Every row meets the first event of each kind the tour committed, and every event
+      // that names its group, a batch it holds or its head: at most eight of a kind for each
+      // of those, so the thousands of freezes that expect its head leave its own group's in.
+      meets: (t, event) =>
+        (t !== undefined && concerns(t, event)) || (firsts.has(event) && "the first of its kind"),
+      most: 8,
+      forms: trunkForms,
+      times: [T0],
+      table: trunkFolds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Fifty-three shapes of trunk, nine of them one fold past the tour, each meeting at most
+    // eight events of a kind for each reason, in every form.
+    const shape = foldShape(cases);
+    expect({ ...shape, rows: shape.rows.length }).toEqual({
+      folds: 10064,
+      refused: 9126,
+      rows: 53,
+    });
   });
 });
 

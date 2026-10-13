@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold's `atFlush` for PromotionFrozen is always true, so it takes an event that check refused.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..e6485cc2 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -574,7 +574,7 @@ export const evolvePromotion = (
+         : illegal(trunk, event);
+ 
+     case "PromotionFrozen": {
+-      const atFlush = trunk.phase === "debouncing" && event.expected === trunk.head;
++      const atFlush = true;
+       const inGroup =
+         trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId;
+       return atFlush || inGroup

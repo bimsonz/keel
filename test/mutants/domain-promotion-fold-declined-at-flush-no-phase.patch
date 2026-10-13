@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold no longer refuses PromotionDeclined on `trunk.phase !== "debouncing"`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..1a57fe9c 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -510,7 +510,7 @@ export const evolvePromotion = (
+           ? { ...left, solo: true }
+           : left;
+       }
+-      if (trunk.phase !== "debouncing" || !trunk.queue.some((b) => b.batchId === event.batchId))
++      if (!trunk.queue.some((b) => b.batchId === event.batchId))
+         return illegal(trunk, event);
+       const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
+       return { ...trunk, queue, phase: settled(queue) };

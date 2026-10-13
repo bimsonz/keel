@@ -1,0 +1,22 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionComposed with its guard gone: `trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId && wal.composed === undefined && sameChain(event.commits, wal)`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..c05799bf 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -544,13 +544,7 @@ export const evolvePromotion = (
+     }
+ 
+     case "PromotionComposed":
+-      return trunk.phase === "promoting" &&
+-        wal !== undefined &&
+-        wal.groupId === event.groupId &&
+-        wal.composed === undefined &&
+-        sameChain(event.commits, wal)
+-        ? { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } }
+-        : illegal(trunk, event);
++      return { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } };
+ 
+     case "TrunkAdvanced":
+       return trunk.phase === "promoting" &&

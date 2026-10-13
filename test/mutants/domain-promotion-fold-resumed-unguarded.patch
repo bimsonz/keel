@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionResumed with its guard gone: `trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..600bd659 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -591,13 +591,11 @@ export const evolvePromotion = (
+     }
+ 
+     case "PromotionResumed":
+-      return trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)
+-        ? {
++      return {
+             ...without(trunk, "wal", "frozen"),
+             head: event.head ?? trunk.head,
+             phase: settled(trunk.queue),
+-          }
+-        : illegal(trunk, event);
++          };
+ 
+     default: {
+       const unreachable: never = event;

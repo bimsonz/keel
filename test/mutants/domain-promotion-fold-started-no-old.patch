@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold no longer refuses PromotionStarted on `event.old !== trunk.head`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..b89cca38 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -522,12 +522,7 @@ export const evolvePromotion = (
+       const inOrder =
+         front.length === event.batches.length &&
+         front.every((b, i) => b.batchId === event.batches[i]);
+-      if (
+-        trunk.phase !== "debouncing" ||
+-        event.old !== trunk.head ||
+-        event.batches.length === 0 ||
+-        !inOrder
+-      )
++      if (trunk.phase !== "debouncing" || event.batches.length === 0 || !inOrder)
+         return illegal(trunk, event);
+       return {
+         ...trunk,

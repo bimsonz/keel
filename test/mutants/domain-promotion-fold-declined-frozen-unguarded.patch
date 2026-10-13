@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionDeclined with its guard gone: `trunk.phase === "frozen" && wal !== undefined && wal.batches.some((b) => b.batchId === event.batchId)`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..14a0a013 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -483,14 +483,10 @@ export const evolvePromotion = (
+ 
+     case "PromotionDeclined": {
+       if (event.reason === "frozen") {
+-        return trunk.phase === "frozen" &&
+-          wal !== undefined &&
+-          wal.batches.some((b) => b.batchId === event.batchId)
+-          ? {
++        return {
+               ...trunk,
+               wal: { ...wal, batches: wal.batches.filter((b) => b.batchId !== event.batchId) },
+-            }
+-          : illegal(trunk, event);
++            };
+       }
+       if (event.reason === "pack-too-large" || event.reason === "repo-bytes-quota") {
+         if (

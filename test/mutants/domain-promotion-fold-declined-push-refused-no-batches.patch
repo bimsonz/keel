@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold no longer refuses PromotionDeclined on `!wal.batches.some((b) => b.batchId === event.batchId)`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..bcf718c6 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -493,11 +493,7 @@ export const evolvePromotion = (
+           : illegal(trunk, event);
+       }
+       if (event.reason === "pack-too-large" || event.reason === "repo-bytes-quota") {
+-        if (
+-          trunk.phase !== "promoting" ||
+-          wal?.composed === undefined ||
+-          !wal.batches.some((b) => b.batchId === event.batchId)
+-        )
++        if (trunk.phase !== "promoting" || wal?.composed === undefined)
+           return illegal(trunk, event);
+         const batches = wal.batches.filter((b) => b.batchId !== event.batchId);
+         // The group's last batch ends it: trunk never moved, so there is nothing to read back.

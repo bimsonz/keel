@@ -1,0 +1,35 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes TrunkAdvanced with its guard gone: `trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId && wal.old === event.from && wal.composed === event.to && event.landings.map((`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..6086916d 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -553,16 +553,7 @@ export const evolvePromotion = (
+         : illegal(trunk, event);
+ 
+     case "TrunkAdvanced":
+-      return trunk.phase === "promoting" &&
+-        wal !== undefined &&
+-        wal.groupId === event.groupId &&
+-        wal.old === event.from &&
+-        wal.composed === event.to &&
+-        event.landings.map((l) => l.changeId).join() === membersOf(wal).join() &&
+-        (event.height === undefined ||
+-          trunk.height === undefined ||
+-          event.height === trunk.height + 1)
+-        ? {
++      return {
+             // An advance without a height (an older Trunk DO's) leaves the height unknown.
+             // A push landed: grouping resumes.
+             ...without(trunk, "wal", "height", "solo"),
+@@ -570,8 +561,7 @@ export const evolvePromotion = (
+             promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
+             phase: settled(trunk.queue),
+             ...(event.height === undefined ? {} : { height: event.height }),
+-          }
+-        : illegal(trunk, event);
++          };
+ 
+     case "PromotionFrozen": {
+       const atFlush = trunk.phase === "debouncing" && event.expected === trunk.head;

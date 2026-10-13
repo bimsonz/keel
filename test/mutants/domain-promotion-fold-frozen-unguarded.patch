@@ -1,0 +1,27 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionFrozen with its guard gone: `atFlush || inGroup`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..ec8e7736 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -577,8 +577,7 @@ export const evolvePromotion = (
+       const atFlush = trunk.phase === "debouncing" && event.expected === trunk.head;
+       const inGroup =
+         trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId;
+-      return atFlush || inGroup
+-        ? {
++      return {
+             ...trunk,
+             phase: "frozen",
+             frozen: {
+@@ -586,8 +585,7 @@ export const evolvePromotion = (
+               observed: event.observed,
+               ...(event.reason === undefined ? {} : { reason: event.reason }),
+             },
+-          }
+-        : illegal(trunk, event);
++          };
+     }
+ 
+     case "PromotionResumed":

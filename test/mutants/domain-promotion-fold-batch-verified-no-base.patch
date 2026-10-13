@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold no longer refuses BatchVerified on `event.base === undefined`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..aa3750ae 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -459,11 +459,7 @@ export const evolvePromotion = (
+       return illegal(trunk, event);
+ 
+     case "BatchVerified": {
+-      if (
+-        event.members === undefined ||
+-        event.base === undefined ||
+-        trunk.queue.some((b) => b.batchId === event.batchId)
+-      )
++      if (event.members === undefined || trunk.queue.some((b) => b.batchId === event.batchId))
+         return illegal(trunk, event);
+       const queued: QueuedBatch = {
+         batchId: event.batchId,

@@ -1,0 +1,26 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes TrunkAdvanced without the check `wal.groupId === event.groupId`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..bf117bec 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -553,16 +553,9 @@ export const evolvePromotion = (
+         : illegal(trunk, event);
+ 
+     case "TrunkAdvanced":
+-      return trunk.phase === "promoting" &&
+-        wal !== undefined &&
+-        wal.groupId === event.groupId &&
+-        wal.old === event.from &&
+-        wal.composed === event.to &&
+-        event.landings.map((l) => l.changeId).join() === membersOf(wal).join() &&
+-        (event.height === undefined ||
++      return trunk.phase === "promoting" && wal !== undefined && wal.old === event.from && wal.composed === event.to && event.landings.map((l) => l.changeId).join() === membersOf(wal).join() && (event.height === undefined ||
+           trunk.height === undefined ||
+-          event.height === trunk.height + 1)
+-        ? {
++          event.height === trunk.height + 1) ? {
+             // An advance without a height (an older Trunk DO's) leaves the height unknown.
+             // A push landed: grouping resumes.
+             ...without(trunk, "wal", "height", "solo"),

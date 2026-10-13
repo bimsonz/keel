@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold takes PromotionComposed without the check `sameChain(event.commits, wal)`.
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index d5224caa..576a5dc7 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -544,12 +544,7 @@ export const evolvePromotion = (
+     }
+ 
+     case "PromotionComposed":
+-      return trunk.phase === "promoting" &&
+-        wal !== undefined &&
+-        wal.groupId === event.groupId &&
+-        wal.composed === undefined &&
+-        sameChain(event.commits, wal)
+-        ? { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } }
++      return trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId && wal.composed === undefined ? { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } }
+         : illegal(trunk, event);
+ 
+     case "TrunkAdvanced":
