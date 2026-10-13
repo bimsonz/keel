@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-own-entry
+# why: a sign-in is written to the agent's store under the agent's own entry, so logging in destroys the machine's agent key, which Keel cannot give back
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..5b6e5e3e 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -181,7 +181,7 @@ export async function loginCommand(
+     );
+     return 0;
+   }
+-  await io.signIns.write(asked.entry, encodeSignIn(made));
++  await (io.keyStore ?? io.signIns).write(asked.entry, encodeSignIn(made));
+   io.stdout(
+     asked.json
+       ? JSON.stringify(

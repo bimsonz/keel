@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/git-credential.test.ts
+# kills: cli.setup-git-profile
+# why: the line git runs does not name the profile, so git set up for one sign-in asks for another
+diff --git a/packages/cli/src/git-credential.ts b/packages/cli/src/git-credential.ts
+index 5d4a62fd..2e905794 100644
+--- a/packages/cli/src/git-credential.ts
++++ b/packages/cli/src/git-credential.ts
+@@ -86,7 +86,6 @@ export async function setupGit(
+   const helper = `!${[
+     ...(io.self ?? ["keeltown"]),
+     ...HELPER,
+-    ...(profile === undefined ? [] : ["--profile", profile]),
+   ]
+     .map(quoted)
+     .join(" ")}`;

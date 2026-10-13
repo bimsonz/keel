@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.logout
+# why: logout asks Keel to sign out with no credential, so the session lives on at Keel after the machine has forgotten its token and nobody can end it from here
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..f244d231 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -214,7 +214,7 @@ export async function logoutCommand(
+       send,
+       `${asked.baseUrl}/v1/auth/sign-out`,
+       {},
+-      { authorization: `Bearer ${held.token}` },
++      {},
+     );
+     status = ended.status;
+   } catch {

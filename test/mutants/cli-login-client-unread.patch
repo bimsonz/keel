@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-client
+# why: a person who has signed in is still told the machine holds no credential, so login gives them git and nothing else
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index ea290f60..d7c8a766 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -506,9 +506,7 @@ async function clientFor(
+     });
+   // No agent's credential at all: the person signed in on this machine.
+   const signIn = await heldSignIn(io.env, io.signIns, entry);
+-  return signIn === undefined
+-    ? undefined
+-    : createKeelClient({ baseUrl, session: signIn.token, ...fetch });
++  return signIn === undefined ? undefined : undefined;
+ }
+ 
+ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {

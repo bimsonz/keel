@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/git-credential.test.ts
+# kills: cli.setup-git
+# why: keeltown is added after the helpers set for every host and none is cleared, so the system's helper is asked first for Keel's host and is handed Keel's token to keep
+diff --git a/packages/cli/src/git-credential.ts b/packages/cli/src/git-credential.ts
+index 5d4a62fd..ea9973ad 100644
+--- a/packages/cli/src/git-credential.ts
++++ b/packages/cli/src/git-credential.ts
+@@ -91,7 +91,6 @@ export async function setupGit(
+     .map(quoted)
+     .join(" ")}`;
+   for (const args of [
+-    ["config", "--global", "--replace-all", key, ""],
+     ["config", "--global", "--add", key, helper],
+   ]) {
+     const ran = await io.exec?.("git", args);

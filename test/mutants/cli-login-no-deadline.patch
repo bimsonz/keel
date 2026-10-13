@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-deadline
+# why: the wait has no end of its own, so a login nobody approves polls Keel for a day after its code stopped being good
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..30a68e79 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -113,7 +113,7 @@ export async function deviceLogin(asked: {
+   const until = asked.now() + (seconds(code, "expires_in") ?? 0) * 1000;
+   let token: string | undefined;
+   while (token === undefined) {
+-    if (asked.now() + wait * 1000 > until) throw new LoginFailed(RAN_OUT);
++    if (asked.now() + wait * 1000 > until + 86_400_000) throw new LoginFailed(RAN_OUT);
+     await asked.sleep(wait * 1000);
+     const polled = await post(asked.fetch, `${auth}/device/token`, {
+       grant_type: DEVICE_GRANT,

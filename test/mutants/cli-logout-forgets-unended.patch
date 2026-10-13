@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.logout-kept
+# why: a sign-in Keel could not be told to end is forgotten all the same, so a live session is left at Keel with nothing on the machine that could end it
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..16cb2650 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -221,7 +221,7 @@ export async function logoutCommand(
+     status = undefined;
+   }
+   // A session Keel no longer knows needs no ending: 400 and 401 are how it says so.
+-  const ended = status === 200 || status === 400 || status === 401;
++  const ended = true;
+   if (!ended)
+     throw new LoginFailed(
+       `Keel could not be told to end the session (${status === undefined ? "no answer" : `HTTP ${status}`}). The sign-in is still held: run \`keeltown logout\` again.`,

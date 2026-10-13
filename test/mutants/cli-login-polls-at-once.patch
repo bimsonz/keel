@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login
+# why: the CLI asks for the token again as fast as Keel answers, so Keel tells every sign-in to slow down and the person's own request limit is spent on polling
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..cd8ec503 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -114,7 +114,7 @@ export async function deviceLogin(asked: {
+   let token: string | undefined;
+   while (token === undefined) {
+     if (asked.now() + wait * 1000 > until) throw new LoginFailed(RAN_OUT);
+-    await asked.sleep(wait * 1000);
++    await asked.sleep(0);
+     const polled = await post(asked.fetch, `${auth}/device/token`, {
+       grant_type: DEVICE_GRANT,
+       device_code: deviceCode,

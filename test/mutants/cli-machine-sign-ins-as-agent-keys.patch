@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/machine.test.ts
+# kills: cli.machine-stores
+# why: the machine's store for sign-ins is the agent's own, so on a real machine keeltown login writes over the agent's key
+diff --git a/packages/cli/src/machine.ts b/packages/cli/src/machine.ts
+index f3b4afa0..d9370109 100644
+--- a/packages/cli/src/machine.ts
++++ b/packages/cli/src/machine.ts
+@@ -25,7 +25,7 @@ export async function machineIo(machine: Machine, exec: Exec = run): Promise<Io>
+     stderr: machine.stderr,
+     stdin: machine.stdin,
+     keyStore: await keyStoreFor(machine.platform, exec),
+-    signIns: await keyStoreFor(machine.platform, exec, SIGN_INS),
++    signIns: await keyStoreFor(machine.platform, exec),
+     exec,
+     ...(program === undefined || script === undefined ? {} : { self: [program, script] }),
+   };

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.logout
+# why: logout ends the session and leaves its token in the key store, so git goes on offering a dead credential and the machine says it is signed in
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..9aea1c6f 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -230,7 +230,6 @@ export async function logoutCommand(
+     io.stdout("Signed out. The session is ended at Keel: unset KEEL_SESSION.");
+     return 0;
+   }
+-  await io.signIns?.remove(asked.entry);
+   io.stdout(
+     `Signed out${held.handle === undefined ? "" : ` ${held.handle}`}. The session is ended at Keel and nothing is held in ${held.where}.`,
+   );

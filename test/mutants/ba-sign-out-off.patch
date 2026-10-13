@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.device-sign-out
+# why: sign-out is not served, so keeltown logout cannot end the session it holds and a terminal's sign-in lives until it lapses
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 5a0a0bed..3f49d4e5 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -51,6 +51,7 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
+ export const DISABLED_PATHS = [
+   "/list-sessions",
+   "/revoke-session",
++  "/sign-out",
+   "/sign-in/email",
+   "/sign-up/email",
+   "/sign-in/username",

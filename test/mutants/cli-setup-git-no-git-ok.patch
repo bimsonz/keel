@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/git-credential.test.ts
+# kills: cli.setup-git-no-git
+# why: on a machine with no git, setup-git says git now asks keeltown and exits 0, having set nothing
+diff --git a/packages/cli/src/git-credential.ts b/packages/cli/src/git-credential.ts
+index 5d4a62fd..43b3ec4e 100644
+--- a/packages/cli/src/git-credential.ts
++++ b/packages/cli/src/git-credential.ts
+@@ -97,7 +97,7 @@ export async function setupGit(
+     const ran = await io.exec?.("git", args);
+     if (ran === undefined) {
+       io.stderr("git is not on this machine's PATH, so there is nothing to set up.");
+-      return 2;
++      continue;
+     }
+     if (ran.code !== 0) {
+       io.stderr(

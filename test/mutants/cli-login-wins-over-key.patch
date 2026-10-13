@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-key-first
+# why: a sign-in on the machine takes every command from the agent whose key is there, so an agent's work is done as the person and recorded as theirs
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index ea290f60..806f691f 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -496,7 +496,7 @@ async function clientFor(
+     return createKeelClient({ baseUrl, clientId, clientSecret, ...fetch });
+   if (session !== undefined) return createKeelClient({ baseUrl, session, ...fetch });
+   const held = await signedUpKey(io, entry);
+-  if (held !== undefined)
++  if (held !== undefined && (await heldSignIn(io.env, io.signIns, entry)) === undefined)
+     return createKeelClient({
+       baseUrl,
+       agentId: held.agentId,

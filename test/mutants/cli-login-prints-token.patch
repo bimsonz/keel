@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-quiet
+# why: login --json prints everything the sign-in made, the session's token with it, into whatever log the terminal's output goes to
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..afa5779f 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -185,7 +185,7 @@ export async function loginCommand(
+   io.stdout(
+     asked.json
+       ? JSON.stringify(
+-          { handle: made.handle, userId: made.userId, signIn: io.signIns.kind },
++          { ...made, signIn: io.signIns.kind },
+           null,
+           2,
+         )

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-slow-down
+# why: a slow_down changes nothing, so the CLI keeps asking at the pace Keel has just refused and is refused for as long as the code lasts
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..a2c708ad 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -125,7 +125,7 @@ export async function deviceLogin(asked: {
+     if (token !== undefined) break;
+     const error = text(answer, "error");
+     if (error === "authorization_pending") continue;
+-    if (error === "slow_down") wait += SLOW_DOWN_SECONDS;
++    if (error === "slow_down") wait += 0;
+     else if (error === "access_denied")
+       throw new LoginFailed("The sign-in was refused on Keel. Nothing is held on this machine.");
+     else if (error === "expired_token") throw new LoginFailed(RAN_OUT);

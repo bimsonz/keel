@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-denied
+# why: a sign-in the person refused on Keel is asked about until the code runs out, half an hour later, and then reads as a code that ran out
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..0ae23cdb 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -124,7 +124,7 @@ export async function deviceLogin(asked: {
+     token = polled.ok ? text(answer, "access_token") : undefined;
+     if (token !== undefined) break;
+     const error = text(answer, "error");
+-    if (error === "authorization_pending") continue;
++    if (error === "authorization_pending" || error === "access_denied") continue;
+     if (error === "slow_down") wait += SLOW_DOWN_SECONDS;
+     else if (error === "access_denied")
+       throw new LoginFailed("The sign-in was refused on Keel. Nothing is held on this machine.");

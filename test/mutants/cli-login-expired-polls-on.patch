@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.login-expired
+# why: a code Keel says has run out is asked about again and again, each answer the same
+diff --git a/packages/cli/src/login.ts b/packages/cli/src/login.ts
+index 72ce236c..c1bd4be5 100644
+--- a/packages/cli/src/login.ts
++++ b/packages/cli/src/login.ts
+@@ -124,7 +124,7 @@ export async function deviceLogin(asked: {
+     token = polled.ok ? text(answer, "access_token") : undefined;
+     if (token !== undefined) break;
+     const error = text(answer, "error");
+-    if (error === "authorization_pending") continue;
++    if (error === "authorization_pending" || error === "expired_token") continue;
+     if (error === "slow_down") wait += SLOW_DOWN_SECONDS;
+     else if (error === "access_denied")
+       throw new LoginFailed("The sign-in was refused on Keel. Nothing is held on this machine.");
