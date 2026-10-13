@@ -4,7 +4,7 @@ import {
   InstantSchema,
   NamespaceId,
   ProjectId,
-  type RunId,
+  type RunRef,
   type SessionId,
   UserId,
 } from "../kernel/index.ts";
@@ -62,16 +62,6 @@ export const Agent = Schema.Struct({
 export type Agent = typeof Agent.Type;
 
 /**
- * What an agent calls one of its runs: one word of lower-case
- * letters and digits, joined by `-`, `_` or `.`, at most 64 characters. It is
- * the agent's own claim; Keel proves only that the run is the agent's.
- */
-export const RunLabel = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,63}$/)).pipe(
-  Schema.brand("RunLabel"),
-);
-export type RunLabel = typeof RunLabel.Type;
-
-/**
  * Who a verified token says is calling. A token of an agent that signed up by
  * key may name no project: it stands in the agent's own namespace, where the
  * agent makes its first.
@@ -89,7 +79,7 @@ export interface AgentClaims {
   /** The agent's given handle, when it signed up by key. */
   readonly handle?: Handle;
   /** The run the token is for: one stream of the agent's work. */
-  readonly run?: { readonly id: RunId; readonly label?: RunLabel };
+  readonly run?: RunRef;
   /**
    * Whether the token is bound to a key its presenter proved it holds on this
    * request. Absent on a token of the secret exchange, which is never bound.

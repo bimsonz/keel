@@ -1,7 +1,7 @@
 import type { Result } from "effect";
 import { Schema } from "effect";
 import { EntityRef } from "./entity.ts";
-import { AgentId, EventId, type Instant, InstantSchema, ProjectId, UserId } from "./ids.ts";
+import { AgentId, EventId, type Instant, InstantSchema, ProjectId, RunRef, UserId } from "./ids.ts";
 
 /**
  * The principal whose command an event records: an agent or a user, each by
@@ -22,6 +22,19 @@ export type Actor = typeof Actor.Type;
 /** The actor an agent's own commands commit under. */
 export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
 
+/**
+ * Whose command an agent's commit is: the agent, and the run of it that asked
+ * when its token names one. Every commit an agent causes takes both from here,
+ * so an event never names the agent and loses its run.
+ */
+export const byAgent = (
+  agentId: AgentId,
+  run: RunRef | undefined,
+): { readonly actor: Actor; readonly run?: RunRef } => ({
+  actor: agentActor(agentId),
+  ...(run === undefined ? {} : { run }),
+});
+
 /** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */
 export const userActor = (userId: UserId): Actor => `user:${userId}`;
 
@@ -38,6 +51,12 @@ export const EventEnvelope = Schema.Struct({
   dedupeKey: Schema.NonEmptyString,
   causation: Schema.optional(EventId),
   actor: Schema.optional(Actor),
+  /**
+   * The run of the agent whose command this was: one agent has any
+   * number at once, and each event says which. Absent when the actor is a user
+   * or the platform, and for an agent's token that names no run.
+   */
+  run: Schema.optional(RunRef),
   /** The project the emitting entity belongs to. Absent only for events no project owns. */
   project: Schema.optional(ProjectId),
   affected: Schema.Array(EntityRef),

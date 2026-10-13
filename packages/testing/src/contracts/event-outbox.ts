@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ChangeId, type EntityRef, type EventEnvelope } from "@keeltown/core/kernel";
+import { Actor, ChangeId, type EntityRef, type EventEnvelope, RunRef } from "@keeltown/core/kernel";
 import {
   type Clock,
   commit,
@@ -78,6 +78,41 @@ const aboutOnly = (entity: EntityRef) => ({ entity, affected: [] });
 
 export function describeEventOutboxContract(adapter: string, harness: () => OutboxHarness) {
   describe(`EventOutbox contract: ${adapter}`, () => {
+    it.effect(
+      "[run.envelope] every event a commit makes names the run whose command it was, beside the actor, and a commit that names none stamps none",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const entity = change();
+          const actor = Schema.decodeUnknownSync(Actor)(`agent:agt_${randomUlid()}`);
+          const run = Schema.decodeUnknownSync(RunRef)({
+            id: `run_${randomUlid()}`,
+            label: "run-c",
+          });
+          const unlabelled = Schema.decodeUnknownSync(RunRef)({ id: `run_${randomUlid()}` });
+          const one = (revision: number) =>
+            Result.succeed({ drafts: [started(entity, revision)], value: null });
+          const events = yield* h.run(
+            Effect.gen(function* () {
+              yield* commit({ entity, cause: cause(), actor, run }, () =>
+                Result.succeed({ drafts: [started(entity, 1), started(entity, 2)], value: null }),
+              );
+              yield* commit({ entity, cause: cause(), actor, run: unlabelled }, () => one(3));
+              yield* commit({ entity, cause: cause(), actor }, () => one(4));
+              yield* emit(entity);
+              return yield* log(entity);
+            }),
+          );
+          expect(events.map((event) => [event.actor, event.run])).toEqual([
+            [actor, run],
+            [actor, run],
+            [actor, unlabelled],
+            [actor, undefined],
+            [undefined, undefined],
+          ]);
+          expect(events.map((event) => "run" in event)).toEqual([true, true, true, false, false]);
+        }),
+    );
     it.effect(
       "numbers each entity's events 1..n, gap-free and independently of other entities",
       () =>

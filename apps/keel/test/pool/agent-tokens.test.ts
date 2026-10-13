@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { runIdOf, RunLabel } from "@keeltown/core/domain/identity";
+import { runIdOf } from "@keeltown/core/domain/identity";
+import { RunLabel } from "@keeltown/core/kernel";
 import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
 import { decodeJwt, decodeProtectedHeader } from "jose";

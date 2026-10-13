@@ -1,6 +1,14 @@
 import { Result, Schema } from "effect";
-import { type AgentId, makeId, ProjectId, type RunId, sha256Hex } from "../kernel/index.ts";
-import { type Agent, RunLabel } from "./agent.ts";
+import {
+  type AgentId,
+  makeId,
+  ProjectId,
+  type RunId,
+  RunLabel,
+  type RunRef,
+  sha256Hex,
+} from "../kernel/index.ts";
+import type { Agent } from "./agent.ts";
 import { idBody, type KeyThumbprint } from "./agent-key.ts";
 import { AgentNotAdmitted } from "./errors.ts";
 import type { Handle } from "./handle.ts";
@@ -46,7 +54,7 @@ export interface RunClaims {
   readonly handle?: Handle;
   /** The one project the token is for; none for a token that stands in the agent's own namespace. */
   readonly prj?: ProjectId;
-  readonly run?: { readonly id: RunId; readonly label?: RunLabel };
+  readonly run?: RunRef;
 }
 
 export type RunRefusal = TargetRefused | RunLabelRefused | RunKeyRefused | AgentNotAdmitted;

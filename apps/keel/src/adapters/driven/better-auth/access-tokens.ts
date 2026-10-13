@@ -1,5 +1,5 @@
-import { type AgentClaims, Handle, RunLabel, Scope } from "@keeltown/core/domain/identity";
-import { AgentId, ProjectId, RunId } from "@keeltown/core/kernel";
+import { type AgentClaims, Handle, Scope } from "@keeltown/core/domain/identity";
+import { AgentId, ProjectId, RunId, RunLabel } from "@keeltown/core/kernel";
 import {
   createDpopReplayStore,
   enforceDpopBinding,

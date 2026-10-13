@@ -51,6 +51,20 @@ export type SessionId = typeof SessionId.Type;
 /** One stream of an agent's work. An agent may have any number at once. */
 export const RunId = prefixed("run").pipe(Schema.brand("RunId"));
 export type RunId = typeof RunId.Type;
+
+/**
+ * What an agent calls one of its runs: one word of lower-case
+ * letters and digits, joined by `-`, `_` or `.`, at most 64 characters. It is
+ * the agent's own claim; Keel proves only that the run is the agent's.
+ */
+export const RunLabel = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,63}$/)).pipe(
+  Schema.brand("RunLabel"),
+);
+export type RunLabel = typeof RunLabel.Type;
+
+/** A run as an event, a change and a session name it: its id, and its label when the agent gave one. */
+export const RunRef = Schema.Struct({ id: RunId, label: Schema.optional(RunLabel) });
+export type RunRef = typeof RunRef.Type;
 export const ChangeId = prefixed("chg").pipe(Schema.brand("ChangeId"));
 export type ChangeId = typeof ChangeId.Type;
 export const WorkspaceId = prefixed("wsp").pipe(Schema.brand("WorkspaceId"));

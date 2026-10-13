@@ -7,9 +7,8 @@ import {
   KeyThumbprint,
   runClaims,
   runIdOf,
-  RunLabel,
 } from "../../../src/domain/identity/index.ts";
-import { Instant, makeId, RunId } from "../../../src/domain/kernel/index.ts";
+import { Instant, makeId, RunId, RunLabel } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const thumbprint = Schema.decodeUnknownSync(KeyThumbprint);
