@@ -319,6 +319,9 @@ function derivingWorld() {
 /** The parser's answer for a commit it read with nothing left out. */
 const READ = { parser: "memory", skipped: [] };
 
+/** `[d21.derive.small]` builds two thousand modules and their anchors: under load that outlasts the default five seconds. */
+const PROPERTY_TIMEOUT = 60_000;
+
 /** One of the many modules of `[d21.derive.small]`, by its number. */
 const moduleFile = (n: string) => `src/load/module-${n}.ts`;
 
@@ -706,5 +709,6 @@ describe("Precheck's derivation", () => {
         );
       });
     },
+    { timeout: PROPERTY_TIMEOUT },
   );
 });
