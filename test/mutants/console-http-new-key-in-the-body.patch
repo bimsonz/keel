@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.call
+# why: the attempt's key is sent in the body as well, which is not the operation's input: Keel's body is whose, what name and how it starts
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index abf41bf3..7e139bb1 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -318,7 +318,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+       const response = await (options.fetch ?? fetch)(`${options.origin ?? ""}/v1/projects`, {
+         method: "POST",
+         headers: { "content-type": "application/json", "idempotency-key": attempt },
+-        body: JSON.stringify(body),
++        body: JSON.stringify({ ...body, "idempotency-key": attempt }),
+       });
+       if (!response.ok) throw await refusalOf(response);
+       return answered<ProjectView>(response);

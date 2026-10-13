@@ -15,6 +15,8 @@ export type Place =
   /** Where `keeltown login` sends a person, with the code their terminal is showing. */
   | { at: "device"; userCode: string }
   | { at: "new-org" }
+  /** Making a project. `owner` is the namespace the link here named, where it named one. */
+  | { at: "new-project"; owner?: string }
   /** A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. */
   | { at: "namespace"; handle: string }
   /** An org's members and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
@@ -47,8 +49,13 @@ export function placeOf(pathname: string, search = ""): Place | null {
   )
     return { at: "namespace", handle: segment };
   switch (segment) {
-    case "new":
+    case "new": {
+      if (second === undefined) {
+        const owner = new URLSearchParams(search).get("owner");
+        return { at: "new-project", ...(owner === null || owner === "" ? {} : { owner }) };
+      }
       return second === "org" && third === undefined ? { at: "new-org" } : null;
+    }
     case "orgs": {
       if (second === undefined) return null;
       // An org's home was once here. It is at its handle, and main.tsx corrects the address.
@@ -81,6 +88,8 @@ function pathOf(place: Place): string[] {
   switch (place.at) {
     case "new-org":
       return ["new", "org"];
+    case "new-project":
+      return ["new"];
     case "namespace":
       return [place.handle];
     case "org":
@@ -95,6 +104,7 @@ function pathOf(place: Place): string[] {
 export function hrefOf(place: Place, next?: string): string {
   const query = new URLSearchParams();
   if (place.at === "device" && place.userCode !== "") query.set("user_code", place.userCode);
+  if (place.at === "new-project" && place.owner !== undefined) query.set("owner", place.owner);
   if (next !== undefined && next !== "/") query.set("next", next);
   const path = pathOf(place)
     .map((segment) => encodeURIComponent(segment))
@@ -145,6 +155,7 @@ export function sentFrom(
   // These pages are for a user with a name on this Keel: Keel refuses them to one who has not chosen it.
   const above =
     place.at === "new-org" ||
+    place.at === "new-project" ||
     place.at === "namespace" ||
     place.at === "org" ||
     place.at === "invite";

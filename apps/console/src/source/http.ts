@@ -21,6 +21,7 @@ import type {
   AgentCard,
   AgentProfile,
   Agents_approveSponsorInput,
+  Operator_createProjectInput,
   Agents_endSponsorshipInput,
   EscalationPage,
   EscalationView,
@@ -306,6 +307,21 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
       if (page.items === undefined || typeof page.nextCursor !== "string")
         throw new Error("reading events failed: the page has no cursor");
       return { items: page.items.map((record) => record.type), nextCursor: page.nextCursor };
+    },
+    async createProject(asked, key) {
+      // The operation's whole input: the attempt's key as its header, and whose, what name and how it starts
+      // as its body. Nothing of the page's own rides beside them: Keel makes the project as whoever is signed in.
+      const { "idempotency-key": attempt, ...body }: Operator_createProjectInput = {
+        ...asked,
+        "idempotency-key": key,
+      };
+      const response = await (options.fetch ?? fetch)(`${options.origin ?? ""}/v1/projects`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": attempt },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ProjectView>(response);
     },
   };
 }

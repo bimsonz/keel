@@ -37,6 +37,12 @@ export interface Page<Item> {
  */
 export interface KeelDirectory {
   /**
+   * Makes a project, as the person signed in: `POST /v1/projects`. Keel answers once the project's trunk exists,
+   * and where it refuses a start it makes no project and gives the name back. `key` is the attempt's own: the
+   * same request asked again under it finishes the same project.
+   */
+  createProject(asked: Keel.CreateProjectRequest, key: string): Promise<Keel.ProjectView>;
+  /**
    * Whose a handle is: a person's, an agent's or an org's. Null where nobody has it. Keel answers anyone, so
    * that a handle exists is no secret; what it holds is.
    */

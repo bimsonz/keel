@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.key
+# why: the attempt's key carries the name that was typed, where a key is made of nothing the reader gave
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..f1e44d8b 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -42,7 +42,7 @@ export function keys(
+   let last: { asked: string; key: string } | undefined;
+   return (asked) => {
+     const said = JSON.stringify(asked);
+-    if (last?.asked !== said) last = { asked: said, key: `console:new:${fresh()}` };
++    if (last?.asked !== said) last = { asked: said, key: `console:new:${asked.name}:${fresh()}` };
+     return last.key;
+   };
+ }

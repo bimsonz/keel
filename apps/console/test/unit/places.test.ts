@@ -28,6 +28,7 @@ describe("the pages above every project", () => {
       "/signup",
       "/settings",
       "/device",
+      "/new",
       "/new/org",
       "/orgs/ada",
       "/orgs/ada/members",
@@ -43,7 +44,7 @@ describe("the pages above every project", () => {
       "/acme/demo",
       "/acme/login",
       "/login/extra",
-      "/new",
+      "/new/project",
       "/orgs",
       "/orgs/ada/projects",
       "/orgs/ada/members/extra",
@@ -86,6 +87,26 @@ describe("the pages above every project", () => {
     expect(placeOf("/invite/inv_1")).toEqual({ at: "invite", id: "inv_1" });
     for (const address of ["/new/org", "/lovelace", "/orgs/lovelace/members", "/invite/inv_1"])
       expect(hrefOf(placeOf(address) ?? { at: "login" })).toBe(address);
+  });
+
+  it("[places.new] has making a project at /new, with the owner a link named, for someone signed in who has a handle", () => {
+    expect(placeOf("/new")).toEqual({ at: "new-project" });
+    expect(placeOf("/new", "?owner=acme")).toEqual({ at: "new-project", owner: "acme" });
+    expect(placeOf("/new", "?owner=")).toEqual({ at: "new-project" });
+    expect(hrefOf({ at: "new-project" })).toBe("/new");
+    expect(hrefOf({ at: "new-project", owner: "acme" })).toBe("/new?owner=acme");
+    // A visitor signs in first, and comes back to the form with the owner the link named.
+    expect(
+      sentFrom(
+        { at: "new-project", owner: "acme" },
+        { is: "visitor" },
+        { pathname: "/new", search: "?owner=acme" },
+      ),
+    ).toBe("/login?next=%2Fnew%3Fowner%3Dacme");
+    // Someone who has chosen no handle chooses one first: Keel makes a project for nobody without a name.
+    const bare = { pathname: "/new", search: "" };
+    expect(sentFrom({ at: "new-project" }, { is: "user" }, bare)).toBe("/signup?next=%2Fnew");
+    expect(sentFrom({ at: "new-project" }, { is: "user", handle: "ada" }, bare)).toBeNull();
   });
 
   it("[places.sent] sends a visitor to sign in and back to the page they asked for, an invitation included", () => {

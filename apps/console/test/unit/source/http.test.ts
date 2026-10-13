@@ -8,6 +8,7 @@ import { createHttpDirectory, createHttpSource } from "../../../src/source/http.
 import { KeelRefused } from "../../../src/source/types.ts";
 import {
   MAINTAINERS_AFTER_MS,
+  PUBLIC_REPOSITORY,
   type Role,
   SESSION_COOKIE,
   createFakeKeel,
@@ -347,6 +348,130 @@ describe("who the page reads as", () => {
     await settled();
     expect(pathsFrom(second).toSorted()).toEqual(["/v1/namespaces/acme", "/v1/namespaces/nobody"]);
     expect([sought.has("acme"), sought.has("nobody"), cards.size]).toEqual([true, true, 1]);
+  });
+
+  it("[new.call] makes a project by Keel's own operation: the attempt's key in its header, whose, what name and how it starts as the body, and no credential of the page's", async () => {
+    const r = reading("member");
+    const made = await r.directory.createProject(
+      { namespace: "acme", name: "Notes", source: { kind: "empty" } },
+      "console:new:key-one",
+    );
+    // Keel answers the project as it made it: under the name in its own case, private, with the maker's role.
+    expect(made).toMatchObject({
+      namespace: { handle: "acme", kind: "org" },
+      name: "notes",
+      visibility: "private",
+      viewer: { role: "member" },
+    });
+    const sent = r.fromThePage.filter((request) => request.method === "POST");
+    expect(sent.map((request) => new URL(request.url).pathname)).toEqual(["/v1/projects"]);
+    expect(sent[0]?.headers.get("idempotency-key")).toBe("console:new:key-one");
+    expect(sent[0]?.headers.get("authorization")).toBeNull();
+    expect(await sent[0]?.json()).toEqual({
+      namespace: "acme",
+      name: "Notes",
+      source: { kind: "empty" },
+    });
+    // It is there at once: found at its address, and among the projects Keel lists its maker.
+    expect(await r.directory.findProject("acme", "notes")).toMatchObject({ id: made.id });
+    expect((await r.directory.listProjects()).map((project) => project.name)).toEqual([
+      "demo",
+      "notes",
+    ]);
+  });
+
+  it("[new.refused] gives Keel's refusal of a start in Keel's own words with the way forward it names, and makes nothing", async () => {
+    const r = reading("member");
+    let attempt = 0;
+    const tried = (
+      from: ReturnType<typeof reading>,
+      asked: Parameters<typeof r.directory.createProject>[0],
+    ) => {
+      attempt += 1;
+      return from.directory.createProject(asked, `console:new:attempt-${attempt}`).then(
+        () => "made",
+        (error: unknown) =>
+          error instanceof KeelRefused
+            ? { status: error.status, code: error.code, said: error.message, next: [...error.next] }
+            : String(error),
+      );
+    };
+    const empty = { kind: "empty" } as const;
+    // A name the namespace has, in any case.
+    expect(await tried(r, { namespace: "acme", name: "Demo", source: empty })).toEqual({
+      status: 409,
+      code: "project.name_taken",
+      said: 'The org already has a project named "demo", in some case.',
+      next: ["Choose another name"],
+    });
+    // An address no public repository answers at: a private one reads the same.
+    expect(
+      await tried(r, {
+        namespace: "acme",
+        name: "forge",
+        source: { kind: "import", url: "https://git.example/acme/private" },
+      }),
+    ).toEqual({
+      status: 404,
+      code: "project.import_refused",
+      said: "No public repository answers at that URL. A private one reads the same. Nothing was imported, and no project was made (not-found).",
+      next: ["Check the URL names a public repository, then create the project again"],
+    });
+    // An address Keel will not import from at all.
+    expect(
+      await tried(r, {
+        namespace: "acme",
+        name: "forge",
+        source: { kind: "import", url: "http://git.example/acme/forge-lite" },
+      }),
+    ).toEqual({
+      status: 400,
+      code: "request.invalid",
+      said: "The import's url must begin with https:// (not-https).",
+      next: ["Correct the import's url, then create the project again"],
+    });
+    // A namespace nobody has, a signed-in person who is no member of the namespace, and a visitor.
+    expect(await tried(r, { namespace: "nobody", name: "notes", source: empty })).toMatchObject({
+      status: 404,
+      code: "resource.not_found",
+    });
+    expect(
+      await tried(reading("stranger"), { namespace: "acme", name: "notes", source: empty }),
+    ).toEqual({
+      status: 403,
+      code: "auth.forbidden",
+      said: "Refused: role.",
+      next: ["Ask a member: this needs that role"],
+    });
+    expect(
+      await tried(reading("visitor"), { namespace: "acme", name: "notes", source: empty }),
+    ).toMatchObject({ status: 401, code: "auth.required" });
+    // Nothing was made by any of them.
+    expect((await r.directory.listProjects()).map((project) => project.name)).toEqual(["demo"]);
+    expect(await r.directory.findProject("acme", "forge")).toBeNull();
+  });
+
+  it("[new.again] finishes the same project when the same request is asked again under its key, and is refused an old key for another request", async () => {
+    const r = reading("member");
+    const asked = {
+      namespace: "acme",
+      name: "forge",
+      source: { kind: "import", url: PUBLIC_REPOSITORY, ref: "main" },
+    } as const;
+    const first = await r.directory.createProject(asked, "console:new:the-same");
+    const second = await r.directory.createProject(asked, "console:new:the-same");
+    expect(second.id).toBe(first.id);
+    expect((await r.directory.listProjects()).map((project) => project.name)).toEqual([
+      "demo",
+      "forge",
+    ]);
+    await expect(
+      r.directory.createProject({ ...asked, name: "forge-2" }, "console:new:the-same"),
+    ).rejects.toMatchObject({
+      code: "request.idempotency_conflict",
+      message: "Idempotency-Key console:new:the-same was used for a different project.",
+      next: ["Call again with a fresh Idempotency-Key"],
+    });
   });
 
   it("[http.namespace] finds a project under its own namespace and under no other", async () => {

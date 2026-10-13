@@ -30,6 +30,7 @@ import {
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
 import { wayToFresh } from "./fresh.ts";
+import { NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 import { Sponsor } from "./Sponsor.tsx";
@@ -772,7 +773,8 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   const handle =
     place.at === "namespace" ? place.handle : place.at === "org" ? place.org : undefined;
   const tab: OrgTab = place.at === "org" ? place.tab : "home";
-  const orgs = useOrgs(account, named && handle !== undefined);
+  // The frame's dropdown lists the reader's orgs, and so does the form that makes a project, as its owners.
+  const orgs = useOrgs(account, named && (handle !== undefined || place.at === "new-project"));
   const signingIn = reader.is === "visitor" && (place.at === "login" || place.at === "signup");
   const methods = useMethods(account, signingIn);
 
@@ -798,6 +800,17 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   else if (reader.is === "user" && place.at === "device")
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
+  else if (reader.is === "user" && place.at === "new-project")
+    // Whose the project may be is the reader's own account and their orgs: the form waits for Keel's list.
+    page =
+      orgs === null ? null : (
+        <NewProject
+          directory={directory}
+          orgs={orgs}
+          who={reader.who}
+          {...(place.owner === undefined ? {} : { owner: place.owner })}
+        />
+      );
   else if (reader.is === "user" && handle !== undefined)
     page = (
       <NamespacePages

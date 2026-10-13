@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.refused
+# why: Keel's refusal to make a project is read as the project, so the reader is sent to a project that was never made
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index abf41bf3..614c90fa 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -320,7 +320,6 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+         headers: { "content-type": "application/json", "idempotency-key": attempt },
+         body: JSON.stringify(body),
+       });
+-      if (!response.ok) throw await refusalOf(response);
+       return answered<ProjectView>(response);
+     },
+   };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.refused
+# why: the stand-in for Keel makes a project from an address no public repository answers at, where Keel makes none
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index a36474ad..2b5c0a95 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -631,7 +631,7 @@ export function createFakeKeel(
+             `The org already has a project named "${name.toLowerCase()}", in some case.`,
+           );
+         // One public repository answers here. Any other address is to Keel as a private one is: nothing there.
+-        if (typeof address === "string" && address !== PUBLIC_REPOSITORY)
++        if (typeof address !== "string" && address !== PUBLIC_REPOSITORY)
+           return problem(
+             404,
+             "project.import_refused",

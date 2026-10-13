@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.call
+# why: the project is asked for with no key, so Keel cannot tell an attempt asked again from another
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index abf41bf3..92763e17 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -317,7 +317,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+       };
+       const response = await (options.fetch ?? fetch)(`${options.origin ?? ""}/v1/projects`, {
+         method: "POST",
+-        headers: { "content-type": "application/json", "idempotency-key": attempt },
++        headers: { "content-type": "application/json" },
+         body: JSON.stringify(body),
+       });
+       if (!response.ok) throw await refusalOf(response);

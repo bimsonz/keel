@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.owners
+# why: an org is offered as the owner before the person's own account, so a project meant to be theirs is made in an org by default
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..d183e1be 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -53,7 +53,7 @@ export function ownersOf(
+   who: { handle?: string | undefined },
+ ): { handle: string; note: string }[] {
+   return [
+-    ...(who.handle === undefined ? [] : [{ handle: who.handle, note: "you" }]),
+     ...orgs.map((org) => ({ handle: org.handle, note: org.name })),
++    ...(who.handle === undefined ? [] : [{ handle: who.handle, note: "you" }]),
+   ];
+ }

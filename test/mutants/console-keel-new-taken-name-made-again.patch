@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.refused
+# why: the stand-in for Keel makes a second project under a name its namespace has, which Keel refuses: the page would never be tested against that refusal
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index a36474ad..30dee7d2 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -621,8 +621,7 @@ export function createFakeKeel(
+                 `Idempotency-Key ${key} was used for a different project.`,
+               );
+         if (
+-          madeAt(handle, name) !== undefined ||
+-          (handle === project.namespace.handle && name.toLowerCase() === project.name)
++          false
+         )
+           return problem(
+             409,

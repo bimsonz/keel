@@ -15,7 +15,13 @@ import { encode } from "uqr";
 import { build, preview } from "vite";
 import { createAccount } from "../src/account/account.ts";
 import { type Identity, createIdentity } from "../test/fixtures/identity/standIn.ts";
-import { type FakeKeel, type Reader, createFakeKeel } from "../test/fixtures/mock/fakeKeel.ts";
+import {
+  type Call,
+  type FakeKeel,
+  PUBLIC_REPOSITORY,
+  type Reader,
+  createFakeKeel,
+} from "../test/fixtures/mock/fakeKeel.ts";
 
 const dev = process.argv[2] ?? "http://localhost:5311";
 const BUILT_PORT = 5312;
@@ -3272,6 +3278,121 @@ expectEqual(
 );
 await passing.close();
 
+// ── Making a project ──
+// Ada makes a project under her own handle, on a Keel she has made nothing on yet. It answers as Keel's handler
+// does: the project once its trunk exists, or its refusal, and then no project. Whose a namespace is, whether a
+// name is free and whether a repository can be imported are Keel's to say, and the page says them in its words.
+const starting = createFakeKeel({ namespace: NAMESPACE, readerOf, whose: whoseHandle });
+await asDeployed(lobby, { keel: starting, sent: sentToKeel });
+const creates = (): Call[] =>
+  starting.calls.filter((call) => call.method === "POST" && call.path === "/v1/projects");
+const makeIt = person.getByRole("button", { name: "Make the project" });
+/** Opens the form, and waits for it to have its owners. */
+const newProject = async (query = ""): Promise<void> => {
+  await person.goto(`${built}/new${query}`, { waitUntil: "domcontentloaded" });
+  await person.getByRole("heading", { level: 1, name: "Make a project" }).waitFor();
+};
+/** What Keel refused, as the page says it, once it has: its sentence and the ways forward under it. */
+const refusedOn = async (shown: Page): Promise<string> => {
+  await shown
+    .getByRole("alert")
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+  return (await shown.getByRole("alert").count()) === 0
+    ? "no refusal"
+    : squash(await shown.getByRole("alert").innerText());
+};
+await newProject();
+expectEqual(
+  "new project: the owner is the reader's own account first, and nothing can be asked before there is a name",
+  `${(await person.getByLabel("Owner").locator("option").allInnerTexts())[0] ?? "no owner"} | ${await person.getByLabel("Owner").inputValue()} | ${await makeIt.isDisabled()} | ${creates().length} asked`,
+  "ada (you) | ada | true | 0 asked",
+);
+await person.getByLabel("Name").fill(" Notes ");
+expectEqual(
+  "new project: the form says the address the project will have, and starts from nothing unless told otherwise",
+  `${await person.getByText(/\/ada\/notes$/).count()} | ${await person.getByLabel("Nothing").isChecked()} | ${await person.getByLabel("Repository address").count()} address asked`,
+  "1 | true | 0 address asked",
+);
+await makeIt.click();
+await person.waitForURL(`${built}/ada/notes`, { timeout: 10_000 }).catch(() => undefined);
+await person
+  .getByRole("navigation", { name: "Project" })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "new project: Keel is asked by its own operation, under a key made for the attempt, and the reader lands on the project it made",
+  `${pathOf(person)} | ${creates()[0]?.body ?? "nothing sent"} | ${/^console:new:[0-9a-f-]{36}$/.test(creates()[0]?.idempotencyKey ?? "")} | ${creates()[0]?.authorization === ""}`,
+  '/ada/notes | {"namespace":"ada","name":"Notes","source":{"kind":"empty"}} | true | true',
+);
+// A name the namespace has: Keel's refusal, in its words, and the reader stays on the form.
+await newProject("?owner=ada");
+await person.getByLabel("Name").fill("NOTES");
+await makeIt.click();
+expectEqual(
+  "new project: a name that is taken is refused in what Keel said, with its way forward, and nothing is made",
+  `${await refusedOn(person)} | ${pathOf(person)}`,
+  'The org already has a project named "notes", in some case. Choose another name | /new',
+);
+// An address no public repository answers at. Asked again as it was, the attempt keeps its key.
+await person.getByLabel("Name").fill("forge");
+await person.getByLabel("A public Git repository").check();
+await person.getByLabel("Repository address").fill("https://git.example/acme/private");
+const beforeImport = creates().length;
+await makeIt.click();
+const toldOfImport = await refusedOn(person);
+await makeIt.click();
+for (let tries = 0; tries < 50 && creates().length < beforeImport + 2; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page
+  await new Promise((resolve) => setTimeout(resolve, 100));
+expectEqual(
+  "new project: a repository Keel cannot import is refused in what Keel said, and asking again as it was keeps the attempt's key",
+  `${toldOfImport} | ${
+    new Set(
+      creates()
+        .slice(beforeImport)
+        .map((call) => call.idempotencyKey),
+    ).size
+  } key for ${creates().length - beforeImport} asks`,
+  "No public repository answers at that URL. A private one reads the same. Nothing was imported, and no project was made (not-found). Check the URL names a public repository, then create the project again | 1 key for 2 asks",
+);
+// The address corrected, with a branch named: another request, under another key, and Keel makes the project.
+await person.getByLabel("Repository address").fill(PUBLIC_REPOSITORY);
+await person.getByLabel("Branch").fill("main");
+await makeIt.click();
+await person.waitForURL(`${built}/ada/forge`, { timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "new project: a public repository is imported from the address and the branch given, under a key of its own",
+  `${pathOf(person)} | ${creates().at(-1)?.body ?? "nothing sent"} | ${new Set(creates().map((call) => call.idempotencyKey)).size} keys for ${creates().length} asks`,
+  `/ada/forge | {"namespace":"ada","name":"forge","source":{"kind":"import","url":"${PUBLIC_REPOSITORY}","ref":"main"}} | 4 keys for 5 asks`,
+);
+// Her own page lists what she made, and has the way to the form with her as its owner.
+await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
+await person.getByRole("link", { name: "New project" }).waitFor();
+expectEqual(
+  "new project: a person's own page has the way to the form, with them as the owner",
+  await person
+    .getByRole("link", { name: "New project" })
+    .evaluate((to) =>
+      to instanceof HTMLAnchorElement
+        ? `${new URL(to.href).pathname}${new URL(to.href).search}`
+        : "not a link",
+    ),
+  "/new?owner=ada",
+);
+// A visitor is sent to sign in, and back to the form.
+const outside = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(outside, { keel: starting });
+const unsigned = watch(await outside.newPage(), "built, a visitor at the form");
+await unsigned.goto(`${built}/new`, { waitUntil: "domcontentloaded" });
+await unsigned.waitForURL(/\/login/, { timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "new project: a visitor is sent to sign in, and back to the form",
+  `${new URL(unsigned.url()).pathname}${new URL(unsigned.url()).search}`,
+  "/login?next=%2Fnew",
+);
+await outside.close();
+
 // Whatever the page asked of Keel, of its identity or of anything else, it put no credential of its own on it.
 expectEqual(
   "account: the page sent Keel no Authorization",
@@ -3365,7 +3486,7 @@ await newcomer
 expectEqual(
   "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
   squash(await newcomer.getByRole("main").innerText()),
-  "Your projects turing You have no project yet.",
+  "Your projects turing You have no project yet. New project",
 );
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();

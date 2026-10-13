@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.new
+# why: a link to the form from a namespace's page loses whose page it was, so the project would be made under another owner
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index eea17785..41b23c09 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -104,7 +104,6 @@ function pathOf(place: Place): string[] {
+ export function hrefOf(place: Place, next?: string): string {
+   const query = new URLSearchParams();
+   if (place.at === "device" && place.userCode !== "") query.set("user_code", place.userCode);
+-  if (place.at === "new-project" && place.owner !== undefined) query.set("owner", place.owner);
+   if (next !== undefined && next !== "/") query.set("next", next);
+   const path = pathOf(place)
+     .map((segment) => encodeURIComponent(segment))

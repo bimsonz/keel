@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.request
+# why: a branch left empty is sent as an empty branch, which Keel refuses, where leaving it out takes the repository's default
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..c1cc392b 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -18,7 +18,7 @@ export function requestOf(namespace: string, name: string, start: Start): Create
+     source:
+       start.kind === "empty"
+         ? { kind: "empty" }
+-        : { kind: "import", url: start.url.trim(), ...(ref === "" ? {} : { ref }) },
++        : { kind: "import", url: start.url.trim(), ref },
+   };
+ }
+ 

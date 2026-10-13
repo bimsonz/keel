@@ -21,6 +21,10 @@ export const saidOf = (error: unknown): Said => ({
   code: error instanceof Refused || error instanceof KeelRefused ? error.code : "",
 });
 
+/** A plain select, as the account pages draw one. */
+export const SELECT =
+  "h-8 rounded-md border border-kumo-line bg-kumo-base px-2 text-sm text-kumo-default disabled:opacity-60";
+
 /** Runs one thing the reader asked for, and says so if Keel refuses it. */
 export function useAsking(): {
   busy: boolean;

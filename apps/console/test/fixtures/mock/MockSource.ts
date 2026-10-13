@@ -88,6 +88,8 @@ export async function fixtureDirectory(source: MockSource): Promise<KeelDirector
       viewer: { role: "owner" },
     }));
   return {
+    // Only Keel makes a project: a test fixture's log is what it is.
+    createProject: () => Promise.reject(new Error("A test fixture makes no project")),
     findNamespace: (handle) =>
       Promise.resolve(
         handle === FIXTURE_NAMESPACE.handle

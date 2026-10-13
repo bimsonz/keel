@@ -27,7 +27,7 @@ import {
   type Who,
   nameOf,
 } from "./account.ts";
-import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
+import { Card, HANDLE, Refusal, SELECT, go, useAsking } from "./parts.tsx";
 import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
 
 /** What a page calls a namespace that is not a person's. */
@@ -70,9 +70,6 @@ function useOrg(
   }, [account, handle, who]);
   return { held, read };
 }
-
-const SELECT =
-  "h-8 rounded-md border border-kumo-line bg-kumo-base px-2 text-sm text-kumo-default disabled:opacity-60";
 
 function RoleSelect({
   label,
@@ -247,6 +244,13 @@ function Home({ page, directory }: { page: OrgPage; directory: KeelDirectory }) 
           ) : (
             <ProjectList projects={projects} />
           ))}
+        {/* Keel lets any member of an org make a project in it, and says so where it refuses. */}
+        <a
+          className="a-link self-start text-sm"
+          href={hrefOf({ at: "new-project", owner: page.org.handle })}
+        >
+          New project
+        </a>
       </section>
       <section className="a-panel flex flex-col gap-3 p-4" aria-label="Members">
         <h2 className="a-h">Members</h2>
@@ -679,6 +683,12 @@ function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab:
           ) : (
             <ProjectList projects={projects} />
           ))}
+        <a
+          className="a-link self-start text-sm"
+          href={hrefOf({ at: "new-project", owner: handle })}
+        >
+          New project
+        </a>
       </section>
     </div>
   );

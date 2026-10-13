@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.ready
+# why: the form asks Keel to import a repository before an address has been given
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..197dd4d4 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -27,7 +27,7 @@ export function ready(asked: CreateProjectRequest): boolean {
+   return (
+     asked.namespace !== "" &&
+     asked.name !== "" &&
+-    (asked.source.kind !== "import" || asked.source.url !== "")
++    true
+   );
+ }
+ 

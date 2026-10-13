@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.request
+# why: the name is sent with the spaces typed round it, so Keel is asked for a project nobody meant to name that way
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..d23537d3 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -14,7 +14,7 @@ export function requestOf(namespace: string, name: string, start: Start): Create
+   const ref = start.kind === "import" ? start.ref.trim() : "";
+   return {
+     namespace,
+-    name: name.trim(),
++    name,
+     source:
+       start.kind === "empty"
+         ? { kind: "empty" }

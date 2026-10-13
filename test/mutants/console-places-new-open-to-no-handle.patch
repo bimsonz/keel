@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.new
+# why: someone who has chosen no handle is shown the form, which Keel refuses to anyone without one
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index eea17785..3fac9c3a 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -155,7 +155,6 @@ export function sentFrom(
+   // These pages are for a user with a name on this Keel: Keel refuses them to one who has not chosen it.
+   const above =
+     place.at === "new-org" ||
+-    place.at === "new-project" ||
+     place.at === "namespace" ||
+     place.at === "org" ||
+     place.at === "invite";

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/starting.test.ts
+# kills: new.key
+# why: asking again for the same project sends a new key, so a start that was cut short is not finished and a second project may be made
+diff --git a/apps/console/src/account/starting.ts b/apps/console/src/account/starting.ts
+index 47d64cef..ed05a4b9 100644
+--- a/apps/console/src/account/starting.ts
++++ b/apps/console/src/account/starting.ts
+@@ -42,7 +42,7 @@ export function keys(
+   let last: { asked: string; key: string } | undefined;
+   return (asked) => {
+     const said = JSON.stringify(asked);
+-    if (last?.asked !== said) last = { asked: said, key: `console:new:${fresh()}` };
++    last = { asked: said, key: `console:new:${fresh()}` };
+     return last.key;
+   };
+ }

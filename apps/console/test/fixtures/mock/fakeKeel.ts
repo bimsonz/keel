@@ -138,6 +138,16 @@ export interface FakeKeel {
   pausedFor(agentId: string): string | undefined;
 }
 
+/** Keel's way forward from a refused start: the same operation, asked again. */
+const again = (title: string): NextAction => ({
+  kind: "call",
+  title,
+  operationId: "Operator_createProject",
+});
+
+/** The one public repository the stand-in can import: every other address is told as nothing there. */
+export const PUBLIC_REPOSITORY = "https://git.example/acme/forge-lite";
+
 /** How long an agent's code is good for. */
 export const SPONSOR_CODE_FOR_MS = 600_000;
 
@@ -368,6 +378,15 @@ export function createFakeKeel(
     return [{ id, name, handle }];
   });
   const agents = new Map([...working, ...(options.agents ?? [])].map((agent) => [agent.id, agent]));
+  /**
+   * The projects made here, by the key each was made under, with what was asked: Keel's `createProject`. A
+   * made project is its maker's to read, and holds a trunk and no entry yet.
+   */
+  const made = new Map<string, { asked: string; by: string; view: ProjectView }>();
+  const madeAt = (handle: string, name: string) =>
+    [...made.values()].find(
+      (one) => one.view.namespace.handle === handle && one.view.name === name.toLowerCase(),
+    );
   /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
@@ -532,6 +551,9 @@ export function createFakeKeel(
       const named = /^\/v1\/namespaces\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
       if (named !== null && request.method === "GET") {
         const [, handle = "", name = ""] = named.map((part) => decodeURIComponent(part));
+        const mine = madeAt(handle, name);
+        if (mine !== undefined)
+          return mine.by === reader?.id ? Response.json(mine.view satisfies ProjectView) : gone();
         if (!visible || handle !== project.namespace.handle || name !== project.name) return gone();
         return Response.json({
           ...project,
@@ -539,7 +561,95 @@ export function createFakeKeel(
         } satisfies ProjectView);
       }
       if (url.pathname === "/v1/projects" && request.method === "GET")
-        return Response.json({ items: visible ? [project] : [] });
+        return Response.json({
+          items: [
+            ...(visible ? [project] : []),
+            ...[...made.values()].filter((one) => one.by === reader?.id).map((one) => one.view),
+          ],
+        });
+
+      // Making a project: Keel's `createProject`, answered in its handler's order and its sentences
+      // (`apps/keel/src/adapters/driving/http/operator.ts`). A refused start makes no project.
+      if (url.pathname === "/v1/projects" && request.method === "POST") {
+        if (reader === null) return problem(401, "auth.required");
+        if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+        const body = fields(sent);
+        const key = request.headers.get("idempotency-key") ?? "";
+        const handle = body.get("namespace");
+        const name = body.get("name");
+        const source = fields(JSON.stringify(body.get("source") ?? null));
+        const kind = source.get("kind");
+        const address = source.get("url");
+        if (
+          key.length < 8 ||
+          typeof handle !== "string" ||
+          typeof name !== "string" ||
+          name === "" ||
+          (kind !== "empty" && kind !== "import") ||
+          (kind === "import" && typeof address !== "string")
+        )
+          return problem(400, "request.invalid");
+        // Whose the namespace is: the project's own, where any member may make one, or the reader's own handle.
+        const own = (await options.whose?.(handle))?.id === reader.id && reader.id !== undefined;
+        if (handle === project.namespace.handle ? !member : !own) {
+          const known =
+            handle === project.namespace.handle || (await options.whose?.(handle)) !== undefined;
+          return !known
+            ? gone()
+            : problem(
+                403,
+                "auth.forbidden",
+                [{ kind: "escalate", title: "Ask a member: this needs that role" }],
+                "Refused: role.",
+              );
+        }
+        if (typeof address === "string" && !address.startsWith("https://"))
+          return problem(
+            400,
+            "request.invalid",
+            [again("Correct the import's url, then create the project again")],
+            "The import's url must begin with https:// (not-https).",
+          );
+        const held = made.get(key);
+        if (held !== undefined)
+          return held.asked === sent
+            ? Response.json(held.view, { status: 201 })
+            : problem(
+                409,
+                "request.idempotency_conflict",
+                [again("Call again with a fresh Idempotency-Key")],
+                `Idempotency-Key ${key} was used for a different project.`,
+              );
+        if (
+          madeAt(handle, name) !== undefined ||
+          (handle === project.namespace.handle && name.toLowerCase() === project.name)
+        )
+          return problem(
+            409,
+            "project.name_taken",
+            [again("Choose another name")],
+            `The org already has a project named "${name.toLowerCase()}", in some case.`,
+          );
+        // One public repository answers here. Any other address is to Keel as a private one is: nothing there.
+        if (typeof address === "string" && address !== PUBLIC_REPOSITORY)
+          return problem(
+            404,
+            "project.import_refused",
+            [again("Check the URL names a public repository, then create the project again")],
+            "No public repository answers at that URL. A private one reads the same. Nothing was imported, and no project was made (not-found).",
+          );
+        const view: ProjectView = {
+          id: `prj_${crypto.randomUUID().replaceAll("-", "").slice(0, 26).toUpperCase()}`,
+          namespace:
+            handle === project.namespace.handle ? project.namespace : { handle, kind: "user" },
+          name: name.toLowerCase(),
+          visibility: "private",
+          createdAt: new Date(now()).toISOString(),
+          viewer: { role: reader.role ?? "owner" },
+        };
+        made.set(key, { asked: sent, by: reader.id ?? "", view });
+        return Response.json(view, { status: 201 });
+      }
 
       // A project's repository is read by whoever the project is shown to.
       const repoRead = /^\/v1\/projects\/([^/]+)\/repo\/(tree|blob|commits)(?:\/([^/]+))?$/.exec(
@@ -590,6 +700,19 @@ export function createFakeKeel(
         // A log is one project's. Asked for none, someone signed in is read every project Keel may read them,
         // and a visitor is asked for a session: the spec's "without a token and without `project`, 401".
         if (asked === null && reader === null) return problem(401, "auth.required");
+        const mine = [...made.values()].find((one) => one.view.id === asked);
+        if (mine !== undefined && mine.by === reader?.id) {
+          // Nothing has been written in it yet. A waiting read is held a moment, as Keel holds one.
+          if (url.searchParams.has("wait"))
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, 1000);
+            });
+          const at = url.searchParams.get("cursor") ?? "0";
+          return Response.json({
+            items: [],
+            nextCursor: at === "end" ? "0" : at,
+          } satisfies EventPage);
+        }
         if (asked !== null && (asked !== project.id || !visible)) return gone();
         const cursor = url.searchParams.get("cursor") ?? "0";
         // A cursor is a place an earlier page gave, or Keel's word for the head. Anything else is refused.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: new.refused
+# why: the stand-in for Keel lets someone who is no member of a namespace make a project in it
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index a36474ad..d514a022 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -591,7 +591,7 @@ export function createFakeKeel(
+           return problem(400, "request.invalid");
+         // Whose the namespace is: the project's own, where any member may make one, or the reader's own handle.
+         const own = (await options.whose?.(handle))?.id === reader.id && reader.id !== undefined;
+-        if (handle === project.namespace.handle ? !member : !own) {
++        if (handle !== project.namespace.handle && !own) {
+           const known =
+             handle === project.namespace.handle || (await options.whose?.(handle)) !== undefined;
+           return !known
