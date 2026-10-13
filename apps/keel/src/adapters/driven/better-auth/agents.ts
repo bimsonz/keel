@@ -1,8 +1,21 @@
-import { type ClientDiscovery, oauthProvider } from "@better-auth/oauth-provider";
-import { type Agent, GrantableScope } from "@keeltown/core/domain/identity";
+import {
+  type ClientDiscovery,
+  type OAuthClaimExtensionInput,
+  oauthProvider,
+} from "@better-auth/oauth-provider";
+import {
+  type Agent,
+  GrantableScope,
+  KeyThumbprint,
+  runClaims,
+  type RunRefusal,
+} from "@keeltown/core/domain/identity";
 import { AgentId } from "@keeltown/core/kernel";
 import type { BetterAuthPlugin } from "better-auth";
-import { Schema } from "effect";
+import { APIError } from "better-auth/api";
+import { deriveDpopJkt } from "better-auth/oauth2";
+import { Result, Schema } from "effect";
+import { decodeProtectedHeader } from "jose";
 
 /**
  * Keel as an authorization server for agents, on Better Auth's
@@ -20,6 +33,37 @@ export interface AgentAccess {
 
 /** Where an agent asks for a token, under Better Auth's base path. */
 export const TOKEN_PATH = "/oauth2/token";
+
+/**
+ * The provider's and the jwt plugin's routes Keel does not serve. An agent
+ * needs the token endpoint and the published key; a person does not sign in
+ * through the provider yet, so every route of that flow, every client-management
+ * route and the route that turns a session into a token are closed.
+ */
+export const CLOSED_PATHS = [
+  "/token",
+  "/oauth2/authorize",
+  "/oauth2/register",
+  "/oauth2/consent",
+  "/oauth2/continue",
+  "/oauth2/userinfo",
+  "/oauth2/introspect",
+  "/oauth2/revoke",
+  "/oauth2/end-session",
+  "/oauth2/end-session/confirm",
+  "/oauth2/create-client",
+  "/oauth2/get-client",
+  "/oauth2/get-clients",
+  "/oauth2/public-client",
+  "/oauth2/public-client-prelogin",
+  "/oauth2/update-client",
+  "/oauth2/delete-client",
+  "/oauth2/client/rotate-secret",
+  "/oauth2/get-consent",
+  "/oauth2/get-consents",
+  "/oauth2/update-consent",
+  "/oauth2/delete-consent",
+] as const;
 
 /** The name the provider records as where a client came from. */
 export const AGENT_DISCOVERY = "keel-agents";
@@ -68,6 +112,88 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
   };
 }
 
+/** A refusal in OAuth's own shape (RFC 6749 §5.2), which the provider answers as it stands. */
+const refuse = (error: string, description: string) =>
+  new APIError("BAD_REQUEST", { error, error_description: description });
+
+function refusal(failure: RunRefusal): APIError {
+  switch (failure._tag) {
+    case "TargetRefused":
+      return refuse("invalid_target", "`project` must be a project's id.");
+    case "RunLabelRefused":
+      return refuse(
+        "invalid_request",
+        "`run` must be one word of lower-case letters and digits joined by '-', '_' or '.', at most 64 characters.",
+      );
+    case "RunKeyRefused":
+      return refuse(
+        "invalid_dpop_proof",
+        "A token is bound to a key made for the run, never to the key the agent signed up with.",
+      );
+    case "AgentNotAdmitted":
+      return refuse("invalid_client", "This agent may not act.");
+    default: {
+      const unmapped: never = failure;
+      return unmapped;
+    }
+  }
+}
+
+/** One of the token request's form fields: absent, or its text. Anything else is no value at all. */
+function field(body: unknown, name: string): string | undefined {
+  if (typeof body !== "object" || body === null || !(name in body)) return undefined;
+  const value: unknown = Object.getOwnPropertyDescriptor(body, name)?.value;
+  return typeof value === "string" ? value : "";
+}
+
+const asThumbprint = Schema.decodeUnknownOption(KeyThumbprint);
+
+/** The key that made the request's proof. The provider has verified the proof before it asks for claims. */
+async function proofKey(proof: string): Promise<KeyThumbprint> {
+  const unproven = refuse("invalid_dpop_proof", "The proof names no key.");
+  let jwk: ReturnType<typeof decodeProtectedHeader>["jwk"];
+  try {
+    ({ jwk } = decodeProtectedHeader(proof));
+  } catch {
+    throw unproven;
+  }
+  if (jwk === undefined) throw unproven;
+  const thumbprint = asThumbprint(await deriveDpopJkt(jwk));
+  if (thumbprint._tag === "None") throw unproven;
+  return thumbprint.value;
+}
+
+/**
+ * What Keel adds to an agent's token: the project and the run the request
+ * names, the agent's epoch and its handle. A request the rule refuses gets no
+ * token.
+ */
+export async function agentClaims(
+  agents: AgentAccess,
+  input: OAuthClaimExtensionInput,
+): Promise<Record<string, unknown>> {
+  const { clientId } = input.client;
+  if (input.client.clientDiscoveryId !== AGENT_DISCOVERY || !isAgentId(clientId)) return {};
+  const agent = await agents.find(clientId);
+  if (agent === undefined) throw refuse("invalid_client", "This agent is not known.");
+  const body: unknown = input.ctx.body;
+  const proof = input.ctx.headers?.get("dpop") ?? undefined;
+  const decided = runClaims(agent, {
+    project: field(body, "project"),
+    run: field(body, "run"),
+    runKey: proof === undefined ? undefined : await proofKey(proof),
+  });
+  if (Result.isFailure(decided)) throw refusal(decided.failure);
+  const { epoch, handle, prj, run } = decided.success;
+  return {
+    epoch,
+    ...(handle === undefined ? {} : { handle }),
+    ...(prj === undefined ? {} : { prj }),
+    ...(run === undefined ? {} : { run: run.id }),
+    ...(run?.label === undefined ? {} : { run_label: run.label }),
+  };
+}
+
 export interface AgentTokensConfig {
   /** `https://<KEEL_HOST>`: the resource an agent's token is for. */
   readonly origin: string;
@@ -84,6 +210,16 @@ export interface AgentTokensConfig {
  * one plugin that fails to assign takes every other plugin's typed API with it.
  */
 export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
+  // Better Auth is made for one request, so the agent is read once for all of it: the provider
+  // resolves a client more than once, and the claims are decided on the same record.
+  const read = new Map<AgentId, Promise<Agent | undefined>>();
+  const agents: AgentAccess = {
+    find: (agentId) => {
+      const known = read.get(agentId) ?? config.agents.find(agentId);
+      read.set(agentId, known);
+      return known;
+    },
+  };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above: the plugin is one, its declared type is what does not assign
   return oauthProvider({
     // No person signs in through the provider yet: these are where it would send one.
@@ -97,7 +233,12 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
     m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
     assertionMaxLifetime: ASSERTION_SECONDS,
     allowDynamicClientRegistration: false,
-    extensions: [{ clientDiscovery: agentDiscovery(config.agents) }],
+    extensions: [
+      {
+        clientDiscovery: agentDiscovery(agents),
+        claims: { accessToken: (input) => agentClaims(agents, input) },
+      },
+    ],
     // Keel serves the discovery documents at its origin's root itself.
     silenceWarnings: { oauthAuthServerConfig: true, openidConfig: true },
   }) as BetterAuthPlugin;

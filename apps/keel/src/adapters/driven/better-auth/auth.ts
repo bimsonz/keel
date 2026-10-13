@@ -8,7 +8,7 @@ import { jwt } from "better-auth/plugins/jwt";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
-import { type AgentAccess, agentTokens, TOKEN_PATH } from "./agents.ts";
+import { type AgentAccess, agentTokens, CLOSED_PATHS, TOKEN_PATH } from "./agents.ts";
 import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
@@ -277,7 +277,7 @@ export function authOptions(config: AuthConfig) {
     baseURL: origin,
     basePath: AUTH_BASE_PATH,
     trustedOrigins: [origin],
-    disabledPaths: [...DISABLED_PATHS],
+    disabledPaths: [...DISABLED_PATHS, ...CLOSED_PATHS],
     telemetry: { enabled: false },
     // A handle lost to another account in the same moment is NAME_TAKEN, as the read before it answers.
     onAPIError: {

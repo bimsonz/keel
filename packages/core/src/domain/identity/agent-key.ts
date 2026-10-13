@@ -52,13 +52,18 @@ export function agentIdOf(thumbprint: KeyThumbprint): AgentId {
   let bits = 0n;
   for (const character of thumbprint.slice(0, 22))
     bits = (bits << 6n) | BigInt(BASE64URL.indexOf(character));
-  bits >>= 4n;
+  return makeId("agt", idBody(bits >> 4n));
+}
+
+/** An id's body for 128 bits: 26 characters of the id alphabet. */
+export function idBody(bits: bigint): string {
+  let rest = bits;
   let body = "";
   for (let i = 0; i < 26; i += 1) {
-    body = CROCKFORD.charAt(Number(bits & 31n)) + body;
-    bits >>= 5n;
+    body = CROCKFORD.charAt(Number(rest & 31n)) + body;
+    rest >>= 5n;
   }
-  return makeId("agt", body);
+  return body;
 }
 
 /** How many characters of an agent's id its given handle carries: 78 bits of its key. */

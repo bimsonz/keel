@@ -8,4 +8,5 @@ export * from "./events.ts";
 export * from "./inbox.ts";
 export * from "./quota.ts";
 export * from "./revocation.ts";
+export * from "./run.ts";
 export * from "./tenancy.ts";

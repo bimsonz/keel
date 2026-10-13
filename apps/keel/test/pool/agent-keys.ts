@@ -95,6 +95,10 @@ export async function assertionBy(
     .sign(key.privateKey);
 }
 
+/** An address no other request in the run comes from (TEST-NET-3 and beyond, never routed). */
+export const freshAddress = (): string =>
+  `203.0.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}-${crypto.randomUUID().slice(0, 8)}`;
+
 /** An agent as signing up with `account` leaves it in the directory. */
 export async function seedKeyAgent(
   account: TestKey,
@@ -121,6 +125,8 @@ export interface TokenRequest {
   readonly proof?: string;
   /** The resource the token is for (RFC 8707): Keel's own when absent, none when null. */
   readonly resource?: string | null;
+  /** The address the request comes from; one of its own when absent. */
+  readonly from?: string;
 }
 
 /** Asks Keel's token endpoint for a token as `agentId`, the way an agent holding `account` does. */
@@ -138,6 +144,8 @@ export async function requestToken(
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
+      // Each request from an address of its own, so the per-address limit never decides a case that is not about it.
+      "cf-connecting-ip": request.from ?? freshAddress(),
       ...(proof === undefined ? {} : { dpop: proof }),
     },
     body: new URLSearchParams({

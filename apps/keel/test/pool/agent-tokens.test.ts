@@ -1,7 +1,18 @@
+import { runIdOf, RunLabel } from "@keeltown/core/domain/identity";
+import { sampleProjectId } from "@keeltown/testing";
+import { Schema } from "effect";
 import { decodeJwt, decodeProtectedHeader } from "jose";
 import { describe, expect, it } from "vitest";
-import { assertionBy, granted, ISSUER, newKey, requestToken, seedKeyAgent } from "./agent-keys.ts";
-import { BASE } from "./helpers.ts";
+import {
+  assertionBy,
+  freshAddress,
+  granted,
+  ISSUER,
+  newKey,
+  requestToken,
+  seedKeyAgent,
+} from "./agent-keys.ts";
+import { BASE, seedUser, uniqueHandle, worker } from "./helpers.ts";
 
 /** What a refused token request says, in OAuth's own shape. */
 const refusal = async (response: Response) => ({
@@ -48,6 +59,110 @@ describe("a token for an agent that holds only a key", () => {
     ).toEqual({ status: 400, error: "invalid_target" });
   });
 
+  it("[token.claims] the token names the project and the run the request asked for, with the agent's epoch and handle", async () => {
+    const account = await newKey();
+    const run = await newKey();
+    const agent = await seedKeyAgent(account, { revocationEpoch: 4 });
+    const lane = Schema.decodeUnknownSync(RunLabel)("run-c");
+    const labelled = decodeJwt(
+      (
+        await granted(
+          await requestToken(agent.id, account, {
+            runKey: run,
+            project: sampleProjectId,
+            run: lane,
+          }),
+        )
+      ).access_token,
+    );
+    expect(labelled).toMatchObject({
+      sub: agent.id,
+      prj: sampleProjectId,
+      run: runIdOf(agent.id, { label: lane }),
+      run_label: lane,
+      epoch: 4,
+      handle: agent.handle,
+    });
+    const unlabelled = decodeJwt(
+      (await granted(await requestToken(agent.id, account, { runKey: run }))).access_token,
+    );
+    expect(unlabelled).toMatchObject({
+      run: runIdOf(agent.id, { runKey: run.key.jkt }),
+      epoch: 4,
+      handle: agent.handle,
+    });
+    expect("prj" in unlabelled || "run_label" in unlabelled).toBe(false);
+    const bearer = decodeJwt((await granted(await requestToken(agent.id, account))).access_token);
+    expect("run" in bearer).toBe(false);
+    expect(bearer).toMatchObject({ epoch: 4, handle: agent.handle });
+  });
+
+  it("[token.target] a project that is no project id, and a run label that is no label, are refused in OAuth's own words", async () => {
+    const account = await newKey();
+    const run = await newKey();
+    const agent = await seedKeyAgent(account);
+    expect(
+      await refusal(await requestToken(agent.id, account, { runKey: run, project: "keel" })),
+    ).toEqual({ status: 400, error: "invalid_target" });
+    expect(
+      await refusal(await requestToken(agent.id, account, { runKey: run, run: "Run C" })),
+    ).toEqual({ status: 400, error: "invalid_request" });
+  });
+
+  it("[token.run-key-apart] a token is never bound to the key the agent signs up and asks with", async () => {
+    const account = await newKey();
+    const agent = await seedKeyAgent(account);
+    expect(await refusal(await requestToken(agent.id, account, { runKey: account }))).toEqual({
+      status: 400,
+      error: "invalid_dpop_proof",
+    });
+  });
+
+  it("[dpop.unbound] a request with no proof gets a plain 300-second bearer, bound to no key", async () => {
+    const account = await newKey();
+    const agent = await seedKeyAgent(account);
+    const token = await granted(await requestToken(agent.id, account));
+    expect(token.token_type).toBe("Bearer");
+    expect(token.expires_in).toBe(300);
+    const claims = decodeJwt(token.access_token);
+    expect(claims.sub).toBe(agent.id);
+    expect("cnf" in claims).toBe(false);
+  });
+
+  it("[token.assertion] a signed request is good once, for Keel alone, and for a minute at most", async () => {
+    const account = await newKey();
+    const run = await newKey();
+    const agent = await seedKeyAgent(account);
+    const once = await assertionBy(account, agent.id);
+    await granted(await requestToken(agent.id, account, { runKey: run, assertion: once }));
+    expect(
+      await refusal(await requestToken(agent.id, account, { runKey: run, assertion: once })),
+    ).toMatchObject({ error: "invalid_client" });
+    for (const audience of [BASE, "https://elsewhere.example/v1/auth", `${ISSUER}/jwks`])
+      expect(
+        await refusal(
+          await requestToken(agent.id, account, {
+            runKey: run,
+            assertion: await assertionBy(account, agent.id, { audience }),
+          }),
+        ),
+      ).toMatchObject({ error: "invalid_client" });
+    expect(
+      await refusal(
+        await requestToken(agent.id, account, {
+          runKey: run,
+          assertion: await assertionBy(account, agent.id, { lifetime: 120 }),
+        }),
+      ),
+    ).toMatchObject({ error: "invalid_client" });
+    await granted(
+      await requestToken(agent.id, account, {
+        runKey: run,
+        assertion: await assertionBy(account, agent.id, { lifetime: 60 }),
+      }),
+    );
+  });
+
   it("[token.key-only] only a key of that agent gets its token: another agent's key and an unknown agent are refused", async () => {
     const account = await newKey();
     const other = await newKey();
@@ -78,5 +193,74 @@ describe("a token for an agent that holds only a key", () => {
         await refusal(await requestToken(agent.id, account, { runKey: await newKey() })),
       ).toMatchObject({ error: "invalid_client" });
     }
+  });
+});
+
+/** Every route the provider and the jwt plugin define that Keel does not serve. */
+const CLOSED = [
+  "/token",
+  "/oauth2/authorize",
+  "/oauth2/register",
+  "/oauth2/consent",
+  "/oauth2/continue",
+  "/oauth2/userinfo",
+  "/oauth2/introspect",
+  "/oauth2/revoke",
+  "/oauth2/end-session",
+  "/oauth2/end-session/confirm",
+  "/oauth2/create-client",
+  "/oauth2/get-client",
+  "/oauth2/get-clients",
+  "/oauth2/public-client",
+  "/oauth2/public-client-prelogin",
+  "/oauth2/update-client",
+  "/oauth2/delete-client",
+  "/oauth2/client/rotate-secret",
+  "/oauth2/get-consent",
+  "/oauth2/get-consents",
+  "/oauth2/update-consent",
+  "/oauth2/delete-consent",
+  "/admin/oauth2/create-client",
+  "/admin/oauth2/update-client",
+  "/admin/oauth2/resources",
+] as const;
+
+describe("the provider's routes at /v1/auth", () => {
+  it("[oauth.surface] Keel serves the token endpoint and the published key, and no other route of the provider's", async () => {
+    const answers: [string, string, number][] = [];
+    for (const path of CLOSED)
+      for (const method of ["GET", "POST"] as const) {
+        const response = await worker(`${BASE}/v1/auth${path}`, {
+          method,
+          headers: {
+            "cf-connecting-ip": freshAddress(),
+            ...(method === "POST" ? { "content-type": "application/json", origin: BASE } : {}),
+          },
+          ...(method === "POST" ? { body: "{}" } : {}),
+        });
+        if (response.status !== 404) answers.push([method, path, response.status]);
+      }
+    expect(answers).toEqual([]);
+    const jwks = await worker(`${BASE}/v1/auth/jwks`);
+    expect(jwks.status).toBe(200);
+    const unsigned = await worker(`${BASE}/v1/auth/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "cf-connecting-ip": freshAddress(),
+      },
+      body: new URLSearchParams({ grant_type: "client_credentials" }),
+    });
+    expect(unsigned.status).not.toBe(404);
+    expect(unsigned.status).toBeLessThan(500);
+  });
+
+  it("[oauth.surface] a person's session is never turned into a signed token", async () => {
+    const user = await seedUser(uniqueHandle("session"));
+    const session = await worker(`${BASE}/v1/auth/get-session`, {
+      headers: { authorization: `Bearer ${user.token}` },
+    });
+    expect(session.status).toBe(200);
+    expect(session.headers.get("set-auth-jwt")).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import { Brand, Schema } from "effect";
 export const ID_PREFIXES = {
   agent: "agt",
   session: "ses",
+  run: "run",
   change: "chg",
   workspace: "wsp",
   sketch: "sk",
@@ -47,6 +48,9 @@ export const AgentId = prefixed("agt").pipe(Schema.brand("AgentId"));
 export type AgentId = typeof AgentId.Type;
 export const SessionId = prefixed("ses").pipe(Schema.brand("SessionId"));
 export type SessionId = typeof SessionId.Type;
+/** One stream of an agent's work. An agent may have any number at once. */
+export const RunId = prefixed("run").pipe(Schema.brand("RunId"));
+export type RunId = typeof RunId.Type;
 export const ChangeId = prefixed("chg").pipe(Schema.brand("ChangeId"));
 export type ChangeId = typeof ChangeId.Type;
 export const WorkspaceId = prefixed("wsp").pipe(Schema.brand("WorkspaceId"));
@@ -108,6 +112,7 @@ export type CredentialId = typeof CredentialId.Type;
 export interface IdOf {
   agt: AgentId;
   ses: SessionId;
+  run: RunId;
   chg: ChangeId;
   wsp: WorkspaceId;
   sk: SketchId;
