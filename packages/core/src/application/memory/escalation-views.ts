@@ -16,8 +16,10 @@ import {
   type EscalationListRead,
   type EscalationReader,
   EscalationRecord,
+  type LabelledEscalation,
   type Stored,
 } from "../ports/index.ts";
+import { labelGiven } from "./feed.ts";
 
 /**
  * The Projector's read model of the questions put to people, beside its
@@ -65,13 +67,29 @@ const ESCALATION_TYPES: ReadonlySet<string> = new Set([
 /** Whether the escalation view folds this event at all. */
 export const foldsEscalation = (event: EventEnvelope): boolean => ESCALATION_TYPES.has(event.type);
 
-/** An escalation as the Projector has folded it; undefined for one it has not heard raised. */
+/** The record as the fold keeps it: the label is the feed's, joined when it is read. */
+function folded(store: Store, escalationId: EscalationId): EscalationRecord | undefined {
+  const stored = store.get(ESCALATION_VIEWS.escalation, escalationId);
+  return stored === undefined ? undefined : decodeRecord(stored);
+}
+
+/**
+ * The record with the label the feed gave its raising. The Projector records
+ * an arrival on the feed before it folds it, so only a store the feed never
+ * numbered answers `E-0`.
+ */
+const labelled = (store: Store, record: EscalationRecord): LabelledEscalation => ({
+  ...record,
+  label: labelGiven(store, record.project, "E-", record.escalation.id) ?? "E-0",
+});
+
+/** An escalation as the Projector has folded it, with its label; undefined for one it has not heard raised. */
 export function escalationView(
   store: Store,
   escalationId: EscalationId,
-): EscalationRecord | undefined {
-  const stored = store.get(ESCALATION_VIEWS.escalation, escalationId);
-  return stored === undefined ? undefined : decodeRecord(stored);
+): LabelledEscalation | undefined {
+  const record = folded(store, escalationId);
+  return record === undefined ? undefined : labelled(store, record);
 }
 
 /** What a decision chose, once the Projector has heard it recorded. */
@@ -99,7 +117,7 @@ export function foldEscalationViews(store: Store, event: EventEnvelope): string 
     if (Option.isNone(recorded)) return `${event.eventId}: an undecodable DecisionRecorded`;
     const { decisionId, escalationId, option, summary } = recorded.value;
     store.put(ESCALATION_VIEWS.decision, decisionId, asStored({ option, summary }));
-    const known = escalationView(store, escalationId);
+    const known = folded(store, escalationId);
     if (known === undefined) return `${decisionId} was recorded for ${escalationId}, never heard`;
     store.put(
       ESCALATION_VIEWS.escalation,
@@ -111,7 +129,7 @@ export function foldEscalationViews(store: Store, event: EventEnvelope): string 
   const decoded = decodeEscalationEvent(event.payload);
   if (Option.isNone(decoded)) return `${event.eventId}: an undecodable ${event.type}`;
   const payload = decoded.value;
-  const before = escalationView(store, payload.escalationId);
+  const before = folded(store, payload.escalationId);
   let escalation: EscalationRecord["escalation"];
   try {
     escalation = evolveEscalation(before?.escalation, { at: event.at, payload });
@@ -187,7 +205,7 @@ export function listedTo(
 export function listEscalations(store: Store, read: EscalationListRead): EscalationListPage {
   const limit = Math.min(Math.max(read.limit ?? ESCALATION_PAGE, 1), ESCALATION_PAGE_MAX);
   const from = read.cursor === undefined ? headOf(store) : Number(read.cursor) - 1;
-  const items: EscalationRecord[] = [];
+  const items: LabelledEscalation[] = [];
   let at = Number.isFinite(from) ? from : 0;
   for (; at >= 1 && items.length < limit; at -= 1) {
     const id = store.get(ESCALATION_VIEWS.order, position(at));
@@ -195,7 +213,7 @@ export function listEscalations(store: Store, read: EscalationListRead): Escalat
     if (stored === undefined) continue;
     const record = decodeRecord(stored);
     if (read.state !== undefined && record.escalation.state !== read.state) continue;
-    if (listedTo(record, read.reader, read.now)) items.push(record);
+    if (listedTo(record, read.reader, read.now)) items.push(labelled(store, record));
   }
   // `at` is one below the last position read; more may be listed beneath it.
   return at >= 1 ? { items, nextCursor: position(at + 1) } : { items };

@@ -30,6 +30,16 @@ export const EscalationRecord = Schema.Struct({
 });
 export type EscalationRecord = typeof EscalationRecord.Type;
 
+/**
+ * An escalation as the Projector reads it: the record, with the label Keel
+ * gave its question when it was raised (`E-n`, counted per project).
+ */
+export const LabelledEscalation = Schema.Struct({
+  ...EscalationRecord.fields,
+  label: Schema.String,
+});
+export type LabelledEscalation = typeof LabelledEscalation.Type;
+
 /** What a ruling's decision chose: the option's id, and its label as the decision's summary. */
 export const DecisionChosen = Schema.Struct({ option: Schema.String, summary: Schema.String });
 export type DecisionChosen = typeof DecisionChosen.Type;
@@ -55,7 +65,7 @@ export interface EscalationListRead {
 
 export interface EscalationListPage {
   /** Newest first. */
-  readonly items: readonly EscalationRecord[];
+  readonly items: readonly LabelledEscalation[];
   readonly nextCursor?: string | undefined;
 }
 
@@ -85,12 +95,12 @@ export class Escalations extends Context.Service<
     readonly list: (read: EscalationListRead) => Effect.Effect<EscalationListPage>;
     readonly get: (
       escalationId: EscalationId,
-    ) => Effect.Effect<EscalationRecord, EscalationNotFound>;
+    ) => Effect.Effect<LabelledEscalation, EscalationNotFound>;
     /**
      * A person's answer: RulingGiven and its DecisionRecorded, together. Once
      * per escalation; the same key again answers the escalation as it stands,
      * and the same key with another body is an IdempotencyConflict.
      */
-    readonly rule: (command: RulingCommand) => Effect.Effect<EscalationRecord, RulingRefusal>;
+    readonly rule: (command: RulingCommand) => Effect.Effect<LabelledEscalation, RulingRefusal>;
   }
 >()("keel/Escalations") {}

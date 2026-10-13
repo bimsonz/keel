@@ -45,12 +45,18 @@ import {
   ConflictMoves,
   type ConflictRecord,
   type ConflictView,
+  type EscalationListRead,
+  type EscalationReader,
+  Escalations,
   EventFeed,
   type EventFeedEntry,
   type EventFeedPage,
   Inbox,
+  type LabelledEscalation,
   ProbeStore,
   ProjectViews,
+  type RulingCommand,
+  type RulingRefusal,
   type SubmissionStatus,
   type ViewSnapshot,
 } from "../ports/index.ts";
@@ -313,6 +319,73 @@ export const readConflict: (
   conflictId: ConflictId,
 ) => Effect.Effect<ConflictRecord, ConflictNotFound, ProjectViews> = (scope, conflictId) =>
   ProjectViews.use((views) => views.conflict(scope.project, conflictId));
+
+/** Where a project is, as a reader is shown it: its namespace's handle and its own name. */
+export interface ProjectRef {
+  readonly id: ProjectId;
+  readonly namespace: string;
+  readonly name: string;
+}
+
+/** A question put to a person, with the place of the project it is about. */
+export interface PlacedEscalation {
+  readonly record: LabelledEscalation;
+  readonly project: ProjectRef;
+}
+
+export interface PlacedEscalationPage {
+  /** Newest first. */
+  readonly items: readonly PlacedEscalation[];
+  readonly nextCursor?: string | undefined;
+}
+
+/**
+ * A reader's escalations, newest first, each with its project's place: an
+ * agent's are its project's, a person's are their inbox (`listedTo`).
+ * `placeOf` is the doorway's: it answers a project's place where the policy
+ * lets this reader see what the project's members see, and nothing otherwise.
+ * An escalation it answers nothing for is left out, so a page may hold fewer
+ * than its limit while `nextCursor` says more follow.
+ */
+export const readEscalationList = <R>(
+  reader: EscalationReader,
+  read: Omit<EscalationListRead, "reader" | "now">,
+  placeOf: (project: ProjectId) => Effect.Effect<ProjectRef | undefined, never, R>,
+): Effect.Effect<PlacedEscalationPage, never, Escalations | Clock | R> =>
+  Effect.gen(function* () {
+    const now = yield* (yield* Clock).now;
+    const page = yield* Escalations.use((escalations) =>
+      escalations.list({ ...read, reader, now }),
+    );
+    const placed = yield* Effect.forEach(page.items, (record) =>
+      Effect.map(placeOf(record.project), (project) =>
+        project === undefined ? [] : [{ record, project }],
+      ),
+    );
+    return {
+      items: placed.flat(),
+      ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
+    };
+  });
+
+/**
+ * A person's ruling on an escalation, answered with the escalation as it then
+ * stands and its project's place. The doorway decided on that project before
+ * this ran, so a place that is gone by now is a defect.
+ */
+export const ruleOnEscalation = <R>(
+  command: RulingCommand,
+  placeOf: (project: ProjectId) => Effect.Effect<ProjectRef | undefined, never, R>,
+): Effect.Effect<PlacedEscalation, RulingRefusal, Escalations | R> =>
+  Escalations.use((escalations) => escalations.rule(command)).pipe(
+    Effect.flatMap((record) =>
+      Effect.flatMap(placeOf(record.project), (project) =>
+        project === undefined
+          ? Effect.die(new Error(`${record.escalation.id} was ruled on in a project with no place`))
+          : Effect.succeed({ record, project }),
+      ),
+    ),
+  );
 
 /** A probe's source: the files of the bundle its last draft was kept under, by path. */
 export interface ProbeSource {

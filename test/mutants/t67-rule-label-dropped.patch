@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t t67.label
+# kills: t67.label
+# why: a ruling's answer is the namespace object's record as it came, which knows no label, so the ruled question comes back without its E-n
+diff --git a/apps/keel/src/adapters/driven/do-rpc/escalations.ts b/apps/keel/src/adapters/driven/do-rpc/escalations.ts
+index 24bc8905..fce3ed23 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/escalations.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/escalations.ts
+@@ -47,7 +47,7 @@ export function EscalationsRpc(
+             namespace(namespaceAddress(known.namespace)).rule(
+               Schema.encodeSync(RuleCommand)(command),
+             ),
+-          ).pipe(Effect.map((ruled) => ({ ...ruled, label: known.label }))),
++          ),
+         ),
+     }),
+   );

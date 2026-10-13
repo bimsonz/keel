@@ -11,8 +11,11 @@ import {
   readChangeList,
   readConflict,
   readConflictList,
+  readEscalationList,
   readProbeSource,
   resolveMove,
+  ruleOnEscalation,
+  type ProjectRef,
   readEvents,
   readInbox,
   readSnapshot,
@@ -40,6 +43,7 @@ import {
 import {
   type Actor,
   type Audience,
+  authorize,
   GrantableScope,
   type ProjectResource,
 } from "@keeltown/core/domain/identity";
@@ -49,7 +53,7 @@ import {
   ProjectId as ProjectIdSchema,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
+import { type EscalationReader, Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import {
@@ -77,6 +81,13 @@ import {
   standingInput,
   standingOk,
 } from "./operator.ts";
+import {
+  escalationListInput,
+  escalationsOk,
+  rulingError,
+  rulingInput,
+  rulingOk,
+} from "./escalations.ts";
 import { eventsInput, eventsOk } from "./events.ts";
 import {
   changeListInput,
@@ -218,6 +229,60 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
       ...(role === undefined ? {} : { viewer: { role } }),
     } satisfies ProjectViewBody;
   });
+
+/** Where a project is, as a reader is shown it: its namespace's handle and its own name. Nothing for a project with no place. */
+const placeOf = (project: ProjectId) =>
+  Effect.gen(function* () {
+    const place = yield* ProjectOrgs.use((places) => places.byId(project));
+    if (Option.isNone(place)) return undefined;
+    const namespace = yield* Orgs.use((orgs) => orgs.byId(place.value.org));
+    return {
+      id: project,
+      namespace: Option.match(namespace, {
+        onNone: () => place.value.org,
+        onSome: (record) => record.name,
+      }),
+      name: place.value.name,
+    } satisfies ProjectRef;
+  });
+
+/**
+ * A project's place for one item of a person's or an agent's list of
+ * escalations: answered only where the policy lets the caller read what the
+ * project's members see (the list's own rule), and decided once a project a
+ * request.
+ */
+const escalationPlaces = (caller: Caller) => {
+  const seen = new Map<ProjectId, ProjectRef | undefined>();
+  return (project: ProjectId) =>
+    seen.has(project)
+      ? Effect.succeed(seen.get(project))
+      : Effect.gen(function* () {
+          const resource = yield* projectResource(project);
+          const place = Result.isSuccess(
+            authorize(caller.principal, "Operator_listEscalations", resource),
+          )
+            ? yield* placeOf(project)
+            : undefined;
+          seen.set(project, place);
+          return place;
+        });
+};
+
+/**
+ * Whose list of escalations a caller reads: an agent, its own project's; a
+ * person, their inbox, with the namespaces they maintain or own.
+ */
+const escalationReader = (caller: Caller): EscalationReader =>
+  caller.principal._tag === "User"
+    ? {
+        _tag: "User",
+        userId: caller.principal.userId,
+        maintains: caller.principal.memberships
+          .filter((membership) => membership.role !== "member")
+          .map((membership) => membership.org),
+      }
+    : { _tag: "Project", project: projectOf(caller).projectId };
 
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
@@ -756,8 +821,34 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
           standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
         Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
           standing(caller, "Operator_revokeAgent", input, revokeAgent),
-        Operator_listEscalations: notYet,
-        Operator_giveRuling: notYet,
+        Operator_listEscalations: (caller: Caller, input: Input<"Operator_listEscalations">) => {
+          const decoded = escalationListInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            readEscalationList(
+              escalationReader(caller),
+              decoded.success,
+              escalationPlaces(caller),
+            ).pipe(Effect.map(escalationsOk)),
+          );
+        },
+        Operator_giveRuling: (caller: Caller, input: Input<"Operator_giveRuling">) => {
+          const decoded = rulingInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            actorOf(caller).pipe(
+              Effect.flatMap((actor) =>
+                ruleOnEscalation({ ...decoded.success, by: actor.userId }, placeOf),
+              ),
+              Effect.match({
+                onSuccess: rulingOk,
+                onFailure: (error) => rulingError(caller, error),
+              }),
+            ),
+          );
+        },
         SignIn_methods: async () => ({ status: 200 as const, body: { ...signIn } }),
       } satisfies Operations<Caller>,
       RESOLVERS,

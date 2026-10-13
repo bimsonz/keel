@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t t67.label
+# kills: t67.label
+# why: an escalation's label is read under the conflicts' prefix, so every question is served as E-0 and a row cannot link to its page
+diff --git a/packages/core/src/application/memory/escalation-views.ts b/packages/core/src/application/memory/escalation-views.ts
+index 84767e83..ae35900f 100644
+--- a/packages/core/src/application/memory/escalation-views.ts
++++ b/packages/core/src/application/memory/escalation-views.ts
+@@ -80,7 +80,7 @@ function folded(store: Store, escalationId: EscalationId): EscalationRecord | un
+  */
+ const labelled = (store: Store, record: EscalationRecord): LabelledEscalation => ({
+   ...record,
+-  label: labelGiven(store, record.project, "E-", record.escalation.id) ?? "E-0",
++  label: labelGiven(store, record.project, "C-", record.escalation.id) ?? "E-0",
+ });
+ 
+ /** An escalation as the Projector has folded it, with its label; undefined for one it has not heard raised. */

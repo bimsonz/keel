@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations-inbox.test.ts -t t67.ruling
+# kills: t67.ruling
+# why: a ruling is decided on the project without the user asked first, so the person the question was put to cannot answer it unless they maintain the namespace
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 935d761f..ed442ee7 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -147,7 +147,7 @@ const escalationProject = (id: unknown) =>
+     onNone: () => Effect.succeed(MISSING),
+     onSome: (escalationId) =>
+       Escalations.use((escalations) => escalations.get(escalationId)).pipe(
+-        Effect.flatMap((record) => projectResource(record.project, record.sponsor)),
++        Effect.flatMap((record) => projectResource(record.project)),
+         Effect.catchTag("EscalationNotFound", () => Effect.succeed(MISSING)),
+       ),
+   });

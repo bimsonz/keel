@@ -47,7 +47,7 @@ export function EscalationsRpc(
             namespace(namespaceAddress(known.namespace)).rule(
               Schema.encodeSync(RuleCommand)(command),
             ),
-          ),
+          ).pipe(Effect.map((ruled) => ({ ...ruled, label: known.label }))),
         ),
     }),
   );

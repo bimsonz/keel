@@ -205,8 +205,14 @@ export const EscalationsRead = Schema.Struct({
   limit: Schema.optional(Schema.Int),
 });
 
+/** An escalation as the Projector reads it: the record, with its `E-n` (the port's `LabelledEscalation`). */
+export const LabelledEscalation = Schema.Struct({
+  ...EscalationRecord.fields,
+  label: Schema.String,
+});
+
 export const EscalationPage = Schema.Struct({
-  items: Schema.Array(EscalationRecord),
+  items: Schema.Array(LabelledEscalation),
   nextCursor: Schema.optional(Schema.String),
 });
 
@@ -221,7 +227,7 @@ export const ProjectorCodecs = {
   conflict: exitCodec(ConflictRecord, ConflictNotFound),
   probeConflict: exitCodec(ConflictRecord, ProbeNotFound),
   escalations: exitCodec(EscalationPage, Schema.Never),
-  escalation: exitCodec(EscalationRecord, EscalationNotFound),
+  escalation: exitCodec(LabelledEscalation, EscalationNotFound),
 };
 
 /**

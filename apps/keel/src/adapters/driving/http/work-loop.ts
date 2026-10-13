@@ -670,7 +670,12 @@ function leaseStale(caller: Caller, error: LeaseStale) {
   };
 }
 
-function reusedKey(caller: Caller, error: IdempotencyConflict, operationId: string, verb: string) {
+export function reusedKey(
+  caller: { readonly requestId: string },
+  error: IdempotencyConflict,
+  operationId: string,
+  verb: string,
+) {
   return {
     status: 409 as const,
     body: problem(409, "request.idempotency_conflict", caller.requestId, {

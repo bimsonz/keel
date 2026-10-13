@@ -99,7 +99,6 @@ const STUBBED = [
   "Views_getCandidate",
   "Views_listLanes",
   "Views_getTrunk",
-  "Operator_listEscalations",
 ];
 
 /**
@@ -224,18 +223,6 @@ describe("stubbed operations", () => {
         ),
       ),
     );
-  });
-
-  it("Operator_giveRuling is a stub no caller reaches yet: its escalation resolves to the agent's own project, which only a user may rule on", async () => {
-    const [agent, owner] = await answersTo("Operator_giveRuling");
-    expect(agent).toEqual({
-      status: 403,
-      body: expect.objectContaining({ code: "auth.forbidden", detail: "Refused: users-only." }),
-    });
-    expect(owner).toEqual({
-      status: 404,
-      body: expect.objectContaining({ code: "resource.not_found" }),
-    });
   });
 });
 

@@ -165,9 +165,52 @@ export function describeEscalationsContract(
           const read = yield* escalations.get(request.escalationId);
           const missing = yield* Effect.flip(escalations.get(makeId("esc", ulid())));
 
-          expect(read).toEqual(raised);
+          // The read is what was raised, with the label the feed gave it: its project's first question.
+          expect(read).toEqual({ ...raised, label: "E-1" });
           expect(read).toMatchObject({ namespace, project: request.project, sponsor });
           expect(missing._tag).toBe("EscalationNotFound");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[escalations.contract] [t67.label] each question carries Keel's label, counted in its own project in the order raised, and the read by id, the list and the ruling's answer all say the same",
+      () => {
+        const harness = makeHarness();
+        const namespace = makeId("org", ulid());
+        const by = makeId("usr", ulid());
+        const project = makeId("prj", ulid());
+        const first = { ...raiseIn(namespace, by), project };
+        const elsewhere = raiseIn(namespace, by);
+        const second = { ...raiseIn(namespace, by), project };
+        return Effect.gen(function* () {
+          const gate = yield* HumanGate;
+          for (const request of [first, elsewhere, second]) {
+            yield* gate.raise(request);
+            // One at a time, so each project's count follows the order they were raised in.
+            yield* harness.settled(namespace);
+          }
+          const escalations = yield* Escalations;
+          const read = yield* Effect.forEach([first, elsewhere, second], (request) =>
+            escalations.get(request.escalationId),
+          );
+          const listed = yield* escalations.list({
+            reader: { _tag: "Project", project },
+            now: Instant(0),
+          });
+          const ruled = yield* escalations.rule({
+            escalationId: second.escalationId,
+            option: PREMISE_HOLDS,
+            by,
+            idempotencyKey: "rule-label",
+          });
+
+          expect(read.map((record) => record.label)).toEqual(["E-1", "E-1", "E-2"]);
+          expect(listed.items.map((record) => [record.escalation.id, record.label])).toEqual([
+            [second.escalationId, "E-2"],
+            [first.escalationId, "E-1"],
+          ]);
+          expect([ruled.escalation.id, ruled.label]).toEqual([second.escalationId, "E-2"]);
         }).pipe(Effect.provide(harness.layer));
       },
     );

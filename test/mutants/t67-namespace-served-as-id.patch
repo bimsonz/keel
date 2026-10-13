@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations-inbox.test.ts -t t67.escalation-rows
+# kills: t67.escalation-rows
+# why: a project's place names its namespace by id, not by its handle, so the console cannot link to the project
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index a182ac69..3efad121 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -240,7 +240,7 @@ const placeOf = (project: ProjectId) =>
+       id: project,
+       namespace: Option.match(namespace, {
+         onNone: () => place.value.org,
+-        onSome: (record) => record.name,
++        onSome: (record) => record.org,
+       }),
+       name: place.value.name,
+     } satisfies ProjectRef;

@@ -3065,6 +3065,7 @@
       "get": {
         "operationId": "Operator_listEscalations",
         "summary": "List escalations",
+        "description": "The questions Keel has put to people, newest first. An agent reads its own project's. A person\nreads their inbox across every project: a question they are the first asked, at once, and a\nquestion of a namespace they maintain once thirty minutes have passed without an answer. A page\nmay hold fewer than `limit` while `nextCursor` says more follow.",
         "parameters": [
           {
             "name": "state",
@@ -3196,6 +3197,7 @@
       "post": {
         "operationId": "Operator_giveRuling",
         "summary": "Rule on an escalation",
+        "description": "Answer a question: the person first asked, or a maintainer of its namespace, names one of its\noptions. The ruling records a decision and resolves the conflict the question was about. An\noption the question does not offer is a 400 `escalation.option_unknown` whose next actions rule\neach valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.",
         "parameters": [
           {
             "name": "escalationId",
@@ -10192,6 +10194,8 @@
         "type": "object",
         "required": [
           "id",
+          "label",
+          "project",
           "question",
           "options",
           "about",
@@ -10205,6 +10209,18 @@
         "properties": {
           "id": {
             "$ref": "#/components/schemas/EscalationId"
+          },
+          "label": {
+            "type": "string",
+            "description": "Keel's short name for the question, counted per project: `E-1` is the project's first."
+          },
+          "project": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectRef"
+              }
+            ],
+            "description": "The project whose conflict the question is about."
           },
           "question": {
             "type": "string"
@@ -14818,6 +14834,9 @@
           "change.not_found",
           "conflict.not_found",
           "conflict.move_refused",
+          "escalation.not_found",
+          "escalation.state_refused",
+          "escalation.option_unknown",
           "probe.not_found",
           "change.lease_stale",
           "change.lease_not_lapsed",
@@ -14994,6 +15013,31 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ProjectRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "namespace",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "The handle of the namespace the project belongs to."
+          },
+          "name": {
+            "type": "string",
+            "description": "The project's name, unique in its namespace."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Where a project is: enough to name it and to link to it."
       },
       "ProjectSettingChange": {
         "type": "object",

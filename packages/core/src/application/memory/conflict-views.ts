@@ -41,7 +41,7 @@ import {
   type WorldCheckView,
 } from "../ports/index.ts";
 import { decisionChosen, escalationView } from "./escalation-views.ts";
-import { FEED } from "./feed.ts";
+import { labelGiven } from "./feed.ts";
 
 /**
  * The Projector's read model of a project's conflicts, beside its change
@@ -311,9 +311,7 @@ function labelOf(
   prefix: string,
   id: string | undefined,
 ): string | undefined {
-  if (id === undefined) return undefined;
-  const label = store.get(FEED.given, `${project}/${prefix}/${id}`);
-  return typeof label === "string" ? label : undefined;
+  return id === undefined ? undefined : labelGiven(store, project, prefix, id);
 }
 
 function recordOf(store: Store, project: ProjectId, folded: ConflictFolded): ConflictRecord {

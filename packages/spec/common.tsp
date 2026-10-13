@@ -163,6 +163,9 @@ union ProblemCode {
   changeNotFound: "change.not_found",
   conflictNotFound: "conflict.not_found",
   conflictMoveRefused: "conflict.move_refused",
+  escalationNotFound: "escalation.not_found",
+  escalationStateRefused: "escalation.state_refused",
+  escalationOptionUnknown: "escalation.option_unknown",
   probeNotFound: "probe.not_found",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",
@@ -363,6 +366,17 @@ model AgentEnvelope<Result> {
   notices: Notice[];
 
   cost: CallCost;
+}
+
+/** Where a project is: enough to name it and to link to it. */
+model ProjectRef {
+  id: ProjectId;
+
+  /** The handle of the namespace the project belongs to. */
+  `namespace`: string;
+
+  /** The project's name, unique in its namespace. */
+  name: string;
 }
 
 // ─── Lists, waiting and preconditions ───────────────────────────────────────

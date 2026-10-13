@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations-inbox.test.ts -t t67.session-list
+# kills: t67.session-list
+# why: the list is decided on the caller's own project for everyone, so a signed-in person has no inbox: they are told 404
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 935d761f..2a66f636 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -229,8 +229,7 @@ export const RESOLVERS: Resolvers = {
+ 
+   Operator_getSettings: (input) => projectNamed(input.projectId),
+   Operator_putSettings: (input) => projectNamed(input.projectId),
+-  Operator_listEscalations: (_input, caller) =>
+-    caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
++  Operator_listEscalations: ownProject,
+   Operator_giveRuling: (input) => escalationProject(input.escalationId),
+   Operator_enrolAgent: (input) => projectNamed(input.projectId),
+   Operator_suspendAgent: (input) => agentProject(input.agentId),

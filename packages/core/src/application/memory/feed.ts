@@ -106,6 +106,17 @@ function labelFor(store: Store, event: EventEnvelope): string | undefined {
   return label;
 }
 
+/** The label the feed gave something of a project when it recorded its creation, by the prefix of its kind (`E-`, `C-` …). */
+export function labelGiven(
+  store: Store,
+  project: string,
+  prefix: string,
+  id: string,
+): string | undefined {
+  const label = store.get(FEED.given, `${project}/${prefix}/${id}`);
+  return typeof label === "string" ? label : undefined;
+}
+
 /**
  * Records an arrived event at the feed's next position, with its label if it
  * gets one. Synchronous: it runs inside the receipt's transaction, so a

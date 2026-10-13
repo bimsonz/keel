@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations-inbox.test.ts -t t67.session-list
+# kills: t67.session-list
+# why: a cursor that is no page's nextCursor is taken, so a malformed one reads as an empty last page instead of a refusal
+diff --git a/apps/keel/src/adapters/driving/http/escalations.ts b/apps/keel/src/adapters/driving/http/escalations.ts
+index 46fff107..da5f0837 100644
+--- a/apps/keel/src/adapters/driving/http/escalations.ts
++++ b/apps/keel/src/adapters/driving/http/escalations.ts
+@@ -30,7 +30,7 @@ const CURSOR = /^\d{12}$/;
+ export function escalationListInput(
+   input: Input<"Operator_listEscalations">,
+ ): Result.Result<Omit<EscalationListRead, "reader" | "now">, Issues> {
+-  if (input.cursor !== undefined && !CURSOR.test(input.cursor))
++  if (input.cursor !== undefined && input.cursor.length === 0)
+     return Result.fail([
+       { path: ["query", "cursor"], message: "Expected the nextCursor of the page before" },
+     ]);

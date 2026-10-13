@@ -93,6 +93,13 @@ model EnrolledAgent {
 /** A question put to a person, as Mission Control's inbox shows it: what EscalationRaised carried, and where it stands. */
 model EscalationView {
   id: EscalationId;
+
+  /** Keel's short name for the question, counted per project: `E-1` is the project's first. */
+  label: string;
+
+  /** The project whose conflict the question is about. */
+  project: ProjectRef;
+
   question: string;
 
   /** At least two, with unique ids; a ruling names one by `id`. */
@@ -190,12 +197,24 @@ interface Operator {
   @post
   revokeAgent(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
 
+  /**
+   * The questions Keel has put to people, newest first. An agent reads its own project's. A person
+   * reads their inbox across every project: a question they are the first asked, at once, and a
+   * question of a namespace they maintain once thirty minutes have passed without an answer. A page
+   * may hold fewer than `limit` while `nextCursor` says more follow.
+   */
   @summary("List escalations")
   @useAuth(AgentRead | SessionAuth)
   @route("/escalations")
   @get
   listEscalations(@query state?: "open" | "ruled" | "withdrawn", ...PageQuery): EscalationPage | StandardErrors;
 
+  /**
+   * Answer a question: the person first asked, or a maintainer of its namespace, names one of its
+   * options. The ruling records a decision and resolves the conflict the question was about. An
+   * option the question does not offer is a 400 `escalation.option_unknown` whose next actions rule
+   * each valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.
+   */
   @summary("Rule on an escalation")
   @useAuth(SessionAuth)
   @route("/escalations/{escalationId}/ruling")

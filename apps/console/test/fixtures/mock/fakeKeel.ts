@@ -435,6 +435,8 @@ export function createFakeKeel(
         const { payload } = asked;
         const view = (): EscalationView => ({
           id: payload.escalationId,
+          label: asked.label ?? "E-1",
+          project: { id: project.id, namespace: project.org, name: project.name },
           question: payload.question,
           options: payload.options,
           about: payload.about,

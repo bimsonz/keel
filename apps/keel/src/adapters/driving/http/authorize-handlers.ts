@@ -11,11 +11,19 @@ import {
   SPEC_ACTIONS,
   type SpecAction,
 } from "@keeltown/core/domain/identity";
-import { AgentId, ChangeId, ProjectId, type UserId } from "@keeltown/core/kernel";
-import { AgentDirectory, Changes, Orgs, ProjectOrgs, Projects } from "@keeltown/core/ports";
+import { AgentId, ChangeId, EscalationId, ProjectId, type UserId } from "@keeltown/core/kernel";
+import {
+  AgentDirectory,
+  Changes,
+  Escalations,
+  Orgs,
+  ProjectOrgs,
+  Projects,
+} from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
+import { escalationNotFound } from "./escalations.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import { conflictNotFound, probeNotFound } from "./views.ts";
@@ -35,7 +43,7 @@ export interface PerItem {
 }
 const PER_ITEM: PerItem = { _tag: "PerItem" };
 
-type ResolverServices = ProjectOrgs | Orgs | Projects | Changes | AgentDirectory;
+type ResolverServices = ProjectOrgs | Orgs | Projects | Changes | AgentDirectory | Escalations;
 
 /** How an operation finds the resource it is decided on, from its input and its caller. */
 export type Resolver<A extends Operation> = (
@@ -84,6 +92,7 @@ export const projectResource = (
 const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
+const decodeEscalationId = Schema.decodeUnknownOption(EscalationId);
 
 /** The project an id names, or missing when it names none. */
 const projectNamed = (id: unknown) =>
@@ -128,6 +137,21 @@ const agentProject = (id: unknown) =>
       ),
   });
 
+/**
+ * The project an escalation's question is about, with the user asked first:
+ * what a ruling is decided on. An escalation the Projector has not heard
+ * raised is missing.
+ */
+const escalationProject = (id: unknown) =>
+  Option.match(decodeEscalationId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (escalationId) =>
+      Escalations.use((escalations) => escalations.get(escalationId)).pipe(
+        Effect.flatMap((record) => projectResource(record.project, record.sponsor)),
+        Effect.catchTag("EscalationNotFound", () => Effect.succeed(MISSING)),
+      ),
+  });
+
 /** An org by its name, in any case. */
 const orgNamed = (name: string) =>
   Orgs.use((orgs) => orgs.byName(name)).pipe(
@@ -159,7 +183,10 @@ const projectByName = (orgName: string, name: string) =>
 /**
  * What each operation is decided on. Work is only ever in the agent's own
  * project; reads of a change are decided on the change's project; a move on an
- * agent on the agent's project and sponsor. Operations not implemented yet that
+ * agent on the agent's project and sponsor; a ruling on the project its
+ * escalation is about and the user asked first. A person's list of escalations
+ * spans projects, so each item is decided on its own; an agent's is its own
+ * project's. Operations not implemented yet that
  * name a resource by an id of their own resolve to the caller's own project
  * until their lane resolves the id.
  */
@@ -202,8 +229,9 @@ export const RESOLVERS: Resolvers = {
 
   Operator_getSettings: (input) => projectNamed(input.projectId),
   Operator_putSettings: (input) => projectNamed(input.projectId),
-  Operator_listEscalations: ownProject,
-  Operator_giveRuling: ownProject,
+  Operator_listEscalations: (_input, caller) =>
+    caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
+  Operator_giveRuling: (input) => escalationProject(input.escalationId),
   Operator_enrolAgent: (input) => projectNamed(input.projectId),
   Operator_suspendAgent: (input) => agentProject(input.agentId),
   Operator_reinstateAgent: (input) => agentProject(input.agentId),
@@ -264,6 +292,11 @@ export function refusalResult(
         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
       if (action === "Probes_getProbeSource")
         return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
+      if (action === "Operator_giveRuling")
+        return escalationNotFound(
+          { requestId },
+          { escalationId: String(Object(input).escalationId) },
+        );
       return { status: 404, body: problem(404, "resource.not_found", requestId) };
     default: {
       const unmapped: never = refusal;

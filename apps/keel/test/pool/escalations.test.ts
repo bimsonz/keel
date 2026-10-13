@@ -37,6 +37,7 @@ import {
   BASE,
   drainAfter,
   drainOutbox,
+  OTHER_ORG,
   POOL_ORG,
   POOL_SPONSOR,
   seedAgent,
@@ -182,8 +183,34 @@ const resolve = (
 const get = (path: string, token: string) =>
   worker(`${BASE}${path}`, { headers: { authorization: `Bearer ${token}` } });
 
+interface Question {
+  readonly id: string;
+  readonly label: string;
+  readonly project: { readonly id: string; readonly namespace: string; readonly name: string };
+  readonly state: string;
+}
+
+/** A reader's escalations through the doorway: an agent's project's, or a person's inbox. */
+async function questions(token: string, query = "") {
+  const response = await get(`/v1/escalations${query}`, token);
+  const body = await response.json<{ readonly items?: readonly Question[] }>();
+  return { status: response.status, items: body.items ?? [] };
+}
+
+/** A person's ruling through the doorway. */
+const rule = (token: string, escalationId: string, key: string, option: string) =>
+  worker(`${BASE}/v1/escalations/${escalationId}/ruling`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "idempotency-key": key,
+    },
+    body: JSON.stringify({ option, rationale: "the session cache is the product" }),
+  });
+
 describe("[t35.park-resume] a conflict put to a person parks its parties until the ruling", () => {
-  it("[t35.park-resume] a party escalates a proven conflict over REST: its sponsor is asked, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1, resolves the conflict and resumes both, each told", async () => {
+  it("[t35.park-resume] [t67.inbox] a party escalates a proven conflict over REST: its sponsor is asked and reads it in their inbox, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1, resolves the conflict and resumes both, each told", async () => {
     await using probes = await inertProbe();
     await using prechecks = await inertPrecheck();
     const projectId = makeId("prj", ulid());
@@ -305,19 +332,53 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
     expect(open.escalation?.options?.map((option) => option.id)).toContain(EFFECT_STANDS);
     expect(open.escalation?.evidence?.map((evidence) => evidence.class)).toContain("proof");
 
+    // [t67.inbox] The inbox through the doorway. The person asked reads the question with Keel's label
+    // and its project's place, and so does the project's agent; a maintainer's turn has not come, and
+    // a person of another namespace reads nothing of it.
+    const outsider = await seedUser(uniqueHandle("outside"), { org: OTHER_ORG });
+    const row = {
+      id: escalationId,
+      label: "E-1",
+      project: { id: projectId, namespace: "pool", name: projectId.toLowerCase() },
+      state: "open",
+    };
+    expect(await questions(sponsor.token)).toEqual({
+      status: 200,
+      items: [expect.objectContaining(row)],
+    });
+    expect(await questions(token)).toEqual({ status: 200, items: [expect.objectContaining(row)] });
+    expect(await questions(maintainer.token)).toEqual({ status: 200, items: [] });
+    expect(await questions(outsider.token)).toEqual({ status: 200, items: [] });
+
+    // From outside the namespace the question is not there to rule on; inside it, only who is asked or maintains may.
+    const fromOutside = await rule(outsider.token, escalationId, "ruling-0", EFFECT_STANDS);
+    expect([fromOutside.status, (await fromOutside.json<{ code: string }>()).code]).toEqual([
+      404,
+      "escalation.not_found",
+    ]);
+    const notOffered = await rule(sponsor.token, escalationId, "ruling-0", "neither");
+    expect([notOffered.status, (await notOffered.json<{ code: string }>()).code]).toEqual([
+      400,
+      "escalation.option_unknown",
+    ]);
+
     // The person asked rules: the decision is recorded with the ruling, and the subject resolves its conflict with it.
-    const ruled = ok(
-      await escalations((port) =>
-        port.rule({
-          escalationId,
-          option: EFFECT_STANDS,
-          by: sponsor.userId,
-          rationale: "the session cache is the product",
-          idempotencyKey: "rule-1",
-        }),
-      ),
-    );
-    expect(ruled).toMatchObject({ decisionId, escalation: { state: "ruled" } });
+    const ruling = await rule(sponsor.token, escalationId, "ruling-1", EFFECT_STANDS);
+    expect(ruling.status).toBe(200);
+    expect(await ruling.json<Question>()).toMatchObject({ ...row, state: "ruled" });
+    const repeated = await rule(sponsor.token, escalationId, "ruling-1", EFFECT_STANDS);
+    expect([repeated.status, (await repeated.json<Question>()).state]).toEqual([200, "ruled"]);
+    const second = await rule(maintainer.token, escalationId, "ruling-2", EFFECT_STANDS);
+    expect([second.status, (await second.json<{ code: string }>()).code]).toEqual([
+      409,
+      "escalation.state_refused",
+    ]);
+    await vi.waitFor(async () => {
+      expect((await questions(sponsor.token, "?state=ruled")).items).toEqual([
+        expect.objectContaining({ ...row, state: "ruled" }),
+      ]);
+      expect((await questions(sponsor.token, "?state=open")).items).toEqual([]);
+    }, WAIT);
     await vi.waitFor(async () => {
       const view = await runInDurableObject(subjectOf(projectId), (instance: SubjectDO) =>
         instance["runtime"].runPromise(conflictView(conflictId)),

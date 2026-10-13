@@ -8,6 +8,7 @@ import {
   escalationView,
   foldEscalationViews,
   listEscalations,
+  recordFeed,
 } from "@keeltown/core/application/memory";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
 import type { EntityRef, EscalationId, EventEnvelope, OrgId } from "@keeltown/core/kernel";
@@ -30,8 +31,9 @@ const notFound = (escalationId: EscalationId) =>
 /**
  * HumanGate and Escalations in memory: one object per namespace address, each
  * with its own store and outbox, running the use-cases the namespace's
- * Durable Object runs; and one view store folding what they commit with the
- * Projector's own fold, as soon as it is committed.
+ * Durable Object runs; and one view store recording and folding what they
+ * commit as the Projector does (the feed first, so each question has its
+ * `E-n`), as soon as it is committed.
  */
 export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
   const objects = new Map<string, ReturnType<typeof makeEventOutboxMemory>>();
@@ -57,8 +59,11 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
       ...log(namespace, { kind: "decision", id: decisionIdOf(escalationId) }),
     ];
     for (const event of events) {
-      if (folded.has(event.eventId)) continue;
-      folded.add(event.eventId);
+      // Each namespace's object mints its own event ids, so two namespaces' ids can be the same.
+      const heard = `${namespaceAddress(namespace)}/${event.eventId}`;
+      if (folded.has(heard)) continue;
+      folded.add(heard);
+      recordFeed(views, event);
       foldEscalationViews(views, event);
     }
   };
@@ -88,6 +93,7 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
           if (known === undefined) return Effect.fail(notFound(command.escalationId));
           return on(known.namespace, giveRuling(command)).pipe(
             Effect.tap(() => Effect.sync(() => project(known.namespace, command.escalationId))),
+            Effect.map((ruled) => ({ ...ruled, label: known.label })),
           );
         }),
     }),

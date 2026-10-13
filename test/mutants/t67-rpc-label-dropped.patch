@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts -t t67.inbox
+# kills: t67.inbox
+# why: the Projector's list answers through the unlabelled record's codec, so the label is dropped on the way to the doorway
+diff --git a/apps/keel/src/rpc/projector.ts b/apps/keel/src/rpc/projector.ts
+index 55a0daae..6c922343 100644
+--- a/apps/keel/src/rpc/projector.ts
++++ b/apps/keel/src/rpc/projector.ts
+@@ -212,7 +212,7 @@ export const LabelledEscalation = Schema.Struct({
+ });
+ 
+ export const EscalationPage = Schema.Struct({
+-  items: Schema.Array(LabelledEscalation),
++  items: Schema.Array(EscalationRecord),
+   nextCursor: Schema.optional(Schema.String),
+ });
+ 

@@ -2,13 +2,13 @@
 # kills: authz.public-private-missing
 # why: what the caller may not see answers 403 rather than the operation's own 404, so a private project's existence leaks to anyone who asks
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 91279af..0165e65 100644
+index 935d761f..94cafb3f 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -265,7 +265,7 @@ export function refusalResult(
-         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
-       if (action === "Probes_getProbeSource")
-         return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
+@@ -297,7 +297,7 @@ export function refusalResult(
+           { requestId },
+           { escalationId: String(Object(input).escalationId) },
+         );
 -      return { status: 404, body: problem(404, "resource.not_found", requestId) };
 +      return { status: 403, body: problem(403, "auth.forbidden", requestId) };
      default: {
