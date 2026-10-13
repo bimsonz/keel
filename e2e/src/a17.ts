@@ -18,7 +18,10 @@
 //       host) and committed by Keel, names the agent and the run in its
 //       Keel-Agent and Keel-Run trailers, and stock git verifies it against
 //       the signers file Keel publishes and refuses it against a file that
-//       names another key.
+//       names another key;
+//   (e) it replaces the settings of its own project, and
+//       ProjectSettingsChanged on the project's feed is the agent's, in that
+//       run.
 // No token, remote URL or key is printed.
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -292,6 +295,37 @@ async function landWithOnlyAKey(baseUrl: string, label: string): Promise<void> {
     reader.change.id,
     {},
     { lease: reader.lease.id, idempotencyKey: key("reader:abandon") },
+  );
+
+  // (e) the agent replaces the settings of its own project, in the same run.
+  const { cursor: beforePut } = await worker.snapshot({ project: project.id });
+  const batch = settings.maxBatchSize === 16 ? 15 : settings.maxBatchSize + 1;
+  const replaced = await worker.putSettings(project.id, {
+    protectedPaths: [...settings.protectedPaths],
+    maxBatchSize: batch,
+    verification: "required",
+  });
+  check(
+    replaced.maxBatchSize === batch && replaced.verification === "required",
+    `(e) the agent replaces its own project's settings: its largest batch is now ${batch}`,
+  );
+  const settled = await projectEvents(
+    worker,
+    beforePut,
+    project.id,
+    (seen) => tagged(seen, "ProjectSettingsChanged").length > 0,
+  );
+  const changed = tagged(settled, "ProjectSettingsChanged")[0];
+  console.log(
+    `     ProjectSettingsChanged by ${changed?.actor}, in run ${JSON.stringify(changed?.run)}`,
+  );
+  check(
+    changed?.actor === `agent:${agentId}`,
+    "(e) ProjectSettingsChanged on the project's feed is the agent's own",
+  );
+  check(
+    changed?.run?.id === runId && changed.run.label === label,
+    "(e) and it names the run the settings were replaced in",
   );
 }
 
