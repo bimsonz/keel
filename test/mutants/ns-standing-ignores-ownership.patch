@@ -1,5 +1,5 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
-# kills: ports.memberships-own
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts apps/keel/test/pool/operator.test.ts
+# kills: ports.memberships-own, ns.own-project
 # why: a sponsor's standing is read from member rows alone, so a person has no role in their own namespace and the agents they enrolled there are refused work as if their inviter had left
 diff --git a/apps/keel/src/adapters/driven/d1/memberships.ts b/apps/keel/src/adapters/driven/d1/memberships.ts
 index 84bd0ab..df01d3b 100644

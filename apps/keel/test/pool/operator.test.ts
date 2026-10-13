@@ -23,11 +23,19 @@ import {
  */
 const SOURCE = "fixture-forge-lite";
 
-function operatorApp() {
+/**
+ * Each app counts its agents from one, and every app in the file writes them to the one D1
+ * directory, where an id's row keeps the namespace it was first given. A case that reads what
+ * the directory says of its agent passes `agentsAfter`, for ids no other case reaches.
+ */
+function operatorApp(options: { readonly agentsAfter?: number } = {}) {
   const projects = makeProjectsMemory({ sources: [SOURCE] });
   const { app } = makeIsolate(
     env,
-    isolateLayer(env, { projects: projects.layer, enrolments: makeEnrolmentsMemory().layer }),
+    isolateLayer(env, {
+      projects: projects.layer,
+      enrolments: makeEnrolmentsMemory({ after: options.agentsAfter ?? 0 }).layer,
+    }),
   );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
   return { projects, via };
@@ -155,7 +163,7 @@ describe("project bootstrap", () => {
   });
 
   it("[ns.own-project] a person owns the namespace that is their own by being that person: they create there, their agent works there under their id, and nobody else creates there", async () => {
-    const { via } = operatorApp();
+    const { via } = operatorApp({ agentsAfter: Date.now() });
     const handle = uniqueHandle("own");
     const { session } = await signUp(BASE, handle, {
       fetcher: (request) => via(request.url, request),
@@ -189,15 +197,15 @@ describe("project bootstrap", () => {
       namespace: session.userId,
       sponsor: session.userId,
     });
-    const me = await call(
-      via,
-      await tokenOf(agent.body.clientId, agent.body.clientSecret),
-      "GET",
-      "/agents/me",
-    );
-    // Each app in this file counts its agents from one, so the directory's row for this id may be an
-    // earlier case's, whose namespace it keeps: the enrolment's own answer above is what names it.
-    expect(me.status).toBe(200);
+    const asAgent = await tokenOf(agent.body.clientId, agent.body.clientSecret);
+    const me = await call(via, asAgent, "GET", "/agents/me");
+    expect([me.status, me.body.result.agent]).toMatchObject([
+      200,
+      { id: agent.body.agent.id, projectId: project.body.id },
+    ]);
+    // The agent stands on its sponsor's ownership: it reads the private project it works in.
+    const worked = await call(via, asAgent, "GET", `/namespaces/${handle}/projects/mine`);
+    expect([worked.status, worked.body.id]).toEqual([200, project.body.id]);
 
     // A member of an org is nobody in a person's namespace, and a person's namespace takes no members.
     const other = await maintainer();

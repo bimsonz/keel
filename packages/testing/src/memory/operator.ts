@@ -137,10 +137,12 @@ export function makeProjectsMemory(
  * Enrolments over an AgentDirectory: each one writes the agent and its
  * credential's hash into the directory before answering, as the AgentSession DO
  * writes the D1 projection. A replay re-issues the secret and retires the old one.
+ * Agent ids are counted from one past `after`: two of these over one directory
+ * hand out the same ids unless one starts where the other cannot reach.
  */
-export function makeEnrolmentsMemory() {
+export function makeEnrolmentsMemory(options: { readonly after?: number } = {}) {
   const byKey = new Map<string, Keyed<{ readonly agent: Agent; readonly clientId: string }>>();
-  let count = 0;
+  let count = options.after ?? 0;
   return {
     layer: Layer.effect(
       Enrolments,
