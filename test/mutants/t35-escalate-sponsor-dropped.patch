@@ -2,14 +2,14 @@
 # kills: t35.resolve-escalate
 # why: the escalating agent's sponsor is not passed to the raise, so the person who vouches for the agent is never asked first
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 9074637..6f83d5d 100644
+index 330797f9..d208a354 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -198,7 +198,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+@@ -200,7 +200,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
        namespace: place.value.namespace,
        escalationId,
        project: at.projectId,
 -      sponsor: command.sponsor,
+       agent: command.agentId,
        raisedBy: subjectAddress(at.projectId, at.key),
        ask: askAbout(view, "human-class", command.note),
-     })

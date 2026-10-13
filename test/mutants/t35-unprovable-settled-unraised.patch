@@ -2,10 +2,10 @@
 # kills: t35.unprovable-escalates
 # why: an unprovable conflict is settled as escalated with an id nobody raised, so it waits on a question no person was ever asked
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 9074637..f243f23 100644
+index 330797f9..b8eb97cf 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -104,16 +104,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
+@@ -105,17 +105,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
        ? undefined
        : Option.getOrUndefined(yield* (yield* AgentDirectory).findAgent(agentId));
    const escalationId = escalationIdOf(conflictId);
@@ -15,6 +15,7 @@ index 9074637..f243f23 100644
 -      escalationId,
 -      project: at.projectId,
 -      sponsor: agent?.sponsor,
+-      agent: agentId,
 -      raisedBy: subjectAddress(at.projectId, at.key),
 -      ask: askAbout(view, "unprovable"),
 -    })

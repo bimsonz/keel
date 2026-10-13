@@ -2,15 +2,15 @@
 # kills: gate.claims
 # why: an agent that signed itself up governs whatever namespace its token's project is in, a person's and an org's among them
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index be3dab27..f3e71d2d 100644
+index 75dc530c..78bcfc9f 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -201,7 +201,7 @@ export const principalOf: (
+@@ -206,7 +206,7 @@ export const principalOf: (
            ? Option.none()
            : yield* ProjectNamespaces.use((places) => places.byId(projectId));
        const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
 -      const governs = projectId === undefined || (Option.isSome(place) && org === own);
 +      const governs = true;
-       return {
-         principal: {
-           _tag: "Agent",
+       const invited =
+         governs || Option.isNone(place)
+           ? Option.none()

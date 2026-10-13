@@ -2,15 +2,15 @@
 # kills: authz.agent-resource
 # why: ending a sponsor's link is decided on the caller's own record, so the policy grants it to any account and only the agent's own object stands in the way
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 4a5aca00..83742335 100644
+index 6fccc289..b7587a71 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -125,7 +125,7 @@ export const SPEC_ACTIONS = {
+@@ -143,7 +143,7 @@ export const SPEC_ACTIONS = {
    // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.
    Operator_suspendAgent: rule("Agent", "sponsor"),
    Operator_reinstateAgent: rule("Agent", "sponsor"),
 -  Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
 +  Agents_endSponsorship: rule("Self", "account"),
-   Operator_putSettings: rule("Project", "maintain"),
- } as const satisfies Record<string, ActionRule>;
- 
+   Agents_listNamespaces: rule("Self", "self"),
+   Agents_acceptInvitation: rule("Self", "self"),
+   Agents_leaveNamespace: rule("Self", "self"),

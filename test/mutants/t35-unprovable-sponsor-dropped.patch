@@ -2,14 +2,14 @@
 # kills: t35.unprovable-escalates
 # why: Keel's own escalation names nobody to ask first, so the premise holder's sponsor is not asked until the maintainers are
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 9074637..4025986 100644
+index 330797f9..54053534 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -109,7 +109,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
+@@ -110,7 +110,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
        namespace: place.value.namespace,
        escalationId,
        project: at.projectId,
 -      sponsor: agent?.sponsor,
+       agent: agentId,
        raisedBy: subjectAddress(at.projectId, at.key),
        ask: askAbout(view, "unprovable"),
-     })

@@ -2,14 +2,14 @@
 # kills: b11.standing-repair
 # why: the Projector never repeats a standing in the directory, so a crash between the commit and the inline write leaves the row wrong for good
 diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
-index 08b433b7..59c88157 100644
+index 600469a8..8fbbad21 100644
 --- a/apps/keel/src/adapters/driving/do/projector.ts
 +++ b/apps/keel/src/adapters/driving/do/projector.ts
-@@ -70,7 +70,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+@@ -75,7 +75,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
      recordFeed(tx.store, event);
      const skipped = foldViews(tx.store, event);
      if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
 -    noteStanding(tx.store, event);
      noteVisibility(tx.store, event);
+     noteInvitation(tx.store, event);
      return { drafts: [] };
-   }
