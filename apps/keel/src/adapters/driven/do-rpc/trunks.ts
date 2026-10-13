@@ -27,6 +27,10 @@ export function TrunksRpc(
         callObject(TrunkCodecs.initialize, () => trunk(projectId).initialize(head, by)).pipe(
           Effect.asVoid,
         ),
+      adopt: (projectId, commit) =>
+        callObject(TrunkCodecs.adopt, () => trunk(projectId).adopt(commit)),
+      seed: (projectId, name, at) =>
+        callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
       head: (projectId) =>
         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
           Effect.map((status) => status.head),

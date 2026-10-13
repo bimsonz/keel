@@ -9,6 +9,7 @@ import { projectRepos } from "@keeltown/core/application/integration";
 import {
   CommitSha,
   EventEnvelope,
+  Instant,
   makeId,
   type NamespaceId,
   type ProjectId,
@@ -25,6 +26,7 @@ import {
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
+  MEMORY_SEED,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -55,6 +57,7 @@ const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
 async function placedTrunk(head: string) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
+  const writer = makeTrunkWriterMemory(Schema.decodeUnknownSync(CommitSha)(head));
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
       instance,
@@ -63,15 +66,18 @@ async function placedTrunk(head: string) {
         Layer.mergeAll(
           backbone(state.storage),
           makeCodeHostMemory().layer,
-          makeTrunkWriterMemory(Schema.decodeUnknownSync(CommitSha)(head)).layer,
+          writer.layer,
           placedIn(projectId, freshOrg()).layer,
           makeOrgUsageMemory().layer,
         ),
       ),
     );
   });
-  return { projectId, stub };
+  return { projectId, stub, writer };
 }
+
+/** What a call that failed said, or "done" for one that did not. */
+const said = <A>(exit: Exit.Exit<A>) => (Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "done");
 
 describe("the Trunk DO", () => {
   it("[trunk.do.init] initialize names trunk's first head once; a retry answers it, another head is refused", async () => {
@@ -112,6 +118,34 @@ describe("the Trunk DO", () => {
     expect(await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.head(projectId)))).toEqual(
       Exit.succeed(head),
     );
+  });
+
+  it("[trunk.do.first-write] the Trunks port reaches the trunk's one writer for a first write: main adopted at a commit, a first commit seeded from a name and a time, and neither once trunk has its head", async () => {
+    const start = Schema.decodeUnknownSync(CommitSha)("a".repeat(40));
+    const came = Schema.decodeUnknownSync(CommitSha)("f".repeat(40));
+    const { projectId, writer } = await placedTrunk(start);
+    const at = Instant(1_760_000_000_000);
+    const viaPort = <A>(use: (trunks: (typeof Trunks)["Service"]) => Effect.Effect<A>) =>
+      viaTrunks(Effect.flatMap(Trunks, use));
+
+    expect(await viaPort((trunks) => trunks.adopt(projectId, came))).toEqual(Exit.void);
+    expect(writer.adopted()).toEqual([came]);
+    expect(await viaPort((trunks) => trunks.seed(projectId, "keel", at))).toEqual(
+      Exit.succeed(MEMORY_SEED),
+    );
+    expect(writer.seeds()).toEqual([{ name: "keel", at }]);
+
+    await viaTrunks(
+      Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, MEMORY_SEED, "seed")),
+    );
+    expect([
+      said(await viaPort((trunks) => trunks.adopt(projectId, start))),
+      said(await viaPort((trunks) => trunks.seed(projectId, "other", at))),
+    ]).toEqual([
+      expect.stringContaining(`trunk ${projectId} is initialized: adopt`),
+      expect.stringContaining(`trunk ${projectId} is initialized: seed`),
+    ]);
+    expect([writer.adopted(), writer.seeds()]).toEqual([[came], [{ name: "keel", at }]]);
   });
 
   it("[trunk.do.no-org] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {

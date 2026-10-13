@@ -19,6 +19,7 @@ import type {
   CommitSha,
   EntityRef,
   EventEnvelope,
+  Instant,
   ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -207,6 +208,41 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
   const bytes = yield* (yield* TrunkWriter).historyBytes(head);
   yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
   return trunk;
+});
+
+/**
+ * A first write is asked only of a trunk with no head yet. Once trunk is
+ * initialized its main moves by promotion alone, so the writer is not reached
+ * and the caller's mistake is named.
+ */
+const beforeItsHead = (projectId: ProjectId, write: string) =>
+  Effect.flatMap(EntityStore, (store) =>
+    trunkOf(store, projectId) === undefined
+      ? Effect.void
+      : Effect.die(
+          new Error(
+            `trunk ${projectId} is initialized: ${write} is a first write, and none follows`,
+          ),
+        ),
+  );
+
+/** Makes main at `came`, the head of the branch an import brought under another name. A defect once trunk is initialized. */
+export const adoptTrunk = Effect.fn("integration/adoptTrunk")(function* (
+  projectId: ProjectId,
+  came: CommitSha,
+) {
+  yield* beforeItsHead(projectId, "adopt");
+  yield* (yield* TrunkWriter).adopt(came);
+});
+
+/** Writes an empty trunk's first commit, made of `name` and `at` alone, and answers it. A defect once trunk is initialized. */
+export const seedTrunk = Effect.fn("integration/seedTrunk")(function* (
+  projectId: ProjectId,
+  name: string,
+  at: Instant,
+) {
+  yield* beforeItsHead(projectId, "seed");
+  return yield* (yield* TrunkWriter).seed(name, at);
 });
 
 /**

@@ -4,6 +4,7 @@
 // debounce and push deadlines run `flushTrunk` and `pushPromotion`.
 import { describe, expect, it } from "@effect/vitest";
 import {
+  adoptTrunk,
   deleteProjectRepos,
   destroyTrunk,
   flushTrunk,
@@ -12,6 +13,7 @@ import {
   projectRepos,
   pushPromotion,
   resumeTrunk,
+  seedTrunk,
   syncMirror,
   syncTrunk,
   trunkDestroyed,
@@ -39,6 +41,7 @@ import {
   makeOrgUsageMemory,
   makeProjectNamespacesMemory,
   makeTrunkWriterMemory,
+  MEMORY_SEED,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
@@ -127,6 +130,40 @@ describe("the Trunk's Initialize", () => {
         expect(trunkOf(yield* EntityStore, PROJECT)?.head).toBe(sha("a"));
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
       }).pipe(Effect.provide(ports().layer)),
+  );
+});
+
+describe("the Trunk's first write", () => {
+  it.effect(
+    "[trunk.adopt] before trunk has a head the writer makes main at the commit named; once it is initialized the ask is a defect and the writer is not reached",
+    () => {
+      const w = ports();
+      return Effect.gen(function* () {
+        yield* adoptTrunk(PROJECT, sha("b"));
+        expect(w.writer.adopted()).toEqual([sha("b")]);
+        yield* initializeTrunk(PROJECT, sha("b"), "seed");
+        const said = yield* defectOf(adoptTrunk(PROJECT, sha("c")));
+        expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: adopt`);
+        expect(w.writer.adopted()).toEqual([sha("b")]);
+        expect(w.writer.head()).toBe(sha("b"));
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.seed] before trunk has a head the writer is asked for the first commit with the name and the time given, and it is answered; once it is initialized the ask is a defect and the writer is not reached",
+    () => {
+      const w = ports();
+      const at = Instant(1_760_000_000_000);
+      return Effect.gen(function* () {
+        expect(yield* seedTrunk(PROJECT, "keel", at)).toBe(MEMORY_SEED);
+        expect(w.writer.seeds()).toEqual([{ name: "keel", at }]);
+        yield* initializeTrunk(PROJECT, MEMORY_SEED, "seed");
+        const said = yield* defectOf(seedTrunk(PROJECT, "other", Instant(1)));
+        expect(said ?? "no defect").toContain(`trunk ${PROJECT} is initialized: seed`);
+        expect(w.writer.seeds()).toEqual([{ name: "keel", at }]);
+      }).pipe(Effect.provide(w.layer));
+    },
   );
 });
 

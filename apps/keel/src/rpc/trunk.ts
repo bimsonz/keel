@@ -1,5 +1,5 @@
 import { PromotionState, PromotionStateRefused } from "@keeltown/core/domain/integration";
-import { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha, type InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { RepoNotFound } from "./project.ts";
@@ -32,6 +32,8 @@ export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
   resume: exitCodec(TrunkStatus, Schema.Never),
   initialize: exitCodec(TrunkStatus, PromotionStateRefused),
+  adopt: exitCodec(Schema.Void, Schema.Never),
+  seed: exitCodec(CommitSha, Schema.Never),
   sync: exitCodec(TrunkSync, Schema.Union([RepoNotFound, PackTooLarge])),
   destroy: exitCodec(Schema.Void, Schema.Never),
 };
@@ -47,6 +49,18 @@ export interface TrunkRpc {
    * head, or any head once trunk has one, is PromotionStateRefused.
    */
   initialize(head: typeof CommitSha.Encoded, by: string): Promise<ExitJson>;
+  /**
+   * Makes main at `commit` in a trunk that was imported under another
+   * branch's name (the Project DO's createProject, before `initialize`). No
+   * object is sent. A defect once trunk is initialized.
+   */
+  adopt(commit: typeof CommitSha.Encoded): Promise<ExitJson>;
+  /**
+   * Writes an empty trunk's first commit, made of the project's `name` and
+   * the time `at` alone, and answers it (the Project DO's createProject,
+   * before `initialize`). A defect once trunk is initialized.
+   */
+  seed(name: string, at: typeof InstantSchema.Encoded): Promise<ExitJson>;
   /**
    * Copies trunk's head into the project's staging and mirror (relaying
    * trunk's pack, so commit ids survive). Idempotent; the Project DO's

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.adopt
+# why: An initialized trunk's main is made again at whatever commit a caller names, outside any promotion
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 4b66acfe..cee38487 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -231,7 +231,6 @@ export const adoptTrunk = Effect.fn("integration/adoptTrunk")(function* (
+   projectId: ProjectId,
+   came: CommitSha,
+ ) {
+-  yield* beforeItsHead(projectId, "adopt");
+   yield* (yield* TrunkWriter).adopt(came);
+ });
+ 

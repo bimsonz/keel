@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts
+# kills: trunk.do.first-write
+# why: The first commit is asked for at a time of the port's own, so a retry writes another commit than the first try's
+diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+index 7fb8d1f6..573cd130 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+@@ -30,7 +30,7 @@ export function TrunksRpc(
+       adopt: (projectId, commit) =>
+         callObject(TrunkCodecs.adopt, () => trunk(projectId).adopt(commit)),
+       seed: (projectId, name, at) =>
+-        callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
++        callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, 0)),
+       head: (projectId) =>
+         callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+           Effect.map((status) => status.head),

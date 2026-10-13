@@ -244,6 +244,10 @@ export function makeStagingWriterMemory(main: MainRef = cellOf()) {
   };
 }
 
+/** A first write asked of a trunk that has its head: the caller's defect, as it is the Trunk's own. */
+const afterItsHead = (projectId: ProjectId, write: string) =>
+  Effect.die(new Error(`trunk ${projectId} is initialized: ${write} is a first write`));
+
 /**
  * Each project's trunk head once initialized, how often it was synced, and
  * who destroyed it. `journal` records each call in order beside other
@@ -254,11 +258,17 @@ export function makeTrunksMemory(
   options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
 ) {
   const heads = new Map<ProjectId, CommitSha>();
+  const adopted = new Map<ProjectId, CommitSha>();
+  const seeded = new Map<ProjectId, { readonly name: string; readonly at: Instant }>();
   const syncs = new Map<ProjectId, number>();
   const destroyed = new Map<ProjectId, string>();
   let failures = options.failSyncOnce === true ? 1 : 0;
   return {
     heads,
+    /** The commit each project's main was made at with `adopt`. */
+    adopted,
+    /** What each project's first commit was asked to be made of with `seed`; each answered `MEMORY_SEED`. */
+    seeded,
     syncs,
     destroyed,
     layer: Layer.succeed(
@@ -274,6 +284,20 @@ export function makeTrunksMemory(
             heads.set(projectId, head);
             options.journal?.push(`initialize ${projectId}`);
             return Effect.void;
+          }),
+        adopt: (projectId, commit) =>
+          Effect.suspend(() => {
+            if (heads.has(projectId)) return afterItsHead(projectId, "adopt");
+            adopted.set(projectId, commit);
+            options.journal?.push(`adopt ${projectId}`);
+            return Effect.void;
+          }),
+        seed: (projectId, name, at) =>
+          Effect.suspend(() => {
+            if (heads.has(projectId)) return afterItsHead(projectId, "seed");
+            seeded.set(projectId, { name, at });
+            options.journal?.push(`seed ${projectId}`);
+            return Effect.succeed(MEMORY_SEED);
           }),
         head: (projectId) =>
           Effect.suspend(() => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts
+# kills: trunk.do.first-write
+# why: The port answers an adopt without asking the Trunk DO, so an import under another branch never gets a main
+diff --git a/apps/keel/src/adapters/driven/do-rpc/trunks.ts b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+index 7fb8d1f6..9b3869c8 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/trunks.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/trunks.ts
+@@ -28,7 +28,7 @@ export function TrunksRpc(
+           Effect.asVoid,
+         ),
+       adopt: (projectId, commit) =>
+-        callObject(TrunkCodecs.adopt, () => trunk(projectId).adopt(commit)),
++        Effect.void,
+       seed: (projectId, name, at) =>
+         callObject(TrunkCodecs.seed, () => trunk(projectId).seed(name, at)),
+       head: (projectId) =>

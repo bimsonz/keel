@@ -1,6 +1,6 @@
 import { Context, type Effect } from "effect";
 import type { PromotionStateRefused } from "../../domain/integration/index.ts";
-import type { CommitSha, ProjectId } from "../../domain/kernel/index.ts";
+import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
 
 /** Where a sync left the project's repos: trunk's head, and staging and the mirror brought to it. */
 export interface TrunkSynced {
@@ -22,6 +22,20 @@ export class Trunks extends Context.Service<
       head: CommitSha,
       by: string,
     ) => Effect.Effect<void, PromotionStateRefused>;
+    /**
+     * Makes main at `commit` in a trunk that was imported under another
+     * branch's name, through the trunk's one writer (`TrunkWriter.adopt`). A
+     * first write: asked of a trunk that is already initialized it is a
+     * defect, and nothing is written.
+     */
+    readonly adopt: (projectId: ProjectId, commit: CommitSha) => Effect.Effect<void>;
+    /**
+     * Writes an empty trunk's first commit through the trunk's one writer
+     * (`TrunkWriter.seed`) and answers it. The same `name` and `at` give the
+     * same commit, so a retry finds it. A first write: asked of a trunk that
+     * is already initialized it is a defect, and nothing is written.
+     */
+    readonly seed: (projectId: ProjectId, name: string, at: Instant) => Effect.Effect<CommitSha>;
     /**
      * Trunk's head as its Trunk DO records it: what the Lane composes onto,
      * never a ref read that may lag or lead it. Dies for a trunk not yet

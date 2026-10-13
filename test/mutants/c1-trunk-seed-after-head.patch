@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.seed
+# why: An initialized trunk is asked for a first commit again, so its writer is reached outside any promotion
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 4b66acfe..03522ff2 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -241,7 +241,6 @@ export const seedTrunk = Effect.fn("integration/seedTrunk")(function* (
+   name: string,
+   at: Instant,
+ ) {
+-  yield* beforeItsHead(projectId, "seed");
+   return yield* (yield* TrunkWriter).seed(name, at);
+ });
+ 

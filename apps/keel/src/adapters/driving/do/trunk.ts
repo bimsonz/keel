@@ -1,4 +1,5 @@
 import {
+  adoptTrunk,
   DEBOUNCE_MS,
   deleteProjectRepos,
   destroyTrunk,
@@ -7,13 +8,14 @@ import {
   pushPromotion,
   type PushOutcome,
   resumeTrunk,
+  seedTrunk,
   syncMirror,
   syncTrunk,
   trunkHeard,
   trunkOf,
 } from "@keeltown/core/application/integration";
 import type { Trunk } from "@keeltown/core/domain/integration";
-import { CommitSha, type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
+import { CommitSha, type EventEnvelope, InstantSchema, ProjectId } from "@keeltown/core/kernel";
 import {
   EntityStore,
   REDELIVERY_CAP_MS,
@@ -34,6 +36,7 @@ export const MIRROR_SYNC = "mirror sync";
 export const TRUNK_DESTROY = "trunk destroy";
 
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
+const decodeInstant = Schema.decodeUnknownEffect(InstantSchema);
 const decodeProject = Schema.decodeUnknownSync(ProjectId);
 
 /** A Trunk DO is addressed as `trunk:<projectId>`. */
@@ -103,6 +106,24 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       Effect.map(statusOf),
     );
     return this.answer(TrunkCodecs.initialize, program);
+  }
+
+  async adopt(commit: string) {
+    const projectId = this.projectId;
+    const program = decodeHead(commit).pipe(
+      Effect.orDie,
+      Effect.flatMap((sha) => adoptTrunk(projectId, sha)),
+    );
+    return this.answer(TrunkCodecs.adopt, program);
+  }
+
+  async seed(name: string, at: number) {
+    const projectId = this.projectId;
+    const program = decodeInstant(at).pipe(
+      Effect.orDie,
+      Effect.flatMap((when) => seedTrunk(projectId, name, when)),
+    );
+    return this.answer(TrunkCodecs.seed, program);
   }
 
   async sync() {
