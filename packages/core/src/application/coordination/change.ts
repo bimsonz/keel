@@ -725,6 +725,12 @@ export const remedyOf = (log: readonly EventEnvelope[]): Remedy | undefined => {
   return remedy;
 };
 
+/** Whether a waiter on a submission has something new: the state, the revision or the submitted commit moved. */
+export const submissionMoved = (before: SubmissionStatus, after: SubmissionStatus): boolean =>
+  after.change.state !== before.change.state ||
+  after.change.intent.revision !== before.change.intent.revision ||
+  after.commitSha !== before.commitSha;
+
 /** The change's submission as it stands: the change, the commit last submitted for it, and any remedy owed. */
 export const submissionStatus: (
   changeId: ChangeId,

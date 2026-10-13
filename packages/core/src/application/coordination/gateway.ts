@@ -69,7 +69,13 @@ import type {
   WorkspaceHeadMoved,
 } from "../ports/index.ts";
 import { projectNamespace } from "../verification/index.ts";
-import type { CommitParentRefused, CommittedChange, RebasedChange, Withdrawal } from "./change.ts";
+import {
+  type CommitParentRefused,
+  type CommittedChange,
+  type RebasedChange,
+  submissionMoved,
+  type Withdrawal,
+} from "./change.ts";
 import type {
   AbandonCall,
   Adopted,
@@ -92,10 +98,49 @@ import { audienceOf, type FeedScope, type ProjectScope } from "./read-scope.ts";
  */
 
 /** The longest a read may wait, in seconds (the spec's `?wait`). */
-export const MAX_WAIT_SECONDS = 30;
+export const MAX_WAIT_SECONDS = 900;
+
+/** The longest one hold on an object, in seconds: the object's own bound. */
+export const HOLD_SECONDS = 30;
 
 const clampWait = (seconds: number | undefined) =>
   Math.min(MAX_WAIT_SECONDS, Math.max(0, Math.trunc(seconds ?? 0)));
+
+/**
+ * The most holds one wait makes. A hold may end before its time with nothing
+ * to say (its object restarted under it, or every event that woke it is one
+ * the reader is not shown) and the wait holds on from there. The holds are
+ * counted, so an object that keeps going or a busy feed ends a wait early, as
+ * it stands, and never runs a request out of calls.
+ */
+export const MAX_HOLDS = 60;
+
+/**
+ * A wait longer than one object's hold: holds of at most `HOLD_SECONDS`, one
+ * after another, until an answer is `ready`, `waitSeconds` have passed by the
+ * clock or `MAX_HOLDS` are made, when the last answer is given as it stands.
+ * Each hold is handed the answer before it, so a read carries its cursor on
+ * and nothing that lands between two holds is missed. Nothing polls: a commit
+ * wakes the hold it lands under, and the 30 seconds are only that hold's
+ * deadline.
+ */
+const inHolds = <A, E, R>(
+  waitSeconds: number | undefined,
+  hold: (seconds: number, last: A | undefined) => Effect.Effect<A, E, R>,
+  ready: (answer: A) => boolean,
+): Effect.Effect<A, E, R | Clock> =>
+  Effect.gen(function* () {
+    const clock = yield* Clock;
+    const wait = clampWait(waitSeconds);
+    const deadline = (yield* clock.now) + wait * 1000;
+    let answer = yield* hold(Math.min(HOLD_SECONDS, wait), undefined);
+    for (let holds = 1; !ready(answer) && holds < MAX_HOLDS; holds += 1) {
+      const left = Math.ceil((deadline - (yield* clock.now)) / 1000);
+      if (left <= 0) break;
+      answer = yield* hold(Math.min(HOLD_SECONDS, left), answer);
+    }
+    return answer;
+  });
 
 export const declareChange: (
   principal: AgentToken,
@@ -240,21 +285,46 @@ export const abandonChange: (
     : Changes.use((changes) => changes.abandon({ ...rest, authority }));
 };
 
-/** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
+/**
+ * Where a change's submission stands, waiting up to `waitSeconds` (0–900) for
+ * it to move. One hold is the object's own answer. A longer wait reads the
+ * submission first and holds until an answer differs from that read: an
+ * object's hold sees only what moves under it, so a move between two holds is
+ * told at the next hold's deadline, never missed.
+ */
 export const submissionOf: (
   changeId: ChangeId,
   waitSeconds?: number,
-) => Effect.Effect<SubmissionStatus, ChangeNotFound, Changes> = (changeId, waitSeconds) =>
-  Changes.use((changes) => changes.awaitSubmission(changeId, clampWait(waitSeconds)));
+) => Effect.Effect<SubmissionStatus, ChangeNotFound, Changes | Clock> = (changeId, waitSeconds) =>
+  Changes.use((changes) =>
+    clampWait(waitSeconds) <= HOLD_SECONDS
+      ? changes.awaitSubmission(changeId, clampWait(waitSeconds))
+      : Effect.flatMap(changes.awaitSubmission(changeId, 0), (first) =>
+          inHolds(
+            waitSeconds,
+            (seconds) => changes.awaitSubmission(changeId, seconds),
+            (now) => submissionMoved(first, now),
+          ),
+        ),
+  );
 
-/** The caller's own inbox after `cursor`, read as the run its token names, waiting up to `waitSeconds` (0–30) for a notice. */
+/**
+ * The caller's own inbox after `cursor`, read as the run its token names,
+ * waiting up to `waitSeconds` (0–900) for a notice. Each hold reads on from
+ * the cursor the one before answered, so `end` finds the head once.
+ */
 export const readInbox: (
   principal: AgentToken,
   cursor: string | undefined,
   waitSeconds?: number,
-) => Effect.Effect<InboxPage, never, Inbox> = (principal, cursor, waitSeconds) =>
+) => Effect.Effect<InboxPage, never, Inbox | Clock> = (principal, cursor, waitSeconds) =>
   Inbox.use((inbox) =>
-    inbox.read(principal.agentId, cursor, clampWait(waitSeconds), principal.run?.id),
+    inHolds(
+      waitSeconds,
+      (seconds, last) =>
+        inbox.read(principal.agentId, last?.cursor ?? cursor, seconds, principal.run?.id),
+      (page) => page.notices.length > 0,
+    ),
   );
 
 /**
@@ -296,12 +366,13 @@ const kept = (
 };
 
 /**
- * The event feed after `cursor`, waiting up to `waitSeconds` (0–30) for an
+ * The event feed after `cursor`, waiting up to `waitSeconds` (0–900) for an
  * event, as far as `scope` reads it. One project's read is sought through
  * that project's index in the feed, so a page is the project's next `limit`
  * and its cursor moves past every other project's events at once. A page
  * keeps only the events the scope reads, so it may hold fewer than `limit`,
- * or none, while its cursor still moves past the rest.
+ * or none, while its cursor still moves past the rest: a wait holds on from
+ * that cursor until a page keeps an event, so `end` finds the head once.
  */
 export const readEvents: (
   scope: FeedScope,
@@ -310,17 +381,26 @@ export const readEvents: (
     readonly limit?: number;
     readonly waitSeconds?: number;
   },
-) => Effect.Effect<EventFeedPage, never, EventFeed> = (scope, input) =>
+) => Effect.Effect<EventFeedPage, never, EventFeed | Clock> = (scope, input) =>
   EventFeed.use((feed) =>
-    feed.read({
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-      waitSeconds: clampWait(input.waitSeconds),
-      ...(scope._tag === "Project" ? { project: scope.project } : {}),
-    }),
-  ).pipe(
-    Effect.flatMap((page) =>
-      Effect.map(kept(scope, page.events), (events) => ({ ...page, events })),
+    inHolds(
+      input.waitSeconds,
+      (seconds, last: EventFeedPage | undefined) => {
+        const cursor = last?.cursor ?? input.cursor;
+        return feed
+          .read({
+            ...(cursor === undefined ? {} : { cursor }),
+            ...(input.limit === undefined ? {} : { limit: input.limit }),
+            waitSeconds: seconds,
+            ...(scope._tag === "Project" ? { project: scope.project } : {}),
+          })
+          .pipe(
+            Effect.flatMap((page) =>
+              Effect.map(kept(scope, page.events), (events) => ({ ...page, events })),
+            ),
+          );
+      },
+      (page) => page.events.length > 0,
     ),
   );
 

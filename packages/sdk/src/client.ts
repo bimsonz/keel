@@ -751,7 +751,7 @@ export class KeelClient {
     return this.call("Memory_getDecision", { decisionId }, options);
   }
 
-  /** Where a change's submission stands; with `wait` (0–30 s), once it moves. */
+  /** Where a change's submission stands; with `wait` (0–900 s), once it moves. */
   status(
     changeId: string,
     options: CallOptions & { readonly wait?: number } = {},
@@ -759,7 +759,7 @@ export class KeelClient {
     return this.call("status", { changeId, wait: options.wait }, options);
   }
 
-  /** Notices after `cursor`; with `wait` (0–30 s), the first one to arrive. */
+  /** Notices after `cursor`; with `wait` (0–900 s), the first one to arrive. */
   inbox(
     options: CallOptions & { readonly cursor?: string; readonly wait?: number } = {},
   ): Promise<WireOutputs["inbox"]> {

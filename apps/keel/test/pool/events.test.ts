@@ -237,7 +237,7 @@ describe("GET /v1/events", () => {
     expect(on.body.items.map((e) => e.eventId)).not.toContain(before.eventId);
   });
 
-  it("[feed.restart-under-wait] a waiting read whose Projector restarts under it is answered with the page as it stands, never a 500, and reading on from it misses nothing", async () => {
+  it("[feed.restart-under-wait] a waiting read whose Projector restarts under it is held on, never a 500: what arrives next answers it well before its deadline, and nothing is missed", async () => {
     const { projectA, member } = await tenancy();
     const from = await head(member);
     const started = Date.now();
@@ -247,14 +247,15 @@ describe("GET /v1/events", () => {
     await runInDurableObject(projector(), (_instance, state) =>
       state.abort("the Projector restarts under a held read"),
     ).catch(() => undefined);
-    const page = await waiting;
-    expect([page.status, page.body.items]).toEqual([200, []]);
-    expect(page.body.nextCursor >= from).toBe(true);
-    // Answered when the object went, not at the wait's end.
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // The read was read again as the object stood, and the wait holds on from there.
+    await new Promise((resolve) => setTimeout(resolve, 300));
     const arrived = await arrive(projectA);
+    const page = await waiting;
+    expect([page.status, page.body.items.map((e) => e.eventId)]).toEqual([200, [arrived.eventId]]);
+    // Answered by the arrival, not at the wait's end.
+    expect(Date.now() - started).toBeLessThan(10_000);
     const on = await events(member, `?project=${projectA}&cursor=${page.body.nextCursor}`);
-    expect(on.body.items.map((e) => e.eventId)).toEqual([arrived.eventId]);
+    expect(on.body.items).toEqual([]);
   });
 
   it("[feed.timeout-beside-wait] a waiting read that times out answers its own empty page and leaves a younger one waiting: both are answered 200, each at its own deadline", async () => {

@@ -70,6 +70,15 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(toolNames(readOnly)).toEqual(tagged.toSorted());
   });
 
+  it("[mcp.tools-read-on] what a notice tells an agent to read is a tool: the inbox, the feed and a conflict", async () => {
+    const tools = toolNames(
+      await mcpResult(await mcp(await tokenFor(await seedAgent()), "tools/list")),
+    );
+    expect(tools).toEqual(
+      expect.arrayContaining(["inbox", "Inbox_listEvents", "Conflicts_getConflict"]),
+    );
+  });
+
   it("[lattice.rest] answers anyone every predicate's lattice, exactly as the domain publishes it", async () => {
     const reader = await tokenFor(await seedAgent({}, ["agent:read"]));
     const anonymous = await exports.default.fetch(`${BASE}/v1/lattices`);

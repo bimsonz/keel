@@ -227,4 +227,18 @@ describe("the inbox from its head, through the real handler", () => {
     expect(Exit.isSuccess(page) && page.value.notices.map((notice) => notice.id)).toEqual([landed]);
     expect(next.notices).toEqual([landed]);
   });
+
+  it("[wait.spec] a wait of 900 seconds is taken, and answered at once when a notice waits; 901 is refused", async () => {
+    const seeded = await seedAgent();
+    const token = await tokenFor(seeded);
+    const waited = await deliver(seeded.agent.id, 1);
+
+    const long = await inboxAt(token, "wait=900");
+    const over = await exports.default.fetch(`${BASE}/v1/inbox?wait=901`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect([long.status, ids(long.body.result.notices)]).toEqual([200, waited]);
+    expect(over.status).toBe(400);
+  });
 });

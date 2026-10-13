@@ -20,12 +20,13 @@ import {
   commitEdits,
   rely,
   revise,
+  submissionMoved,
   submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
 import { lapsesAt } from "@keeltown/core/domain/coordination";
 import { ChangeId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
-import type { SubmissionStatus, Transaction } from "@keeltown/core/ports";
+import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Exit, Option, Schema } from "effect";
 import {
   type ChangeServices,
@@ -66,12 +67,6 @@ const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
 /** A lease's deadline is its own alarm row, so adoption withdraws the old one and arms the new. */
 const LEASE_DEADLINE = /^lease (\S+) lapses$/;
 const leaseDeadline = (leaseId: string) => `lease ${leaseId} lapses`;
-
-/** Whether a waiter on `submission` has something new: the state, the revision or the submitted commit moved. */
-const moved = (before: SubmissionStatus, after: SubmissionStatus) =>
-  after.change.state !== before.change.state ||
-  after.change.intent.revision !== before.change.intent.revision ||
-  after.commitSha !== before.commitSha;
 
 /**
  * The Change DO (`change:<ULID>`): a change and its lease, decided by the
@@ -202,7 +197,9 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     const waiters = this.waiters;
     const program = Effect.gen(function* () {
       const before = yield* submissionStatus(changeId);
-      return yield* waiters.until(waitMs, submissionStatus(changeId), (now) => moved(before, now));
+      return yield* waiters.until(waitMs, submissionStatus(changeId), (now) =>
+        submissionMoved(before, now),
+      );
     });
     return this.answer(ChangeCodecs.submission, program);
   }

@@ -2,8 +2,8 @@ import { describe, expect, it } from "@effect/vitest";
 import { type FeedScope, readEvents } from "@keeltown/core/application/coordination";
 import type { Audience } from "@keeltown/core/domain/identity";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { makeEventFeedMemory, ulidOf } from "@keeltown/testing";
-import { Effect, Schema } from "effect";
+import { makeEventFeedMemory, makeManualClock, ulidOf } from "@keeltown/testing";
+import { Effect, Layer, Schema } from "effect";
 
 const MEMBERS_OF = makeId("prj", ulidOf(1));
 const PUBLIC = makeId("prj", ulidOf(2));
@@ -59,7 +59,7 @@ describe("readEvents", () => {
         );
         expect(seen(asPublic)).toEqual([[PUBLIC, "ChangeStarted"]]);
         expect(asPublic.cursor).toBe(asMember.cursor);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(Layer.merge(memory.layer, makeManualClock().layer)));
     },
   );
 
@@ -89,7 +89,7 @@ describe("readEvents", () => {
         ]);
         expect(asked.toSorted()).toEqual([MEMBERS_OF, PUBLIC, UNREADABLE].toSorted());
         expect(page.cursor).toBe("000000000007");
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(Layer.merge(memory.layer, makeManualClock().layer)));
     },
   );
 });

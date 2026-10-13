@@ -300,6 +300,7 @@ interface Conflicts {
    * another. A conflict the caller may not read is the 404 of an unknown one.
    */
   @summary("Get a conflict")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/{conflictId}")
   @get

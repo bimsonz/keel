@@ -72,7 +72,12 @@ model EventPage {
 
 @tag("Inbox")
 interface Inbox {
-  /** Notices about what this agent relies on. `?wait` long-polls for harnesses that cannot hold a stream. */
+  /**
+   * Notices about what this agent relies on, for the run its token names. With `wait` the call
+   * holds until a notice arrives and answers the moment one does, or answers what there is when
+   * that many seconds have passed: an agent that keeps no stream open is told this way. Pass the
+   * answer's cursor back as `cursor` to be told only of what is newer.
+   */
   @summary("Read the inbox")
   @tag("mcp")
   @operationId("inbox")
@@ -93,6 +98,7 @@ interface Inbox {
    * moves stay with the project's members. Without a token and without `project`, 401.
    */
   @summary("Read events")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/events")
   @get

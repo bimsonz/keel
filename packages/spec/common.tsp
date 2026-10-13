@@ -443,10 +443,14 @@ model PageQuery {
 }
 
 model WaitQuery {
-  /** Long-poll: wait up to this many seconds for something new before answering. */
+  /**
+   * Hold the answer until something new arrives, for at most this many seconds (900 is fifteen
+   * minutes). The answer comes the moment there is something to say; at the deadline it is the
+   * state as it stands. Nothing polls: what arrives wakes the call.
+   */
   @query
   @minValue(0)
-  @maxValue(30)
+  @maxValue(900)
   wait?: int32;
 }
 

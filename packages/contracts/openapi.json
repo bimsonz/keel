@@ -4079,7 +4079,8 @@
           }
         },
         "tags": [
-          "Conflicts"
+          "Conflicts",
+          "mcp"
         ],
         "security": [
           {},
@@ -4942,7 +4943,8 @@
           }
         },
         "tags": [
-          "Inbox"
+          "Inbox",
+          "mcp"
         ],
         "security": [
           {},
@@ -5093,7 +5095,7 @@
       "get": {
         "operationId": "inbox",
         "summary": "Read the inbox",
-        "description": "Notices about what this agent relies on. `?wait` long-polls for harnesses that cannot hold a stream.",
+        "description": "Notices about what this agent relies on, for the run its token names. With `wait` the call\nholds until a notice arrives and answers the moment one does, or answers what there is when\nthat many seconds have passed: an agent that keeps no stream open is told this way. Pass the\nanswer's cursor back as `cursor` to be told only of what is newer.",
         "parameters": [
           {
             "name": "cursor",
@@ -9204,12 +9206,12 @@
         "name": "wait",
         "in": "query",
         "required": false,
-        "description": "Long-poll: wait up to this many seconds for something new before answering.",
+        "description": "Hold the answer until something new arrives, for at most this many seconds (900 is fifteen\nminutes). The answer comes the moment there is something to say; at the deadline it is the\nstate as it stands. Nothing polls: what arrives wakes the call.",
         "schema": {
           "type": "integer",
           "format": "int32",
           "minimum": 0,
-          "maximum": 30
+          "maximum": 900
         },
         "explode": false
       },
