@@ -2,15 +2,15 @@
 # kills: escalation.replay
 # why: evolve withdraws by mutating the state it was handed, so an earlier snapshot changes under it
 diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
-index e1f19b8..481bd79 100644
+index e8dd8c6c..95a24314 100644
 --- a/packages/core/src/domain/verification/escalation-machine.ts
 +++ b/packages/core/src/domain/verification/escalation-machine.ts
-@@ -225,7 +225,7 @@ export const evolveEscalation = (
+@@ -243,7 +243,7 @@ export const evolveEscalation = (
          : illegal(escalation, event);
      case "EscalationWithdrawn":
        return escalation.state === "open"
 -        ? { ...escalation, state: "withdrawn", withdrawnReason: event.reason }
 +        ? Object.assign(escalation, { state: "withdrawn" as const, withdrawnReason: event.reason })
          : illegal(escalation, event);
-     default: {
-       const unreachable: never = event;
+     case "EscalationWidened":
+       return escalation.state === "open" && escalation.widenedAt === undefined

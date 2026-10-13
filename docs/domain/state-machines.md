@@ -405,6 +405,7 @@ stateDiagram-v2
   [*] --> Open: EscalationRaised
   Open --> Ruled: RulingGiven
   Open --> Withdrawn: EscalationWithdrawn
+  Open --> Open: EscalationWidened
   Ruled --> [*]
   Withdrawn --> [*]
 ```
@@ -415,8 +416,9 @@ stateDiagram-v2
 | — | Open | A human-class conflict or step, an unprovable conflict, an overrule request, a frozen trunk | At least two options with unique ids, and the default among them (otherwise invalid) | `EscalationRaised` |
 | Open | Ruled | A person answers | Scope `operator`; the option is one the escalation offers (otherwise refused, with a next action per valid id) | `RulingGiven`, emitted by the owner, with the `DecisionRecorded` it makes in the same transaction. The object that raised the escalation hears the decision and acts on it (a conflict resolves with it, and its parked parties resume) |
 | Open | Withdrawn | Its subject was resolved some other way | — | `EscalationWithdrawn` |
+| Open | Open | The user asked first has had thirty minutes (the owner's own deadline) | Not widened before: a second widening commits nothing | `EscalationWidened`: the namespace's maintainers are asked too. The escalation records when (`widenedAt`); who may answer does not change |
 
-**Terminal:** Ruled, Withdrawn: a second ruling, even an identical one, is refused (the doorway's idempotency key covers retries). While Open the owner holds; the default is only a suggestion and is never applied on a timeout. A ruling produces a Decision.
+**Terminal:** Ruled, Withdrawn: a second ruling, even an identical one, is refused (the doorway's idempotency key covers retries), and neither is widened. While Open the owner holds; the default is only a suggestion and is never applied on a timeout. A ruling produces a Decision.
 
 ---
 

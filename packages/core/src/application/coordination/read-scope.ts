@@ -121,6 +121,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   VerdictIssued: "public",
   EscalationRaised: "members",
   EscalationWithdrawn: "members",
+  EscalationWidened: "members",
 
   RulingGiven: "members",
   DecisionRecorded: "public",

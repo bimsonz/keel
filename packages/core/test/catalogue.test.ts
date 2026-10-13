@@ -46,7 +46,7 @@ describe("the domain's events are the catalogue's events", () => {
     expect(tags(union).toSorted()).toEqual((sections.get(context) ?? []).toSorted());
   });
 
-  it("covers all 109 catalogued events", () => {
-    expect([...sections.values()].flat()).toHaveLength(109);
+  it("covers all 110 catalogued events", () => {
+    expect([...sections.values()].flat()).toHaveLength(110);
   });
 });

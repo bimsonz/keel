@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.widen-once
+# why: the fold takes EscalationWidened and records nothing, so the escalation never says its maintainers were asked and a second Widen commits again
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e8dd8c6c..c7de8348 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -247,7 +247,7 @@ export const evolveEscalation = (
+         : illegal(escalation, event);
+     case "EscalationWidened":
+       return escalation.state === "open" && escalation.widenedAt === undefined
+-        ? { ...escalation, widenedAt: committed.at }
++        ? escalation
+         : illegal(escalation, event);
+     default: {
+       const unreachable: never = event;

@@ -3,6 +3,8 @@ import {
   giveRuling,
   namespaceAddress,
   raiseEscalation,
+  wideningsOwed,
+  widenEscalation,
 } from "@keeltown/core/application/coordination";
 import {
   escalationView,
@@ -104,6 +106,13 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
     layer: Layer.mergeAll(gate, escalations),
     /** The events committed on `entity` in a namespace's object. */
     log,
+    /** The widenings a namespace's object owes: what its deadlines are armed from. */
+    owed: (namespace: NamespaceId) => on(namespace, wideningsOwed),
+    /** An escalation's widening deadline coming due, as the object's alarm runs it; what it commits is folded. */
+    widen: (namespace: NamespaceId, escalationId: EscalationId) =>
+      on(namespace, widenEscalation(escalationId)).pipe(
+        Effect.tap(() => Effect.sync(() => project(namespace, escalationId))),
+      ),
   };
 }
 export type EscalationsMemory = ReturnType<typeof makeEscalationsMemory>;

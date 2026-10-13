@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.widen-once
+# why: a second Widen commits EscalationWidened again, so the maintainers are told twice of one question
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e8dd8c6c..df6e1366 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -185,9 +185,7 @@ export const decideEscalation = (
+       if (escalation.state !== "open") return refuse();
+       // Once: an escalation already widened stays as it is, and commits nothing.
+       return Result.succeed(
+-        escalation.widenedAt === undefined
+-          ? [EscalationWidened.make({ escalationId: escalation.id })]
+-          : [],
++        [EscalationWidened.make({ escalationId: escalation.id })],
+       );
+     default: {
+       const unreachable: never = command;

@@ -61,6 +61,7 @@ const ESCALATION_TYPES: ReadonlySet<string> = new Set([
   "EscalationRaised",
   "RulingGiven",
   "EscalationWithdrawn",
+  "EscalationWidened",
   "DecisionRecorded",
 ]);
 
@@ -179,9 +180,12 @@ export function foldEscalationViews(store: Store, event: EventEnvelope): string 
  * asked first (the sponsor of the agent concerned) sees the escalation from
  * the moment it is raised; the maintainers of its namespace see it once
  * thirty minutes have passed without an answer, or at once when it names
- * nobody to ask first. It is a rule of the read, by the reader's clock: no
- * timer fires, and nothing is reassigned. In a person's own namespace the
- * maintainers are its owner alone, so the wider turn reaches nobody new.
+ * nobody to ask first. It is a rule of the read, by the reader's clock, and
+ * nothing is reassigned. The namespace's object commits EscalationWidened at
+ * that moment so an open inbox hears of it, but the list never waits for the
+ * event: a deadline that fires late hides no question. In a person's own
+ * namespace the maintainers are its owner alone, so the wider turn reaches
+ * nobody new.
  */
 export function listedTo(
   record: EscalationRecord,

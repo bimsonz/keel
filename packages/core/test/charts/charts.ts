@@ -338,7 +338,13 @@ export const escalationChart: Chart = {
   initial: "open",
   meta: { createdBy: "EscalationRaised", section: "Escalation" },
   states: {
-    open: { on: { RulingGiven: e("ruled"), EscalationWithdrawn: e("withdrawn") } },
+    open: {
+      on: {
+        RulingGiven: e("ruled"),
+        EscalationWithdrawn: e("withdrawn"),
+        EscalationWidened: e("open"),
+      },
+    },
     ruled: { type: "final" },
     withdrawn: { type: "final" },
   },

@@ -95,6 +95,7 @@ export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
   "ProjectSettingsChanged",
   "EscalationRaised",
   "EscalationWithdrawn",
+  "EscalationWidened",
   "RulingGiven",
   "OverruleRequested",
   "SessionOpened",

@@ -216,6 +216,14 @@ export const EscalationWithdrawn = Schema.TaggedStruct("EscalationWithdrawn", {
   escalationId: EscalationId,
   reason: Schema.String,
 });
+/**
+ * The person asked first has had their turn and the escalation is still open:
+ * its namespace's maintainers are asked too. Nothing is reassigned, and the
+ * person asked first may still answer.
+ */
+export const EscalationWidened = Schema.TaggedStruct("EscalationWidened", {
+  escalationId: EscalationId,
+});
 
 export const VerificationEvent = Schema.Union([
   ConflictSuspected,
@@ -233,5 +241,6 @@ export const VerificationEvent = Schema.Union([
   VerdictIssued,
   EscalationRaised,
   EscalationWithdrawn,
+  EscalationWidened,
 ]);
 export type VerificationEvent = typeof VerificationEvent.Type;

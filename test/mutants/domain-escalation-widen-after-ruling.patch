@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.transitions, escalation.widen-once
+# why: an escalation already answered or withdrawn is widened, asking the maintainers a question that is closed
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e8dd8c6c..0e035f08 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -182,7 +182,6 @@ export const decideEscalation = (
+           ])
+         : refuse();
+     case "Widen":
+-      if (escalation.state !== "open") return refuse();
+       // Once: an escalation already widened stays as it is, and commits nothing.
+       return Result.succeed(
+         escalation.widenedAt === undefined

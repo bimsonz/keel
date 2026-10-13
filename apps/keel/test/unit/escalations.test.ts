@@ -358,6 +358,197 @@ function ruled() {
 const conflictLog = (memory: ReturnType<typeof ruled>["memory"], at: SubjectRef, id: ConflictId) =>
   Effect.runSync(memory.log(at, { kind: "conflict", id }));
 
+/** An escalation raised on a memory namespace whose clock the test moves, and what its widening deadline does there. */
+function raisedOn(
+  memory: ReturnType<typeof makeEscalationsMemory>,
+  sponsor?: UserId,
+  namespace: NamespaceId = nextId("org"),
+) {
+  const project = nextId("prj");
+  const conflictId = nextId("cfl");
+  const escalationId = escalationIdOf(conflictId);
+  const about: EntityRef = { kind: "conflict", id: conflictId };
+  const raisedAt = memory.clock.now();
+  Effect.runSync(
+    HumanGate.use((gate) =>
+      gate.raise({
+        namespace,
+        escalationId,
+        project,
+        ...(sponsor === undefined ? {} : { sponsor }),
+        raisedBy: `subj:${project}:authz.session`,
+        ask: {
+          question: "Which holds?",
+          options: [
+            { id: PREMISE_HOLDS, label: "The premise holds", consequence: "one gives way" },
+            { id: EFFECT_STANDS, label: "The effect stands", consequence: "the other does" },
+          ],
+          about,
+          category: "ambiguous-requirement",
+          evidence: [],
+          precedents: [],
+          default: PREMISE_HOLDS,
+        },
+      }),
+    ).pipe(Effect.provide(memory.layer)),
+  );
+  return {
+    namespace,
+    project,
+    escalationId,
+    about,
+    raisedAt,
+    /** The deadline coming due, whatever the clock says. */
+    deadline: () => Effect.runSync(memory.widen(namespace, escalationId)),
+    owed: () => Effect.runSync(memory.owed(namespace)),
+    log: () => memory.log(namespace, { kind: "escalation", id: escalationId }),
+    rule: (by: UserId) =>
+      Effect.runSync(
+        Escalations.use((escalations) =>
+          escalations.rule({ escalationId, option: EFFECT_STANDS, by, idempotencyKey: "rule-1" }),
+        ).pipe(Effect.provide(memory.layer)),
+      ),
+    view: () =>
+      Effect.runSync(
+        Escalations.use((escalations) => escalations.get(escalationId)).pipe(
+          Effect.provide(memory.layer),
+        ),
+      ),
+  };
+}
+
+describe("an escalation widening to its namespace's maintainers", () => {
+  it(
+    "[t35.widened] however often and whenever its deadline comes, an escalation is widened once, and only if it asked a person first, is still unanswered and has waited thirty minutes; what is owed says the same",
+    () => {
+      fc.assert(
+        fc.property(
+          fc.boolean(),
+          fc.option(fc.integer({ min: 0, max: 4 }), { nil: undefined }),
+          fc.array(fc.integer({ min: 0, max: MAINTAINERS_AFTER_MS }), {
+            minLength: 1,
+            maxLength: 5,
+            size: "max",
+          }),
+          (asked, ruledBefore, waits) => {
+            const memory = makeEscalationsMemory();
+            const sponsor = asked ? nextId("usr") : undefined;
+            const e = raisedOn(memory, sponsor);
+            let widened = false;
+            let answered = false;
+            waits.forEach((wait, step) => {
+              if (ruledBefore === step) {
+                e.rule(nextId("usr"));
+                answered = true;
+              }
+              memory.clock.advance(wait);
+              e.deadline();
+              const due = memory.clock.now() - e.raisedAt >= MAINTAINERS_AFTER_MS;
+              if (asked && !answered && due) widened = true;
+              expect(types(e.log()).filter((type) => type === "EscalationWidened")).toEqual(
+                widened ? ["EscalationWidened"] : [],
+              );
+              expect(e.owed()).toEqual(
+                asked && !answered && !widened
+                  ? [{ escalationId: e.escalationId, at: e.raisedAt + MAINTAINERS_AFTER_MS }]
+                  : [],
+              );
+            });
+          },
+        ),
+      );
+    },
+    PROPERTY_TIMEOUT,
+  );
+
+  it("[t35.widened] at thirty minutes and not a millisecond before, in the question's project and concerning whom its raising did; the person asked first may still answer", () => {
+    const memory = makeEscalationsMemory();
+    const sponsor = nextId("usr");
+    const e = raisedOn(memory, sponsor);
+    const owed = [{ escalationId: e.escalationId, at: e.raisedAt + MAINTAINERS_AFTER_MS }];
+    expect(e.owed()).toEqual(owed);
+
+    memory.clock.advance(MAINTAINERS_AFTER_MS - 1);
+    e.deadline();
+    expect(types(e.log())).toEqual(["EscalationRaised"]);
+    // Early, it stays owed: the object arms it again.
+    expect(e.owed()).toEqual(owed);
+    expect(e.view().escalation.widenedAt).toBeUndefined();
+
+    memory.clock.advance(1);
+    e.deadline();
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWidened"]);
+    expect(e.log()[1]).toMatchObject({
+      at: e.raisedAt + MAINTAINERS_AFTER_MS,
+      project: e.project,
+      payload: { _tag: "EscalationWidened", escalationId: e.escalationId },
+      affected: [e.about, { kind: "org", id: e.namespace }, { kind: "user", id: sponsor }],
+    });
+    expect(e.owed()).toEqual([]);
+    // The Projector's view takes it: still open, and saying when.
+    expect(e.view().escalation).toMatchObject({
+      state: "open",
+      widenedAt: e.raisedAt + MAINTAINERS_AFTER_MS,
+    });
+
+    // Once: the deadline again, much later, commits nothing.
+    memory.clock.advance(MAINTAINERS_AFTER_MS);
+    e.deadline();
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWidened"]);
+    // Nothing was reassigned.
+    expect(e.rule(sponsor).escalation.state).toBe("ruled");
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWidened", "RulingGiven"]);
+  });
+
+  it("[t35.widened] never when it was answered first, when nobody was asked first, or for an escalation never raised", () => {
+    const memory = makeEscalationsMemory();
+    const answered = raisedOn(memory, nextId("usr"));
+    expect(answered.owed()).toHaveLength(1);
+    answered.rule(nextId("usr"));
+    // The ruling withdraws the deadline; one that fires all the same commits nothing.
+    expect(answered.owed()).toEqual([]);
+    const unasked = raisedOn(memory);
+    expect(unasked.owed()).toEqual([]);
+    memory.clock.advance(2 * MAINTAINERS_AFTER_MS);
+    answered.deadline();
+    unasked.deadline();
+    expect(types(answered.log())).toEqual(["EscalationRaised", "RulingGiven"]);
+    expect(types(unasked.log())).toEqual(["EscalationRaised"]);
+    expect(unasked.view().escalation.widenedAt).toBeUndefined();
+
+    const never = escalationIdOf(nextId("cfl"));
+    Effect.runSync(memory.widen(unasked.namespace, never));
+    expect(memory.log(unasked.namespace, { kind: "escalation", id: never })).toEqual([]);
+  });
+
+  it("[t35.widened] two escalations of one namespace each owe their own deadline, earliest first, and answering or widening one leaves the other's", () => {
+    const memory = makeEscalationsMemory();
+    const namespace = nextId("org");
+    const owes = (e: ReturnType<typeof raisedOn>) => ({
+      escalationId: e.escalationId,
+      at: e.raisedAt + MAINTAINERS_AFTER_MS,
+    });
+    const first = raisedOn(memory, nextId("usr"), namespace);
+    memory.clock.advance(60_000);
+    const second = raisedOn(memory, nextId("usr"), namespace);
+    memory.clock.advance(60_000);
+    const third = raisedOn(memory, nextId("usr"), namespace);
+    expect(third.owed()).toEqual([owes(first), owes(second), owes(third)]);
+
+    second.rule(nextId("usr"));
+    expect(third.owed()).toEqual([owes(first), owes(third)]);
+    memory.clock.advance(MAINTAINERS_AFTER_MS - 120_000);
+    first.deadline();
+    third.deadline();
+    expect(third.owed()).toEqual([owes(third)]);
+    expect([first, second, third].map((e) => types(e.log()))).toEqual([
+      ["EscalationRaised", "EscalationWidened"],
+      ["EscalationRaised", "RulingGiven"],
+      ["EscalationRaised"],
+    ]);
+  });
+});
+
 describe("a subject hearing the decision of an escalation it raised", () => {
   it("[t35.hear-decision] resolves the conflict the decision is about, with that decision and the move escalate, telling both parties, once", () => {
     const { memory, at, conflictId, holder, other, decision } = ruled();

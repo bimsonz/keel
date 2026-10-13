@@ -14,24 +14,36 @@ import {
   EFFECT_STANDS,
   escalationIdOf,
   namespaceAddress,
+  PREMISE_HOLDS,
 } from "@keeltown/core/application/coordination";
 import { MAINTAINERS_AFTER_MS } from "@keeltown/core/application/memory";
 import { Proposition } from "@keeltown/core/domain/coordination";
 import {
   type AgentId,
   type ConflictId,
+  type EscalationId,
   Instant,
   makeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { Escalations, EventOutbox, ProbeLedger, PROJECTOR } from "@keeltown/core/ports";
-import { Effect, Schema } from "effect";
+import { makeManualClock } from "@keeltown/testing";
+import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
 import { ProbeLedgerRpc } from "../../src/adapters/driven/do-rpc/probe-ledger.ts";
+import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
+import type { NamespaceDO } from "../../src/adapters/driving/do/namespace.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
-import { AgentSessionCodecs, ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { backbone } from "../../src/composition/do.ts";
+import {
+  AgentSessionCodecs,
+  ChangeCodecs,
+  decodeExit,
+  NamespaceCodecs,
+  RaiseCommand,
+} from "../../src/rpc/index.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
 import {
   BASE,
@@ -49,6 +61,7 @@ import {
 import { inertPrecheck } from "./inert-precheck.ts";
 import { inertProbe } from "./inert-probe.ts";
 import { admitted, LEAF, subjectOf } from "./probe-harness.ts";
+import { project } from "./project-harness.ts";
 
 const WAIT = { timeout: 20_000, interval: 50 };
 const PLAN_HASH = `sha256:${"e".repeat(64)}`;
@@ -492,5 +505,195 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       sponsor: sponsor.userId,
       escalation: { state: "open", category: "unprovable-conflict" },
     });
+  });
+});
+
+type NamespaceStub = ReturnType<typeof namespaceObject>;
+
+const widening = (escalationId: string) => `escalation ${escalationId} widens`;
+
+/** The deadline an escalation owes: thirty minutes after it was raised. */
+const owed = (escalation: { readonly id: string; readonly raisedAt: number }) => ({
+  kind: "deadline",
+  reason: widening(escalation.id),
+  at: escalation.raisedAt + MAINTAINERS_AFTER_MS,
+});
+
+/** The widening deadlines armed in `storage` for these escalations, by reason. */
+const wideningsIn = (storage: DurableObjectStorage, escalationIds: readonly string[]) =>
+  armedAlarms(storage)
+    .filter((alarm) => escalationIds.some((id) => alarm.reason === widening(id)))
+    .toSorted((a, b) => a.reason.localeCompare(b.reason));
+
+/** The widening deadlines the namespace's object has armed for these escalations. */
+const wideningsOf = (stub: NamespaceStub, escalationIds: readonly string[]) =>
+  runInDurableObject(stub, (_instance: NamespaceDO, state) =>
+    wideningsIn(state.storage, escalationIds),
+  );
+
+/**
+ * An escalation raised on the real namespace object as if `ago` milliseconds
+ * ago: the object's clock reads that moment for the raise alone, and its own
+ * runtime is back before the turn ends, so everything after is the object as
+ * deployed. Nothing is stamped ahead of the real clock, so what the raise
+ * commits is due for delivery at once. Answers the escalation with the
+ * deadline armed for it, read in the same turn: one already due fires by
+ * itself as soon as the turn is over.
+ */
+const raisedAgo = (
+  stub: NamespaceStub,
+  ago: number,
+  request: Omit<typeof RaiseCommand.Type, "ask" | "escalationId">,
+) => {
+  const conflictId = makeId("cfl", ulid());
+  const escalationId = escalationIdOf(conflictId);
+  const command = Schema.encodeSync(RaiseCommand)({
+    ...request,
+    escalationId,
+    ask: {
+      question: "Which holds?",
+      options: [
+        { id: PREMISE_HOLDS, label: "The premise holds", consequence: "one gives way" },
+        { id: EFFECT_STANDS, label: "The effect stands", consequence: "the other does" },
+      ],
+      about: { kind: "conflict", id: conflictId },
+      category: "ambiguous-requirement",
+      evidence: [],
+      precedents: [],
+      default: PREMISE_HOLDS,
+    },
+  });
+  return runInDurableObject(stub, async (instance: NamespaceDO, state) => {
+    const own: unknown = Reflect.get(instance, "runtime");
+    Reflect.set(
+      instance,
+      "runtime",
+      ManagedRuntime.make(
+        Layer.merge(backbone(state.storage), makeManualClock(Date.now() - ago).layer),
+      ),
+    );
+    try {
+      const { escalation } = ok(decodeExit(NamespaceCodecs.raise, await instance.raise(command)));
+      return { ...escalation, armed: wideningsIn(state.storage, [escalationId]) };
+    } finally {
+      Reflect.set(instance, "runtime", own);
+    }
+  });
+};
+
+/**
+ * An escalation's widening deadline run now, whatever time it is armed for:
+ * its row is brought to the present and the object's own alarm handler run in
+ * the same turn, so the platform's timer does not decide when.
+ */
+const deadlineNow = (stub: NamespaceStub, escalationId: string) =>
+  runInDurableObject(stub, async (instance: NamespaceDO, state) => {
+    await scheduleAlarm(state.storage, {
+      kind: "deadline",
+      reason: widening(escalationId),
+      at: Date.now(),
+    });
+    await instance.alarm();
+  });
+
+/** What the namespace's object has committed on an escalation. */
+const committedOn = (stub: NamespaceStub, escalationId: EscalationId) =>
+  runInDurableObject(stub, (instance: NamespaceDO) =>
+    instance["runtime"].runPromise(
+      Effect.map(EventOutbox, (outbox) =>
+        outbox.log({ kind: "escalation", id: escalationId }).map((event) => event.type),
+      ),
+    ),
+  );
+
+interface FeedPage {
+  readonly items: readonly {
+    readonly type: string;
+    readonly payload: { readonly escalationId?: string };
+  }[];
+  readonly nextCursor: string;
+}
+
+describe("[t35.widened-real] a question passing to its namespace's maintainers, on the real namespace object", () => {
+  it("[t35.widened-real] arms its deadline with the raise and withdraws it with the ruling; come due through the object's own alarm it commits EscalationWidened once, which a member's feed read serves and a visitor's does not", async () => {
+    const p = await project();
+    await p.open();
+    const member = await seedUser(uniqueHandle("member"));
+    const sponsor = await seedUser(uniqueHandle("sponsor"));
+    const ns = namespaceObject(namespaceAddress(POOL_ORG));
+    const feed = async (cursor: string, token?: string) => {
+      const response = await worker(
+        `${BASE}/v1/events?project=${p.projectId}&cursor=${cursor}&limit=500`,
+        token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } },
+      );
+      expect(response.status).toBe(200);
+      return response.json<FeedPage>();
+    };
+    const from = (await feed("end", member.token)).nextCursor;
+    // A subject of this project raises: the object that hears a ruling's decision is a real one, in a placed project.
+    const raiser = { project: p.projectId, raisedBy: `subj:${p.projectId}:${LEAF}` };
+    const asking = { ...raiser, sponsor: sponsor.userId };
+
+    // Armed with the raise, thirty minutes on, and only where a person was asked first.
+    const answered = await raisedAgo(ns, 0, asking);
+    const unasked = await raisedAgo(ns, 0, raiser);
+    expect([answered.armed, unasked.armed]).toEqual([[owed(answered)], []]);
+
+    // A ruling withdraws its escalation's deadline.
+    await drainOutbox(ns);
+    const ruling = (escalationId: EscalationId) =>
+      escalations((port) =>
+        port.rule({
+          escalationId,
+          option: EFFECT_STANDS,
+          by: sponsor.userId,
+          idempotencyKey: `rule-${escalationId}`,
+        }),
+      );
+    ok(await ruling(answered.id));
+    expect(await wideningsOf(ns, [answered.id])).toEqual([]);
+
+    // A minute early, the deadline commits nothing and is armed again where it was.
+    const early = await raisedAgo(ns, MAINTAINERS_AFTER_MS - 60_000, asking);
+    expect(early.armed).toEqual([owed(early)]);
+    await deadlineNow(ns, early.id);
+    expect(await committedOn(ns, early.id)).toEqual(["EscalationRaised"]);
+    expect(await wideningsOf(ns, [early.id])).toEqual([owed(early)]);
+
+    // Thirty minutes on, the object's own alarm commits the event, and owes nothing more.
+    const waiting = await raisedAgo(ns, MAINTAINERS_AFTER_MS, asking);
+    expect(waiting.armed).toEqual([owed(waiting)]);
+    await vi.waitFor(
+      async () =>
+        expect(await committedOn(ns, waiting.id)).toEqual([
+          "EscalationRaised",
+          "EscalationWidened",
+        ]),
+      WAIT,
+    );
+    expect(await wideningsOf(ns, [waiting.id])).toEqual([]);
+    // Once: the deadline again commits nothing.
+    await deadlineNow(ns, waiting.id);
+    expect(await committedOn(ns, waiting.id)).toEqual(["EscalationRaised", "EscalationWidened"]);
+    expect(await wideningsOf(ns, [waiting.id])).toEqual([]);
+
+    // A member's feed read of the project serves it; a visitor's, from the same place, holds only the ruling's public decision.
+    await drainOutbox(ns);
+    const members = await feed(from, member.token);
+    const visitors = await feed(from);
+    expect(
+      members.items
+        .filter((event) => event.type === "EscalationWidened")
+        .map((event) => event.payload.escalationId),
+    ).toEqual([waiting.id]);
+    expect(visitors.items.map((event) => event.type)).toEqual(["DecisionRecorded"]);
+    // The Projector's view says when; the question is still open, and still the first person's to answer.
+    const view = ok(await escalations((port) => port.get(waiting.id))).escalation;
+    expect(view.state).toBe("open");
+    expect(view.widenedAt).toBeGreaterThanOrEqual(waiting.raisedAt + MAINTAINERS_AFTER_MS);
+    expect(ok(await ruling(waiting.id)).escalation.state).toBe("ruled");
+    // The one still waiting is answered too, so no deadline outlives the case.
+    ok(await ruling(early.id));
+    expect(await wideningsOf(ns, [early.id, waiting.id])).toEqual([]);
   });
 });

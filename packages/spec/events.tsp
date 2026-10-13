@@ -1123,6 +1123,16 @@ model EscalationWithdrawn {
   reason: string;
 }
 
+/**
+ * The person asked first has had thirty minutes and the escalation is still
+ * open: its namespace's maintainers are asked too. Committed once. Nothing is
+ * reassigned, and the person asked first may still answer.
+ */
+model EscalationWidened {
+  _tag: "EscalationWidened";
+  escalationId: EscalationId;
+}
+
 // ─── Integration ────────────────────────────────────────────────────────────
 
 /** Where a step runs: 0 pure git inside a Durable Object, 1 a throwaway isolate, 2 a container. */
@@ -1673,6 +1683,7 @@ union KeelEvent {
   VerdictIssued,
   EscalationRaised,
   EscalationWithdrawn,
+  EscalationWidened,
 
   // Integration
   BatchFormed,

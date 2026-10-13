@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.widened
+# why: an escalation that named nobody to ask first is widened too, though its maintainers were asked from the start and there is no later turn to tell them of
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index d989f624..40d2c4eb 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -420,7 +420,7 @@ export const widenEscalation = Effect.fn("coordination/widenEscalation")(functio
+   const widen = (tx: Transaction): Result.Result<Transition<undefined>> => {
+     const nothing = Result.succeed({ drafts: [], value: undefined });
+     const row = storedRow(tx.store, escalationId);
+-    if (row === undefined || row.sponsor === undefined) {
++    if (row === undefined) {
+       tx.store.remove(WIDENING, escalationId);
+       return nothing;
+     }

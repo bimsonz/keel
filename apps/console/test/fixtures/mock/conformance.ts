@@ -165,6 +165,7 @@ const RULES: Record<EventType, Rule[]> = {
   EscalationWithdrawn: [
     { kind: "escalation", idField: "escalationId", from: ["open"], to: "withdrawn" },
   ],
+  EscalationWidened: [{ kind: "escalation", idField: "escalationId", from: ["open"] }],
 
   BatchFormed: [{ kind: "batch", idField: "batchId", from: null, to: "forming" }],
   CandidateAssembled: [

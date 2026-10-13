@@ -43,10 +43,10 @@ const UNKNOWN = "not-an-option";
 
 type Kind = EscalationCommand["_tag"];
 type Key = "none" | Escalation["state"];
-const KINDS: readonly Kind[] = ["Raise", "Rule", "Withdraw"];
+const KINDS: readonly Kind[] = ["Raise", "Rule", "Withdraw", "Widen"];
 const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Raise"],
-  open: ["Rule", "Rule", "Withdraw"],
+  open: ["Rule", "Widen", "Rule", "Withdraw", "Widen"],
   ruled: KINDS,
   withdrawn: KINDS,
 };
@@ -73,6 +73,7 @@ const option = (id: string): EscalationOption => ({
   consequence: `what ${id} does`,
 });
 const OPTIONS = [option("keep"), option("revert"), option("overrule")];
+const WIDEN: EscalationCommand = { _tag: "Widen" };
 
 /** Valid raises with two or three options, then one option, a repeated id, and a default that is no option. */
 const raise = (variant: number): EscalationCommand => {
@@ -116,6 +117,8 @@ const build = (kind: Kind, state: Escalation | undefined, step: Step): Escalatio
     }
     case "Withdraw":
       return { _tag: "Withdraw", reason: "the conflict was dismissed" };
+    case "Widen":
+      return WIDEN;
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -166,6 +169,8 @@ const oracle = (before: Escalation | undefined, command: EscalationCommand): Key
         : "refused";
     case "Withdraw":
       return before.state === "open" ? "withdrawn" : "refused";
+    case "Widen":
+      return before.state === "open" ? "open" : "refused";
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -203,6 +208,9 @@ const rule = (chosen: string): EscalationCommand => ({
 });
 const terminal = (e: Escalation | undefined): boolean =>
   e?.state === "ruled" || e?.state === "withdrawn";
+/** What a decision said: the refusal's tag, or the events it committed. */
+const said = (r: ReturnType<typeof decideEscalation>) =>
+  failureTag(r) ?? eventsOf(r).map((event) => event._tag);
 
 describe("the Escalation machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[escalation.transitions] in every state a run reaches, every command lands where the docs' table says, or is refused", () => {
@@ -320,6 +328,41 @@ describe("the Escalation machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(failureTag(twice.results[2] ?? Result.succeed([]))).toBe("EscalationStateRefused");
   });
 
+  it("[escalation.widen-once] an open escalation is widened once: the first says when, a second commits nothing and changes nothing, and one never raised or already answered takes none", () => {
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          r.probes.every((p) => {
+            const before = r.before;
+            if (p.command._tag !== "Widen" || before?.state !== "open") return true;
+            const committed = eventsOf(p.result).map((event) => event._tag);
+            if (!Result.isSuccess(p.result) || p.threw) return false;
+            return before.widenedAt === undefined
+              ? committed.join() === "EscalationWidened" &&
+                  p.after?.state === "open" &&
+                  p.after.widenedAt === r.now
+              : committed.length === 0 && comparable(p.after) === comparable(before);
+          }),
+        ),
+      ),
+    );
+    // Each branch by hand: the first, the second, and after the answer.
+    const widened = drive([raise(0), WIDEN, WIDEN, rule("keep"), WIDEN]);
+    expect(widened.results.map(said)).toEqual([
+      ["EscalationRaised"],
+      ["EscalationWidened"],
+      [],
+      ["RulingGiven"],
+      "EscalationStateRefused",
+    ]);
+    expect(widened.state).toMatchObject({ state: "ruled", widenedAt: T0 });
+    expect(drive([raise(0)]).state?.widenedAt).toBeUndefined();
+    expect(drive([WIDEN]).results.map(said)).toEqual(["EscalationNotFound"]);
+    const withdrawn = drive([raise(0), { _tag: "Withdraw", reason: "dismissed" }, WIDEN]);
+    expect(withdrawn.results.map(said)[2]).toBe("EscalationStateRefused");
+    expect(withdrawn.state?.widenedAt).toBeUndefined();
+  });
+
   it("[escalation.raise-valid] an escalation is raised only with at least two options, unique ids, and a default among them", () => {
     let refused = 0;
     fc.assert(
@@ -361,18 +404,21 @@ const escalationTour = (): readonly Fold<Escalation, EscalationEvent>[] => {
           dt: 1,
         })),
       ),
-    signature: (e) => e?.state ?? "none",
+    // A widened escalation is told from one that is not: what it takes next differs.
+    signature: (e) =>
+      e === undefined ? "none" : `${e.state}${e.widenedAt === undefined ? "" : ", widened"}`,
   });
   return walkedTour;
 };
 
 const ANOTHER = makeId("esc", `${"0".repeat(25)}1`);
 
-/** What the fold's table is about: whose the escalation is, its state, the options it offers and how it ended. */
+/** What the fold's table is about: whose the escalation is, its state, the options it offers, whether it has widened and how it ended. */
 interface Folded {
   readonly id: Escalation["id"];
   readonly state: Escalation["state"];
   readonly options: readonly string[];
+  readonly widened: boolean;
   readonly ended?: string;
 }
 
@@ -380,7 +426,12 @@ interface Folded {
 const folds = (from: Folded | undefined, event: EscalationEvent): Folded | "illegal" => {
   if (from === undefined)
     return event._tag === "EscalationRaised"
-      ? { id: event.escalationId, state: "open", options: event.options.map((o) => o.id) }
+      ? {
+          id: event.escalationId,
+          state: "open",
+          options: event.options.map((o) => o.id),
+          widened: false,
+        }
       : "illegal";
   if (event.escalationId !== from.id || from.state !== "open") return "illegal";
   switch (event._tag) {
@@ -392,6 +443,8 @@ const folds = (from: Folded | undefined, event: EscalationEvent): Folded | "ille
         : "illegal";
     case "EscalationWithdrawn":
       return { ...from, state: "withdrawn", ended: event.reason };
+    case "EscalationWidened":
+      return from.widened ? "illegal" : { ...from, widened: true };
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -408,11 +461,12 @@ describe("the Escalation fold", () => {
         id: e.id,
         state: e.state,
         options: e.options.map((o) => o.id),
+        widened: e.widenedAt !== undefined,
         ...(e.ruling === undefined ? {} : { ended: e.ruling.option }),
         ...(e.withdrawnReason === undefined ? {} : { ended: e.withdrawnReason }),
       }),
       shown: (f) =>
-        `${f.id} ${f.state} of ${f.options.join("/")}${f.ended === undefined ? "" : `, ${f.ended}`}`,
+        `${f.id} ${f.state}${f.widened ? " and widened" : ""} of ${f.options.join("/")}${f.ended === undefined ? "" : `, ${f.ended}`}`,
       // Each event as committed and as another escalation's, and a ruling for an option never offered.
       forms: (event) => [
         event,
@@ -424,17 +478,22 @@ describe("the Escalation fold", () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Five rows by eleven forms: four raises, a ruling and a withdrawal, each as this
-    // escalation's and as another's, and the ruling for an option never offered.
+    // Eight rows by thirteen forms: three raises, a ruling, a withdrawal and a widening, each
+    // as this escalation's and as another's, and the ruling for an option never offered.
+    // Fourteen are taken: a raise from nothing (six), an open escalation's ruling, withdrawal
+    // and widening (three, on each of two), and a widened one's ruling and withdrawal.
     expect(foldShape(cases)).toEqual({
-      folds: 55,
-      refused: 45,
+      folds: 104,
+      refused: 90,
       rows: [
         "none",
         `${ESCALATION} open of keep/revert`,
         `${ESCALATION} open of keep/revert/overrule`,
         `${ESCALATION} ruled of keep/revert, keep`,
         `${ESCALATION} withdrawn of keep/revert, the conflict was dismissed`,
+        `${ESCALATION} open and widened of keep/revert`,
+        `${ESCALATION} ruled and widened of keep/revert, keep`,
+        `${ESCALATION} withdrawn and widened of keep/revert, the conflict was dismissed`,
       ],
     });
   });

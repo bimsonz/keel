@@ -21,13 +21,22 @@ import {
   InvalidEscalation,
   RulingOptionUnknown,
 } from "./errors.ts";
-import { EscalationRaised, EscalationWithdrawn } from "./events.ts";
+import { EscalationRaised, EscalationWidened, EscalationWithdrawn } from "./events.ts";
 
 /** The events the owning DO commits for one escalation. */
-export const EscalationEvent = Schema.Union([EscalationRaised, RulingGiven, EscalationWithdrawn]);
+export const EscalationEvent = Schema.Union([
+  EscalationRaised,
+  RulingGiven,
+  EscalationWithdrawn,
+  EscalationWidened,
+]);
 export type EscalationEvent = typeof EscalationEvent.Type;
 
-/** Raised by the DO that needs the answer; ruled by an operator through the doorway; withdrawn by its owner. */
+/**
+ * Raised by the DO that needs the answer; ruled by an operator through the
+ * doorway; withdrawn by its owner; widened by its owner once the person asked
+ * first has had their turn.
+ */
 export type EscalationCommand =
   | {
       readonly _tag: "Raise";
@@ -45,7 +54,8 @@ export type EscalationCommand =
       readonly by: string;
       readonly rationale?: string;
     }
-  | { readonly _tag: "Withdraw"; readonly reason: string };
+  | { readonly _tag: "Withdraw"; readonly reason: string }
+  | { readonly _tag: "Widen" };
 
 /** Facts from I/O: the time, and the escalation this decision is about. */
 export interface EscalationFacts {
@@ -171,6 +181,14 @@ export const decideEscalation = (
             EscalationWithdrawn.make({ escalationId: escalation.id, reason: command.reason }),
           ])
         : refuse();
+    case "Widen":
+      if (escalation.state !== "open") return refuse();
+      // Once: an escalation already widened stays as it is, and commits nothing.
+      return Result.succeed(
+        escalation.widenedAt === undefined
+          ? [EscalationWidened.make({ escalationId: escalation.id })]
+          : [],
+      );
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -226,6 +244,10 @@ export const evolveEscalation = (
     case "EscalationWithdrawn":
       return escalation.state === "open"
         ? { ...escalation, state: "withdrawn", withdrawnReason: event.reason }
+        : illegal(escalation, event);
+    case "EscalationWidened":
+      return escalation.state === "open" && escalation.widenedAt === undefined
+        ? { ...escalation, widenedAt: committed.at }
         : illegal(escalation, event);
     default: {
       const unreachable: never = event;

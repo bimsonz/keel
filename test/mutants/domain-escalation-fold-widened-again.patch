@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.fold-table
+# why: the fold takes a second EscalationWidened and moves the time the maintainers were asked
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e8dd8c6c..e5e99cbb 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -246,7 +246,7 @@ export const evolveEscalation = (
+         ? { ...escalation, state: "withdrawn", withdrawnReason: event.reason }
+         : illegal(escalation, event);
+     case "EscalationWidened":
+-      return escalation.state === "open" && escalation.widenedAt === undefined
++      return escalation.state === "open"
+         ? { ...escalation, widenedAt: committed.at }
+         : illegal(escalation, event);
+     default: {

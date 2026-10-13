@@ -60,6 +60,8 @@ export const Escalation = Schema.Struct({
   /** The option suggested to the person: always one of `options`. */
   default: Schema.NonEmptyString,
   raisedAt: InstantSchema,
+  /** When its namespace's maintainers were asked too; absent while only the person asked first has been. */
+  widenedAt: Schema.optional(InstantSchema),
   ruling: Schema.optional(Ruling),
   withdrawnReason: Schema.optional(Schema.String),
 });

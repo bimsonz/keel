@@ -82,6 +82,7 @@ export const EVENT_TYPES = [
   "VerdictIssued",
   "EscalationRaised",
   "EscalationWithdrawn",
+  "EscalationWidened",
   // integration
   "BatchFormed",
   "CandidateAssembled",

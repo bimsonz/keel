@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.widened
+# why: EscalationWidened names nothing it concerns, so a reader cannot tell whose namespace's maintainers are asked or who was asked first
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index d989f624..b4da38b4 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -440,7 +440,7 @@ export const widenEscalation = Effect.fn("coordination/widenEscalation")(functio
+     return Result.succeed({
+       drafts: widened.success.map((payload): EventDraft => ({
+         payload: payloadOf(encodeEscalationEvent(payload)),
+-        affected: concerning(row),
++        affected: [],
+       })),
+       value: undefined,
+     });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts
+# kills: b12.event-audience
+# why: EscalationWidened is served to anyone on a public project, telling visitors that a question is waiting on a person and since when
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index cb37f6bd..70e158e7 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -119,7 +119,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   VerdictIssued: "public",
+   EscalationRaised: "members",
+   EscalationWithdrawn: "members",
+-  EscalationWidened: "members",
++  EscalationWidened: "public",
+ 
+   RulingGiven: "members",
+   DecisionRecorded: "public",

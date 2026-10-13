@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.chart
+# why: the chart draws EscalationWidened as an edge to Ruled, so the diagram says widening a question answers it
+diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
+index 713346a6..a6798056 100644
+--- a/packages/core/test/charts/charts.ts
++++ b/packages/core/test/charts/charts.ts
+@@ -342,7 +342,7 @@ export const escalationChart: Chart = {
+       on: {
+         RulingGiven: e("ruled"),
+         EscalationWithdrawn: e("withdrawn"),
+-        EscalationWidened: e("open"),
++        EscalationWidened: e("ruled"),
+       },
+     },
+     ruled: { type: "final" },

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.widened
+# why: a widening deadline that comes before thirty minutes have passed commits the event all the same, so the maintainers are told a question is theirs while the person asked first still has their turn
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index d989f624..30486c2a 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -424,7 +424,6 @@ export const widenEscalation = Effect.fn("coordination/widenEscalation")(functio
+       tx.store.remove(WIDENING, escalationId);
+       return nothing;
+     }
+-    if (tx.at - row.escalation.raisedAt < MAINTAINERS_AFTER_MS) return nothing;
+     tx.store.remove(WIDENING, escalationId);
+     const widened = decideEscalation(
+       row.escalation,

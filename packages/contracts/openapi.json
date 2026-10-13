@@ -11486,6 +11486,28 @@
         },
         "description": "A question put to a person, as Mission Control's inbox shows it: what EscalationRaised carried, and where it stands."
       },
+      "EscalationWidened": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "escalationId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "EscalationWidened"
+            ]
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The person asked first has had thirty minutes and the escalation is still\nopen: its namespace's maintainers are asked too. Committed once. Nothing is\nreassigned, and the person asked first may still answer."
+      },
       "EscalationWithdrawn": {
         "type": "object",
         "required": [
@@ -12840,6 +12862,9 @@
           },
           {
             "$ref": "#/components/schemas/EscalationWithdrawn"
+          },
+          {
+            "$ref": "#/components/schemas/EscalationWidened"
           },
           {
             "$ref": "#/components/schemas/BatchFormed"

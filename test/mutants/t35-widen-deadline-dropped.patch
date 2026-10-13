@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.widened
+# why: the raise writes no widening owed, so the object arms no deadline and the event is never committed
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index d989f624..f16ec547 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -273,8 +273,6 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
+     };
+     tx.store.put(ESCALATION, request.escalationId, asStored(encodeRow(row)));
+     // With nobody asked first the maintainers are asked at once: there is no later turn to tell them of.
+-    if (row.sponsor !== undefined)
+-      tx.store.put(WIDENING, request.escalationId, escalation.raisedAt + MAINTAINERS_AFTER_MS);
+     tx.outbox.subscribe(request.raisedBy, ESCALATION_TELLS, entity);
+     return Result.succeed({
+       drafts: decided.success.map((payload): EventDraft => ({

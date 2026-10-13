@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.widened
+# why: a widening that commits leaves itself owed, so the object arms a deadline already past again and again
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index d989f624..5d17e93e 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -425,7 +425,6 @@ export const widenEscalation = Effect.fn("coordination/widenEscalation")(functio
+       return nothing;
+     }
+     if (tx.at - row.escalation.raisedAt < MAINTAINERS_AFTER_MS) return nothing;
+-    tx.store.remove(WIDENING, escalationId);
+     const widened = decideEscalation(
+       row.escalation,
+       { _tag: "Widen" },

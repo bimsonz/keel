@@ -6,6 +6,7 @@ import {
   DecisionId,
   type EntityRef,
   EscalationId,
+  Instant,
   NamespaceId,
   userActor,
 } from "../../domain/kernel/index.ts";
@@ -25,6 +26,7 @@ import {
   evolveEscalation,
   type InvalidEscalation,
 } from "../../domain/verification/index.ts";
+import { MAINTAINERS_AFTER_MS } from "../memory/index.ts";
 import { commit, type Transaction, type Transition } from "../ports/commit.ts";
 import type { EventDraft } from "../ports/event-outbox.ts";
 import type { Stored } from "../ports/entity-store.ts";
@@ -169,6 +171,15 @@ const ESCALATION = "escalation";
 const DECISION = "decision";
 /** The one cause an escalation is raised under: a repeated raise is that commit again. */
 const RAISE = "raise";
+/** The one cause an escalation is widened under: a deadline that fires again is that commit again. */
+const WIDEN = "widen";
+/**
+ * The widenings the object still owes, by escalation id: when each falls due.
+ * Written in the raise's own transaction and removed by the ruling's and the
+ * widening's, so what is owed is never out of step with the escalation. The
+ * object's alarm is kept level with these rows.
+ */
+const WIDENING = "escalation-widening";
 
 /** What the object that raised an escalation hears of it: the decision its ruling recorded. */
 export const ESCALATION_TELLS = ["DecisionRecorded"] as const;
@@ -261,6 +272,9 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
       raisedBy: request.raisedBy,
     };
     tx.store.put(ESCALATION, request.escalationId, asStored(encodeRow(row)));
+    // With nobody asked first the maintainers are asked at once: there is no later turn to tell them of.
+    if (row.sponsor !== undefined)
+      tx.store.put(WIDENING, request.escalationId, escalation.raisedAt + MAINTAINERS_AFTER_MS);
     tx.outbox.subscribe(request.raisedBy, ESCALATION_TELLS, entity);
     return Result.succeed({
       drafts: decided.success.map((payload): EventDraft => ({
@@ -336,6 +350,8 @@ export const giveRuling = Effect.fn("coordination/giveRuling")(function* (comman
     if (decision !== undefined)
       tx.store.put(DECISION, decisionId, asStored(encodeDecision(decision)));
     tx.store.put(ESCALATION, escalationId, asStored(encodeRow({ ...row, escalation, decisionId })));
+    // Answered: nobody else is asked.
+    tx.store.remove(WIDENING, escalationId);
     return Result.succeed({
       drafts,
       value: undefined,
@@ -356,4 +372,78 @@ export const giveRuling = Effect.fn("coordination/giveRuling")(function* (comman
   if (committed.duplicate && !committed.sameCommand)
     return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
   return yield* escalationRecord(escalationId);
+});
+
+/** A widening the object owes: the escalation, and when its maintainers are asked too. */
+export interface WideningOwed {
+  readonly escalationId: EscalationId;
+  readonly at: Instant;
+}
+
+const isEscalationId = Schema.is(EscalationId);
+
+/**
+ * Every widening this namespace's object owes, earliest first: the open
+ * escalations that asked a person first and have not yet been put to the
+ * maintainers. The object arms one deadline for each and withdraws any other.
+ */
+export const wideningsOwed: Effect.Effect<readonly WideningOwed[], never, EntityStore> = Effect.map(
+  EntityStore,
+  (store) =>
+    store
+      .list(WIDENING)
+      .flatMap(({ id, value }) =>
+        isEscalationId(id) && typeof value === "number"
+          ? [{ escalationId: id, at: Instant(value) }]
+          : [],
+      )
+      .toSorted((a, b) => a.at - b.at || a.escalationId.localeCompare(b.escalationId)),
+);
+
+/**
+ * The person asked first has had their turn: EscalationWidened on
+ * `escalation:<id>`, in the question's project and concerning whom its
+ * raising did, so a maintainer's open inbox hears that the question is now
+ * theirs too. The list's rule is the clock's and never waits for this.
+ *
+ * Committed once, and only for an open escalation that asked a person first,
+ * no sooner than `MAINTAINERS_AFTER_MS` after it was raised. A deadline that
+ * comes early commits nothing and stays owed; one that comes for an
+ * escalation already answered, or never raised, commits nothing and is owed
+ * no longer.
+ */
+export const widenEscalation = Effect.fn("coordination/widenEscalation")(function* (
+  escalationId: EscalationId,
+) {
+  const entity = escalationRef(escalationId);
+  const project = storedRow(yield* EntityStore, escalationId)?.project;
+  const widen = (tx: Transaction): Result.Result<Transition<undefined>> => {
+    const nothing = Result.succeed({ drafts: [], value: undefined });
+    const row = storedRow(tx.store, escalationId);
+    if (row === undefined || row.sponsor === undefined) {
+      tx.store.remove(WIDENING, escalationId);
+      return nothing;
+    }
+    if (tx.at - row.escalation.raisedAt < MAINTAINERS_AFTER_MS) return nothing;
+    tx.store.remove(WIDENING, escalationId);
+    const widened = decideEscalation(
+      row.escalation,
+      { _tag: "Widen" },
+      { now: tx.at, escalationId },
+    );
+    // Refused only once answered or withdrawn: nobody else is asked then.
+    if (Result.isFailure(widened)) return nothing;
+    let escalation = row.escalation;
+    for (const payload of widened.success)
+      escalation = evolveEscalation(escalation, { at: tx.at, payload });
+    tx.store.put(ESCALATION, escalationId, asStored(encodeRow({ ...row, escalation })));
+    return Result.succeed({
+      drafts: widened.success.map((payload): EventDraft => ({
+        payload: payloadOf(encodeEscalationEvent(payload)),
+        affected: concerning(row),
+      })),
+      value: undefined,
+    });
+  };
+  yield* commit({ entity, cause: WIDEN, ...(project === undefined ? {} : { project }) }, widen);
 });

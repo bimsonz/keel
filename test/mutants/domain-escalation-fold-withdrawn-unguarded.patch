@@ -2,10 +2,10 @@
 # kills: escalation.fold-table
 # why: the fold takes EscalationWithdrawn with its guard gone: `escalation.state === "open"`.
 diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
-index e1f19b88..3fc318f4 100644
+index e8dd8c6c..ccb13c90 100644
 --- a/packages/core/src/domain/verification/escalation-machine.ts
 +++ b/packages/core/src/domain/verification/escalation-machine.ts
-@@ -224,9 +224,7 @@ export const evolveEscalation = (
+@@ -242,9 +242,7 @@ export const evolveEscalation = (
            }
          : illegal(escalation, event);
      case "EscalationWithdrawn":
@@ -13,6 +13,6 @@ index e1f19b88..3fc318f4 100644
 -        ? { ...escalation, state: "withdrawn", withdrawnReason: event.reason }
 -        : illegal(escalation, event);
 +      return { ...escalation, state: "withdrawn", withdrawnReason: event.reason };
-     default: {
-       const unreachable: never = event;
-       return unreachable;
+     case "EscalationWidened":
+       return escalation.state === "open" && escalation.widenedAt === undefined
+         ? { ...escalation, widenedAt: committed.at }

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: t35.widened-real
+# why: the namespace's object leaves an answered escalation's deadline armed after its ruling
+diff --git a/apps/keel/src/adapters/driving/do/namespace.ts b/apps/keel/src/adapters/driving/do/namespace.ts
+index bc30b88d..5f6c0d2c 100644
+--- a/apps/keel/src/adapters/driving/do/namespace.ts
++++ b/apps/keel/src/adapters/driving/do/namespace.ts
+@@ -51,7 +51,6 @@ export class NamespaceDO extends KeelObject implements NamespaceRpc {
+       NamespaceCodecs.rule,
+       decoded(RuleCommand, command).pipe(Effect.flatMap(giveRuling)),
+     );
+-    await this.armWidenings();
+     return answer;
+   }
+ 
