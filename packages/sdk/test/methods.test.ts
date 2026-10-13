@@ -87,7 +87,6 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Lattices_listLattices: (c) => c.lattices(),
   Views_getTrunk: (c) => c.trunk("prj_1"),
   Views_getVerdict: (c) => c.verdict("vrd_1"),
-  Views_getCandidate: (c) => c.candidate("cnd_1"),
   Views_listLanes: (c) => c.lanes("prj_1", { limit: 2 }),
   Repo_getTree: (c) => c.tree("prj_1"),
   Repo_getBlob: (c) => c.blob("prj_1", "README.md"),

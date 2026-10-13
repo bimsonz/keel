@@ -817,13 +817,6 @@ export class KeelClient {
     return this.call("Views_getVerdict", { verdictId }, options);
   }
 
-  candidate(
-    candidateId: string,
-    options?: CallOptions,
-  ): Promise<WireOutputs["Views_getCandidate"]> {
-    return this.call("Views_getCandidate", { candidateId }, options);
-  }
-
   /** A project's lanes; pass a page's `nextCursor` for the next. */
   lanes(
     projectId: string,

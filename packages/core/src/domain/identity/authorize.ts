@@ -124,7 +124,6 @@ export const SPEC_ACTIONS = {
   status: rule("Project", "read"),
   nearby: rule("Project", "read"),
   why: rule("Project", "read"),
-  Views_getCandidate: rule("Project", "read"),
   Views_getVerdict: rule("Project", "read"),
   Views_getTrunk: rule("Project", "read"),
   Views_listLanes: rule("Project", "read"),

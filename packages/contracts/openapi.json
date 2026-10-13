@@ -2222,135 +2222,6 @@
         ]
       }
     },
-    "/candidates/{candidateId}": {
-      "get": {
-        "operationId": "Views_getCandidate",
-        "summary": "Get a candidate",
-        "parameters": [
-          {
-            "name": "candidateId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/CandidateId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The request has succeeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CandidateView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The server could not understand the request due to invalid syntax.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Access is unauthorized.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access is forbidden.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The server cannot find the requested resource.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Client error",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service unavailable.",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Views"
-        ],
-        "security": [
-          {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
-          },
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
     "/changes": {
       "get": {
         "operationId": "Changes_listChanges",
@@ -10741,54 +10612,6 @@
           },
           "trunkSha": {
             "$ref": "#/components/schemas/CommitSha"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "CandidateView": {
-        "type": "object",
-        "required": [
-          "id",
-          "batchId",
-          "members",
-          "state",
-          "tier"
-        ],
-        "properties": {
-          "id": {
-            "$ref": "#/components/schemas/CandidateId"
-          },
-          "batchId": {
-            "type": "string"
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ChangeId"
-            }
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "forming",
-              "assembled",
-              "verifying",
-              "green",
-              "red",
-              "bisected",
-              "promoted",
-              "invalidated"
-            ]
-          },
-          "tier": {
-            "type": "number",
-            "enum": [
-              0,
-              1,
-              2
-            ]
           }
         },
         "additionalProperties": {
@@ -21443,8 +21266,7 @@
           "projectId",
           "head",
           "advancedAt",
-          "frozen",
-          "redCount"
+          "frozen"
         ],
         "properties": {
           "projectId": {
@@ -21459,11 +21281,6 @@
           },
           "frozen": {
             "type": "boolean"
-          },
-          "redCount": {
-            "type": "integer",
-            "format": "int32",
-            "description": "How many times trunk has been red. The claim is that this stays zero."
           }
         },
         "additionalProperties": {

@@ -1,4 +1,4 @@
-import { Batch, CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
+import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import { VerdictOutcome } from "@keeltown/core/domain/verification";
 import { BatchId, CandidateId, ContentHash, NextAction, VerdictId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -30,7 +30,6 @@ export const VerificationEndedCommand = Schema.Struct({ instanceId: Schema.NonEm
 export type VerificationEndedCommand = typeof VerificationEndedCommand.Type;
 
 export const LaneCodecs = {
-  batch: exitCodec(Batch, CandidateNotFound),
   recordVerdict: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
   destroy: exitCodec(Schema.Void, Schema.Never),
   verificationEnded: exitCodec(Schema.Void, Schema.Never),
@@ -42,7 +41,6 @@ export const LaneCodecs = {
  * by a call.
  */
 export interface LaneRpc {
-  batch(batchId: string): Promise<ExitJson>;
   recordVerdict(command: typeof RecordVerdictCommand.Encoded): Promise<ExitJson>;
   /**
    * Stops the lane for good, when its project is deleted: it drops its queue

@@ -1,12 +1,7 @@
 import type { Effect } from "effect";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type {
-  Batch,
-  CandidateNotFound,
-  ProjectNotFound,
-  PromotionState,
-} from "../../domain/integration/index.ts";
-import type { CandidateId, CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
+import type { ProjectNotFound, PromotionState } from "../../domain/integration/index.ts";
+import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
 
@@ -26,7 +21,6 @@ export interface TrunkView {
   readonly head: CommitSha;
   readonly advancedAt: Instant;
   readonly promotion: PromotionState;
-  readonly redCount: number;
 }
 
 export interface LaneView {
@@ -35,11 +29,6 @@ export interface LaneView {
   readonly queued: number;
   readonly inFlight: number;
 }
-
-export const getCandidate: (
-  principal: AgentToken,
-  candidateId: CandidateId,
-) => Effect.Effect<Batch, CandidateNotFound, EntityStore> = stub("integration/getCandidate");
 
 export const listLanes: (
   principal: AgentToken,

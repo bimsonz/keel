@@ -99,7 +99,7 @@ describe("the Trunk DO", () => {
     const head = "a".repeat(40);
     const { stub } = await placedTrunk(head);
     const first = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed", EMPTY));
-    expect(first).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0, origin: EMPTY }));
+    expect(first).toEqual(Exit.succeed({ head, promotion: "idle", origin: EMPTY }));
     const again = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed", EMPTY));
     expect(again).toEqual(first);
     const other = decodeExit(
@@ -128,7 +128,7 @@ describe("the Trunk DO", () => {
       TrunkCodecs.initialize,
       await trunkStub(projectId).initialize(head, "seed", EMPTY),
     );
-    expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0, origin: EMPTY }));
+    expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", origin: EMPTY }));
   });
 
   it("[trunks.rpc.head] the Trunks port reads trunk's head as its Trunk DO records it", async () => {
@@ -347,7 +347,7 @@ async function promoting(placed?: { readonly org: NamespaceId; readonly history:
     );
   });
   expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(base, "seed", EMPTY))).toEqual(
-    Exit.succeed({ head: base, promotion: "idle", redCount: 0, origin: EMPTY }),
+    Exit.succeed({ head: base, promotion: "idle", origin: EMPTY }),
   );
   /** Change `n`'s candidate on `on`, at refs/heads/cand/<cid> in staging. */
   const composed = (n: number, on: CommitSha) => {
@@ -423,7 +423,7 @@ describe("the Trunk DO's promotion", () => {
       const types = (await t.log()).map((e) => e.type);
       expect(types.filter((x) => x === "PromotionDeclined")).toHaveLength(9);
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: tips[0], promotion: "idle", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: tips[0], promotion: "idle", origin: EMPTY }),
       );
     });
     const log = await t.log();
@@ -449,7 +449,7 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(1, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: t.base, promotion: "frozen", origin: EMPTY }),
       ),
     );
     expect((await t.log()).at(-1)?.payload).toMatchObject({
@@ -469,18 +469,18 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(1, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: t.base, promotion: "frozen", origin: EMPTY }),
       ),
     );
     expect(
       decodeExit(TrunkCodecs.resume, await t.stub.resume(userActor(makeId("usr", ulid())))),
-    ).toEqual(Exit.succeed({ head: moved, promotion: "debouncing", redCount: 0, origin: EMPTY }));
+    ).toEqual(Exit.succeed({ head: moved, promotion: "debouncing", origin: EMPTY }));
     // Batch 1 waited on the old head: it is declined, and batch 2, verified on the new one, lands.
     const tip = await t.composed(2, moved);
     await t.stub.receive([t.verified(2, moved)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: tip, promotion: "idle", origin: EMPTY }),
       ),
     );
     const types = (await t.log()).map((e) => e.type);
@@ -507,7 +507,7 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(2, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: tip, promotion: "idle", origin: EMPTY }),
       ),
     );
     const log = await t.log();
@@ -541,7 +541,7 @@ describe("the Trunk DO's promotion", () => {
     await t.stub.receive([t.verified(2, t.base)]);
     await t.until(async () =>
       expect(await t.status()).toEqual(
-        Exit.succeed({ head: tip, promotion: "idle", redCount: 0, origin: EMPTY }),
+        Exit.succeed({ head: tip, promotion: "idle", origin: EMPTY }),
       ),
     );
     const log = await t.log();
@@ -599,7 +599,7 @@ describe("the Trunk DO's promotion", () => {
     await t.until(async () => expect(t.code.repos.size).toBe(0));
     expect(mirrorDeletions).toEqual(["failed", "deleted"]);
     expect(await t.status()).toEqual(
-      Exit.succeed({ head: t.base, promotion: "idle", redCount: 0, origin: EMPTY }),
+      Exit.succeed({ head: t.base, promotion: "idle", origin: EMPTY }),
     );
     expect((await t.log()).map((e) => e.type)).toEqual(["TrunkInitialized"]);
     expect(t.writer.pushes()).toEqual([]);

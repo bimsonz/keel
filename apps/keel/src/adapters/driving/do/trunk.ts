@@ -57,11 +57,10 @@ const projectOfName = (name: string | undefined): ProjectId => {
 const startOf = (trunk: Trunk | undefined) =>
   trunk?.origin === undefined ? {} : { origin: trunk.origin };
 
-/** What the RPC answers for a trunk. No Auditor runs before L4, so nothing is red yet. */
+/** What the RPC answers for a trunk. */
 const statusOf = (trunk: Trunk) => ({
   head: trunk.head,
   promotion: trunk.phase,
-  redCount: 0,
   ...startOf(trunk),
 });
 

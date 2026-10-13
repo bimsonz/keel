@@ -173,7 +173,6 @@ export const ROUTES = {
   Lattices_listLattices: { method: "GET", path: "/lattices" },
   Inbox_getSnapshot: { method: "GET", path: "/events/snapshot", query: ["project"] },
   Views_getVerdict: { method: "GET", path: "/verdicts/{verdictId}" },
-  Views_getCandidate: { method: "GET", path: "/candidates/{candidateId}" },
   Views_listLanes: {
     method: "GET",
     path: "/projects/{projectId}/lanes",

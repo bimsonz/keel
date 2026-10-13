@@ -972,7 +972,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           );
         },
         Views_getVerdict: notYet,
-        Views_getCandidate: notYet,
         Views_listLanes: notYet,
         Views_getTrunk: notYet,
         // Anyone lists projects: one page is read for the caller's audience and the policy decides each row, so a visitor sees the public ones.

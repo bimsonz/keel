@@ -6,14 +6,6 @@ using Http;
 
 namespace Keel;
 
-model CandidateView {
-  id: CandidateId;
-  batchId: string;
-  members: ChangeId[];
-  state: "forming" | "assembled" | "verifying" | "green" | "red" | "bisected" | "promoted" | "invalidated";
-  tier: 0 | 1 | 2;
-}
-
 model LaneView {
   id: string;
   projectId: ProjectId;
@@ -26,9 +18,6 @@ model TrunkView {
   head: CommitSha;
   advancedAt: utcDateTime;
   frozen: boolean;
-
-  /** How many times trunk has been red. The claim is that this stays zero. */
-  redCount: int32;
 }
 
 model LanePage is Page<LaneView>;
@@ -40,12 +29,6 @@ interface Views {
   @route("/verdicts/{verdictId}")
   @get
   getVerdict(@path verdictId: VerdictId): VerdictView | NotFound | StandardErrors;
-
-  @summary("Get a candidate")
-  @useAuth(AgentRead | SessionAuth)
-  @route("/candidates/{candidateId}")
-  @get
-  getCandidate(@path candidateId: CandidateId): CandidateView | NotFound | StandardErrors;
 
   @summary("List a project's lanes")
   @useAuth(AgentRead | SessionAuth)

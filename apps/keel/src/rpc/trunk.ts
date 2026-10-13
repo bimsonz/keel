@@ -13,7 +13,6 @@ import { RepoRef } from "./workspace-pool.ts";
 export const TrunkStatus = Schema.Struct({
   head: CommitSha,
   promotion: PromotionState,
-  redCount: Schema.Int,
   /** Where trunk started; absent on a trunk initialized before origins were kept. */
   origin: Schema.optional(TrunkOrigin),
 });
