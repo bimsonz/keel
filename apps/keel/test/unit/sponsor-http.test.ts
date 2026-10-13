@@ -1,13 +1,15 @@
-import type { SignedIn } from "@keeltown/core/application/identity";
+import { type SignedIn, signUpAgent } from "@keeltown/core/application/identity";
 import {
   type Agent,
   AgentStateRefused,
+  givenHandle,
   type Principal,
   type Role,
 } from "@keeltown/core/domain/identity";
 import { type AgentId, Instant, makeId, type OrgId, type UserId } from "@keeltown/core/kernel";
 import { Sponsorships } from "@keeltown/core/ports";
 import {
+  freshAgentKey,
   makeAgentDirectoryMemory,
   makeAgentSignUpsMemory,
   makeBetterAuthMemory,
@@ -104,7 +106,7 @@ function world() {
       directory.layer,
       projects.layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
-      makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeAgentSignUpsMemory(rows).layer.pipe(Layer.provide(directory.layer)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
       sponsorships.layer.pipe(Layer.provide(directory.layer)),
@@ -499,7 +501,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the org it works in, never who stands behind it", async () => {
+  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the org it works in, its handle and its own namespace when it signed itself up, never who stands behind it", async () => {
     const w = world();
     const held = await sponsored(w, ANN, "carded");
     const card = async (caller: Caller, agentId: string) =>
@@ -519,6 +521,16 @@ describe("the sponsor link at the doorway", () => {
       id: placeless,
       name: "placeless",
       kind: "interactive",
+    });
+    // An agent that signed itself up has a handle and a namespace of its own, and no kind or org.
+    const { jkt, jwk } = freshAgentKey();
+    const { agent: keyed } = await w.runtime.runPromise(signUpAgent({ jkt, jwk }, "keyed"));
+    expect(keyed.handle).toBe(givenHandle(keyed.id));
+    expect((await card(VISITOR, keyed.id)).body).toEqual({
+      id: keyed.id,
+      name: "keyed",
+      handle: keyed.handle,
+      namespace: { handle: keyed.handle, kind: "agent" },
     });
     // An id nobody has and one that is no id read the same.
     const missing = await card(VISITOR, makeId("agt", ulid()));

@@ -92,7 +92,15 @@ model ApproveSponsorRequest {
 model AgentCard {
   id: AgentId;
   name: string;
-  kind: AgentKind;
+
+  /** The handle it was given at sign-up, made from its key. An agent enrolled by a person has none. */
+  handle?: Handle;
+
+  /** Its own namespace, where its own projects live: its handle, of kind `agent`. An agent enrolled by a person has none. */
+  `namespace`?: NamespaceRef;
+
+  /** What runs it. An agent that signed itself up with a key has none. */
+  kind?: AgentKind;
 
   /** The org the agent works in, by its handle. */
   org?: string;

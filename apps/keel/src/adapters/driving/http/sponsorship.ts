@@ -6,7 +6,7 @@ import type {
   SponsorRequestRefused,
 } from "@keeltown/core/domain/identity";
 import { AgentId } from "@keeltown/core/kernel";
-import type { SponsorRequest } from "@keeltown/core/ports";
+import type { NamespaceRecord, SponsorRequest } from "@keeltown/core/ports";
 import { Schema } from "effect";
 import type {
   Agents_approveSponsorResult,
@@ -232,16 +232,23 @@ export function sponsoredOk(agents: readonly Agent[]): Agents_listSponsoredResul
 }
 
 /**
- * An agent as anyone may see it: who it is and the org it works in, by that
- * org's handle. Never its sponsor, its scopes or its standing.
+ * An agent as anyone may see it: who it is, its own namespace when it signed
+ * itself up, and the org it works in, by that org's handle. Never its sponsor,
+ * its scopes or its standing.
  */
-export function cardOk(agent: Agent, org: string | undefined): Agents_getAgentResult {
+export function cardOk(
+  agent: Agent,
+  place: { readonly own: NamespaceRecord | undefined; readonly org: string | undefined },
+): Agents_getAgentResult {
+  const { own, org } = place;
   return {
     status: 200,
     body: {
       id: agent.id,
       name: agent.name,
-      kind: agent.kind,
+      ...(agent.handle === undefined ? {} : { handle: agent.handle }),
+      ...(own === undefined ? {} : { namespace: { handle: own.handle, kind: own.kind } }),
+      ...(agent.kind === undefined ? {} : { kind: agent.kind }),
       ...(org === undefined ? {} : { org }),
     },
   };
