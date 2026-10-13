@@ -1,6 +1,6 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-kept"
-# kills: b1.alarm-kept
-# why: Starting a request arms nothing, so one whose invocation died waits for some other deadline to find it
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "b1.alarm-counted"
+# kills: b1.alarm-counted
+# why: Starting a request arms nothing, so once the platform stops retrying a dead invocation its request waits for some other deadline to find it
 diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
 index 0fb24ffa..9931b1ca 100644
 --- a/apps/keel/src/adapters/driving/do/alarm.ts

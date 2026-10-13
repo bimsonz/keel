@@ -355,15 +355,16 @@ const TEST_DEADLINE = "a test's deadline";
 /**
  * Runs the object's alarm as if the test deadline's retry had come due: the
  * wait before a dead handler's request is run again is real time otherwise.
+ * Only the row's time is moved. The alarm itself is whatever the object
+ * armed: one that armed nothing for a dead handler's request is never run.
  */
 const retried = async (stub: DurableObjectStub<ChangeDO>) => {
-  await runInDurableObject(stub, async (_instance: ChangeDO, state) => {
+  await runInDurableObject(stub, (_instance: ChangeDO, state) => {
     state.storage.sql.exec(
       "UPDATE keel_alarms SET retry = ? WHERE reason = ? AND retry IS NOT NULL",
       Date.now() - 1,
       TEST_DEADLINE,
     );
-    await state.storage.setAlarm(Date.now());
   });
   await runDurableObjectAlarm(stub).catch(() => false);
 };
@@ -525,19 +526,22 @@ describe("alarms", () => {
       const at = Date.now() - 1;
       const dies = { kind: "deadline", reason: "a handler that dies", at } as const;
       await scheduleAlarm(state.storage, dies);
-      await scheduleAlarm(state.storage, { kind: "deadline", reason: "behind it", at });
       const [first] = (await dueAlarms(state.storage, at)).due;
       if (first === undefined) throw new Error("nothing was due");
       // The invocation dies under the first handler: nothing is finished, and the second never started.
       await startAlarm(state.storage, first, at);
+      const armedForRetry = await state.storage.getAlarm();
+      await scheduleAlarm(state.storage, { kind: "deadline", reason: "behind it", at });
       const atOnce = (await dueAlarms(state.storage, at)).due;
       const armedFor = await state.storage.getAlarm();
       const later = (await dueAlarms(state.storage, at + ALARM_RETRY_MS)).due;
       // A delivery arms the dead handler's reason again: it is due at once, its one start still counted.
       await scheduleAlarm(state.storage, dies);
       const rearmed = (await dueAlarms(state.storage, at)).due;
-      return { at, atOnce, armedFor, later, rearmed };
+      return { at, armedForRetry, atOnce, armedFor, later, rearmed };
     });
+    // Starting a request arms the alarm for its retry: nothing else would run it again.
+    expect(result.armedForRetry).toBe(result.at + ALARM_RETRY_MS);
     expect(counts(result.atOnce)).toEqual([["behind it", 0]]);
     // Armed for the request that is due now, not held back to the dead one's retry.
     expect(result.armedFor).toBeLessThan(result.at + ALARM_RETRY_MS);
