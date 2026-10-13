@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/holds.test.ts packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.holds, conflict.holds-inverts-against
+# why: a ruling against the premise's holder still upheld the premise, so a decision that let the effect stand is met as one that kept the premise
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index 342f58f6..1d1676cc 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -187,5 +187,5 @@ export const holds = (
+   const holderLost = against.includes(premise.holder);
+   const authorLost = against.includes(effect.changeId);
+   if (holderLost === authorLost) return [];
+-  return [authorLost ? premise.proposition : effect.proposition];
++  return [premise.proposition];
+ };

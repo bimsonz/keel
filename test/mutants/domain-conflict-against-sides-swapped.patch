@@ -1,14 +1,16 @@
-# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
-# kills: conflict.ruling-against
-# why: the sides are swapped: a ruling goes against the side it lets stand, so the change a person upheld is bounced and the other resumes
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.ruling-against, conflict.holds-inverts-against
+# why: the sides are swapped: a ruling goes against the side it lets stand, so the change a person upheld is bounced and the other resumes, and what the ruling upheld is read as the side it ruled out
 diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
-index f355e540..06cc36b7 100644
+index 342f58f6..0501272a 100644
 --- a/packages/core/src/domain/verification/conflict.ts
 +++ b/packages/core/src/domain/verification/conflict.ts
-@@ -163,5 +163,5 @@ export const sidesAgainst = (
+@@ -163,7 +163,7 @@ export const sidesAgainst = (
    const holder = conflict.premise?.holder;
    const author = conflict.effect?.changeId;
    if (holder === undefined || author === undefined || holder === author) return [];
 -  return [stands === "premise" ? author : holder];
 +  return [stands === "premise" ? holder : author];
  };
+ 
+ /**

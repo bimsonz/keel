@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none, precedent.ended-not-met
+# why: the precedent carries none of what its decision upheld, so it is listed and never contradicted
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..4dd3ab73 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -19,6 +19,6 @@ export const scopedPrecedent = (
+           decidedAt: decision.decidedAt,
+           ...(decision.scope === undefined ? {} : { scope: decision.scope }),
+         },
+-        holds: upheld,
++        holds: [],
+       }
+     : undefined;

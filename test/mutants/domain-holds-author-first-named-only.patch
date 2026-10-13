@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/holds.test.ts
+# kills: conflict.holds
+# why: the effect's change is looked for only in the first place of against, so a ruling that names it after another change upheld nothing, or the effect
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index 342f58f6..39e87034 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -185,7 +185,7 @@ export const holds = (
+   const { premise, effect } = sides;
+   if (premise === undefined || effect === undefined) return [];
+   const holderLost = against.includes(premise.holder);
+-  const authorLost = against.includes(effect.changeId);
++  const authorLost = against[0] === effect.changeId;
+   if (holderLost === authorLost) return [];
+   return [authorLost ? premise.proposition : effect.proposition];
+ };

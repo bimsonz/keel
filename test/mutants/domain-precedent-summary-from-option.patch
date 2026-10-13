@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none
+# why: the precedent's summary is the chosen option's id, not its label, so an agent reads an identifier where the ruling's words belong
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..46b84fe4 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -15,7 +15,7 @@ export const scopedPrecedent = (
+     ? {
+         ref: {
+           decisionId: decision.id,
+-          summary: decision.summary,
++          summary: decision.option,
+           decidedAt: decision.decidedAt,
+           ...(decision.scope === undefined ? {} : { scope: decision.scope }),
+         },

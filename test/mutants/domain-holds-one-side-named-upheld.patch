@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/holds.test.ts packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.holds, conflict.holds-inverts-against
+# why: a conflict that names only its premise has it upheld by any ruling not against its holder, though no effect was ruled out
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index 342f58f6..51be441f 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -183,7 +183,8 @@ export const holds = (
+   against: readonly ChangeId[],
+ ): readonly Proposition[] => {
+   const { premise, effect } = sides;
+-  if (premise === undefined || effect === undefined) return [];
++  if (premise === undefined) return [];
++  if (effect === undefined) return against.includes(premise.holder) ? [] : [premise.proposition];
+   const holderLost = against.includes(premise.holder);
+   const authorLost = against.includes(effect.changeId);
+   if (holderLost === authorLost) return [];

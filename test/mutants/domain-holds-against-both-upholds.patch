@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/holds.test.ts
+# kills: conflict.holds
+# why: a ruling that went against both sides still upheld the premise, though it let neither stand
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index 342f58f6..ebf6d494 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -186,6 +186,6 @@ export const holds = (
+   if (premise === undefined || effect === undefined) return [];
+   const holderLost = against.includes(premise.holder);
+   const authorLost = against.includes(effect.changeId);
+-  if (holderLost === authorLost) return [];
++  if (!holderLost && !authorLost) return [];
+   return [authorLost ? premise.proposition : effect.proposition];
+ };

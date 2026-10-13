@@ -10,6 +10,7 @@ import {
   type ConflictKind,
   decideConflict,
   evolveConflict,
+  holds,
   type ProbeCommand,
   replayConflict,
   sidesAgainst,
@@ -882,6 +883,57 @@ describe("a ruling's side", () => {
           effectStands: twoSides ? [holder] : [],
         };
       }),
+    );
+  });
+
+  it("[conflict.holds-inverts-against] what a ruling upheld is the side it let stand: `holds` of whom `sidesAgainst` names is that side's proposition and no other, on the suspicion and on the conflict the ruling resolved, and nothing where it names no one", () => {
+    const CHANGES = [undefined, CHANGE_A, CHANGE_B, OUTSIDER];
+    const EFFECT = EFFECTS[0] ?? PREMISE;
+    const { premise: _p, effect: _e, ...bare } = between;
+    const cases = CHANGES.flatMap((holder) =>
+      CHANGES.flatMap((author) =>
+        (["premise", "effect"] as const).map((stands) => ({ holder, author, stands })),
+      ),
+    );
+    type Case = (typeof cases)[number];
+    const suspect = ({ holder, author }: Case): LedgerCommand =>
+      C({
+        ...bare,
+        ...(holder === undefined ? {} : { premise: { holder, proposition: PREMISE } }),
+        ...(author === undefined ? {} : { effect: { changeId: author, proposition: EFFECT } }),
+      });
+    /** The ruling is taken where the conflict can be proven and its sides are parties: both named, by A or B. */
+    const ruledOn = ({ holder, author }: Case): boolean =>
+      [holder, author].every((id) => id === CHANGE_A || id === CHANGE_B);
+    const outcome = (c: Case) => {
+      const suspected = drive([suspect(c)]).state?.conflict;
+      if (suspected === undefined) throw new Error("the suspicion was refused");
+      const against = sidesAgainst(suspected, c.stands);
+      if (!ruledOn(c)) return { onSuspicion: holds(suspected, against), onResolved: "not ruled" };
+      const proven = drive([suspect(c), draft, ...cells(3), settle]).state?.conflict;
+      const decided = decideConflict(
+        proven,
+        { _tag: "Resolve", move: "escalate", decisionId: DECISION, against },
+        facts,
+      );
+      if (Result.isFailure(decided)) throw new Error("the ruling was refused");
+      const resolved = throughTheWire(
+        ConflictEvent,
+        decided.success.map((payload) => ({ at: T0, payload })),
+      ).reduce<Conflict | undefined>((state, event) => evolveConflict(state, event), proven);
+      if (resolved?.state !== "resolved") throw new Error("the ruling resolved nothing");
+      return {
+        onSuspicion: holds(suspected, against),
+        onResolved: holds(resolved, resolved.against ?? []),
+      };
+    };
+    const expected = (c: Case) => {
+      const twoSides = c.holder !== undefined && c.author !== undefined && c.holder !== c.author;
+      const stood = twoSides ? [c.stands === "premise" ? PREMISE : EFFECT] : [];
+      return { onSuspicion: stood, onResolved: ruledOn(c) ? stood : "not ruled" };
+    };
+    expect(cases.map((c) => ({ ...c, ...outcome(c) }))).toEqual(
+      cases.map((c) => ({ ...c, ...expected(c) })),
     );
   });
 

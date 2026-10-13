@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none, precedent.ended-not-met
+# why: a superseded decision still scopes a precedent, beside the decision that replaced it
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..59a6aec1 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -11,7 +11,7 @@ export const scopedPrecedent = (
+   decision: Decision,
+   upheld: readonly Proposition[],
+ ): ScopedPrecedent | undefined =>
+-  decision.state === "active"
++  decision.state !== "overruled"
+     ? {
+         ref: {
+           decisionId: decision.id,

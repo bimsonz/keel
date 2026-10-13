@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none
+# why: the precedent's ref loses the decision's scope, so a ruling for one environment reads as one for everywhere
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..fb7b1039 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -17,7 +17,6 @@ export const scopedPrecedent = (
+           decisionId: decision.id,
+           summary: decision.summary,
+           decidedAt: decision.decidedAt,
+-          ...(decision.scope === undefined ? {} : { scope: decision.scope }),
+         },
+         holds: upheld,
+       }

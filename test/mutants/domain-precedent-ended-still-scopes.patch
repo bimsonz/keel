@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none, precedent.ended-not-met
+# why: the decision's state is not read, so a decision superseded or overruled is still listed and an intent is told to distinguish a ruling that no longer stands
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..bd8b64b1 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -11,7 +11,7 @@ export const scopedPrecedent = (
+   decision: Decision,
+   upheld: readonly Proposition[],
+ ): ScopedPrecedent | undefined =>
+-  decision.state === "active"
++  decision.state !== undefined
+     ? {
+         ref: {
+           decisionId: decision.id,

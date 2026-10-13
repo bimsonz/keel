@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/holds.test.ts
+# kills: conflict.holds
+# why: a ruling against a change on neither side is read as against the premise's holder, so the effect is upheld by a ruling that never named its opponent
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index 342f58f6..c77e6e17 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -184,7 +184,7 @@ export const holds = (
+ ): readonly Proposition[] => {
+   const { premise, effect } = sides;
+   if (premise === undefined || effect === undefined) return [];
+-  const holderLost = against.includes(premise.holder);
++  const holderLost = against.length > 0 && !against.includes(effect.changeId);
+   const authorLost = against.includes(effect.changeId);
+   if (holderLost === authorLost) return [];
+   return [authorLost ? premise.proposition : effect.proposition];

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/precedent.test.ts
+# kills: precedent.ended-scopes-none, precedent.ended-not-met
+# why: the check is inverted: only a decision that ended scopes a precedent, and a standing one is never met
+diff --git a/packages/core/src/domain/memory/precedent.ts b/packages/core/src/domain/memory/precedent.ts
+index 913dfcdc..a09a7630 100644
+--- a/packages/core/src/domain/memory/precedent.ts
++++ b/packages/core/src/domain/memory/precedent.ts
+@@ -11,7 +11,7 @@ export const scopedPrecedent = (
+   decision: Decision,
+   upheld: readonly Proposition[],
+ ): ScopedPrecedent | undefined =>
+-  decision.state === "active"
++  decision.state !== "active"
+     ? {
+         ref: {
+           decisionId: decision.id,

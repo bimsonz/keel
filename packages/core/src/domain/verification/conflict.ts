@@ -165,3 +165,27 @@ export const sidesAgainst = (
   if (holder === undefined || author === undefined || holder === author) return [];
   return [stands === "premise" ? author : holder];
 };
+
+/**
+ * The propositions a ruling upheld: the side of the conflict it did not go
+ * against. Against the change that makes the effect, the premise stood;
+ * against the change that holds the premise, the effect did. It inverts
+ * `sidesAgainst`. A ruling that went against neither side or against both
+ * upheld nothing typed, and so did any ruling on a conflict that does not name
+ * both sides or names one change on both: its decision can be followed and
+ * never contradicted. The proposition is returned as the conflict carries it.
+ */
+export const holds = (
+  sides: {
+    readonly premise?: SuspectPremise | undefined;
+    readonly effect?: SuspectEffect | undefined;
+  },
+  against: readonly ChangeId[],
+): readonly Proposition[] => {
+  const { premise, effect } = sides;
+  if (premise === undefined || effect === undefined) return [];
+  const holderLost = against.includes(premise.holder);
+  const authorLost = against.includes(effect.changeId);
+  if (holderLost === authorLost) return [];
+  return [authorLost ? premise.proposition : effect.proposition];
+};

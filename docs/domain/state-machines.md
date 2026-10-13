@@ -449,6 +449,8 @@ stateDiagram-v2
 
 **Stances** do not change a Decision's state; each is a fact about a change: `PrecedentSurfaced` (preflight showed it), then `PrecedentFollowed`, `PrecedentDistinguished` or `OverruleRequested`.
 
+**As a precedent:** only an Active decision is one. `scopedPrecedent(decision, upheld)` gives preflight the decision's id, summary, date and scope with the propositions it upheld, and nothing once the decision is Superseded or Overruled: it is then neither listed nor contradicted, and the decision that ended it brings only what it upheld itself. What a decision upheld is `holds(sides, against)`, read from the conflict it ruled: the side its ruling did not go against (the premise when only the effect's change lost, the effect when only the premise's holder lost), and nothing typed when the ruling went against neither side or both, or the conflict does not name two sides. A decision that upheld nothing typed can be followed and never contradicted.
+
 **Terminal:** Superseded, Overruled.
 
 **Invariant:** a precedent never blocks by itself; only guards do. A Decision carries its date, scope, evidence and the alternatives it rejected.
