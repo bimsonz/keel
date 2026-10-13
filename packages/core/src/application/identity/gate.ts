@@ -1,15 +1,21 @@
 import { Effect, Option, Schema } from "effect";
 import {
   type Agent,
+  type AgentClaims,
   AgentNotAdmitted,
   AgentNotKnown,
   type AgentStanding,
-  type AgentToken,
   type Principal,
   TokenRejected,
 } from "../../domain/identity/index.ts";
-import { AgentId, UserId } from "../../domain/kernel/index.ts";
-import { AgentDirectory, Memberships, TokenIssuer, Users } from "../ports/index.ts";
+import { AgentId, type NamespaceId, UserId } from "../../domain/kernel/index.ts";
+import {
+  AgentDirectory,
+  Memberships,
+  ProjectNamespaces,
+  TokenIssuer,
+  Users,
+} from "../ports/index.ts";
 
 /**
  * How and when a session was signed in: `by` is the method as the sign-in
@@ -22,16 +28,44 @@ export interface SignedIn {
   readonly at: number;
 }
 
-/** What a request presents, as the doorway reads it: a Keel token, a user's session, or nothing. */
+/** An agent's own token as a request presents it: the token, how it was presented, and where. */
+export interface PresentedToken {
+  readonly token: string;
+  /** `DPoP` when the request says the token is bound to a key (RFC 9449 §7.1), else `Bearer`. */
+  readonly scheme: "Bearer" | "DPoP";
+  /** The request's DPoP proof, when it sent one. */
+  readonly proof?: string | undefined;
+  readonly method: string;
+  /** Where the request was made: Keel's origin and the path, with no query. */
+  readonly url: string;
+}
+
+/** Why an agent's own token is refused, in the codes RFC 6750 and RFC 9449 give them. */
+export interface TokenRefusal {
+  readonly refused: "invalid_token" | "invalid_dpop_proof";
+  readonly detail: string;
+}
+
+/**
+ * What a request presents, as the doorway reads it: a token of the secret
+ * exchange, still to be verified; the claims of an agent's own token, which
+ * the doorway has verified (its signature, audience, expiry and key binding);
+ * a user's session; or nothing.
+ */
 export type Credential =
   | { readonly _tag: "Token"; readonly token: string }
+  | { readonly _tag: "Claims"; readonly claims: AgentClaims }
   | { readonly _tag: "Session"; readonly userId: UserId; readonly signedIn: SignedIn }
   | { readonly _tag: "None" };
 
-/** Who the gate admitted: for an agent the token it verified, for a user how its session was signed in. */
+/**
+ * Who the gate admitted: for an agent the claims of the token it verified
+ * (which name a project, unless it is a new agent's first), for a user how its
+ * session was signed in.
+ */
 export interface Admitted {
   readonly principal: Principal;
-  readonly token?: AgentToken;
+  readonly token?: AgentClaims;
   readonly signedIn?: SignedIn;
 }
 
@@ -65,10 +99,10 @@ export function whyNotAdmitted(agent: Agent): AgentNotAdmitted["reason"] | null 
  * AgentSession DO.
  */
 export const admit: (
-  principal: AgentToken,
+  principal: AgentClaims,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
   "identity/admit",
-)(function* (principal: AgentToken) {
+)(function* (principal: AgentClaims) {
   const directory = yield* AgentDirectory;
   const agent = yield* directory.findAgent(principal.agentId);
   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
@@ -97,49 +131,84 @@ export type GateRefusal =
  * for a sponsor. A token whose `org` is not its agent's current one (minted
  * before the agent was placed) is stale, and the agent exchanges its credential
  * again. A user is admitted with how and when its session was signed in.
+ *
+ * An agent that signed itself up presents its own token, which names one
+ * project or none. It stands in that project's namespace, read from the
+ * project's place on every request, or in its own when the token names none.
+ * It governs its own namespace and nowhere else: in another's it has no
+ * standing until a person invites it there. A token for a project that has no
+ * place stands as one for a project the agent has no standing in, so a token
+ * never tells whether a project exists.
  */
 export const principalOf: (
   credential: Credential,
-) => Effect.Effect<Admitted, GateRefusal, TokenIssuer | AgentDirectory | Users | Memberships> =
-  Effect.fn("identity/principalOf")(function* (credential: Credential) {
-    switch (credential._tag) {
-      case "None":
-        return { principal: { _tag: "Anonymous" } };
-      case "Session": {
-        const user = yield* Users.use((users) => users.principal(credential.userId));
-        if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
-        return { principal: user.value, signedIn: credential.signedIn };
-      }
-      case "Token": {
-        const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
-        const agent = yield* admit(token);
-        if (agent.org === undefined || agent.projectId === undefined)
-          return yield* new AgentUnplaced({ agentId: agent.id });
-        if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
-        const { org, sponsor: sponsorId, projectId } = agent;
-        const standing: AgentStanding =
-          sponsorId === undefined
-            ? { _tag: "None" }
-            : {
-                _tag: "Invited",
-                by: yield* Memberships.use((memberships) => memberships.standing(sponsorId, org)),
-              };
-        return {
-          principal: {
-            _tag: "Agent",
-            agentId: agent.id,
-            org,
-            projectId,
-            scopes: token.scopes,
-            paused: agent.state === "suspended",
-            standing,
-          },
-          token,
-        };
-      }
-      default: {
-        const unmatched: never = credential;
-        return unmatched;
-      }
+) => Effect.Effect<
+  Admitted,
+  GateRefusal,
+  TokenIssuer | AgentDirectory | Users | Memberships | ProjectNamespaces
+> = Effect.fn("identity/principalOf")(function* (credential: Credential) {
+  switch (credential._tag) {
+    case "None":
+      return { principal: { _tag: "Anonymous" } };
+    case "Session": {
+      const user = yield* Users.use((users) => users.principal(credential.userId));
+      if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
+      return { principal: user.value, signedIn: credential.signedIn };
     }
-  });
+    case "Token": {
+      const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+      const agent = yield* admit(token);
+      if (agent.org === undefined || agent.projectId === undefined)
+        return yield* new AgentUnplaced({ agentId: agent.id });
+      if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
+      const { org, sponsor: sponsorId, projectId } = agent;
+      const standing: AgentStanding =
+        sponsorId === undefined
+          ? { _tag: "None" }
+          : {
+              _tag: "Invited",
+              by: yield* Memberships.use((memberships) => memberships.standing(sponsorId, org)),
+            };
+      return {
+        principal: {
+          _tag: "Agent",
+          agentId: agent.id,
+          org,
+          projectId,
+          scopes: token.scopes,
+          paused: agent.state === "suspended",
+          standing,
+        },
+        token,
+      };
+    }
+    case "Claims": {
+      const { claims } = credential;
+      const agent = yield* admit(claims);
+      const own: NamespaceId = agent.id;
+      const { projectId } = claims;
+      const place =
+        projectId === undefined
+          ? Option.none()
+          : yield* ProjectNamespaces.use((places) => places.byId(projectId));
+      const org = Option.match(place, { onNone: () => own, onSome: (found) => found.namespace });
+      const governs = projectId === undefined || (Option.isSome(place) && org === own);
+      return {
+        principal: {
+          _tag: "Agent",
+          agentId: agent.id,
+          org,
+          ...(projectId === undefined ? {} : { projectId }),
+          scopes: claims.scopes,
+          paused: agent.state === "suspended",
+          standing: governs ? { _tag: "Governs" } : { _tag: "None" },
+        },
+        token: claims,
+      };
+    }
+    default: {
+      const unmatched: never = credential;
+      return unmatched;
+    }
+  }
+});

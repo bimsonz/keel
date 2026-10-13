@@ -3,6 +3,7 @@ import { agentIdOf, givenHandle, KeyThumbprint } from "@keeltown/core/domain/ide
 import { createKeelClient, generateAgentKey, signUp, thumbprint } from "@keeltown/sdk";
 import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
+import { decodeJwt } from "jose";
 import { describe, expect, it } from "vitest";
 import { verifyAgentToken } from "../../src/adapters/driven/better-auth/access-tokens.ts";
 import { makeAuth } from "../../src/adapters/driven/better-auth/auth.ts";
@@ -17,18 +18,14 @@ interface Sent {
 }
 
 /**
- * Keel's real Worker as a client's `fetch`. A call to the API is kept and
- * answered here, so the request the client built can be put to the token check
- * exactly as it was sent, its proof unspent.
+ * Keel's real Worker as a client's `fetch`. Each call to the API is kept as it
+ * was sent, so the request the client built can be read back.
  */
 function keel() {
   const calls: Sent[] = [];
   const fetch = async (url: string, init: RequestInit): Promise<Response> => {
     const headers = new Headers(init.headers);
-    if (url.startsWith(`${BASE}/v1/agents/`)) {
-      calls.push({ url, headers });
-      return Response.json({ ok: true, summary: "kept for the token check", result: {} });
-    }
+    if (url.startsWith(`${BASE}/v1/agents/`)) calls.push({ url, headers: new Headers(headers) });
     // Each request from an address of its own, so the per-address limits decide nothing here.
     headers.set("cf-connecting-ip", freshAddress());
     return exports.default.fetch(url, { ...init, headers });
@@ -37,7 +34,7 @@ function keel() {
 }
 
 /** The check the gate makes of an agent's token, as `agent-access-tokens.test.ts` makes it. */
-const admitted = (presented: Parameters<typeof verifyAgentToken>[2]) =>
+const admitted = (presented: Parameters<typeof verifyAgentToken>[3]) =>
   verifyAgentToken(
     makeAuth({
       db: env.DB,
@@ -45,6 +42,7 @@ const admitted = (presented: Parameters<typeof verifyAgentToken>[2]) =>
       host: env.KEEL_HOST,
       agents: { find: async () => undefined },
     }),
+    BASE,
     BASE,
     presented,
   );
@@ -54,7 +52,7 @@ const settled = (agentId: string) =>
   drainOutbox(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
 describe("the SDK against Keel's real Worker, holding only a key", () => {
-  it("[sdk.key-live] the SDK signs an agent up and gets a token for one project and one run, and the call it then builds passes the token check with its own proof", async () => {
+  it("[sdk.key-live] the SDK signs an agent up, gets a token for one project and one run, and its next call is answered as that agent: the gate takes the proof the SDK made, once", async () => {
     const worker = keel();
     const { signer } = await generateAgentKey();
     const agentId = agentIdOf(
@@ -77,26 +75,31 @@ describe("the SDK against Keel's real Worker, holding only a key", () => {
       run: "run-c",
       fetch: worker.fetch,
     });
-    await client.whoami();
+    // The Worker's own gate admits the call: the token for one project and one run, bound to the run's key.
+    expect((await client.whoami()).result.agent).toMatchObject({
+      id: agentId,
+      handle: givenHandle(agentId),
+      name: "builder",
+    });
     const [call] = worker.calls;
     const [scheme, token = ""] = (call?.headers.get("authorization") ?? "").split(" ");
     expect(scheme).toBe("DPoP");
-    const presented = {
-      token,
-      scheme: "DPoP" as const,
-      proof: call?.headers.get("dpop") ?? undefined,
-      method: "GET",
-      url: WHOAMI,
-    };
-    expect(await admitted(presented)).toMatchObject({
-      agentId,
-      projectId: sampleProjectId,
-      handle: givenHandle(agentId),
-      run: { label: "run-c" },
-      bound: true,
+    expect(decodeJwt(token)).toMatchObject({
+      sub: agentId,
+      prj: sampleProjectId,
+      run_label: "run-c",
+      cnf: { jkt: expect.any(String) },
     });
-    // The proof was good once: the same request again is a replay.
-    expect(await admitted(presented)).toMatchObject({ refused: "invalid_dpop_proof" });
+    // The gate spent the proof: the same request again is a replay.
+    expect(
+      await admitted({
+        token,
+        scheme: "DPoP",
+        proof: call?.headers.get("dpop") ?? undefined,
+        method: "GET",
+        url: WHOAMI,
+      }),
+    ).toMatchObject({ refused: "invalid_dpop_proof" });
     await settled(agentId);
   });
 });

@@ -19,7 +19,7 @@ import { BASE } from "./helpers.ts";
 const WHOAMI = `${BASE}/v1/agents/me`;
 
 /** The check the gate makes of an agent's token, over a Better Auth made for the call as the gate makes one. */
-const verify = (presented: Parameters<typeof verifyAgentToken>[2]) =>
+const verify = (presented: Parameters<typeof verifyAgentToken>[3], resource: string = BASE) =>
   verifyAgentToken(
     makeAuth({
       db: env.DB,
@@ -28,6 +28,7 @@ const verify = (presented: Parameters<typeof verifyAgentToken>[2]) =>
       agents: { find: async () => undefined },
     }),
     BASE,
+    resource,
     presented,
   );
 
@@ -155,5 +156,26 @@ describe("an agent's token at the gate", () => {
     expect(
       await verify({ token: "not.a.token", scheme: "Bearer", method: "GET", url: WHOAMI }),
     ).toMatchObject({ refused: "invalid_token" });
+  });
+  it("[dpop.audience] a token is taken only at the door it was issued for: one for the API is refused at the MCP server, and one for the MCP server at the API", async () => {
+    const MCP = `${BASE}/mcp`;
+    const forApi = await bound();
+    const forMcp = await bound({ resource: MCP });
+    const at = async (held: Awaited<ReturnType<typeof bound>>, door: "api" | "mcp") => {
+      const [method, url] = door === "mcp" ? ["POST", MCP] : ["GET", WHOAMI];
+      const answer = await verify(
+        await withProof(held.run, held.token, method, url),
+        door === "mcp" ? MCP : BASE,
+      );
+      return "refused" in answer ? answer.refused : answer.agentId;
+    };
+    expect([await at(forApi, "api"), await at(forApi, "mcp")]).toEqual([
+      forApi.agent.id,
+      "invalid_token",
+    ]);
+    expect([await at(forMcp, "mcp"), await at(forMcp, "api")]).toEqual([
+      forMcp.agent.id,
+      "invalid_token",
+    ]);
   });
 });

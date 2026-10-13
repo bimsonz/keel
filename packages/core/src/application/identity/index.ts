@@ -8,6 +8,7 @@ import {
   CredentialRejected,
   type IdempotencyConflict,
   type Identity,
+  type AgentClaims,
   type AgentToken,
   type Scope,
   ScopeNotGranted,
@@ -35,9 +36,9 @@ import {
 
 /** Who the caller is: its admitted agent, with its org and sponsor, and its current session. */
 export const whoami: (
-  principal: AgentToken,
+  principal: AgentClaims,
 ) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
-  Effect.fn("identity/whoami")(function* (principal: AgentToken) {
+  Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
     const agent = yield* admit(principal);
     const current = yield* (yield* Sessions).current(agent.id);
     return { agent, session: current === null ? null : { id: current.id } };

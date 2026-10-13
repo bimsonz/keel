@@ -216,8 +216,16 @@ export async function forgetSpentIds(db: D1Database, now: Date = new Date()): Pr
   ]);
 }
 
+/**
+ * The resources an agent's token may be for (RFC 8707), each a door of its own:
+ * Keel's API at its origin, and its MCP server at `/mcp`. A token request names
+ * the one it wants, the token's audience is that one, and each door takes only
+ * its own.
+ */
+export const agentResources = (origin: string) => ({ api: origin, mcp: `${origin}/mcp` }) as const;
+
 export interface AgentTokensConfig {
-  /** `https://<KEEL_HOST>`: the resource an agent's token is for. */
+  /** `https://<KEEL_HOST>`: the resource an agent's token is for when its request names none. */
   readonly origin: string;
   readonly agents: AgentAccess;
 }
@@ -249,8 +257,8 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
     consentPage: `${config.origin}/consent`,
     grantTypes: ["client_credentials"],
     scopes: [...AGENT_SCOPES],
-    resources: [config.origin],
-    // The provider links a resource to a stored client row, and an agent has none: Keel has one resource.
+    resources: Object.values(agentResources(config.origin)),
+    // The provider links a resource to a stored client row, and an agent has none: every agent may ask for either.
     enforcePerClientResources: false,
     m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
     assertionMaxLifetime: ASSERTION_SECONDS,

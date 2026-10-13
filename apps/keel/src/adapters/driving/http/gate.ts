@@ -1,10 +1,23 @@
-import type { Admitted, Credential, SignedIn } from "@keeltown/core/application/identity";
+import type {
+  Admitted,
+  Credential,
+  PresentedToken,
+  SignedIn,
+  TokenRefusal,
+} from "@keeltown/core/application/identity";
+import type { AgentClaims } from "@keeltown/core/domain/identity";
 import type { UserId } from "@keeltown/core/kernel";
-import { bearerToken } from "./caller.ts";
+import { presentedToken } from "./caller.ts";
 import { problemResponse } from "./problems.ts";
 
 /** The session cookie Better Auth sets for Keel (`__Secure-` and the `keel` prefix). */
 export const SESSION_COOKIE = "__Secure-keel.session_token";
+
+/**
+ * The door a request came in by. Each is a resource of its own (RFC 8707): an
+ * agent's token says which it is for, and a door takes only its own.
+ */
+export type Door = "api" | "mcp";
 
 /** Why the gate refused a credential, as composition reads it from the core gate's errors. */
 export type GateRefusal =
@@ -27,6 +40,19 @@ export interface GateDeps {
    * one kept beyond the request.
    */
   readonly sessionUser: (headers: Headers) => Promise<SessionUser | null>;
+  /**
+   * The claims of an agent's own token presented at `door`, once the identity adapter's checks
+   * pass: its signature, issuer, expiry, that it is for this door, and its key binding.
+   */
+  readonly agentToken: (
+    presented: PresentedToken,
+    door: Door,
+  ) => Promise<AgentClaims | TokenRefusal>;
+  /**
+   * The `WWW-Authenticate` value of a 401 at `door`: where the door's metadata is, so a client
+   * finds the server that issues its tokens, or for a refused proof what a proof must be.
+   */
+  readonly challenge: (door: Door, refusal?: TokenRefusal) => string;
   /** The principal for a credential, or why it is refused. */
   readonly admit: (
     credential: Credential,
@@ -42,6 +68,23 @@ export interface Gated {
 const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
 const JWT = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
+/** The type an agent's own token names in its header (RFC 9068); a token of the secret exchange says `JWT`. */
+const ACCESS_TOKEN = "at+jwt";
+
+/** What a JWT's header says its type is, unverified: it only chooses which check the token is given. */
+function typeOf(jwt: string): string | undefined {
+  try {
+    const header: unknown = JSON.parse(
+      atob((jwt.split(".")[0] ?? "").replaceAll("-", "+").replaceAll("_", "/")),
+    );
+    const typ: unknown =
+      typeof header === "object" && header !== null && "typ" in header ? header.typ : undefined;
+    return typeof typ === "string" ? typ.toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function hasSessionCookie(cookie: string | null): boolean {
   return (
     cookie !== null &&
@@ -53,6 +96,12 @@ function hasSessionCookie(cookie: string | null): boolean {
 function only(headers: Headers, name: "authorization" | "cookie"): Headers {
   const value = headers.get(name);
   return new Headers(value === null ? {} : { [name]: value });
+}
+
+/** A 401 with the door's challenge, so a client that holds no good token learns where to get one. */
+function challenged(response: Response, challenge: string): Response {
+  if (response.status === 401) response.headers.set("www-authenticate", challenge);
+  return response;
 }
 
 function refusal(answer: GateRefusal, requestId: string): Response {
@@ -105,6 +154,12 @@ function refusal(answer: GateRefusal, requestId: string): Response {
  * origin: a mutation without that Origin is refused (fail closed). A stale
  * cookie reads as anonymous. MCP passes `cookies: false`: it takes bearers only.
  *
+ * An agent that signed itself up presents its own token (`at+jwt`), as a plain
+ * bearer or, bound to a key, under the `DPoP` scheme with a proof made by that
+ * key for this request (RFC 9449). The identity adapter checks it for the door
+ * the request came in by, and the core gate is handed its claims. Every 401
+ * names the door's metadata in `WWW-Authenticate`.
+ *
  * A session is admitted with how and when it was signed in, so an operation
  * that wants a fresh sign-in can ask it of its caller. A paused agent is
  * admitted too: the policy answers it, not the gate.
@@ -113,8 +168,11 @@ export async function gate(
   request: Request,
   requestId: string,
   deps: GateDeps,
-  options: { readonly cookies: boolean } = { cookies: true },
+  options: { readonly cookies: boolean; readonly door?: Door } = { cookies: true },
 ): Promise<Gated | Response> {
+  const door = options.door ?? "api";
+  const refused = (answer: GateRefusal) =>
+    challenged(refusal(answer, requestId), deps.challenge(door));
   const started = Date.now();
   let sessionMs = 0;
   const session = async (headers: Headers): Promise<SessionUser | null> => {
@@ -126,12 +184,41 @@ export async function gate(
   let credential: Credential = { _tag: "None" };
   const header = request.headers.get("authorization");
   if (header !== null) {
-    const bearer = bearerToken(header);
-    if (bearer === null) return refusal({ refused: "invalid" }, requestId);
-    if (JWT.test(bearer)) credential = { _tag: "Token", token: bearer };
+    const presented = presentedToken(header);
+    if (presented === null) return refused({ refused: "invalid" });
+    const { scheme, token } = presented;
+    if (JWT.test(token) && typeOf(token) === ACCESS_TOKEN) {
+      const answer = await deps.agentToken(
+        {
+          token,
+          scheme,
+          proof: request.headers.get("dpop") ?? undefined,
+          method: request.method,
+          // Keel's own origin, never the request's Host: a proof is for the address Keel answers on.
+          url: `${deps.origin}${new URL(request.url).pathname}`,
+        },
+        door,
+      );
+      if ("refused" in answer)
+        return challenged(
+          problemResponse(401, "auth.invalid_token", requestId, {
+            detail: answer.detail,
+            nextActions: [
+              {
+                kind: "escalate",
+                title:
+                  "Ask the token endpoint named in /.well-known/oauth-authorization-server for a token for this address, with a request your key signs",
+              },
+            ],
+          }),
+          deps.challenge(door, answer),
+        );
+      credential = { _tag: "Claims", claims: answer };
+    } else if (scheme !== "Bearer") return refused({ refused: "invalid" });
+    else if (JWT.test(token)) credential = { _tag: "Token", token };
     else {
       const user = await session(only(request.headers, "authorization"));
-      if (user === null) return refusal({ refused: "invalid" }, requestId);
+      if (user === null) return refused({ refused: "invalid" });
       credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
     }
   } else if (options.cookies && hasSessionCookie(request.headers.get("cookie"))) {
@@ -147,7 +234,7 @@ export async function gate(
       credential = { _tag: "Session", userId: user.userId, signedIn: user.signedIn };
   }
   const answer = await deps.admit(credential);
-  if (!("admitted" in answer)) return refusal(answer, requestId);
+  if (!("admitted" in answer)) return refused(answer);
   return {
     admitted: answer.admitted,
     timing: `gate;dur=${Date.now() - started}, session;dur=${sessionMs}`,

@@ -17,7 +17,15 @@ import {
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
-import { type AgentAccess, TOKEN_PATH } from "../adapters/driven/better-auth/agents.ts";
+import {
+  resourceChallenge,
+  verifyAgentToken,
+} from "../adapters/driven/better-auth/access-tokens.ts";
+import {
+  type AgentAccess,
+  agentResources,
+  TOKEN_PATH,
+} from "../adapters/driven/better-auth/agents.ts";
 import {
   authorizationServerDocument,
   protectedResourceDocument,
@@ -136,8 +144,9 @@ function gateDeps(
   host: string,
   auth: () => ReturnType<typeof makeAuth>,
 ): GateDeps {
+  const origin = `https://${host}`;
   return {
-    origin: `https://${host}`,
+    origin,
     sessionUser: async (headers) => {
       const session = await auth().api.getSession({ headers });
       if (session === null) return null;
@@ -152,6 +161,9 @@ function gateDeps(
         },
       };
     },
+    agentToken: (presented, door) =>
+      verifyAgentToken(auth(), origin, agentResources(origin)[door], presented),
+    challenge: (door, refusal) => resourceChallenge(agentResources(origin)[door], refusal),
     admit: (credential: Credential) =>
       runtime.runPromise(
         principalOf(credential).pipe(

@@ -1,5 +1,8 @@
+import { createResourceServerChallenge } from "@better-auth/oauth-provider";
+import type { PresentedToken, TokenRefusal } from "@keeltown/core/application/identity";
 import { type AgentClaims, Handle, Scope } from "@keeltown/core/domain/identity";
 import { AgentId, ProjectId, RunId, RunLabel } from "@keeltown/core/kernel";
+import { APIError } from "better-auth/api";
 import {
   createDpopReplayStore,
   enforceDpopBinding,
@@ -10,23 +13,7 @@ import { Schema } from "effect";
 import { AUTH_BASE_PATH, type KeelAuth } from "./auth.ts";
 import { KEY_ALGORITHMS } from "./key-proofs.ts";
 
-/** An agent's token as a request presents it. */
-export interface PresentedToken {
-  readonly token: string;
-  /** `DPoP` when the request says the token is bound to a key (RFC 9449 §7.1), else `Bearer`. */
-  readonly scheme: "Bearer" | "DPoP";
-  /** The request's DPoP proof, when it sent one. */
-  readonly proof?: string | undefined;
-  readonly method: string;
-  /** Where the request was made: Keel's origin and the path, with no query. */
-  readonly url: string;
-}
-
-/** Why a token is refused, in the codes RFC 6750 and RFC 9449 give them. */
-export interface TokenRefusal {
-  readonly refused: "invalid_token" | "invalid_dpop_proof";
-  readonly detail: string;
-}
+export type { PresentedToken, TokenRefusal };
 
 /** How old a request's proof may be. */
 const PROOF_SECONDS = 60;
@@ -60,14 +47,17 @@ const NOT_A_TOKEN: TokenRefusal = {
 /**
  * Who an agent's token says is calling, once Better Auth's own checks pass: the
  * token's signature, issuer, audience and expiry, then its binding (RFC 9449
- * §7.1). A token bound to a key needs the DPoP scheme and a proof made by that
- * key for this request, used once; a plain bearer needs neither and is refused
- * with either. The proof's id is kept in Better Auth's own store until the
- * proof would have expired.
+ * §7.1). The audience is `resource`, the door the request came in by: a token
+ * issued for another of Keel's resources is refused here. A token bound to a
+ * key needs the DPoP scheme and a proof made by that key for this request,
+ * used once; a plain bearer needs neither and is refused with either. The
+ * proof's id is kept in Better Auth's own store until the proof would have
+ * expired.
  */
 export async function verifyAgentToken(
   auth: KeelAuth,
   origin: string,
+  resource: string,
   presented: PresentedToken,
 ): Promise<AgentClaims | TokenRefusal> {
   let payload: Awaited<ReturnType<typeof verifyJwsAccessToken>>;
@@ -77,7 +67,7 @@ export async function verifyAgentToken(
       jwksCacheKey: SIGNING_KEYS,
       verifyOptions: {
         issuer: `${origin}${AUTH_BASE_PATH}`,
-        audience: origin,
+        audience: resource,
         typ: "at+jwt",
         algorithms: ["EdDSA"],
       },
@@ -118,4 +108,29 @@ export async function verifyAgentToken(
     ...(run === undefined ? {} : { run: { id: run, ...(label === undefined ? {} : { label }) } }),
     bound: cnf !== undefined,
   };
+}
+
+/**
+ * The `WWW-Authenticate` value of a 401 at `resource`, as Better Auth's
+ * provider writes it: for a refused proof the `DPoP` challenge with the
+ * algorithms a proof may use (RFC 9449 §7.1), otherwise the bearer challenge
+ * naming the resource's metadata (RFC 9728), where a client reads which server
+ * issues its tokens.
+ */
+export function resourceChallenge(resource: string, refusal?: TokenRefusal): string {
+  const error = new APIError("UNAUTHORIZED", {
+    message: refusal?.detail ?? NOT_A_TOKEN.detail,
+    ...(refusal === undefined ? {} : { error: refusal.refused, error_description: refusal.detail }),
+  });
+  const challenge: unknown = createResourceServerChallenge(error, resource, {
+    dpopSigningAlgorithms: KEY_ALGORITHMS,
+  })?.headers;
+  const value: unknown =
+    challenge instanceof Headers
+      ? challenge.get("www-authenticate")
+      : typeof challenge === "object" && challenge !== null
+        ? Reflect.get(challenge, "WWW-Authenticate")
+        : undefined;
+  if (typeof value !== "string") throw new Error(`no challenge was made for ${resource}`);
+  return value;
 }

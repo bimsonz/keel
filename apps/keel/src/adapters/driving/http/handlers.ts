@@ -77,7 +77,7 @@ import {
   refusalResult,
   RESOLVERS,
 } from "./authorize-handlers.ts";
-import type { Caller, AgentToken } from "./caller.ts";
+import type { AgentClaims, AgentToken, Caller } from "./caller.ts";
 import { specRoute } from "./spec-routes.ts";
 import {
   latticesOk,
@@ -191,18 +191,33 @@ import {
 /** Every operation not yet implemented answers the declared 503 `service.not_implemented`. */
 const notYet = (caller: Caller) => notImplemented(caller.requestId);
 
-/** The token of the agent calling: the policy grants work to agents only, so one is there. */
-function tokenOf(caller: Caller): Effect.Effect<AgentToken> {
+/** The claims of the agent calling: the policy grants an agent's own operations to agents only, so they are there. */
+function claimsOf(caller: Caller): Effect.Effect<AgentClaims> {
   return caller.principal._tag === "Agent" && caller.token !== undefined
     ? Effect.succeed(caller.token)
     : Effect.die(new Error("an agent's operation ran without an agent's token"));
 }
 
+/**
+ * The token of the agent calling, for work: the policy decides work on the
+ * project the token names, so a token that names none was refused before here.
+ */
+function tokenOf(caller: Caller): Effect.Effect<AgentToken> {
+  return claimsOf(caller).pipe(
+    Effect.flatMap((claims) => {
+      const { projectId } = claims;
+      return projectId === undefined
+        ? Effect.die(new Error("an agent's work ran on a token that names no project"))
+        : Effect.succeed({ ...claims, projectId });
+    }),
+  );
+}
+
 /** Who withdraws a change: its agent (with its lease) or a maintainer of its project's org, as the policy granted. */
 function withdrawerOf(caller: Caller): Effect.Effect<Withdrawer> {
   const { principal } = caller;
-  if (principal._tag === "Agent" && caller.token !== undefined)
-    return Effect.succeed({ _tag: "Agent", token: caller.token });
+  if (principal._tag === "Agent")
+    return Effect.map(tokenOf(caller), (token) => ({ _tag: "Agent", token }));
   if (principal._tag === "User")
     return Effect.succeed({
       _tag: "Maintainer",
@@ -461,7 +476,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             ? agentsOnly(caller.requestId)
             : run(
                 caller,
-                tokenOf(caller).pipe(
+                claimsOf(caller).pipe(
                   Effect.flatMap(whoami),
                   Effect.match({
                     onSuccess: whoamiOk,

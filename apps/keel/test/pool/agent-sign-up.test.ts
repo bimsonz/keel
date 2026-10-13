@@ -11,7 +11,7 @@ import {
   type TestKey,
   TOKEN_ENDPOINT,
 } from "./agent-keys.ts";
-import { BASE, drainOutbox, worker } from "./helpers.ts";
+import { BASE, drainOutbox, type Fetch, mcp, mcpResult, worker } from "./helpers.ts";
 
 const REGISTER = `${BASE}/v1/oauth/register`;
 const AT = "2026-10-13T12:00:00.000Z";
@@ -61,6 +61,21 @@ interface Registered {
   readonly jwks: { readonly keys: readonly Record<string, unknown>[] };
 }
 
+/** What an agent sends with a key-bound token: the DPoP scheme, and a proof by the run's key for this method and address. */
+const proved = async (run: TestKey, token: string, method: string, url: string) => ({
+  authorization: `DPoP ${token}`,
+  dpop: await proofBy(run, method, url, { accessToken: token }),
+});
+
+/** The Worker, with `headers` set on whatever the caller sends. */
+const sending =
+  (headers: Record<string, string>): Fetch =>
+  (url, init) => {
+    const sent = new Headers(init?.headers);
+    for (const [name, value] of Object.entries(headers)) sent.set(name, value);
+    return worker(url, { ...init, headers: sent });
+  };
+
 const refusal = async (response: Response) => ({
   status: response.status,
   error: (await response.json<{ error?: string }>()).error,
@@ -83,10 +98,56 @@ describe("an agent signs itself up with a key", () => {
       jwks: { keys: [account.key.jwk] },
     });
     expect(registered.client_id_issued_at).toBeGreaterThan(1_700_000_000);
-    const token = await granted(
-      await requestToken(registered.client_id, account, { runKey: await newKey() }),
-    );
+    const run = await newKey();
+    const token = await granted(await requestToken(registered.client_id, account, { runKey: run }));
     expect(token.token_type).toBe("DPoP");
+    // With that token and its run's key it is admitted as itself, at the API and at the MCP server.
+    const ME = `${BASE}/v1/agents/me`;
+    const me = await worker(ME, { headers: await proved(run, token.access_token, "GET", ME) });
+    const profile = { id: agentId, handle: registered.handle, name: "builder", state: "active" };
+    expect([me.status, (await me.json<{ result: { agent: object } }>()).result.agent]).toEqual([
+      200,
+      expect.objectContaining(profile),
+    ]);
+    const MCP = `${BASE}/mcp`;
+    const forMcp = await granted(
+      await requestToken(registered.client_id, account, { runKey: run, resource: MCP }),
+    );
+    const tool = await mcpResult(
+      await mcp(
+        null,
+        "tools/call",
+        { name: "whoami", arguments: {} },
+        "whoami",
+        sending(await proved(run, forMcp.access_token, "POST", MCP)),
+      ),
+    );
+    expect(tool["structuredContent"]).toMatchObject({ result: { agent: profile } });
+    // Each door takes only its own token, and the token alone, without its key's proof, is nobody.
+    const refusals = {
+      "the MCP server's token at the API": await worker(ME, {
+        headers: await proved(run, forMcp.access_token, "GET", ME),
+      }),
+      "the API's token at the MCP server": await mcp(
+        null,
+        "tools/call",
+        { name: "whoami", arguments: {} },
+        "whoami",
+        sending(await proved(run, token.access_token, "POST", MCP)),
+      ),
+      "the token as a plain bearer": await worker(ME, {
+        headers: { authorization: `Bearer ${token.access_token}` },
+      }),
+      "the token with no proof": await worker(ME, {
+        headers: { authorization: `DPoP ${token.access_token}` },
+      }),
+    };
+    for (const [what, answer] of Object.entries(refusals))
+      expect([what, answer.status, answer.headers.get("www-authenticate") !== null]).toEqual([
+        what,
+        401,
+        true,
+      ]);
     // Its handle is a namespace of its own, which anyone may look up.
     const namespace = await worker(`${BASE}/v1/namespaces/${registered.handle}`);
     expect([namespace.status, await namespace.json()]).toEqual([

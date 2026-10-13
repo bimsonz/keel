@@ -41,7 +41,7 @@ describe("a token for an agent that holds only a key", () => {
     expect((claims.exp ?? 0) - (claims.iat ?? 0)).toBe(300);
   });
 
-  it("[token.resource] a token is for Keel's own API whether or not the request names it, and for nothing else", async () => {
+  it("[token.resource] a token is for Keel's own API when the request names it or names nothing, for Keel's MCP server when it names that, and for nothing else", async () => {
     const account = await newKey();
     const run = await newKey();
     const agent = await seedKeyAgent(account);
@@ -52,6 +52,10 @@ describe("a token for an agent that holds only a key", () => {
     );
     expect(decodeProtectedHeader(unnamed.access_token).typ).toBe("at+jwt");
     expect(decodeJwt(unnamed.access_token).aud).toBe(BASE);
+    const forMcp = await granted(
+      await requestToken(agent.id, account, { runKey: run, resource: `${BASE}/mcp` }),
+    );
+    expect(decodeJwt(forMcp.access_token).aud).toBe(`${BASE}/mcp`);
     expect(
       await refusal(
         await requestToken(agent.id, account, {
