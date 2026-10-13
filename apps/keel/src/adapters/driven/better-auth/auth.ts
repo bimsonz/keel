@@ -18,6 +18,7 @@ import {
 import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
+import { keyUse, usedNow } from "./passkeys.ts";
 import { ORG_ROLES, orgAccess } from "./roles.ts";
 import { ownSessions, SESSION_WRITE_SECONDS } from "./sessions.ts";
 
@@ -428,6 +429,7 @@ export function authOptions(config: AuthConfig) {
       }),
       bearer(),
       ownSessions(),
+      keyUse(),
       // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
       // is never turned into a token: no answer carries one in a header.
       jwt({
@@ -439,6 +441,11 @@ export function authOptions(config: AuthConfig) {
         rpID: config.host,
         rpName: "Keel",
         origin,
+        authentication: {
+          // Called once the assertion has verified: a sign-in that fails marks no passkey as used.
+          afterVerification: ({ ctx, verification }) =>
+            usedNow(ctx, verification.authenticationInfo.credentialID),
+        },
         registration: {
           // Passkey-first sign-up: the chosen handle names a user made only once the passkey verifies.
           requireSession: false,
