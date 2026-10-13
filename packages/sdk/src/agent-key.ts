@@ -238,11 +238,9 @@ export async function discover(baseUrl: string, fetcher: Fetch = fetch): Promise
   const { issuer, tokenEndpoint, signUpEndpoint } = named;
   if (issuer === undefined || tokenEndpoint === undefined || signUpEndpoint === undefined)
     throw refused("names no issuer, token endpoint or sign-up.");
-  for (const place of [issuer, tokenEndpoint, signUpEndpoint]) {
-    const url = URL.parse(place);
-    if (url === null || url.origin !== origin || url.protocol !== "https:")
+  for (const place of [issuer, tokenEndpoint, signUpEndpoint])
+    if (!URL.canParse(place) || new URL(place).origin !== origin || !place.startsWith("https:"))
       throw refused(`names ${place}, which is not ${origin} over https.`);
-  }
   return { issuer, tokenEndpoint, signUpEndpoint };
 }
 

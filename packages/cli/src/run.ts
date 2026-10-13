@@ -1,11 +1,16 @@
 import { parseArgs } from "node:util";
 import {
   createKeelClient,
+  generateAgentKey,
   type KeelClient,
   type KeelClientOptions,
   KeelProblem,
   KeelTokenError,
+  signUp,
+  thumbprint,
 } from "@keeltown/sdk";
+import { encodeEntry, entryName, type Held, heldKey, KeyError } from "./agent-key.ts";
+import type { KeyStore } from "./key-store.ts";
 
 /** Where the CLI writes, and how it reaches Keel; tests pass their own. */
 export interface Io {
@@ -13,6 +18,8 @@ export interface Io {
   readonly stdout: (line: string) => void;
   readonly stderr: (line: string) => void;
   readonly fetch?: KeelClientOptions["fetch"];
+  /** This machine's key store, where an agent's key is kept; undefined when it has none. */
+  readonly keyStore?: KeyStore | undefined;
 }
 
 /** 0: done. 1: Keel refused (the next actions are printed). 2: the command line or credentials are wrong. */
@@ -20,6 +27,9 @@ export type ExitCode = 0 | 1 | 2;
 
 const USAGE = `keeltown <command> [options]
 
+  agent signup [--name <label>] [--profile <name>] [--print-key]
+  agent show [--profile <name>]
+  token [--project <prj_…>] [--run <label>] [--header] [--profile <name>]
   whoami
   session open [--harness <name>] [--model <id>] [--key <idempotency-key>]
   declare --goal <text> [--footprint <path[:edit|create|delete]>]... [--key <idempotency-key>]
@@ -37,8 +47,13 @@ const USAGE = `keeltown <command> [options]
   agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
-Credentials: KEEL_URL, and an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's KEEL_SESSION.
-Projects and agents are governed by a user (KEEL_SESSION); work is done by an agent.
+An agent is a key: \`agent signup\` makes one, keeps it in this machine's key store and signs up with it.
+Its commands then run as that agent, each token for one project (--project or KEEL_PROJECT) and one
+run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that takes only a bearer;
+--header prints it as the header an MCP client's helper wants. Where there is no key store, the key
+comes from KEEL_AGENT_KEY with KEEL_AGENT_ID (\`agent signup --print-key\` prints one, once).
+Other credentials: KEEL_URL always; an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's
+KEEL_SESSION, which win over a key when set. Projects and agents are governed by a user.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -60,6 +75,10 @@ const OPTIONS = {
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
   project: { type: "string" },
+  run: { type: "string" },
+  profile: { type: "string" },
+  header: { type: "boolean" },
+  "print-key": { type: "boolean" },
   harness: { type: "string" },
   model: { type: "string" },
   "if-match": { type: "string" },
@@ -255,6 +274,154 @@ function summaryOf(answer: unknown): string {
   return typeof summary === "string" ? summary : JSON.stringify(answer, null, 2);
 }
 
+const NO_KEY =
+  "This machine holds no agent key for this Keel. Run `keeltown agent signup` to make one and sign up with it.";
+
+/** The project and the run a key's tokens are for: the command line's, else the environment's. */
+function target(values: ReturnType<typeof parse>["values"], env: Io["env"]) {
+  const project = values.project ?? env["KEEL_PROJECT"];
+  const label = values.run ?? env["KEEL_RUN"];
+  return {
+    ...(project === undefined || project === "" ? {} : { project }),
+    ...(label === undefined || label === "" ? {} : { run: label }),
+  };
+}
+
+/** An agent's key, once it has signed up: what a token is asked with. */
+type SignedUpKey = Held & { readonly agentId: string };
+
+async function signedUpKey(io: Io, entry: string): Promise<SignedUpKey | undefined> {
+  const held = await heldKey(io.env, io.keyStore, entry);
+  if (held === undefined) return undefined;
+  if (held.agentId === undefined)
+    throw new KeyError(
+      held.stored === undefined
+        ? "KEEL_AGENT_KEY is set without KEEL_AGENT_ID: `keeltown agent signup` prints the agent's id"
+        : "this machine's key has not signed up yet: run `keeltown agent signup`",
+    );
+  return { ...held, agentId: held.agentId };
+}
+
+/**
+ * `agent signup`: the key is made and put in the key store before Keel is
+ * asked, so a crash after sign-up never loses it. The same key signs up as the
+ * same agent, so running it again is safe.
+ */
+async function signUpCommand(
+  io: Io,
+  values: ReturnType<typeof parse>["values"],
+  baseUrl: string,
+  entry: string,
+): Promise<ExitCode> {
+  const asked = {
+    baseUrl,
+    ...(values.name === undefined ? {} : { name: values.name }),
+    ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
+  };
+  if (values["print-key"] === true) {
+    // A key for somewhere else to keep: printed once, before Keel is asked, and written nowhere.
+    const { signer, privateJwk } = await generateAgentKey();
+    io.stdout(JSON.stringify(privateJwk));
+    const made = await signUp({ ...asked, signer });
+    io.stderr(
+      `Signed up agent ${made.handle}. The line above is the only copy of its private key: keep it in a CI secret or a secret manager as KEEL_AGENT_KEY, with KEEL_AGENT_ID=${made.agentId}. Keel cannot give it back.`,
+    );
+    return 0;
+  }
+  let held = await heldKey(io.env, io.keyStore, entry);
+  if (held === undefined) {
+    if (io.keyStore === undefined) {
+      io.stderr(
+        "This machine has no key store the CLI can use, and a key is never written to a file. Set KEEL_AGENT_KEY to the agent's private key, or run `keeltown agent signup --print-key` to make one and print it once for a secret manager.",
+      );
+      return 2;
+    }
+    const { signer, privateJwk } = await generateAgentKey();
+    await io.keyStore.write(entry, encodeEntry({ jwk: privateJwk }));
+    held = { signer, where: io.keyStore.kind, stored: privateJwk };
+  }
+  const made = await signUp({ ...asked, signer: held.signer });
+  if (held.stored !== undefined && io.keyStore !== undefined)
+    await io.keyStore.write(
+      entry,
+      encodeEntry({ jwk: held.stored, agentId: made.agentId, handle: made.handle }),
+    );
+  io.stdout(
+    values.json === true
+      ? JSON.stringify({ ...made, key: held.where }, null, 2)
+      : `${made.created ? "Signed up" : "Already signed up:"} agent ${made.handle} (${made.agentId}). Its key is held in ${held.where}.`,
+  );
+  return 0;
+}
+
+/** The commands about the key itself. Undefined for every other command. */
+async function keyCommand(
+  io: Io,
+  command: string,
+  values: ReturnType<typeof parse>["values"],
+  baseUrl: string,
+  entry: string,
+): Promise<ExitCode | undefined> {
+  if (command === "agent signup") return signUpCommand(io, values, baseUrl, entry);
+  if (command !== "agent show" && command !== "token") return undefined;
+  const held = await signedUpKey(io, entry);
+  if (held === undefined) {
+    io.stderr(NO_KEY);
+    return 2;
+  }
+  if (command === "agent show") {
+    const shown = {
+      agentId: held.agentId,
+      ...(held.handle === undefined ? {} : { handle: held.handle }),
+      thumbprint: await thumbprint(held.signer.publicJwk),
+      key: held.where,
+    };
+    io.stdout(
+      values.json === true
+        ? JSON.stringify(shown, null, 2)
+        : `Agent ${shown.handle ?? shown.agentId} (${shown.agentId}). Its key ${shown.thumbprint} is held in ${shown.key}.`,
+    );
+    return 0;
+  }
+  // A plain bearer, for a tool that cannot sign: good for five minutes, one project and one run.
+  const token = await createKeelClient({
+    baseUrl,
+    agentId: held.agentId,
+    key: held.signer,
+    bound: false,
+    ...target(values, io.env),
+    ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
+  }).token();
+  io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);
+  return 0;
+}
+
+/** The client a work command runs as: an agent's secret or a user's session when set, else the agent this machine holds a key for. */
+async function clientFor(
+  io: Io,
+  values: ReturnType<typeof parse>["values"],
+  baseUrl: string,
+  entry: string,
+): Promise<KeelClient | undefined> {
+  const clientId = io.env["KEEL_CLIENT_ID"];
+  const clientSecret = io.env["KEEL_CLIENT_SECRET"];
+  const session = io.env["KEEL_SESSION"];
+  const fetch = io.fetch === undefined ? {} : { fetch: io.fetch };
+  // An agent's credentials win when both are set: work is an agent's.
+  if (clientId !== undefined && clientSecret !== undefined)
+    return createKeelClient({ baseUrl, clientId, clientSecret, ...fetch });
+  if (session !== undefined) return createKeelClient({ baseUrl, session, ...fetch });
+  const held = await signedUpKey(io, entry);
+  if (held === undefined) return undefined;
+  return createKeelClient({
+    baseUrl,
+    agentId: held.agentId,
+    key: held.signer,
+    ...target(values, io.env),
+    ...fetch,
+  });
+}
+
 export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
   let parsed: ReturnType<typeof parse>;
   try {
@@ -269,29 +436,26 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     return positionals.length === 0 && values.help !== true ? 2 : 0;
   }
   const baseUrl = io.env["KEEL_URL"];
-  const clientId = io.env["KEEL_CLIENT_ID"];
-  const clientSecret = io.env["KEEL_CLIENT_SECRET"];
-  const session = io.env["KEEL_SESSION"];
-  const agent = clientId !== undefined && clientSecret !== undefined;
-  if (baseUrl === undefined || (!agent && session === undefined)) {
-    io.stderr(
-      "Set KEEL_URL, and KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent) or KEEL_SESSION (a user).",
-    );
+  if (baseUrl === undefined) {
+    io.stderr("Set KEEL_URL to Keel's address, such as https://keel.town.");
     return 2;
   }
-  const fetch = io.fetch === undefined ? {} : { fetch: io.fetch };
-  // An agent's credentials win when both are set: work is an agent's.
-  const client = createKeelClient(
-    agent
-      ? { baseUrl, clientId, clientSecret, ...fetch }
-      : { baseUrl, session: session ?? "", ...fetch },
-  );
   try {
+    const entry = entryName(baseUrl, values.profile ?? io.env["KEEL_PROFILE"]);
+    const about = await keyCommand(io, positionals.join(" "), values, baseUrl, entry);
+    if (about !== undefined) return about;
+    const client = await clientFor(io, values, baseUrl, entry);
+    if (client === undefined) {
+      io.stderr(
+        `${NO_KEY} Or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
+      );
+      return 2;
+    }
     const answer = await dispatch(client, positionals, values);
     io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : summaryOf(answer));
     return 0;
   } catch (error) {
-    if (error instanceof UsageError) {
+    if (error instanceof UsageError || error instanceof KeyError) {
       io.stderr(`${error.message}\n\n${USAGE}`);
       return 2;
     }
