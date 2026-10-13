@@ -11,6 +11,7 @@ import {
   makeChangesMemory,
   makeClockMemory,
   makeCodeHostMemory,
+  makeAgentSignUpsMemory,
   makeEnrolmentsMemory,
   makeSessionsMemory,
   makeSponsorshipsMemory,
@@ -37,6 +38,12 @@ import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { commitsOk } from "../../src/adapters/driving/http/repo.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
+/** Sign-up is not what these cases are about: a key is never proved here. */
+const NO_SIGN_UPS = {
+  provenKey: async () =>
+    ({ refused: "invalid_dpop_proof", detail: "no key is proved in this test" }) as const,
+};
+
 const project = Schema.decodeUnknownSync(ProjectId);
 const PRIVATE = project("prj_25R7GR504NN2N2MB7JTCFBPPQ8");
 const ELSEWHERE = project("prj_0SYSTEM0000000000000000000");
@@ -56,6 +63,7 @@ const runtime = ManagedRuntime.make(
     directory,
     projects.layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+    makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
     makeSessionsMemory().layer.pipe(Layer.provide(directory)),
     makeStandingsMemory().layer.pipe(Layer.provide(directory)),
     makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
@@ -80,7 +88,7 @@ afterAll(() => runtime.dispose());
 const handlers = makeHandlers(
   makeRunner(runtime),
   { emailCode: false, github: false },
-  { origin: "https://keel.test", fresh: () => true },
+  { origin: "https://keel.test", fresh: () => true, ...NO_SIGN_UPS },
 );
 
 const settings = (visibility: "private" | "public"): ProjectSettings => ({

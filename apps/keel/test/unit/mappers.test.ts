@@ -14,6 +14,7 @@ import {
   makeChangesMemory,
   makeClockMemory,
   makeCodeHostMemory,
+  makeAgentSignUpsMemory,
   makeEnrolmentsMemory,
   makeEventFeedMemory,
   makeIdsMemory,
@@ -42,6 +43,12 @@ import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers
 import { statusOk, submitError } from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
+
+/** Sign-up is not what these cases are about: a key is never proved here. */
+const NO_SIGN_UPS = {
+  provenKey: async () =>
+    ({ refused: "invalid_dpop_proof", detail: "no key is proved in this test" }) as const,
+};
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const callerAs = (principal: Principal, token?: Caller["token"]): Caller => ({
@@ -131,6 +138,7 @@ function grantedSurface() {
       directory,
       projects.layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+      makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory)),
       makeStandingsMemory().layer.pipe(Layer.provide(directory)),
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
@@ -183,7 +191,7 @@ function grantedSurface() {
   const handlers = makeHandlers(
     makeRunner(runtime),
     { emailCode: false, github: false },
-    { origin: "https://keel.test", fresh: () => true },
+    { origin: "https://keel.test", fresh: () => true, ...NO_SIGN_UPS },
   );
   return { runtime, handlers, callers: [agent, owner] };
 }

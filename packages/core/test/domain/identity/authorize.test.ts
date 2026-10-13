@@ -959,13 +959,14 @@ describe("authorize", () => {
     );
   });
 
-  it("[authz.no-instance-role] nothing is decided on the instance but signing in, the lattices and making an org", () => {
+  it("[authz.no-instance-role] nothing is decided on the instance but signing in or up, the lattices and making an org", () => {
     const onInstance = Object.entries(ACTIONS)
       .filter(([, rule]) => rule.resource === "Instance")
       .map(([action, rule]) => `${action}: ${rule.need}`)
       .toSorted();
     expect(onInstance).toEqual([
       "Auth_exchangeToken: anyone",
+      "Auth_registerClient: anyone",
       "CreateOrg: account",
       "Lattices_listLattices: anyone",
       "SignIn_methods: anyone",

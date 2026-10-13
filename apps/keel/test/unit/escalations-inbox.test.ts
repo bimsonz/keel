@@ -18,6 +18,7 @@ import {
   makeBetterAuthMemory,
   makeChangesMemory,
   makeCodeHostMemory,
+  makeAgentSignUpsMemory,
   makeEnrolmentsMemory,
   makeEscalationsMemory,
   makeEventFeedMemory,
@@ -43,6 +44,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
+
+/** Sign-up is not what these cases are about: a key is never proved here. */
+const NO_SIGN_UPS = {
+  provenKey: async () =>
+    ({ refused: "invalid_dpop_proof", detail: "no key is proved in this test" }) as const,
+};
 
 /**
  * The escalations inbox and the ruling, through the handlers the routes and
@@ -95,6 +102,7 @@ function world() {
       directory,
       projects.layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+      makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory)),
       makeStandingsMemory().layer.pipe(Layer.provide(directory)),
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
@@ -119,7 +127,7 @@ function world() {
   const handlers = makeHandlers(
     makeRunner(runtime),
     { emailCode: false, github: false },
-    { origin: "https://keel.test", fresh: () => true },
+    { origin: "https://keel.test", fresh: () => true, ...NO_SIGN_UPS },
   );
   /** Raises a question about a fresh conflict of `project`, asking `sponsor` first. */
   const raise = async (

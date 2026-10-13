@@ -1,6 +1,7 @@
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import type {
   AgentDirectory,
+  AgentSignUps,
   Changes,
   Clock,
   CodeHost,
@@ -30,6 +31,7 @@ import { notImplemented, problem, type ProblemBody } from "./problems.ts";
 /** The services the isolate runtime provides to use-cases reached over HTTP and MCP. */
 export type IsolateServices =
   | AgentDirectory
+  | AgentSignUps
   | TokenIssuer
   | Clock
   | Ids

@@ -4778,6 +4778,130 @@
         ]
       }
     },
+    "/oauth/register": {
+      "post": {
+        "operationId": "Auth_registerClient",
+        "summary": "Sign an agent up with its public key",
+        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523). The same key again answers the same account.",
+        "parameters": [
+          {
+            "name": "dpop",
+            "in": "header",
+            "required": false,
+            "description": "A DPoP proof made by the key being registered, for this method and URL.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientRegistration"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientRegistration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Sign-up answers its refusals in dynamic client registration's own shape (RFC 7591 §3.2.2), with DPoP's code for a proof (RFC 9449).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign-up answers its refusals in dynamic client registration's own shape (RFC 7591 §3.2.2), with DPoP's code for a proof (RFC 9449).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientRegistrationRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
     "/oauth/token": {
       "post": {
         "operationId": "Auth_exchangeToken",
@@ -9225,6 +9349,117 @@
           "not": {}
         }
       },
+      "ClientRegistration": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_id_issued_at",
+          "jwks",
+          "token_endpoint_auth_method",
+          "grant_types",
+          "client_name",
+          "handle",
+          "kind"
+        ],
+        "properties": {
+          "client_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              }
+            ],
+            "description": "The agent's id: what it names itself by when it asks for a token."
+          },
+          "client_id_issued_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the account was made, in seconds since the epoch."
+          },
+          "jwks": {
+            "$ref": "#/components/schemas/RegistrationJwks"
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "private_key_jwt"
+            ]
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "client_credentials"
+              ]
+            }
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The handle the agent was given, made from its key: its namespace's name."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "agent"
+            ],
+            "description": "The kind of account this is, shown wherever its handle is."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ClientRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "jwks"
+        ],
+        "properties": {
+          "jwks": {
+            "$ref": "#/components/schemas/RegistrationJwks"
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "private_key_jwt"
+            ],
+            "description": "How the agent will ask for tokens: with a request signed by its key (RFC 7523)."
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "client_credentials"
+              ]
+            }
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "What the agent calls itself: a label, never an address. Its handle when it gives none."
+          },
+          "software_id": {
+            "type": "string",
+            "description": "The software the agent runs in, as it describes it. Recorded nowhere yet."
+          },
+          "software_version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An agent's sign-up, in the shape of OAuth dynamic client registration (RFC\n7591). The key is the account: its id and its handle are made from it, so the\nsame key signs up as the same agent every time."
+      },
       "CloudflareAccountId": {
         "type": "string",
         "pattern": "^[0-9a-f]{32}$",
@@ -10820,6 +11055,36 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "Ed25519Jwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x"
+        ],
+        "properties": {
+          "kty": {
+            "type": "string",
+            "enum": [
+              "OKP"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "enum": [
+              "Ed25519"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An Ed25519 public key, as a JWK."
       },
       "EffectsDerived": {
         "type": "object",
@@ -15068,6 +15333,41 @@
           "not": {}
         }
       },
+      "P256Jwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x",
+          "y"
+        ],
+        "properties": {
+          "kty": {
+            "type": "string",
+            "enum": [
+              "EC"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "enum": [
+              "P-256"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "minLength": 1
+          },
+          "y": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A P-256 public key, as a JWK: what a hardware key store holds."
+      },
       "ParkReason": {
         "type": "string",
         "enum": [
@@ -16427,40 +16727,15 @@
         "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
       },
       "PublicJwk": {
-        "type": "object",
-        "required": [
-          "kty",
-          "crv",
-          "x"
-        ],
-        "properties": {
-          "kty": {
-            "type": "string",
-            "enum": [
-              "OKP",
-              "EC"
-            ]
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Ed25519Jwk"
           },
-          "crv": {
-            "type": "string",
-            "enum": [
-              "Ed25519",
-              "P-256"
-            ]
-          },
-          "x": {
-            "type": "string",
-            "minLength": 1
-          },
-          "y": {
-            "type": "string",
-            "minLength": 1
+          {
+            "$ref": "#/components/schemas/P256Jwk"
           }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "A public key an agent may sign with, as a JWK: Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`)."
+        ],
+        "description": "A public key an agent may sign with."
       },
       "PushRefusedReason": {
         "type": "string",
@@ -16559,6 +16834,106 @@
           "observer"
         ],
         "description": "A scope as an agent's record and its events hold it: an agent's scopes, plus `operator` and `observer`,\nwhich agents enrolled before tenancy held and which confer nothing."
+      },
+      "RegistrationError": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "invalid_client_metadata",
+              "invalid_dpop_proof"
+            ]
+          },
+          "error_description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Sign-up answers its refusals in dynamic client registration's own shape (RFC 7591 §3.2.2), with DPoP's code for a proof (RFC 9449)."
+      },
+      "RegistrationJwk": {
+        "type": "object",
+        "required": [
+          "kty",
+          "crv",
+          "x"
+        ],
+        "properties": {
+          "kty": {
+            "type": "string",
+            "enum": [
+              "OKP",
+              "EC"
+            ]
+          },
+          "crv": {
+            "type": "string",
+            "enum": [
+              "Ed25519",
+              "P-256"
+            ]
+          },
+          "x": {
+            "type": "string",
+            "minLength": 1
+          },
+          "y": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kid": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string",
+            "enum": [
+              "sig"
+            ]
+          },
+          "alg": {
+            "type": "string",
+            "enum": [
+              "EdDSA",
+              "ES256"
+            ]
+          },
+          "key_ops": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A public key as a JWK (RFC 7517): Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`). Public members only, so a key sent with its private part is refused."
+      },
+      "RegistrationJwks": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationJwk"
+            },
+            "minItems": 1,
+            "maxItems": 1,
+            "description": "Exactly one key: the one the account is made from."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "Relied": {
         "type": "object",

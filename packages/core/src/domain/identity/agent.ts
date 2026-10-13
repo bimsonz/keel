@@ -8,7 +8,7 @@ import {
   UserId,
 } from "../kernel/index.ts";
 import { AgentKey } from "./agent-key.ts";
-import { Handle } from "./tenancy.ts";
+import { Handle } from "./handle.ts";
 
 /**
  * `interactive`: an agent a person drives; `hosted`: one Keel's operator runs;

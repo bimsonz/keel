@@ -5,6 +5,7 @@
  */
 export * from "./admitted-guards.ts";
 export * from "./agent-directory.ts";
+export * from "./agent-sign-ups.ts";
 export * from "./background.ts";
 export * from "./batch-verdicts.ts";
 export * from "./batch-verification.ts";

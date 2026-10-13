@@ -24,7 +24,7 @@ import {
   AgentSuspended,
   AgentUnsponsored,
 } from "./events.ts";
-import type { Handle } from "./tenancy.ts";
+import type { Handle } from "./handle.ts";
 
 /** What an agent that signs up by key may do, until an org it is invited into says otherwise. */
 const SIGNED_UP_SCOPES: readonly Scope[] = ["agent:work", "agent:read"];

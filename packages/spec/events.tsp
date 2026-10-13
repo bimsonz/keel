@@ -667,16 +667,31 @@ model AgentEnrolled {
   sponsor?: UserId;
 }
 
-/** A public key an agent may sign with, as a JWK: Ed25519 (`OKP`) or P-256 (`EC`, which also has `y`). */
-model PublicJwk {
-  kty: "OKP" | "EC";
-  crv: "Ed25519" | "P-256";
+/** An Ed25519 public key, as a JWK. */
+model Ed25519Jwk {
+  kty: "OKP";
+  crv: "Ed25519";
+
+  @minLength(1)
+  x: string;
+}
+
+/** A P-256 public key, as a JWK: what a hardware key store holds. */
+model P256Jwk {
+  kty: "EC";
+  crv: "P-256";
 
   @minLength(1)
   x: string;
 
   @minLength(1)
-  y?: string;
+  y: string;
+}
+
+/** A public key an agent may sign with. */
+union PublicJwk {
+  Ed25519Jwk,
+  P256Jwk,
 }
 
 /** A key as an agent presented it, with the RFC 7638 thumbprint Keel computed for it. */

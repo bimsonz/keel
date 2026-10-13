@@ -8,6 +8,7 @@ import {
   makeChangesMemory,
   makeClockMemory,
   makeCodeHostMemory,
+  makeAgentSignUpsMemory,
   makeEnrolmentsMemory,
   makeIdsMemory,
   makeEventFeedMemory,
@@ -33,6 +34,12 @@ import { describe, expect, it } from "vitest";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
+
+/** Sign-up is not what these cases are about: a key is never proved here. */
+const NO_SIGN_UPS = {
+  provenKey: async () =>
+    ({ refused: "invalid_dpop_proof", detail: "no key is proved in this test" }) as const,
+};
 
 const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
 if (!("privateKey" in pair)) throw new Error("Ed25519 did not generate a key pair");
@@ -85,6 +92,7 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
       makeProbeLedgerMemory().world,
       makeProjectsMemory().layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeCodeHostMemory().layer,
       makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
@@ -98,7 +106,7 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
   const handlers = makeHandlers(
     makeRunner(runtime),
     { emailCode: false, github: false },
-    { origin: "https://keel.test", fresh: () => true },
+    { origin: "https://keel.test", fresh: () => true, ...NO_SIGN_UPS },
   );
   const answer = await handlers.Auth_exchangeToken(
     { requestId: "req-1", principal: { _tag: "Anonymous" }, signal: new AbortController().signal },

@@ -9,6 +9,7 @@ import {
   openSession,
   readInbox,
   reserveChange,
+  signUp,
   type StandingMove,
   takeNotices,
   viewSession,
@@ -26,6 +27,7 @@ import {
   InboxRead,
   OpenSession,
   ReserveChange,
+  SignUpCommand,
   StandingCommand,
   TakeNotices,
 } from "../../../rpc/index.ts";
@@ -244,5 +246,15 @@ export class AgentSessionDO
       Effect.flatMap((enrolling) => enrol(agentId, enrolling)),
     );
     return this.answer(AgentSessionCodecs.enrol, program);
+  }
+
+  /** Signs up this object's agent with its key: AgentSignedUp committed, then the directory row and the key written, before it answers. */
+  async signUp(command: typeof SignUpCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(SignUpCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((signing) => signUp(agentId, signing)),
+    );
+    return this.answer(AgentSessionCodecs.signUp, program);
   }
 }

@@ -13,6 +13,8 @@ export interface Route {
 export const UNROUTED = {
   Auth_exchangeToken:
     "the client's own token exchange: an RFC 6749 form post it makes before any call, not a JSON call",
+  Auth_registerClient:
+    "the client's own sign-up: an RFC 7591 registration it signs with its key before it has a token",
 } as const;
 
 export type UnroutedOperation = keyof typeof UNROUTED;

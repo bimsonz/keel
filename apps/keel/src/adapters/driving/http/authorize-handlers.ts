@@ -259,6 +259,7 @@ const projectByName = (handle: string, name: string) =>
  */
 export const RESOLVERS: Resolvers = {
   Auth_exchangeToken: instance,
+  Auth_registerClient: instance,
   SignIn_methods: instance,
   Lattices_listLattices: instance,
   whoami: self,

@@ -3,7 +3,7 @@ import { type AgentId, makeId, ProjectId, type RunId, sha256Hex } from "../kerne
 import type { Agent } from "./agent.ts";
 import { idBody, type KeyThumbprint } from "./agent-key.ts";
 import { AgentNotAdmitted } from "./errors.ts";
-import type { Handle } from "./tenancy.ts";
+import type { Handle } from "./handle.ts";
 
 /**
  * What an agent calls one of its runs: one word of lower-case

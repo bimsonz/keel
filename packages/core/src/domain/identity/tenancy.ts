@@ -11,15 +11,9 @@ import {
   type UserId,
 } from "../kernel/index.ts";
 import type { Scope } from "./agent.ts";
+import { Handle } from "./handle.ts";
 
-/**
- * A user's handle or an org's name: one segment of `/<org>/<project>`, unique
- * per instance across users and orgs, as on GitHub. Lower-case letters and
- * digits with single hyphens between them, at most 39 characters. The reserved
- * names are the (`names.ts`); this is only the shape.
- */
-export const Handle = Schema.String.check(Schema.isPattern(/^[a-z0-9](?:-?[a-z0-9]){0,38}$/));
-export type Handle = typeof Handle.Type;
+export { Handle };
 
 /**
  * A member's role in an org. Each includes the one

@@ -6,10 +6,11 @@ import type {
   Identity,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
-import type { GrantedToken } from "@keeltown/core/application/identity";
+import type { GrantedToken, SignedUp } from "@keeltown/core/application/identity";
 import { LATTICES } from "@keeltown/core/domain/coordination";
 import type {
   Auth_exchangeTokenResult,
+  Auth_registerClientResult,
   Lattices_listLatticesResult,
   WhoamiResult,
 } from "../../../generated/http/app.gen.ts";
@@ -128,6 +129,39 @@ export function admissionRefused(
       return unmapped;
     }
   }
+}
+
+/**
+ * A sign-up's answer, in dynamic client registration's shape (RFC 7591 §3.2.1):
+ * 201 when this request made the account, 200 when the key had signed up before.
+ */
+export function registeredOk({ agent, created }: SignedUp): Auth_registerClientResult {
+  if (agent.handle === undefined || agent.keys === undefined)
+    throw new Error(`${agent.id} signed up with no handle or no key`);
+  return {
+    status: created ? 201 : 200,
+    body: {
+      client_id: agent.id,
+      client_id_issued_at: Math.floor(agent.createdAt / 1000),
+      jwks: { keys: agent.keys.map((key) => ({ ...key.jwk })) },
+      token_endpoint_auth_method: "private_key_jwt",
+      grant_types: ["client_credentials"],
+      client_name: agent.name,
+      handle: agent.handle,
+      kind: "agent",
+    },
+  };
+}
+
+/** A sign-up refused for its key or its proof, in registration's own shape (RFC 7591 §3.2.2). */
+export function registrationRefused(
+  refused: "invalid_client_metadata" | "invalid_dpop_proof",
+  detail: string,
+): Auth_registerClientResult {
+  return {
+    status: refused === "invalid_dpop_proof" ? 401 : 400,
+    body: { error: refused, error_description: detail },
+  };
 }
 
 /** `expires_in` is the lifetime the token was issued with, never re-derived from a later clock read. */

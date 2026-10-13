@@ -12,6 +12,7 @@ import {
   ChangeCodecs,
   DeclareCommand,
   type EnrolCommand,
+  type SignUpCommand,
   type InboxRead,
   type OpenSession,
   type ReserveChange,
@@ -41,6 +42,7 @@ export interface AgentSessionStub {
   inbox(request: typeof InboxRead.Encoded): Promise<unknown>;
   takeNotices(request: typeof TakeNotices.Encoded): Promise<unknown>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<unknown>;
+  signUp(command: typeof SignUpCommand.Encoded): Promise<unknown>;
   openSession(command: typeof OpenSession.Encoded): Promise<unknown>;
   describe(): Promise<unknown>;
 }

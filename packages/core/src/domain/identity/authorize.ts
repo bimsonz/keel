@@ -66,6 +66,7 @@ const rule = <K extends ResourceKind, N extends Need>(resource: K, need: N) => (
 /** Every operation in the spec (`packages/contracts/openapi.json`), by its operationId. */
 export const SPEC_ACTIONS = {
   Auth_exchangeToken: rule("Instance", "anyone"),
+  Auth_registerClient: rule("Instance", "anyone"),
   Lattices_listLattices: rule("Instance", "anyone"),
   SignIn_methods: rule("Instance", "anyone"),
   whoami: rule("Self", "self"),

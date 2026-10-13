@@ -5,9 +5,12 @@ import {
   AgentNotAdmitted,
   AgentNotKnown,
   AgentStateRefused,
+  Handle,
   IdempotencyConflict,
   InboxPage,
+  PresentedKey,
   Scope,
+  SignUpRefused,
   SponsorRequestRefused,
 } from "@keeltown/core/domain/identity";
 import { Session } from "@keeltown/core/domain/memory";
@@ -90,6 +93,19 @@ export const EnrolCommand = Schema.Struct({
 });
 
 /**
+ * An agent signs itself up with a key. The isolate makes the agent
+ * id and the handle from the key, so the same key reaches this object every
+ * time; the DO commits AgentSignedUp and writes the D1 projection and the key
+ * before it answers. The same key again answers the same agent. Another key
+ * under this id is SignUpRefused.
+ */
+export const SignUpCommand = Schema.Struct({
+  handle: Handle,
+  key: PresentedKey,
+  name: Schema.optional(Schema.NonEmptyString),
+});
+
+/**
  * A person suspends, reinstates or revokes the agent. `by` is who, as the
  * envelope names an actor (`user:<id>`): the events' `by` and the commit's
  * actor; `reason` is a suspension's. The commit's cause is
@@ -139,6 +155,7 @@ export const AgentSessionCodecs = {
   inbox: exitCodec(InboxPage, AgentNotKnown),
   takeNotices: exitCodec(Schema.Array(AgentNotice), Schema.Never),
   enrol: exitCodec(Agent, IdempotencyConflict),
+  signUp: exitCodec(Agent, SignUpRefused),
   suspend: exitCodec(Agent, StandingRefusal),
   reinstate: exitCodec(Agent, StandingRefusal),
   revoke: exitCodec(Agent, StandingRefusal),
@@ -180,6 +197,7 @@ export interface AgentSessionRpc extends EventReceiverRpc {
    */
   takeNotices(request: typeof TakeNotices.Encoded): Promise<ExitJson>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<ExitJson>;
+  signUp(command: typeof SignUpCommand.Encoded): Promise<ExitJson>;
   /**
    * Suspends, reinstates or revokes the agent through the domain's Agent
    * machine, writing its directory row (guarded by the event's seq) before

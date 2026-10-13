@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { type AgentId, InstantSchema, makeId } from "../kernel/index.ts";
-import type { Handle } from "./tenancy.ts";
+import type { Handle } from "./handle.ts";
 
 /**
  * A public key's thumbprint (RFC 7638): the SHA-256 of its canonical JWK, in

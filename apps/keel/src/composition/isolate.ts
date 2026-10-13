@@ -34,6 +34,7 @@ import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
 import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
+import { AgentSignUpsRpc } from "../adapters/driven/do-rpc/sign-ups.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
 import { SponsorshipsRpc } from "../adapters/driven/do-rpc/sponsorships.ts";
 import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
@@ -83,6 +84,7 @@ export function isolateLayer(
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
+    AgentSignUpsRpc(agentSession),
     overrides.sessions ?? SessionsRpc(agentSession),
     overrides.standings ?? StandingsRpc(agentSession),
     overrides.sponsorships ?? SponsorshipsRpc(agentSession),

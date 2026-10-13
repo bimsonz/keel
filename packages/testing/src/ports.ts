@@ -12,6 +12,10 @@ import {
 import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
 import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
+import {
+  type AgentSignUpsHarness,
+  describeAgentSignUpsContract,
+} from "./contracts/agent-sign-ups.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
 import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
@@ -124,6 +128,7 @@ import type {
   BatchVerdicts,
   ChangePrecheck,
   Changes,
+  AgentSignUps,
   Enrolments,
   EventFeed,
   FlowSpecSource,
@@ -341,6 +346,16 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
   };
 }
 
+function memoryAgentSignUpsHarness(): AgentSignUpsHarness {
+  const directory = identity.makeAgentDirectoryMemory().layer;
+  return {
+    layer: Layer.merge(
+      operator.makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
+      directory,
+    ),
+  };
+}
+
 /** The in-memory ledger runs the Subject DO's own use-cases, one object per subject. */
 function memoryProbeLedgerHarness(): ProbeLedgerHarness {
   const memory = makeProbeLedgerMemory();
@@ -497,6 +512,10 @@ export const PORTS = {
   Enrolments: harnessed<Enrolments | AgentDirectory, EnrolmentsHarness>(
     memoryEnrolmentsHarness,
     describeEnrolmentsContract,
+  ),
+  AgentSignUps: harnessed<AgentSignUps | AgentDirectory, AgentSignUpsHarness>(
+    memoryAgentSignUpsHarness,
+    describeAgentSignUpsContract,
   ),
   LiveChanges: harnessed<LiveChanges, LiveChangesHarness>(
     memoryLiveChangesHarness,

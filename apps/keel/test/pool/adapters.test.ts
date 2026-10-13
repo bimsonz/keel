@@ -4,6 +4,7 @@ import { type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import type { AgentId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentNotice,
+  AgentSignUps,
   Enrolments,
   EntityStore,
   EventOutbox,
@@ -30,6 +31,7 @@ import { Effect, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
+import { AgentSignUpsRpc } from "../../src/adapters/driven/do-rpc/sign-ups.ts";
 import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
 import { ConflictMovesRpc } from "../../src/adapters/driven/do-rpc/conflict-moves.ts";
 import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
@@ -209,6 +211,24 @@ const drainedEnrolments = Layer.effect(
 
 PORTS.Enrolments.contract("AgentSession DO over RPC", () => ({
   layer: Layer.merge(drainedEnrolments, AgentDirectoryD1(env.DB)),
+}));
+
+/** A sign-up commits AgentSignedUp on the agent's own AgentSession DO; each one waits for that object's outbox to go quiet. */
+const drainedSignUps = Layer.effect(
+  AgentSignUps,
+  Effect.gen(function* () {
+    const signUps = yield* AgentSignUps;
+    return AgentSignUps.of({
+      signUp: (input) =>
+        signUps
+          .signUp(input)
+          .pipe(Effect.ensuring(Effect.promise(() => drainOutbox(agentSession(input.agentId))))),
+    });
+  }),
+).pipe(Layer.provide(AgentSignUpsRpc(agentSession)));
+
+PORTS.AgentSignUps.contract("AgentSession DO over RPC", () => ({
+  layer: Layer.merge(drainedSignUps, AgentDirectoryD1(env.DB)),
 }));
 
 /** Opening a session commits SessionOpened on the agent's AgentSession DO; each open waits for its outbox to go quiet. */

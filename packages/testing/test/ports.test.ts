@@ -7,6 +7,7 @@ const CONTRACT_PORTS = [
   "Clock",
   "Ids",
   "AgentDirectory",
+  "AgentSignUps",
   "TokenIssuer",
   "CodeHost",
   "WorkspacePool",

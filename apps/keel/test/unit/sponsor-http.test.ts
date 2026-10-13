@@ -9,6 +9,7 @@ import { type AgentId, Instant, makeId, type OrgId, type UserId } from "@keeltow
 import { Sponsorships } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
+  makeAgentSignUpsMemory,
   makeBetterAuthMemory,
   makeChangesMemory,
   makeCodeHostMemory,
@@ -103,6 +104,7 @@ function world() {
       directory.layer,
       projects.layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
       sponsorships.layer.pipe(Layer.provide(directory.layer)),

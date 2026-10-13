@@ -1,3 +1,4 @@
+import { signUp } from "@keeltown/core/application/identity";
 import { DEFAULT_SETTINGS } from "@keeltown/core/application/integration";
 import {
   type Actor,
@@ -9,6 +10,8 @@ import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
+  AgentSignUps,
+  Clock,
   type Enrolment,
   Enrolments,
   type ProjectRecord,
@@ -17,7 +20,8 @@ import {
   RepoNotFound,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
-import { hashSecret } from "./identity.ts";
+import { makeEventOutboxMemory } from "./event-outbox.ts";
+import { hashSecret, makeClockMemory } from "./identity.ts";
 import { makeLiveChangesMemory } from "./live-changes.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -188,5 +192,35 @@ export function makeEnrolmentsMemory() {
         });
       }),
     ),
+  };
+}
+
+/**
+ * `AgentSignUps` in memory: each agent has an object of its own, an outbox and
+ * a store, and the object runs the real `signUp`, projecting into the
+ * AgentDirectory beside it.
+ */
+export function makeAgentSignUpsMemory() {
+  const objects = new Map<AgentId, ReturnType<typeof makeEventOutboxMemory>>();
+  return {
+    objects,
+    layer: Layer.effect(
+      AgentSignUps,
+      Effect.gen(function* () {
+        const directory = yield* AgentDirectory;
+        const clock = yield* Clock;
+        return AgentSignUps.of({
+          signUp: ({ agentId, handle, key, name }) => {
+            const object = objects.get(agentId) ?? makeEventOutboxMemory();
+            objects.set(agentId, object);
+            return signUp(agentId, { handle, key, name }).pipe(
+              Effect.provide(object.layer),
+              Effect.provideService(AgentDirectory, directory),
+              Effect.provideService(Clock, clock),
+            );
+          },
+        });
+      }),
+    ).pipe(Layer.provide(makeClockMemory().layer)),
   };
 }

@@ -28,6 +28,7 @@ import {
 import {
   enrolAgent,
   exchangeToken,
+  signUpAgent,
   openAgentSession,
   reinstateAgent,
   revokeAgent,
@@ -47,6 +48,7 @@ import {
   type Audience,
   authorize,
   GrantableScope,
+  type PresentedKey,
   type ProjectResource,
   roleOf,
 } from "@keeltown/core/domain/identity";
@@ -76,7 +78,15 @@ import {
   RESOLVERS,
 } from "./authorize-handlers.ts";
 import type { Caller, AgentToken } from "./caller.ts";
-import { latticesOk, tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
+import {
+  latticesOk,
+  registeredOk,
+  registrationRefused,
+  tokenError,
+  tokenOk,
+  whoamiError,
+  whoamiOk,
+} from "./mappers.ts";
 import { listProjects, viewerRole } from "./project-list.ts";
 import {
   createProjectError,
@@ -343,11 +353,26 @@ export interface SignInMethods {
 
 /** What composition tells the handlers of the doorway they stand in. */
 export interface Doorway {
-  /** `https://<KEEL_HOST>`: where the console's pages are. */
+  /** `https://<KEEL_HOST>`: where the console's pages are, and where a request arrived. */
   readonly origin: string;
   /** Whether the caller's session is a fresh sign-in, by the sign-in adapter's own rule. */
   readonly fresh: (caller: Caller) => boolean;
+  /** Sign-up's check that the key a request registers made the proof beside it, by the identity adapter. */
+  readonly provenKey: (request: {
+    readonly jwk: unknown;
+    readonly proof: string | undefined;
+    readonly url: string;
+  }) => Promise<
+    | PresentedKey
+    | {
+        readonly refused: "invalid_client_metadata" | "invalid_dpop_proof";
+        readonly detail: string;
+      }
+  >;
 }
+
+/** Where an agent signs up: the path its proof must name. */
+export const REGISTER_PATH = "/v1/oauth/register";
 
 export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorway) {
   /** A person's move that wants a fresh sign-in: refused here, before its port is called. */
@@ -377,6 +402,29 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
     run,
     authorizeHandlers(
       {
+        Auth_registerClient: async (caller: Caller, input: Input<"Auth_registerClient">) => {
+          const proven = await doorway.provenKey({
+            jwk: input.jwks.keys[0],
+            proof: input.dpop,
+            url: `${doorway.origin}${REGISTER_PATH}`,
+          });
+          if ("refused" in proven) return registrationRefused(proven.refused, proven.detail);
+          return run(
+            caller,
+            signUpAgent(proven, input.client_name).pipe(
+              Effect.map(registeredOk),
+              // The id is another key's account: a collision in 128 bits of a thumbprint.
+              Effect.catchTag("SignUpRefused", () =>
+                Effect.succeed(
+                  registrationRefused(
+                    "invalid_client_metadata",
+                    "This key cannot sign up: make another key and sign up with that.",
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
         Auth_exchangeToken: (
           caller: Caller,
           input: {
