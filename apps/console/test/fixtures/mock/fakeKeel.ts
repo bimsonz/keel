@@ -529,11 +529,27 @@ export function createFakeKeel(
         } satisfies SponsoredAgents);
       }
 
-      // Who an agent is, Keel answers anyone: its card, and never who stands behind it.
+      // Who an agent is, Keel answers anyone: its card, and never who stands behind it. The card names the orgs
+      // the agent has joined, each by its handle and oldest invitation first, and has no list where it has joined
+      // none: an invitation nobody has answered is in none, and who made any of them is never read (Keel's
+      // `joinedOrgs`).
       const card = /^\/v1\/agents\/([^/]+)$/.exec(url.pathname);
       if (card !== null && request.method === "GET") {
         const known = agents.get(decodeURIComponent(card[1] ?? ""));
-        return known === undefined ? gone() : Response.json(known satisfies AgentCard);
+        if (known === undefined) return gone();
+        const orgs = [...invited]
+          .flatMap(([handle, rows]) => {
+            const row = rows.get(known.id);
+            return row?.state === "joined"
+              ? [{ handle, kind: "org" as const, at: row.invitedAt }]
+              : [];
+          })
+          .toSorted((a, b) => a.at.localeCompare(b.at))
+          .map(({ handle, kind }) => ({ handle, kind }));
+        return Response.json({
+          ...known,
+          ...(orgs.length === 0 ? {} : { orgs }),
+        } satisfies AgentCard);
       }
 
       // A person stands behind an agent with the code it showed them: Keel's `approveSponsor`.

@@ -11,7 +11,7 @@ import {
   standingOf,
 } from "../../../src/account/orgAgents.ts";
 import type { AgentCard, NamespaceAgent, Scope } from "../../../src/contract/keel/index.ts";
-import { createHttpOrgAgents } from "../../../src/source/http.ts";
+import { createHttpOrgAgents, createHttpSponsorship } from "../../../src/source/http.ts";
 import { KeelRefused } from "../../../src/source/types.ts";
 import { createIdentity } from "../../fixtures/identity/standIn.ts";
 import { SESSION_COOKIE, createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
@@ -85,7 +85,13 @@ function keel() {
     const body: { code?: string; state?: string } = await response.json();
     return `${response.status} ${body.code ?? body.state ?? ""}`;
   };
-  return { fake, fromThePage, as, keyed };
+  /** Keel's card of an agent, as this reader is read it. */
+  const card = (who: Person | undefined, agentId: string) =>
+    createHttpSponsorship({
+      origin: ORIGIN,
+      fetch: (input, init) => serve(who)(new Request(input, init)),
+    }).findAgent(agentId);
+  return { fake, fromThePage, as, keyed, card };
 }
 
 /** A refusal in full: Keel's sentence and the ways forward it gave under it, as a page shows them. */
@@ -304,6 +310,22 @@ describe("the agents in an org", () => {
     expect(
       (await k.as("grace").listAgents("acme")).map((agent) => `${agent.handle} ${agent.invitedBy}`),
     ).toEqual(["quiet-heron mary", "tidy-otter ada"]);
+  });
+
+  it("[org-agents.card] are named the orgs they have joined on their own card, to anyone: none while an invitation waits, none once taken out, and never who invited them", async () => {
+    const k = keel();
+    await k.as("grace").inviteAgent("acme", "tidy-otter", SCOPES.work);
+    // An invitation nobody has answered is on no card, and a card with no org has no list of them.
+    expect(await k.card(undefined, OTTER.id)).toEqual(OTTER);
+    k.fake.accepts("acme", OTTER.id);
+    const joined = { ...OTTER, orgs: [{ handle: "acme", kind: "org" }] };
+    expect(await k.card(undefined, OTTER.id)).toEqual(joined);
+    // The same card whoever reads it: the member who invited it is told no more there than a visitor.
+    expect(await k.card("grace", OTTER.id)).toEqual(joined);
+    expect(await k.card("eve", OTTER.id)).toEqual(joined);
+    expect(await k.card(undefined, HERON.id)).toEqual(HERON);
+    await k.as("ada").removeAgent("acme", OTTER.id);
+    expect(await k.card(undefined, OTTER.id)).toEqual(OTTER);
   });
 
   it("[org-agents.stale] is refused a removal from a sign-in that is not fresh, in Keel's sentence with its way forward, and nothing is changed", async () => {

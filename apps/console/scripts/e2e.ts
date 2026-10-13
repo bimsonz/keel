@@ -4767,6 +4767,32 @@ expectEqual(
   await joinedOn(onlooker),
   `Tidy Otter joined ${today} | /tidy-otter`,
 );
+// An agent's own page names the orgs it has joined, as its card does to anyone: each by its handle, linked to
+// the org, and nothing of an invitation nobody has answered or of who invited it.
+const joinedPageOf = async (shown: Page, handle: string): Promise<string> => {
+  await shown.goto(`${built}/${handle}`, { waitUntil: "domcontentloaded" });
+  const about = shown.locator('main section[aria-label="Agent"]');
+  await about
+    .getByText("Name")
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+  const said = squash(await about.innerText({ timeout: 2000 }).catch(() => "no card"));
+  const links = await about
+    .getByRole("link")
+    .evaluateAll((found) => found.map((anchor) => anchor.getAttribute("href") ?? ""));
+  return `${said} | ${links.join(" ") || "no link"}`;
+};
+expectEqual(
+  "org agents: an agent's own page names the org it has joined, linked to the org, to a visitor",
+  await joinedPageOf(onlooker, "tidy-otter"),
+  "Agent Name Tidy Otter Joined symmetry | /symmetry",
+);
+expectEqual(
+  "org agents: an agent whose invitation nobody has answered is said to have joined nothing",
+  await joinedPageOf(onlooker, "unbroken-heron"),
+  `Agent Name ${UNBROKEN.name} | no link`,
+);
 await onlooking.close();
 await noether.goto(`${built}/symmetry`, { waitUntil: "domcontentloaded" });
 expectEqual(

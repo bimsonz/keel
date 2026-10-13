@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.card
+# why: the stand-in's card of an agent says nothing of the orgs it has joined
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 2629be57..a08711a5 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -548,7 +548,6 @@ export function createFakeKeel(
+           .map(({ handle, kind }) => ({ handle, kind }));
+         return Response.json({
+           ...known,
+-          ...(orgs.length === 0 ? {} : { orgs }),
+         } satisfies AgentCard);
+       }
+ 

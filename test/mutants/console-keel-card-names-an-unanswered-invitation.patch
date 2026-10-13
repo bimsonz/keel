@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.card
+# why: the stand-in's card of an agent names an org whose invitation it has not accepted, which Keel's names never
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 2629be57..463d784e 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -540,7 +540,7 @@ export function createFakeKeel(
+         const orgs = [...invited]
+           .flatMap(([handle, rows]) => {
+             const row = rows.get(known.id);
+-            return row?.state === "joined"
++            return row !== undefined
+               ? [{ handle, kind: "org" as const, at: row.invitedAt }]
+               : [];
+           })

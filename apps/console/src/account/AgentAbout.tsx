@@ -1,6 +1,7 @@
 // An agent's own page, at its handle: what Keel shows anyone of it. Keel's
-// public card is the whole of it: its name, the kind it declared, and the
-// namespace it works in. Who stands behind an agent is never on this page.
+// public card is the whole of it: its name, the kind it declared, the
+// namespace it works in and the orgs it has joined. Who stands behind an
+// agent, and who invited it anywhere, is never on this page.
 // The one person who does is told so from their own list of the agents they
 // stand behind, and is sent to their settings, where the controls are.
 
@@ -94,6 +95,23 @@ export function AgentAbout({
                 >
                   {card.namespace}
                 </a>
+              </dd>
+            </>
+          )}
+          {/* The orgs it has joined, as its card names them: none where an invitation still waits. */}
+          {card.orgs !== undefined && card.orgs.length > 0 && (
+            <>
+              <dt className="text-kumo-subtle">Joined</dt>
+              <dd className="flex flex-wrap gap-x-3 gap-y-1">
+                {card.orgs.map((org) => (
+                  <a
+                    key={org.handle}
+                    className="a-link a-mono"
+                    href={hrefOf({ at: "namespace", handle: org.handle })}
+                  >
+                    {org.handle}
+                  </a>
+                ))}
               </dd>
             </>
           )}
