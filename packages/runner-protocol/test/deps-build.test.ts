@@ -847,8 +847,7 @@ describe("the deps box's command", () => {
   });
 
   it("[deps.inputs.encoded] hands the inputs over as one line of base64, of their UTF-8 bytes: a session's exec indents every line of a value after its first", () => {
-    const inputs =
-      "keel.install/1\n" + `${"6".repeat(64)}  caf${String.fromCodePoint(233)}/package.json\n`;
+    const inputs = `keel.install/1\n${"6".repeat(64)}  caf${String.fromCodePoint(233)}/package.json\n`;
     expect(depsInputsEncoded(inputs)).toBe(
       "a2VlbC5pbnN0YWxsLzEKNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NiAgY2Fmw6kvcGFja2FnZS5qc29uCg==",
     );
