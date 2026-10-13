@@ -21277,10 +21277,12 @@
           },
           "advancedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When trunk's head last changed."
           },
           "frozen": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Promotion has stopped until an operator resumes it: trunk did not read as Keel left it."
           }
         },
         "additionalProperties": {

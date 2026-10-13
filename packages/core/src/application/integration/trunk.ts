@@ -1,4 +1,4 @@
-import { Effect, Exit, Result, Schema } from "effect";
+import { Effect, Exit, Option, Result, Schema } from "effect";
 import type { PushRefusedReason } from "../../domain/coordination/index.ts";
 import {
   BatchVerified,
@@ -30,10 +30,12 @@ import {
   commit,
   EntityStore,
   type EventDraft,
+  EventOutbox,
   ImportTooLarge,
   OrgUsage,
   RELAY_PACK_CAP_BYTES,
   type Transaction,
+  type TrunkStanding,
   TrunkWriter,
 } from "../ports/index.ts";
 import { projectNamespace } from "../verification/index.ts";
@@ -90,6 +92,53 @@ export const trunkOf = (
   const stored = store.get(TRUNK, projectId);
   return stored === undefined ? undefined : decodeTrunk(stored);
 };
+
+/** The head an event of the trunk's own log names as trunk's from then on, if it names one. */
+const headAfter = (event: EventEnvelope): unknown => {
+  const field =
+    event.type === "TrunkInitialized" || event.type === "PromotionResumed"
+      ? "head"
+      : event.type === "TrunkAdvanced"
+        ? "to"
+        : undefined;
+  return field === undefined || typeof event.payload !== "object" || event.payload === null
+    ? undefined
+    : Reflect.get(event.payload, field);
+};
+
+/** When trunk's head last changed, by its own log: the time of the last event that named another head. */
+const headChangedAt = (log: readonly EventEnvelope[]): Instant | undefined => {
+  let head: unknown;
+  let at: Instant | undefined;
+  for (const event of log) {
+    const next = headAfter(event);
+    if (next !== undefined && next !== head) {
+      head = next;
+      at = event.at;
+    }
+  }
+  return at;
+};
+
+/**
+ * The trunk as a reader of its project is shown it, or none before
+ * TrunkInitialized. A trunk stored before `advancedAt` was kept answers from
+ * its own log, the time of the last event there that changed its head, until
+ * the next such event writes the field.
+ */
+export const trunkStanding = Effect.fn("integration/trunkStanding")(function* (
+  projectId: ProjectId,
+) {
+  const trunk = trunkOf(yield* EntityStore, projectId);
+  if (trunk === undefined) return Option.none<TrunkStanding>();
+  const advancedAt =
+    trunk.advancedAt ?? headChangedAt((yield* EventOutbox).log({ kind: "trunk", id: projectId }));
+  if (advancedAt === undefined)
+    return yield* Effect.die(
+      new Error(`trunk ${projectId} has a head and no event that put it there`),
+    );
+  return Option.some<TrunkStanding>({ head: trunk.head, phase: trunk.phase, advancedAt });
+});
 
 /** Whether the project's trunk was destroyed: it then takes no batch and its repos are deleted. */
 export const trunkDestroyed = (
@@ -176,7 +225,8 @@ export const promote = Effect.fn("integration/promote")(function* (
         decidePromotion(trunkOf(tx.store, projectId), command, { now, projectId }),
         (events) => {
           const after = events.reduce<Trunk | undefined>(
-            (trunk, payload) => evolvePromotion(trunk, { at: now, payload }),
+            // The instant the events are stamped with: trunk's `advancedAt` is its event's own time.
+            (trunk, payload) => evolvePromotion(trunk, { at: tx.at, payload }),
             trunkOf(tx.store, projectId),
           );
           if (after !== undefined) tx.store.put(TRUNK, projectId, encodeTrunk(after));

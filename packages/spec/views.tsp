@@ -16,7 +16,11 @@ model LaneView {
 model TrunkView {
   projectId: ProjectId;
   head: CommitSha;
+
+  /** When trunk's head last changed. */
   advancedAt: utcDateTime;
+
+  /** Promotion has stopped until an operator resumes it: trunk did not read as Keel left it. */
   frozen: boolean;
 }
 

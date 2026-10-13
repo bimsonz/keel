@@ -89,6 +89,7 @@ export async function followTrunk(
       origin: unused,
       adopt: unused,
       seed: unused,
+      view: unused,
       sync: unused,
       destroy: unused,
     }),

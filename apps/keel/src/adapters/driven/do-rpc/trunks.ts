@@ -47,6 +47,11 @@ export function TrunksRpc(
           Effect.map((status) => status.head),
           Effect.orDie,
         ),
+      view: (projectId) =>
+        callObject(TrunkCodecs.view, () => trunk(projectId).view()).pipe(
+          Effect.map((answer) => Option.fromUndefinedOr(answer.trunk)),
+          Effect.orDie,
+        ),
       sync: (projectId) =>
         callObject(TrunkCodecs.sync, () => trunk(projectId).sync()).pipe(
           Effect.map(({ head }) => ({ head, staging: head, mirror: head })),

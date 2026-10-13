@@ -1,9 +1,10 @@
 // The repo read API through the handler object: who may read a project's
-// code, and what each read answers, over in-memory trunks.
+// code, and what each read answers, over in-memory trunks. And a project's
+// trunk as its Trunk DO holds it, read the same way.
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { Principal } from "@keeltown/core/domain/identity";
 import { AgentId, CommitSha, Instant, ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, type ProjectSettings } from "@keeltown/core/ports";
+import { CodeHost, type ProjectSettings, Trunks } from "@keeltown/core/ports";
 import {
   type FixtureFiles,
   makeAgentDirectoryMemory,
@@ -60,6 +61,7 @@ const directory = makeAgentDirectoryMemory().layer;
 const inbox = makeInboxMemory();
 const codeHost = makeCodeHostMemory();
 const projects = makeProjectsMemory();
+const trunks = makeTrunksMemory();
 const places = makeProjectNamespacesMemory();
 const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "forge" }] });
 const runtime = ManagedRuntime.make(
@@ -67,7 +69,7 @@ const runtime = ManagedRuntime.make(
     makeOrgUsageMemory().layer,
     directory,
     projects.layer,
-    makeTrunksMemory().layer,
+    trunks.layer,
     makeRepoServerMemory({ repos: new Map() }).layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
     makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
@@ -411,5 +413,46 @@ describe("the repo read API", () => {
     ]);
     expect(page.body.items[0]?.committer.at).toBe("2026-10-11T00:00:00.000Z");
     expect(page.body).not.toHaveProperty("nextCursor");
+  });
+});
+
+describe("a project's trunk", () => {
+  it("[views.trunk] a project's trunk is shown at its head with the time it last moved, and frozen only while its promotion is; with no head yet it is a 404 that says so, and a stranger learns nothing either way", async () => {
+    const reader = agentOf(DIFFS);
+    const trunk = () => handlers.Views_getTrunk(reader, { projectId: DIFFS });
+    const none = await trunk();
+    expect([none.status, await bodyOf(none)]).toMatchObject([
+      404,
+      { code: "resource.not_found", detail: `Project ${DIFFS} has no trunk yet.` },
+    ]);
+    const sha = Schema.decodeUnknownSync(CommitSha);
+    await Effect.runPromise(
+      Effect.flatMap(Trunks, (port) =>
+        port.initialize(DIFFS, sha("a".repeat(40)), "seed", { kind: "empty" }),
+      ).pipe(Effect.provide(trunks.layer)),
+    );
+    const tip = sha("b".repeat(40));
+    trunks.advance(DIFFS, tip, Instant(Date.UTC(2026, 9, 13, 20, 39, 10, 641)));
+    const shown = { projectId: DIFFS, head: tip, advancedAt: "2026-10-13T20:39:10.641Z" };
+    for (const [phase, frozen] of [
+      ["idle", false],
+      ["debouncing", false],
+      ["promoting", false],
+      ["frozen", true],
+      ["idle", false],
+    ] as const) {
+      trunks.stand(DIFFS, phase);
+      const answer = await trunk();
+      expect([phase, answer.status, await bodyOf(answer)]).toEqual([
+        phase,
+        200,
+        { ...shown, frozen },
+      ]);
+    }
+    // A person of the project's org reads it too; a caller the project is hidden from is told what a missing project is told.
+    expect((await handlers.Views_getTrunk(member, { projectId: DIFFS })).status).toBe(200);
+    const hidden = await handlers.Views_getTrunk(anonymous, { projectId: DIFFS });
+    const missing = await handlers.Views_getTrunk(anonymous, { projectId: ELSEWHERE });
+    expect([hidden.status, await bodyOf(hidden)]).toEqual([404, await bodyOf(missing)]);
   });
 });

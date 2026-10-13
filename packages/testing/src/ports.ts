@@ -19,6 +19,7 @@ import {
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
 import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
+import { describeTrunksContract, type TrunksHarness } from "./contracts/trunks.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import {
   describeSponsorshipsContract,
@@ -168,6 +169,7 @@ import type {
   Sponsorships,
   Standings,
   SyntaxSource,
+  Trunks,
   Users,
   OrgUsage,
 } from "@keeltown/core/ports";
@@ -437,6 +439,21 @@ function memorySessionsHarness(): SessionsHarness {
   };
 }
 
+/** In-memory Trunks take any project: each case gets one no other has named. */
+function memoryTrunksHarness(): TrunksHarness {
+  return {
+    layer: integration.makeTrunksMemory().layer,
+    fresh: () =>
+      Effect.sync(() => ({
+        projectId: makeId(
+          "prj",
+          crypto.randomUUID().replaceAll("-", "").slice(0, 26).toUpperCase(),
+        ),
+        head: CommitSha.make("7".repeat(40)),
+      })),
+  };
+}
+
 /** In-memory OrgUsage counts for any org, on a clock the suite moves. */
 function memoryOrgUsageHarness(): OrgUsageHarness {
   const usage = makeOrgUsageMemory();
@@ -514,10 +531,7 @@ export const PORTS = {
     WorkspaceRefresherHarness
   >(memoryWorkspaceRefresherHarness, describeWorkspaceRefresherContract),
   RepoServer: port(memoryRepoServer, describeRepoServerContract),
-  Trunks: port(
-    () => integration.makeTrunksMemory().layer,
-    pending("Trunks", ["initialize", "sync"]),
-  ),
+  Trunks: harnessed<Trunks, TrunksHarness>(memoryTrunksHarness, describeTrunksContract),
   Lanes: port(() => integration.makeLanesMemory().layer, pending("Lanes", ["destroy"])),
   OrgUsage: harnessed<OrgUsage, OrgUsageHarness>(memoryOrgUsageHarness, describeOrgUsageContract),
   SubjectRegistry: port(

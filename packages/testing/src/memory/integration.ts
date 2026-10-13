@@ -1,5 +1,6 @@
 import {
   CompositionRefused,
+  type PromotionState,
   PromotionStateRefused,
   PushRejected,
   type TrunkOrigin,
@@ -12,7 +13,7 @@ import {
   ContentHash,
   type NamespaceId,
   type ProjectId,
-  type Instant,
+  Instant,
 } from "@keeltown/core/kernel";
 import {
   BatchVerification,
@@ -254,7 +255,8 @@ const afterItsHead = (projectId: ProjectId, write: string) =>
  * Each project's trunk head once initialized, how often it was synced, and
  * who destroyed it. `journal` records each call in order beside other
  * adapters'; `failSyncOnce` makes the first sync die, as a crash
- * mid-bootstrap would.
+ * mid-bootstrap would. A trunk is shown idle and moved when it was
+ * initialized, until `advance` or `stand` says otherwise.
  */
 export function makeTrunksMemory(
   options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
@@ -266,9 +268,26 @@ export function makeTrunksMemory(
   const seeded = new Map<ProjectId, { readonly name: string; readonly at: Instant }>();
   const syncs = new Map<ProjectId, number>();
   const destroyed = new Map<ProjectId, string>();
+  const standings = new Map<
+    ProjectId,
+    { readonly phase: PromotionState; readonly advancedAt: Instant }
+  >();
   let failures = options.failSyncOnce === true ? 1 : 0;
   return {
     heads,
+    /** Moves an initialized trunk to `head` at `at`, as a promotion's advance does. */
+    advance: (projectId: ProjectId, head: CommitSha, at: Instant) => {
+      heads.set(projectId, head);
+      standings.set(projectId, {
+        phase: standings.get(projectId)?.phase ?? "idle",
+        advancedAt: at,
+      });
+    },
+    /** Puts an initialized trunk's promotion in `phase`: a freeze, or its release. */
+    stand: (projectId: ProjectId, phase: PromotionState) => {
+      const standing = standings.get(projectId);
+      if (standing !== undefined) standings.set(projectId, { ...standing, phase });
+    },
     /** Where each project's trunk started, as its first `initialize` said. */
     origins,
     /** The project's trunk refuses its `initialize` with `refusal` from here on, and gets no head. */
@@ -300,7 +319,10 @@ export function makeTrunksMemory(
                 );
               const refusal = refusals.get(projectId);
               if (held === undefined && refusal !== undefined) return Effect.fail(refusal);
-              if (held === undefined) origins.set(projectId, origin);
+              if (held === undefined) {
+                origins.set(projectId, origin);
+                standings.set(projectId, { phase: "idle", advancedAt: Instant(Date.now()) });
+              }
               heads.set(projectId, head);
               options.journal?.push(`initialize ${projectId}`);
               return Effect.void;
@@ -327,6 +349,14 @@ export function makeTrunksMemory(
             return head === undefined
               ? Effect.die(new Error(`${projectId} has no trunk yet`))
               : Effect.succeed(head);
+          }),
+        view: (projectId) =>
+          Effect.sync(() => {
+            const head = heads.get(projectId);
+            const standing = standings.get(projectId);
+            return head === undefined || standing === undefined
+              ? Option.none()
+              : Option.some({ head, ...standing });
           }),
         sync: (projectId) =>
           Effect.suspend(() => {

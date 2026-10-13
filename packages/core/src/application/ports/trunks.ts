@@ -1,6 +1,10 @@
 import { Context, type Effect, type Option, Schema } from "effect";
 import type { QuotaExceeded } from "../../domain/identity/index.ts";
-import type { PromotionStateRefused, TrunkOrigin } from "../../domain/integration/index.ts";
+import type {
+  PromotionState,
+  PromotionStateRefused,
+  TrunkOrigin,
+} from "../../domain/integration/index.ts";
 import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
 
 /**
@@ -19,6 +23,14 @@ export interface TrunkSynced {
   readonly head: CommitSha;
   readonly staging: CommitSha;
   readonly mirror: CommitSha;
+}
+
+/** A trunk as a reader of its project is shown it: its head, when that last changed, and what its promotion is doing. */
+export interface TrunkStanding {
+  readonly head: CommitSha;
+  readonly phase: PromotionState;
+  /** When `head` last changed: the commit time of the event that put it there. */
+  readonly advancedAt: Instant;
 }
 
 /** A project's trunk, through its Trunk DO (`trunk:<projectId>`). */
@@ -67,6 +79,13 @@ export class Trunks extends Context.Service<
      * initialized, since no change exists in such a project.
      */
     readonly head: (projectId: ProjectId) => Effect.Effect<CommitSha>;
+    /**
+     * The trunk as a reader is shown it: none for a trunk with no head yet,
+     * which is never a defect here. `advancedAt` is the time of the event that
+     * last changed `head` (TrunkInitialized, a TrunkAdvanced, or a resume at
+     * another head), and no other event of the trunk's changes it.
+     */
+    readonly view: (projectId: ProjectId) => Effect.Effect<Option.Option<TrunkStanding>>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
     readonly sync: (projectId: ProjectId) => Effect.Effect<TrunkSynced>;
     /**

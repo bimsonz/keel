@@ -1322,6 +1322,97 @@ describe("trunk height", { timeout: PROPERTY_TIMEOUT }, () => {
   });
 });
 
+/** The head an event names as trunk's from then on, if it names one. */
+const headAfter = (event: TrunkEvent): CommitSha | undefined =>
+  event._tag === "TrunkInitialized" || event._tag === "PromotionResumed"
+    ? event.head
+    : event._tag === "TrunkAdvanced"
+      ? event.to
+      : undefined;
+
+/** When trunk's head last changed, read off a log: the time of the last event that named another head. */
+const headChangedAt = (log: readonly Committed<TrunkEvent>[]): Instant | undefined => {
+  let head: CommitSha | undefined;
+  let at: Instant | undefined;
+  for (const committed of log) {
+    const next = headAfter(committed.payload);
+    if (next !== undefined && next !== head) {
+      head = next;
+      at = committed.at;
+    }
+  }
+  return at;
+};
+
+/** A scenario's events, each at an instant of its own, and trunk's advancedAt after each. */
+const timedThrough = (commands: readonly PromotionCommand[]) => {
+  const timed = drive(commands)
+    .results.flatMap(eventsOf)
+    .map((payload, i) => ({ at: Instant(T0 + i + 1), payload }));
+  return {
+    timed,
+    tags: timed.map((c) => c.payload._tag),
+    seen: timed.map((_, i) => replayPromotion(timed.slice(0, i + 1))?.advancedAt),
+  };
+};
+
+describe("when trunk's head last changed", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[trunk.advanced-at] trunk's advancedAt is the commit time of the event that last changed its head: TrunkInitialized, each TrunkAdvanced, and a resume at another head; a batch queued, a decline, a freeze and a resume at the same head leave it", () => {
+    let advances = 0;
+    let resumes = 0;
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) => {
+          if (r.log.at(-1)?.payload._tag === "TrunkAdvanced") advances += 1;
+          if (r.log.at(-1)?.payload._tag === "PromotionResumed") resumes += 1;
+          return r.after?.advancedAt === headChangedAt(r.log);
+        }),
+      ),
+    );
+    expect(advances).toBeGreaterThan(0);
+    expect(resumes).toBeGreaterThan(0);
+    // By hand: one advance, then a second group frozen at read-back on a head that is not
+    // Keel's, and the operator's resume at that head.
+    const moved = timedThrough([
+      ...l1Path,
+      readBack(NEW),
+      enqueue(2, C2),
+      flush([facts(2, C2, "src/b.ts")], NEW, "group-2"),
+      composedAs([C2], sha(0x1002)),
+      readBack(STRAY),
+      { _tag: "Resume", by: RELEASER, head: STRAY },
+    ]);
+    expect(moved.tags).toEqual([
+      "TrunkInitialized",
+      "BatchVerified",
+      "PromotionStarted",
+      "PromotionComposed",
+      "TrunkAdvanced",
+      "BatchVerified",
+      "PromotionStarted",
+      "PromotionComposed",
+      "PromotionFrozen",
+      "PromotionDeclined",
+      "PromotionResumed",
+    ]);
+    expect(moved.seen).toEqual([
+      ...Array.from({ length: 4 }, () => moved.timed[0]?.at),
+      ...Array.from({ length: 6 }, () => moved.timed[4]?.at),
+      moved.timed[10]?.at,
+    ]);
+    expect(replayPromotion(moved.timed)).toMatchObject({ head: STRAY });
+    // A resume at the head trunk already has changes no head, and no time.
+    const stayed = timedThrough([
+      ...l1Path,
+      readBack(STRAY),
+      { _tag: "Resume", by: RELEASER, head: H0 },
+    ]);
+    expect(stayed.tags.at(-1)).toBe("PromotionResumed");
+    expect(new Set(stayed.seen)).toEqual(new Set([stayed.timed[0]?.at]));
+    expect(replayPromotion(stayed.timed)).toMatchObject({ head: H0, phase: "idle" });
+  });
+});
+
 describe("the verified flag", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.verified-carried] a verdict's verified flag reaches BatchVerified, the queue and the WAL unchanged, and one unverified batch makes the advance unverified", () => {
     const flagArb = fc.constantFrom<Flag>("absent", true, false);

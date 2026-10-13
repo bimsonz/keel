@@ -4,7 +4,7 @@ import {
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
-import { type CommandActor, CommitSha, type InstantSchema } from "@keeltown/core/kernel";
+import { type CommandActor, CommitSha, InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { ImportTooLarge, RepoNotFound } from "./project.ts";
@@ -15,6 +15,13 @@ export const TrunkStatus = Schema.Struct({
   promotion: PromotionState,
   /** Where trunk started; absent on a trunk initialized before origins were kept. */
   origin: Schema.optional(TrunkOrigin),
+});
+
+/** A trunk as a reader of its project is shown it: nothing for a trunk with no head yet. */
+export const TrunkStandingAnswer = Schema.Struct({
+  trunk: Schema.optional(
+    Schema.Struct({ head: CommitSha, phase: PromotionState, advancedAt: InstantSchema }),
+  ),
 });
 
 /** Where trunk started: no origin for a trunk with no head yet, or one initialized before origins were kept. */
@@ -40,6 +47,7 @@ export const PackTooLarge = Schema.TaggedStruct("PackTooLarge", {
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
   origin: exitCodec(TrunkStart, Schema.Never),
+  view: exitCodec(TrunkStandingAnswer, Schema.Never),
   resume: exitCodec(TrunkStatus, Schema.Never),
   initialize: exitCodec(
     TrunkStatus,
@@ -56,6 +64,12 @@ export interface TrunkRpc {
   status(): Promise<ExitJson>;
   /** Where trunk started, for a reader of the project: answers a trunk with no head yet too, with no origin. */
   origin(): Promise<ExitJson>;
+  /**
+   * The trunk as a reader of the project is shown it: its head, when that
+   * last changed (the time of the event that put it there) and its
+   * promotion's phase. Answers a trunk with no head yet too, with nothing.
+   */
+  view(): Promise<ExitJson>;
   /** Releases a frozen promotion. Operator only. */
   resume(by: CommandActor): Promise<ExitJson>;
   /**

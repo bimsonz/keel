@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { ProjectId } from "@keeltown/core/kernel";
-import { CodeHost } from "@keeltown/core/ports";
-import { makeCodeHostMemory, makeProjectsMemory } from "@keeltown/testing";
-import { Effect, Schema } from "effect";
+import { type CommitSha, ProjectId } from "@keeltown/core/kernel";
+import { CodeHost, Trunks } from "@keeltown/core/ports";
+import { makeCodeHostMemory, makeProjectsMemory, makeTrunksMemory } from "@keeltown/testing";
+import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import { BASE, type Fetch, seedAgent, seedForeignAgent, tokenFor, worker } from "./helpers.ts";
@@ -11,7 +11,8 @@ import { BASE, type Fetch, seedAgent, seedForeignAgent, tokenFor, worker } from 
 /**
  * The repo read API through the real doorway and auth gate: its routes admit a
  * caller with no token, yet read a token that is presented. Trunks and settings
- * are in memory; agents and tokens are real.
+ * are in memory; agents and tokens are real. The trunk's own route goes
+ * through the same doorway.
  */
 const project = Schema.decodeUnknownSync(ProjectId);
 const PRIVATE = project("prj_25R7GR504NN2N2MB7JTCFBPPQ8");
@@ -20,6 +21,8 @@ const PUBLIC = project("prj_7VDSYA2DEW8R8GHT98W18TZKVN");
 async function repoApp() {
   const codeHost = makeCodeHostMemory();
   const projects = makeProjectsMemory();
+  const trunks = makeTrunksMemory();
+  const heads = new Map<ProjectId, CommitSha>();
   for (const [projectId, visibility] of [
     [PRIVATE, "private"],
     [PUBLIC, "public"],
@@ -31,19 +34,28 @@ async function repoApp() {
       visibility,
     });
     const trunk = projectRepos(projectId).trunk;
-    await Effect.runPromise(
+    const head = await Effect.runPromise(
       Effect.gen(function* () {
         yield* (yield* CodeHost).create(trunk);
-        yield* codeHost.fixture.commit(trunk, "refs/heads/main", { "README.md": "# hi\n" });
-      }).pipe(Effect.provide(codeHost.layer)),
+        const first = yield* codeHost.fixture.commit(trunk, "refs/heads/main", {
+          "README.md": "# hi\n",
+        });
+        yield* (yield* Trunks).initialize(projectId, first, "seed", { kind: "empty" });
+        return first;
+      }).pipe(Effect.provide(Layer.merge(codeHost.layer, trunks.layer))),
     );
+    heads.set(projectId, head);
   }
   const { app } = makeIsolate(
     env,
-    isolateLayer(env, { codeHost: codeHost.layer, projects: projects.layer }),
+    isolateLayer(env, {
+      codeHost: codeHost.layer,
+      projects: projects.layer,
+      trunks: trunks.layer,
+    }),
   );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
-  return via;
+  return { via, heads };
 }
 
 const tree = (via: Fetch, projectId: string, authorization?: string) =>
@@ -51,9 +63,14 @@ const tree = (via: Fetch, projectId: string, authorization?: string) =>
     headers: authorization === undefined ? {} : { authorization },
   }).then(async (r) => ({ status: r.status, body: await r.json<{ code?: string }>() }));
 
+const trunkOf = (via: Fetch, projectId: string, authorization?: string) =>
+  via(`${BASE}/v1/projects/${projectId}/trunk`, {
+    headers: authorization === undefined ? {} : { authorization },
+  }).then(async (r) => ({ status: r.status, body: await r.json<Record<string, unknown>>() }));
+
 describe("the repo read API's doorway", () => {
   it("[repo.http] no token reads only a public project; a presented token is read, its agent's own project opens, a bad one is refused", async () => {
-    const via = await repoApp();
+    const { via } = await repoApp();
     const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
     const sibling = await tokenFor(await seedAgent({ projectId: PUBLIC }));
     const other = await tokenFor(await seedForeignAgent());
@@ -78,6 +95,33 @@ describe("the repo read API's doorway", () => {
       expect(await tree(via, PUBLIC, bad)).toMatchObject({
         status: 401,
         body: { code: "auth.invalid_token" },
+      });
+  });
+
+  it("[views.trunk.wired] the trunk's route answers through the real doorway: anyone reads a public project's trunk, a private one's is read by its own agent, and a stranger is told the project is missing", async () => {
+    const { via, heads } = await repoApp();
+    const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    const other = await tokenFor(await seedForeignAgent());
+    const open = await trunkOf(via, PUBLIC);
+    expect(open).toMatchObject({
+      status: 200,
+      body: { projectId: PUBLIC, head: heads.get(PUBLIC), frozen: false },
+    });
+    expect(Object.keys(open.body).toSorted()).toEqual([
+      "advancedAt",
+      "frozen",
+      "head",
+      "projectId",
+    ]);
+    expect(new Date(String(open.body["advancedAt"])).toISOString()).toBe(open.body["advancedAt"]);
+    expect(await trunkOf(via, PRIVATE, `Bearer ${own}`)).toMatchObject({
+      status: 200,
+      body: { projectId: PRIVATE, head: heads.get(PRIVATE), frozen: false },
+    });
+    for (const authorization of [undefined, `Bearer ${other}`])
+      expect(await trunkOf(via, PRIVATE, authorization)).toMatchObject({
+        status: 404,
+        body: { code: "resource.not_found" },
       });
   });
 

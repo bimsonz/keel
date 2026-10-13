@@ -43,6 +43,7 @@ import {
   readRepoCommit,
   compareRepoCommits,
   readRepoTree,
+  readTrunk,
 } from "@keeltown/core/application/integration";
 import {
   type Actor,
@@ -144,6 +145,7 @@ import {
   treeOk,
 } from "./repo.ts";
 import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
+import { noTrunk, trunkOk } from "./integration-views.ts";
 import {
   approveError,
   askError,
@@ -973,7 +975,20 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         },
         Views_getVerdict: notYet,
         Views_listLanes: notYet,
-        Views_getTrunk: notYet,
+        Views_getTrunk: (caller: Caller, input: Input<"Views_getTrunk">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          return run(
+            caller,
+            Effect.map(
+              readTrunk(projectId.success),
+              Option.match({
+                onNone: () => noTrunk(caller, projectId.success),
+                onSome: trunkOk,
+              }),
+            ),
+          );
+        },
         // Anyone lists projects: one page is read for the caller's audience and the policy decides each row, so a visitor sees the public ones.
         Operator_listProjects: (caller: Caller, input: Input<"Operator_listProjects">) => {
           const after = input.cursor === undefined ? undefined : decodeCursor(input.cursor);

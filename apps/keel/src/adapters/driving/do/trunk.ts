@@ -13,6 +13,7 @@ import {
   syncTrunk,
   trunkHeard,
   trunkOf,
+  trunkStanding,
 } from "@keeltown/core/application/integration";
 import { type Trunk, TrunkOrigin } from "@keeltown/core/domain/integration";
 import {
@@ -28,7 +29,7 @@ import {
   redeliveryDelay,
   type Transaction,
 } from "@keeltown/core/ports";
-import { Cause, Effect, Exit, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { TrunkCodecs, type TrunkRpc } from "../../../rpc/trunk.ts";
 import { type TrunkServices, trunkServices } from "../../../composition/do.ts";
 import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
@@ -110,6 +111,14 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       TrunkCodecs.origin,
       Effect.map(EntityStore, (store) => startOf(trunkOf(store, projectId))),
     );
+  }
+
+  async view() {
+    const program = Effect.map(
+      trunkStanding(this.projectId),
+      Option.match({ onNone: () => ({}), onSome: (trunk) => ({ trunk }) }),
+    );
+    return this.answer(TrunkCodecs.view, program);
   }
 
   async resume(by: CommandActor) {

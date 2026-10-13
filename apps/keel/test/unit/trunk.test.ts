@@ -19,6 +19,7 @@ import {
   trunkDestroyed,
   trunkHeard,
   trunkOf,
+  trunkStanding,
 } from "@keeltown/core/application/integration";
 import {
   type BatchId,
@@ -35,6 +36,7 @@ import {
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
 import type { TrunkOrigin } from "@keeltown/core/domain/integration";
 import {
+  Clock,
   CodeHost,
   EntityStore,
   EventOutbox,
@@ -51,7 +53,7 @@ import {
   makeTrunkWriterMemory,
   MEMORY_SEED,
 } from "@keeltown/testing";
-import { Cause, Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
 import * as fc from "fast-check";
 import { ulid } from "ulid";
 
@@ -920,7 +922,8 @@ describe("the Trunk's promotion", () => {
     );
     // Well inside the default quota, so no landing above was refused.
     expect(DEFAULT_QUOTAS["repo-bytes"]).toBeGreaterThan(7 * 5_000_000);
-  });
+    // Fifty runs, each landing up to six packs: seconds in all on a loaded machine, past the default five.
+  }, 60_000);
 
   it.effect(
     "[trunk.retry-same-sha] a push trunk did not take is pushed again with the recorded SHA, never recomposed",
@@ -1160,5 +1163,94 @@ describe("the Trunk's destroy", () => {
           expect(yield* typesOf).toEqual(["TrunkInitialized", "PromotionStarted"]);
         }).pipe(Effect.provide(opened.layer));
       }),
+  );
+});
+
+/** A clock that never gives one instant twice, as a wall clock may not between two reads. */
+const ticking = () => {
+  let now = 1_700_000_000_000;
+  return Clock.of({
+    now: Effect.sync(() => {
+      now += 7;
+      return Instant(now);
+    }),
+  });
+};
+
+/** A stored trunk as a Trunk DO wrote it before `advancedAt` was kept. */
+const beforeItsTime = (stored: unknown) => {
+  if (typeof stored !== "object" || stored === null) throw new Error("no trunk is stored");
+  return Object.fromEntries(Object.entries(stored).filter(([key]) => key !== "advancedAt"));
+};
+
+describe("the Trunk as a reader is shown it", () => {
+  it.effect(
+    "[trunk.advanced-at.event-time] on a clock that moves between any two reads, trunk's advancedAt is its event's own commit time: TrunkInitialized's, then TrunkAdvanced's",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const initialized = (yield* trunkLog).at(-1);
+        expect(initialized?.type).toBe("TrunkInitialized");
+        expect(trunkOf(yield* EntityStore, PROJECT)?.advancedAt).toBe(initialized?.at);
+        const tip = yield* w.composed(1, base);
+        yield* deliver(verified(1, base));
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        const advanced = (yield* trunkLog).at(-1);
+        expect(advanced?.type).toBe("TrunkAdvanced");
+        expect(advanced?.at).not.toBe(initialized?.at);
+        expect(yield* trunkStanding(PROJECT)).toEqual(
+          Option.some({ head: tip, phase: "idle", advancedAt: advanced?.at }),
+        );
+      }).pipe(Effect.provideService(Clock, ticking()), Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.standing] a trunk with no head yet is shown as none; one stored before advancedAt was kept is shown the time of the last event in its log that changed its head: an advance, not the freeze after it, then a resume at another head",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        expect(yield* trunkStanding(PROJECT)).toEqual(Option.none());
+        const base = yield* w.seeded;
+        w.clock.advance(5_000);
+        const tip = yield* w.composed(1, base);
+        yield* deliver(verified(1, base));
+        yield* flushTrunk(PROJECT);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        const store = yield* EntityStore;
+        store.put("trunk", PROJECT, beforeItsTime(store.get("trunk", PROJECT)));
+        expect(trunkOf(store, PROJECT)).toMatchObject({ head: tip });
+        expect(trunkOf(store, PROJECT)?.advancedAt).toBeUndefined();
+        const [initialized, advanced] = (yield* trunkLog)
+          .filter((e) => e.type === "TrunkInitialized" || e.type === "TrunkAdvanced")
+          .map((e) => e.at);
+        expect(advanced).toBe(Instant((initialized ?? 0) + 5_000));
+        expect(yield* trunkStanding(PROJECT)).toEqual(
+          Option.some({ head: tip, phase: "idle", advancedAt: advanced }),
+        );
+        // Someone else's commit reaches trunk: the next batch freezes it, and it is shown frozen where Keel left it.
+        w.clock.advance(5_000);
+        yield* w.composed(2, tip);
+        w.writer.interfere(sha("f"));
+        yield* deliver(verified(2, tip));
+        expect(yield* flushTrunk(PROJECT)).toBe("frozen");
+        expect(yield* trunkStanding(PROJECT)).toEqual(
+          Option.some({ head: tip, phase: "frozen", advancedAt: advanced }),
+        );
+        // The operator takes that commit as trunk's head: the head changed then, and the stored trunk says so.
+        w.clock.advance(5_000);
+        const resumedAt = Instant((advanced ?? 0) + 10_000);
+        expect(yield* resumeTrunk(PROJECT, RELEASER)).toMatchObject({
+          head: sha("f"),
+          advancedAt: resumedAt,
+        });
+        store.put("trunk", PROJECT, beforeItsTime(store.get("trunk", PROJECT)));
+        expect(yield* trunkStanding(PROJECT)).toEqual(
+          Option.some({ head: sha("f"), phase: "debouncing", advancedAt: resumedAt }),
+        );
+      }).pipe(Effect.provide(w.layer));
+    },
   );
 });

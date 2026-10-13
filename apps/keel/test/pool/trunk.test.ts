@@ -19,6 +19,7 @@ import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
   Changes,
   CodeHost,
+  EntityStore,
   EventOutbox,
   ImportTooLarge,
   OrgUsage,
@@ -38,6 +39,7 @@ import {
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
   MEMORY_SEED,
+  PORTS,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { ulid } from "ulid";
@@ -90,6 +92,23 @@ async function placedTrunk(head: string) {
   });
   return { projectId, stub, writer, org, usage };
 }
+
+// The port's own suite, through the real object: each case's project is placed, its trunk not yet initialized.
+PORTS.Trunks.contract("do-rpc", () => ({
+  layer: TrunksRpc(env.TRUNK),
+  fresh: () =>
+    Effect.promise(async () => {
+      const head = Schema.decodeUnknownSync(CommitSha)("7".repeat(40));
+      const { projectId } = await placedTrunk(head);
+      return { projectId, head };
+    }),
+}));
+
+/** A stored record's fields, as the object's store holds them. */
+const fieldsOf = (stored: unknown) => {
+  if (typeof stored !== "object" || stored === null) throw new Error("nothing is stored");
+  return Object.entries(stored);
+};
 
 /** What a call that failed said, or "done" for one that did not. */
 const said = <A>(exit: Exit.Exit<A>) => (Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "done");
@@ -492,6 +511,66 @@ describe("the Trunk DO's promotion", () => {
       "TrunkAdvanced",
     ]);
     expect(t.writer.pushes()).toEqual([{ from: moved, to: tip }]);
+  });
+
+  it("[trunk.do.view] through the real object and the port a trunk is shown at its head with the time of the event that moved it there, and frozen while its promotion is", async () => {
+    const t = await promoting();
+    const view = () => viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.view(t.projectId)));
+    const initialized = (await t.log()).at(-1);
+    expect(initialized?.type).toBe("TrunkInitialized");
+    expect(await view()).toEqual(
+      Exit.succeed(Option.some({ head: t.base, phase: "idle", advancedAt: initialized?.at })),
+    );
+    const tip = await t.composed(1, t.base);
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () =>
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: tip, promotion: "idle", origin: EMPTY }),
+      ),
+    );
+    const advanced = (await t.log()).findLast((e) => e.type === "TrunkAdvanced");
+    const shown = { head: tip, advancedAt: advanced?.at };
+    expect(await view()).toEqual(Exit.succeed(Option.some({ ...shown, phase: "idle" })));
+    // Someone else's commit reaches trunk before the next batch: promotion freezes where Keel left it.
+    await t.composed(2, tip);
+    t.writer.interfere(Schema.decodeUnknownSync(CommitSha)("e".repeat(40)));
+    await t.stub.receive([t.verified(2, tip)]);
+    await t.until(async () =>
+      expect(await view()).toEqual(Exit.succeed(Option.some({ ...shown, phase: "frozen" }))),
+    );
+  });
+
+  it("[trunk.do.view-legacy] a trunk the object stored before advancedAt was kept is shown the time of the last advance in its own log", async () => {
+    const t = await promoting();
+    const tip = await t.composed(1, t.base);
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () =>
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: tip, promotion: "idle", origin: EMPTY }),
+      ),
+    );
+    const stored = await runInDurableObject(t.stub, (instance: TrunkDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EntityStore, (store) => {
+          const before = fieldsOf(store.get("trunk", t.projectId));
+          store.put(
+            "trunk",
+            t.projectId,
+            Object.fromEntries(before.filter(([key]) => key !== "advancedAt")),
+          );
+          return {
+            had: before.find(([key]) => key === "advancedAt")?.[1],
+            has: fieldsOf(store.get("trunk", t.projectId)).map(([key]) => key),
+          };
+        }),
+      ),
+    );
+    const advanced = (await t.log()).findLast((e) => e.type === "TrunkAdvanced");
+    expect(stored.had).toBe(advanced?.at);
+    expect(stored.has).not.toContain("advancedAt");
+    expect(await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.view(t.projectId)))).toEqual(
+      Exit.succeed(Option.some({ head: tip, phase: "idle", advancedAt: advanced?.at })),
+    );
   });
 
   it("[trunk.do.refused-too-large] a batch whose pack is over the cap is declined through the real object, and the batch delivered behind it lands", async () => {

@@ -101,6 +101,12 @@ export const Trunk = Schema.Struct({
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   /** Where trunk started, as TrunkInitialized said it; absent on a trunk initialized before origins were kept. */
   origin: Schema.optional(TrunkOrigin),
+  /**
+   * When trunk's head last changed: the commit time of its TrunkInitialized,
+   * of each TrunkAdvanced, and of a PromotionResumed that took another head.
+   * Absent in state folded before it was kept, until the next of those.
+   */
+  advancedAt: Schema.optional(InstantSchema),
   wal: Schema.optional(PendingGroup),
   /**
    * Set once a group of several batches was refused as too large a pack:

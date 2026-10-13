@@ -117,7 +117,6 @@ const STUBBED = [
   "Memory_getDecision",
   "Views_getVerdict",
   "Views_listLanes",
-  "Views_getTrunk",
 ];
 
 /**

@@ -463,6 +463,7 @@ export const evolvePromotion = (
           queue: [],
           promoted: [],
           height: 0,
+          advancedAt: committed.at,
           ...(event.origin === undefined ? {} : { origin: event.origin }),
         }
       : illegal(state, event);
@@ -582,6 +583,7 @@ export const evolvePromotion = (
             // A push landed: grouping resumes.
             ...without(trunk, "wal", "height", "solo"),
             head: event.to,
+            advancedAt: committed.at,
             promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
             phase: settled(trunk.queue),
             ...(event.height === undefined ? {} : { height: event.height }),
@@ -610,6 +612,10 @@ export const evolvePromotion = (
         ? {
             ...without(trunk, "wal", "frozen"),
             head: event.head ?? trunk.head,
+            // A resume at another head changed trunk's head, whoever wrote that commit.
+            ...(event.head === undefined || event.head === trunk.head
+              ? {}
+              : { advancedAt: committed.at }),
             phase: settled(trunk.queue),
           }
         : illegal(trunk, event);
