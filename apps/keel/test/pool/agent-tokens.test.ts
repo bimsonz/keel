@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { runIdOf, RunLabel } from "@keeltown/core/domain/identity";
 import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
@@ -193,6 +194,51 @@ describe("a token for an agent that holds only a key", () => {
         await refusal(await requestToken(agent.id, account, { runKey: await newKey() })),
       ).toMatchObject({ error: "invalid_client" });
     }
+  });
+});
+
+/** How many one-time ids Better Auth holds: signed token requests, and DPoP proofs. */
+const heldIds = async () => {
+  const [assertions, proofs] = await env.DB.batch<{ n: number }>([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM oauthClientAssertion`),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM verification WHERE identifier LIKE 'dpop-proof:%'`),
+  ]);
+  return { assertions: assertions?.results[0]?.n, proofs: proofs?.results[0]?.n };
+};
+
+describe("the one-time ids a token request leaves behind", () => {
+  it("[oauth.rows] the next token request deletes the ids that have expired, and never one still in its window", async () => {
+    const account = await newKey();
+    const run = await newKey();
+    const agent = await seedKeyAgent(account);
+    const first = await assertionBy(account, agent.id);
+    await granted(await requestToken(agent.id, account, { runKey: run, assertion: first }));
+    await granted(await requestToken(agent.id, account, { runKey: run }));
+    const before = await heldIds();
+    expect(before.assertions).toBeGreaterThanOrEqual(2);
+    expect(before.proofs).toBeGreaterThanOrEqual(2);
+    // Everything held so far is aged past its window, with one row that is no proof beside it.
+    const past = new Date(Date.now() - 3_600_000).toISOString();
+    await env.DB.batch([
+      env.DB.prepare(`UPDATE oauthClientAssertion SET expiresAt = ?`).bind(past),
+      env.DB.prepare(
+        `UPDATE verification SET expiresAt = ? WHERE identifier LIKE 'dpop-proof:%'`,
+      ).bind(past),
+      env.DB.prepare(
+        `INSERT INTO verification (id, identifier, value, expiresAt, createdAt, updatedAt) VALUES ('kept', 'something-else', 'v', ?1, ?1, ?1)`,
+      ).bind(past),
+    ]);
+    const live = await assertionBy(account, agent.id);
+    await granted(await requestToken(agent.id, account, { runKey: run, assertion: live }));
+    expect(await heldIds()).toEqual({ assertions: 1, proofs: 1 });
+    const kept = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM verification WHERE id = 'kept'`,
+    ).first<{ n: number }>();
+    expect(kept?.n).toBe(1);
+    // The live one is still held: its request is good once.
+    expect(
+      await refusal(await requestToken(agent.id, account, { runKey: run, assertion: live })),
+    ).toMatchObject({ error: "invalid_client" });
   });
 });
 

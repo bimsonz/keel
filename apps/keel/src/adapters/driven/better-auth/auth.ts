@@ -8,7 +8,13 @@ import { jwt } from "better-auth/plugins/jwt";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
-import { type AgentAccess, agentTokens, CLOSED_PATHS, TOKEN_PATH } from "./agents.ts";
+import {
+  type AgentAccess,
+  agentTokens,
+  CLOSED_PATHS,
+  forgetSpentIds,
+  TOKEN_PATH,
+} from "./agents.ts";
 import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
@@ -236,6 +242,7 @@ export function authOptions(config: AuthConfig) {
   };
 
   const beforeOrg = orgBefore(db, sessionOf);
+  const afterOrg = orgAfter(db, sessionOf);
 
   /**
    * Refuses a request to change how an account signs in unless its session is
@@ -351,7 +358,10 @@ export function authOptions(config: AuthConfig) {
           await claimable(db, slug);
         return beforeOrg(ctx);
       }),
-      after: createAuthMiddleware(orgAfter(db, sessionOf)),
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === TOKEN_PATH) return forgetSpentIds(db);
+        return afterOrg(ctx);
+      }),
     },
     databaseHooks: {
       // The endpoint making a session says how it was signed in; nothing a request sends does.

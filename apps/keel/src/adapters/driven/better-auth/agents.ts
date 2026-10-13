@@ -194,6 +194,26 @@ export async function agentClaims(
   };
 }
 
+/**
+ * Deletes the one-time ids whose window has passed: the id of each signed token
+ * request, which the provider keeps and never deletes, and the id of each DPoP
+ * proof, which Better Auth prunes only when a person signs in. An id is held so
+ * that its request or proof is good once; past its expiry the request or proof
+ * is refused for its age, so the row guards nothing. It runs on the token
+ * request's own path, which is what writes them: no schedule.
+ */
+export async function forgetSpentIds(db: D1Database, now: Date = new Date()): Promise<void> {
+  const at = now.toISOString();
+  await db.batch([
+    db.prepare(`DELETE FROM "oauthClientAssertion" WHERE "expiresAt" < ?`).bind(at),
+    db
+      .prepare(
+        `DELETE FROM "verification" WHERE "identifier" LIKE 'dpop-proof:%' AND "expiresAt" < ?`,
+      )
+      .bind(at),
+  ]);
+}
+
 export interface AgentTokensConfig {
   /** `https://<KEEL_HOST>`: the resource an agent's token is for. */
   readonly origin: string;
