@@ -5,6 +5,7 @@ import { createRng } from "../../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../../fixtures/mock/builder.ts";
 import { admission, checkLog } from "../../../fixtures/mock/conformance.ts";
 import { generateS3, generateS4 } from "../../../fixtures/mock/proven.ts";
+import { generateS1 } from "../../../fixtures/mock/s1.ts";
 import { generateS5 } from "../../../fixtures/mock/same.ts";
 import type { ScriptedEvent } from "../../../fixtures/mock/scripted.ts";
 
@@ -370,6 +371,78 @@ const bounces = (events: ScriptedEvent[]) =>
   events.filter((event) => event.type === "ChangeBounced");
 const notes = (events: ScriptedEvent[]) => events.filter((event) => event.type === "ConflictNoted");
 
+/** Scenario 1 under a ruling that goes against one side, and the resolution that says so. */
+const ruled = (seed: number) => generateS1(seed, "invalidate");
+const resolutionOf = (events: ScriptedEvent[]) => {
+  const resolved = events.find((event) => event.type === "ConflictResolved");
+  if (resolved?.type !== "ConflictResolved") throw new Error("scenario 1 resolves nothing");
+  return resolved.payload;
+};
+
+describe("what a ruling does to the change it goes against, held to Keel's rule", () => {
+  const NOT_AGAINST = expect.stringMatching(
+    /^ChangeBounced: no resolution by dec_\w+ went against chg_\w+$/,
+  );
+
+  it("[conformance.ruling-bounce] refuses a ruling's bounce of a change its resolution did not go against, and of one that was not waiting for the ruling", () => {
+    expect(checkLog(ruled(42).events)).toEqual([]);
+    // The resolution goes against nobody.
+    expect(
+      told(ruled, (events) => {
+        delete resolutionOf(events).against;
+      }),
+    ).toEqual([NOT_AGAINST]);
+    // It goes against the other side.
+    expect(
+      told(ruled, (events) => {
+        const other = events.find((event) => event.type === "ChangeResumed");
+        if (other?.type === "ChangeResumed")
+          resolutionOf(events).against = [other.payload.changeId];
+      }),
+    ).toEqual([NOT_AGAINST]);
+    // The change was never parked for the ruling.
+    const unparked = told(ruled, (events) => {
+      const bounced = bounces(events)[0]?.payload.changeId;
+      const at = events.findIndex(
+        (event) => event.type === "ChangeParked" && event.payload.changeId === bounced,
+      );
+      events.splice(at, 1);
+    });
+    // A bounce on a verdict may follow a verification; a ruling's may not.
+    expect(unparked).toContainEqual(
+      expect.stringMatching(
+        /^ChangeBounced: change:chg_\w+ is verifying, which this event cannot follow$/,
+      ),
+    );
+  });
+
+  it("[conformance.resolution-against] refuses a resolution that goes against nobody, against a change that is no side of its conflict, or against anyone with no decision", () => {
+    expect(
+      told(ruled, (events) => {
+        resolutionOf(events).against = [];
+      }),
+    ).toEqual([
+      "ConflictResolved: a resolution goes against a party only by a decision, and never against none",
+      NOT_AGAINST,
+    ]);
+    expect(
+      told(ruled, (events) => {
+        resolutionOf(events).against = ["chg_stranger"];
+      }),
+    ).toEqual([
+      expect.stringMatching(/^ConflictResolved: chg_stranger is not one of cfl_\w+'s sides$/),
+      NOT_AGAINST,
+    ]);
+    expect(
+      told(ruled, (events) => {
+        delete resolutionOf(events).decisionId;
+      }),
+    ).toContain(
+      "ConflictResolved: a resolution goes against a party only by a decision, and never against none",
+    );
+  });
+});
+
 describe("what a proof does to a change, held to Keel's rule", () => {
   it("[conformance.bounce-cause] refuses a bounce that names two causes, or a verdict nobody issued", () => {
     expect(
@@ -378,7 +451,7 @@ describe("what a proof does to a change, held to Keel's rule", () => {
         if (first !== undefined) first.payload.verdictId = "vrd_never";
       }),
     ).toEqual([
-      "ChangeBounced: a bounce names exactly one cause: its verdict, its conflict or its declined batch",
+      "ChangeBounced: a bounce names exactly one cause: its verdict, its conflict, its declined batch or the decision that went against it",
       "ChangeBounced: verdict vrd_never was not issued",
     ]);
   });

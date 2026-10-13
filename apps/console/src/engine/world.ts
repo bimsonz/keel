@@ -134,14 +134,17 @@ export interface ChangeEntry {
   /** Each time a guard failed in this change's own plan: Keel's fact, with the revision it was at. */
   guardFailures: { guardId: string; revision: number; at: string }[];
   /**
-   * Its latest bounce, and the one thing Keel named as its cause: a verdict, a conflict proven against it, or
-   * its batch's push being refused. `next` is the ways forward Keel gave its agent, in Keel's words.
+   * Its latest bounce, and the one thing Keel named as its cause: a verdict, a conflict proven against it, its
+   * batch's push being refused, or the decision of a ruling that went against it. `reasons` is why and `next`
+   * the ways forward Keel gave its agent, both in Keel's words.
    */
   bounce?: {
     at: string;
     verdictId?: string;
     conflictId?: string;
     declined?: PushRefusedReason;
+    decisionId?: string;
+    reasons: string[];
     next: string[];
   };
   /** Every bounce Keel recorded of it, each counted under the one cause Keel named for it. */
@@ -180,11 +183,15 @@ export interface ChangeEntry {
   }[];
 }
 
-/** Bounces by the one cause Keel names for each: a verdict, a conflict proven against the change, or its batch's push refused. */
+/**
+ * Bounces by the one cause Keel names for each: a verdict, a conflict proven against the change, its batch's
+ * push refused, or a ruling that went against it.
+ */
 export interface BounceCounts {
   verdict: number;
   conflict: number;
   declined: number;
+  ruling: number;
 }
 
 export interface TimelineEntry {
@@ -222,6 +229,8 @@ export interface ConflictEntry {
   /** Why it was put to a person. */
   escalated?: ConflictEscalated["reason"];
   decisionId?: string;
+  /** The changes its ruling went against, as its resolution names them: each bounces by that decision. */
+  against?: string[];
   /** What proved it, as ConflictProven carries it. */
   proven?: ConflictProven["evidence"];
   /** Why it was dismissed, in Keel's words. */
@@ -409,6 +418,11 @@ export class World {
     string,
     { how: "bounced" | "noted"; nextActions: NextAction[]; at: string }
   >();
+  /**
+   * The ways forward Keel gave a change a ruling went against, keyed `decisionId/changeId`. Kept beside the
+   * conflict as `told` is: the bounce names the decision and no conflict, and the two come in no fixed order.
+   */
+  readonly ruled = new Map<string, string[]>();
   /** The latest status of each step, keyed `subject/stepId`. */
   readonly steps = new Map<string, StepObservation>();
   /** The latest counters only the platform knows. */
@@ -606,7 +620,7 @@ export class World {
           unverified: false,
           conflictIds: [],
           guardFailures: [],
-          bounces: { verdict: 0, conflict: 0, declined: 0 },
+          bounces: { verdict: 0, conflict: 0, declined: 0, ruling: 0 },
           reached: { precheck: false, verified: false },
           noted: [],
           alternatives: [],
@@ -766,12 +780,14 @@ export class World {
       case "ChangeBounced": {
         const change = this.#change(event.payload.changeId, "bounced");
         if (change !== undefined) {
-          const { verdictId, conflictId, declined, nextActions } = event.payload;
+          const { verdictId, conflictId, declined, decisionId, nextActions } = event.payload;
           change.bounce = {
             at: event.at,
             ...(verdictId === undefined ? {} : { verdictId }),
             ...(conflictId === undefined ? {} : { conflictId }),
             ...(declined === undefined ? {} : { declined: declined.reason }),
+            ...(decisionId === undefined ? {} : { decisionId }),
+            reasons: [...event.payload.reasons],
             next: (nextActions ?? []).map((action) => action.title),
           };
           if (conflictId !== undefined)
@@ -787,6 +803,12 @@ export class World {
           if (declined !== undefined) change.bounces.declined += 1;
           else if (conflictId !== undefined) change.bounces.conflict += 1;
           else if (verdictId !== undefined) change.bounces.verdict += 1;
+          else if (decisionId !== undefined) change.bounces.ruling += 1;
+          if (decisionId !== undefined)
+            this.ruled.set(
+              `${decisionId}/${change.id}`,
+              (nextActions ?? []).map((action) => action.title),
+            );
           this.#note(
             this.#conflictOf(change.id),
             event,
@@ -1161,6 +1183,7 @@ export class World {
         conflict.settledAt = event.at;
         conflict.move = event.payload.move;
         if (event.payload.decisionId !== undefined) conflict.decisionId = event.payload.decisionId;
+        if (event.payload.against !== undefined) conflict.against = [...event.payload.against];
         break;
       }
       case "VerdictIssued": {

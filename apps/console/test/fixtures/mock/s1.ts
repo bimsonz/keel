@@ -1175,7 +1175,8 @@ function ruled(
   b: ScriptBuilder,
   p: Prelude,
   option: S1Ruling,
-  decision: { chosen: string; rejected: [string, string][] },
+  /** `against` is the change the ruling goes against: the side it does not let stand. */
+  decision: { against: string; chosen: string; rejected: [string, string][] },
 ) {
   const chosen = S1_OPTIONS.find((candidate) => candidate.id === option);
   const given = b.at(472).emit({
@@ -1196,6 +1197,7 @@ function ruled(
       conflictId: p.conflict,
       move: option === "no-cache" ? "yield" : "refine",
       decisionId,
+      against: [decision.against],
     },
     causation: given,
   });
@@ -1260,46 +1262,45 @@ function landA(
   return tenet;
 }
 
+/**
+ * The ruling went against a change. Keel bounces it by the decision, with no verdict, and gives as its reason
+ * the consequence of the option chosen, word for word as the question showed it. The ways forward are the two
+ * Keel gives any change a ruling went against.
+ */
 function bounce(
   b: ScriptBuilder,
-  p: Prelude,
   at: number,
   change: string,
-  agent: string,
-  summary: string,
-  actions: string[],
+  ruling: { option: S1Ruling; decisionId: string },
   cause: AnyEvent,
 ): void {
-  const verdict = b.at(at).id("vrd");
-  b.emit({
-    type: "VerdictIssued",
-    entity: { kind: "verdict", id: verdict },
-    payload: {
-      verdictId: verdict,
-      subject: change,
-      outcome: "bounce",
-      evidence: b.reasons(verdict, "bounce", [
-        { class: "ruling", summary, by: "Ruling on E-1", ref: `esc:${p.escalation}`, at: b.iso() },
-      ]),
-      planHash: "plan:3f9a…d27e",
-      x: { summary },
-    },
-  });
-  b.after(0.1).emit({
-    type: "ChangeBounced",
-    entity: changeRef(change),
-    payload: {
-      changeId: change,
-      verdictId: verdict,
-      reasons: [`esc:${p.escalation}`],
-      nextActions: actions.map((title) => ({
-        kind: "call" as const,
-        title,
-        operationId: "revise",
-      })),
-    },
-    causation: cause,
-  });
+  const chosen = S1_OPTIONS.find((candidate) => candidate.id === ruling.option);
+  b.at(at)
+    .after(0.1)
+    .emit({
+      type: "ChangeBounced",
+      entity: changeRef(change),
+      payload: {
+        changeId: change,
+        decisionId: ruling.decisionId,
+        reasons: chosen === undefined ? [] : [chosen.consequence],
+        nextActions: [
+          {
+            kind: "call",
+            title: "Revise the change's intent so that it no longer contradicts what was ruled",
+            operationId: "revise",
+            args: { changeId: change },
+          },
+          {
+            kind: "call",
+            title: "Withdraw the change",
+            operationId: "abandon",
+            args: { changeId: change },
+          },
+        ],
+      },
+      causation: cause,
+    });
 }
 
 /** The scripted ruling: cache allowed if revocation invalidates it. B revises; both land. */
@@ -1308,6 +1309,7 @@ export function continueInvalidate(
   p: Prelude,
 ): { decisionId: string; tenetId: string | undefined } {
   const { given, decisionId } = ruled(b, p, "invalidate", {
+    against: p.changeB,
     chosen: "Cache allowed if revocation invalidates it",
     rejected: [
       [
@@ -1326,19 +1328,7 @@ export function continueInvalidate(
     payload: { changeId: p.changeA, decisionId },
     causation: given,
   });
-  bounce(
-    b,
-    p,
-    472.8,
-    p.changeB,
-    p.agentB,
-    "Decision D-1: the cache may stay if revocation invalidates it. As written, it does not.",
-    [
-      "Invalidate a session's cached roles on revocation",
-      "Declare the effect on authz.permission-evaluation",
-    ],
-    given,
-  );
+  bounce(b, 472.8, p.changeB, { option: "invalidate", decisionId }, given);
   const tenetId = landA(b, p, 474, p.head0, HEAD_1, 1, true);
 
   // B meets the decision as precedent, follows it, and comes back.
@@ -1519,6 +1509,7 @@ export function continueInvalidate(
 /** Never cache: A lands, B cannot land as written and withdraws. */
 function continueNoCache(b: ScriptBuilder, p: Prelude): void {
   const { given, decisionId } = ruled(b, p, "no-cache", {
+    against: p.changeB,
     chosen: "Never cache permission checks",
     rejected: [
       [
@@ -1537,16 +1528,7 @@ function continueNoCache(b: ScriptBuilder, p: Prelude): void {
     payload: { changeId: p.changeA, decisionId },
     causation: given,
   });
-  bounce(
-    b,
-    p,
-    472.8,
-    p.changeB,
-    p.agentB,
-    "Decision D-1: permission checks are never cached.",
-    ["Withdraw the change", "Find the speed-up somewhere that keeps freshness at most per-request"],
-    given,
-  );
+  bounce(b, 472.8, p.changeB, { option: "no-cache", decisionId }, given);
   landA(b, p, 474, p.head0, HEAD_1, 1, true);
   b.at(520).emit({
     type: "ChangeWithdrawn",
@@ -1563,6 +1545,7 @@ function continueNoCache(b: ScriptBuilder, p: Prelude): void {
 /** Allow staleness: the guard is retired, B lands, and A must relax its premise first. */
 function continueAllowStale(b: ScriptBuilder, p: Prelude): void {
   const { given, decisionId } = ruled(b, p, "allow-stale", {
+    against: p.changeA,
     chosen: "Cache for the session; revocation applies at next sign-in",
     rejected: [
       ["Never cache permission checks", "The speed-up was judged worth a bounded delay"],
@@ -1584,16 +1567,7 @@ function continueAllowStale(b: ScriptBuilder, p: Prelude): void {
     payload: { changeId: p.changeB, decisionId },
     causation: given,
   });
-  bounce(
-    b,
-    p,
-    472.8,
-    p.changeA,
-    p.agentA,
-    `Decision D-1: revocation applies at next sign-in. ${NUMBER_A}'s premise no longer holds.`,
-    ["Relax the premise to at most per-session", "Say so where the owner revokes"],
-    given,
-  );
+  bounce(b, 472.8, p.changeA, { option: "allow-stale", decisionId }, given);
   land(b, p, {
     at: 474,
     change: p.changeB,

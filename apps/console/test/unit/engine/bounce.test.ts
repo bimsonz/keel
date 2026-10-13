@@ -3,7 +3,8 @@ import type { Player } from "../../../src/engine/player.ts";
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
-import { generateS1 } from "../../fixtures/mock/s1.ts";
+import { S1_CHOICES, generateS1 } from "../../fixtures/mock/s1.ts";
+import { generateS2 } from "../../fixtures/mock/s2.ts";
 import { createRng } from "../../fixtures/prng.ts";
 import { showing } from "../showing.ts";
 
@@ -64,11 +65,13 @@ describe("a conflict proven against a change", () => {
   });
 
   it("[change.bounce-verdict] leaves a bounce on a verdict as the verdict's, with no conflict named for it", async () => {
-    const log = generateS1(42, "invalidate");
-    const at = log.events.findIndex((event) => event.type === "ChangeBounced");
+    const log = generateS2(42);
+    const at = log.events.findIndex(
+      (event) => event.type === "ChangeBounced" && event.payload.verdictId !== undefined,
+    );
     const first = log.events[at];
-    if (first?.type !== "ChangeBounced") throw new Error("scenario 1 bounces nothing");
-    const player = showing(createMockSource({ scenario: "s1", seed: 42, ruling: "invalidate" }));
+    if (first?.type !== "ChangeBounced") throw new Error("scenario 2 bounces nothing on a verdict");
+    const player = showing(createMockSource({ scenario: "s2", seed: 42 }));
     await player.load();
     player.seek((log.eventTimes[at] ?? 0) + 50);
     const page = changePageOf(player.world, first.payload.changeId, player);
@@ -79,6 +82,63 @@ describe("a conflict proven against a change", () => {
     });
     expect(page?.bounce?.next.length).toBeGreaterThan(0);
     expect(page?.verdict?.id).toBe(first.payload.verdictId);
+  });
+
+  it("[change.bounce-ruling] says a ruling went against a change by its decision, with the conflict that decision settled and Keel's reason, and shows no earlier verdict as the cause", async () => {
+    const log = generateS1(42, "invalidate");
+    const at = log.events.findIndex((event) => event.type === "ChangeBounced");
+    const first = log.events[at];
+    if (first?.type !== "ChangeBounced") throw new Error("scenario 1 bounces nothing");
+    const player = showing(createMockSource({ scenario: "s1", seed: 42, ruling: "invalidate" }));
+    await player.load();
+    player.seek((log.eventTimes[at] ?? 0) + 50);
+    const [conflict] = [...player.world.conflicts.values()];
+    const page = changePageOf(player.world, first.payload.changeId, player);
+    expect(page?.change.state).toBe("bounced");
+    expect(first.payload.decisionId).toBeDefined();
+    expect(page?.bounce).toEqual({
+      at: first.at,
+      ruling: {
+        decision: { label: "D-1", chosen: "Cache allowed if revocation invalidates it" },
+        conflict: { id: conflict?.id, label: "C-1" },
+        reasons: [S1_CHOICES.find((option) => option.id === "invalidate")?.consequence],
+      },
+      next: first.payload.nextActions?.map((action) => action.title),
+    });
+    expect(page?.bounce?.next.length).toBeGreaterThan(0);
+    // The verdict that sent it to its wait was given before the ruling, and is not this bounce's.
+    expect(player.world.changes.get(first.payload.changeId)?.verdictIds.length).toBeGreaterThan(0);
+    expect(page?.verdict).toBeUndefined();
+  });
+
+  it("[change.bounce-ruling-alone] says of a ruling's bounce only what the log holds: no decision and no conflict it has not read", async () => {
+    // Keel's objects write in no fixed order, so a bounce can be read before the resolution and the decision.
+    // A conflict some other decision settled is not the one this bounce's decision did.
+    const { player, conflictId, changeId } = await proven();
+    then(player, (b) => {
+      b.at(1).emit({
+        type: "ConflictResolved",
+        entity: { kind: "conflict", id: conflictId },
+        payload: { conflictId, move: "yield", decisionId: "dec_other" },
+      });
+      b.at(2).emit({
+        type: "ChangeBounced",
+        entity: { kind: "change", id: changeId },
+        payload: {
+          changeId,
+          decisionId: "dec_unread",
+          reasons: ["It cannot land as written."],
+          nextActions: [{ kind: "call", title: "Revise the intent" }],
+        },
+      });
+    });
+    const page = changePageOf(player.world, changeId, player);
+    expect(page?.bounce).toEqual({
+      at: page?.bounce?.at,
+      ruling: { reasons: ["It cannot land as written."] },
+      next: ["Revise the intent"],
+    });
+    expect(page?.verdict).toBeUndefined();
   });
 
   it("[change.bounce-refused] says a change's batch was refused its push, and shows no earlier verdict as the cause", async () => {
@@ -139,7 +199,39 @@ describe("a conflict proven against a change", () => {
   });
 });
 
+/** Scenario 1 under a ruling: what the conflict's page says the ruling did to each side, A then B, at a time. */
+async function ruledOn(ruling: "invalidate" | "allow-stale") {
+  const log = generateS1(42, ruling);
+  const settled = log.eventTimes[log.events.findIndex((e) => e.type === "ConflictResolved")];
+  const bounced = log.events.find((event) => event.type === "ChangeBounced");
+  if (bounced?.type !== "ChangeBounced") throw new Error("scenario 1 bounces nothing");
+  const player = showing(createMockSource({ scenario: "s1", seed: 42, ruling }));
+  await player.load();
+  const sides = (at: number) => {
+    player.seek(at);
+    const [conflict] = [...player.world.conflicts.values()];
+    const parties = conflictPageOf(player.world, conflict?.id ?? "", player)?.parties;
+    return [parties?.A.ruledAgainst, parties?.B.ruledAgainst];
+  };
+  const next = bounced.payload.nextActions?.map((action) => action.title) ?? [];
+  return { sides, settled: settled ?? 0, next };
+}
+
 describe("a conflict, once settled", () => {
+  it("[conflict.ruled-against] says on the side its resolution names that the ruling went against it, with what its agent was told, and nothing on the other side", async () => {
+    // The premise stands: against #1, which makes the effect and is the page's side B.
+    const kept = await ruledOn("invalidate");
+    expect(kept.next.length).toBeGreaterThan(0);
+    // The resolution alone names the side. The decision and the bounce are not read yet, so neither is said.
+    expect(kept.sides(kept.settled + 10)).toEqual([undefined, { next: [] }]);
+    expect(kept.sides(640_000)).toEqual([undefined, { decision: "D-1", next: kept.next }]);
+    // #1 came back revised and landed: the ruling still went against it.
+    expect(kept.sides(700_000)).toEqual([undefined, { decision: "D-1", next: kept.next }]);
+    // The effect stands: against #2, which holds the premise and is side A.
+    const relaxed = await ruledOn("allow-stale");
+    expect(relaxed.sides(640_000)).toEqual([{ decision: "D-1", next: relaxed.next }, undefined]);
+  });
+
   it("[conflict.after] keeps the matrix as the probe left it, and says what came of each side from the verdicts given since", async () => {
     const log = generateS1(42, "invalidate");
     const settled = log.eventTimes[log.events.findIndex((e) => e.type === "ConflictResolved")] ?? 0;
@@ -154,12 +246,9 @@ describe("a conflict, once settled", () => {
     player.seek(settled + 10);
     expect(page()?.conflict.state).toBe("resolved");
     expect(after()).toEqual([]);
-    // The ruling bounces #1, and #2 lands as it was.
+    // The ruling bounces #1 by its decision, with no verdict, and #2 lands as it was.
     player.seek(640_000);
-    expect(after()).toEqual([
-      ["#2", 1, "land"],
-      ["#1", 1, "bounce"],
-    ]);
+    expect(after()).toEqual([["#2", 1, "land"]]);
     // #1 comes back revised and lands: that verdict is where it is seen to pass.
     player.seek(700_000);
     expect(after()).toEqual([

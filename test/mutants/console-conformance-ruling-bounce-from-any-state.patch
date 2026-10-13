@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.ruling-bounce
+# why: the fixtures' check lets a ruling bounce a change that was not waiting for it
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 722b6de2..75b8867d 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -272,7 +272,6 @@ function rulesFor(event: AnyEvent): Rule[] {
+         : conflict(["proven", "escalated"], "resolved");
+     case "ChangeBounced":
+       // A ruling goes against a change only while it waits for that ruling.
+-      if (event.payload.decisionId !== undefined) return [change(["parked"], "bounced")];
+       if (event.payload.conflictId !== undefined)
+         return [change(["deriving", "verifying", "queued"], "bounced")];
+       return event.payload.declined === undefined

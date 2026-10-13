@@ -2,13 +2,13 @@
 # kills: change.bounce-verdict, proven.block
 # why: the ways forward Keel gave a bounced change's agent are not kept, so the page lists none
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index a9a609b..0840594 100644
+index 02ddbf97..46efa8ca 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -658,7 +658,7 @@ export class World {
-             ...(verdictId === undefined ? {} : { verdictId }),
-             ...(conflictId === undefined ? {} : { conflictId }),
+@@ -783,7 +783,7 @@ export class World {
              ...(declined === undefined ? {} : { declined: declined.reason }),
+             ...(decisionId === undefined ? {} : { decisionId }),
+             reasons: [...event.payload.reasons],
 -            next: (nextActions ?? []).map((action) => action.title),
 +            next: [],
            };

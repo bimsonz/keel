@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.ruling-bounce, conformance.resolution-against
+# why: the fixtures' check lets a ruling bounce a change its resolution did not go against
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 722b6de2..9628a7e4 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -483,7 +483,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+         if (verdictId !== undefined && states.get(`verdict:${verdictId}`) !== "issued")
+           problems.push(`${where}: verdict ${verdictId} was not issued`);
+         // A ruling bounces the parties its conflict's resolution went against, and no other change.
+-        if (decisionId !== undefined && ruledAgainst.get(decisionId)?.includes(changeId) !== true)
++        if (decisionId !== undefined && !ruledAgainst.has(decisionId) && false)
+           problems.push(`${where}: no resolution by ${decisionId} went against ${changeId}`);
+         if (conflictId === undefined) break;
+         for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);

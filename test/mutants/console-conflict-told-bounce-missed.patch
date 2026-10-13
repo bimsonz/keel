@@ -2,11 +2,11 @@
 # kills: conflict.told
 # why: a side bounced on the conflict is not said to be, and the ways forward Keel gave it are not shown
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index a9a609b..87d7eac 100644
+index 02ddbf97..cd7cb369 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -660,12 +660,6 @@ export class World {
-             ...(declined === undefined ? {} : { declined: declined.reason }),
+@@ -785,12 +785,6 @@ export class World {
+             reasons: [...event.payload.reasons],
              next: (nextActions ?? []).map((action) => action.title),
            };
 -          if (conflictId !== undefined)

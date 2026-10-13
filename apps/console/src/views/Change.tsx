@@ -9,7 +9,13 @@ import {
 import type { ReactNode } from "react";
 import { CodeDiff, PlanGraph } from "./later.tsx";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
-import type { ChangePageState, DiffAnnotation, IntentRow, PlanStep } from "../domain/state.ts";
+import type {
+  ChangePageState,
+  DiffAnnotation,
+  IntentRow,
+  PlanStep,
+  RulingBounce,
+} from "../domain/state.ts";
 import type { ChangeTab } from "../route.ts";
 import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
@@ -235,12 +241,39 @@ function IntentRowLine({ row, self }: { row: IntentRow; self: boolean }) {
   );
 }
 
+/**
+ * What a ruling did to this change, in a sentence: the decision by Keel's name for it and what it chose, and the
+ * conflict it settled, each said only where the log names it.
+ */
+function RuledAgainst({ ruling }: { ruling: RulingBounce }) {
+  return (
+    <>
+      A ruling went against this change
+      {ruling.decision !== undefined &&
+        `: decision ${ruling.decision.label} chose “${ruling.decision.chosen}”`}
+      {ruling.conflict !== undefined && (
+        <>
+          , on{" "}
+          <ConflictLink id={ruling.conflict.id} className="a-link">
+            conflict {ruling.conflict.label}
+          </ConflictLink>
+        </>
+      )}
+      . It bounced on the ruling: no verdict was issued.
+    </>
+  );
+}
+
 /** The one line that says where the change stands. */
 function standing(state: ChangePageState): string {
   const { change, verdict, escalation } = state;
   if (change.state === "landed") return "Landed on trunk";
   if (change.state === "withdrawn") return "Withdrawn";
   if (escalation?.state === "open") return `Parked: waiting for a ruling on ${escalation.label}`;
+  if (state.bounce?.ruling !== undefined)
+    return state.bounce.ruling.decision === undefined
+      ? "Bounced on a ruling"
+      : `Bounced on decision ${state.bounce.ruling.decision.label}`;
   if (state.bounce?.conflict !== undefined)
     return `Bounced on conflict ${state.bounce.conflict.label}`;
   if (state.bounce?.refused !== undefined) return "Bounced: its push was refused";
@@ -357,7 +390,9 @@ export function Change({
                   {standing(state)}
                 </h2>
                 <p className="text-lg text-kumo-default">
-                  {state.bounce?.conflict !== undefined ? (
+                  {state.bounce?.ruling !== undefined ? (
+                    <RuledAgainst ruling={state.bounce.ruling} />
+                  ) : state.bounce?.conflict !== undefined ? (
                     <>
                       Keel proved{" "}
                       <ConflictLink id={state.bounce.conflict.id} className="a-link">
@@ -384,6 +419,12 @@ export function Change({
                         · plan <span className="a-mono">{verdict.planHash}</span>
                       </>
                     )}
+                  </p>
+                )}
+                {state.bounce?.ruling !== undefined && state.bounce.ruling.reasons.length > 0 && (
+                  <p className="text-base text-kumo-default" data-part="ruling-reasons">
+                    <span className="text-sm text-kumo-subtle">Keel gave this reason: </span>
+                    {state.bounce.ruling.reasons.join(" ")}
                   </p>
                 )}
                 {state.bounce !== undefined && state.bounce.next.length > 0 && (

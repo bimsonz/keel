@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.cause, funnel.whole
+# why: a bounce by a ruling is left out of the bounces in all, and a change that only ever bounced on one is not counted as bounced
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index 18363773..a08c1dcb 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -34,7 +34,7 @@ export interface ChangeRow {
+ 
+ /** Every bounce counted, whatever cause Keel named for it. */
+ export const bouncesIn = (counts: BounceCounts): number =>
+-  counts.verdict + counts.conflict + counts.declined + counts.ruling;
++  counts.verdict + counts.conflict + counts.declined;
+ 
+ export interface ChangeFunnel {
+   rows: ChangeRow[];

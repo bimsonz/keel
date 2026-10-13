@@ -116,6 +116,12 @@ export interface Party {
    * words. Present only where one of Keel's events told the agent something: nothing is said for it otherwise.
    */
   told?: { how: "noted" | "bounced"; next: string[] };
+  /**
+   * Set where the conflict's resolution names this side's change as one its ruling went against. `decision` is
+   * Keel's name for the decision where the log holds it, and `next` the ways forward Keel gave the agent with
+   * the bounce by it.
+   */
+  ruledAgainst?: { decision?: string; next: string[] };
 }
 
 /** A suite's latest run in one world of the matrix, as Keel recorded it. */
@@ -323,6 +329,13 @@ export interface HeldUnder {
   run?: { id: string; label?: string; anchor: string };
 }
 
+/** The ruling a change bounced on, as far as the log names it. */
+export interface RulingBounce {
+  decision?: { label: string; chosen: string };
+  conflict?: { id: string; label: string };
+  reasons: string[];
+}
+
 export interface ChangePageState {
   change: {
     /** True where the project has verification switched off: its verdict or its landing was not verified. */
@@ -372,12 +385,15 @@ export interface ChangePageState {
   /**
    * While it stands bounced: what Keel named as the cause, where that is not a verdict. A change whose plan
    * blocks on a predicate bounces on a conflict proven on it, and one whose batch Artifacts refused to take
-   * bounces on that refusal; no verdict is issued for either. `next` is the ways forward Keel gave its agent.
+   * bounces on that refusal; one a ruling went against bounces on that ruling's decision, and `ruling` names
+   * it, the conflict whose resolution names the same decision, and the reasons Keel gave, in its words. No
+   * verdict is issued for any of the three. `next` is the ways forward Keel gave its agent.
    */
   bounce?: {
     at: string;
     conflict?: { id: string; label: string; predicate?: string };
     refused?: "pack-too-large" | "repo-bytes-quota";
+    ruling?: RulingBounce;
     next: string[];
   };
   /**

@@ -271,6 +271,8 @@ function rulesFor(event: AnyEvent): Rule[] {
         ? RULES.ConflictResolved
         : conflict(["proven", "escalated"], "resolved");
     case "ChangeBounced":
+      // A ruling goes against a change only while it waits for that ruling.
+      if (event.payload.decisionId !== undefined) return [change(["parked"], "bounced")];
       if (event.payload.conflictId !== undefined)
         return [change(["deriving", "verifying", "queued"], "bounced")];
       return event.payload.declined === undefined
@@ -342,6 +344,8 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
   const sides = new Map<string, { parties: readonly string[]; predicate?: Predicate }>();
   const proofs = new Map<string, ConflictProof>();
   const policies = new Map<string, EventPredicatePolicies>();
+  /** The changes each decision's resolution went against. */
+  const ruledAgainst = new Map<string, readonly string[]>();
   /** Every way a proof's mark on a change (a bounce or a note) disagrees with the conflict it names. */
   const againstProof = (changeId: string, conflictId: string): string[] => {
     const wrong: string[] = [];
@@ -468,19 +472,38 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
         else policies.set(event.payload.changeId, event.payload.predicatePolicy);
         break;
       case "ChangeBounced": {
-        const { changeId, verdictId, conflictId, declined } = event.payload;
-        if ([verdictId, conflictId, declined].filter((cause) => cause !== undefined).length !== 1)
+        const { changeId, verdictId, conflictId, declined, decisionId } = event.payload;
+        if (
+          [verdictId, conflictId, declined, decisionId].filter((cause) => cause !== undefined)
+            .length !== 1
+        )
           problems.push(
-            `${where}: a bounce names exactly one cause: its verdict, its conflict or its declined batch`,
+            `${where}: a bounce names exactly one cause: its verdict, its conflict, its declined batch or the decision that went against it`,
           );
         if (verdictId !== undefined && states.get(`verdict:${verdictId}`) !== "issued")
           problems.push(`${where}: verdict ${verdictId} was not issued`);
+        // A ruling bounces the parties its conflict's resolution went against, and no other change.
+        if (decisionId !== undefined && ruledAgainst.get(decisionId)?.includes(changeId) !== true)
+          problems.push(`${where}: no resolution by ${decisionId} went against ${changeId}`);
         if (conflictId === undefined) break;
         for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);
         if (policyOn(changeId, conflictId) !== "block")
           problems.push(
             `${where}: the change's plan does not block on the conflict's predicate (${policyOn(changeId, conflictId)})`,
           );
+        break;
+      }
+      case "ConflictResolved": {
+        const { conflictId, decisionId, against } = event.payload;
+        if (against === undefined) break;
+        if (decisionId === undefined || against.length === 0)
+          problems.push(
+            `${where}: a resolution goes against a party only by a decision, and never against none`,
+          );
+        else ruledAgainst.set(decisionId, against);
+        for (const changeId of against)
+          if (sides.get(conflictId)?.parties.includes(changeId) !== true)
+            problems.push(`${where}: ${changeId} is not one of ${conflictId}'s sides`);
         break;
       }
       case "ConflictNoted": {

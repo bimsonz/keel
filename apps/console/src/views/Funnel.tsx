@@ -12,6 +12,7 @@ import { ArrowDownIcon, HandPalmIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { EvidenceClass } from "../contract/mfp.ts";
 import type { FunnelStage } from "../contract/observations.ts";
+import { bouncesIn } from "../engine/funnel.ts";
 import type { ChangeRow, ChangeStage, FunnelRow, FunnelState } from "../engine/funnel.ts";
 import { PAGE } from "../engine/lists.ts";
 import { Link } from "../router.tsx";
@@ -70,6 +71,7 @@ const CHANGE: Record<ChangeStage, { name: string; does: string }> = {
 const LEFT: readonly [keyof ChangeRow["out"], string][] = [
   ["verdict", "bounced on a verdict"],
   ["conflict", "bounced on a proven conflict"],
+  ["ruling", "bounced on a ruling"],
   ["declined", "bounced on a refused push"],
   ["drifted", "drifted from what it declared"],
   ["withdrawn", "withdrawn"],
@@ -418,7 +420,7 @@ export function Funnel({ state }: { state: FunnelState }) {
   const hidden = usePublicOnly();
   const counted = state.rows.some((row) => row.reported && row.stage === 0);
   const { changes, estimate } = state;
-  const bounces = changes.bounces.verdict + changes.bounces.conflict + changes.bounces.declined;
+  const bounces = bouncesIn(changes.bounces);
   const perThousand =
     state.usd === undefined || state.changesLanded === 0
       ? undefined

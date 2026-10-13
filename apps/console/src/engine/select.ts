@@ -14,6 +14,7 @@ import type {
   EvidenceItem,
   MatrixRow,
   Party,
+  RulingBounce,
   PlanStep,
   StepOutcome,
   ConflictPageState,
@@ -25,7 +26,13 @@ import { readable } from "./evidence.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
 import { contradictionsOf } from "./sides.ts";
-import { type ChangeEntry, type EscalationEntry, outcomesIn, type World } from "./world.ts";
+import {
+  type ChangeEntry,
+  type ConflictEntry,
+  type EscalationEntry,
+  outcomesIn,
+  type World,
+} from "./world.ts";
 
 /** What the console has fetched from Keel's read models, on demand, beside the log. */
 export interface Resources {
@@ -100,9 +107,18 @@ const nameOf = (world: World, changeId: string): string =>
   world.changes.get(changeId)?.label ?? changeId.slice(-4);
 
 /** One side of a conflict, as Keel named it, with what the log says of its change. */
-function party(world: World, cards: Cards, side: ConflictSide, letter: "A" | "B"): Party {
+function party(
+  world: World,
+  cards: Cards,
+  side: ConflictSide,
+  letter: "A" | "B",
+  conflict: ConflictEntry | undefined,
+): Party {
   const change = world.changes.get(side.changeId);
   const { proposition, told } = side;
+  // The resolution says who its ruling went against; the bounce by the same decision, what its agent was told.
+  const ruledAgainst = conflict?.against?.includes(side.changeId) === true;
+  const decision = world.decisions.get(conflict?.decisionId ?? "");
   return {
     world: letter,
     changeId: side.changeId,
@@ -123,6 +139,29 @@ function party(world: World, cards: Cards, side: ConflictSide, letter: "A" | "B"
     ...(told === undefined || told.nextActions.length === 0
       ? {}
       : { told: { how: told.how, next: told.nextActions.map((action) => action.title) } }),
+    ...(ruledAgainst
+      ? {
+          ruledAgainst: {
+            ...(decision === undefined ? {} : { decision: decision.label }),
+            next: world.ruled.get(`${conflict?.decisionId}/${side.changeId}`) ?? [],
+          },
+        }
+      : {}),
+  };
+}
+
+/** The ruling a change bounced on: its decision as the log has it, and the conflict whose resolution names that decision. */
+function rulingOf(world: World, decisionId: string, reasons: string[]): RulingBounce {
+  const decision = world.decisions.get(decisionId);
+  const settled = [...world.conflicts.values()].find(
+    (conflict) => conflict.decisionId === decisionId,
+  );
+  return {
+    ...(decision === undefined
+      ? {}
+      : { decision: { label: decision.label, chosen: decision.chosen } }),
+    ...(settled === undefined ? {} : { conflict: { id: settled.id, label: settled.label } }),
+    reasons,
   };
 }
 
@@ -302,8 +341,8 @@ export function conflictPageFrom(
     detail.sides === undefined
       ? undefined
       : {
-          A: party(world, cards, detail.sides.holder, "A"),
-          B: party(world, cards, detail.sides.other, "B"),
+          A: party(world, cards, detail.sides.holder, "A", conflict),
+          B: party(world, cards, detail.sides.other, "B", conflict),
         };
   const timeline: TimelineItem[] = (conflict?.timeline ?? []).map((entry, index, all) => ({
     at: entry.at,
@@ -601,10 +640,12 @@ export function changePageOf(
   const by = world.agents.get(change.agentId);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
   const cause = world.conflicts.get(bounce?.conflictId ?? "");
-  // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
-  // one is not this bounce's.
+  // A change bounced on a conflict, on its batch's refused push or on a ruling was given no verdict for that:
+  // an earlier one is not this bounce's.
   const verdict =
-    bounce?.conflictId === undefined && bounce?.declined === undefined
+    bounce?.conflictId === undefined &&
+    bounce?.declined === undefined &&
+    bounce?.decisionId === undefined
       ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
       : undefined;
   const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");
@@ -700,6 +741,9 @@ export function changePageOf(
                   },
                 }),
             ...(bounce.declined === undefined ? {} : { refused: bounce.declined }),
+            ...(bounce.decisionId === undefined
+              ? {}
+              : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
             next: bounce.next,
           },
         }),

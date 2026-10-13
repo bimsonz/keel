@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-ruling
+# why: Keel's reason for a ruling's bounce is not kept, so the page gives none
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 145dd52a..04ac7245 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -787,7 +787,7 @@ export class World {
+             ...(conflictId === undefined ? {} : { conflictId }),
+             ...(declined === undefined ? {} : { declined: declined.reason }),
+             ...(decisionId === undefined ? {} : { decisionId }),
+-            reasons: [...event.payload.reasons],
++            reasons: [],
+             next: (nextActions ?? []).map((action) => action.title),
+           };
+           if (conflictId !== undefined)

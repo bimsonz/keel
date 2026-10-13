@@ -9,6 +9,7 @@ import {
   type ChangeStage,
   type FunnelRow,
   type FunnelState,
+  bouncesIn,
   changeFunnelOf,
   funnelOf,
 } from "../../../src/engine/funnel.ts";
@@ -309,7 +310,8 @@ function handWritten(): World {
     cause:
       | { verdictId: string }
       | { conflictId: string }
-      | { declined: { batchId: string; reason: "pack-too-large" } },
+      | { declined: { batchId: string; reason: "pack-too-large" } }
+      | { decisionId: string },
   ): void => {
     b.after(1).emit({
       type: "ChangeBounced",
@@ -352,6 +354,14 @@ function handWritten(): World {
     entity: on("chg_held"),
     payload: { changeId: "chg_held", reason: "awaiting-ruling", escalationId: "esc_1" },
   });
+  // Waited for a ruling at its precheck, and the ruling went against it.
+  precheck("chg_ruled");
+  b.after(1).emit({
+    type: "ChangeParked",
+    entity: on("chg_ruled"),
+    payload: { changeId: "chg_ruled", reason: "awaiting-ruling", escalationId: "esc_1" },
+  });
+  bounce("chg_ruled", { decisionId: "dec_1" });
   // Verified and landed.
   plan("chg_done", 0.03);
   batch("chg_done", 1);
@@ -402,7 +412,15 @@ function handWritten(): World {
   return world;
 }
 
-const NONE = { verdict: 0, conflict: 0, declined: 0, drifted: 0, withdrawn: 0, superseded: 0 };
+const NONE = {
+  verdict: 0,
+  conflict: 0,
+  declined: 0,
+  ruling: 0,
+  drifted: 0,
+  withdrawn: 0,
+  superseded: 0,
+};
 const stageOf = (rows: readonly ChangeRow[], stage: ChangeStage): ChangeRow | undefined =>
   rows.find((candidate) => candidate.stage === stage);
 
@@ -418,21 +436,21 @@ describe("the funnel of changes, on a log written by hand", () => {
     ]);
     expect(stageOf(funnel.rows, "declared")).toEqual({
       stage: "declared",
-      reached: 13,
-      wentOn: 11,
+      reached: 14,
+      wentOn: 12,
       here: 1,
       parked: 0,
       out: { ...NONE, withdrawn: 1 },
     });
-    expect(stageOf(funnel.rows, "precheck")).toMatchObject({ reached: 11, wentOn: 6, here: 2 });
+    expect(stageOf(funnel.rows, "precheck")).toMatchObject({ reached: 12, wentOn: 6, here: 2 });
     expect(stageOf(funnel.rows, "verified")).toMatchObject({ reached: 5, wentOn: 2, here: 2 });
     expect(stageOf(funnel.rows, "landed")).toMatchObject({ reached: 3 });
-    expect(funnel).toMatchObject({ declared: 13, landed: 3 });
+    expect(funnel).toMatchObject({ declared: 14, landed: 3 });
   });
 
   it("[funnel.once] counts a change that came round again once at each stage, and leaves it where it got to", () => {
-    // Three changes were prechecked twice: eleven changes reached the precheck in fourteen prechecks.
-    expect(stageOf(funnel.rows, "precheck")?.reached).toBe(11);
+    // Three changes were prechecked twice: twelve changes reached the precheck in fifteen prechecks.
+    expect(stageOf(funnel.rows, "precheck")?.reached).toBe(12);
     // One was verified at its second attempt and is queued again. One was verified, had its batch's push
     // refused and is at its precheck again. Each is still one that was verified, and is not back at the precheck.
     expect(stageOf(funnel.rows, "verified")).toMatchObject({ reached: 5, here: 2, parked: 0 });
@@ -441,11 +459,18 @@ describe("the funnel of changes, on a log written by hand", () => {
 
   it("[funnel.cause] puts a bounced change under the one cause Keel named, at the stage it had got to", () => {
     // Two stand bounced on a conflict and one on a verdict: were the causes mixed up, the two would change places.
-    expect(stageOf(funnel.rows, "precheck")?.out).toEqual({ ...NONE, verdict: 1, conflict: 2 });
+    // One more stands bounced on a ruling, which is none of the other three.
+    expect(stageOf(funnel.rows, "precheck")?.out).toEqual({
+      ...NONE,
+      verdict: 1,
+      conflict: 2,
+      ruling: 1,
+    });
     expect(stageOf(funnel.rows, "verified")?.out).toEqual({ ...NONE, declined: 1 });
     // Every bounce in the log, the ones a change came back from among them.
-    expect(funnel.bounces).toEqual({ verdict: 2, conflict: 3, declined: 2 });
-    expect(funnel).toMatchObject({ bounced: 7, bouncedThenLanded: 1 });
+    expect(funnel.bounces).toEqual({ verdict: 2, conflict: 3, declined: 2, ruling: 1 });
+    expect(bouncesIn(funnel.bounces)).toBe(8);
+    expect(funnel).toMatchObject({ bounced: 8, bouncedThenLanded: 1 });
   });
 
   it("[funnel.parked] keeps a change Keel has parked at its stage, and says it is parked", () => {
@@ -537,9 +562,7 @@ describe("the funnel of changes, held to each fixture's own log", () => {
         );
       // And every bounce in the log is counted under a cause.
       const bounces = events.filter((event) => event.type === "ChangeBounced").length;
-      expect(funnel.bounces.verdict + funnel.bounces.conflict + funnel.bounces.declined).toBe(
-        bounces,
-      );
+      expect(bouncesIn(funnel.bounces)).toBe(bounces);
     },
   );
 });

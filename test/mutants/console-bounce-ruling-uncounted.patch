@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.cause, funnel.whole
+# why: a bounce by a ruling is counted under no cause, so the bounces counted are fewer than Keel recorded
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 145dd52a..cc6884aa 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -803,7 +803,6 @@ export class World {
+           if (declined !== undefined) change.bounces.declined += 1;
+           else if (conflictId !== undefined) change.bounces.conflict += 1;
+           else if (verdictId !== undefined) change.bounces.verdict += 1;
+-          else if (decisionId !== undefined) change.bounces.ruling += 1;
+           if (decisionId !== undefined)
+             this.ruled.set(
+               `${decisionId}/${change.id}`,

@@ -574,6 +574,57 @@ expectEqual(
   "No verdict yet | true",
 );
 
+// A ruling that goes against a change bounces it by the ruling's decision. The page names the decision, what it
+// chose and the conflict it settled, gives Keel's reason in Keel's words, and shows no verdict as the cause.
+const RULED = "scenario=s1&ruling=invalidate&t=473&play=0";
+const RULED_WAYS = [
+  "Revise the change's intent so that it no longer contradicts what was ruled",
+  "Withdraw the change",
+];
+await page.goto(at("/changes/1", RULED), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: bounced on a ruling, it names the decision, and shows no verdict",
+  `${squash(await standing.getByRole("heading", { level: 2 }).innerText())} | ${await standing.getByText(/^Issued/).count()}`,
+  "Bounced on decision D-1 | 0",
+);
+expectEqual(
+  "change: it says the ruling went against it, what the decision chose, and the conflict it settled",
+  squash(await standing.locator("p").first().innerText()),
+  "A ruling went against this change: decision D-1 chose “Cache allowed if revocation invalidates it”, on conflict C-1. It bounced on the ruling: no verdict was issued.",
+);
+expectEqual(
+  "change: Keel's reason for a ruling's bounce, in Keel's words",
+  (await standing.locator('[data-part="ruling-reasons"]').allInnerTexts()).map(squash).join(" | "),
+  "Keel gave this reason: #1 revises to drop a session's cached roles on revocation. Both changes land. The probe stays as a guard.",
+);
+expectEqual(
+  "change: the ways forward Keel gave the agent of a change a ruling went against",
+  (
+    await standing
+      .getByRole("list", { name: "Ways forward Keel gave its agent" })
+      .getByRole("listitem")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  RULED_WAYS.join(" | "),
+);
+await follow(standing.getByRole("link", { name: "conflict C-1" }), "table.a-matrix");
+expectEqual(
+  "change: a ruling's bounce links to the conflict the ruling settled",
+  pathOf(page),
+  "/acme/demo/conflicts/C-1",
+);
+// The other side went on: the ruling did not go against it, and its page says nothing of one.
+await page.goto(at("/changes/2", RULED), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: the side the ruling let stand is not said to have had it go against it",
+  `${await standing.getByText(/A ruling went against this change/).count()} | ${await standing.locator('[data-part="ruling-reasons"]').count()}`,
+  "0 | 0",
+);
+
 // What Keel told each side of a conflict is said in Keel's words, where one of its events told them anything.
 const toldOn = async (fixture: string): Promise<string> => {
   await page.goto(at("/conflicts/C-1", fixture), { waitUntil: "networkidle" });
@@ -602,6 +653,36 @@ expectEqual(
   "conflict: where Keel told a side nothing, the page says nothing for it",
   `${await toldOn("scenario=s1&t=470&ruling=live&play=0")}${await page.getByText(/Notice:/).count()}`,
   "0",
+);
+// The side a ruling went against says so, on its own row and on no other: the resolution names it.
+const ruledOn = async (fixture: string): Promise<string> => {
+  await page.goto(at("/conflicts/C-1", fixture), { waitUntil: "networkidle" });
+  await page.locator("table.a-matrix").waitFor();
+  const rows = page.locator("[data-party]");
+  const said: string[] = [];
+  for (const row of await rows.all()) {
+    const line = row.getByText(/^The ruling went against it/);
+    // oxlint-disable-next-line no-await-in-loop -- two rows, read in the page's order
+    said.push(
+      `${await row.getAttribute("data-party")}: ${(await line.allInnerTexts()).map(squash).join(" ")}`,
+    );
+  }
+  return said.join(" | ");
+};
+expectEqual(
+  "conflict: the side its ruling went against says so, with the decision and what Keel told its agent, and the other side says nothing",
+  await ruledOn(RULED),
+  `A:  | B: The ruling went against it: Keel bounced it on decision D-1, and told its agent: ${RULED_WAYS.join(" · ")}`,
+);
+expectEqual(
+  "conflict: a ruling that lets the effect stand goes against the side that holds the premise",
+  await ruledOn("scenario=s1&ruling=allow-stale&t=473&play=0"),
+  `A: The ruling went against it: Keel bounced it on decision D-1, and told its agent: ${RULED_WAYS.join(" · ")} | B: `,
+);
+expectEqual(
+  "conflict: before a ruling, no side is said to have had one go against it",
+  await ruledOn("scenario=s1&t=470&ruling=live&play=0"),
+  "A:  | B: ",
 );
 
 // The same intent. Three agents declared the same effect; Keel shows them to each other and picks none.
@@ -1449,6 +1530,14 @@ expectEqual(
 );
 
 // Insights: trunk's numbers with what each means, the review funnel, and the benchmark where a run was sealed.
+// A change a ruling went against is counted where it had got to, under that cause and no other.
+await page.goto(at("/insights/funnel", RULED), { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "Review funnel" }).waitFor();
+expectEqual(
+  "funnel: a change bounced on a ruling is counted under that cause, at the stage it had got to",
+  `${await stat("Changes bounced")} | ${await stage("changes", 1)}`,
+  "1 | 2 | 1 50.0% 1 left here, 1 still here 1 bounced on a ruling · 1 still here | 0 | —",
+);
 await page.goto(at("/insights", "scenario=swarm&t=95&play=0"), { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "Trunk" }).waitFor();
 expectEqual(

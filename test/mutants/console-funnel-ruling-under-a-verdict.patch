@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.cause
+# why: a change bounced on a ruling is counted as bounced on a verdict Keel never issued
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index 18363773..2b7a1eae 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -149,7 +149,6 @@ export function changeFunnelOf(world: World): ChangeFunnel {
+         case "bounced":
+           if (change.bounce?.declined !== undefined) row.out.declined += 1;
+           else if (change.bounce?.conflictId !== undefined) row.out.conflict += 1;
+-          else if (change.bounce?.decisionId !== undefined) row.out.ruling += 1;
+           else row.out.verdict += 1;
+           break;
+         case "drifted":

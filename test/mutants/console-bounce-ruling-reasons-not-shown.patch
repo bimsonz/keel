@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-ruling, change.bounce-ruling-alone
+# why: Keel's reason for a ruling's bounce does not reach the change's page
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index e5ac021a..f9f93c97 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -161,7 +161,7 @@ function rulingOf(world: World, decisionId: string, reasons: string[]): RulingBo
+       ? {}
+       : { decision: { label: decision.label, chosen: decision.chosen } }),
+     ...(settled === undefined ? {} : { conflict: { id: settled.id, label: settled.label } }),
+-    reasons,
++    reasons: [],
+   };
+ }
+ 

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.resolution-against
+# why: the fixtures' check lets a resolution go against a change that is no side of its conflict
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 722b6de2..1cc17728 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -502,8 +502,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+           );
+         else ruledAgainst.set(decisionId, against);
+         for (const changeId of against)
+-          if (sides.get(conflictId)?.parties.includes(changeId) !== true)
+-            problems.push(`${where}: ${changeId} is not one of ${conflictId}'s sides`);
++          if (false) problems.push(`${where}: ${changeId} is not one of ${conflictId}'s sides`);
+         break;
+       }
+       case "ConflictNoted": {

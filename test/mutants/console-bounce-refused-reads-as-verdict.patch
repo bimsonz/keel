@@ -1,16 +1,15 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
 # kills: change.bounce-refused
-# why: a change bounced because its push was refused is shown under the verdict that had cleared it to land
+# why: a change whose batch's push was refused is shown an earlier verdict as the cause of its bounce
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 979e132..1a88dd1 100644
+index e5ac021a..f9a32a3e 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -612,7 +612,7 @@ export function changePageOf(
-   // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
-   // one is not this bounce's.
+@@ -644,7 +644,6 @@ export function changePageOf(
+   // an earlier one is not this bounce's.
    const verdict =
--    bounce?.conflictId === undefined && bounce?.declined === undefined
-+    bounce?.conflictId === undefined
+     bounce?.conflictId === undefined &&
+-    bounce?.declined === undefined &&
+     bounce?.decisionId === undefined
        ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
        : undefined;
-   const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");

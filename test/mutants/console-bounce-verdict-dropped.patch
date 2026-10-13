@@ -1,15 +1,17 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
 # kills: change.bounce-verdict
-# why: a change bounced on its verdict is shown with no verdict, as one bounced on a conflict is
+# why: a change bounced on a verdict is shown no verdict
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 979e132..5109327 100644
+index e5ac021a..24352350 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -612,7 +612,7 @@ export function changePageOf(
-   // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
-   // one is not this bounce's.
+@@ -643,9 +643,7 @@ export function changePageOf(
+   // A change bounced on a conflict, on its batch's refused push or on a ruling was given no verdict for that:
+   // an earlier one is not this bounce's.
    const verdict =
--    bounce?.conflictId === undefined && bounce?.declined === undefined
+-    bounce?.conflictId === undefined &&
+-    bounce?.declined === undefined &&
+-    bounce?.decisionId === undefined
 +    bounce === undefined
        ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
        : undefined;

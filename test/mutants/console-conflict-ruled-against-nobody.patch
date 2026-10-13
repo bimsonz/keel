@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: conflict.ruled-against
+# why: no side of a conflict is said to have had its ruling go against it
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index e5ac021a..b255a527 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -117,7 +117,7 @@ function party(
+   const change = world.changes.get(side.changeId);
+   const { proposition, told } = side;
+   // The resolution says who its ruling went against; the bounce by the same decision, what its agent was told.
+-  const ruledAgainst = conflict?.against?.includes(side.changeId) === true;
++  const ruledAgainst = false;
+   const decision = world.decisions.get(conflict?.decisionId ?? "");
+   return {
+     world: letter,

@@ -32,6 +32,10 @@ export interface ChangeRow {
   out: BounceCounts & { drifted: number; withdrawn: number; superseded: number };
 }
 
+/** Every bounce counted, whatever cause Keel named for it. */
+export const bouncesIn = (counts: BounceCounts): number =>
+  counts.verdict + counts.conflict + counts.declined + counts.ruling;
+
 export interface ChangeFunnel {
   rows: ChangeRow[];
   declared: number;
@@ -123,7 +127,15 @@ export function changeFunnelOf(world: World): ChangeFunnel {
       wentOn: 0,
       here: 0,
       parked: 0,
-      out: { verdict: 0, conflict: 0, declined: 0, drifted: 0, withdrawn: 0, superseded: 0 },
+      out: {
+        verdict: 0,
+        conflict: 0,
+        declined: 0,
+        ruling: 0,
+        drifted: 0,
+        withdrawn: 0,
+        superseded: 0,
+      },
     };
     for (const change of changes) {
       if (!got(change, stage)) continue;
@@ -137,6 +149,7 @@ export function changeFunnelOf(world: World): ChangeFunnel {
         case "bounced":
           if (change.bounce?.declined !== undefined) row.out.declined += 1;
           else if (change.bounce?.conflictId !== undefined) row.out.conflict += 1;
+          else if (change.bounce?.decisionId !== undefined) row.out.ruling += 1;
           else row.out.verdict += 1;
           break;
         case "drifted":
@@ -155,9 +168,7 @@ export function changeFunnelOf(world: World): ChangeFunnel {
     return row;
   });
   const landed = changes.filter((change) => change.state === "landed");
-  const bounced = changes.filter(
-    ({ bounces }) => bounces.verdict + bounces.conflict + bounces.declined > 0,
-  );
+  const bounced = changes.filter(({ bounces }) => bouncesIn(bounces) > 0);
   const sum = (cause: keyof BounceCounts): number =>
     changes.reduce((count, change) => count + change.bounces[cause], 0);
   return {
@@ -165,7 +176,12 @@ export function changeFunnelOf(world: World): ChangeFunnel {
     declared: changes.length,
     landed: landed.length,
     landedUnverified: landed.filter((change) => !change.reached.verified).length,
-    bounces: { verdict: sum("verdict"), conflict: sum("conflict"), declined: sum("declined") },
+    bounces: {
+      verdict: sum("verdict"),
+      conflict: sum("conflict"),
+      declined: sum("declined"),
+      ruling: sum("ruling"),
+    },
     bounced: bounced.length,
     bouncedThenLanded: bounced.filter((change) => change.state === "landed").length,
   };

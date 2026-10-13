@@ -1,5 +1,11 @@
 import { usePublicOnly } from "../engine/react.tsx";
-import { BellIcon, HandPalmIcon, ShieldCheckIcon, WarningDiamondIcon } from "@phosphor-icons/react";
+import {
+  BellIcon,
+  GavelIcon,
+  HandPalmIcon,
+  ShieldCheckIcon,
+  WarningDiamondIcon,
+} from "@phosphor-icons/react";
 import { CodeFile } from "./later.tsx";
 import type { ConflictPageState, MatrixRow, Outcome, Party, Pending } from "../domain/state.ts";
 import type { ConflictTab } from "../route.ts";
@@ -54,7 +60,7 @@ function PartyCard({
   const known = proposition.role === "premise" ? PREMISE : proposition.evidence;
   const derived = known?.declared === false;
   return (
-    <div className="flex min-w-0 flex-col justify-center gap-1 px-5">
+    <div className="flex min-w-0 flex-col justify-center gap-1 px-5" data-party={party.world}>
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-kumo-contrast text-base font-semibold text-kumo-inverse">
           {party.world}
@@ -120,6 +126,19 @@ function PartyCard({
             Keel{" "}
             {party.told.how === "bounced" ? "bounced it on this conflict" : "noted this against it"}
             , and told its agent: {party.told.next.join(" · ")}
+          </span>
+        </p>
+      )}
+      {party.ruledAgainst !== undefined && (
+        <p className="flex min-w-0 items-center gap-1.5 text-sm text-kumo-subtle">
+          <GavelIcon size={14} className="shrink-0" />
+          <span className="truncate" title={party.ruledAgainst.next.join(" · ")}>
+            The ruling went against it: Keel bounced it on{" "}
+            {party.ruledAgainst.decision === undefined
+              ? "the decision"
+              : `decision ${party.ruledAgainst.decision}`}
+            {party.ruledAgainst.next.length > 0 &&
+              `, and told its agent: ${party.ruledAgainst.next.join(" · ")}`}
           </span>
         </p>
       )}

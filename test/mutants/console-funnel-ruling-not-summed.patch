@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.cause, funnel.whole
+# why: the log's bounces by a ruling are reported as none
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index 18363773..76a07f96 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -180,7 +180,7 @@ export function changeFunnelOf(world: World): ChangeFunnel {
+       verdict: sum("verdict"),
+       conflict: sum("conflict"),
+       declined: sum("declined"),
+-      ruling: sum("ruling"),
++      ruling: 0,
+     },
+     bounced: bounced.length,
+     bouncedThenLanded: bounced.filter((change) => change.state === "landed").length,

@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
 # kills: conflict.told
-# why: where Keel told a side's agent nothing about a conflict, the console says something of its own
+# why: a side Keel told nothing is said to have been told something
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index a9322ab..d412971 100644
+index e5ac021a..cd02fbe4 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -115,7 +115,7 @@ function party(world: World, side: ConflictSide, letter: "A" | "B"): Party {
+@@ -137,7 +137,7 @@ function party(
      },
      // An annotation tells no one, so a telling with no way forward in it gives nothing here.
      ...(told === undefined || told.nextActions.length === 0
 -      ? {}
 +      ? { told: { how: "noted", next: ["Read the conflict"] } }
        : { told: { how: told.how, next: told.nextActions.map((action) => action.title) } }),
-   };
- }
+     ...(ruledAgainst
+       ? {
