@@ -2,12 +2,11 @@
 # kills: commit.parent-bound
 # why: Any commit the workspace holds is taken as a parent, grafting history the change never had
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 403d5842..279f52be 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1301,7 +1301,7 @@ export const commitEdits: (
-   const lease = checkLease(change, command.leaseId, now);
-   if (Result.isFailure(lease)) return yield* Effect.fail(lease.failure);
+@@ -1403,7 +1403,7 @@
+   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+   const held = allowed.success;
    const parent = command.parent ?? command.expectedHead;
 -  if (parent !== command.expectedHead && parent !== change.baseSha)
 +  if (parent !== command.expectedHead && parent === "never")

@@ -4,21 +4,27 @@
 // so a refused commit writes nothing; a written one renews the lease.
 import { describe, expect, it } from "@effect/vitest";
 import {
+  abandon,
+  adopt,
   changeWorkspace,
   CommitParentRefused,
   commitEdits,
   declare,
   getChange,
+  refreshWorkspace,
   submit,
 } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { AgentId, ChangeId, type CommitSha, LeaseId } from "@keeltown/core/kernel";
+import { AgentId, ChangeId, type CommitSha, LeaseId, ProjectId } from "@keeltown/core/kernel";
+import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import {
   CodeHost,
+  EventOutbox,
   EditsRefused,
   ObjectNotFound,
   PackTooLarge,
   WorkspaceHeadMoved,
+  WorkspacePool,
 } from "@keeltown/core/ports";
 import {
   makeCodeHostMemory,
@@ -32,22 +38,25 @@ import {
   makeWorkspaceWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
-import { Effect, Layer, Result, Schema } from "effect";
+import { Effect, Fiber, Layer, Result, Schema } from "effect";
 import { DeclareCommand, SubmitCommand } from "../../src/rpc/index.ts";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { commitEditsError, commitInput } from "../../src/adapters/driving/http/work-loop.ts";
 
 const changeId = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+const otherAgent = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V2");
+const otherProject = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V2");
 const MAIN = "refs/heads/main";
 const repos = projectRepos(sampleProjectId);
 const text = (s: string) => new TextEncoder().encode(s);
 
-/** A Change DO's state beside its project's trunk, whose head at the grant is `base`. */
+/** A Change DO's state beside its project's trunk, whose head at the grant is `base`; `asked` names the holder of each grant the pool is asked for. */
 function world() {
   const clock = makeManualClock();
   const code = makeCodeHostMemory();
   const writer = makeWorkspaceWriterMemory(code);
+  const asked: string[] = [];
   const seeded = Effect.gen(function* () {
     const host = yield* CodeHost;
     yield* host.create(repos.trunk);
@@ -63,14 +72,25 @@ function world() {
       makeEventOutboxMemory().layer,
       makeIdsMemory().layer,
       clock.layer,
-      makeWorkspacePoolMemory({ baseSha: base }).layer,
+      Layer.effect(
+        WorkspacePool,
+        Effect.map(WorkspacePool, (pool) =>
+          WorkspacePool.of({
+            ...pool,
+            grant: (projectId, holder) => {
+              asked.push(holder);
+              return pool.grant(projectId, holder);
+            },
+          }),
+        ),
+      ).pipe(Layer.provide(makeWorkspacePoolMemory({ baseSha: base }).layer)),
       code.layer,
       makeTrunksMemory().layer,
       makeWorkspaceRebaserMemory(code).layer,
       writer.layer,
       makeLiveChangesMemory().layer,
     );
-  return { clock, code, writer, seeded, layerFor };
+  return { clock, code, writer, asked, seeded, layerFor };
 }
 
 const declaring = Schema.decodeUnknownSync(DeclareCommand)({
@@ -86,14 +106,15 @@ const declaring = Schema.decodeUnknownSync(DeclareCommand)({
 
 /** Declares the change and forks its workspace from the mirror, at the grant's base, as the pool does. */
 const declared = Effect.gen(function* () {
-  const { change } = yield* declare(declaring);
+  const { change, grant: declaredGrant } = yield* declare(declaring);
   const held = yield* changeWorkspace(changeId);
   yield* (yield* CodeHost).fork(repos.mirror, held.repo);
-  return { lease: change.lease.id, held };
+  return { lease: change.lease.id, held, grant: declaredGrant };
 });
 
 const committing = (leaseId: LeaseId, expectedHead: CommitSha, idempotencyKey = "commit-1") => ({
   agentId,
+  projectId: sampleProjectId,
   handle: "swarm-1",
   leaseId,
   expectedHead,
@@ -219,6 +240,246 @@ describe("commit", () => {
             head: first.commit.commitSha,
           });
           expect((yield* getChange(changeId)).lease.renewedAt).toBe(renewedAt);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.own-agent] another agent, or the change's agent in another project, reads the change as not found and nothing is written",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const stranger = yield* Effect.flip(
+            commitEdits(changeId, { ...committing(lease, base), agentId: otherAgent }),
+          );
+          expect(stranger).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          const elsewhere = yield* Effect.flip(
+            commitEdits(changeId, {
+              ...committing(lease, base, "commit-2"),
+              projectId: otherProject,
+            }),
+          );
+          expect(elsewhere).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect(w.writer.committed).toEqual([]);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.lease-before-state] a stale lease on a submitted change reads as the lease, as every leased command does",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const made = yield* commitEdits(changeId, committing(lease, base));
+          yield* submit(
+            changeId,
+            Schema.decodeUnknownSync(SubmitCommand)({
+              agentId,
+              leaseId: lease,
+              commitSha: made.commit.commitSha,
+              idempotencyKey: "submit-1",
+            }),
+          );
+          const stale = Schema.decodeUnknownSync(LeaseId)("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9");
+          const refused = yield* Effect.flip(
+            commitEdits(changeId, committing(stale, made.commit.commitSha, "commit-2")),
+          );
+          expect(refused).toMatchObject({ _tag: "LeaseStale" });
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.replay] a retry of a call that committed answers its commit, even once the workspace has moved on",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const first = yield* commitEdits(changeId, committing(lease, base));
+          yield* commitEdits(changeId, {
+            ...committing(lease, first.commit.commitSha, "commit-2"),
+            edits: [{ path: "src/b.ts", content: text("export const b = 1;\n") }],
+          });
+          const retried = yield* commitEdits(changeId, committing(lease, base));
+          expect(retried.commit).toEqual(first.commit);
+          expect(retried.parent).toBe(base);
+          expect(w.writer.committed).toHaveLength(2);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.key-reused] the same key with other edits is refused, and nothing is written",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const first = yield* commitEdits(changeId, committing(lease, base));
+          const reused = yield* Effect.flip(
+            commitEdits(changeId, {
+              ...committing(lease, first.commit.commitSha),
+              edits: [{ path: "src/b.ts", content: text("export const b = 1;\n") }],
+            }),
+          );
+          expect(reused).toMatchObject({ _tag: "IdempotencyConflict", idempotencyKey: "commit-1" });
+          expect(w.writer.committed).toHaveLength(1);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.decides-again] an abandon that lands while the writer pushes refuses the call, and no commit is recorded for its key",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const hold = w.writer.holdNext();
+          const pushing = yield* Effect.forkChild(commitEdits(changeId, committing(lease, base)));
+          yield* Effect.promise(() => hold.held);
+          yield* abandon(changeId, {
+            authority: { _tag: "Lease", leaseId: lease, agentId },
+            idempotencyKey: "abandon-1",
+          });
+          hold.release();
+          const answer = yield* Effect.flip(Fiber.join(pushing));
+          expect(answer).toMatchObject({ _tag: "ChangeStateRefused", command: "commit" });
+          const retried = yield* Effect.flip(commitEdits(changeId, committing(lease, base)));
+          expect(retried).toMatchObject({ _tag: "ChangeStateRefused", command: "commit" });
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[commit.decides-again-adopted] an adoption that lands while the writer pushes refuses the old agent's call, and its lease is not renewed",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const hold = w.writer.holdNext();
+          const pushing = yield* Effect.forkChild(commitEdits(changeId, committing(lease, base)));
+          yield* Effect.promise(() => hold.held);
+          w.clock.advance(LEASE_TTL_MS + 1);
+          const adopted = yield* adopt(changeId, {
+            agentId: otherAgent,
+            projectId: sampleProjectId,
+            idempotencyKey: "adopt-1",
+          });
+          hold.release();
+          const answer = yield* Effect.flip(Fiber.join(pushing));
+          expect(answer).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          const after = yield* getChange(changeId);
+          expect(after.agentId).toBe(otherAgent);
+          expect(after.lease).toEqual(adopted.change.lease);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+});
+
+const asking = (leaseId: LeaseId) => ({ agentId, projectId: sampleProjectId, leaseId });
+
+describe("refresh", () => {
+  const changeLog = Effect.map(EventOutbox, (outbox) =>
+    outbox.log({ kind: "change", id: changeId }),
+  );
+
+  it.effect(
+    "[workspace.refresh-same] the change's own agent gets the workspace it holds with a token of its own, and no event is committed",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease, held, grant } = yield* declared;
+          const before = (yield* changeLog).length;
+          const fresh = yield* refreshWorkspace(changeId, asking(lease));
+          expect(fresh.workspaceId).toBe(held.workspaceId);
+          expect(fresh.repo).toEqual(held.repo);
+          expect(fresh.token).not.toBe(grant.token);
+          expect((yield* changeLog).length).toBe(before);
+          expect(w.asked).toEqual([changeId, changeId]);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[workspace.refresh-under-lease] a stale or lapsed lease is refused and the pool mints nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const stale = Schema.decodeUnknownSync(LeaseId)("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9");
+          const refused = yield* Effect.flip(refreshWorkspace(changeId, asking(stale)));
+          expect(refused).toMatchObject({ _tag: "LeaseStale", reason: "stale" });
+          w.clock.advance(LEASE_TTL_MS + 1);
+          const lapsed = yield* Effect.flip(refreshWorkspace(changeId, asking(lease)));
+          expect(lapsed).toMatchObject({ _tag: "LeaseStale", reason: "lapsed" });
+          expect(w.asked).toEqual([changeId]);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[workspace.refresh-own] another agent, or the change's agent in another project, reads the change as not found",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          const stranger = yield* Effect.flip(
+            refreshWorkspace(changeId, { ...asking(lease), agentId: otherAgent }),
+          );
+          expect(stranger).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          const elsewhere = yield* Effect.flip(
+            refreshWorkspace(changeId, { ...asking(lease), projectId: otherProject }),
+          );
+          expect(elsewhere).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect(w.asked).toEqual([changeId]);
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[workspace.refresh-ended] a withdrawn change is refused and the pool is never asked",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          yield* abandon(changeId, {
+            authority: { _tag: "Lease", leaseId: lease, agentId },
+            idempotencyKey: "abandon-1",
+          });
+          const refused = yield* Effect.flip(refreshWorkspace(changeId, asking(lease)));
+          expect(refused).toMatchObject({ _tag: "ChangeStateRefused", state: "withdrawn" });
+          expect(w.asked).toEqual([changeId]);
         }).pipe(Effect.provide(w.layerFor(base)));
       });
     },

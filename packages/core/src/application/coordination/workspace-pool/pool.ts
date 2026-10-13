@@ -8,11 +8,11 @@ import {
   WorkspacePushed,
 } from "../../../domain/coordination/index.ts";
 import {
-  type ChangeId,
+  ChangeId,
   type CommitSha,
   Instant,
   type ProjectId,
-  type SketchId,
+  SketchId,
   type WorkspaceId,
 } from "../../../domain/kernel/index.ts";
 import {
@@ -390,6 +390,20 @@ export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(funct
         ? Result.fail(new WorkspaceNotFound({ workspaceId }))
         : Result.succeed({ value: undefined, drafts: collectIn(tx, workspaceId, reason, now) }),
   );
+});
+
+const decodeHolder = Schema.decodeUnknownSync(Schema.Union([ChangeId, SketchId]));
+
+/**
+ * The change or sketch that holds the workspace, while it is granted. A
+ * ready, refreshing or collected workspace, or one this pool never forked,
+ * has no holder.
+ */
+export const holderOf = Effect.fn("coordination/holderOf")(function* (workspaceId: WorkspaceId) {
+  const slot = slotOf(yield* EntityStore, workspaceId);
+  return slot?.state === "granted" && slot.holder !== undefined
+    ? decodeHolder(slot.holder)
+    : undefined;
 });
 
 /**

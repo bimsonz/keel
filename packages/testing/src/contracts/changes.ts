@@ -228,6 +228,95 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
       },
     );
 
+    it.live(
+      "refreshes the workspace a change holds for its own agent under its lease: the same workspace, a token of its own",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const refreshed = yield* changes.refreshWorkspace(who, {
+            changeId: result.change.id,
+            lease: result.change.lease.id,
+          });
+          expect(refreshed).toMatchObject({
+            workspaceId: result.workspace.workspaceId,
+            remote: result.workspace.remote,
+          });
+          expect(refreshed.token).not.toBe("");
+          expect(refreshed.token).not.toBe(result.workspace.token);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "reads a refresh by another agent, or by the change's agent in another project, as ChangeNotFound",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const input = { changeId: result.change.id, lease: result.change.lease.id };
+          const other: AgentToken = {
+            ...who,
+            agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
+          };
+          const elsewhere: AgentToken = {
+            ...who,
+            projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
+          };
+          const errors = [
+            yield* Effect.flip(changes.refreshWorkspace(other, input)),
+            yield* Effect.flip(changes.refreshWorkspace(elsewhere, input)),
+          ];
+          expect(errors).toMatchObject([
+            { _tag: "ChangeNotFound", changeId: result.change.id },
+            { _tag: "ChangeNotFound", changeId: result.change.id },
+          ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live("refuses a refresh under another lease as LeaseStale", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const changes = yield* Changes;
+        const { who, result } = yield* declared(harness);
+        const other = Schema.decodeUnknownSync(LeaseId)(fresh("lse"));
+        const error = yield* Effect.flip(
+          changes.refreshWorkspace(who, { changeId: result.change.id, lease: other }),
+        );
+        expect(error).toMatchObject({
+          _tag: "LeaseStale",
+          changeId: result.change.id,
+          leaseId: other,
+        });
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("refuses a refresh of an abandoned change as ChangeStateRefused", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const changes = yield* Changes;
+        const { who, result } = yield* declared(harness);
+        const lease = result.change.lease.id;
+        yield* changes.abandon({
+          changeId: result.change.id,
+          authority: { _tag: "Lease", leaseId: lease, agentId: who.agentId },
+          reason: "A smaller change does it",
+          idempotencyKey: `abandon-${crypto.randomUUID()}`,
+        });
+        const error = yield* Effect.flip(
+          changes.refreshWorkspace(who, { changeId: result.change.id, lease }),
+        );
+        expect(error).toMatchObject({
+          _tag: "ChangeStateRefused",
+          changeId: result.change.id,
+          state: "withdrawn",
+        });
+      }).pipe(Effect.provide(harness.layer));
+    });
+
     it.live("answers ChangeNotFound for a change that was never declared", () => {
       const harness = make();
       return Effect.gen(function* () {

@@ -1,15 +1,15 @@
 # expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
 # kills: commit.lease-first
-# why: The lease is never checked, so a stale lease writes
+# why: The lease is never checked before the push, so a stale lease writes
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 403d5842..7c367ae6 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1299,7 +1299,6 @@ export const commitEdits: (
-   if (held === undefined || !COMMITTABLE.has(change.state)) return yield* refused(change, "commit");
-   const now = yield* (yield* Clock).now;
-   const lease = checkLease(change, command.leaseId, now);
--  if (Result.isFailure(lease)) return yield* Effect.fail(lease.failure);
-   const parent = command.parent ?? command.expectedHead;
-   if (parent !== command.expectedHead && parent !== change.baseSha)
-     return yield* Effect.fail(
+@@ -1334,8 +1334,6 @@
+   if (!isOwnAgent(store, change, use)) return Result.fail(notFound(change.id));
+   const held = heldWorkspace(store, change.id);
+   if (TERMINAL.has(change.state)) return Result.fail(refused(change, use.command));
+-  const lease = checkLease(change, use.leaseId, now);
+-  if (Result.isFailure(lease)) return Result.fail(lease.failure);
+   if (held === undefined || (use.states !== undefined && !use.states.has(change.state)))
+     return Result.fail(refused(change, use.command));
+   return Result.succeed(held);

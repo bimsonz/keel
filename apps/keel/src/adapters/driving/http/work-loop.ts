@@ -15,6 +15,7 @@ import type {
   ReviseInput,
   Revised,
   SubmitInput,
+  WorkspaceTokenInput,
 } from "@keeltown/core/application/coordination";
 import type { PushRejected } from "@keeltown/core/domain/integration";
 import {
@@ -33,6 +34,7 @@ import {
   Move,
   Proposition,
   type RevisionMismatch,
+  type WorkspaceNotFound,
 } from "@keeltown/core/domain/coordination";
 import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import type { ConflictNotFound, MoveRefused } from "@keeltown/core/domain/verification";
@@ -44,6 +46,7 @@ import {
   CommitSha,
   ConflictId,
   LeaseId,
+  WorkspaceId,
 } from "@keeltown/core/kernel";
 import type {
   ConflictView,
@@ -53,6 +56,7 @@ import type {
   Remedy,
   SubmissionStatus,
   WorkspaceEdit,
+  WorkspaceGrant,
   WorkspaceHeadMoved,
 } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
@@ -66,6 +70,7 @@ import type {
   Operations,
   CommitResult,
   RebaseResult,
+  RefreshWorkspaceTokenResult,
   RelyResult,
   ResolveResult,
   ReviseResult,
@@ -248,6 +253,17 @@ function changeView(change: Change) {
   };
 }
 
+/** A workspace as the API hands it out: its token is shown once, here. */
+function workspaceView(workspace: WorkspaceGrant) {
+  return {
+    id: workspace.workspaceId,
+    remote: workspace.remote,
+    token: workspace.token,
+    expiresAt: iso(workspace.expiresAt),
+    baseSha: workspace.baseSha,
+  };
+}
+
 function leaseView(lease: Lease) {
   return {
     id: lease.id,
@@ -320,12 +336,7 @@ export function declareOk(declared: Declared): DeclareResult {
       {
         change: changeView(change),
         preflight: preflightView(preflight),
-        workspace: {
-          id: workspace.workspaceId,
-          remote: workspace.remote,
-          token: workspace.token,
-          expiresAt: iso(workspace.expiresAt),
-        },
+        workspace: workspaceView(workspace),
         lease: leaseView(change.lease),
       },
       [
@@ -672,6 +683,7 @@ export function commitEditsError(
     | ChangeNotFound
     | LeaseStale
     | ChangeStateRefused
+    | IdempotencyConflict
     | CommitParentRefused
     | WorkspaceHeadMoved
     | EditsRefused
@@ -704,6 +716,8 @@ export function commitEditsError(
           nextActions: [statusOf(error.changeId)],
         }),
       };
+    case "IdempotencyConflict":
+      return reusedKey(caller, error, "commit", "Commit");
     case "CommitParentRefused":
       return {
         status: 400,
@@ -783,6 +797,50 @@ export function commitEditsError(
           ],
         }),
       };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+const TokenFields = Schema.Struct({ workspaceId: WorkspaceId, lease: LeaseId });
+
+/** The workspace and the lease: nothing is stored, so the Idempotency-Key is not used. */
+export function refreshInput(
+  input: Input<"refreshWorkspaceToken">,
+): Result.Result<WorkspaceTokenInput, Issues> {
+  return decodeWith(TokenFields, { workspaceId: input.workspaceId, lease: input["keel-lease"] });
+}
+
+/** The same workspace, as `declare` hands it out, with its fresh token. */
+export function refreshedOk(workspace: WorkspaceGrant): RefreshWorkspaceTokenResult {
+  return { status: 200, body: workspaceView(workspace) };
+}
+
+export function refreshError(
+  caller: Caller,
+  error: WorkspaceNotFound | LeaseStale | ChangeStateRefused,
+): RefreshWorkspaceTokenResult {
+  switch (error._tag) {
+    case "WorkspaceNotFound":
+      return {
+        status: 404,
+        body: problem(404, "workspace.not_found", caller.requestId, {
+          detail: `You hold no workspace ${error.workspaceId}.`,
+          nextActions: [
+            {
+              kind: "call",
+              title: "Declare a change for a workspace of your own",
+              operationId: "declare",
+            },
+          ],
+        }),
+      };
+    case "LeaseStale":
+      return leaseStale(caller, error);
+    case "ChangeStateRefused":
+      return stateRefused(caller, error);
     default: {
       const unmapped: never = error;
       return unmapped;
@@ -1047,16 +1105,7 @@ export function adoptOk(adopted: Adopted): AdoptResult {
       {
         change: changeView(change),
         lease: leaseView(change.lease),
-        ...(workspace === undefined
-          ? {}
-          : {
-              workspace: {
-                id: workspace.workspaceId,
-                remote: workspace.remote,
-                token: workspace.token,
-                expiresAt: iso(workspace.expiresAt),
-              },
-            }),
+        ...(workspace === undefined ? {} : { workspace: workspaceView(workspace) }),
       },
       [statusOf(change.id)],
     ),

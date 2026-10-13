@@ -38,6 +38,7 @@ import {
   makeRepoServerMemory,
   makeLanesMemory,
   makeTrunksMemory,
+  makeWorkspacePoolMemory,
   makeUsersMemory,
   sampleOrgId,
   sampleProjectId,
@@ -113,7 +114,7 @@ describe("mappers", () => {
  * The operations still answering 503 service.not_implemented to a caller the
  * policy grants them. Shrinks, visibly, as lanes land each one.
  */
-const STUBBED = ["Workspaces_refreshWorkspaceToken", "why", "Views_getVerdict"];
+const STUBBED = ["why", "Views_getVerdict"];
 
 /**
  * A project placed in its org with settings, so the policy sees it, and the
@@ -147,6 +148,7 @@ function grantedSurface() {
       makeTrunksMemory().layer,
       makeLanesMemory().layer,
       makeRepoServerMemory({ repos: new Map() }).layer,
+      makeWorkspacePoolMemory().layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
       makeAgentSignUpsMemory().layer.pipe(Layer.provide(directory)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory)),

@@ -370,7 +370,7 @@ export const RESOLVERS: Resolvers = {
   submit: ownProject,
   resolve: ownProject,
   Sessions_openSession: ownProject,
-  Workspaces_refreshWorkspaceToken: ownProject,
+  refreshWorkspaceToken: ownProject,
 };
 
 /** The policy's next actions as a problem carries them: absent fields left out rather than undefined. */

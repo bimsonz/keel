@@ -639,14 +639,17 @@ export class KeelClient {
     );
   }
 
-  /** A fresh token for a workspace the caller holds. */
+  /**
+   * A fresh two-hour token for the workspace the caller's change holds, under
+   * the change's lease: the same workspace, nothing else moves.
+   */
   refreshWorkspaceToken(
     workspaceId: string,
-    options: Idempotent = {},
-  ): Promise<WireOutputs["Workspaces_refreshWorkspaceToken"]> {
+    options: Idempotent & { readonly lease: string },
+  ): Promise<WireOutputs["refreshWorkspaceToken"]> {
     return this.call(
-      "Workspaces_refreshWorkspaceToken",
-      { workspaceId, "idempotency-key": keyOf(options) },
+      "refreshWorkspaceToken",
+      { workspaceId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
       options,
     );
   }

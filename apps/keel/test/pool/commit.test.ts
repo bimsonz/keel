@@ -6,11 +6,12 @@ import { type CommitSha, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost } from "@keeltown/core/ports";
 import { Effect } from "effect";
 import { ulid } from "ulid";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
 import { BASE, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
+import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 
-/** A declared change whose workspace holds one commit on main, and a token for an agent of its project. */
+/** A declared change whose workspace holds one commit on main, a token for its own agent, and one for another agent of its project. */
 async function declaredWithWorkspace() {
   const projectId: ProjectId = makeId("prj", ulid());
   const c = await changeUnderTest(projectId);
@@ -24,8 +25,9 @@ async function declaredWithWorkspace() {
       });
     }).pipe(Effect.provide(c.code.layer)),
   );
-  const token = await tokenFor(await seedAgent({ projectId }));
-  return { c, declared, head, token };
+  const token = await tokenFor(await seedAgent({ projectId, id: c.agentId }));
+  const other = await tokenFor(await seedAgent({ projectId }));
+  return { c, declared, head, token, other };
 }
 
 const request = (expectedHead: CommitSha) => ({
@@ -125,5 +127,74 @@ describe("committing to a change's workspace through the doorways", () => {
     expect(both.status).toBe(400);
     expect(c.writer.committed).toEqual([]);
     expect(await headOf(c, declared.grant.repo)).toBe(head);
+  });
+
+  it("[commit.rest-head-moved] a commit on a head that moved is 409 workspace.head_moved naming the head now, and nothing is written", async () => {
+    const { c, declared, head, token } = await declaredWithWorkspace();
+    const lease = declared.change.lease.id;
+
+    const first = await (
+      await commitRest(c, token, lease, "commit-key-0004", request(head))
+    ).json<CommitBody>();
+    const moved = await commitRest(c, token, lease, "commit-key-0005", {
+      ...request(head),
+      edits: [{ path: "src/b.ts", content: "export const b = 1;\n" }],
+    });
+    const problem = await moved.json<{
+      code: string;
+      nextActions: readonly { operationId?: string; title: string }[];
+    }>();
+
+    expect([moved.status, problem.code]).toEqual([409, "workspace.head_moved"]);
+    expect(problem.nextActions[0]).toMatchObject({ operationId: "commit" });
+    expect(problem.nextActions[0]?.title).toContain(first.result.commitSha);
+    expect(c.writer.committed).toHaveLength(1);
+    expect(await headOf(c, declared.grant.repo)).toBe(first.result.commitSha);
+  });
+
+  it("[commit.rest-own] another agent of the project, holding the lease, is 404 change.not_found, and nothing is written", async () => {
+    const { c, declared, head, other } = await declaredWithWorkspace();
+
+    const response = await commitRest(
+      c,
+      other,
+      declared.change.lease.id,
+      "commit-key-0006",
+      request(head),
+    );
+
+    expect([response.status, (await response.json<{ code: string }>()).code]).toEqual([
+      404,
+      "change.not_found",
+    ]);
+    expect(c.writer.committed).toEqual([]);
+  });
+
+  it("[commit.rest-decides-again] an abandon that lands on the Change DO while the commit is pushed answers the commit 409 change.state_refused, not its commit", async () => {
+    const { c, declared, head, token } = await declaredWithWorkspace();
+    const lease = declared.change.lease.id;
+    const hold = c.writer.holdNext();
+
+    const pending = commitRest(c, token, lease, "commit-key-0007", request(head));
+    // Waited out on the test's own timer: `held` settles inside the Change DO's request, and
+    // a test awaiting it would go on there, where the test's own stub cannot be used.
+    await vi.waitFor(() => expect(c.writer.committed).toHaveLength(1), { timeout: 20_000 });
+    ok(
+      decodeExit(
+        ChangeCodecs.abandon,
+        await c.stub.abandon({
+          authority: { _tag: "Lease", leaseId: lease, agentId: c.agentId },
+          idempotencyKey: "abandon-1",
+        }),
+      ),
+    );
+    hold.release();
+    const response = await pending;
+
+    expect([response.status, (await response.json<{ code: string }>()).code]).toEqual([
+      409,
+      "change.state_refused",
+    ]);
+    expect((await c.current()).state).toBe("withdrawn");
   });
 });

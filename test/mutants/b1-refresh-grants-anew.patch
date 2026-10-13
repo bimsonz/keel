@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: workspace.refresh-same
+# why: The refresh asks the pool for a holder that holds nothing, so it is granted another workspace
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1492,7 +1492,7 @@
+   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+   // The pool finds the workspace this change holds and only mints a token: it cannot run out.
+   return yield* (yield* WorkspacePool)
+-    .grant(allowed.success.projectId, changeId)
++    .grant(allowed.success.projectId, `${changeId}-again` as ChangeId)
+     .pipe(Effect.orDie);
+ });
+ 

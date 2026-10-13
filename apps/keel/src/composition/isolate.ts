@@ -16,6 +16,7 @@ import {
   RepoServer,
   type Lanes,
   type Trunks,
+  type WorkspacePool,
 } from "@keeltown/core/ports";
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
@@ -68,6 +69,7 @@ import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { LanesRpc } from "../adapters/driven/do-rpc/lanes.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
+import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
@@ -119,6 +121,8 @@ export function isolateLayer(
     overrides.trunks ?? TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     // A project's lanes, as their own objects count them.
     overrides.lanes ?? LanesRpc(env.LANE, artifactsLocationHint(env)),
+    // A workspace's holder, which a token refresh asks its project's pool for.
+    overrides.workspacePool ?? WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     AgentSignUpsRpc(agentSession),
     overrides.sessions ?? SessionsRpc(agentSession),
@@ -156,6 +160,8 @@ export interface IsolateOverrides {
   readonly trunks?: Layer.Layer<Trunks>;
   /** Pass the lanes a test counts in memory. */
   readonly lanes?: Layer.Layer<Lanes>;
+  /** Pass the pool in-memory `changes` grant from, so a workspace's holder is one of theirs. */
+  readonly workspacePool?: Layer.Layer<WorkspacePool>;
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;

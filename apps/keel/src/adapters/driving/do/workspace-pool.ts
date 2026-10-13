@@ -5,6 +5,7 @@ import {
   countBehind,
   destroyPool,
   grantWorkspace,
+  holderOf,
   observePush,
   poolStatus,
   refillPool,
@@ -127,6 +128,15 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
       at: Date.now(),
     });
     return answer;
+  }
+
+  async holder(workspaceId: string) {
+    const program = decodeWorkspaceId(workspaceId).pipe(
+      Effect.orDie,
+      Effect.flatMap((id) => holderOf(id)),
+      Effect.map((holder) => holder ?? null),
+    );
+    return this.answer(WorkspacePoolCodecs.holder, program);
   }
 
   async configure(config: unknown) {

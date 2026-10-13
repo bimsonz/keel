@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/commit.test.ts apps/keel/test/unit/commit.test.ts -t "commit.decides-again|commit.rest-decides-again"
+# kills: commit.decides-again, commit.decides-again-adopted, commit.rest-decides-again
+# why: The change is decided only before the push, so an abandon or adoption landing meanwhile still answers the stale call with its commit
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1460,10 +1460,9 @@
+           : Result.fail(conflict);
+       const stored = storedChange(tx.store, changeId);
+       if (stored === undefined) throw new Error(`${changeId} has no state after its commit`);
+-      const again = mayUseWorkspace(tx.store, stored, use, tx.at);
+-      if (Result.isFailure(again)) return Result.fail(again.failure);
+-      const renewed = renew(stored, command.leaseId, tx.at);
+-      if (Result.isFailure(renewed)) return Result.fail(renewed.failure);
++      const renewed = Result.succeed(
++        Result.getOrElse(renew(stored, command.leaseId, tx.at), () => stored),
++      );
+       const record: MadeCommit = { fingerprint, ...made, parent };
+       tx.store.put(CHANGE_COMMIT, `${changeId}/${command.idempotencyKey}`, asStored(record));
+       tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));

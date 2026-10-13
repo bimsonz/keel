@@ -8,6 +8,7 @@ import {
   destroyPool,
   grantWorkspace,
   GRANT_TTL_SECONDS,
+  holderOf,
   observePush,
   ownerOfRepo,
   poolStatus,
@@ -391,6 +392,30 @@ describe("WorkspacePool", () => {
           "RepoNotFound",
         );
     }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.holder] a granted workspace's holder is its change; a ready, a collected and an unknown workspace have none",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(5));
+        expect(yield* holderOf(grant.workspaceId)).toBe(holder(5));
+        const ready = (yield* slotsHeld).filter((slot) => slot.state === "ready");
+        expect(ready).toHaveLength(1);
+        for (const slot of ready) expect(yield* holderOf(slot.id)).toBeUndefined();
+        const store = yield* EntityStore;
+        const outbox = yield* EventOutbox;
+        const landed = {
+          type: "ChangeLanded",
+          payload: { _tag: "ChangeLanded", changeId: holder(5) },
+        };
+        store.transaction(() => collectOnChangeEnd({ store, outbox, at: Instant(1) }, landed, 1));
+        expect(yield* holderOf(grant.workspaceId)).toBeUndefined();
+        expect(yield* holderOf(makeId("wsp", "0".repeat(26)))).toBeUndefined();
+      }).pipe(Effect.provide(pool())),
   );
 
   it.effect(

@@ -7,7 +7,14 @@ import type {
   Proposition,
 } from "../../domain/coordination/index.ts";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
+import type {
+  ChangeId,
+  CommitSha,
+  Instant,
+  LeaseId,
+  SketchId,
+  WorkspaceId,
+} from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { Clock, Ids, WorkspaceEdit, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
 import type { Withdrawal } from "./change.ts";
@@ -99,6 +106,18 @@ export interface CommitInput extends LeasedCall {
   readonly parent?: CommitSha;
   readonly edits: readonly WorkspaceEdit[];
   readonly message: string;
+}
+
+/** A fresh token for the workspace a change holds: the caller holds its lease. Nothing is stored, so no key. */
+export interface RefreshInput {
+  readonly changeId: ChangeId;
+  readonly lease: LeaseId;
+}
+
+/** A fresh token for a workspace, as a doorway names it: the lease is on the change that holds it. */
+export interface WorkspaceTokenInput {
+  readonly workspaceId: WorkspaceId;
+  readonly lease: LeaseId;
 }
 
 export interface Revised {

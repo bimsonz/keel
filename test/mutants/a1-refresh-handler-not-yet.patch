@@ -1,0 +1,28 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t refresh.wire
+# kills: refresh.wire
+# why: refreshWorkspaceToken still answers the declared 503 service.not_implemented, so no agent can renew a workspace token
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -787,20 +787,7 @@
+             ),
+           );
+         },
+-        refreshWorkspaceToken: (caller: Caller, input: Input<"refreshWorkspaceToken">) => {
+-          const decoded = refreshInput(input);
+-          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+-          return run(
+-            caller,
+-            tokenOf(caller).pipe(
+-              Effect.flatMap((principal) => refreshWorkspaceToken(principal, decoded.success)),
+-              Effect.match({
+-                onSuccess: refreshedOk,
+-                onFailure: (error) => refreshError(caller, error),
+-              }),
+-            ),
+-          );
+-        },
++        refreshWorkspaceToken: notYet,
+         submit: (caller: Caller, input: Input<"submit">) => {
+           const decoded = submitInput(input);
+           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

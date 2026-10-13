@@ -73,6 +73,14 @@ export class WorkspacePool extends Context.Service<
       reason?: CollectionReason,
     ) => Effect.Effect<void>;
     /**
+     * The change or sketch the workspace is granted to; undefined for one that
+     * is ready, collected, or not this project's pool's. Reads, commits nothing.
+     */
+    readonly holder: (
+      projectId: ProjectId,
+      workspaceId: WorkspaceId,
+    ) => Effect.Effect<ChangeId | SketchId | undefined>;
+    /**
      * Points the project's pool at its source (the project's mirror) and the
      * number of ready workspaces to keep forked. The pool starts forking.
      */

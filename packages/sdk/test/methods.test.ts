@@ -73,7 +73,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
       { expectedHead: "a".repeat(40), message: "m", edits: [{ path: "x", content: "y" }] },
       LEASE,
     ),
-  Workspaces_refreshWorkspaceToken: (c) => c.refreshWorkspaceToken("wsp_1"),
+  refreshWorkspaceToken: (c) => c.refreshWorkspaceToken("wsp_1", LEASE),
   inbox: (c) => c.inbox({ cursor: "000000000001" }),
   Inbox_listEvents: (c) => c.events({ limit: 1 }),
   Inbox_getSnapshot: (c) => c.snapshot({ project: "prj_1" }),

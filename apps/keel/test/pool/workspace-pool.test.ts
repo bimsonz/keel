@@ -187,6 +187,25 @@ describe("the WorkspacePool RPC adapter", () => {
     );
     expect(refused).toMatchObject({ _tag: "PoolExhausted", retryAfterMs: 15_000 });
   });
+
+  it("[pool.rpc.holder] a granted workspace's holder is its change; once released, or never forked, it has none", async () => {
+    const projectId = freshProject();
+    await stock(projectId, 1);
+    const changeId = holder();
+    const holders = await Effect.runPromise(
+      WorkspacePool.use((pool) =>
+        Effect.gen(function* () {
+          const grant = yield* pool.grant(projectId, changeId);
+          const granted = yield* pool.holder(projectId, grant.workspaceId);
+          yield* pool.release(projectId, grant.workspaceId);
+          const released = yield* pool.holder(projectId, grant.workspaceId);
+          const unknown = yield* pool.holder(projectId, makeId("wsp", ulid()));
+          return [granted, released, unknown];
+        }),
+      ).pipe(Effect.provide(WorkspacePoolRpc(env.WORKSPACE_POOL))),
+    );
+    expect(holders).toEqual([changeId, undefined, undefined]);
+  });
 });
 
 describe("the WorkspacePool DO", () => {

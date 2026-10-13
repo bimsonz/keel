@@ -63,6 +63,12 @@ model Workspace {
   token?: string;
 
   expiresAt: utcDateTime;
+
+  /**
+   * The commit the workspace's `main` was at when it was granted: the first
+   * `expectedHead` of a `commit`, and the change's base until it rebases.
+   */
+  baseSha: CommitSha;
 }
 
 model Change {

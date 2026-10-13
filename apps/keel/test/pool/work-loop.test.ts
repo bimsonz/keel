@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { AgentNotKnown } from "@keeltown/core/domain/identity";
 import { ChangeId, CommitSha, Instant, WorkspaceId } from "@keeltown/core/kernel";
-import { makeChangesMemory, makeInboxMemory } from "@keeltown/testing";
+import { makeChangesMemory, makeInboxMemory, makeWorkspacePoolMemory } from "@keeltown/testing";
 import { Exit, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
@@ -11,35 +11,47 @@ import { BASE, type Fetch, mcp, mcpResult, seedAgent, tokenFor } from "./helpers
 
 /**
  * The work loop end to end through the real HTTP and MCP doorways, the real
- * auth gate and the one handler object, over in-memory Changes and Inbox until
- * the DOs answer their RPC (then these run over `exports.default.fetch`).
+ * auth gate and the one handler object, over in-memory Changes, Inbox and
+ * WorkspacePool here (then these run over
+ * `exports.default.fetch`).
  */
 function loop(options: { readonly capacity?: number } = {}) {
   const changes = makeChangesMemory(options);
   const inbox = makeInboxMemory();
+  const pool = makeWorkspacePoolMemory();
   const { app } = makeIsolate(
     env,
     isolateLayer(env, {
       changes: changes.layer,
       inbox: inbox.layer,
       notifier: inbox.notifier,
+      workspacePool: pool.layer,
     }),
   );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
-  return { changes, inbox, via };
+  return { changes, inbox, pool, via };
 }
 
 const json = { "content-type": "application/json" };
 const declareBody = { goal: "Cache permission lookups per request", footprint: [], premises: [] };
 
+/** A workspace as declare and a token refresh hand it out. */
+interface Workspace {
+  readonly id: string;
+  readonly remote: string;
+  readonly token: string;
+  readonly expiresAt: string;
+  readonly baseSha: string;
+}
+
 interface Declared {
   readonly change: { readonly id: string; readonly state: string };
   readonly lease: { readonly id: string };
-  readonly workspace: { readonly id: string; readonly token: string; readonly expiresAt: string };
+  readonly workspace: Workspace;
 }
 
-/** Every body these tests read: an agent envelope, or a problem. */
-interface Body {
+/** Every body these tests read: an agent envelope, a problem, or a workspace. */
+interface Body extends Workspace {
   readonly result: Declared & {
     readonly state: string;
     readonly commitSha: string;
@@ -90,7 +102,11 @@ describe("the work loop over REST and MCP", () => {
     expect(first.body.result).toMatchObject({
       change: { state: "working", revision: 1, goal: declareBody.goal },
       lease: { id: expect.stringMatching(/^lse_/) },
-      workspace: { id: expect.stringMatching(/^wsp_/), token: expect.any(String) },
+      workspace: {
+        id: expect.stringMatching(/^wsp_/),
+        token: expect.any(String),
+        baseSha: expect.stringMatching(/^[0-9a-f]{40}$/),
+      },
     });
     const replay = await tool(via, token, "declare", {
       "idempotency-key": "declare-key-0001",
@@ -127,6 +143,50 @@ describe("the work loop over REST and MCP", () => {
       ...body,
     });
     expect(retried).toEqual(submitted.body);
+  });
+
+  it("[refresh.wire] refreshes a held workspace's token under the lease over REST and MCP: the same workspace, a token of its own", async () => {
+    const { via, pool } = loop();
+    const token = await tokenFor(await seedAgent());
+    const { change, lease, workspace } = (await declare(via, token, "declare-key-0008")).body
+      .result;
+    // The in-memory Changes grants its own workspaces: the pool is told the holder, as the real one knows it.
+    pool.granted.set(
+      Schema.decodeUnknownSync(WorkspaceId)(workspace.id),
+      Schema.decodeUnknownSync(ChangeId)(change.id),
+    );
+    const refresh = (workspaceId: string, headers: Record<string, string>) =>
+      rest(via, token, `/workspaces/${workspaceId}/token`, {
+        method: "POST",
+        headers: { "idempotency-key": "refresh-key-0008", ...headers },
+      });
+    const refreshed = await refresh(workspace.id, { "keel-lease": lease.id });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body).toEqual({
+      id: workspace.id,
+      remote: workspace.remote,
+      token: expect.any(String),
+      expiresAt: expect.any(String),
+      baseSha: workspace.baseSha,
+    });
+    expect(refreshed.body.token).not.toBe(workspace.token);
+    const unleased = await refresh(workspace.id, {});
+    const unknown = await refresh("wsp_01JZ8PT2C4E6G8J0M2N4Q6S8V0", { "keel-lease": lease.id });
+    expect([unleased, unknown].map((r) => [r.status, r.body.code])).toEqual([
+      [400, "request.invalid"],
+      [404, "workspace.not_found"],
+    ]);
+    const viaMcp = await tool(via, token, "refreshWorkspaceToken", {
+      workspaceId: workspace.id,
+      "keel-lease": lease.id,
+      "idempotency-key": "refresh-key-0008",
+    });
+    // Each refresh mints a token with its own expiry; everything else is the same answer.
+    expect(viaMcp).toEqual({
+      ...refreshed.body,
+      token: expect.any(String),
+      expiresAt: expect.any(String),
+    });
   });
 
   it("[a11.status] answers status alike over REST and MCP, and a waiting read as soon as the change moves", async () => {

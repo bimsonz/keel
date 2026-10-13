@@ -128,6 +128,9 @@ function objects(answers: {
       commit: async () => {
         throw new Error("this test never commits");
       },
+      refreshWorkspace: async () => {
+        throw new Error("this test never refreshes a workspace");
+      },
       revise: async () => {
         throw new Error("this test never revises");
       },

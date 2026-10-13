@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/commit.test.ts -t commit.rest-head-moved
+# kills: commit.rest-head-moved
+# why: A moved head is refused without naming where main is now, so the agent must read the workspace again to commit
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -746,7 +746,7 @@
+               title:
+                 error.head === null
+                   ? "Read the change, then commit again"
+-                  : `Commit again with expectedHead ${error.head}, after reading what it holds`,
++                  : "Read the change, then commit again",
+               operationId: "commit",
+             },
+           ],

@@ -31,6 +31,7 @@ import {
   type RevisionMismatch,
   type SubjectKey,
   subjectAncestors,
+  TERMINAL,
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
@@ -53,10 +54,12 @@ import {
   contentHashOf,
   type EntityRef,
   type EventEnvelope,
+  type Instant,
   type Json,
   type LeaseId,
   NextAction,
   ProjectId,
+  sha256HexOfBytes,
   type SketchId,
   type UserId,
   type VerdictId,
@@ -126,6 +129,21 @@ import { preflightFor } from "./preflight.ts";
 export const CHANGE = "change";
 /** Where it keeps the workspace the change holds, beside the change and outside the domain's Change. */
 export const CHANGE_WORKSPACE = "change-workspace";
+/**
+ * Where it keeps each commit a call made, by `<changeId>/<idempotencyKey>`: a
+ * commit appends no event, so the outbox holds no cause for it to replay.
+ */
+export const CHANGE_COMMIT = "change-commit";
+
+/** A commit a call made, under the fingerprint of the call that made it. */
+const MadeCommit = Schema.Struct({
+  fingerprint: Schema.String,
+  commitSha: CommitSha,
+  tree: Schema.String,
+  changed: Schema.Number,
+  parent: CommitSha,
+});
+type MadeCommit = typeof MadeCommit.Type;
 
 /**
  * The workspace a change holds, the commit it was granted at, and its
@@ -330,6 +348,8 @@ export interface RebaseChange {
 /** Commit edits in the change's workspace, under its lease, with no clone. */
 export interface CommitEdits {
   readonly agentId: AgentId;
+  /** The caller's project, from its token. */
+  readonly projectId: ProjectId;
   /** The run of the agent that asks, when its token names one. */
   readonly run?: RunRef | undefined;
   /** The agent's handle, which authors the commit (its id while it has none). */
@@ -363,6 +383,13 @@ export interface CommittedChange {
   readonly change: Change;
   readonly commit: CommittedEdits;
   readonly parent: CommitSha;
+}
+
+export interface RefreshWorkspace {
+  readonly agentId: AgentId;
+  /** The caller's project, from its token. */
+  readonly projectId: ProjectId;
+  readonly leaseId: LeaseId;
 }
 
 /** What rebasing answers: the change on its new base, and the workspace branch holding that base, to fetch and merge. */
@@ -424,6 +451,7 @@ const encodeHeld = Schema.encodeSync(HeldWorkspace);
 const encodeEvent = Schema.encodeSync(ChangeEvent);
 const encodeVerdict = Schema.encodeSync(VerdictIssued);
 const decodeBounced = Schema.decodeUnknownSync(ChangeBounced);
+const decodeMadeCommit = Schema.decodeUnknownSync(MadeCommit);
 
 /** As stored: JSON, without the keys an absent optional field leaves undefined. */
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
@@ -1277,13 +1305,79 @@ export const rebase: (
 /** Where an agent may commit to its workspace: as for Submit and Rebase. */
 const COMMITTABLE: ReadonlySet<ChangeState> = new Set<ChangeState>(["working", "bounced"]);
 
+/** Whether the caller is the change's own agent, in the change's project. */
+const isOwnAgent = (
+  store: Store,
+  change: Change,
+  caller: { readonly agentId: AgentId; readonly projectId: ProjectId },
+): boolean => {
+  const held = heldWorkspace(store, change.id);
+  return (
+    change.agentId === caller.agentId && (held === undefined || held.projectId === caller.projectId)
+  );
+};
+
 /**
- * Commits an agent's edits in its change's workspace, with no clone: the
- * lease and the state are checked first, so a refused call writes nothing;
- * then the writer applies the edits to `parent` and pushes one commit with
- * `expectedHead` as the old value; then the lease is renewed (state, not an
- * event: the commit itself is seen as the workspace's push). Only the
- * change's own workspace is written, never trunk.
+ * Whether an agent may use the change's workspace: the one check behind every
+ * use of a held workspace (a commit, a fresh token). Only the change's own
+ * agent, in the change's project, may; any other reads the change as not
+ * found. Then in `decideChange`'s order: an ended change is refused, then a
+ * stale or lapsed lease, then a state outside `states` (absent: any state
+ * before the change ends).
+ */
+const mayUseWorkspace = (
+  store: Store,
+  change: Change,
+  use: {
+    readonly agentId: AgentId;
+    readonly projectId: ProjectId;
+    readonly leaseId: LeaseId;
+    readonly states?: ReadonlySet<ChangeState>;
+    readonly command: string;
+  },
+  now: Instant,
+): Result.Result<HeldWorkspace, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
+  if (!isOwnAgent(store, change, use)) return Result.fail(notFound(change.id));
+  const held = heldWorkspace(store, change.id);
+  if (TERMINAL.has(change.state)) return Result.fail(refused(change, use.command));
+  const lease = checkLease(change, use.leaseId, now);
+  if (Result.isFailure(lease)) return Result.fail(lease.failure);
+  if (held === undefined || (use.states !== undefined && !use.states.has(change.state)))
+    return Result.fail(refused(change, use.command));
+  return Result.succeed(held);
+};
+
+const madeCommit = (store: Store, changeId: ChangeId, idempotencyKey: string) => {
+  const value = store.get(CHANGE_COMMIT, `${changeId}/${idempotencyKey}`);
+  return value === undefined ? undefined : decodeMadeCommit(value);
+};
+
+/** A commit call's fingerprint, each edit's content by its hash. */
+const commitFingerprint = (command: CommitEdits): string =>
+  fingerprintOf("commit", {
+    ...command,
+    edits: command.edits.map((edit) =>
+      "delete" in edit
+        ? edit
+        : {
+            path: edit.path,
+            content: sha256HexOfBytes(edit.content),
+            executable: edit.executable,
+          },
+    ),
+  });
+
+/**
+ * Commits an agent's edits in its change's workspace, with no clone. Any
+ * caller but the change's own agent reads the change as not found. A call
+ * whose key already made a commit answers that commit, or is refused if its
+ * edits differ. Otherwise the change is checked first (`mayUseWorkspace`), so
+ * a refused call writes nothing; then the writer applies the edits to
+ * `parent` and pushes one commit with `expectedHead` as the old value. The
+ * DO takes other requests while the writer pushes, so the change is checked
+ * again in the transaction that records the commit and renews the lease
+ * (state, not an event: the commit itself is seen as the workspace's push).
+ * Only the change's own workspace is written, never trunk.
  */
 export const commitEdits: (
   changeId: ChangeId,
@@ -1293,6 +1387,7 @@ export const commitEdits: (
   | ChangeNotFound
   | LeaseStale
   | ChangeStateRefused
+  | IdempotencyConflict
   | CommitParentRefused
   | WorkspaceHeadMoved
   | EditsRefused
@@ -1300,12 +1395,32 @@ export const commitEdits: (
   | PackTooLarge,
   Clock | EntityStore | EventOutbox | WorkspaceWriter
 > = Effect.fn("coordination/commitEdits")(function* (changeId: ChangeId, command: CommitEdits) {
+  const fingerprint = commitFingerprint(command);
+  const conflict = new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
+  const answer = (made: MadeCommit) =>
+    Effect.map(getChange(changeId), (change) => ({
+      change,
+      commit: { commitSha: made.commitSha, tree: made.tree, changed: made.changed },
+      parent: made.parent,
+    }));
+  const store = yield* EntityStore;
   const change = yield* getChange(changeId);
-  const held = heldWorkspace(yield* EntityStore, changeId);
-  if (held === undefined || !COMMITTABLE.has(change.state)) return yield* refused(change, "commit");
+  if (!isOwnAgent(store, change, command)) return yield* notFound(changeId);
+  const prior = madeCommit(store, changeId, command.idempotencyKey);
+  if (prior !== undefined)
+    return yield* prior.fingerprint === fingerprint ? answer(prior) : Effect.fail(conflict);
+
+  const use = {
+    agentId: command.agentId,
+    projectId: command.projectId,
+    leaseId: command.leaseId,
+    states: COMMITTABLE,
+    command: "commit",
+  };
   const now = yield* (yield* Clock).now;
-  const lease = checkLease(change, command.leaseId, now);
-  if (Result.isFailure(lease)) return yield* Effect.fail(lease.failure);
+  const allowed = mayUseWorkspace(store, change, use, now);
+  if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+  const held = allowed.success;
   const parent = command.parent ?? command.expectedHead;
   if (parent !== command.expectedHead && parent !== change.baseSha)
     return yield* Effect.fail(
@@ -1330,21 +1445,74 @@ export const commitEdits: (
       at: now,
     })
     .pipe(Effect.catchTag("RepoNotFound", Effect.die));
-  const renewed = yield* commit(
+  const committed = yield* commit(
     {
       entity: changeRef(changeId),
-      cause: `${command.idempotencyKey}:${made.commitSha}`,
+      cause: `commit:${command.idempotencyKey}`,
+      fingerprint,
       ...byAgent(command.agentId, command.run),
       project: held.projectId,
     },
-    (tx) =>
-      Result.map(transition(tx, changeId, ["ChangeNotFound"], [], command.leaseId), asTransition),
+    (
+      tx,
+    ): Result.Result<
+      Transition<MadeCommit>,
+      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+    > => {
+      const raced = madeCommit(tx.store, changeId, command.idempotencyKey);
+      if (raced !== undefined)
+        return raced.fingerprint === fingerprint
+          ? Result.succeed({ drafts: [], value: raced })
+          : Result.fail(conflict);
+      const stored = storedChange(tx.store, changeId);
+      if (stored === undefined) throw new Error(`${changeId} has no state after its commit`);
+      const again = mayUseWorkspace(tx.store, stored, use, tx.at);
+      if (Result.isFailure(again)) return Result.fail(again.failure);
+      const renewed = renew(stored, command.leaseId, tx.at);
+      if (Result.isFailure(renewed)) return Result.fail(renewed.failure);
+      const record: MadeCommit = { fingerprint, ...made, parent };
+      tx.store.put(CHANGE_COMMIT, `${changeId}/${command.idempotencyKey}`, asStored(record));
+      tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));
+      return Result.succeed({ drafts: [], value: record });
+    },
   );
-  return {
-    change: renewed.duplicate ? yield* getChange(changeId) : renewed.value,
-    commit: made,
-    parent,
-  };
+  // A commit appends no event, so the outbox never holds its cause.
+  if (committed.duplicate)
+    return yield* Effect.die(new Error(`commit:${command.idempotencyKey} has events`));
+  return yield* answer(committed.value);
+});
+
+/**
+ * A fresh token for the workspace the change holds, for its own agent under
+ * its current lease, in any state before the change ends (`mayUseWorkspace`):
+ * the same workspace, a new two-hour token, and no event. A retry mints
+ * again; nothing is stored. An ended change never reaches the pool, which
+ * would grant a holder without a workspace a new one.
+ */
+export const refreshWorkspace: (
+  changeId: ChangeId,
+  command: RefreshWorkspace,
+) => Effect.Effect<
+  WorkspaceGrant,
+  ChangeNotFound | LeaseStale | ChangeStateRefused,
+  Clock | EntityStore | WorkspacePool
+> = Effect.fn("coordination/refreshWorkspace")(function* (
+  changeId: ChangeId,
+  command: RefreshWorkspace,
+) {
+  const change = yield* getChange(changeId);
+  const now = yield* (yield* Clock).now;
+  const allowed = mayUseWorkspace(
+    yield* EntityStore,
+    change,
+    { ...command, command: "refresh" },
+    now,
+  );
+  if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+  // The pool finds the workspace this change holds and only mints a token: it cannot run out.
+  return yield* (yield* WorkspacePool)
+    .grant(allowed.success.projectId, changeId)
+    .pipe(Effect.orDie);
 });
 
 /**

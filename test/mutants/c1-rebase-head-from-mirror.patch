@@ -4,15 +4,15 @@
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -30,6 +30,7 @@
-   subjectAncestors,
+@@ -34,6 +34,7 @@
+   TERMINAL,
  } from "../../domain/coordination/index.ts";
  import { IdempotencyConflict } from "../../domain/identity/index.ts";
 +import { projectRepos } from "../integration/project-repos.ts";
  import {
    BatchFailed,
    BatchFormed,
-@@ -1073,7 +1074,9 @@
+@@ -1257,7 +1258,9 @@
    const held = heldWorkspace(yield* EntityStore, changeId);
    if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
    const from = change.baseSha;

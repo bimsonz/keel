@@ -437,19 +437,42 @@ const memoryReader = (repo: MemoryRepo) => {
   };
 };
 
+/** A promise, and what settles it from outside. */
+function settleable(): { readonly promise: Promise<void>; readonly settle: () => void } {
+  const settlers: (() => void)[] = [];
+  const promise = new Promise<void>((resolve) => {
+    settlers.push(resolve);
+  });
+  return {
+    promise,
+    settle: () => {
+      for (const settle of settlers) settle();
+    },
+  };
+}
+
 /**
  * WorkspaceWriter over a memory code host: the edits are applied to the
  * parent's tree with gitcore, as the real writer does, and the workspace's
  * main moves only if it is at `expectedHead`. A main elsewhere is
  * WorkspaceHeadMoved, unless it already holds this commit's tree on this
- * parent (a retry). `committed` records each commit in order.
+ * parent (a retry). `committed` records each commit in order. `holdNext`
+ * holds the next commit after main moves and before it answers, as a slow
+ * push holds its caller: `held` settles once it is held, `release` lets it go.
  */
 export function makeWorkspaceWriterMemory(
   code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
 ) {
   const committed: { readonly workspace: RepoRef; readonly commit: CommitSha }[] = [];
+  let hold: { readonly reached: () => void; readonly released: Promise<void> } | undefined;
   return {
     committed,
+    holdNext: () => {
+      const held = settleable();
+      const released = settleable();
+      hold = { reached: held.settle, released: released.promise };
+      return { held: held.promise, release: released.settle };
+    },
     layer: Layer.succeed(
       WorkspaceWriter,
       WorkspaceWriter.of({
@@ -506,6 +529,12 @@ export function makeWorkspaceWriterMemory(
             target.objects.set(sha, { type: "commit", body });
             target.refs.set(WORKSPACE_BRANCH, sha);
             committed.push({ workspace, commit: sha });
+            const holding = hold;
+            hold = undefined;
+            if (holding !== undefined) {
+              holding.reached();
+              yield* Effect.promise(() => holding.released);
+            }
             return answer;
           }),
       }),

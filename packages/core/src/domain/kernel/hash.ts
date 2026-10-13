@@ -70,15 +70,17 @@ const utf8 = (input: string): number[] => {
   return out;
 };
 
-export const sha256Hex = (input: string): string => {
-  const bytes = utf8(input);
-  const bitLength = bytes.length * 8;
-  bytes.push(0x80);
-  while (bytes.length % 64 !== 56) bytes.push(0);
+/** SHA-256 of `input`, in hex. */
+export const sha256HexOfBytes = (input: Uint8Array): string => {
+  const bitLength = input.length * 8;
+  const bytes = new Uint8Array(Math.ceil((input.length + 9) / 64) * 64);
+  bytes.set(input);
+  bytes[input.length] = 0x80;
   const high = Math.floor(bitLength / 0x100000000);
   const low = bitLength >>> 0;
-  for (const word of [high, low])
-    bytes.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
+  for (const [i, word] of [high, low].entries())
+    for (let b = 0; b < 4; b++)
+      bytes[bytes.length - 8 + i * 4 + b] = (word >>> (24 - b * 8)) & 0xff;
 
   const h = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -119,6 +121,9 @@ export const sha256Hex = (input: string): string => {
   }
   return h.map((x) => x.toString(16).padStart(8, "0")).join("");
 };
+
+/** SHA-256 of `input`'s UTF-8, in hex. */
+export const sha256Hex = (input: string): string => sha256HexOfBytes(Uint8Array.from(utf8(input)));
 
 /** The content address of a JSON value: SHA-256 over its canonical form. */
 export const contentHashOf = (value: Json): ContentHash =>

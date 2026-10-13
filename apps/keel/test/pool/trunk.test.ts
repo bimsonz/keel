@@ -337,6 +337,7 @@ async function promoting(placed?: { readonly org: NamespaceId; readonly history:
         adopt: () => Effect.die(new Error("the Lane never adopts")),
         rebase: () => Effect.die(new Error("the Lane never rebases")),
         commit: () => Effect.die(new Error("the Lane never commits")),
+        refreshWorkspace: () => Effect.die(new Error("the Lane never refreshes a workspace")),
         revise: () => Effect.die(new Error("the Lane never revises")),
         rely: () => Effect.die(new Error("the Lane never relies")),
         nearby: () => Effect.die(new Error("the Lane never reads nearby")),

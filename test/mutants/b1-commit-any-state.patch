@@ -2,15 +2,13 @@
 # kills: commit.state
 # why: A submitted change takes commits
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 9b15cd9d..dbdac0a3 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1280,7 +1280,7 @@ export const commitEdits: (
- > = Effect.fn("coordination/commitEdits")(function* (changeId: ChangeId, command: CommitEdits) {
-   const change = yield* getChange(changeId);
-   const held = heldWorkspace(yield* EntityStore, changeId);
--  if (held === undefined || !COMMITTABLE.has(change.state)) return yield* refused(change, "commit");
-+  if (held === undefined ) return yield* refused(change, "commit");
+@@ -1395,7 +1395,6 @@
+     agentId: command.agentId,
+     projectId: command.projectId,
+     leaseId: command.leaseId,
+-    states: COMMITTABLE,
+     command: "commit",
+   };
    const now = yield* (yield* Clock).now;
-   const lease = checkLease(change, command.leaseId, now);
-   if (Result.isFailure(lease)) return yield* Effect.fail(lease.failure);

@@ -146,10 +146,10 @@ export const ROUTES = {
     path: "/changes/{changeId}/commits",
     headers: ["keel-lease", "idempotency-key"],
   },
-  Workspaces_refreshWorkspaceToken: {
+  refreshWorkspaceToken: {
     method: "POST",
     path: "/workspaces/{workspaceId}/token",
-    headers: ["idempotency-key"],
+    headers: ["keel-lease", "idempotency-key"],
   },
   Conflicts_listConflicts: {
     method: "GET",

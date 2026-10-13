@@ -209,6 +209,7 @@ union ProblemCode {
   changeStateRefused: "change.state_refused",
   changeRevisionMismatch: "change.revision_mismatch",
   changeCommitNotInWorkspace: "change.commit_not_in_workspace",
+  workspaceNotFound: "workspace.not_found",
   workspacePoolExhausted: "workspace.pool_exhausted",
   workspaceBusy: "workspace.busy",
   workspacePackTooLarge: "workspace.pack_too_large",

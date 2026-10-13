@@ -99,6 +99,8 @@ export const CommitEdit = Schema.Union([
 /** Commit edits in the change's workspace under its lease, with no clone. */
 export const CommitCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   /** The agent's handle, which authors the commit. */
@@ -111,6 +113,18 @@ export const CommitCommand = Schema.Struct({
   idempotencyKey: Schema.String,
 });
 export type CommitCommand = typeof CommitCommand.Type;
+
+/**
+ * A fresh token for the workspace the change holds, for its own agent under
+ * its lease. `projectId` is the caller's, from its token: another agent's
+ * change, or one of another project, reads as not found.
+ */
+export const RefreshCommand = Schema.Struct({
+  agentId: AgentId,
+  projectId: ProjectId,
+  leaseId: LeaseId,
+});
+export type RefreshCommand = typeof RefreshCommand.Type;
 
 /** The WorkspaceWriter port's errors, by shape (rule R15). */
 export const WorkspaceHeadMoved = Schema.TaggedStruct("WorkspaceHeadMoved", {
@@ -386,12 +400,18 @@ export const ChangeCodecs = {
       ChangeNotFound,
       LeaseStale,
       ChangeStateRefused,
+      IdempotencyConflict,
       CommitParentRefused,
       WorkspaceHeadMoved,
       EditsRefused,
       ObjectNotFound,
       PackTooLarge,
     ]),
+  ),
+  // The same workspace with a fresh token; an ended change never reaches the pool.
+  refreshWorkspace: exitCodec(
+    WorkspaceGrant,
+    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused]),
   ),
   // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(
@@ -432,6 +452,8 @@ export interface ChangeRpc extends EventReceiverRpc {
   rebase(command: typeof RebaseCommand.Encoded): Promise<ExitJson>;
   /** Commits edits in the workspace under the lease: one commit on the head, never trunk. */
   commit(command: typeof CommitCommand.Encoded): Promise<ExitJson>;
+  /** A fresh token for the workspace the change holds, for its own agent under its lease. */
+  refreshWorkspace(command: typeof RefreshCommand.Encoded): Promise<ExitJson>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<ExitJson>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<ExitJson>;
   /**

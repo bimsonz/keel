@@ -50,6 +50,7 @@ const TITLES: Record<ProblemCode, string> = {
   "change.state_refused": "The change's state does not allow this",
   "change.revision_mismatch": "The change moved past the revision you last read",
   "change.commit_not_in_workspace": "The commit is not in the change's workspace",
+  "workspace.not_found": "You hold no such workspace",
   "workspace.pool_exhausted": "No workspace is ready yet",
   "workspace.busy": "The change's workspace was busy, so nothing moved",
   "workspace.pack_too_large": "What the workspace needs from trunk is over the relay limit",

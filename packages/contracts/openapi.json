@@ -9011,12 +9011,15 @@
     },
     "/workspaces/{workspaceId}/token": {
       "post": {
-        "operationId": "Workspaces_refreshWorkspaceToken",
+        "operationId": "refreshWorkspaceToken",
         "summary": "Refresh a workspace token",
-        "description": "Mint a fresh write token for the workspace.",
+        "description": "Your workspace token from `declare` or `adopt` is about to expire, or has: get a fresh\ntwo-hour write token for the same workspace. Only the change's own agent may, under the\nchange's current lease, while the change holds the workspace. Another agent's workspace, or\none Keel does not know, is 404 `workspace.not_found`; a stale or lapsed lease is 409\n`change.lease_stale`; a change that has ended is 409 `change.state_refused` (404 once its\nworkspace is collected). Each call mints a new token, and nothing else moves.",
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkspacePath"
+          },
+          {
+            "$ref": "#/components/parameters/LeaseHeader"
           },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -9065,6 +9068,16 @@
           },
           "404": {
             "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9123,7 +9136,8 @@
           }
         },
         "tags": [
-          "Workspaces"
+          "Workspaces",
+          "mcp"
         ],
         "security": [
           {
@@ -18638,6 +18652,7 @@
           "change.state_refused",
           "change.revision_mismatch",
           "change.commit_not_in_workspace",
+          "workspace.not_found",
           "workspace.pool_exhausted",
           "workspace.busy",
           "workspace.pack_too_large",
@@ -21869,7 +21884,8 @@
         "required": [
           "id",
           "remote",
-          "expiresAt"
+          "expiresAt",
+          "baseSha"
         ],
         "properties": {
           "id": {
@@ -21886,6 +21902,14 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "baseSha": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit the workspace's `main` was at when it was granted: the first\n`expectedHead` of a `commit`, and the change's base until it rebases."
           }
         },
         "additionalProperties": {

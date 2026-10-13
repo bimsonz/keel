@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: commit.replay
+# why: Nothing remembers what a key committed, so a retry after the workspace moved on is refused as a moved head
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1465,7 +1465,6 @@
+       const renewed = renew(stored, command.leaseId, tx.at);
+       if (Result.isFailure(renewed)) return Result.fail(renewed.failure);
+       const record: MadeCommit = { fingerprint, ...made, parent };
+-      tx.store.put(CHANGE_COMMIT, `${changeId}/${command.idempotencyKey}`, asStored(record));
+       tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));
+       return Result.succeed({ drafts: [], value: record });
+     },

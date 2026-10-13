@@ -13,6 +13,7 @@ import {
   type Preflight,
   type RevisionMismatch,
   type SketchNotFound,
+  WorkspaceNotFound,
 } from "../../domain/coordination/index.ts";
 import type {
   Audience,
@@ -60,6 +61,8 @@ import {
   type RulingRefusal,
   type SubmissionStatus,
   type ViewSnapshot,
+  type WorkspaceGrant,
+  WorkspacePool,
 } from "../ports/index.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
 import type {
@@ -88,6 +91,7 @@ import type {
   ReviseInput,
   Revised,
   SubmitInput,
+  WorkspaceTokenInput,
 } from "./index.ts";
 import { audienceOf, type FeedScope, type ProjectScope } from "./read-scope.ts";
 
@@ -193,6 +197,7 @@ export const commitChange: (
   | ChangeNotFound
   | LeaseStale
   | ChangeStateRefused
+  | IdempotencyConflict
   | CommitParentRefused
   | WorkspaceHeadMoved
   | EditsRefused
@@ -200,6 +205,33 @@ export const commitChange: (
   | PackTooLarge,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.commit(principal, input));
+
+const isChangeId = Schema.is(ChangeId);
+
+/**
+ * A fresh token for a workspace, for the agent whose change holds it: the
+ * project's pool names the holder, then the Change DO checks the agent, the
+ * lease and the state. A workspace no change holds (a sketch's, a ready or
+ * collected one, an unknown one) and another agent's both read as not found.
+ */
+export const refreshWorkspaceToken = (
+  principal: AgentToken,
+  input: WorkspaceTokenInput,
+): Effect.Effect<
+  WorkspaceGrant,
+  WorkspaceNotFound | LeaseStale | ChangeStateRefused,
+  Changes | WorkspacePool
+> =>
+  Effect.gen(function* () {
+    const notFound = new WorkspaceNotFound({ workspaceId: input.workspaceId });
+    const holder = yield* WorkspacePool.use((pool) =>
+      pool.holder(principal.projectId, input.workspaceId),
+    );
+    if (holder === undefined || !isChangeId(holder)) return yield* Effect.fail(notFound);
+    return yield* Changes.use((changes) =>
+      changes.refreshWorkspace(principal, { changeId: holder, lease: input.lease }),
+    ).pipe(Effect.catchTag("ChangeNotFound", () => Effect.fail(notFound)));
+  });
 
 /** Revises a change's intent at the revision the caller last read. The Change DO checks the lease and the revision. */
 export const reviseChange: (

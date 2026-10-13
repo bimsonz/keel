@@ -31,6 +31,7 @@ import type {
   Lanes,
   Trunks,
   Users,
+  WorkspacePool,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
 import {
@@ -81,7 +82,8 @@ export type IsolateServices =
   | Trunks
   | Lanes
   | OrgUsage
-  | RepoServer;
+  | RepoServer
+  | WorkspacePool;
 
 /**
  * Whether what a request died of is the database being away for a moment.

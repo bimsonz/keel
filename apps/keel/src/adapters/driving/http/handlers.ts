@@ -4,6 +4,7 @@ import {
   adoptChange,
   rebaseChange,
   commitChange,
+  refreshWorkspaceToken,
   declareChange,
   getSettings,
   nearbyOf,
@@ -201,6 +202,9 @@ import {
   commitInput,
   committedOk,
   commitEditsError,
+  refreshInput,
+  refreshedOk,
+  refreshError,
   submitOk,
 } from "./work-loop.ts";
 
@@ -785,7 +789,20 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             ),
           );
         },
-        Workspaces_refreshWorkspaceToken: notYet,
+        refreshWorkspaceToken: (caller: Caller, input: Input<"refreshWorkspaceToken">) => {
+          const decoded = refreshInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => refreshWorkspaceToken(principal, decoded.success)),
+              Effect.match({
+                onSuccess: refreshedOk,
+                onFailure: (error) => refreshError(caller, error),
+              }),
+            ),
+          );
+        },
         submit: (caller: Caller, input: Input<"submit">) => {
           const decoded = submitInput(input);
           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

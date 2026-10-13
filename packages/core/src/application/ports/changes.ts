@@ -35,12 +35,14 @@ import type {
   CommittedChange,
   RebasedChange,
   RebaseInput,
+  RefreshInput,
   RelyInput,
   ReviseInput,
   Revised,
   SubmitInput,
 } from "../coordination/index.ts";
 import type { ObjectNotFound, RepoRef } from "./code-host.ts";
+import type { WorkspaceGrant } from "./workspace-pool.ts";
 import type { EditsRefused, WorkspaceHeadMoved } from "./workspace-writer.ts";
 
 /** What a bounce asked of the agent, verbatim: its cause (a verdict or a conflict), its reasons and its next actions. */
@@ -144,8 +146,10 @@ export class Changes extends Context.Service<
      * `expectedHead` as the old value, and the lease renewed. Working or
      * Bounced, under the lease. WorkspaceHeadMoved: the workspace moved since
      * the agent read it; EditsRefused: the edits cannot apply; ObjectNotFound:
-     * the workspace lacks the parent. A retry whose commit already sits at the
-     * head answers that commit.
+     * the workspace lacks the parent. Only the change's own agent, in its
+     * project, may: any other reads the change as not found. A retry with the
+     * same key answers the first commit; the same key with other edits is
+     * IdempotencyConflict.
      */
     readonly commit: (
       principal: AgentToken,
@@ -155,12 +159,22 @@ export class Changes extends Context.Service<
       | ChangeNotFound
       | LeaseStale
       | ChangeStateRefused
+      | IdempotencyConflict
       | CommitParentRefused
       | WorkspaceHeadMoved
       | EditsRefused
       | ObjectNotFound
       | PackTooLarge
     >;
+    /**
+     * A fresh two-hour token for the workspace the change holds, for its own
+     * agent under its lease, in any state before the change ends. Any other
+     * caller reads the change as not found. Commits nothing.
+     */
+    readonly refreshWorkspace: (
+      principal: AgentToken,
+      input: RefreshInput,
+    ) => Effect.Effect<WorkspaceGrant, ChangeNotFound | LeaseStale | ChangeStateRefused>;
     /**
      * Revises the intent under the lease, at the revision the caller last read
      * (RevisionMismatch otherwise), and answers the preflight of the intent it

@@ -15,6 +15,7 @@ import {
   type DescribeSession,
   NearbyCommand,
   RebaseCommand,
+  RefreshCommand,
   RelyCommand,
   ReviseCommand,
   AgentSessionCodecs,
@@ -40,6 +41,7 @@ export interface ChangeStub {
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
   rebase(command: typeof RebaseCommand.Encoded): Promise<unknown>;
   commit(command: typeof CommitCommand.Encoded): Promise<unknown>;
+  refreshWorkspace(command: typeof RefreshCommand.Encoded): Promise<unknown>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
@@ -67,6 +69,7 @@ const encodeSubmit = Schema.encodeSync(SubmitCommand);
 const encodeAdopt = Schema.encodeSync(AdoptCommand);
 const encodeRebase = Schema.encodeSync(RebaseCommand);
 const encodeCommit = Schema.encodeSync(CommitCommand);
+const encodeRefresh = Schema.encodeSync(RefreshCommand);
 const encodeRevise = Schema.encodeSync(ReviseCommand);
 const encodeRely = Schema.encodeSync(RelyCommand);
 const encodeNearby = Schema.encodeSync(NearbyCommand);
@@ -171,6 +174,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).commit(
             encodeCommit({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               ...(principal.handle === undefined ? {} : { handle: principal.handle }),
               leaseId: input.lease,
@@ -200,6 +204,16 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
             EditsRefused: (e) => Effect.fail(new EditsRefused({ reason: e.reason, path: e.path })),
             ObjectNotFound: (e) => Effect.fail(new ObjectNotFound({ repo: e.repo, oid: e.oid })),
           }),
+        ),
+      refreshWorkspace: (principal, input) =>
+        callObject(ChangeCodecs.refreshWorkspace, () =>
+          objects.change(input.changeId).refreshWorkspace(
+            encodeRefresh({
+              agentId: principal.agentId,
+              projectId: principal.projectId,
+              leaseId: input.lease,
+            }),
+          ),
         ),
       revise: (principal, input) =>
         callObject(ChangeCodecs.revise, () =>

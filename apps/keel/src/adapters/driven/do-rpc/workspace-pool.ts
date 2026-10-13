@@ -34,6 +34,10 @@ export function WorkspacePoolRpc(
         call(WorkspacePoolCodecs.release, () => pool(projectId).release(workspaceId, reason)).pipe(
           Effect.orDie,
         ),
+      holder: (projectId, workspaceId) =>
+        call(WorkspacePoolCodecs.holder, () => pool(projectId).holder(workspaceId)).pipe(
+          Effect.map((holder) => holder ?? undefined),
+        ),
       configure: (projectId, config) =>
         call(WorkspacePoolCodecs.configure, () => pool(projectId).configure(config)).pipe(
           Effect.asVoid,

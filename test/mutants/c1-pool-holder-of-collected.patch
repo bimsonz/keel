@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t pool.holder
+# kills: pool.holder
+# why: A workspace's holder is read whatever its state, so a collected workspace still names the change that ended, and a refresh would reach it
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -401,7 +401,7 @@
+  */
+ export const holderOf = Effect.fn("coordination/holderOf")(function* (workspaceId: WorkspaceId) {
+   const slot = slotOf(yield* EntityStore, workspaceId);
+-  return slot?.state === "granted" && slot.holder !== undefined
++  return slot !== undefined && slot.holder !== undefined
+     ? decodeHolder(slot.holder)
+     : undefined;
+ });

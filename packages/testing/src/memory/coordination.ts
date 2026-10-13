@@ -1,5 +1,6 @@
 import type {
   CommitInput,
+  CommittedChange,
   LeasedCall,
   RebasedChange,
   Revised,
@@ -12,6 +13,7 @@ import {
   ChangeNotFound,
   type ChangeState,
   ChangeStateRefused,
+  checkLease,
   CommitNotInWorkspace,
   isLapsed,
   LeaseNotLapsed,
@@ -26,14 +28,16 @@ import {
   type SubjectKey,
   TERMINAL,
 } from "@keeltown/core/domain/coordination";
-import { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { type AgentToken, IdempotencyConflict } from "@keeltown/core/domain/identity";
 import {
   type AgentId,
   type ChangeId,
   CommitSha,
   Instant,
+  type LeaseId,
   makeId,
   type ProjectId,
+  type SketchId,
   type WorkspaceId,
 } from "@keeltown/core/kernel";
 import {
@@ -51,7 +55,7 @@ import {
   type WorkspaceGrant,
   WorkspacePool,
 } from "@keeltown/core/ports";
-import { Duration, Clock as EffectClock, Effect, Layer, Option } from "effect";
+import { Duration, Clock as EffectClock, Effect, Layer, Option, Result } from "effect";
 
 const MEMORY_BASE = CommitSha.make("0".repeat(40));
 /** What a rebase answers: the change on its base, and the workspace branch holding it. */
@@ -94,7 +98,7 @@ export function makeWorkspacePoolMemory(
 ) {
   const capacity = options.capacity ?? Number.POSITIVE_INFINITY;
   const baseSha = options.baseSha ?? MEMORY_BASE;
-  const granted = new Map<WorkspaceId, string>();
+  const granted = new Map<WorkspaceId, ChangeId | SketchId>();
   const released = new Map<WorkspaceId, string>();
   const configured = new Map<ProjectId, PoolConfig>();
   /** Each push recorded, by its push id. */
@@ -133,6 +137,7 @@ export function makeWorkspacePoolMemory(
           Effect.sync(() => {
             if (granted.delete(workspaceId)) released.set(workspaceId, reason);
           }),
+        holder: (_projectId, workspaceId) => Effect.sync(() => granted.get(workspaceId)),
         configure: (projectId, config) =>
           Effect.sync(() => {
             configured.set(projectId, config);
@@ -249,12 +254,26 @@ function makeWaiters<K>() {
  * only a commit `push`ed to the change's workspace. `abandon` withdraws it
  * under its lease or as a maintainer of its project (another project's is
  * ChangeNotFound), refused once it has ended or while it is integrating, as
- * the Change machine refuses it. `awaitSubmission` waits
- * for `settle` (or a submit) to move the change, up to its deadline.
+ * the Change machine refuses it. `commit` and `refreshWorkspace` serve only
+ * the change's own agent in its project (any other reads the change as not
+ * found), then refuse an ended change, then a stale or lapsed lease, as the
+ * Change DO does; a commit replays by its key and renews the lease, and a
+ * refresh mints a two-hour token for the same workspace. `awaitSubmission`
+ * waits for `settle` (or a submit) to move the change, up to its deadline.
  * `capacity` bounds the workspaces it will grant.
  */
 /** The project every in-memory change's workspace belongs to, unless a test names another. */
 const MEMORY_PROJECT = makeId("prj", "00000000000000000000000000");
+
+/** A change's workspace as the in-memory `Changes` hands it out, with `token`. */
+const handout = (workspaceId: WorkspaceId, token: string, expiresAt: Instant): WorkspaceGrant => ({
+  workspaceId,
+  remote: `https://artifacts.invalid/${workspaceId}.git`,
+  token,
+  expiresAt,
+  baseSha: MEMORY_BASE,
+  repo: { namespace: "memory", name: workspaceId },
+});
 
 export function makeChangesMemory(
   options: {
@@ -269,6 +288,11 @@ export function makeChangesMemory(
   const commits = new Map<ChangeId, CommitSha>();
   /** Each commit made through `commit`, in order: what a test reads back. */
   const committedEdits: { readonly changeId: ChangeId; readonly input: CommitInput }[] = [];
+  /** A commit replays by its key per change; the same key with another call is a conflict. */
+  const madeCommits = new Map<
+    string,
+    { readonly fingerprint: string; readonly answer: Omit<CommittedChange, "change"> }
+  >();
   const workspaces = new Map<ChangeId, WorkspaceId>();
   const pushed = new Map<WorkspaceId, Set<string>>();
   const reservations = new Map<
@@ -326,15 +350,49 @@ export function makeChangesMemory(
     const workspaceId = workspaces.get(changeId) ?? makeId("wsp", sequentialId((sequence += 1)));
     workspaces.set(changeId, workspaceId);
     tokens += 1;
-    return {
-      workspaceId,
-      remote: `https://artifacts.invalid/${workspaceId}.git`,
-      token: `memory-token-${tokens}`,
-      expiresAt: Instant(now + 3_600_000),
-      baseSha: MEMORY_BASE,
-      repo: { namespace: "memory", name: workspaceId },
-    };
+    return handout(workspaceId, `memory-token-${tokens}`, Instant(now + 3_600_000));
   };
+  /**
+   * Whether the caller may use the change's workspace, in the Change DO's
+   * order: only its own agent, in its project, may (any other reads it as not
+   * found); then an ended change is refused, then a stale or lapsed lease,
+   * then a change in a state outside `states` or holding no workspace.
+   */
+  /** The change, if `principal` is its own agent in its project: any other caller reads it as not found. */
+  const ownChange = (principal: AgentToken, changeId: ChangeId) =>
+    Effect.gen(function* () {
+      const change = changes.get(changeId);
+      if (
+        change === undefined ||
+        change.agentId !== principal.agentId ||
+        (workspaces.has(changeId) && projects.get(changeId) !== principal.projectId)
+      )
+        return yield* new ChangeNotFound({ changeId });
+      return change;
+    });
+  const mayUseWorkspace = (
+    principal: AgentToken,
+    changeId: ChangeId,
+    leaseId: LeaseId,
+    command: string,
+    states?: ReadonlySet<ChangeState>,
+  ) =>
+    Effect.gen(function* () {
+      const now = Instant(yield* EffectClock.currentTimeMillis);
+      const change = yield* ownChange(principal, changeId);
+      const workspaceId = workspaces.get(changeId);
+      const refused = new ChangeStateRefused({ changeId, state: change.state, command });
+      if (TERMINAL.has(change.state)) return yield* refused;
+      // A test's `lapse` stands for the deadline passing, which the lease reads as lapsed.
+      const leased: Change = lapsed.has(changeId)
+        ? { ...change, lease: { ...change.lease, state: "lapsed" } }
+        : change;
+      const lease = checkLease(leased, leaseId, now);
+      if (Result.isFailure(lease)) return yield* lease.failure;
+      if (workspaceId === undefined || (states !== undefined && !states.has(change.state)))
+        return yield* refused;
+      return { change, workspaceId, now };
+    });
   const status = (change: Change): SubmissionStatus => ({
     change,
     commitSha: commits.get(change.id) ?? null,
@@ -567,19 +625,29 @@ export function makeChangesMemory(
               projectId: options.projectId ?? MEMORY_PROJECT,
             };
           }),
-        commit: (_principal, input) =>
+        commit: (principal, input) =>
           Effect.gen(function* () {
-            const change = changes.get(input.changeId);
-            if (change === undefined)
-              return yield* new ChangeNotFound({ changeId: input.changeId });
-            if (change.lease.id !== input.lease || change.lease.state !== "active")
-              return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
-            if (!REBASABLE.has(change.state))
-              return yield* new ChangeStateRefused({
-                changeId: change.id,
-                state: change.state,
-                command: "commit",
-              });
+            const key = `${input.changeId} ${input.idempotencyKey}`;
+            const { idempotencyKey: _key, ...call } = input;
+            const { agentId, projectId, run, handle } = principal;
+            const fingerprint = JSON.stringify(
+              { agentId, projectId, run, handle, ...call },
+              (_field, value: unknown) => (value instanceof Uint8Array ? [...value] : value),
+            );
+            const own = yield* ownChange(principal, input.changeId);
+            const made = madeCommits.get(key);
+            if (made !== undefined) {
+              if (made.fingerprint !== fingerprint)
+                return yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
+              return { change: own, ...made.answer };
+            }
+            const { change, now } = yield* mayUseWorkspace(
+              principal,
+              input.changeId,
+              input.lease,
+              "commit",
+              REBASABLE,
+            );
             const parent = input.parent ?? input.expectedHead;
             if (parent !== input.expectedHead && parent !== change.baseSha)
               return yield* new CommitParentRefused({
@@ -590,11 +658,25 @@ export function makeChangesMemory(
               });
             committedEdits.push({ changeId: change.id, input });
             const commitSha = CommitSha.make(committedEdits.length.toString(16).padStart(40, "c"));
-            return {
-              change,
+            const renewed: Change = { ...change, lease: { ...change.lease, renewedAt: now } };
+            changes.set(change.id, renewed);
+            const answer = {
               commit: { commitSha, tree: "d".repeat(40), changed: input.edits.length },
               parent,
             };
+            madeCommits.set(key, { fingerprint, answer });
+            return { change: renewed, ...answer };
+          }),
+        refreshWorkspace: (principal, input) =>
+          Effect.gen(function* () {
+            const { workspaceId, now } = yield* mayUseWorkspace(
+              principal,
+              input.changeId,
+              input.lease,
+              "refresh",
+            );
+            tokens += 1;
+            return handout(workspaceId, `memws_${tokens}`, Instant(now + 7_200_000));
           }),
         rebase: (_principal, input) =>
           Effect.gen(function* () {

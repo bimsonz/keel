@@ -2,15 +2,13 @@
 # kills: commit.writes
 # why: A written commit leaves the lease as it was
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 9b15cd9d..e95596a1 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1307,7 +1307,7 @@ export const commitEdits: (
-       project: held.projectId,
+@@ -1453,7 +1453,6 @@
+       if (Result.isFailure(renewed)) return Result.fail(renewed.failure);
+       const record: MadeCommit = { fingerprint, ...made, parent };
+       tx.store.put(CHANGE_COMMIT, `${changeId}/${command.idempotencyKey}`, asStored(record));
+-      tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));
+       return Result.succeed({ drafts: [], value: record });
      },
-     (tx) =>
--      Result.map(transition(tx, changeId, ["ChangeNotFound"], [], command.leaseId), asTransition),
-+      Result.map(transition(tx, changeId, ["ChangeNotFound"], []), asTransition),
    );
-   return {
-     change: renewed.duplicate ? yield* getChange(changeId) : renewed.value,

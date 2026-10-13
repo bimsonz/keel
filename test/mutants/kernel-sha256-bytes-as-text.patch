@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.sha256-bytes
+# why: Bytes are hashed as the text they decode to, so contents that are not UTF-8 hash alike
+diff --git a/packages/core/src/domain/kernel/hash.ts b/packages/core/src/domain/kernel/hash.ts
+--- a/packages/core/src/domain/kernel/hash.ts
++++ b/packages/core/src/domain/kernel/hash.ts
+@@ -71,7 +71,8 @@
+ };
+ 
+ /** SHA-256 of `input`, in hex. */
+-export const sha256HexOfBytes = (input: Uint8Array): string => {
++export const sha256HexOfBytes = (raw: Uint8Array): string => {
++  const input = Uint8Array.from(utf8(new TextDecoder().decode(raw)));
+   const bitLength = input.length * 8;
+   const bytes = new Uint8Array(Math.ceil((input.length + 9) / 64) * 64);
+   bytes.set(input);

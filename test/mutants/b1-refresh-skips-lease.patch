@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: workspace.refresh-under-lease
+# why: The refresh takes the change's own lease as the caller's, so a stale or lapsed lease mints a token
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1486,7 +1486,7 @@
+   const allowed = mayUseWorkspace(
+     yield* EntityStore,
+     change,
+-    { ...command, command: "refresh" },
++    { ...command, leaseId: change.lease.id, command: "refresh" },
+     now,
+   );
+   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);

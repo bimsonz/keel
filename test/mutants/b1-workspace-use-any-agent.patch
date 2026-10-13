@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/commit.test.ts apps/keel/test/unit/commit.test.ts -t "commit.own-agent|workspace.refresh-own|commit.rest-own"
+# kills: commit.own-agent, workspace.refresh-own, commit.rest-own
+# why: Only the project is checked, so any agent of the project holding the lease id uses another agent's workspace
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1306,9 +1306,7 @@
+   caller: { readonly agentId: AgentId; readonly projectId: ProjectId },
+ ): boolean => {
+   const held = heldWorkspace(store, change.id);
+-  return (
+-    change.agentId === caller.agentId && (held === undefined || held.projectId === caller.projectId)
+-  );
++  return held === undefined || held.projectId === caller.projectId;
+ };
+ 
+ /**

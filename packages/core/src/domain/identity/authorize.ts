@@ -153,7 +153,7 @@ export const SPEC_ACTIONS = {
   submit: rule("Project", "work"),
   resolve: rule("Project", "work"),
   Sessions_openSession: rule("Project", "work"),
-  Workspaces_refreshWorkspaceToken: rule("Project", "work"),
+  refreshWorkspaceToken: rule("Project", "work"),
   abandon: rule("Project", "workOrMaintain"),
 
   Operator_enrolAgent: rule("Project", "member"),

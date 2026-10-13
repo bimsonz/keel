@@ -18,6 +18,7 @@ import {
   matchesGlob,
   RunRef,
   sha256Hex,
+  sha256HexOfBytes,
   userActor,
   weakest,
 } from "../../../src/domain/kernel/index.ts";
@@ -47,6 +48,17 @@ describe("sha256", () => {
       fc.property(text, (s) => {
         expect(sha256Hex(s)).toBe(reference(s));
       }),
+    );
+  });
+
+  it("[kernel.sha256-bytes] hashes bytes as they are, not as text, across every padding length", () => {
+    fc.assert(
+      fc.property(fc.uint8Array({ maxLength: 300 }), (bytes) => {
+        expect(sha256HexOfBytes(bytes)).toBe(createHash("sha256").update(bytes).digest("hex"));
+      }),
+    );
+    expect(sha256HexOfBytes(Uint8Array.of(0xff, 0xfe))).toBe(
+      createHash("sha256").update(Uint8Array.of(0xff, 0xfe)).digest("hex"),
     );
   });
 });

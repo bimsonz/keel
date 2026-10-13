@@ -37,6 +37,7 @@ import {
   makeRepoServerMemory,
   makeLanesMemory,
   makeTrunksMemory,
+  makeWorkspacePoolMemory,
   makeUsersMemory,
   makeOrgUsageMemory,
 } from "@keeltown/testing";
@@ -120,6 +121,7 @@ function world() {
       makeTrunksMemory().layer,
       makeLanesMemory().layer,
       makeRepoServerMemory({ repos: new Map() }).layer,
+      makeWorkspacePoolMemory().layer,
       makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeAgentSignUpsMemory(rows).layer.pipe(Layer.provide(directory.layer)),
       makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
