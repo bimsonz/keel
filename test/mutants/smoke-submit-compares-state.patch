@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/smoke-work-loop.test.ts
+# kills: smoke.submit-replay
+# why: a replay is compared by its state too, so the smoke goes red whenever the Precheck starts between a submit and its replay
+diff --git a/e2e/src/smoke/work-loop.ts b/e2e/src/smoke/work-loop.ts
+index a34b09dd..b417786f 100644
+--- a/e2e/src/smoke/work-loop.ts
++++ b/e2e/src/smoke/work-loop.ts
+@@ -96,7 +96,7 @@ const resultField = (answer: unknown, name: string): unknown =>
+   Reflect.get(Object(Reflect.get(Object(answer), "result")), name);
+ 
+ const submissionOf = (answer: unknown): unknown[] =>
+-  ["changeId", "revision", "commitSha"].map((name) => resultField(answer, name));
++  ["changeId", "revision", "commitSha", "state"].map((name) => resultField(answer, name));
+ 
+ /**
+  * Whether two answers are of one submission. A replay under the same key answers the

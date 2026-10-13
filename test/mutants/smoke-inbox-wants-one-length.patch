@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/smoke-work-loop.test.ts
+# kills: smoke.inbox-later
+# why: two reads of one cursor must be of one length, so a notice landing between them turns the smoke red
+diff --git a/e2e/src/smoke/work-loop.ts b/e2e/src/smoke/work-loop.ts
+index a34b09dd..88a4fd15 100644
+--- a/e2e/src/smoke/work-loop.ts
++++ b/e2e/src/smoke/work-loop.ts
+@@ -120,7 +120,7 @@ export function samePageSoFar(a: unknown, b: unknown): boolean {
+   if (!Array.isArray(one) || !Array.isArray(other)) return false;
+   const shared = Math.min(one.length, other.length);
+   if (!same(one.slice(0, shared), other.slice(0, shared))) return false;
+-  return one.length !== other.length || same(resultField(a, "cursor"), resultField(b, "cursor"));
++  return one.length === other.length && same(resultField(a, "cursor"), resultField(b, "cursor"));
+ }
+ 
+ export async function workLoopSmoke(

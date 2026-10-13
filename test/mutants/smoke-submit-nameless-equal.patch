@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/smoke-work-loop.test.ts
+# kills: smoke.submit-other
+# why: two answers that name no submission compare equal, so two refusals pass for a submit and its replay
+diff --git a/e2e/src/smoke/work-loop.ts b/e2e/src/smoke/work-loop.ts
+index a34b09dd..73b69db3 100644
+--- a/e2e/src/smoke/work-loop.ts
++++ b/e2e/src/smoke/work-loop.ts
+@@ -106,7 +106,7 @@ const submissionOf = (answer: unknown): unknown[] =>
+  */
+ export function sameSubmission(a: unknown, b: unknown): boolean {
+   return (
+-    submissionOf(a).every((part) => part !== undefined) && same(submissionOf(a), submissionOf(b))
++    same(submissionOf(a), submissionOf(b))
+   );
+ }
+ 

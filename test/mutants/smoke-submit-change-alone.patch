@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/smoke-work-loop.test.ts
+# kills: smoke.submit-other
+# why: a replay is compared by its change alone, so a second revision or another commit passes for the first submission
+diff --git a/e2e/src/smoke/work-loop.ts b/e2e/src/smoke/work-loop.ts
+index a34b09dd..c2b8461f 100644
+--- a/e2e/src/smoke/work-loop.ts
++++ b/e2e/src/smoke/work-loop.ts
+@@ -96,7 +96,7 @@ const resultField = (answer: unknown, name: string): unknown =>
+   Reflect.get(Object(Reflect.get(Object(answer), "result")), name);
+ 
+ const submissionOf = (answer: unknown): unknown[] =>
+-  ["changeId", "revision", "commitSha"].map((name) => resultField(answer, name));
++  ["changeId"].map((name) => resultField(answer, name));
+ 
+ /**
+  * Whether two answers are of one submission. A replay under the same key answers the

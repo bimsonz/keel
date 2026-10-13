@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/smoke-work-loop.test.ts
+# kills: smoke.inbox-other
+# why: the notices both pages hold are never compared, so REST and MCP may read different inboxes and the smoke stays green
+diff --git a/e2e/src/smoke/work-loop.ts b/e2e/src/smoke/work-loop.ts
+index a34b09dd..669b6530 100644
+--- a/e2e/src/smoke/work-loop.ts
++++ b/e2e/src/smoke/work-loop.ts
+@@ -119,7 +119,6 @@ export function samePageSoFar(a: unknown, b: unknown): boolean {
+   const [one, other] = [resultField(a, "notices"), resultField(b, "notices")];
+   if (!Array.isArray(one) || !Array.isArray(other)) return false;
+   const shared = Math.min(one.length, other.length);
+-  if (!same(one.slice(0, shared), other.slice(0, shared))) return false;
+   return one.length !== other.length || same(resultField(a, "cursor"), resultField(b, "cursor"));
+ }
+ 
