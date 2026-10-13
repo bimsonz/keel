@@ -2,14 +2,14 @@
 # kills: token.shape
 # why: an agent's token lasts the provider's default hour, so a token copied from a log is good twelve times as long
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 5a71018f..25bb613e 100644
+index da8663a1..2dde11e5 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -260,7 +260,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
+@@ -261,7 +261,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
      resources: Object.values(agentResources(config.origin)),
      // The provider links a resource to a stored client row, and an agent has none: every agent may ask for either.
      enforcePerClientResources: false,
 -    m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
      assertionMaxLifetime: ASSERTION_SECONDS,
-     allowDynamicClientRegistration: false,
-     extensions: [
+     // A token is bound only to a key whose proofs Keel's own doors take: the library's list is wider.
+     dpop: { signingAlgorithms: [...KEY_ALGORITHMS] },

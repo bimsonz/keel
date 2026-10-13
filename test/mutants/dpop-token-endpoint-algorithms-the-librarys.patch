@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts -t dpop.algorithms
+# kills: dpop.algorithms
+# why: the provider is left its library's list of proof algorithms, wider than the two Keel's doors take, so a P-521 or RSA key is given a token bound to it that every door then refuses
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index da8663a1..fe655aa6 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -264,7 +264,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
+     m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
+     assertionMaxLifetime: ASSERTION_SECONDS,
+     // A token is bound only to a key whose proofs Keel's own doors take: the library's list is wider.
+-    dpop: { signingAlgorithms: [...KEY_ALGORITHMS] },
+     allowDynamicClientRegistration: false,
+     extensions: [
+       {
