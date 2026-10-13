@@ -406,6 +406,8 @@ export interface ChangePageState {
     refused?: "pack-too-large" | "repo-bytes-quota";
     ruling?: RulingBounce;
     next: string[];
+    /** The decision the bounce cites, by its id: the one Keel's next actions say to read. */
+    cites?: string;
   };
   /**
    * Conflicts Keel proved against it and let it go on from: its plan advises or annotates on that predicate.

@@ -43,6 +43,7 @@ import type {
   Outcome,
   World as WorldId,
 } from "../domain/state.ts";
+import { citedIn } from "./decisions.ts";
 
 export interface AgentEntry {
   id: string;
@@ -150,6 +151,8 @@ export interface ChangeEntry {
     decisionId?: string;
     reasons: string[];
     next: string[];
+    /** The decision this bounce cites: the one Keel's next actions say to read, where they name one. */
+    cites?: string;
   };
   /** Every bounce Keel recorded of it, each counted under the one cause Keel named for it. */
   bounces: BounceCounts;
@@ -825,6 +828,9 @@ export class World {
             `${change.label} bounces`,
             event.payload.nextActions?.[0]?.title,
           );
+          // A bounce by a guard that holds a decision is a verdict's, and names the decision among its ways on.
+          const cited = citedIn(nextActions ?? []);
+          if (cited !== undefined) change.bounce.cites = cited;
         }
         break;
       }

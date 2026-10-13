@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/decisions.test.ts
+# kills: decisions.cited
+# why: a bounce that names two decisions cites the second, which is not the one Keel put first
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index dc4cba05..96a45c71 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -11,9 +11,10 @@ const READS_A_DECISION = "Memory_getDecision";
+  * such action cites none.
+  */
+ export function citedIn(nextActions: readonly NextAction[]): string | undefined {
++  let last: string | undefined;
+   for (const action of nextActions) {
+     const id = action.operationId === READS_A_DECISION ? action.args?.["decisionId"] : undefined;
+-    if (typeof id === "string" && id !== "") return id;
++    if (typeof id === "string" && id !== "") last = id;
+   }
+-  return undefined;
++  return last;
+ }

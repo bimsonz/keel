@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/decisions.test.ts
+# kills: decisions.cited-by-argument
+# why: an argument that is no id is taken for a decision's, so a bounce links to a decision that is not there
+diff --git a/apps/console/src/engine/decisions.ts b/apps/console/src/engine/decisions.ts
+index dc4cba05..a72d378d 100644
+--- a/apps/console/src/engine/decisions.ts
++++ b/apps/console/src/engine/decisions.ts
+@@ -13,7 +13,7 @@ const READS_A_DECISION = "Memory_getDecision";
+ export function citedIn(nextActions: readonly NextAction[]): string | undefined {
+   for (const action of nextActions) {
+     const id = action.operationId === READS_A_DECISION ? action.args?.["decisionId"] : undefined;
+-    if (typeof id === "string" && id !== "") return id;
++    if (id !== undefined) return String(id);
+   }
+   return undefined;
+ }

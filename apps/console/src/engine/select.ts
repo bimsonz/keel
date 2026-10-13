@@ -751,6 +751,7 @@ export function changePageOf(
               ? {}
               : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
             next: bounce.next,
+            ...(bounce.cites === undefined ? {} : { cites: bounce.cites }),
           },
         }),
     noted: change.noted.flatMap((note) => {

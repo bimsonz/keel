@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-cites
+# why: the change's page is not handed the decision its bounce cites
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 2598a4e0..54f7bbf1 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -751,7 +751,6 @@ export function changePageOf(
+               ? {}
+               : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
+             next: bounce.next,
+-            ...(bounce.cites === undefined ? {} : { cites: bounce.cites }),
+           },
+         }),
+     noted: change.noted.flatMap((note) => {

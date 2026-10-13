@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-cites
+# why: the fold forgets which decision a bounce cites
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 4f7317c1..fae9b7d0 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -830,7 +830,6 @@ export class World {
+           );
+           // A bounce by a guard that holds a decision is a verdict's, and names the decision among its ways on.
+           const cited = citedIn(nextActions ?? []);
+-          if (cited !== undefined) change.bounce.cites = cited;
+         }
+         break;
+       }

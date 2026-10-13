@@ -84,6 +84,48 @@ describe("a conflict proven against a change", () => {
     expect(page?.verdict?.id).toBe(first.payload.verdictId);
   });
 
+  it("[change.bounce-cites] names the decision a verdict's bounce cites, from Keel's next action, and leaves the bounce the verdict's", async () => {
+    const { player, changeId } = await proven();
+    const bounced = (
+      nextActions: {
+        kind: "read" | "call";
+        title: string;
+        operationId?: string;
+        args?: Record<string, unknown>;
+      }[],
+    ): void =>
+      then(player, (b) =>
+        b.at(1).emit({
+          type: "ChangeBounced",
+          entity: { kind: "change", id: changeId },
+          payload: {
+            changeId,
+            verdictId: "vdt_guard",
+            reasons: ["guard G-1 failed: holds decision dec_01: permissions are read fresh"],
+            nextActions,
+          },
+        }),
+      );
+    bounced([
+      { kind: "call", title: "Revise the change", operationId: "Changes_revise" },
+      {
+        kind: "read",
+        title: "Read the decision this guard holds",
+        operationId: "Memory_getDecision",
+        args: { decisionId: "dec_01" },
+      },
+    ]);
+    const page = changePageOf(player.world, changeId, player);
+    expect(page?.bounce?.cites).toBe("dec_01");
+    // The cause is the verdict's still: no ruling and no conflict is named for it.
+    expect(page?.bounce?.ruling).toBe(undefined);
+    expect(page?.bounce?.conflict).toBe(undefined);
+    expect(player.world.changes.get(changeId)?.bounces).toMatchObject({ verdict: 1, ruling: 0 });
+    // A later bounce that says to read no decision cites none, whatever its reasons say.
+    bounced([{ kind: "call", title: "Revise the change", operationId: "Changes_revise" }]);
+    expect(changePageOf(player.world, changeId, player)?.bounce).not.toHaveProperty("cites");
+  });
+
   it("[change.bounce-ruling] says a ruling went against a change by its decision, with the conflict that decision settled and Keel's reason, and shows no earlier verdict as the cause", async () => {
     const log = generateS1(42, "invalidate");
     const at = log.events.findIndex((event) => event.type === "ChangeBounced");
