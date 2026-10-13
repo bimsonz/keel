@@ -7824,15 +7824,7 @@
                 "$ref": "#/components/schemas/Handle"
               }
             ],
-            "description": "The handle it was given at sign-up, made from its key. An agent enrolled by a person has none."
-          },
-          "namespace": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/NamespaceRef"
-              }
-            ],
-            "description": "Its own namespace, where its own projects live: its handle, of kind `agent`. An agent enrolled by a person has none."
+            "description": "The handle it was given at sign-up, made from its key, which is also its own namespace's. An agent enrolled by a person has none."
           },
           "kind": {
             "allOf": [

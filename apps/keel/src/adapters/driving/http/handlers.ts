@@ -558,18 +558,15 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 directory.findAgent(accountOf(caller).agentId),
               );
               if (Option.isNone(agent)) return cardNotFound(caller);
-              const { id, org } = agent.value;
-              const namespaces = yield* Namespaces;
-              // An agent that signed itself up is a namespace under its own id; one a person enrolled is none.
-              const own = yield* namespaces.byId(id);
-              const place = org === undefined ? Option.none() : yield* namespaces.byId(org);
-              return cardOk(agent.value, {
-                own: Option.getOrUndefined(own),
-                org: Option.match(place, {
-                  onNone: () => undefined,
-                  onSome: (record) => record.handle,
-                }),
-              });
+              const { org } = agent.value;
+              const place =
+                org === undefined
+                  ? Option.none()
+                  : yield* Namespaces.use((namespaces) => namespaces.byId(org));
+              return cardOk(
+                agent.value,
+                Option.match(place, { onNone: () => undefined, onSome: (record) => record.handle }),
+              );
             }),
           ),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>

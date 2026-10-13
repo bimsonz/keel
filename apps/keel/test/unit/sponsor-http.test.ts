@@ -501,7 +501,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the org it works in, its handle and its own namespace when it signed itself up, never who stands behind it", async () => {
+  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the org it works in, its handle when it signed itself up, never who stands behind it", async () => {
     const w = world();
     const held = await sponsored(w, ANN, "carded");
     const card = async (caller: Caller, agentId: string) =>
@@ -522,7 +522,7 @@ describe("the sponsor link at the doorway", () => {
       name: "placeless",
       kind: "interactive",
     });
-    // An agent that signed itself up has a handle and a namespace of its own, and no kind or org.
+    // An agent that signed itself up has a handle, which is its own namespace's, and no kind or org.
     const { jkt, jwk } = freshAgentKey();
     const { agent: keyed } = await w.runtime.runPromise(signUpAgent({ jkt, jwk }, "keyed"));
     expect(keyed.handle).toBe(givenHandle(keyed.id));
@@ -530,7 +530,6 @@ describe("the sponsor link at the doorway", () => {
       id: keyed.id,
       name: "keyed",
       handle: keyed.handle,
-      namespace: { handle: keyed.handle, kind: "agent" },
     });
     // An id nobody has and one that is no id read the same.
     const missing = await card(VISITOR, makeId("agt", ulid()));
