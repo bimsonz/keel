@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.park-follows-question, change.transitions
+# why: a change is parked again under the question it already waits on, so every redelivered escalation commits another park
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..df1def5a 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -698,8 +698,7 @@ export const decideChange = (
+       // A change already waiting takes the park for another question, and waits on that one from then.
+       const another =
+         at("parked") &&
+-        change.parkReason === "awaiting-ruling" &&
+-        command.escalationId !== change.escalationId;
++        change.parkReason === "awaiting-ruling";
+       return at("verifying", "queued") || another
+         ? Result.succeed([
+             ChangeParked.make({

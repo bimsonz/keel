@@ -2,14 +2,14 @@
 # kills: t35.ruling-bounces
 # why: the report of a ruling that did not bounce a party names neither the decision nor the conflict
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index f18a29b5..4fcd1d65 100644
+index 776c146f..9ce93b8b 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1796,7 +1796,6 @@ export const reactToBatch = (
+@@ -1817,7 +1817,6 @@ export const reactToBatch = (
        : {
            drafts: [],
            problem:
 -            reacting.refusal ??
-             `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
+             `${event.type} refused with ${failure._tag} in state ${change.state}`,
          };
-   return {
+   }

@@ -2,15 +2,15 @@
 # kills: t35.park-resume
 # why: the machine parks a change only at verifying, where no change ever rests, so a party lands past the question a person was asked
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 3af515e..30e61f6 100644
+index 49027283..22a017fe 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -617,7 +617,7 @@ export const decideChange = (
- 
-     case "Park":
-       // Past its plan and not yet in a batch: a party cannot land past the question a person was asked.
--      return at("verifying", "queued")
-+      return at("verifying")
+@@ -700,7 +700,7 @@ export const decideChange = (
+         at("parked") &&
+         change.parkReason === "awaiting-ruling" &&
+         command.escalationId !== change.escalationId;
+-      return at("verifying", "queued") || another
++      return at("verifying") || another
          ? Result.succeed([
              ChangeParked.make({
                changeId: id,

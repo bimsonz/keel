@@ -2,15 +2,15 @@
 # kills: t35.park-after-requeue
 # why: a requeued change is not parked, so one whose conflict went to a person while it was in a batch goes back into the queue unheld
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0fcd078b..9a9eb2d5 100644
+index 776c146f..a655e8c6 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1691,7 +1691,7 @@ const commandFor = (
-  * read, so the escalation ruled on is never the one it waits for.
+@@ -1754,7 +1754,7 @@ const commandFor = (
+  * resume needs none: the machine takes it only when nothing is awaited.
   */
  const heldAgain = (store: Store, command: ChangeCommand): readonly ChangeCommand[] => {
--  if (command._tag !== "Resume" && command._tag !== "Requeue") return [];
-+  if (command._tag !== "Resume") return [];
+-  if (command._tag !== "Requeue") return [];
++  return [];
    const asked = awaitedEscalation(store);
    return asked === undefined ? [] : [{ _tag: "Park", escalationId: asked }];
  };

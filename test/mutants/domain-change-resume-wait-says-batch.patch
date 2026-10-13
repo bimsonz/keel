@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.no-resume-past-escalation
+# why: the refused resume says the change joins a batch once they rule, which is the batch's wait and not the one it is in
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..51cf45bb 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -819,7 +819,7 @@ export const decideChange = (
+         return refuse(change, command);
+       // The ruling on one question does not release a change another question still holds.
+       return (
+-        blocked(change, NO_BLOCKERS, command.awaitingRuling, RESUMES_ONCE_RULED) ??
++        blocked(change, NO_BLOCKERS, command.awaitingRuling) ??
+         Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
+       );
+ 

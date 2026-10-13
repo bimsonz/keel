@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.park-follows-question, change.resume-returns
+# why: a park for another question drops the change's lane, so the last ruling resumes it into no lane
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..6a631a76 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1072,7 +1072,7 @@ export const evolveChange = (
+         // Already waiting, and held by another question: it waits on that one, from where it first parked.
+         if (from("parked") && change.parkReason === "awaiting-ruling")
+           return event.escalationId !== undefined && event.escalationId !== change.escalationId
+-            ? { ...change, escalationId: event.escalationId }
++            ? { ...moveTo(change, "parked", ["laneId"]), escalationId: event.escalationId }
+             : illegal(change, event);
+         // It keeps its lane and its plan: the ruling puts it back where it waited.
+         return change.state === "verifying" || change.state === "queued"

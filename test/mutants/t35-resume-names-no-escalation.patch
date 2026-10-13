@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.park-after-resume
+# kills: t35.park-after-resume
+# why: the resume tells the machine that nothing is awaited without reading it, so the first of two rulings resumes the change with the other question open
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 776c146f..57d27ab9 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1680,7 +1680,7 @@ const commandFor = (
+       return change.parkReason === "awaiting-ruling" &&
+         change.escalationId === escalationIdOf(conflictId)
+         ? {
+-            command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
++            command: { _tag: "Resume", decisionId, awaitingRuling: [] },
+             refusable: true,
+           }
+         : undefined;

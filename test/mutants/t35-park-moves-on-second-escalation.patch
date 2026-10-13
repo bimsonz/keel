@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.park-after-resume
+# kills: t35.park-after-resume
+# why: a second escalation moves the park of a change that already waits for a ruling, so it reads as waiting on the later question while the first is still open
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 776c146f..155ba96b 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1639,7 +1639,6 @@ const commandFor = (
+       const escalated = decodeEscalated(event.payload);
+       // A change that already waits for a ruling goes on waiting for that one: its park moves to another
+       // question only once the one it names is ruled on (`reactToBatch`).
+-      if (change.parkReason === "awaiting-ruling") return undefined;
+       // The machine says where a change parks; anywhere else it goes on as it was, and that is no problem.
+       return Option.isSome(escalated)
+         ? {

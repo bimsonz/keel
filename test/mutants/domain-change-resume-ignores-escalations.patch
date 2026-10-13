@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.no-resume-past-escalation, change.transitions
+# why: a resume is taken whatever is still awaited, so the first of two rulings puts the change back in its queue with the other question open
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..58d75ef3 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -818,10 +818,9 @@ export const decideChange = (
+       if (!(at("parked") && change.parkReason === "awaiting-ruling"))
+         return refuse(change, command);
+       // The ruling on one question does not release a change another question still holds.
+-      return (
+-        blocked(change, NO_BLOCKERS, command.awaitingRuling, RESUMES_ONCE_RULED) ??
+-        Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
+-      );
++      return Result.succeed([
++        ChangeResumed.make({ changeId: id, decisionId: command.decisionId }),
++      ]);
+ 
+     case "Adopt":
+       if (!isLapsed(change.lease, now)) {

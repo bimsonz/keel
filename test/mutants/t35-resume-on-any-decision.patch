@@ -1,17 +1,17 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
 # kills: t35.park-resume
-# why: a parked change resumes on the decision of any conflict it is a party to, so it leaves the question it waits for unanswered
+# why: a parked change asks to resume on the decision of any conflict it is a party to; the machine holds it back while its own question is open, and every such ruling is reported as a problem
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index f18a29b5..f4f12637 100644
+index 776c146f..04dba802 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1672,8 +1672,7 @@ const commandFor = (
-               }),
+@@ -1677,8 +1677,7 @@ const commandFor = (
          };
-       // Only the ruling on the escalation the change waits for resumes it.
+       // Only the ruling on the escalation the change waits for resumes it, and the machine takes that
+       // only when none of its other conflicts is still with a person.
 -      return change.parkReason === "awaiting-ruling" &&
 -        change.escalationId === escalationIdOf(conflictId)
 +      return change.parkReason === "awaiting-ruling"
-         ? { command: { _tag: "Resume", decisionId }, refusable: true }
-         : undefined;
-     }
+         ? {
+             command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+             refusable: true,

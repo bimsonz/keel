@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.park-follows-question
+# why: the fold takes a park for a ruling on a change parked for a lapsed lease, and names a question on a change that waits for an adopter
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..abb3b11c 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1070,7 +1070,7 @@ export const evolveChange = (
+     case "ChangeParked":
+       if (event.reason === "awaiting-ruling") {
+         // Already waiting, and held by another question: it waits on that one, from where it first parked.
+-        if (from("parked") && change.parkReason === "awaiting-ruling")
++        if (from("parked"))
+           return event.escalationId !== undefined && event.escalationId !== change.escalationId
+             ? { ...change, escalationId: event.escalationId }
+             : illegal(change, event);

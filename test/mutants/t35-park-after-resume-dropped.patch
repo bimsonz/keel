@@ -1,16 +1,21 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.park-after-resume
 # kills: t35.park-after-resume
-# why: a resumed change is not parked again, so with another of its conflicts still with a person it sits in the queue as if nothing were asked
+# why: a resume the machine holds back for another question is answered with nothing, so the change stays parked under the escalation just ruled on and no later ruling is read as its own
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0fcd078b..db36fffa 100644
+index 776c146f..4bf04b44 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1691,7 +1691,7 @@ const commandFor = (
-  * read, so the escalation ruled on is never the one it waits for.
-  */
- const heldAgain = (store: Store, command: ChangeCommand): readonly ChangeCommand[] => {
--  if (command._tag !== "Resume" && command._tag !== "Requeue") return [];
-+  if (command._tag !== "Requeue") return [];
-   const asked = awaitedEscalation(store);
-   return asked === undefined ? [] : [{ _tag: "Park", escalationId: asked }];
- };
+@@ -1805,13 +1805,6 @@ export const reactToBatch = (
+       reacting.command._tag === "Resume" && failure._tag === "ChangeBlocked"
+         ? failure.escalations?.[0]
+         : undefined;
+-    if (next !== undefined) {
+-      const held = transition(tx, changeId, REACTION_REFUSALS, [
+-        { _tag: "Park", escalationId: next },
+-      ]);
+-      if (Result.isSuccess(held))
+-        return { drafts: held.success.drafts, ...inProject(tx.store, changeId) };
+-    }
+     return reacting.refusable === true && failure._tag === "ChangeStateRefused"
+       ? { drafts: [] }
+       : {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.park-follows-question
+# why: the fold takes a park that names no question from a change that waits on one, leaving it waiting for nothing
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..f3c6680a 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1071,7 +1071,7 @@ export const evolveChange = (
+       if (event.reason === "awaiting-ruling") {
+         // Already waiting, and held by another question: it waits on that one, from where it first parked.
+         if (from("parked") && change.parkReason === "awaiting-ruling")
+-          return event.escalationId !== undefined && event.escalationId !== change.escalationId
++          return event.escalationId !== change.escalationId
+             ? { ...change, escalationId: event.escalationId }
+             : illegal(change, event);
+         // It keeps its lane and its plan: the ruling puts it back where it waited.

@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.no-resume-past-escalation
+# why: the awaited rulings are read before the state, so a change that is not waiting for any ruling is told to wait for one
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..b9f3f9b2 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -815,12 +815,12 @@ export const decideChange = (
+         : refuse(change, command);
+ 
+     case "Resume":
+-      if (!(at("parked") && change.parkReason === "awaiting-ruling"))
+-        return refuse(change, command);
+       // The ruling on one question does not release a change another question still holds.
+       return (
+         blocked(change, NO_BLOCKERS, command.awaitingRuling, RESUMES_ONCE_RULED) ??
+-        Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
++        (at("parked") && change.parkReason === "awaiting-ruling"
++          ? Result.succeed([ChangeResumed.make({ changeId: id, decisionId: command.decisionId })])
++          : refuse(change, command))
+       );
+ 
+     case "Adopt":

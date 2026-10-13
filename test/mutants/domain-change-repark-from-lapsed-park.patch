@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.park-follows-question, change.transitions
+# why: a change parked for a lapsed lease takes a park for a ruling, though it waits for an adopter and no ruling resumes it
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..e724bc03 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -697,9 +697,7 @@ export const decideChange = (
+       // Past its plan and not yet in a batch: a party cannot land past the question a person was asked.
+       // A change already waiting takes the park for another question, and waits on that one from then.
+       const another =
+-        at("parked") &&
+-        change.parkReason === "awaiting-ruling" &&
+-        command.escalationId !== change.escalationId;
++        at("parked") && command.escalationId !== change.escalationId;
+       return at("verifying", "queued") || another
+         ? Result.succeed([
+             ChangeParked.make({

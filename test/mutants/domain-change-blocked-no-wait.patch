@@ -1,5 +1,5 @@
 # expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
-# kills: change.no-batch-past-escalation
+# kills: change.no-batch-past-escalation, change.no-resume-past-escalation
 # why: a batch refused for an awaited ruling says only to read the conflicts, never that the change is waiting for a person
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
 index 312ec75c..c99e764b 100644
