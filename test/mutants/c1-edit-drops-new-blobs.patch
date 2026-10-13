@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.differential
+# why: A changed file's blob is not written, so the new tree points at an object nobody has
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..e3825b97 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -156,7 +156,7 @@ async function rebuild(
+     const blobs = new Map<string, GitObject>();
+     const oid = await put(blobs, "blob", edit.content);
+     if (existing?.oid === oid && existing.mode === mode) continue;
+-    if (existing?.oid !== oid) for (const [id, o] of blobs) out.set(id, o);
++    if (existing === undefined) for (const [id, o] of blobs) out.set(id, o);
+     entries.set(name, { name, mode, oid });
+     changed += 1;
+   }

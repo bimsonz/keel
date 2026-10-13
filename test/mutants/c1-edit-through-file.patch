@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.differential, edit.through-file
+# why: A path through a file is walked as if the file were a directory
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..2d692d69 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -130,7 +130,7 @@ async function rebuild(
+     const existing = entries.get(name);
+     const edit = child.edit;
+     if (edit === undefined) {
+-      if (existing !== undefined && existing.mode !== MODE_TREE)
++      if (existing !== undefined && existing.mode === "0")
+         throw new EditRefused("through-file", firstPath(child));
+       const below = await rebuild(reader, existing?.oid ?? null, child, joinPath(prefix, name), out);
+       changed += below.changed;

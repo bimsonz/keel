@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.reads-only-the-path
+# why: Every subtree is read, not only those on edited paths
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..0ebe6afc 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -124,6 +124,7 @@ async function rebuild(
+     base === null ? [] : (await reader.readTree(base)).map((e) => [e.name, e]),
+   );
+   let changed = 0;
++  for (const e of entries.values()) if (e.mode === MODE_TREE && !node.children.has(e.name)) await reader.readTree(e.oid);
+   for (const name of [...node.children.keys()].toSorted()) {
+     const child = node.children.get(name);
+     if (child === undefined) continue;

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.differential, edit.keeps-mode
+# why: A file edited with no executable flag loses its executable mode
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..1b82f40f 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -149,7 +149,7 @@ async function rebuild(
+       throw new EditRefused("not-a-file", edit.path);
+     const mode =
+       edit.executable === undefined
+-        ? (existing?.mode ?? MODE_FILE)
++        ? MODE_FILE
+         : edit.executable
+           ? MODE_EXEC
+           : MODE_FILE;

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.differential, edit.prunes-empty
+# why: A directory its last file leaves stays as an empty tree
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..355f524b 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -160,7 +160,7 @@ async function rebuild(
+     entries.set(name, { name, mode, oid });
+     changed += 1;
+   }
+-  if (entries.size === 0 && prefix !== "") return { oid: null, changed };
++  if (entries.size === 0 && prefix === "\0") return { oid: null, changed };
+   const body = encodeTree([...entries.values()]);
+   const oid = await hashObject("tree", body);
+   if (oid !== base) out.set(oid, { type: "tree", body });

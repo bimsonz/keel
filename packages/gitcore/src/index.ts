@@ -3,6 +3,7 @@ export * from "./ancestry.ts";
 export * from "./bytes.ts";
 export * from "./compose.ts";
 export * from "./diff.ts";
+export * from "./edit.ts";
 export * from "./fetch.ts";
 export * from "./histogram.ts";
 export * from "./merge.ts";

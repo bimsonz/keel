@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/edit.test.ts
+# kills: edit.bad-path
+# why: A .git segment is accepted as a path
+diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
+index 3c1d8682..ef977c8b 100644
+--- a/packages/gitcore/src/edit.ts
++++ b/packages/gitcore/src/edit.ts
+@@ -67,7 +67,7 @@ interface EditNode {
+ function segmentsOf(path: string): string[] {
+   const segments = path.split("/");
+   for (const s of segments) {
+-    if (s === "" || s === "." || s === ".." || s.toLowerCase() === ".git" || s.includes("\0"))
++    if (s === "" || s === "." || s === ".." || s.includes("\0"))
+       throw new EditRefused("bad-path", path);
+   }
+   return segments;
