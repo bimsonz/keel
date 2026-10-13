@@ -15331,7 +15331,6 @@
           "_tag",
           "orgId",
           "name",
-          "personal",
           "by"
         ],
         "properties": {
@@ -15346,10 +15345,6 @@
           },
           "name": {
             "$ref": "#/components/schemas/Handle"
-          },
-          "personal": {
-            "type": "boolean",
-            "description": "A user's personal org, created on sign-up and named by its handle."
           },
           "by": {
             "$ref": "#/components/schemas/UserId"

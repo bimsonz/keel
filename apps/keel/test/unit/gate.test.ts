@@ -279,7 +279,7 @@ describe("the request gate", () => {
         expect(admitted.principal).toMatchObject({
           _tag: "Agent",
           agentId: BOT,
-          org: sampleOrgId,
+          namespace: sampleOrgId,
           paused: false,
           standing: { _tag: "None" },
         });
@@ -405,7 +405,7 @@ describe("the request gate", () => {
           principal: {
             _tag: "Agent",
             agentId: KEYED,
-            org: KEYED,
+            namespace: KEYED,
             scopes: ["agent:work", "agent:read"],
             paused: false,
             standing: { _tag: "Governs" },
@@ -414,7 +414,7 @@ describe("the request gate", () => {
         });
         const own = yield* principalOf(claims({ projectId: OWN }));
         expect(own.principal).toMatchObject({
-          org: KEYED,
+          namespace: KEYED,
           projectId: OWN,
           standing: { _tag: "Governs" },
         });
@@ -427,13 +427,13 @@ describe("the request gate", () => {
       Effect.gen(function* () {
         const elsewhere = yield* principalOf(claims({ projectId: ELSEWHERE }));
         expect(elsewhere.principal).toMatchObject({
-          org: sampleOrgId,
+          namespace: sampleOrgId,
           projectId: ELSEWHERE,
           standing: { _tag: "None" },
         });
         const nowhere = yield* principalOf(claims({ projectId: NOWHERE }));
         expect(nowhere.principal).toMatchObject({
-          org: KEYED,
+          namespace: KEYED,
           projectId: NOWHERE,
           standing: { _tag: "None" },
         });

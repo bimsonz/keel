@@ -268,7 +268,7 @@ describe("a new project's source", () => {
           {
             kind: "escalate",
             title:
-              "A private project forks only into its own org; ask a maintainer to make it public",
+              "A private project forks only into its own namespace; ask whoever maintains it to make it public",
           },
         ],
       },

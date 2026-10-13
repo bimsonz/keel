@@ -133,7 +133,7 @@ const agentOf = (projectId: ProjectId) =>
   caller({
     _tag: "Agent",
     agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
-    org: sampleOrgId,
+    namespace: sampleOrgId,
     projectId,
     scopes: ["agent:read", "agent:work"],
     paused: false,

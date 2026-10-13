@@ -196,7 +196,7 @@ describe("createProject", () => {
           [bob, "create-1"],
         ] as const) {
           const taken = yield* Effect.flip(creating(actor, "FORGE", key));
-          expect(taken).toMatchObject({ _tag: "ProjectNameTaken", org: ORG, name: "forge" });
+          expect(taken).toMatchObject({ _tag: "ProjectNameTaken", namespace: ORG, name: "forge" });
         }
         expect(journal).toHaveLength(steps);
         expect(places.places.size).toBe(1);

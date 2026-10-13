@@ -78,11 +78,14 @@ export const UserSignedUp = Schema.TaggedStruct("UserSignedUp", {
   /** Absent until the user chooses one. */
   handle: Schema.optional(Handle),
 });
+/**
+ * An org was made. A person's own namespace is no org and never one of these:
+ * the events of an older Keel carried `personal` for the org a sign-up made,
+ * which is still read and no longer written.
+ */
 export const OrgCreated = Schema.TaggedStruct("OrgCreated", {
   orgId: OrgId,
   name: Handle,
-  /** A user's personal org, created on sign-up and named by its handle. */
-  personal: Schema.Boolean,
   by: UserId,
 });
 /**

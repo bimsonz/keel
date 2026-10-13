@@ -5,7 +5,7 @@ import {
   authorize,
   type Decision,
   type MissingResource,
-  type OrgResource,
+  type NamespaceResource,
   personOwns,
   type Principal,
   type ProjectResource,
@@ -104,10 +104,10 @@ export const projectResource = (
     if (Option.isNone(settings)) return MISSING;
     return {
       _tag: "Project",
-      org: namespace,
+      namespace,
       projectId,
       visibility: settings.value.visibility,
-      orgSuspended: Option.match(record, {
+      namespaceSuspended: Option.match(record, {
         onNone: () => false,
         onSome: (found) => found.suspended,
       }),
@@ -219,9 +219,8 @@ const namespaceNamed = (handle: string) =>
         onNone: () => MISSING,
         onSome: (found) =>
           ({
-            _tag: "Org",
-            org: found.namespace,
-            kind: found.kind,
+            _tag: "Namespace",
+            namespace: found.namespace,
             suspended: found.suspended,
             personOwned: personOwns(found.kind),
           }) as const,
@@ -412,7 +411,7 @@ export const decideEach = (
 export const decideFork = (
   principal: Principal,
   source: ProjectResource | MissingResource,
-  target: OrgResource,
+  target: NamespaceResource,
 ): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
 
 /**

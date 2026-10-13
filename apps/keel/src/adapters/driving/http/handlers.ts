@@ -54,6 +54,8 @@ import {
 } from "@keeltown/core/domain/identity";
 import {
   ConflictId,
+  type NamespaceId,
+  namespaceKind,
   ProbeId,
   ProjectId as ProjectIdSchema,
   type ProjectId,
@@ -264,7 +266,7 @@ const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audien
 });
 
 /** The reader's role in a namespace: its owner's in their own, a member's in an org. */
-const roleIn = (principal: Caller["principal"], namespace: string) =>
+const roleIn = (principal: Caller["principal"], namespace: NamespaceId) =>
   principal._tag === "User" ? roleOf(principal, namespace) : undefined;
 
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(GrantableScope));
@@ -286,9 +288,9 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
     const resource = yield* projectResource(projectId);
     if (resource._tag !== "Project" || Result.isFailure(decideEach(caller.principal, resource)))
       return undefined;
-    const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(resource.org));
+    const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(resource.namespace));
     if (Option.isNone(namespace)) return undefined;
-    const role = roleIn(caller.principal, resource.org);
+    const role = roleIn(caller.principal, resource.namespace);
     return {
       id: projectId,
       namespace: { handle: namespace.value.handle, kind: namespace.value.kind },
@@ -923,7 +925,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             Effect.gen(function* () {
               const actor = yield* actorOf(caller);
-              const target = caller.resource?._tag === "Org" ? caller.resource : undefined;
+              const target = caller.resource?._tag === "Namespace" ? caller.resource : undefined;
               if (target === undefined)
                 return yield* Effect.die(new Error("createProject ran without its namespace"));
               if (source._tag === "Project") {
@@ -938,7 +940,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   );
               }
               return yield* createProject(actor, {
-                namespace: target.org,
+                namespace: target.namespace,
                 name: input.name,
                 source,
                 idempotencyKey: input["idempotency-key"],
@@ -946,8 +948,11 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 Effect.map((project) =>
                   createProjectOk(
                     project,
-                    { handle: input.namespace.toLowerCase(), kind: target.kind },
-                    roleIn(caller.principal, target.org),
+                    {
+                      handle: input.namespace.toLowerCase(),
+                      kind: namespaceKind(target.namespace),
+                    },
+                    roleIn(caller.principal, target.namespace),
                   ),
                 ),
                 Effect.catch((error) => Effect.succeed(createProjectError(caller, error))),

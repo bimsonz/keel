@@ -501,18 +501,18 @@ export function describeProjectNamespacesContract(
             yield* Effect.flip(
               projects.assign({ projectId: rival, namespace: org, name: name.toUpperCase() }),
             ),
-          ).toMatchObject({ _tag: "ProjectNameTaken", org, name });
+          ).toMatchObject({ _tag: "ProjectNameTaken", namespace: org, name });
           const renamed = fresh("renamed");
           expect(yield* Effect.flip(projects.assign({ ...placed, name: renamed }))).toMatchObject({
             _tag: "ProjectNameTaken",
-            org,
+            namespace: org,
             name: renamed,
           });
           expect(
             yield* Effect.flip(projects.assign({ ...placed, namespace: elsewhere })),
           ).toMatchObject({
             _tag: "ProjectNameTaken",
-            org: elsewhere,
+            namespace: elsewhere,
             name,
           });
           expect(yield* projects.byId(placed.projectId)).toEqual(Option.some(placed));

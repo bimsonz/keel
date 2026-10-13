@@ -180,7 +180,7 @@ const agent = (agentId: AgentId, over: { readonly paused?: boolean } = {}): Call
   callerAs({
     _tag: "Agent",
     agentId,
-    org: ACME,
+    namespace: ACME,
     projectId: LEDGER,
     scopes: ["agent:read", "agent:work"],
     paused: over.paused ?? false,

@@ -128,7 +128,7 @@ export type RefusalReason = typeof RefusalReason.Type;
  * already has another place: a project never moves.
  */
 export class ProjectNameTaken extends Schema.TaggedError<ProjectNameTaken>()("ProjectNameTaken", {
-  org: NamespaceId,
+  namespace: NamespaceId,
   name: Schema.String,
 }) {}
 

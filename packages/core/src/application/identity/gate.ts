@@ -173,7 +173,7 @@ export const principalOf: (
         principal: {
           _tag: "Agent",
           agentId: agent.id,
-          org,
+          namespace: org,
           projectId,
           scopes: token.scopes,
           paused: agent.state === "suspended",
@@ -197,7 +197,7 @@ export const principalOf: (
         principal: {
           _tag: "Agent",
           agentId: agent.id,
-          org,
+          namespace: org,
           ...(projectId === undefined ? {} : { projectId }),
           scopes: claims.scopes,
           paused: agent.state === "suspended",

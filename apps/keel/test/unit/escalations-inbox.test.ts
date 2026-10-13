@@ -183,7 +183,7 @@ const agentOf = (org: NamespaceId, projectId: ProjectId, sponsor: UserId): Calle
     {
       _tag: "Agent",
       agentId: AGENT,
-      org,
+      namespace: org,
       projectId,
       scopes: ["agent:read", "agent:work"],
       paused: false,

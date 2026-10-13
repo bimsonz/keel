@@ -12,11 +12,12 @@ import {
   type AuthorizationRefusal,
   type ForkResource,
   type Grant,
+  type Membership,
   type MemberStanding,
   type MissingResource,
   NON_SPEC_ACTIONS,
   type Need,
-  type OrgResource,
+  type NamespaceResource,
   type Principal,
   type ProjectResource,
   type Resource,
@@ -120,7 +121,7 @@ const placedAgentWith = (standing: fc.Arbitrary<AgentStanding>): fc.Arbitrary<Ag
     .map(({ projectId, ...a }) => ({
       _tag: "Agent",
       agentId: makeId("agt", ulid(1)),
-      org: orgOf(projectId),
+      namespace: orgOf(projectId),
       projectId,
       ...a,
     }));
@@ -132,7 +133,7 @@ const agentWith = (standing: fc.Arbitrary<AgentStanding>): fc.Arbitrary<AgentPri
       weight: 1,
       arbitrary: fc
         .tuple(placedAgentWith(standing), fc.constantFrom(...ORGS))
-        .map(([{ projectId: _none, ...a }, org]) => ({ ...a, org })),
+        .map(([{ projectId: _none, ...a }, org]) => ({ ...a, namespace: org })),
     },
   );
 const agentArb = agentWith(standingArb);
@@ -147,20 +148,19 @@ const projectArb: fc.Arbitrary<ProjectResource> = fc
   .record({
     projectId: fc.constantFrom(...PROJECTS),
     visibility: fc.constantFrom("private", "public"),
-    orgSuspended: rare(6),
+    namespaceSuspended: rare(6),
     personOwned: fc.boolean(),
     sponsor: fc.option(fc.constantFrom(...USERS), { nil: undefined }),
   })
   .map(({ sponsor, ...p }) => ({
     _tag: "Project",
-    org: orgOf(p.projectId),
+    namespace: orgOf(p.projectId),
     ...p,
     ...(sponsor === undefined ? {} : { sponsor }),
   }));
-const orgResArb: fc.Arbitrary<OrgResource> = fc.record({
-  _tag: fc.constant("Org"),
-  org: fc.constantFrom(...ORGS),
-  kind: fc.constant("org"),
+const orgResArb: fc.Arbitrary<NamespaceResource> = fc.record({
+  _tag: fc.constant("Namespace"),
+  namespace: fc.constantFrom(...ORGS),
   suspended: rare(6),
   personOwned: fc.boolean(),
 });
@@ -194,6 +194,7 @@ const resourceArb = (kind: ResourceKind): fc.Arbitrary<Resource> => {
       return fc.constant({ _tag: "Instance" });
     case "Self":
       return fc.constant({ _tag: "Self" });
+    case "Namespace":
     case "Org":
       return fc.oneof(
         { weight: 6, arbitrary: orgResArb },
@@ -248,7 +249,7 @@ const outcome = (decision: Result.Result<Grant, AuthorizationRefusal>): string =
 /** Whether the principal is inside the org: a member, or an agent with a standing in it. */
 const inside = (p: Principal, org: NamespaceId): boolean =>
   (p._tag === "User" && p.memberships.some((m) => m.org === org)) ||
-  (p._tag === "Agent" && p.org === org && p.standing._tag !== "None");
+  (p._tag === "Agent" && p.namespace === org && p.standing._tag !== "None");
 
 const READS: ReadonlySet<Need> = new Set(["read", "readMembers"]);
 const GOVERNING: ReadonlySet<Need> = new Set(["member", "maintain", "own", "sponsorOrMaintain"]);
@@ -274,7 +275,7 @@ const INVITER_LEFT: AgentStanding = { _tag: "Invited", by: { userId: INVITER, su
 const agentOn = (projectId: ProjectId, over: Partial<AgentPrincipal> = {}): AgentPrincipal => ({
   _tag: "Agent",
   agentId: makeId("agt", ulid(1)),
-  org: orgOf(projectId),
+  namespace: orgOf(projectId),
   projectId,
   scopes: ["agent:work", "agent:read"],
   paused: false,
@@ -284,7 +285,7 @@ const agentOn = (projectId: ProjectId, over: Partial<AgentPrincipal> = {}): Agen
 /** An agent whose token names no project: it stands in `org` alone, invited unless `over` says otherwise. */
 const agentIn = (org: NamespaceId, over: Partial<AgentPrincipal> = {}): AgentPrincipal => {
   const { projectId: _none, ...a } = agentOn(PRJ_1);
-  return { ...a, org, ...over };
+  return { ...a, namespace: org, ...over };
 };
 /** A project a person owns, unless `over` says otherwise. */
 const project = (
@@ -293,10 +294,10 @@ const project = (
   over: Partial<ProjectResource> = {},
 ): ProjectResource => ({
   _tag: "Project",
-  org: orgOf(projectId),
+  namespace: orgOf(projectId),
   projectId,
   visibility,
-  orgSuspended: false,
+  namespaceSuspended: false,
   personOwned: true,
   ...over,
 });
@@ -307,13 +308,12 @@ const inviterOf = (a: AgentPrincipal, by: MemberStanding): UserPrincipal =>
   user({
     userId: by.userId,
     suspended: by.suspended,
-    memberships: by.role === undefined ? [] : [{ org: asOrg(a.org), role: by.role }],
+    memberships: by.role === undefined ? [] : [{ org: asOrg(a.namespace), role: by.role }],
   });
 /** An org a person owns, unless `over` says otherwise. */
-const into = (org: NamespaceId, over: Partial<OrgResource> = {}): OrgResource => ({
-  _tag: "Org",
-  org,
-  kind: "org",
+const into = (org: NamespaceId, over: Partial<NamespaceResource> = {}): NamespaceResource => ({
+  _tag: "Namespace",
+  namespace: org,
   suspended: false,
   personOwned: true,
   ...over,
@@ -321,7 +321,9 @@ const into = (org: NamespaceId, over: Partial<OrgResource> = {}): OrgResource =>
 
 /** Whether the resource is the project the agent's token is for. */
 const tokenProject = (a: AgentPrincipal, resource: Resource): boolean =>
-  resource._tag === "Project" && resource.projectId === a.projectId && resource.org === a.org;
+  resource._tag === "Project" &&
+  resource.projectId === a.projectId &&
+  resource.namespace === a.namespace;
 
 /** Whether the agent's standing counts now: it governs, or the member who invited it still answers for it. */
 const standing = (a: AgentPrincipal): boolean =>
@@ -335,16 +337,17 @@ const standing = (a: AgentPrincipal): boolean =>
 const governs = (a: AgentPrincipal, resource: Resource): boolean =>
   !a.paused &&
   a.standing._tag === "Governs" &&
-  (tokenProject(a, resource) || (resource._tag === "Org" && resource.org === a.org)) &&
-  (resource._tag === "Project" || resource._tag === "Org") &&
+  (tokenProject(a, resource) ||
+    (resource._tag === "Namespace" && resource.namespace === a.namespace)) &&
+  (resource._tag === "Project" || resource._tag === "Namespace") &&
   !resource.personOwned;
 
 /** Whether the principal holds an owner's rights on the resource: a user who owns its org, or the agent that governs it. */
-const owns = (principal: Principal, resource: ProjectResource | OrgResource): boolean =>
+const owns = (principal: Principal, resource: ProjectResource | NamespaceResource): boolean =>
   principal._tag === "Agent"
     ? governs(principal, resource)
     : principal._tag === "User" &&
-      principal.memberships.some((m) => m.org === resource.org && m.role === "owner");
+      principal.memberships.some((m) => m.org === resource.namespace && m.role === "owner");
 
 /**
  * Whether the principal is of the resource: a user with a membership in its
@@ -359,13 +362,13 @@ const ofResource = (principal: Principal, resource: Resource): boolean => {
     case "Project":
       return principal._tag === "Agent"
         ? tokenProject(principal, resource) && standing(principal)
-        : inside(principal, resource.org);
-    case "Org":
+        : inside(principal, resource.namespace);
+    case "Namespace":
       return principal._tag === "Agent"
         ? governs(principal, resource)
-        : inside(principal, resource.org);
+        : inside(principal, resource.namespace);
     case "Fork":
-      return principal._tag === "User" && inside(principal, resource.target.org);
+      return principal._tag === "User" && inside(principal, resource.target.namespace);
     default:
       return false;
   }
@@ -420,17 +423,19 @@ const ownedRequestArb = fc
   .chain((action) =>
     fc.record({ action: fc.constant(action), resource: resourceArb(kindOf(action)) }),
   );
-/** The actions decided on a project or an org, by kind. */
-const actionsOn = (kind: "Project" | "Org"): readonly Action[] =>
-  ACTION_NAMES.filter((a) => kindOf(a) === kind);
+/** Whether an action is decided on a namespace: any namespace's, or an org's own. */
+const onNamespace = (a: Action): boolean => kindOf(a) === "Namespace" || kindOf(a) === "Org";
+/** The actions decided on a project or on a namespace. */
+const actionsOn = (kind: "Project" | "Namespace"): readonly Action[] =>
+  ACTION_NAMES.filter((a) => (kind === "Project" ? kindOf(a) === "Project" : onNamespace(a)));
 const placedArb = fc.oneof(projectArb, orgResArb);
 
 const subset = (rights: ReadonlySet<Right>, of: ReadonlySet<Right>): boolean =>
   [...rights].every((r) => of.has(r));
 const READ_WORK: ReadonlySet<Right> = new Set(["read", "work"]);
 /** Whether the resource's org is suspended. */
-const shut = (resource: ProjectResource | OrgResource): boolean =>
-  resource._tag === "Org" ? resource.suspended : resource.orgSuspended;
+const shut = (resource: ProjectResource | NamespaceResource): boolean =>
+  resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended;
 /**
  * What an action is decided on where the agent governs and no person owns: its
  * token's project, or the namespace itself. None when the action is a project's
@@ -440,22 +445,22 @@ const governed = (
   agent: AgentPrincipal,
   action: Action,
   proj: ProjectResource,
-  org: OrgResource,
-): ProjectResource | OrgResource | undefined => {
-  if (kindOf(action) === "Org")
-    return { ...org, org: agent.org, suspended: false, personOwned: false };
+  org: NamespaceResource,
+): ProjectResource | NamespaceResource | undefined => {
+  if (onNamespace(action))
+    return { ...org, namespace: agent.namespace, suspended: false, personOwned: false };
   return agent.projectId === undefined
     ? undefined
     : {
         ...proj,
         projectId: agent.projectId,
-        org: agent.org,
-        orgSuspended: false,
+        namespace: agent.namespace,
+        namespaceSuspended: false,
         personOwned: false,
       };
 };
 /** The actions that ask for a governing right, on a project or an org. */
-const GOVERNING_ACTIONS = [...actionsOn("Project"), ...actionsOn("Org")].filter((a) =>
+const GOVERNING_ACTIONS = [...actionsOn("Project"), ...actionsOn("Namespace")].filter((a) =>
   GOVERNING.has(needOf(a)),
 );
 
@@ -468,7 +473,7 @@ describe("authorize", () => {
         fc.constantFrom(...ACTION_NAMES.filter((a) => READS.has(needOf(a)))),
         (principal, resource, action) => {
           const p = { ...resource, visibility: "private" as const };
-          return inside(principal, p.org) || Result.isFailure(decide(principal, action, p));
+          return inside(principal, p.namespace) || Result.isFailure(decide(principal, action, p));
         },
       ),
     );
@@ -495,7 +500,7 @@ describe("authorize", () => {
         (principal, resource, action) => {
           const p = { ...resource, visibility: "private" as const };
           return (
-            inside(principal, p.org) ||
+            inside(principal, p.namespace) ||
             outcome(decide(principal, action, p)) === outcome(decide(principal, action, MISSING))
           );
         },
@@ -519,7 +524,7 @@ describe("authorize", () => {
     );
     fc.assert(
       fc.property(projectArb, (resource) => {
-        const p = { ...resource, visibility: "public" as const, orgSuspended: false };
+        const p = { ...resource, visibility: "public" as const, namespaceSuspended: false };
         return outcome(authorize(ANON, "Repo_getTree", p)) === "ok:public";
       }),
     );
@@ -546,7 +551,7 @@ describe("authorize", () => {
             answers &&
             !agent.paused &&
             resource._tag === "Project" &&
-            !resource.orgSuspended;
+            !resource.namespaceSuspended;
           return (
             subset(rights, READ_WORK) &&
             [...rights].every((r) => bound.has(r === "work" ? "member" : r)) &&
@@ -570,7 +575,12 @@ describe("authorize", () => {
           if (a.standing._tag !== "Invited" || a.projectId === undefined) return false;
           const { by } = a.standing;
           const agent = { ...a, paused: false };
-          const resource = { ...p, projectId: a.projectId, org: a.org, orgSuspended: false };
+          const resource = {
+            ...p,
+            projectId: a.projectId,
+            namespace: a.namespace,
+            namespaceSuspended: false,
+          };
           const result = outcome(decide(agent, action, resource));
           const need = needOf(action);
           const reads = a.scopes.includes("agent:read");
@@ -614,7 +624,7 @@ describe("authorize", () => {
     );
     expect(outcome(authorize(nowhere, "Repo_getTree", project(PRJ_1, "public")))).toBe("ok:public");
     expect([
-      ...rightsOf(agentOn(PRJ_1), project(PRJ_1, "private", { orgSuspended: true })),
+      ...rightsOf(agentOn(PRJ_1), project(PRJ_1, "private", { namespaceSuspended: true })),
     ]).toEqual([]);
   });
 
@@ -714,7 +724,7 @@ describe("authorize", () => {
           if (a.projectId === undefined) return false;
           const agent = { ...a, paused: false };
           const mine = project(a.projectId, visibility);
-          const namespace = into(agent.org);
+          const namespace = into(agent.namespace);
           const resource = kindOf(action) === "Project" ? mine : namespace;
           return (
             subset(rightsOf(agent, mine), READ_WORK) &&
@@ -729,6 +739,7 @@ describe("authorize", () => {
       Instance: { _tag: "Instance" },
       Self: { _tag: "Self" },
       Project: project(PRJ_1, "private"),
+      Namespace: into(ORG_1),
       Org: into(ORG_1),
       Agent: { _tag: "Agent", agentId: BOT },
       Fork: { _tag: "Fork", source: project(PRJ_1, "private"), target: into(ORG_1) },
@@ -760,20 +771,25 @@ describe("authorize", () => {
         agentWith(fc.constant(GOVERNS)),
         projectArb,
         orgResArb,
-        fc.constantFrom(...actionsOn("Project"), ...actionsOn("Org")),
+        fc.constantFrom(...actionsOn("Project"), ...actionsOn("Namespace")),
         (a, proj, org, action) => {
           const agent = { ...a, paused: false };
           const resource = governed(agent, action, proj, org);
           if (resource === undefined) {
             // Its token names no project: every project of its namespace is the public's to it.
-            const any = { ...proj, org: agent.org, orgSuspended: false, personOwned: false };
+            const any = {
+              ...proj,
+              namespace: agent.namespace,
+              namespaceSuspended: false,
+              personOwned: false,
+            };
             const result = outcome(decide(agent, action, any));
             return (
               subset(rightsOf(agent, any), rightsOf(ANON, any)) &&
               (!result.startsWith("ok:") || (result === "ok:public" && needOf(action) === "read"))
             );
           }
-          const owner = user({ memberships: [{ org: asOrg(agent.org), role: "owner" }] });
+          const owner = user({ memberships: [{ org: asOrg(agent.namespace), role: "owner" }] });
           const theirs = outcome(decide(owner, action, resource));
           const its = outcome(decide(agent, action, resource));
           const need = needOf(action);
@@ -792,7 +808,8 @@ describe("authorize", () => {
         const agent = { ...a, paused: false };
         const rights = rightsOf(agent, resource);
         const there =
-          tokenProject(agent, resource) || (resource._tag === "Org" && resource.org === agent.org);
+          tokenProject(agent, resource) ||
+          (resource._tag === "Namespace" && resource.namespace === agent.namespace);
         const rules = there && !resource.personOwned && !shut(resource);
         return (
           PEOPLES.every((r) => rights.has(r) === rules) &&
@@ -871,17 +888,20 @@ describe("authorize", () => {
         fc.oneof(projectArb, orgResArb),
         fc.constantFrom(
           ...ACTION_NAMES.filter(
-            (a) =>
-              NEEDED[needOf(a)] !== undefined && (kindOf(a) === "Project" || kindOf(a) === "Org"),
+            (a) => NEEDED[needOf(a)] !== undefined && (kindOf(a) === "Project" || onNamespace(a)),
           ),
         ),
         (role, resource, action) => {
           const r =
             resource._tag === "Project"
-              ? { ...resource, orgSuspended: false, sponsor: USERS[2] ?? makeId("usr", ulid(3)) }
+              ? {
+                  ...resource,
+                  namespaceSuspended: false,
+                  sponsor: USERS[2] ?? makeId("usr", ulid(3)),
+                }
               : { ...resource, suspended: false };
           if (kindOf(action) !== r._tag) return true;
-          const u = user({ memberships: [{ org: asOrg(r.org), role }] });
+          const u = user({ memberships: [{ org: asOrg(r.namespace), role }] });
           const granted = outcome(decide(u, action, r)).startsWith("ok:");
           return granted === RANK[role] >= (NEEDED[needOf(action)] ?? 0);
         },
@@ -907,7 +927,7 @@ describe("authorize", () => {
     fc.assert(
       fc.property(roleArb, orgResArb, (role, resource) => {
         const org = { ...resource, suspended: false };
-        const u = user({ memberships: [{ org: asOrg(org.org), role }] });
+        const u = user({ memberships: [{ org: asOrg(org.namespace), role }] });
         const may = (action: Action) => outcome(decide(u, action, org)) === "ok:";
         return (
           may("ManageMembers") === (role !== "member") &&
@@ -1028,6 +1048,7 @@ describe("authorize", () => {
         Instance: { _tag: "Instance" },
         Self: { _tag: "Self" },
         Project: project(PRJ_1, "public", { personOwned }),
+        Namespace: into(ORG_1, { personOwned }),
         Org: into(ORG_1, { personOwned }),
         Agent: { _tag: "Agent", agentId: BOT },
         Fork: {
@@ -1038,7 +1059,7 @@ describe("authorize", () => {
       };
       return OWNED_ACTIONS.flatMap((action) => {
         const kind = kindOf(action);
-        const who = personOwned || kind !== "Org" ? [...strangers, ...governors] : strangers;
+        const who = personOwned || !onNamespace(action) ? [...strangers, ...governors] : strangers;
         return who.flatMap(([name, principal]) => {
           const result = outcome(decide(principal, action, theirs[kind]));
           const publicRead = result === "ok:public" && needOf(action) === "read";
@@ -1065,7 +1086,7 @@ describe("authorize", () => {
         (p, resource, action) => {
           const r =
             resource._tag === "Project"
-              ? { ...resource, orgSuspended: true }
+              ? { ...resource, namespaceSuspended: true }
               : { ...resource, suspended: true };
           if (kindOf(action) !== r._tag) return true;
           const principal =
@@ -1074,20 +1095,22 @@ describe("authorize", () => {
           const result = outcome(decide(principal, action, r));
           const scoped = !UNSCOPED.has(need) && (principal._tag === "Agent" || need !== "work");
           if (!scoped) return !result.startsWith("403:org-suspended") && result !== "404";
-          return result === (inside(principal, r.org) ? "403:org-suspended" : "404");
+          return result === (inside(principal, r.namespace) ? "403:org-suspended" : "404");
         },
       ),
     );
     const member = agentOn(PRJ_1);
     expect(
-      outcome(authorize(member, "declare", project(PRJ_1, "private", { orgSuspended: true }))),
+      outcome(
+        authorize(member, "declare", project(PRJ_1, "private", { namespaceSuspended: true })),
+      ),
     ).toBe("403:org-suspended");
     expect(
       outcome(
         authorize(
           agentOn(PRJ_1, { standing: NO_STANDING }),
           "declare",
-          project(PRJ_1, "public", { orgSuspended: true }),
+          project(PRJ_1, "public", { namespaceSuspended: true }),
         ),
       ),
     ).toBe("404");
@@ -1219,16 +1242,18 @@ describe("authorize", () => {
         const { source, target } = resource;
         const readable =
           source._tag === "Project" &&
-          !source.orgSuspended &&
-          (source.visibility === "public" || inside(u, source.org));
+          !source.namespaceSuspended &&
+          (source.visibility === "public" || inside(u, source.namespace));
         if (!readable)
-          return source._tag === "Project" && source.orgSuspended && inside(u, source.org)
+          return source._tag === "Project" &&
+            source.namespaceSuspended &&
+            inside(u, source.namespace)
             ? result === "403:org-suspended"
             : result === "404";
         const granted =
           !target.suspended &&
-          inside(u, target.org) &&
-          (source.visibility === "public" || source.org === target.org);
+          inside(u, target.namespace) &&
+          (source.visibility === "public" || source.namespace === target.namespace);
         return granted === (result === "ok:");
       }),
     );
@@ -1268,17 +1293,111 @@ describe("authorize", () => {
   });
 });
 
+/** A membership that names any namespace as its org: the lie a gate could tell, since a membership's `org` is an org's id. */
+const lyingMembership = (namespace: NamespaceId, role: Role): Membership =>
+  JSON.parse(JSON.stringify({ org: namespace, role }));
+const idOf = (principal: UserPrincipal | AgentPrincipal): string =>
+  principal._tag === "User" ? principal.userId : principal.agentId;
+const nobodyToAsk = (whose: string): string =>
+  `This is ${whose} namespace and has no members: only its owner does this. Use your own namespace, or an org you are a member of`;
+
+/** A person with a handle, whose memberships may name the namespace itself, as only a gate that lied would fill them. */
+const personAt = (namespace: NamespaceId): fc.Arbitrary<UserPrincipal> =>
+  fc.tuple(userArb, fc.option(roleArb, { nil: undefined })).map(([drawn, role]) => ({
+    ...drawn,
+    handle: "ada",
+    suspended: false,
+    memberships:
+      role === undefined
+        ? drawn.memberships
+        : [...drawn.memberships, lyingMembership(namespace, role)],
+  }));
+
 describe("authorize: a namespace by its kind", () => {
   const ADA = USERS[0] ?? makeId("usr", ulid(1));
   const BEA = USERS[2] ?? makeId("usr", ulid(3));
   const ada = user({ userId: ADA });
   const bea = user({ userId: BEA });
   /** Ada's own namespace: its id is hers, and it has no members. */
-  const own = (over: Partial<OrgResource> = {}): OrgResource =>
-    into(ADA, { kind: "user", ...over });
-  const hers = project(PRJ_1, "private", { org: ADA });
+  const own = (over: Partial<NamespaceResource> = {}): NamespaceResource => into(ADA, over);
+  const hers = project(PRJ_1, "private", { namespace: ADA });
+  /** An agent's own namespace: its id is the agent's, and no person owns it. */
+  const bots = into(BOT, { personOwned: false });
 
-  it("[authz.own-namespace] a person owns the namespace whose id is their own, by no membership, and nobody else has a role there", () => {
+  /** The accounts with a namespace of their own: three people and two agents. */
+  const ACCOUNTS: readonly NamespaceId[] = [...USERS, BOT, OTHER_BOT];
+  /** Someone's own namespace. `personOwned` is drawn, not derived: the rules hold whatever the gate filled. */
+  const ownArb: fc.Arbitrary<NamespaceResource> = fc.record({
+    _tag: fc.constant("Namespace"),
+    namespace: fc.constantFrom(...ACCOUNTS),
+    suspended: fc.constant(false),
+    personOwned: fc.boolean(),
+  });
+  /** An agent of any standing whose token is for the namespace, and for one of its projects or none. */
+  const agentAt = (namespace: NamespaceId): fc.Arbitrary<AgentPrincipal> =>
+    fc
+      .tuple(agentArb, fc.constantFrom(BOT, OTHER_BOT))
+      .map(([drawn, agentId]) => ({ ...drawn, agentId, namespace, paused: false }));
+  /** Someone's own namespace or a project in it, with someone who asks there. */
+  const askedArb = ownArb.chain((namespace) =>
+    fc.record({
+      namespace: fc.constant(namespace),
+      resource: fc.oneof(
+        fc.constant<ProjectResource | NamespaceResource>(namespace),
+        fc.record({
+          _tag: fc.constant("Project"),
+          namespace: fc.constant(namespace.namespace),
+          projectId: fc.constantFrom(...PROJECTS),
+          visibility: fc.constantFrom("private", "public"),
+          namespaceSuspended: fc.constant(false),
+          personOwned: fc.constant(namespace.personOwned),
+        }),
+      ),
+      principal: fc.oneof(personAt(namespace.namespace), agentAt(namespace.namespace)),
+    }),
+  );
+
+  /** What Bea, who has no role there, is told on asking for a member's, a maintainer's and an owner's right. */
+  const refusalsAt = (namespace: NamespaceId): readonly string[] => {
+    const at = into(namespace, { personOwned: !isId("agt", namespace) });
+    const open = project(PRJ_1, "public", { namespace, personOwned: at.personOwned });
+    return [
+      decide(bea, "Operator_createProject", at),
+      decide(bea, "Operator_putSettings", open),
+      decide(bea, "ManageCredentials", at),
+    ].map((decision) =>
+      Result.isFailure(decision) && decision.failure._tag === "AccessRefused"
+        ? `${decision.failure.reason}: ${decision.failure.nextActions.map((n) => n.title).join()}`
+        : outcome(decision),
+    );
+  };
+
+  it("[authz.own-namespace] a person's answers in their own namespace are an org owner's on the same resource in an org they own, and nobody else has a role there", () => {
+    const placed = OWNED_ACTIONS.filter(
+      (a) => kindOf(a) === "Namespace" || kindOf(a) === "Project",
+    );
+    fc.assert(
+      fc.property(
+        userArb,
+        fc.constantFrom(...placed),
+        fc.constantFrom(...PROJECTS),
+        fc.constantFrom("private", "public"),
+        rare(6),
+        (drawn, action, projectId, visibility, suspended) => {
+          const person: UserPrincipal = { ...drawn, memberships: [] };
+          const owner: UserPrincipal = { ...drawn, memberships: [{ org: ORG_1, role: "owner" }] };
+          const at = (namespace: NamespaceId): Resource =>
+            kindOf(action) === "Project"
+              ? project(projectId, visibility, { namespace, namespaceSuspended: suspended })
+              : into(namespace, { suspended });
+          const [theirs, orgs] = [at(person.userId), at(ORG_1)];
+          return (
+            outcome(decide(person, action, theirs)) === outcome(decide(owner, action, orgs)) &&
+            [...rightsOf(person, theirs)].join() === [...rightsOf(owner, orgs)].join()
+          );
+        },
+      ),
+    );
     expect(ada.memberships).toEqual([]);
     const orgOwner = user({ userId: BEA, memberships: [{ org: ORG_1, role: "owner" }] });
     expect(rightsOf(ada, own())).toEqual(rightsOf(orgOwner, into(ORG_1)));
@@ -1290,7 +1409,7 @@ describe("authorize: a namespace by its kind", () => {
     expect(outcome(authorize(ada, "Namespaces_getProject", hers))).toBe("ok:members");
     // An agent she enrolled works there: she answers for it as its owner.
     const enrolled = agentOn(PRJ_1, {
-      org: ADA,
+      namespace: ADA,
       standing: invitedBy({ userId: ADA, role: "owner" }),
     });
     expect(outcome(authorize(enrolled, "declare", hers))).toBe("ok:");
@@ -1303,24 +1422,91 @@ describe("authorize: a namespace by its kind", () => {
     // Her ban suspends her namespace: she has no rights in it, and to others it is not there.
     const banned = own({ suspended: true });
     expect(rightsOf(ada, banned).size).toBe(0);
+    expect(rightsOf(user({ userId: ADA, suspended: true }), own()).size).toBe(0);
     expect(outcome(authorize(bea, "Namespaces_getNamespace", banned))).toBe("404");
   });
 
-  it("[authz.org-only] inviting, removing, making an owner and deleting are asked of an org alone: of a person's or an agent's own namespace they are not there", () => {
-    const ORG_ONLY = ["ManageMembers", "ManageOwners", "DeleteOrg"] as const;
+  it("[authz.org-rows] inviting, removing, making an owner and deleting are an org's own: of a person's or an agent's own namespace they are not there, for its owner as for anyone", () => {
+    // Typed apart from the table: the rows that are asked of an org alone.
+    const ORG_ROWS = ["DeleteOrg", "ManageMembers", "ManageOwners"];
+    expect(ACTION_NAMES.filter((a) => kindOf(a) === "Org").toSorted()).toEqual(ORG_ROWS);
+    fc.assert(
+      fc.property(askedArb, fc.constantFrom(...ORG_ROWS.filter(isAction)), (asked, action) => {
+        const on = decide(asked.principal, action, asked.namespace);
+        return outcome(on) === "404";
+      }),
+    );
     const orgOwner = user({ userId: ADA, memberships: [{ org: ORG_1, role: "owner" }] });
-    const agents = into(makeId("agt", ulid(7)), { kind: "agent", personOwned: false });
-    const governor = agentIn(agents.org, { standing: { _tag: "Governs" } });
-    for (const action of ORG_ONLY) {
-      expect([action, outcome(authorize(orgOwner, action, into(ORG_1)))]).toEqual([action, "ok:"]);
-      expect([action, outcome(authorize(ada, action, own()))]).toEqual([action, "404"]);
-      expect([action, outcome(authorize(bea, action, own()))]).toEqual([action, "404"]);
-      expect([action, outcome(authorize(governor, action, agents))]).toEqual([action, "404"]);
-      expect([action, outcome(authorize(ANON, action, own()))]).toEqual([action, "401"]);
+    const governor = agentIn(BOT, { agentId: BOT, standing: GOVERNS });
+    for (const action of ORG_ROWS.filter(isAction)) {
+      expect([action, outcome(decide(orgOwner, action, into(ORG_1)))]).toEqual([action, "ok:"]);
+      expect([action, outcome(decide(ada, action, own()))]).toEqual([action, "404"]);
+      expect([action, outcome(decide(bea, action, own()))]).toEqual([action, "404"]);
+      expect([action, outcome(decide(governor, action, bots))]).toEqual([action, "404"]);
+      expect([action, outcome(decide(ANON, action, own()))]).toEqual([action, "401"]);
+      expect([action, outcome(decide(ANON, action, bots))]).toEqual([action, "401"]);
     }
-    // What is not about members stays the owner's, and an agent's where it governs.
+    // What is not about members stays the owner's, and the agent's in its own namespace.
     expect(outcome(authorize(ada, "ManageCredentials", own()))).toBe("ok:");
-    expect(outcome(authorize(governor, "ManageCredentials", agents))).toBe("ok:");
+    expect(outcome(authorize(governor, "ManageCredentials", bots))).toBe("ok:");
+  });
+
+  it("[authz.no-member-right-off-org] nobody but its own account holds a member's, a maintainer's or an owner's right in a person's or an agent's own namespace, or on its projects", () => {
+    fc.assert(
+      fc.property(askedArb, ({ namespace, resource, principal }) => {
+        const rights = rightsOf(principal, resource);
+        return (
+          idOf(principal) === namespace.namespace ||
+          !(rights.has("member") || rights.has("maintain") || rights.has("own"))
+        );
+      }),
+    );
+    // The table walked: no governing action is granted to a stranger, whatever they say of themselves.
+    const lying = user({ userId: BEA, memberships: [lyingMembership(ADA, "owner")] });
+    const botsProject = project(PRJ_1, "public", { namespace: BOT, personOwned: false });
+    const strangers: readonly (readonly [string, Principal, NamespaceResource, ProjectResource])[] =
+      [
+        ["a person with a membership in a person's namespace", lying, own(), hers],
+        [
+          "an agent said to govern a person's namespace nobody is marked as owning",
+          agentOn(PRJ_1, { namespace: ADA, standing: GOVERNS }),
+          own({ personOwned: false }),
+          { ...hers, personOwned: false },
+        ],
+        [
+          "an agent said to govern another agent's namespace",
+          agentOn(PRJ_1, { agentId: OTHER_BOT, namespace: BOT, standing: GOVERNS }),
+          bots,
+          botsProject,
+        ],
+        [
+          "a person with a membership in an agent's namespace",
+          user({ userId: BEA, memberships: [lyingMembership(BOT, "owner")] }),
+          bots,
+          botsProject,
+        ],
+      ];
+    const granted = strangers.flatMap(([name, principal, namespace, proj]) =>
+      GOVERNING_ACTIONS.flatMap((action) => {
+        const result = outcome(decide(principal, action, onNamespace(action) ? namespace : proj));
+        return result.startsWith("ok:") ? [`${action} by ${name}`] : [];
+      }),
+    );
+    expect(granted).toEqual([]);
+    // Its own account governs an agent's namespace, and its projects on a token for them.
+    const itself = agentOn(PRJ_1, { agentId: BOT, namespace: BOT, standing: GOVERNS });
+    expect([...rightsOf(itself, bots)].toSorted()).toEqual(["maintain", "member", "own", "read"]);
+    expect(rightsOf(itself, botsProject).has("own")).toBe(true);
+  });
+
+  it("[authz.role-refusal-by-kind] whoever lacks a role is told whom to ask in an org, and in a person's or an agent's own namespace that there is nobody to ask", () => {
+    expect(refusalsAt(ORG_1)).toEqual([
+      "role: Ask a member: this needs that role",
+      "role: Ask a maintainer or an owner: this needs that role",
+      "role: Ask an owner: this needs that role",
+    ]);
+    expect(refusalsAt(ADA)).toEqual([1, 2, 3].map(() => `role: ${nobodyToAsk("a person's own")}`));
+    expect(refusalsAt(BOT)).toEqual([1, 2, 3].map(() => `role: ${nobodyToAsk("an agent's own")}`));
   });
 
   it("[authz.person-owns] a person owns a person's namespace and an org, and an agent's own namespace is the agent's", () => {
@@ -1329,10 +1515,10 @@ describe("authorize: a namespace by its kind", () => {
       true,
       false,
     ]);
-    expect([
-      namespaceKind(ADA),
-      namespaceKind(ORG_1),
-      namespaceKind(makeId("agt", ulid(7))),
-    ]).toEqual(["user", "org", "agent"]);
+    expect([namespaceKind(ADA), namespaceKind(ORG_1), namespaceKind(BOT)]).toEqual([
+      "user",
+      "org",
+      "agent",
+    ]);
   });
 });

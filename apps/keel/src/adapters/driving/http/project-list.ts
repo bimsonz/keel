@@ -13,10 +13,10 @@ import { decideEach } from "./authorize-handlers.ts";
 /** A listed project as the policy needs it, from its row alone: no Project object is read for a list. */
 const resourceOf = (row: ListedProject): ProjectResource => ({
   _tag: "Project",
-  org: row.namespace,
+  namespace: row.namespace,
   projectId: row.projectId,
   visibility: row.visibility,
-  orgSuspended: row.suspended,
+  namespaceSuspended: row.suspended,
   personOwned: personOwns(row.kind),
 });
 

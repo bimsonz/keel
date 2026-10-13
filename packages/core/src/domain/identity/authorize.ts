@@ -1,5 +1,11 @@
 import { Result } from "effect";
-import type { NamespaceId, NextAction, ProjectId } from "../kernel/index.ts";
+import {
+  type NamespaceId,
+  type NamespaceKind,
+  namespaceKind,
+  type NextAction,
+  type ProjectId,
+} from "../kernel/index.ts";
 import { AccessRefused, AuthenticationRequired, NotVisible, type RefusalReason } from "./errors.ts";
 import type {
   AgentPrincipal,
@@ -10,7 +16,7 @@ import type {
   Membership,
   MemberStanding,
   MissingResource,
-  OrgResource,
+  NamespaceResource,
   Principal,
   ProjectResource,
   Resource,
@@ -53,8 +59,11 @@ export type Need =
   | "sponsor"
   | "sponsorOrSelf";
 
-/** The kind of resource an action is decided on. */
-export type ResourceKind = "Instance" | "Self" | "Org" | "Project" | "Agent" | "Fork";
+/**
+ * The kind of resource an action is decided on. `Org` is a namespace asked for
+ * what only an org has: its members, its owners, its deletion.
+ */
+export type ResourceKind = "Instance" | "Self" | "Namespace" | "Org" | "Project" | "Agent" | "Fork";
 
 export interface ActionRule {
   readonly resource: ResourceKind;
@@ -78,9 +87,9 @@ export const SPEC_ACTIONS = {
   Agents_approveSponsor: rule("Self", "user"),
   Agents_listSponsored: rule("Self", "user"),
 
-  Operator_listProjects: rule("Org", "read"),
-  Operator_createProject: rule("Org", "member"),
-  Namespaces_getNamespace: rule("Org", "read"),
+  Operator_listProjects: rule("Namespace", "read"),
+  Operator_createProject: rule("Namespace", "member"),
+  Namespaces_getNamespace: rule("Namespace", "read"),
   Namespaces_getProject: rule("Project", "read"),
 
   Changes_listChanges: rule("Project", "read"),
@@ -148,7 +157,7 @@ export const NON_SPEC_ACTIONS = {
   /** Set, clear or list a project's deploy targets. */
   ManageDeployTargets: rule("Project", "own"),
   /** Store, replace or delete a credential in the org's store; none is ever read back. */
-  ManageCredentials: rule("Org", "own"),
+  ManageCredentials: rule("Namespace", "own"),
   DeleteProject: rule("Project", "own"),
   CloneRepo: rule("Project", "read"),
   /** Granted when the caller reads the source and is a member of the target org. */
@@ -159,11 +168,16 @@ export const ACTIONS = { ...SPEC_ACTIONS, ...NON_SPEC_ACTIONS } as const;
 export type Action = keyof typeof ACTIONS;
 export type SpecAction = keyof typeof SPEC_ACTIONS;
 
-/** The resources an action of each kind is decided on. A project or an org may be missing. */
+/**
+ * The resources an action of each kind is decided on. A project or a namespace
+ * may be missing, and an `Org` action is asked of whatever namespace was named:
+ * one that is no org is answered as missing.
+ */
 interface ResourceOfKind {
   readonly Instance: InstanceResource;
   readonly Self: SelfResource;
-  readonly Org: OrgResource | MissingResource;
+  readonly Namespace: NamespaceResource | MissingResource;
+  readonly Org: NamespaceResource | MissingResource;
   readonly Project: ProjectResource | MissingResource;
   readonly Agent: AgentResource | MissingResource;
   readonly Fork: ForkResource;
@@ -192,16 +206,23 @@ const ROLE_RIGHTS: Readonly<Record<Role, readonly Right[]>> = {
 const NONE: ReadonlySet<Right> = new Set();
 const READ: ReadonlySet<Right> = new Set(["read"]);
 
-const roleIn = (memberships: readonly Membership[], org: string): Role | undefined =>
+/** A namespace's kind, read from its id: the one place the policy learns it. */
+const kindOf = (resource: NamespaceResource | ProjectResource): NamespaceKind =>
+  namespaceKind(resource.namespace);
+
+const roleIn = (memberships: readonly Membership[], org: NamespaceId): Role | undefined =>
   memberships.find((m) => m.org === org)?.role;
 
 /**
  * A user's role in a namespace: `owner` of the one whose id is its own, by
  * identity and by no membership, so it holds whatever the gate filled; in an
- * org, the role its membership names.
+ * org, the role its membership names; in anyone else's own namespace none,
+ * whatever a membership says, since only an org has members.
  */
-export const roleOf = (user: UserPrincipal, namespace: string): Role | undefined =>
-  namespace === user.userId ? "owner" : roleIn(user.memberships, namespace);
+export const roleOf = (user: UserPrincipal, namespace: NamespaceId): Role | undefined => {
+  if (namespace === user.userId) return "owner";
+  return namespaceKind(namespace) === "org" ? roleIn(user.memberships, namespace) : undefined;
+};
 
 /**
  * Whom a list of projects is narrowed for before the policy decides each: the
@@ -238,14 +259,14 @@ export const projectAudience = (principal: Principal): ProjectAudience => {
   }
 };
 
-/** Rights from a role in the resource's org, else a public read. */
+/** Rights from a role in the resource's namespace, else a public read. */
 const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {
   switch (resource._tag) {
     case "Project":
-      if (resource.orgSuspended) return NONE;
+      if (resource.namespaceSuspended) return NONE;
       if (role !== undefined) return new Set(ROLE_RIGHTS[role]);
       return resource.visibility === "public" ? READ : NONE;
-    case "Org":
+    case "Namespace":
       if (resource.suspended) return NONE;
       return role === undefined ? READ : new Set(ROLE_RIGHTS[role]);
     case "Agent":
@@ -255,16 +276,16 @@ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<R
   }
 };
 
-const orgOf = (resource: Resource): string | undefined =>
-  resource._tag === "Project" || resource._tag === "Org" ? resource.org : undefined;
+const namespaceOf = (resource: Resource): NamespaceId | undefined =>
+  resource._tag === "Project" || resource._tag === "Namespace" ? resource.namespace : undefined;
 
 /** Whether the resource is the project the agent's token is for. A token that names none is for no project. */
 const isTokenProject = (agent: AgentPrincipal, resource: Resource): boolean =>
   resource._tag === "Project" &&
-  resource.org === agent.org &&
+  resource.namespace === agent.namespace &&
   resource.projectId === agent.projectId;
 
-/** Whether the member who invited an agent still answers for it: a member of the org, not suspended. */
+/** Whether whoever invited an agent still answers for it: holding a role in the namespace, not suspended. */
 const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
 
 /**
@@ -275,13 +296,21 @@ const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.su
  */
 const standingOn = (
   agent: AgentPrincipal,
-  resource: ProjectResource | OrgResource,
+  resource: ProjectResource | NamespaceResource,
 ): AgentStanding["_tag"] => {
   const { standing } = agent;
-  if (resource.org !== agent.org) return "None";
+  if (resource.namespace !== agent.namespace) return "None";
   if (resource._tag === "Project" && resource.projectId !== agent.projectId) return "None";
   return standing._tag === "Invited" && !answers(standing.by) ? "None" : standing._tag;
 };
+
+/**
+ * Whether an agent's `Governs` counts in the resource's namespace: in an org,
+ * and in the agent's own namespace. Never in a person's own, nor in another
+ * agent's, whatever the standing says.
+ */
+const mayGovern = (agent: AgentPrincipal, resource: ProjectResource | NamespaceResource): boolean =>
+  kindOf(resource) === "org" || resource.namespace === agent.agentId;
 
 /** The rights of whoever governs. Where a person owns, they are people's alone. */
 const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
@@ -292,21 +321,24 @@ const GOVERNING: readonly Right[] = ["member", "maintain", "own"];
  * and a read of what is public anywhere else. A paused agent has none. Its
  * scopes cap `read` and `work`; `operator` and `observer` confer nothing.
  *
- * No agent governs where a person owns: on such a resource `member`, `maintain`
- * and `own` are taken out last, whatever the standing says, so the rule does
- * not rest on the gate having filled the standing truthfully.
+ * Governing is by the namespace's kind (`mayGovern`): it counts in an org, and
+ * in an agent's own namespace for that agent alone. And no agent governs where
+ * a person owns: on such a resource `member`, `maintain` and `own` are taken
+ * out last, whatever the standing says, so the rule does not rest on the gate
+ * having filled the standing truthfully.
  */
 const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Right> => {
   if (agent.paused) return NONE;
   if (resource._tag === "Agent") return agent.scopes.includes("agent:read") ? READ : NONE;
-  if (resource._tag !== "Project" && resource._tag !== "Org") return NONE;
-  if (resource._tag === "Org" ? resource.suspended : resource.orgSuspended) return NONE;
+  if (resource._tag !== "Project" && resource._tag !== "Namespace") return NONE;
+  if (resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended) return NONE;
   const standing = standingOn(agent, resource);
   const rights = new Set<Right>();
-  if (resource._tag === "Org" || resource.visibility === "public") rights.add("read");
+  if (resource._tag === "Namespace" || resource.visibility === "public") rights.add("read");
   if (standing !== "None") rights.add("read");
   if (standing !== "None" && resource._tag === "Project") rights.add("work");
-  if (standing === "Governs") for (const right of GOVERNING) rights.add(right);
+  if (standing === "Governs" && mayGovern(agent, resource))
+    for (const right of GOVERNING) rights.add(right);
   if (!agent.scopes.includes("agent:read")) rights.delete("read");
   if (!agent.scopes.includes("agent:work")) rights.delete("work");
   if (resource.personOwned) for (const right of GOVERNING) rights.delete(right);
@@ -318,8 +350,11 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
   switch (principal._tag) {
     case "User": {
       if (principal.suspended || principal.handle === undefined) return NONE;
-      const org = orgOf(resource);
-      return rightsByRole(org === undefined ? undefined : roleOf(principal, org), resource);
+      const namespace = namespaceOf(resource);
+      return rightsByRole(
+        namespace === undefined ? undefined : roleOf(principal, namespace),
+        resource,
+      );
     }
     case "Agent":
       return agentRights(principal, resource);
@@ -378,17 +413,21 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   "inviter-suspended": {
     kind: "escalate",
     title:
-      "The member who answers for you in this org is suspended; ask another member to invite you",
+      "Whoever answers for you in this namespace is suspended; ask another who holds a role there to invite you",
   },
   "inviter-left": {
     kind: "escalate",
-    title: "The member who answers for you in this org left it; ask a member to invite you",
+    title:
+      "Whoever answered for you in this namespace holds no role there now; ask someone who does to invite you",
   },
-  "org-suspended": { kind: "escalate", title: "Ask whoever runs this Keel to reinstate the org" },
+  "org-suspended": {
+    kind: "escalate",
+    title: "This namespace is suspended; ask whoever runs this Keel to reinstate it",
+  },
   "foreign-project": {
     kind: "escalate",
     title:
-      "Your token is for another project, or you have no standing in this one; use a token for it, or ask a member of its org to invite you",
+      "Your token is for another project, or you have no standing in this one; use a token for it, or ask whoever holds a role in its namespace to invite you",
   },
   scope: {
     kind: "call",
@@ -397,7 +436,8 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   },
   "private-source": {
     kind: "escalate",
-    title: "A private project forks only into its own org; ask a maintainer to make it public",
+    title:
+      "A private project forks only into its own namespace; ask whoever maintains it to make it public",
   },
 };
 
@@ -410,39 +450,56 @@ const ROLE_NAMES: Readonly<Record<"member" | "maintain" | "own", string>> = {
   own: "an owner",
 };
 
-const lacksRole = (need: "member" | "maintain" | "own"): Decision =>
+/** A person's or an agent's own namespace has nobody to ask: only its owner does what needs a role there. */
+const OWN_NAMESPACE: Readonly<Record<Exclude<NamespaceKind, "org">, string>> = {
+  user: "a person's own",
+  agent: "an agent's own",
+};
+
+/** The refusal of a role the caller lacks, worded by the namespace's kind: only an org has members to ask. */
+const lacksRole = (need: "member" | "maintain" | "own", kind: NamespaceKind): Decision =>
   Result.fail(
     new AccessRefused({
       reason: "role",
-      nextActions: [{ kind: "escalate", title: `Ask ${ROLE_NAMES[need]}: this needs that role` }],
+      nextActions: [
+        {
+          kind: "escalate",
+          title:
+            kind === "org"
+              ? `Ask ${ROLE_NAMES[need]}: this needs that role`
+              : `This is ${OWN_NAMESPACE[kind]} namespace and has no members: only its owner does this. Use your own namespace, or an org you are a member of`,
+        },
+      ],
     }),
   );
 
 /**
- * Whether a member of the resource's org is asking. An agent counts as inside
- * the org of its token's project while it has a standing there, also one whose
- * inviter no longer answers for it: it is told why it is refused.
+ * Whether someone with a role in the resource's namespace is asking. An agent
+ * counts as inside the namespace of its token's project while it has a standing
+ * there, also one whose inviter no longer answers for it: it is told why it is
+ * refused.
  */
-const insideOrg = (principal: UserPrincipal | AgentPrincipal, org: string): boolean =>
+const inside = (principal: UserPrincipal | AgentPrincipal, namespace: NamespaceId): boolean =>
   principal._tag === "User"
-    ? roleOf(principal, org) !== undefined
-    : principal.org === org && principal.standing._tag !== "None";
+    ? roleOf(principal, namespace) !== undefined
+    : principal.namespace === namespace && principal.standing._tag !== "None";
 
 /**
  * Whether the resource is there for this caller to be refused: a private or
- * missing project, or anything of a suspended org, is NotVisible to outsiders,
- * so they cannot tell it from one that does not exist. Insiders of a suspended
- * org are told it is suspended.
+ * missing project, or anything of a suspended namespace, is NotVisible to
+ * outsiders, so they cannot tell it from one that does not exist. Insiders of a
+ * suspended namespace are told it is suspended.
  */
 const notSeen = (
   principal: UserPrincipal | AgentPrincipal,
-  resource: ProjectResource | OrgResource | MissingResource,
+  resource: ProjectResource | NamespaceResource | MissingResource,
 ): Decision | undefined => {
   if (resource._tag === "Missing") return hidden();
-  const inside = insideOrg(principal, resource.org);
-  const suspended = resource._tag === "Org" ? resource.suspended : resource.orgSuspended;
-  if (suspended) return inside ? refused("org-suspended") : hidden();
-  if (resource._tag === "Project" && resource.visibility === "private" && !inside) return hidden();
+  const within = inside(principal, resource.namespace);
+  const suspended =
+    resource._tag === "Namespace" ? resource.suspended : resource.namespaceSuspended;
+  if (suspended) return within ? refused("org-suspended") : hidden();
+  if (resource._tag === "Project" && resource.visibility === "private" && !within) return hidden();
   return undefined;
 };
 
@@ -457,12 +514,13 @@ const fork = (user: UserPrincipal, resource: ForkResource): Decision => {
   if (source !== undefined) return source;
   const target = notSeen(user, resource.target);
   if (target !== undefined) return target;
-  if (!rightsOf(user, resource.target).has("member")) return lacksRole("member");
+  if (!rightsOf(user, resource.target).has("member"))
+    return lacksRole("member", kindOf(resource.target));
   const { source: project } = resource;
   if (
     project._tag === "Project" &&
     project.visibility === "private" &&
-    project.org !== resource.target.org
+    project.namespace !== resource.target.namespace
   )
     return refused("private-source");
   return granted();
@@ -492,30 +550,30 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   if (resource._tag === "Fork") return fork(principal, resource);
   // An agent that exists is there for anyone to read, as the public: who it is, never who stands behind it.
   if (resource._tag === "Agent") return need === "read" ? granted("public") : hidden();
-  if (resource._tag !== "Project" && resource._tag !== "Org" && resource._tag !== "Missing")
-    return hidden();
+  if (resource._tag !== "Project" && resource._tag !== "Namespace") return hidden();
   const unseen = notSeen(principal, resource);
   if (unseen !== undefined) return unseen;
   const rights = rightsOf(principal, resource);
+  const kind = kindOf(resource);
   switch (need) {
     case "read":
       return granted(rights.has("member") ? "members" : "public");
     case "readMembers":
-      return rights.has("member") ? granted("members") : lacksRole("member");
+      return rights.has("member") ? granted("members") : lacksRole("member", kind);
     case "member":
-      return rights.has("member") ? granted() : lacksRole("member");
+      return rights.has("member") ? granted() : lacksRole("member", kind);
     case "maintain":
     case "workOrMaintain":
-      return rights.has("maintain") ? granted() : lacksRole("maintain");
+      return rights.has("maintain") ? granted() : lacksRole("maintain", kind);
     case "own":
-      return rights.has("own") ? granted() : lacksRole("own");
+      return rights.has("own") ? granted() : lacksRole("own", kind);
     case "sponsorOrMaintain":
       return rights.has("maintain") ||
         (rights.has("member") &&
           resource._tag === "Project" &&
           resource.sponsor === principal.userId)
         ? granted()
-        : lacksRole("maintain");
+        : lacksRole("maintain", kind);
     default:
       return hidden();
   }
@@ -524,7 +582,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
 /** Why an agent may not read or work on what it sees. */
 const whyNoWork = (
   agent: AgentPrincipal,
-  resource: ProjectResource | OrgResource,
+  resource: ProjectResource | NamespaceResource,
 ): Exclude<RefusalReason, "role"> => {
   if (!isTokenProject(agent, resource)) return "foreign-project";
   const { standing } = agent;
@@ -545,9 +603,12 @@ const whyNoWork = (
  */
 const whyNoRule = (
   agent: AgentPrincipal,
-  resource: ProjectResource | OrgResource,
+  resource: ProjectResource | NamespaceResource,
 ): Exclude<RefusalReason, "role"> =>
-  agent.standing._tag === "Governs" && resource.org === agent.org && !resource.personOwned
+  agent.standing._tag === "Governs" &&
+  resource.namespace === agent.namespace &&
+  !resource.personOwned &&
+  mayGovern(agent, resource)
     ? "foreign-project"
     : "users-only";
 
@@ -574,7 +635,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     if (need !== "read") return hidden();
     return rightsOf(principal, resource).has("read") ? granted("public") : refused("scope");
   }
-  if (resource._tag !== "Project" && resource._tag !== "Org") return hidden();
+  if (resource._tag !== "Project" && resource._tag !== "Namespace") return hidden();
   const unseen = notSeen(principal, resource);
   if (unseen !== undefined) return unseen;
   const rights = rightsOf(principal, resource);
@@ -585,7 +646,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     case "read":
       if (rights.has("read")) return granted(asMember ? "members" : "public");
       return refused(
-        resource._tag === "Org" || resource.visibility === "public"
+        resource._tag === "Namespace" || resource.visibility === "public"
           ? "scope"
           : whyNoWork(principal, resource),
       );
@@ -611,14 +672,12 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
 };
 
 /**
- * The actions that are there on an org alone: a person's or an agent's own
- * namespace has no members, and goes only with its account.
+ * Whether an org's own action is asked of a namespace that is no org, where it
+ * is asked of nothing: a person's or an agent's own namespace has no members,
+ * and goes only with its account.
  */
-const ORG_ONLY: ReadonlySet<Action> = new Set(["ManageMembers", "ManageOwners", "DeleteOrg"]);
-
-/** Whether `action` is asked of a namespace that is no org, where it is asked of nothing. */
-const orgOnly = (action: Action, resource: Resource): boolean =>
-  ORG_ONLY.has(action) && resource._tag === "Org" && resource.kind !== "org";
+const noOrg = (asked: ResourceKind, resource: Resource): boolean =>
+  asked === "Org" && resource._tag === "Namespace" && kindOf(resource) !== "org";
 
 /**
  * The one authorization policy: whether `principal` may take `action` on
@@ -628,17 +687,20 @@ const orgOnly = (action: Action, resource: Resource): boolean =>
  *
  * - 401 `AuthenticationRequired`: an anonymous caller asking for anything but a
  *   public read.
- * - 404 `NotVisible`: a private project of an org the caller is not in, a
- *   missing one, or anything of a suspended org to an outsider. It carries no
+ * - 404 `NotVisible`: a private project of a namespace the caller has no role
+ *   in, a missing one, or anything of a suspended namespace to an outsider. It carries no
  *   fields: the gate answers the operation's own not-found, so a private
  *   resource and a missing one read the same.
  * - 403 `AccessRefused`: the caller sees the resource but may not do this, with
- *   a reason and next actions. A private project of the agent's org that its
- *   token is not for is `foreign-project`; one in another org is NotVisible.
+ *   a reason and next actions. A private project of the agent's namespace that
+ *   its token is not for is `foreign-project`; one in another is NotVisible.
  *
- * A person owns the namespace whose id is their own, by identity. Inviting,
- * removing, making an owner and deleting are asked of an org alone: of a
- * person's or an agent's own namespace they are NotVisible.
+ * A person owns the namespace whose id is their own, by identity, and nobody
+ * else holds a role there: a membership counts in an org alone. Inviting,
+ * removing, making an owner and deleting are an org's own actions: of a
+ * person's or an agent's own namespace they are NotVisible. Whoever lacks a
+ * role is told whom to ask in an org, and in anyone's own namespace that there
+ * is nobody to ask.
  *
  * Work is agents' only. Governance is people's wherever a person owns: an agent
  * governs only its own namespace, or an org it created that no person owns, and
@@ -658,8 +720,8 @@ export const authorize = <A extends Action>(
   action: A,
   resource: ResourceFor<A>,
 ): Decision => {
-  const { need } = ACTIONS[action];
-  const on: Resource = orgOnly(action, resource) ? { _tag: "Missing" } : resource;
+  const { need, resource: asked } = ACTIONS[action];
+  const on: Resource = noOrg(asked, resource) ? { _tag: "Missing" } : resource;
   switch (principal._tag) {
     case "Anonymous":
       return anonymous(need, on);

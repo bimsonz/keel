@@ -96,8 +96,8 @@ export type AgentStanding =
 /**
  * A Keel JWT: an agent acting as itself. The agent is tied to no project, but
  * each token is for one run in one namespace and at most one of its projects,
- * so the principal carries that namespace (`org`), the project when the token
- * names one, and the agent's standing there. A new agent's first token names
+ * so the principal carries that namespace, the project when the token names
+ * one, and the agent's standing there. A new agent's first token names
  * no project: it stands in its own namespace, where it makes its first.
  * `paused` is the Agent machine's `suspended` state: a paused agent has no
  * rights anywhere.
@@ -105,7 +105,7 @@ export type AgentStanding =
 export interface AgentPrincipal {
   readonly _tag: "Agent";
   readonly agentId: AgentId;
-  readonly org: NamespaceId;
+  readonly namespace: NamespaceId;
   readonly projectId?: ProjectId;
   readonly scopes: readonly Scope[];
   readonly paused: boolean;
@@ -149,30 +149,30 @@ export interface SelfResource {
 export const personOwns = (kind: NamespaceKind): boolean => kind !== "agent";
 
 /**
- * A namespace: a person's own, an agent's own, or an org (`kind`). Only an org
- * has members, so the actions on members and on deleting it are decided on an
- * org alone. `personOwned` says a person is among its owners: no agent governs
- * there, whatever its standing says.
+ * A namespace: a person's own, an agent's own, or an org. Its id says which
+ * (`namespaceKind`), so no field repeats it. Only an org has members, so the
+ * actions on members and on deleting it are decided on an org alone.
+ * `personOwned` says a person is among its owners: no agent governs there,
+ * whatever its standing says.
  */
-export interface OrgResource {
-  readonly _tag: "Org";
-  readonly org: NamespaceId;
-  readonly kind: NamespaceKind;
+export interface NamespaceResource {
+  readonly _tag: "Namespace";
+  readonly namespace: NamespaceId;
   readonly suspended: boolean;
   readonly personOwned: boolean;
 }
 
 /**
  * A project, with what the policy needs to know about it. `personOwned` is its
- * org's: a person is among the owners. `sponsor` is the sponsor of the agent an
+ * namespace's: a person is among the owners. `sponsor` is the sponsor of the agent an
  * action concerns (a ruling on its escalation, its standing), when there is one.
  */
 export interface ProjectResource {
   readonly _tag: "Project";
-  readonly org: NamespaceId;
+  readonly namespace: NamespaceId;
   readonly projectId: ProjectId;
   readonly visibility: Visibility;
-  readonly orgSuspended: boolean;
+  readonly namespaceSuspended: boolean;
   readonly personOwned: boolean;
   readonly sponsor?: UserId;
 }
@@ -197,13 +197,13 @@ export interface MissingResource {
 export interface ForkResource {
   readonly _tag: "Fork";
   readonly source: ProjectResource | MissingResource;
-  readonly target: OrgResource;
+  readonly target: NamespaceResource;
 }
 
 export type Resource =
   | InstanceResource
   | SelfResource
-  | OrgResource
+  | NamespaceResource
   | ProjectResource
   | AgentResource
   | MissingResource

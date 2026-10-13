@@ -120,7 +120,8 @@ function principalOf(
   return {
     _tag: "Agent",
     agentId: makeId("agt", ulidOf(0)),
-    org: asker.in === undefined ? (project?.namespace ?? namespaceAt(0)) : namespaceAt(asker.in),
+    namespace:
+      asker.in === undefined ? (project?.namespace ?? namespaceAt(0)) : namespaceAt(asker.in),
     ...(project === undefined ? {} : { projectId: project.projectId }),
     scopes,
     paused: asker.paused,
@@ -176,10 +177,10 @@ describe("the list of projects", () => {
                 Result.isSuccess(
                   decideEach(principal, {
                     _tag: "Project",
-                    org: project.namespace,
+                    namespace: project.namespace,
                     projectId: project.projectId,
                     visibility: project.visibility,
-                    orgSuspended: project.held,
+                    namespaceSuspended: project.held,
                     personOwned: personOwns(namespaceKind(project.namespace)),
                   }),
                 ),
@@ -211,7 +212,7 @@ describe("the list of projects", () => {
     const agent = {
       _tag: "Agent" as const,
       agentId: makeId("agt", ulidOf(0)),
-      org: acme,
+      namespace: acme,
       scopes: [],
       paused: false,
       standing: { _tag: "Governs" as const },

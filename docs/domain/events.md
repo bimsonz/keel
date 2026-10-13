@@ -53,7 +53,7 @@ Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identi
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
 | `UserSignedUp` | Better Auth's after-hook (`user:<userId>`) | `userId, handle?` | — | instance audit | — |
-| `OrgCreated` | Better Auth's after-hook (`org:<orgId>`) | `orgId, name: Handle, personal, by: UserId` | — | Projector | A personal org is created on sign-up, named by the user's handle |
+| `OrgCreated` | Better Auth's after-hook (`org:<orgId>`) | `orgId, name: Handle, by: UserId` | — | Projector | A person's own namespace is no org and has no such event; an older event's `personal` is read and dropped |
 | `MembershipChanged` | Better Auth's after-hook (`org:<orgId>`) | `orgId, userId, from?: Role, to?: Role, by?: UserId` (at least one of `from` and `to`, and they differ) | the agents the user sponsored there, when the membership ended | Projector | Ending a membership revokes every live agent the user sponsored in the org (`revokedBy`) |
 | `UserSuspended` | Whoever runs the instance, outside the product (`user:<userId>`); nothing commits it yet | `userId, reason, by: UserId` | — | instance audit | Every request of the user is refused, and so is every request of the agents it sponsors |
 | `UserReinstated` | Whoever runs the instance, outside the product (`user:<userId>`); nothing commits it yet | `userId, by: UserId` | — | instance audit | Requests accepted again |

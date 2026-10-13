@@ -7,6 +7,7 @@ import {
   DEFAULT_QUOTAS,
   eventActorOf,
   MembershipChanged,
+  OrgCreated,
   type QuotaKind,
   type Quotas,
   revokedBy,
@@ -273,5 +274,16 @@ describe("who an event is by", () => {
         );
       }),
     );
+  });
+
+  it("[tenancy.org-created-reads-old] an org's creation stored with `personal` still reads, is written without it, and reads without it", () => {
+    const now = { _tag: "OrgCreated", orgId: ORG_1, name: "acme", by: ADA };
+    const decode = Schema.decodeUnknownSync(OrgCreated);
+    const encode = Schema.encodeSync(OrgCreated);
+    for (const personal of [true, false]) {
+      expect(decode({ ...now, personal })).toEqual(now);
+      expect(encode(decode({ ...now, personal }))).toEqual(now);
+    }
+    expect(decode(now)).toEqual(now);
   });
 });

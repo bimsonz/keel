@@ -50,9 +50,8 @@ export function decideAsRole(role: Role, action: OrgAction) {
     memberships: [{ org: SOME_ORG, role }],
   };
   return authorize(member, action, {
-    _tag: "Org",
-    org: SOME_ORG,
-    kind: "org",
+    _tag: "Namespace",
+    namespace: SOME_ORG,
     suspended: false,
     personOwned: personOwns("org"),
   });

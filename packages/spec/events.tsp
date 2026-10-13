@@ -787,10 +787,6 @@ model OrgCreated {
   _tag: "OrgCreated";
   orgId: OrgId;
   name: Handle;
-
-  /** A user's personal org, created on sign-up and named by its handle. */
-  personal: boolean;
-
   by: UserId;
 }
 

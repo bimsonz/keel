@@ -219,7 +219,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
         assign: (place) =>
           Effect.suspend(() => {
             const name = place.name.toLowerCase();
-            const taken = Effect.fail(new ProjectNameTaken({ org: place.namespace, name }));
+            const taken = Effect.fail(new ProjectNameTaken({ namespace: place.namespace, name }));
             const held = places.get(place.projectId);
             if (held !== undefined)
               return held.namespace === place.namespace && held.name === name ? Effect.void : taken;

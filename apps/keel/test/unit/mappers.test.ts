@@ -163,7 +163,7 @@ function grantedSurface() {
     {
       _tag: "Agent",
       agentId,
-      org: sampleOrgId,
+      namespace: sampleOrgId,
       projectId: sampleProjectId,
       scopes: ["agent:read", "agent:work"],
       paused: false,

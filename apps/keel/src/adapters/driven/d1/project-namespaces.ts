@@ -115,7 +115,7 @@ export function ProjectNamespacesD1(db: D1Database) {
             Option.isSome(held) &&
             held.value.namespace === place.namespace &&
             held.value.name === name;
-          if (!repeated) yield* new ProjectNameTaken({ org: place.namespace, name });
+          if (!repeated) yield* new ProjectNameTaken({ namespace: place.namespace, name });
         }),
       release: (projectId) =>
         Effect.promise(() =>
