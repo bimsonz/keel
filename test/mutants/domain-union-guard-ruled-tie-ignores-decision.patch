@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.guard-ruled
+# why: two members' guards of one strictness are told apart by nothing, so the union keeps or loses a ruled guard's decision by which plan's hash sorts first
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index bbdb4351..2df8dcb5 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -20,7 +20,7 @@ type PlannedGuard = NonNullable<PlanStep["guards"]>;
+  * so without the second a ruled guard's decision would be kept or lost by a hash.
+  */
+ const byStrictness = (a: PlannedGuard, b: PlannedGuard): number =>
+-  STRICTNESS[b.policy] - STRICTNESS[a.policy] || byHeldDecision(a.decision, b.decision);
++  STRICTNESS[b.policy] - STRICTNESS[a.policy];
+ const sortedUnion = <A extends string>(...lists: readonly (readonly A[])[]): A[] =>
+   [...new Set(lists.flat())].toSorted(byCodePoint);
+ const inOrder = <A>(order: readonly A[], ...lists: readonly (readonly A[])[]): A[] =>

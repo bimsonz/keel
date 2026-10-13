@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.guard-ruled
+# why: the plan step of a ruled guard blocks but does not carry the decision, so a bounce has no ruling to cite
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index c21fc356..58954235 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -502,7 +502,6 @@ export const compile = (
+                     ? (facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY)
+                     : "block",
+                 probe: s.guards.probe,
+-                ...(s.guards.decision === undefined ? {} : { decision: s.guards.decision }),
+               },
+             }),
+       },

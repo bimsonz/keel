@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.canonical-ruled
+# why: two listings of one guard with one probe are told apart by nothing, so whether the step holds a decision is decided by the order of the list
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..7192cd44 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -73,7 +73,7 @@ export const byHeldDecision = (a: HeldDecision | undefined, b: HeldDecision | un
+ /** Whether one listing of a guard is kept over another: the least probe hash, then the decision `byHeldDecision` puts first. */
+ const precedes = (a: StepSpec, b: StepSpec): boolean =>
+   a.version === b.version
+-    ? byHeldDecision(a.guards?.decision, b.guards?.decision) < 0
++    ? false
+     : a.version < b.version;
+ 
+ /**

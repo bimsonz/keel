@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.holds-decision
+# why: a guard's step spec leaves out the decision it holds, so compile sees an unruled guard and takes the project's policy
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..a1847557 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -53,7 +53,6 @@ const stepOf = (g: AdmittedGuard): StepSpec => ({
+   guards: {
+     predicate: g.tenet.proposition.predicate,
+     probe: g.probe,
+-    ...(g.decision === undefined ? {} : { decision: g.decision }),
+   },
+ });
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.guard-ruled
+# why: a guard that holds a decision takes the project's policy for its predicate, so under advise or annotate the regression a ruling settled lands
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index c21fc356..f132a025 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -500,7 +500,7 @@ export const compile = (
+                 policy:
+                   s.guards.decision === undefined
+                     ? (facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY)
+-                    : "block",
++                    : (facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY),
+                 probe: s.guards.probe,
+                 ...(s.guards.decision === undefined ? {} : { decision: s.guards.decision }),
+               },

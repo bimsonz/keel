@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.holds-decision
+# why: the decision is cited after the exposure, so it reads as a reason the change is exposed
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..d9a12466 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -98,10 +98,10 @@ export const selectGuards = (
+         spec,
+         because: [
+           g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
++          ...because,
+           ...(g.decision === undefined
+             ? []
+             : [`holds decision ${g.decision.id}: ${g.decision.summary}`]),
+-          ...because,
+         ],
+       });
+   }

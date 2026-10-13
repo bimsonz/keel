@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.holds-decision
+# why: a guard step's reasons say nothing of the decision it holds
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..478f8947 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -98,9 +98,6 @@ export const selectGuards = (
+         spec,
+         because: [
+           g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
+-          ...(g.decision === undefined
+-            ? []
+-            : [`holds decision ${g.decision.id}: ${g.decision.summary}`]),
+           ...because,
+         ],
+       });

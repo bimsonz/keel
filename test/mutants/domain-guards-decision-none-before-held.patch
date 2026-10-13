@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts packages/core/test/domain/verification/union.test.ts
+# kills: guards.canonical-ruled, union.guard-ruled
+# why: a listing or a member that holds no decision is put before one that does, so a ruled guard loses its ruling wherever its step is planned twice
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..8f4e5942 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -67,7 +67,7 @@ const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 :
+  */
+ export const byHeldDecision = (a: HeldDecision | undefined, b: HeldDecision | undefined): number =>
+   a === undefined || b === undefined
+-    ? Number(a === undefined) - Number(b === undefined)
++    ? Number(b === undefined) - Number(a === undefined)
+     : byCodePoint(a.id, b.id);
+ 
+ /** Whether one listing of a guard is kept over another: the least probe hash, then the decision `byHeldDecision` puts first. */

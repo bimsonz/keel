@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.holds-decision
+# why: the decision is cited before the guard is named, where a reader is told which guard first
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6ebc6d55..75ceb1b5 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -97,10 +97,10 @@ export const selectGuards = (
+       byId.set(spec.id, {
+         spec,
+         because: [
+-          g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
+           ...(g.decision === undefined
+             ? []
+             : [`holds decision ${g.decision.id}: ${g.decision.summary}`]),
++          g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
+           ...because,
+         ],
+       });
