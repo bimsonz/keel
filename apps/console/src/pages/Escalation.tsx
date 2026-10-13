@@ -1,6 +1,7 @@
 // One question put to a person: to be answered here while it is open, and
 // read with its answer afterwards.
 
+import { useEffect } from "react";
 import { escalationNamed } from "../engine/lists.ts";
 import { usePlayer, usePublicOnly, useSelected } from "../engine/react.tsx";
 import { useWhere } from "../router.tsx";
@@ -26,6 +27,8 @@ export function EscalationPage({ name }: { name: string }) {
   const state = useSelected(() => escalation?.state, [escalation]);
   const { org, to } = useWhere();
   const hidden = usePublicOnly();
+  // Keel takes an answer from whoever it put the question to, which a member's role does not say: it is asked.
+  useEffect(() => player.wantAsked(), [player]);
   const phoneUrl = state === "open" ? addressOf(to({ at: "escalation", name })) : undefined;
   // Keel shows a question to the project's members. To anyone else it is not that there is none.
   if (escalation === undefined && hidden)
@@ -49,7 +52,7 @@ export function EscalationPage({ name }: { name: string }) {
       answerable={player.canRule(escalation.id)}
       readOnly={
         player.live
-          ? `A member of ${org} answers this. Sign in as one to answer it here.`
+          ? `Keel takes this answer from the person it put the question to first, or from a maintainer of ${org}.`
           : "This fixture's own operator answers this one, a few seconds after it is asked."
       }
       {...(phoneUrl === undefined ? {} : { phoneUrl })}

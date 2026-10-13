@@ -5,8 +5,13 @@ import { type RepoAddress, repositoryOf } from "../../../src/engine/repository.t
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { createHttpDirectory, createHttpSource } from "../../../src/source/http.ts";
 import { KeelRefused } from "../../../src/source/types.ts";
-import { type Role, SESSION_COOKIE, createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
-import { generateS1 } from "../../fixtures/mock/s1.ts";
+import {
+  MAINTAINERS_AFTER_MS,
+  type Role,
+  SESSION_COOKIE,
+  createFakeKeel,
+} from "../../fixtures/mock/fakeKeel.ts";
+import { S1_CHOICES, generateS1 } from "../../fixtures/mock/s1.ts";
 
 const ORIGIN = "https://keel.example";
 
@@ -156,11 +161,18 @@ type Who = Role | "stranger" | "visitor";
  * to its own origin, and says which page a request that changes something came from. What the page's own code
  * put on a request is kept apart, in `fromThePage`.
  */
-function reading(who: Who, visibility: "public" | "private" = "private", ahead = 0) {
+function reading(
+  who: Who,
+  visibility: "public" | "private" = "private",
+  ahead = 0,
+  /** Who the question's agent names, where it names anyone, and Keel's clock. */
+  put: { sponsor?: Role; now?: () => number } = {},
+) {
   const keel = createFakeKeel({
     visibility,
     ahead,
     sessions: { owner: "owner", maintainer: "maintainer", member: "member", stranger: "stranger" },
+    ...put,
   });
   const fromThePage: Request[] = [];
   const serve: typeof fetch = (input, init) => {
@@ -181,8 +193,13 @@ function reading(who: Who, visibility: "public" | "private" = "private", ahead =
 }
 
 /** The project as `who` is shown it, with a playhead on it. */
-async function opened(who: Who, visibility: "public" | "private" = "private", ahead = 0) {
-  const r = reading(who, visibility, ahead);
+async function opened(
+  who: Who,
+  visibility: "public" | "private" = "private",
+  ahead = 0,
+  put: { sponsor?: Role; now?: () => number } = {},
+) {
+  const r = reading(who, visibility, ahead, put);
   const found = await r.directory.findProject("acme", "demo");
   if (found === null) throw new Error("Keel showed this reader no such project");
   const source = createHttpSource(found, { fetch: r.serve });
@@ -480,6 +497,10 @@ describe("Keel's read models, from the page", () => {
 const ruled = (keel: ReturnType<typeof reading>["keel"]): boolean =>
   keel.events().some((event) => event.type === "RulingGiven");
 
+/** When the stand-in's question was put, by its log. */
+const raisedAt = (keel: ReturnType<typeof reading>["keel"]): number =>
+  Date.parse(keel.events().find((event) => event.type === "EscalationRaised")?.at ?? "");
+
 describe("ruling, from the page", () => {
   const answer = { option: "invalidate", idempotencyKey: "k" };
 
@@ -509,8 +530,8 @@ describe("ruling, from the page", () => {
     expect(ruled(keel)).toBe(false);
   });
 
-  it("[http.ruling] answers as the member signed in, by Keel's own operation: the question in the path, the key in the header, the ruling as the body", async () => {
-    const { source, question, keel } = await opened("member");
+  it("[http.ruling] answers as the maintainer signed in, by Keel's own operation: the question in the path, the key in the header, the ruling as the body", async () => {
+    const { source, question, keel } = await opened("maintainer");
     expect(source.canRule?.(question)).toBe(true);
     await source.giveRuling({
       escalationId: question,
@@ -532,7 +553,171 @@ describe("ruling, from the page", () => {
     const late: unknown = await source
       .giveRuling({ escalationId: question, option: "invalidate", idempotencyKey: "another" })
       .catch((error: unknown) => error);
-    expect(late).toMatchObject({ status: 409, code: "escalation.state_refused" });
+    expect(late).toMatchObject({
+      status: 409,
+      code: "escalation.state_refused",
+      message: `${question} is ruled: it takes one ruling, while it is open.`,
+    });
+  });
+
+  it("[http.ruling-words] tells a refused ruling in Keel's words: an option the question does not offer with the ones it does, and a question that is not there", async () => {
+    const { source, question, keel } = await opened("maintainer");
+    const unknown: unknown = await source
+      .giveRuling({ escalationId: question, option: "no-such", idempotencyKey: "k-unknown" })
+      .catch((error: unknown) => error);
+    expect(unknown).toBeInstanceOf(KeelRefused);
+    expect(unknown).toMatchObject({
+      status: 400,
+      code: "escalation.option_unknown",
+      message: `${question} does not offer the option no-such.`,
+      next: S1_CHOICES.map((choice) => choice.label),
+    });
+    const missing: unknown = await source
+      .giveRuling({ escalationId: "esc_none", option: "invalidate", idempotencyKey: "k-missing" })
+      .catch((error: unknown) => error);
+    expect(missing).toMatchObject({
+      status: 404,
+      code: "escalation.not_found",
+      message: "No escalation esc_none.",
+      next: ["List the questions waiting for you"],
+    });
+    expect(ruled(keel)).toBe(false);
+  });
+
+  it("[http.offered] offers a ruling to a maintainer, and to a member only where Keel lists them the question", async () => {
+    const maintainer = await opened("maintainer");
+    expect(maintainer.source.canRule?.(maintainer.question)).toBe(true);
+    // A maintainer is offered every question of the project, so Keel is not asked whose it is.
+    await maintainer.source.readAsked?.();
+    expect(maintainer.keel.calls.some((call) => call.path === "/v1/escalations")).toBe(false);
+
+    // A member the question was not put to is offered nothing, and Keel would have refused them.
+    const plain = await opened("member", "private", 0, { sponsor: "owner" });
+    expect(plain.source.canRule?.(plain.question)).toBe(false);
+    await plain.source.readAsked?.();
+    expect(plain.source.canRule?.(plain.question)).toBe(false);
+    const refused: unknown = await plain.source
+      .giveRuling({ escalationId: plain.question, ...answer })
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ status: 403, code: "auth.forbidden" });
+    expect(ruled(plain.keel)).toBe(false);
+
+    // The member it was put to is offered it once Keel has listed it to them, and Keel takes their answer.
+    const asked = await opened("member", "private", 0, { sponsor: "member" });
+    expect(asked.player.canRule(asked.question)).toBe(false);
+    // The question's page asks, once, and is drawn again when Keel has answered.
+    let drawn = 0;
+    asked.player.subscribe(() => {
+      drawn += 1;
+    });
+    asked.player.wantAsked();
+    asked.player.wantAsked();
+    await settled();
+    expect(asked.player.canRule(asked.question)).toBe(true);
+    expect(drawn).toBeGreaterThan(0);
+    expect(asked.keel.calls.filter((call) => call.path === "/v1/escalations")).toHaveLength(1);
+    await asked.source.giveRuling({ escalationId: asked.question, ...answer });
+    expect(ruled(asked.keel)).toBe(true);
+
+    // Whoever Keel reads only a project's public part is listed nothing of it, and their page does not ask.
+    const visitor = await opened("visitor", "public");
+    await visitor.source.readAsked?.();
+    expect(visitor.keel.calls.some((call) => call.path === "/v1/escalations")).toBe(false);
+  });
+});
+
+describe("the questions Keel has put to someone, from the page", () => {
+  it("[http.waiting] asks Keel for the reader's open questions by its own operation, adds nothing to the request, and follows every cursor", async () => {
+    const { directory, fromThePage, question } = reading("maintainer");
+    expect(await directory.listWaiting()).toMatchObject([
+      {
+        id: question,
+        label: "E-1",
+        project: { namespace: "acme", name: "demo" },
+        state: "open",
+      },
+    ]);
+    const sent = fromThePage.at(-1);
+    expect(sent?.url).toBe(`${ORIGIN}/v1/escalations?state=open&limit=100`);
+    expect(
+      sent?.headers.has("authorization") === true || sent?.headers.has("cookie") === true,
+    ).toBe(false);
+
+    // A page may hold fewer than its limit, none even, while its cursor says more follow.
+    const [listed] = await directory.listWaiting();
+    const asked: string[] = [];
+    const paged = createHttpDirectory({
+      fetch: (input) => {
+        const url = addressOf(input);
+        asked.push(url.search);
+        return Promise.resolve(
+          Response.json(
+            url.searchParams.get("cursor") === null
+              ? { items: [], nextCursor: "000000000007" }
+              : { items: [listed] },
+          ),
+        );
+      },
+    });
+    expect(await paged.listWaiting()).toHaveLength(1);
+    expect(asked).toEqual(["?state=open&limit=100", "?state=open&limit=100&cursor=000000000007"]);
+  });
+
+  it("[http.waiting-whose] is listed a question as Keel lists it: to the person it was put to at once, to a maintainer once thirty minutes have passed, and to nobody else", async () => {
+    const at = raisedAt(reading("owner").keel);
+    const early = { sponsor: "member" as const, now: () => at + MAINTAINERS_AFTER_MS - 1 };
+    expect(await reading("member", "private", 0, early).directory.listWaiting()).toHaveLength(1);
+    expect(await reading("maintainer", "private", 0, early).directory.listWaiting()).toEqual([]);
+    expect(await reading("owner", "private", 0, early).directory.listWaiting()).toEqual([]);
+    const later = { sponsor: "member" as const, now: () => at + MAINTAINERS_AFTER_MS };
+    expect(await reading("maintainer", "private", 0, later).directory.listWaiting()).toHaveLength(
+      1,
+    );
+    expect(await reading("owner", "private", 0, later).directory.listWaiting()).toHaveLength(1);
+
+    // A question that names nobody is its maintainers' at once, and never a plain member's.
+    expect(await reading("maintainer").directory.listWaiting()).toHaveLength(1);
+    expect(await reading("member").directory.listWaiting()).toEqual([]);
+    // Someone signed in whom Keel reads no member's part of the project is listed nothing of it.
+    expect(await reading("stranger", "public").directory.listWaiting()).toEqual([]);
+    // A visitor's page never asks. One that did would be told what Keel says to anyone with no session.
+    const refused: unknown = await reading("visitor", "public")
+      .directory.listWaiting()
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(KeelRefused);
+    expect(refused).toMatchObject({ status: 401, code: "auth.required" });
+  });
+
+  it("[http.own-feed] reads the reader's own feed with no project named, and hands on only what kind each entry is", async () => {
+    const { directory, fromThePage } = reading("maintainer");
+    const first = await directory.readOwnFeed({});
+    expect(fromThePage.at(-1)?.url).toBe(`${ORIGIN}/v1/events?limit=500`);
+    expect(first.items).toContain("EscalationRaised");
+    expect(first.items.every((kind) => typeof kind === "string")).toBe(true);
+
+    // The cursor and the wait are Keel's own inputs, and the wait is never more than Keel allows.
+    const asked: string[] = [];
+    const tail = createHttpDirectory({
+      fetch: (input) => {
+        asked.push(addressOf(input).search);
+        return Promise.resolve(Response.json({ items: [], nextCursor: "000000000009" }));
+      },
+    });
+    await tail.readOwnFeed({ cursor: "000000000004", waitSec: 60 });
+    expect(asked).toEqual(["?limit=500&cursor=000000000004&wait=30"]);
+
+    // Someone signed in whom Keel reads nothing of a private project: no entry of it, and the cursor moves on.
+    const stranger = await reading("stranger").directory.readOwnFeed({});
+    expect(stranger).toEqual({ items: [], nextCursor: first.nextCursor });
+    // A public project's feed is read to them less what is its members': no question, no ruling.
+    const passerBy = await reading("stranger", "public").directory.readOwnFeed({});
+    expect(passerBy.items.length).toBeGreaterThan(0);
+    expect(passerBy.items).not.toContain("EscalationRaised");
+    // A visitor has no feed of their own.
+    const refused: unknown = await reading("visitor", "public")
+      .directory.readOwnFeed({})
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ status: 401, code: "auth.required" });
   });
 });
 

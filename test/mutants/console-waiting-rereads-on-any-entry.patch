@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.follow
+# why: the list of questions is read again at every entry of the reader's feed, a change's as much as a question's
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index 4c11fac..35685a4 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -77,7 +77,7 @@ export async function followTurns(
+         again();
+         continue;
+       }
+-      if (page.items.some((type) => TURNS.has(type))) again();
++      if (page.items.length > 0) again();
+       if (movedOn) continue;
+     } catch (error) {
+       if (error instanceof KeelRefused) return;

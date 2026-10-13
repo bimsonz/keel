@@ -321,6 +321,15 @@ export class Player {
     );
   }
 
+  /** Ask Keel which open questions it lists to this reader, once. Called when a question's page is opened. */
+  wantAsked(): void {
+    if (this.#requested.has("asked")) return;
+    this.#requested.add("asked");
+    void this.#fetch(async () => {
+      await this.source.readAsked?.();
+    });
+  }
+
   /** Fetch a change's diff, once. Called when its page is opened: a swarm has thousands. */
   wantDiff(changeId: string): void {
     if (this.world.changes.get(changeId)?.commit === undefined || this.#requested.has(changeId))

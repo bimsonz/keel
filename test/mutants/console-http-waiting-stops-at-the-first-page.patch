@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.waiting
+# why: a question on a later page of Keel's list is never shown: the cursor of a page that held few is not followed
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 3377497..b355eef 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -182,7 +182,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+         const page = await answered<Partial<EscalationPage>>(response);
+         listed.push(...(page.items ?? []));
+         cursor = page.nextCursor;
+-      } while (cursor !== undefined && cursor !== "");
++      } while (cursor === null);
+       return listed;
+     },
+     async readOwnFeed(asked) {

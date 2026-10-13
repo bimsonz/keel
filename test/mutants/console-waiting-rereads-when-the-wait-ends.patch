@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.no-clock
+# why: the list of questions is read again every time a wait on the feed runs out: a read by the clock
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index 4c11fac..52007ed 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -77,7 +77,7 @@ export async function followTurns(
+         again();
+         continue;
+       }
+-      if (page.items.some((type) => TURNS.has(type))) again();
++      again();
+       if (movedOn) continue;
+     } catch (error) {
+       if (error instanceof KeelRefused) return;

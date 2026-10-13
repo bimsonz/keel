@@ -1574,6 +1574,12 @@ const OPEN_ON_TABS =
 const PUBLIC_ON_TABS =
   "Code | Changes 2 open | Conflicts 1 open | Escalations | Mission Control | Insights";
 const QUESTION_ASKED = /May permission checks be cached within a session\?/;
+/** The home's first part for someone signed in: the questions Keel has put to them. */
+const waitingOn = (shown: Page) => shown.getByRole("region", { name: "Waiting for you" });
+const NONE_WAITING = "No question is waiting for you.";
+/** What a home says of the reader's questions: the line that none waits, and how many are listed. */
+const waitingSaid = async (shown: Page): Promise<string> =>
+  `${await waitingOn(shown).getByText(NONE_WAITING).count()} | ${await waitingOn(shown).getByRole("listitem").count()} listed`;
 /** What a reader Keel shows no questions to is told of them, where the list or one of them would be. */
 const FOR_MEMBERS = "Keel shows a project's questions to its members";
 const filesOn = async (shown: Page): Promise<string> =>
@@ -1642,6 +1648,13 @@ expectEqual(
   "visitor: the home lists the public projects, each under its org",
   squash(await visitor.getByRole("list", { name: "Projects" }).innerText()),
   "ada / demo public",
+);
+// Keel puts a question to a person, by their session. A visitor has none: the home has no such list, and
+// Keel is not asked for one.
+expectEqual(
+  "visitor: the home has no list of questions, and Keel is asked for none",
+  `${await waitingOn(visitor).count()} | ${open.calls.filter((call) => call.path === "/v1/escalations").length} asked`,
+  "0 | 0 asked",
 );
 await visitor.getByRole("list", { name: "Projects" }).getByRole("link", { name: "demo" }).click();
 // The code is asked for as soon as Keel has said which project the address names, and is drawn when it comes:
@@ -2472,6 +2485,58 @@ expectEqual("orgs: deleted, it is no longer there", whereOf(person), "/lovelace"
 // ─── A project, to a member of its org and to someone who is not ───
 // Ada's browser reads the Keel on which her org keeps the project private. She is a member, by the session she
 // signed in with above, so Keel shows it to her: on her org's home, at its own address, and in the frame.
+// Her home says first what Keel has put to her, across her projects: the question by Keel's label, under its
+// project, and a link to its own page, where it is answered.
+/** How many times this Keel has been asked for someone's questions. */
+const listsAsked = (): number =>
+  shut.calls.filter((call) => call.path === "/v1/escalations").length;
+await person.goto(`${built}/`, { waitUntil: "domcontentloaded" });
+const hers = waitingOn(person).getByRole("listitem");
+await hers
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "member: her home lists first the question Keel has put to her, by Keel's label and under its project, and it leads to the question's own page",
+  (await hers.count()) === 1
+    ? `${QUESTION_ASKED.test(await hers.getByRole("link").first().innerText()) ? "the question" : "another"} | ${squash(await hers.locator("b").innerText())} | ${squash(await hers.getByRole("link").nth(1).innerText())} | ${(await hers.getByRole("link").first().getAttribute("href")) ?? ""}`
+    : `${await hers.count()} listed`,
+  "the question | E-1 | ada/demo | /ada/demo/escalations/E-1",
+);
+expectEqual(
+  "member: the questions come before her projects on the home",
+  String(
+    await person.evaluate(() => {
+      const waiting = document.querySelector('section[aria-label="Waiting for you"]');
+      const projects = document.querySelector('ul[aria-label="Your projects"]');
+      return waiting !== null && projects !== null
+        ? (waiting.compareDocumentPosition(projects) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        : null;
+    }),
+  ),
+  "true",
+);
+await shot(person, "home-waiting");
+// On a phone the row wraps and nothing runs past the screen.
+await person.setViewportSize({ width: 390, height: 844 });
+// The page's column scrolls by itself, so what is measured is the list: nothing of it lies right of the screen.
+expectEqual(
+  "member: at a phone's width the question's row wraps, and nothing of the list runs past the screen",
+  String(
+    await person.evaluate(() => {
+      const waiting = document.querySelector('section[aria-label="Waiting for you"]');
+      if (waiting === null) return "no list";
+      const drawn = [waiting, ...waiting.querySelectorAll("*")];
+      return (
+        Math.max(...drawn.map((part) => part.getBoundingClientRect().right)) <= window.innerWidth
+      );
+    }),
+  ),
+  "true",
+);
+await shot(person, "home-waiting-phone");
+await person.setViewportSize({ width: 1280, height: 900 });
+
 await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
 await person.getByRole("list", { name: "Projects" }).getByRole("link").first().waitFor();
 expectEqual(
@@ -2519,6 +2584,25 @@ await person.keyboard.press("Escape");
 // The question. Keel's answer about the project named her a member, so its options can be tapped.
 await person.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
 await person.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
+// A second tab is left on her home while she answers in this one. It reads the list as it arrives and once
+// more at the end of Keel's log as it stood, and then holds one read of her feed open: nothing is asked by a clock.
+const listsBefore = listsAsked();
+const homeOpen = watch(await lobby.newPage(), "member, her home left open");
+await homeOpen.goto(`${built}/`, { waitUntil: "domcontentloaded" });
+await waitingOn(homeOpen)
+  .getByRole("listitem")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+for (let tries = 0; tries < 100 && listsAsked() - listsBefore < 2; tries += 1)
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own reads
+  await new Promise((resolve) => setTimeout(resolve, 100));
+await new Promise((resolve) => setTimeout(resolve, 2_500));
+expectEqual(
+  "member: her open home asks for the list on arriving and at the end of Keel's log, and not again while the log says nothing",
+  `${listsAsked() - listsBefore} reads | ${await waitingSaid(homeOpen)}`,
+  "2 reads | 0 | 1 listed",
+);
 expectEqual(
   "built: the parked changes, by Keel's numbers",
   String(await person.getByText("parked on this: #1 and #2").count()),
@@ -2582,6 +2666,18 @@ expectEqual(
   `${squash(await guest.getByRole("main").innerText()).split(" A question")[0] ?? ""} | ${await guest.locator(".a-option").count()} options, ${await guest.getByRole("link", { name: "Sign in" }).count()} ways in offered`,
   `Escalation E-1 ${FOR_MEMBERS} | 0 options, 0 ways in offered`,
 );
+// And her own home lists her none of it: Keel lists a question to the person it was put to and to the
+// namespace's maintainers.
+await guest.goto(`${built}/`, { waitUntil: "domcontentloaded" });
+await waitingOn(guest)
+  .getByText(NONE_WAITING)
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "stranger: someone signed in who is no member of a project is listed no question of it",
+  await waitingSaid(guest),
+  "1 | 0 listed",
+);
 await visiting.close();
 await second.close();
 
@@ -2590,6 +2686,18 @@ await person.locator(".a-option", { hasText: "Never cache permission checks" }).
 await person
   .getByRole("heading", { name: "Ruled: Never cache permission checks" })
   .waitFor({ timeout: 15_000 });
+// The tab left on her home hears of it from Keel's log, and reads the list again: the question is gone from it
+// with no reload.
+await waitingOn(homeOpen)
+  .getByText(NONE_WAITING)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "member: answered in one tab, the question leaves her home in the other with no reload, because Keel's log said so",
+  await waitingSaid(homeOpen),
+  "1 | 0 listed",
+);
+await homeOpen.close();
 expectEqual(
   "Keel: one ruling, the member's",
   shut

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.offered
+# why: the person Keel put a question to first is offered no way to answer it unless they also maintain the namespace
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 3377497..15d752c 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -317,7 +317,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+       // only the project's public part: neither has anything to ask.
+       if (project.viewer === undefined || maintainer) return;
+       for (const item of await createHttpDirectory(options).listWaiting(signal))
+-        putToReader.add(item.id);
++        void item;
+     },
+     async giveRuling(command: RulingCommand): Promise<void> {
+       // The operation's whole input, as Keel's contract has it: the question in the path, the key in the

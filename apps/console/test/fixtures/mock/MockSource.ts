@@ -92,6 +92,9 @@ export async function fixtureDirectory(source: MockSource): Promise<KeelDirector
         org === FIXTURE_ORG ? (listed().find((project) => project.name === name) ?? null) : null,
       ),
     listProjects: () => Promise.resolve(listed()),
+    // A fixture has nobody signed in: no question is listed to anyone, and no feed is anyone's own.
+    listWaiting: () => Promise.resolve([]),
+    readOwnFeed: (asked) => Promise.resolve({ items: [], nextCursor: asked.cursor ?? "0" }),
   };
 }
 

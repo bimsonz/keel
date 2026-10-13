@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.own-feed
+# why: the reader's feed is asked to wait longer than Keel's thirty seconds, which Keel refuses as an invalid request
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 3377497..32a84c8 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -190,7 +190,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+       const input: Inbox_listEventsInput = {
+         limit: Math.min(asked.limit ?? 500, 500),
+         ...(asked.cursor === undefined || asked.cursor === "" ? {} : { cursor: asked.cursor }),
+-        ...((asked.waitSec ?? 0) > 0 ? { wait: Math.min(asked.waitSec ?? 0, 30) } : {}),
++        ...((asked.waitSec ?? 0) > 0 ? { wait: asked.waitSec ?? 0 } : {}),
+       };
+       const response = await read(`/v1/events${queryOf({ ...input })}`, asked.signal);
+       if (!response.ok) throw await refusalOf(response);

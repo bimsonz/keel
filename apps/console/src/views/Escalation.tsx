@@ -6,12 +6,16 @@ import { CheckCircleIcon, HandPalmIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { EscalationCategory } from "../contract/events.ts";
 import { choicesOf } from "../engine/select.ts";
+import { KeelRefused } from "../source/types.ts";
 import type { EscalationEntry, World } from "../engine/world.ts";
 import { Detail, Head, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import { Qr } from "./Qr.tsx";
 import { ChangeLink, ConflictLink, SubjectLink } from "./links.tsx";
 import { EvidenceList, Panel, clockTime, dateTime } from "./parts.tsx";
+
+/** Keel's refusals of a ruling that say the question takes no answer any more. */
+const CLOSED: ReadonlySet<string> = new Set(["escalation.state_refused", "escalation.not_found"]);
 
 export const CATEGORY: Record<EscalationCategory, string> = {
   "permission-semantics": "Permission semantics",
@@ -66,7 +70,12 @@ export function Escalation({
   onRule: (escalationId: string, option: string) => Promise<void>;
 }) {
   const [sending, setSending] = useState<string | null>(null);
-  const [refused, setRefused] = useState<string | null>(null);
+  const [refused, setRefused] = useState<{
+    said: string;
+    next: readonly string[];
+    /** Whether the question still takes an answer: not where Keel says it was answered, or is not there. */
+    open: boolean;
+  } | null>(null);
   const open = escalation.state === "open";
   const conflict =
     escalation.about.kind === "conflict" ? world.conflicts.get(escalation.about.id) : undefined;
@@ -89,8 +98,13 @@ export function Escalation({
     try {
       await onRule(escalation.id, option);
     } catch (error) {
-      // A ruling Keel would not take is said, and the question stays open to be answered again.
-      setRefused(error instanceof Error ? error.message : "The answer could not be sent.");
+      // A ruling Keel would not take is said in Keel's words, with the ways forward it gave. The question stays
+      // open to be answered again unless Keel says it is closed or gone.
+      setRefused({
+        said: error instanceof Error ? error.message : "The answer could not be sent.",
+        next: error instanceof KeelRefused ? error.next : [],
+        open: !(error instanceof KeelRefused && CLOSED.has(error.code)),
+      });
     } finally {
       setSending(null);
     }
@@ -161,8 +175,19 @@ export function Escalation({
                   className="text-base font-medium"
                   style={{ color: "var(--a-fail-ink)" }}
                 >
-                  Keel did not take that answer: {refused} The question is still open.
+                  Keel did not take that answer: {refused.said}
+                  {refused.open && " The question is still open."}
                 </p>
+              )}
+              {refused !== null && refused.next.length > 0 && (
+                <ul
+                  aria-label="What Keel says to do next"
+                  className="flex list-disc flex-col gap-1 pl-5 text-sm text-kumo-default"
+                >
+                  {refused.next.map((title) => (
+                    <li key={title}>{title}</li>
+                  ))}
+                </ul>
               )}
               {!answerable && <p className="text-sm text-kumo-subtle">{readOnly}</p>}
               {phoneUrl !== undefined && (

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.waiting
+# why: Keel is asked for every question it ever listed the reader, answered ones too, where the home lists what waits
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 3377497..3f6b69b 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -170,7 +170,6 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+       do {
+         // The operation's own input. A page may hold fewer than its limit while its cursor says more follow.
+         const input: Operator_listEscalationsInput = {
+-          state: "open",
+           limit: 100,
+           ...(cursor === undefined ? {} : { cursor }),
+         };

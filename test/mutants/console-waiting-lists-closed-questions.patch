@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.rows
+# why: a question answered or withdrawn since Keel listed it is still shown as waiting for the reader
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index 4c11fac..a897ac7 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -28,7 +28,6 @@ export interface WaitingRow {
+ /** The questions still open, in the order Keel listed them. One answered or withdrawn since is not waiting. */
+ export function waitingRows(listed: readonly EscalationView[]): WaitingRow[] {
+   return listed
+-    .filter((item) => item.state === "open")
+     .map((item) => ({
+       id: item.id,
+       label: item.label,

@@ -42,6 +42,17 @@ export interface KeelDirectory {
   findProject(org: string, name: string, signal?: AbortSignal): Promise<Keel.ProjectView | null>;
   /** Every project Keel lists to this reader. */
   listProjects(signal?: AbortSignal): Promise<Keel.ProjectView[]>;
+  /**
+   * The open questions Keel lists to whoever is signed in, across every project it reads them, newest first:
+   * one whose agent they sponsor, and one of a namespace they maintain once Keel puts it to its maintainers.
+   * Keel refuses a reader with no session, so a visitor's page never asks.
+   */
+  listWaiting(signal?: AbortSignal): Promise<Keel.EscalationView[]>;
+  /**
+   * The next stretch of the reader's own feed, `GET /v1/events` with no project named: Keel's log across every
+   * project it reads them. Only what kind each entry is, which is enough to know a question was put or closed.
+   */
+  readOwnFeed(asked: ReadRequest): Promise<Page<string>>;
 }
 
 export interface SourceDescriptor {
@@ -124,6 +135,11 @@ export interface KeelCommands {
   giveRuling(command: RulingCommand): Promise<void>;
   /** Whether to offer this reader the ruling's buttons. Absent: the source decides some other way. */
   canRule?(escalationId: string): boolean;
+  /**
+   * Asks Keel which open questions it lists to this reader, where `canRule` waits on that: Keel takes a ruling
+   * from the person a question was put to first, whatever their role. Absent where nothing is to be asked.
+   */
+  readAsked?(signal?: AbortSignal): Promise<void>;
 }
 
 /** Keel refused something, and said why. `next` is the ways forward it gave, each by its title. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.offered
+# why: every member of a project's namespace is offered a question's options, where Keel takes an answer from the person it was put to or a maintainer
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 3377497..c5b76ab 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -311,7 +311,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+     // Keel decides who may answer: the person a question was put to first, and a maintainer of the project's
+     // namespace (`sponsorOrMaintain`). The buttons are offered to a maintainer, and to whoever Keel lists the
+     // question to; anyone else would be refused, and is offered none.
+-    canRule: (escalationId: string): boolean => maintainer || putToReader.has(escalationId),
++    canRule: (_escalationId: string): boolean => project.viewer !== undefined,
+     async readAsked(signal?: AbortSignal): Promise<void> {
+       // A maintainer is offered every question of the project, and Keel lists none of it to someone it reads
+       // only the project's public part: neither has anything to ask.

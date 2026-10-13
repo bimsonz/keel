@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.refused
+# why: a feed Keel refuses is asked for again and again, where the refusal is Keel's answer
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index 4c11fac..e2906c5 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -80,7 +80,6 @@ export async function followTurns(
+       if (page.items.some((type) => TURNS.has(type))) again();
+       if (movedOn) continue;
+     } catch (error) {
+-      if (error instanceof KeelRefused) return;
+       // The read dropped on the way. It is asked again from the same place, after a pause that grows.
+       dropped = true;
+     }

@@ -17,11 +17,14 @@
 import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";
 import type {
+  EscalationPage,
+  EscalationView,
   EventPage,
   EventRecord,
   Inbox_listEventsInput,
   LatticeSet,
   Operator_giveRulingInput,
+  Operator_listEscalationsInput,
   Operator_putSettingsInput,
   ProjectPage,
   ProjectSettings,
@@ -161,6 +164,41 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
       } while (cursor !== undefined && cursor !== "");
       return listed;
     },
+    async listWaiting(signal) {
+      const listed: EscalationView[] = [];
+      let cursor: string | undefined;
+      do {
+        // The operation's own input. A page may hold fewer than its limit while its cursor says more follow.
+        const input: Operator_listEscalationsInput = {
+          state: "open",
+          limit: 100,
+          ...(cursor === undefined ? {} : { cursor }),
+        };
+        // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+        const response = await read(`/v1/escalations${queryOf({ ...input })}`, signal);
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        if (!response.ok) throw await refusalOf(response);
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        const page = await answered<Partial<EscalationPage>>(response);
+        listed.push(...(page.items ?? []));
+        cursor = page.nextCursor;
+      } while (cursor !== undefined && cursor !== "");
+      return listed;
+    },
+    async readOwnFeed(asked) {
+      // No project is named: Keel reads a signed-in person every project it may, each as it reads them there.
+      const input: Inbox_listEventsInput = {
+        limit: Math.min(asked.limit ?? 500, 500),
+        ...(asked.cursor === undefined || asked.cursor === "" ? {} : { cursor: asked.cursor }),
+        ...((asked.waitSec ?? 0) > 0 ? { wait: Math.min(asked.waitSec ?? 0, 30) } : {}),
+      };
+      const response = await read(`/v1/events${queryOf({ ...input })}`, asked.signal);
+      if (!response.ok) throw await refusalOf(response);
+      const page = await answered<Partial<EventPage>>(response);
+      if (page.items === undefined || typeof page.nextCursor !== "string")
+        throw new Error("reading events failed: the page has no cursor");
+      return { items: page.items.map((record) => record.type), nextCursor: page.nextCursor };
+    },
   };
 }
 
@@ -211,6 +249,10 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       nextCursor: page.nextCursor,
     };
   };
+
+  /** The open questions Keel lists to this reader: theirs to answer, whatever their role. */
+  const putToReader = new Set<string>();
+  const maintainer = project.viewer?.role === "owner" || project.viewer?.role === "maintainer";
 
   const descriptor: SourceDescriptor = { mode: "live", project };
 
@@ -266,9 +308,17 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       const view: VerdictView = await response.json();
       return view;
     },
-    // Keel decides who may answer. The buttons are offered to a member of the project's org, and for the finer
-    // cases Keel's own refusal says no.
-    canRule: (): boolean => project.viewer !== undefined,
+    // Keel decides who may answer: the person a question was put to first, and a maintainer of the project's
+    // namespace (`sponsorOrMaintain`). The buttons are offered to a maintainer, and to whoever Keel lists the
+    // question to; anyone else would be refused, and is offered none.
+    canRule: (escalationId: string): boolean => maintainer || putToReader.has(escalationId),
+    async readAsked(signal?: AbortSignal): Promise<void> {
+      // A maintainer is offered every question of the project, and Keel lists none of it to someone it reads
+      // only the project's public part: neither has anything to ask.
+      if (project.viewer === undefined || maintainer) return;
+      for (const item of await createHttpDirectory(options).listWaiting(signal))
+        putToReader.add(item.id);
+    },
     async giveRuling(command: RulingCommand): Promise<void> {
       // The operation's whole input, as Keel's contract has it: the question in the path, the key in the
       // header, and the ruling as the body.

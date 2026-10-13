@@ -13,6 +13,7 @@
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
+  EscalationPage,
   EscalationView,
   EventPage,
   EventRecord,
@@ -50,9 +51,16 @@ export type Role = NonNullable<ProjectView["viewer"]>["role"];
 
 /**
  * Who a request is from, as Keel's gate reads it: a user, by their session, with the role they have in the
- * project's org where they are a member of it; or null, a visitor.
+ * project's org where they are a member of it; or null, a visitor. `sponsor` says they are the person the
+ * question's agent names: the one Keel asks first.
  */
-export type Reader = { role?: Role } | null;
+export type Reader = { role?: Role; sponsor?: boolean } | null;
+
+/**
+ * How long a question waits for the person asked first before Keel lists it to its namespace's maintainers
+ * too: `MAINTAINERS_AFTER_MS` in Keel's core, `escalation-views.ts`. Written beside Keel's and not imported.
+ */
+export const MAINTAINERS_AFTER_MS = 30 * 60 * 1000;
 
 /**
  * The events Keel reads to a project's members and to nobody else, as its read scope has them
@@ -120,6 +128,7 @@ interface ProblemDetails {
   title: string;
   status: number;
   code: string;
+  detail?: string;
   requestId: string;
   nextActions: NextAction[];
 }
@@ -140,12 +149,18 @@ function fields(text: string): Map<string, unknown> {
   );
 }
 
-function problem(status: number, code: string, nextActions: NextAction[] = []): Response {
+function problem(
+  status: number,
+  code: string,
+  nextActions: NextAction[] = [],
+  detail?: string,
+): Response {
   const body: ProblemDetails = {
     type: `https://keel.town/problems/${code}`,
     title: code,
     status,
     code,
+    ...(detail === undefined ? {} : { detail }),
     requestId: "req_test",
     nextActions,
   };
@@ -157,6 +172,21 @@ const lacks = (role: string): Response =>
   problem(403, "auth.forbidden", [
     { kind: "escalate", title: `Ask ${role}: this needs that role` },
   ]);
+
+/** Keel's sentence for a question that is not there, or is one of a project this reader is not shown. */
+const noQuestion = (id: string): Response =>
+  problem(
+    404,
+    "escalation.not_found",
+    [
+      {
+        kind: "read",
+        title: "List the questions waiting for you",
+        operationId: "Operator_listEscalations",
+      },
+    ],
+    `No escalation ${id}.`,
+  );
 
 export function createFakeKeel(
   options: {
@@ -170,6 +200,16 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
+    /**
+     * The session, by its cookie's value, of the person the question's agent names: Keel asks them first, and
+     * its namespace's maintainers once `MAINTAINERS_AFTER_MS` has passed. Left out, with `sponsored` unset, the
+     * question names nobody and is its maintainers' at once.
+     */
+    sponsor?: string;
+    /** That the question names a sponsor, where `readerOf` says who each reader is. */
+    sponsored?: boolean;
+    /** Keel's clock, for what it lists to whom and when. The wall clock unless a test says otherwise. */
+    now?: () => number;
     /**
      * How many entries of other projects the instance's log holds ahead of this project's first. Keel's log is
      * the whole instance's: a page is its next stretch with the project's entries picked out, so a stretch
@@ -214,8 +254,26 @@ export function createFakeKeel(
       )?.[1];
       const role = held === undefined ? undefined : options.sessions?.[held];
       if (role === undefined) return null;
-      return role === "stranger" ? {} : { role };
+      const sponsor = held === options.sponsor ? { sponsor: true } : {};
+      return role === "stranger" ? sponsor : { role, ...sponsor };
     });
+  const sponsored = options.sponsor !== undefined || options.sponsored === true;
+  const now = options.now ?? Date.now;
+  /** The question as Keel's list and its ruling both answer it: its label, its project's place, where it stands. */
+  const viewOf = (asked: NonNullable<ReturnType<typeof raised>>): EscalationView => ({
+    id: asked.payload.escalationId,
+    label: asked.label ?? "E-1",
+    project: { id: project.id, namespace: project.org, name: project.name },
+    question: asked.payload.question,
+    options: asked.payload.options,
+    about: asked.payload.about,
+    category: asked.payload.category,
+    evidence: asked.payload.evidence,
+    precedents: asked.payload.precedents,
+    default: asked.payload.default,
+    raisedAt: asked.at,
+    state: ruled === undefined ? "open" : "ruled",
+  });
 
   return {
     calls,
@@ -298,11 +356,10 @@ export function createFakeKeel(
 
       if (url.pathname === "/v1/events" && request.method === "GET") {
         const asked = url.searchParams.get("project");
-        // A log is one project's. Asked for none, a user is read the projects of their orgs, and a visitor is
-        // told to name one.
-        if (asked === null && reader === null) return problem(400, "request.invalid");
+        // A log is one project's. Asked for none, someone signed in is read every project Keel may read them,
+        // and a visitor is asked for a session: the spec's "without a token and without `project`, 401".
+        if (asked === null && reader === null) return problem(401, "auth.required");
         if (asked !== null && (asked !== project.id || !visible)) return gone();
-        if (asked === null && !member) return Response.json({ items: [], nextCursor: "0" });
         const from = Number(url.searchParams.get("cursor") ?? "0") || 0;
         const limit = Math.min(Number(url.searchParams.get("limit") ?? "500") || 500, pageSize);
         // A stretch of the instance's log that is all other projects' is an empty page, and the cursor moves on.
@@ -325,7 +382,9 @@ export function createFakeKeel(
         // the cursor moves on past what they were not shown.
         const cut = log.events.slice(start, start + limit);
         const items = cut
-          .filter((event) => member || !MEMBERS_ONLY.has(event.type))
+          // With no project named, someone signed in is read every project Keel may read them: this one as its
+          // member, its public part where it is public, and nothing of it otherwise.
+          .filter((event) => member || (visible && !MEMBERS_ONLY.has(event.type)))
           .map(
             ({
               eventId,
@@ -414,11 +473,31 @@ export function createFakeKeel(
         return Response.json(settings());
       }
 
+      // A person's own questions, across their projects: one whose agent names them, at once; one of a
+      // namespace they maintain, once the person asked first has had `MAINTAINERS_AFTER_MS`, or at once where
+      // nobody is named. Only of a project Keel reads them as a member (`listedTo`, and the doorway's `placeOf`).
+      if (url.pathname === "/v1/escalations" && request.method === "GET") {
+        if (reader === null) return problem(401, "auth.required");
+        const asked = raised();
+        const state = url.searchParams.get("state");
+        const maintainer = reader.role === "owner" || reader.role === "maintainer";
+        const listed =
+          asked !== undefined &&
+          member &&
+          (state === null || state === (ruled === undefined ? "open" : "ruled")) &&
+          (reader.sponsor === true ||
+            (maintainer && (!sponsored || now() - Date.parse(asked.at) >= MAINTAINERS_AFTER_MS)));
+        return Response.json({
+          items: listed ? [viewOf(asked)] : [],
+        } satisfies EscalationPage);
+      }
+
       const ruling = /^\/v1\/escalations\/([^/]+)\/ruling$/.exec(url.pathname);
       if (ruling !== null && request.method === "POST") {
         // A question is answered by a person: one who is signed in, on a page of Keel's own site, and a member
         // of the project's org. Whoever the project is not shown to is told there is no such question.
-        if (!visible) return gone();
+        const asking = decodeURIComponent(ruling[1] ?? "");
+        if (!visible) return noQuestion(asking);
         if (reader === null) return problem(401, "auth.required");
         // A page of another site, and a call that names no site, are refused alike.
         if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
@@ -426,27 +505,15 @@ export function createFakeKeel(
           return problem(403, "auth.forbidden", [
             { kind: "escalate", title: `Ask an owner of ${project.org} to make you a member` },
           ]);
-        if (decodeURIComponent(ruling[1] ?? "") !== escalationId)
-          return problem(404, "resource.not_found");
+        if (asking !== escalationId) return noQuestion(asking);
+        // A ruling is the person's the question was put to first, or a maintainer's: Keel's `sponsorOrMaintain`.
+        if (reader.sponsor !== true && reader.role === "member")
+          return lacks("the person the question was put to, or a maintainer or an owner");
         const key = request.headers.get("idempotency-key") ?? "";
         const asked = raised();
-        if (asked === undefined) return problem(404, "resource.not_found");
+        if (asked === undefined) return noQuestion(asking);
         // A ruling answers with the question as it now stands.
-        const { payload } = asked;
-        const view = (): EscalationView => ({
-          id: payload.escalationId,
-          label: asked.label ?? "E-1",
-          project: { id: project.id, namespace: project.org, name: project.name },
-          question: payload.question,
-          options: payload.options,
-          about: payload.about,
-          category: payload.category,
-          evidence: payload.evidence,
-          precedents: payload.precedents,
-          default: payload.default,
-          raisedAt: asked.at,
-          state: "ruled",
-        });
+        const view = (): EscalationView => ({ ...viewOf(asked), state: "ruled" });
         const body = fields(sent);
         const option = body.get("option");
         // A body Keel cannot read is refused before the domain sees it.
@@ -454,7 +521,13 @@ export function createFakeKeel(
         // The same command again is answered as it was. The same key on another command is a conflict, as it is
         // on every operation of Keel's that takes a key; and any other command finds the question closed.
         if (ruled !== undefined) {
-          if (ruled.key !== key) return problem(409, "escalation.state_refused");
+          if (ruled.key !== key)
+            return problem(
+              409,
+              "escalation.state_refused",
+              [],
+              `${asking} is ruled: it takes one ruling, while it is open.`,
+            );
           return ruled.option === option
             ? Response.json(view())
             : problem(409, "request.idempotency_conflict");
@@ -464,13 +537,14 @@ export function createFakeKeel(
         if (!isRuling(option)) {
           return problem(
             400,
-            "ruling-option-unknown",
+            "escalation.option_unknown",
             S1_CHOICES.map((choice) => ({
               kind: "call",
               title: choice.label,
               operationId: "Operator_giveRuling",
               args: { option: choice.id },
             })),
+            `${asking} does not offer the option ${option}.`,
           );
         }
         ruled = { option, key };
