@@ -19,6 +19,7 @@ import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
 import { ORG_ROLES, orgAccess } from "./roles.ts";
+import { ownSessions, SESSION_WRITE_SECONDS } from "./sessions.ts";
 
 /** Where Better Auth answers, under Keel's API and outside its TypeSpec document. */
 export const AUTH_BASE_PATH = "/v1/auth";
@@ -37,9 +38,9 @@ export const DEVICE_CLIENT_ID = "keeltown";
 export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
 
 /**
- * Better Auth's routes Keel does not serve. A session list answers every
- * session's token and revoking one takes it, so the console offers only "sign
- * out everywhere else". Keel has no passwords: every route that takes, sets,
+ * Better Auth's routes Keel does not serve. Its session list answers every
+ * session's token and its revoke takes one, so Keel serves a pair of its own,
+ * which names a session by its id (sessions.ts). Keel has no passwords: every route that takes, sets,
  * checks or resets one is off, the email code's among them (it would set a
  * password with no session, and a handle would then sign in with it), and so
  * is Better Auth's account deletion, which asks for one.
@@ -296,6 +297,8 @@ export function authOptions(config: AuthConfig) {
     rateLimit: { enabled: false },
     // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
     session: {
+      // A row is written again once its session is used this long after the last write (sessions.ts).
+      updateAge: SESSION_WRITE_SECONDS,
       additionalFields: {
         signedInBy: { type: "string", required: false, input: false },
       },
@@ -424,6 +427,7 @@ export function authOptions(config: AuthConfig) {
         validateClient: (clientId) => clientId === DEVICE_CLIENT_ID,
       }),
       bearer(),
+      ownSessions(),
       // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
       // is never turned into a token: no answer carries one in a header.
       jwt({
