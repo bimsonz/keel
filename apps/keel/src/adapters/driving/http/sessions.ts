@@ -7,7 +7,7 @@ import type { Session } from "@keeltown/core/domain/memory";
 import type { OpenSessionInput } from "@keeltown/core/ports";
 import type { Sessions_openSessionResult } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
-import { admissionRefused } from "./mappers.ts";
+import { admissionRefused, runView } from "./mappers.ts";
 import { problem } from "./problems.ts";
 import type { Input } from "./work-loop.ts";
 
@@ -28,6 +28,7 @@ export function sessionOk(session: Session): Sessions_openSessionResult {
       id: session.id,
       agentId: session.agentId,
       ...(session.sponsor === undefined ? {} : { sponsor: session.sponsor }),
+      ...(session.run === undefined ? {} : { run: runView(session.run) }),
       openedAt: new Date(session.openedAt).toISOString(),
     },
   };

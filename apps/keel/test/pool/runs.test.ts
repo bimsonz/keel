@@ -118,11 +118,14 @@ async function inboxOf(token: string): Promise<readonly WireNotice[]> {
 async function whoami(token: string) {
   const response = await asAgent(token, "/v1/agents/me");
   const body = await response.json<{
-    result: { session: { id: string } | null };
+    summary: string;
+    result: { session: { id: string } | null; run?: RunRef };
     notices?: WireNotice[];
   }>();
   return {
     status: response.status,
+    summary: body.summary,
+    run: body.result.run,
     session: body.result.session,
     notices: (body.notices ?? []).map((notice) => notice.id),
   };
@@ -218,13 +221,23 @@ async function lapsed(projectId: ProjectId): Promise<ChangeUnderTest> {
 }
 
 /** The token's run adopts the change through the Worker, as the agent's own command. */
-async function adopt(token: string, c: ChangeUnderTest, key: string): Promise<void> {
+async function adopt(token: string, c: ChangeUnderTest, key: string) {
   const response = await asAgent(token, `/v1/changes/${c.changeId}/adopt`, {
     method: "POST",
     headers: { "idempotency-key": key },
   });
   if (response.status !== 200)
     throw new Error(`the adoption answered ${response.status}: ${await response.text()}`);
+  return (await response.json<{ result: { change: { id: string; run?: RunRef } } }>()).result
+    .change;
+}
+
+/** The change as its holder reads it back. */
+async function changeOf(token: string, c: ChangeUnderTest) {
+  const response = await asAgent(token, `/v1/changes/${c.changeId}`);
+  if (response.status !== 200)
+    throw new Error(`the change answered ${response.status}: ${await response.text()}`);
+  return response.json<{ id: string; run?: RunRef }>();
 }
 
 /** Another agent adopts the change once its lease has lapsed again, over the change's own RPC. */
@@ -255,6 +268,11 @@ const told = (...changes: ChangeUnderTest[]) => new Set(changes.map((c) => `chan
 
 /** Opens a session as the token's run, through the Worker; answers its id. */
 async function openSession(token: string, key: string): Promise<string> {
+  return (await openedSession(token, key)).id;
+}
+
+/** The session as opening it answers. */
+async function openedSession(token: string, key: string) {
   const response = await asAgent(token, "/v1/sessions", {
     method: "POST",
     headers: { "content-type": "application/json", "idempotency-key": key },
@@ -262,7 +280,7 @@ async function openSession(token: string, key: string): Promise<string> {
   });
   if (response.status !== 201)
     throw new Error(`the session answered ${response.status}: ${await response.text()}`);
-  return (await response.json<{ id: string }>()).id;
+  return response.json<{ id: string; run?: RunRef }>();
 }
 
 /** Reads SSE events off a stream, skipping comments; each `next()` answers the next notice's id. */
@@ -375,6 +393,34 @@ describe("an agent's two runs, each with its own token", () => {
     expect(await sessions()).toEqual([{ id: ofA }, { id: ofB }, null]);
     const ofNone = await openSession(agent.plain, "session-key-000n");
     expect(await sessions()).toEqual([{ id: ofA }, { id: ofB }, { id: ofNone }]);
+  });
+
+  it("[run.pool-views] whoami, a session and a change each name the run: the asking token's, the one that opened it, the one that holds it; a token that names no run reads none", async () => {
+    const agent = await keyAgent();
+    const [asA, asB, asNone] = [
+      await whoami(agent.a.token),
+      await whoami(agent.b.token),
+      await whoami(agent.plain),
+    ];
+    expect([asA.run, asB.run]).toEqual([agent.a.run, agent.b.run]);
+    expect(asNone).not.toHaveProperty("run", expect.anything());
+    expect([asA.summary, asNone.summary].map((line) => line.includes("in run run-a"))).toEqual([
+      true,
+      false,
+    ]);
+
+    const opened = [
+      await openedSession(agent.a.token, "views-key-0000a"),
+      await openedSession(agent.plain, "views-key-0000n"),
+    ];
+    expect(opened[0]?.run).toEqual(agent.a.run);
+    expect(opened[1]).not.toHaveProperty("run");
+
+    const [held, loose] = [await lapsed(agent.projectId), await lapsed(agent.projectId)];
+    expect((await adopt(agent.b.token, held, "views-adopt-000b")).run).toEqual(agent.b.run);
+    expect((await changeOf(agent.b.token, held)).run).toEqual(agent.b.run);
+    expect(await adopt(agent.plain, loose, "views-adopt-000n")).not.toHaveProperty("run");
+    expect(await changeOf(agent.plain, loose)).not.toHaveProperty("run");
   });
 
   it("[run.pool-stream] the SSE stream carries the reading run's notices only, those waiting and those that arrive", async () => {

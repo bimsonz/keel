@@ -20,6 +20,9 @@ model Session {
   /** The user who sponsors the agent, from its enrolment: never named by the request. */
   sponsor?: UserId;
 
+  /** The run that opened it, when its token named one. */
+  run?: RunRef;
+
   openedAt: utcDateTime;
 }
 
@@ -28,7 +31,8 @@ model Session {
 interface Sessions {
   /**
    * Open a session: the record of the agent's working conversation, independent
-   * of commits. It becomes the agent's current session, replacing any other.
+   * of commits. It becomes the current session of the token's run, replacing that
+   * run's other: another run's session stays.
    * A retry with the same Idempotency-Key and body answers the same session.
    */
   @summary("Open a session")

@@ -72,6 +72,9 @@ model Change {
   /** The commit last submitted; it is the commit that lands. */
   commitSha?: CommitSha;
 
+  /** The run of the agent that holds the change, when its token named one. */
+  run?: RunRef;
+
   createdAt: utcDateTime;
 }
 

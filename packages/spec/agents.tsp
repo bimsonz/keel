@@ -60,7 +60,10 @@ model SessionRef {
 model WhoAmI {
   agent: AgentProfile;
 
-  /** The agent's open session, if it has one. */
+  /** The run the presented token names, when it names one: one agent has any number at once. */
+  run?: RunRef;
+
+  /** The open session of the token's run, if it has one: a session is its run's. */
   session: SessionRef | null;
 }
 
@@ -111,7 +114,7 @@ model SponsoredAgents {
 @tag("Agents")
 @route("/agents")
 interface Agents {
-  /** Who the presented token belongs to, its scopes, and its open session. Call it first. */
+  /** Who the presented token belongs to, its scopes, its run and that run's open session. Call it first. */
   @summary("Who am I?")
   @tag("mcp")
   @operationId("whoami")

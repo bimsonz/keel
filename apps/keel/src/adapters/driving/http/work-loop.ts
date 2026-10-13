@@ -63,6 +63,7 @@ import type {
 } from "../../../generated/http/app.gen.ts";
 import { noticeView } from "../notices.ts";
 import type { Caller } from "./caller.ts";
+import { runView } from "./mappers.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
 
 /**
@@ -234,6 +235,7 @@ function changeView(change: Change) {
       ? {}
       : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
     ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
+    ...(change.run === undefined ? {} : { run: runView(change.run) }),
     createdAt: iso(change.createdAt),
   };
 }

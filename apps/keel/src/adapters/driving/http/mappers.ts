@@ -8,6 +8,7 @@ import type {
 } from "@keeltown/core/domain/identity";
 import type { GrantedToken, SignedUp } from "@keeltown/core/application/identity";
 import { LATTICES } from "@keeltown/core/domain/coordination";
+import type { RunRef } from "@keeltown/core/kernel";
 import type {
   Auth_exchangeTokenResult,
   Auth_registerClientResult,
@@ -64,15 +65,23 @@ export function latticesOk(): Lattices_listLatticesResult {
   };
 }
 
+/** A run as a view names it: its id, and its label when the agent gave one. */
+export const runView = (run: RunRef) => ({
+  id: run.id,
+  ...(run.label === undefined ? {} : { label: run.label }),
+});
+
 export function whoamiOk(identity: Identity): WhoamiResult {
-  const { agent } = identity;
+  const { agent, run } = identity;
+  const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
   return {
     status: 200,
     body: {
       ok: true,
-      summary: `You are ${agent.name} (${agent.id}), holding ${agent.scopes.join(", ")}.`,
+      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.`,
       result: {
         agent: agentProfile(agent),
+        ...(run === undefined ? {} : { run: runView(run) }),
         session: identity.session === null ? null : { id: identity.session.id },
       },
       findings: [],

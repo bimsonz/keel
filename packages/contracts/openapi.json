@@ -202,7 +202,7 @@
       "get": {
         "operationId": "whoami",
         "summary": "Who am I?",
-        "description": "Who the presented token belongs to, its scopes, and its open session. Call it first.",
+        "description": "Who the presented token belongs to, its scopes, its run and that run's open session. Call it first.",
         "parameters": [],
         "responses": {
           "200": {
@@ -6516,7 +6516,7 @@
       "post": {
         "operationId": "Sessions_openSession",
         "summary": "Open a session",
-        "description": "Open a session: the record of the agent's working conversation, independent\nof commits. It becomes the agent's current session, replacing any other.\nA retry with the same Idempotency-Key and body answers the same session.",
+        "description": "Open a session: the record of the agent's working conversation, independent\nof commits. It becomes the current session of the token's run, replacing that\nrun's other: another run's session stays.\nA retry with the same Idempotency-Key and body answers the same session.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -8744,6 +8744,14 @@
               }
             ],
             "description": "The commit last submitted; it is the commit that lands."
+          },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The run of the agent that holds the change, when its token named one."
           },
           "createdAt": {
             "type": "string",
@@ -17805,6 +17813,14 @@
             ],
             "description": "The user who sponsors the agent, from its enrolment: never named by the request."
           },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The run that opened it, when its token named one."
+          },
           "openedAt": {
             "type": "string",
             "format": "date-time"
@@ -19335,6 +19351,14 @@
           "agent": {
             "$ref": "#/components/schemas/AgentProfile"
           },
+          "run": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunRef"
+              }
+            ],
+            "description": "The run the presented token names, when it names one: one agent has any number at once."
+          },
           "session": {
             "type": "object",
             "allOf": [
@@ -19343,7 +19367,7 @@
               }
             ],
             "nullable": true,
-            "description": "The agent's open session, if it has one."
+            "description": "The open session of the token's run, if it has one: a session is its run's."
           }
         },
         "additionalProperties": {

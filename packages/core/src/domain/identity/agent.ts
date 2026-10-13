@@ -99,6 +99,9 @@ export interface SessionRef {
 /** What `whoami` answers. */
 export interface Identity {
   readonly agent: Agent;
+  /** The run the token names, when it names one. */
+  readonly run?: RunRef;
+  /** The current session of that run, or of the agent's tokens that name none. */
   readonly session: SessionRef | null;
 }
 
