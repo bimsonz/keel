@@ -106,7 +106,7 @@ export type DraftFailure = typeof DraftFailure.Type;
 
 export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
   probeId: ProbeId,
-  /** `run-failed`: the probe's run ended before its matrix was complete. */
+  /** `run-failed`: the probe's run ended, for any cause, before its matrix was complete. */
   reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed", "run-failed"]),
   /**
    * Optional only so older events still decode. Always set: a probe whose

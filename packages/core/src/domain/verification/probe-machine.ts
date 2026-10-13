@@ -64,8 +64,10 @@ export type ProbeCommand =
       readonly guardId: GuardId;
     }
   /**
-   * The probe's run ended before its matrix was complete: the Workflow or a
-   * world died after the draft was recorded. The probe is discarded
+   * The probe's run ended, for any cause, with admission still pending: the
+   * Workflow or a world died after the draft was recorded, or every cell the
+   * run had was recorded and fewer than three runs were complete. No more
+   * cells are coming, which only the caller knows. The probe is discarded
    * `run-failed`, and its conflict is unprovable.
    */
   | { readonly _tag: "RunFailed" }

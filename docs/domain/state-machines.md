@@ -288,7 +288,7 @@ stateDiagram-v2
 | Calibrating | Calibrating | One world-matrix cell (trunk, A, B, AB or A-noop; run 1–3) completes | Its conflict is Probing it. The same cell again is a retry and commits nothing; a different answer for it is refused | `ProbeRan` |
 | Calibrating | Admitted | Computed from the `ProbeRan` cells | Passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world, **fails in A-noop**, stable over 3 runs | `GuardAdmitted` |
 | Calibrating | Discarded | Not discriminating, or unstable | — | `ProbeDiscarded` |
-| Calibrating | Discarded | The probe's run ends before its matrix is complete: its Workflow or a world died after the draft was recorded | Its conflict is Probing it. The cells recorded so far stay on the probe; they decided nothing, and no guard is admitted | `ProbeDiscarded {reason: run-failed}` |
+| Calibrating | Discarded | The probe's run ends, for any cause, before its matrix is complete: its Workflow or a world died after the draft was recorded, or every cell the run had is recorded and fewer than three runs are complete. The machine cannot tell that no more cells are coming, so its caller reports the run as failed | Its conflict is Probing it. The cells recorded so far stay on the probe; they decided nothing, and no guard is admitted | `ProbeDiscarded {reason: run-failed}` |
 | Admitted | Retired | A superseding Decision | — | `GuardRetired` |
 
 **Terminal:** Discarded, Retired. (An admitted Guard stays Admitted, guarding trunk, until a Decision retires it.)
