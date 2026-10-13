@@ -19,6 +19,9 @@ export const UNROUTED = {
 
 export type UnroutedOperation = keyof typeof UNROUTED;
 
+/** Every operation in the document: each takes an input, answers a body, or both. */
+type DocumentedOperation = keyof WireInputs | keyof WireOutputs;
+
 /**
  * Every operation in the published document, by operation id, except those
  * `UNROUTED` names. A unit test holds this table and the document equal both
@@ -207,9 +210,26 @@ export const ROUTES = {
     path: "/escalations/{escalationId}/ruling",
     headers: ["idempotency-key"],
   },
-} as const satisfies Record<Exclude<keyof WireOutputs, UnroutedOperation>, Route>;
+  Delivery_createCredential: { method: "POST", path: "/namespaces/{handle}/credentials" },
+  Delivery_listCredentials: { method: "GET", path: "/namespaces/{handle}/credentials" },
+  Delivery_deleteCredential: {
+    method: "DELETE",
+    path: "/namespaces/{handle}/credentials/{credentialId}",
+  },
+  Delivery_putDeployTarget: { method: "PUT", path: "/projects/{projectId}/deploy-targets/{name}" },
+  Delivery_listDeployTargets: { method: "GET", path: "/projects/{projectId}/deploy-targets" },
+  Delivery_deleteDeployTarget: {
+    method: "DELETE",
+    path: "/projects/{projectId}/deploy-targets/{name}",
+  },
+} as const satisfies Record<Exclude<DocumentedOperation, UnroutedOperation>, Route>;
 
 export type RoutedOperation = keyof typeof ROUTES;
+
+/** What an operation answers on success: its body, or nothing for one that answers 204. */
+export type OutputOf<Op extends RoutedOperation> = Op extends keyof WireOutputs
+  ? WireOutputs[Op]
+  : undefined;
 
 /** An operation's input as the contract declares it; an operation with no parameters takes none. */
 export type InputOf<Op extends RoutedOperation> = Op extends keyof WireInputs

@@ -4,6 +4,11 @@ import {
   endProjectInvitation,
   inviteToProject,
 } from "@keeltown/core/application/identity";
+import {
+  commitDeployTarget,
+  commitDeployTargetClear,
+  deployTargetsOf,
+} from "@keeltown/core/application/delivery";
 import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
 import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
@@ -15,12 +20,14 @@ import {
 } from "../../../composition/do.ts";
 import {
   AcceptProjectInvitationCommand,
+  ClearDeployTargetCommand,
   CreateProjectCommand,
   EndProjectInvitationCommand,
   InviteToProjectCommand,
   ProjectCodecs,
   type ProjectRpc,
   PutSettingsCommand,
+  SetDeployTargetCommand,
 } from "../../../rpc/index.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
@@ -42,6 +49,9 @@ export class ProjectDO
       | "createProject"
       | "settings"
       | "putSettings"
+      | "deployTargets"
+      | "setDeployTarget"
+      | "clearDeployTarget"
       | "liveChanges"
       | "liveAnchors"
       | "inviteAgent"
@@ -153,5 +163,38 @@ export class ProjectDO
       ),
     );
     return this.answer(ProjectCodecs.putSettings, program);
+  }
+
+  /** The project's deploy targets, in name order; ProjectNotFound before createProject. */
+  async deployTargets() {
+    return this.answer(ProjectCodecs.deployTargets, deployTargetsOf(projectIdOf(this.ctx.id.name)));
+  }
+
+  /** Sets one of the project's deploy targets, decided over the targets it holds. */
+  async setDeployTarget(command: typeof SetDeployTargetCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(SetDeployTargetCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((setting) =>
+        setting.projectId === projectId
+          ? commitDeployTarget(setting)
+          : Effect.die(`a setDeployTarget for ${setting.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.setDeployTarget, program);
+  }
+
+  /** Clears one of the project's deploy targets; refused when it holds none of that name. */
+  async clearDeployTarget(command: typeof ClearDeployTargetCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(ClearDeployTargetCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((clearing) =>
+        clearing.projectId === projectId
+          ? commitDeployTargetClear(clearing)
+          : Effect.die(`a clearDeployTarget for ${clearing.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.clearDeployTarget, program);
   }
 }

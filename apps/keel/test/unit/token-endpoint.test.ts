@@ -34,6 +34,7 @@ import {
   sampleProjectId,
   sampleSponsorId,
   makeNamespaceUsageMemory,
+  deliveryMemoryLayer,
 } from "@keeltown/testing";
 import { decodeJwt } from "jose";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -111,6 +112,7 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
       makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory.layer)),
       invitationsMemoryLayer(),
+      deliveryMemoryLayer(),
       makeUsersMemory().layer,
       makeMembershipsMemory().layer,
       makeNamespacesMemory().layer,

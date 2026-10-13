@@ -20,8 +20,9 @@ type EventType = (
  * Each event type's audience. Exhaustive, so a new event type does not compile
  * until it is placed here. Members only:
  * - operator data: an agent's enrolment (its scopes and its sponsor) and its
- *   standing (suspended, reinstated or revoked, with the reasons), and a
- *   project's settings and deploy targets (an account and a credential's id);
+ *   standing (suspended, reinstated or revoked, with the reasons), a
+ *   project's settings and deploy targets (an account and a credential's id),
+ *   and the credentials an org stores (their labels, never their secrets);
  * - escalations and rulings: the question, its options and the rationale. That
  *   a conflict waits on a ruling is the conflict's own state, so
  *   ConflictEscalated is public;
@@ -148,6 +149,9 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   MessagesCaptured: "members",
   SessionRedacted: "members",
 
+  // An org's credentials, by label, provider and who stored them: never the secret, and still the owners' alone to read.
+  CredentialStored: "members",
+  CredentialRemoved: "members",
   DeployTargetSet: "members",
   DeployTargetCleared: "members",
   PreviewDeployed: "public",

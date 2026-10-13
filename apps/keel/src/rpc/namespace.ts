@@ -1,4 +1,10 @@
 import {
+  CredentialLabel,
+  CredentialMeta,
+  CredentialMissing,
+  DeployProvider,
+} from "@keeltown/core/domain/delivery";
+import {
   IdempotencyConflict,
   Invitation,
   InvitationRefused,
@@ -17,6 +23,7 @@ import {
 import {
   CommandActor,
   AgentId,
+  CredentialId,
   DecisionId,
   EntityRef,
   EscalationId,
@@ -102,6 +109,34 @@ export const EndInvitationCommand = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/**
+ * A credential's secret as it crosses to the namespace's object and is kept
+ * there: sealed in the Worker before it is sent, under a data key of its own
+ * that the key `kek` wraps, all base64. The object never opens it.
+ */
+export const SealedSecret = Schema.Struct({
+  v: Schema.Literal(1),
+  kek: Schema.String,
+  wrapped: Schema.String,
+  iv: Schema.String,
+  ct: Schema.String,
+});
+
+/** A credential to keep (core's `HoldCredential`): the id the Worker minted and sealed the secret under, and the seal. */
+export const PutCredentialCommand = Schema.Struct({
+  id: CredentialId,
+  label: CredentialLabel,
+  provider: DeployProvider,
+  by: UserId,
+  sealed: SealedSecret,
+});
+
+/** A credential to remove, and who removes it. */
+export const RemoveCredentialCommand = Schema.Struct({ id: CredentialId, by: UserId });
+
+/** One credential with its seal, for the Worker that opens it. */
+export const SealedCredential = Schema.Struct({ meta: CredentialMeta, sealed: SealedSecret });
+
 const invitationMove = exitCodec(
   Invitation,
   Schema.Union([InvitationRefused, IdempotencyConflict]),
@@ -122,6 +157,10 @@ export const NamespaceCodecs = {
     ]),
   ),
   escalation: exitCodec(EscalationRecord, EscalationNotFound),
+  putCredential: exitCodec(CredentialMeta, Schema.Never),
+  listCredentials: exitCodec(Schema.Array(CredentialMeta), Schema.Never),
+  getCredential: exitCodec(SealedCredential, CredentialMissing),
+  removeCredential: exitCodec(Schema.Void, CredentialMissing),
 };
 
 /**
@@ -143,4 +182,12 @@ export interface NamespaceRpc extends EventReceiverRpc {
   acceptInvitation(command: typeof AcceptInvitationCommand.Encoded): Promise<ExitJson>;
   /** The agent's invitation ends: it declines or leaves, or a person takes it out. */
   endInvitation(command: typeof EndInvitationCommand.Encoded): Promise<ExitJson>;
+  /** Keeps a credential sealed in the Worker, and commits `CredentialStored`. Once per id. */
+  putCredential(command: typeof PutCredentialCommand.Encoded): Promise<ExitJson>;
+  /** The namespace's credentials, oldest first: their records alone, never a seal. */
+  listCredentials(): Promise<ExitJson>;
+  /** One credential with its seal, for the Worker that opens it. */
+  getCredential(credentialId: string): Promise<ExitJson>;
+  /** Removes a credential, seal and all, and commits `CredentialRemoved`. */
+  removeCredential(command: typeof RemoveCredentialCommand.Encoded): Promise<ExitJson>;
 }

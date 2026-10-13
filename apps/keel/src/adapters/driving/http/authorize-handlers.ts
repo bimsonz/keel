@@ -326,6 +326,12 @@ export const RESOLVERS: Resolvers = {
   Projects_listAgents: (input) => projectNamed(input.projectId),
   Projects_inviteAgent: (input) => projectNamed(input.projectId),
   Projects_removeAgent: (input) => projectNamed(input.projectId),
+  Delivery_createCredential: (input) => namespaceNamed(input.handle),
+  Delivery_listCredentials: (input) => namespaceNamed(input.handle),
+  Delivery_deleteCredential: (input) => namespaceNamed(input.handle),
+  Delivery_putDeployTarget: (input) => projectNamed(input.projectId),
+  Delivery_listDeployTargets: (input) => projectNamed(input.projectId),
+  Delivery_deleteDeployTarget: (input) => projectNamed(input.projectId),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),

@@ -227,6 +227,9 @@ union ProblemCode {
   projectImportRefused: "project.import_refused",
   projectImportTooLarge: "project.import_too_large",
   quotaExceeded: "quota.exceeded",
+  deployTargetRefused: "deploy_target.refused",
+  deployTargetUnreachable: "deploy_target.unreachable",
+  deployTargetNoWorkersDev: "deploy_target.no_workers_dev",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */
@@ -323,6 +326,14 @@ model Conflict {
 @error
 model PreconditionFailed {
   @statusCode statusCode: 412;
+  @header contentType: "application/problem+json";
+  ...ProblemDetails;
+}
+
+/** The request is well formed, but what it names cannot be used as it stands. */
+@error
+model UnprocessableContent {
+  @statusCode statusCode: 422;
   @header contentType: "application/problem+json";
   ...ProblemDetails;
 }

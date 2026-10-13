@@ -6,6 +6,9 @@ import type {
   Clock,
   CodeHost,
   ConflictMoves,
+  CredentialStore,
+  DeployTargetCheck,
+  DeployTargets,
   Enrolments,
   Decisions,
   Escalations,
@@ -83,7 +86,10 @@ export type IsolateServices =
   | Lanes
   | NamespaceUsage
   | RepoServer
-  | WorkspacePool;
+  | WorkspacePool
+  | CredentialStore
+  | DeployTargetCheck
+  | DeployTargets;
 
 /**
  * Whether what a request died of is the database being away for a moment.

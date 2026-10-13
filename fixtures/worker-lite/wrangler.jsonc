@@ -1,0 +1,10 @@
+{
+  // The Worker Keel previews on the project's Cloudflare account for each change
+  // and deploys after a landing. Its name is pinned by .keel/deploy.json.
+  "name": "worker-lite",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "vars": {
+    "GREETING": "hello from worker-lite",
+  },
+}

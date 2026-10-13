@@ -11,3 +11,6 @@ export const previewCandidate: (
 ) => Effect.Effect<DeployEvidence, DeploymentFailed, Deployer | BundleStore> = stub(
   "delivery/previewCandidate",
 );
+
+export * from "./credentials.ts";
+export * from "./deploy-targets.ts";

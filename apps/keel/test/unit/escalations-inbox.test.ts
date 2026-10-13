@@ -44,6 +44,7 @@ import {
   makeWorkspacePoolMemory,
   makeUsersMemory,
   makeNamespaceUsageMemory,
+  deliveryMemoryLayer,
 } from "@keeltown/testing";
 import { Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
@@ -119,6 +120,7 @@ function world() {
       makeStandingsMemory().layer.pipe(Layer.provide(directory)),
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
       invitationsMemoryLayer(),
+      deliveryMemoryLayer(),
       makeTokenIssuerMemory().layer.pipe(Layer.provide(clock.layer)),
       clock.layer,
       makeIdsMemory().layer,

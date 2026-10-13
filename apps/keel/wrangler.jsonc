@@ -141,10 +141,12 @@
     { "binding": "WORKSPACES", "namespace": "keel-ws-00" },
   ],
   "secrets_store_secrets": [
+    // The key that wraps every credential an org stores: base64 of 32 bytes, from Terraform.
+    // Only the Worker reads it, to seal a credential and to open one for the Deployer.
     {
-      "binding": "DEPLOY_TOKEN",
+      "binding": "CREDENTIAL_KEK",
       "store_id": "PLACEHOLDER-secrets-store",
-      "secret_name": "keel-staging-deploy-token",
+      "secret_name": "keel-staging-credential-kek",
     },
   ],
   "ai": { "binding": "AI" },

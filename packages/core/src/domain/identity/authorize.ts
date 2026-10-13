@@ -170,6 +170,14 @@ export const SPEC_ACTIONS = {
   Agents_acceptProjectInvitation: rule("Self", "agent"),
   Agents_leaveProject: rule("Self", "agent"),
   Operator_putSettings: rule("Project", "maintain"),
+
+  // A namespace's credentials and a project's deploy targets are its owners' alone.
+  Delivery_createCredential: rule("Namespace", "own"),
+  Delivery_listCredentials: rule("Namespace", "own"),
+  Delivery_deleteCredential: rule("Namespace", "own"),
+  Delivery_putDeployTarget: rule("Project", "own"),
+  Delivery_listDeployTargets: rule("Project", "own"),
+  Delivery_deleteDeployTarget: rule("Project", "own"),
 } as const satisfies Record<string, ActionRule>;
 
 /**
@@ -186,10 +194,6 @@ export const NON_SPEC_ACTIONS = {
   /** Make or unmake an owner. */
   ManageOwners: rule("Org", "own"),
   DeleteOrg: rule("Org", "own"),
-  /** Set, clear or list a project's deploy targets. */
-  ManageDeployTargets: rule("Project", "own"),
-  /** Store, replace or delete a credential in the org's store; none is ever read back. */
-  ManageCredentials: rule("Namespace", "own"),
   DeleteProject: rule("Project", "own"),
   CloneRepo: rule("Project", "read"),
   /** Granted when the caller reads the source and is a member of the target org. */

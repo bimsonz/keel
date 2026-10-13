@@ -10,7 +10,7 @@ export const MAX_DEPLOY_TARGETS = 16;
 export interface SetDeployTarget {
   readonly projectId: ProjectId;
   readonly target: DeployTarget;
-  /** The owner setting it; the doorway decides `ManageDeployTargets`. */
+  /** The owner setting it; the doorway decides `Delivery_putDeployTarget`. */
   readonly by: UserId;
   /** Whether the target's credential is in the store of the project's org, read by the caller. */
   readonly credentialInOrg: boolean;

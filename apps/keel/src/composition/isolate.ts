@@ -51,6 +51,10 @@ import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { isD1Unavailable } from "../adapters/driven/d1/unavailable.ts";
+import {
+  CredentialStoreSealed,
+  type CredentialsStub,
+} from "../adapters/driven/credentials/credential-store.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
@@ -68,13 +72,15 @@ import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
+import { DeployTargetsRpc } from "../adapters/driven/do-rpc/deploy-targets.ts";
+import { DeployTargetCheckCloudflare } from "../adapters/driven/deploy/cloudflare-api.ts";
 import { LanesRpc } from "../adapters/driven/do-rpc/lanes.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
-import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
+import { ClockLive, IdsLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
 import { cloneAccess } from "../adapters/driving/http/clone-access.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
@@ -125,6 +131,9 @@ export function isolateLayer(
     ProbeStoreR2(env.BUNDLES),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
+    // A project's deploy targets, held by its own object; a target's account is asked before one is set.
+    DeployTargetsRpc(project),
+    DeployTargetCheckCloudflare(),
     // A project's view names what it was forked from, which its trunk keeps.
     overrides.trunks ?? TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     // A project's lanes, as their own objects count them.
@@ -137,6 +146,7 @@ export function isolateLayer(
     overrides.standings ?? StandingsRpc(agentSession),
     overrides.sponsorships ?? SponsorshipsRpc(agentSession),
     InvitationsRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address)), project),
+    credentialStoreLayer(env),
     NamespaceAgentsD1(env.DB),
     ProjectAgentsD1(env.DB),
     directory,
@@ -153,6 +163,22 @@ export function isolateLayer(
       Layer.provide(ClockLive),
     ),
     SystemLive,
+  );
+}
+
+/**
+ * An org's credentials: sealed and opened here, in the Worker,
+ * under the KEK Secrets Store holds (`CREDENTIAL_KEK`, known to every seal as
+ * `k1`), and kept sealed in the namespace's own object. Pool tests pass the
+ * objects they drain.
+ */
+export function credentialStoreLayer(
+  env: Env,
+  namespace: (address: string) => CredentialsStub = (address) =>
+    env.NAMESPACE.get(env.NAMESPACE.idFromName(address)),
+) {
+  return CredentialStoreSealed({ id: "k1", read: () => env.CREDENTIAL_KEK.get() }, namespace).pipe(
+    Layer.provide(IdsLive),
   );
 }
 

@@ -1679,6 +1679,36 @@ model DeployTarget {
   credential: CredentialId;
 }
 
+/**
+ * A credential as its event records it: core's shape, with `createdAt` an
+ * Instant (the published `Credential` gives a date-time). It names the
+ * credential and never holds its secret.
+ */
+model EventCredential {
+  id: CredentialId;
+  namespaceId: NamespaceId;
+  label: CredentialLabel;
+  provider: DeployProvider;
+  createdAt: Instant;
+  createdBy: UserId;
+}
+
+/** An owner stored a credential in the namespace's store: its record, never its secret. Members only. */
+model CredentialStored {
+  _tag: "CredentialStored";
+  namespaceId: NamespaceId;
+  credential: EventCredential;
+  by: UserId;
+}
+
+/** An owner removed a credential from the namespace's store. Members only. */
+model CredentialRemoved {
+  _tag: "CredentialRemoved";
+  namespaceId: NamespaceId;
+  credentialId: CredentialId;
+  by: UserId;
+}
+
 /** An owner set one of the project's deploy targets, new or in place of the one of that name. */
 model DeployTargetSet {
   _tag: "DeployTargetSet";
@@ -1850,6 +1880,8 @@ union KeelEvent {
   SessionRedacted,
 
   // Delivery
+  CredentialStored,
+  CredentialRemoved,
   DeployTargetSet,
   DeployTargetCleared,
   PreviewDeployed,

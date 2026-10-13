@@ -15,7 +15,10 @@ export type {
  * namespace also holds every project's trunk, staging and guards, so a name is
  * a template only by being listed here.
  */
-export const PROJECT_TEMPLATES: ReadonlySet<string> = new Set(["fixture-forge-lite"]);
+export const PROJECT_TEMPLATES: ReadonlySet<string> = new Set([
+  "fixture-forge-lite",
+  "fixture-worker-lite",
+]);
 
 /** The longest URL a project is imported from, in characters. */
 export const IMPORT_URL_MAX = 2048;

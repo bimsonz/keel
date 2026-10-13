@@ -164,6 +164,7 @@ import {
 import { decisionHandlers } from "./decisions.ts";
 import { whyHandlers } from "./why.ts";
 import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
+import { deliveryHandlers } from "./delivery.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -649,6 +650,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         ...invitationHandlers(run, touched),
         ...projectInvitationHandlers(run, touched),
         ...decisionHandlers(run),
+        ...deliveryHandlers(run),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
             caller,

@@ -119,6 +119,11 @@ import {
   type ProbeStoreHarness,
   freshId,
 } from "./contracts/verification.ts";
+import { describeCredentialStoreContract } from "./contracts/credential-store.ts";
+import {
+  type DeployTargetsHarness,
+  describeDeployTargetsContract,
+} from "./contracts/deploy-targets.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
 import {
   describeMembershipsContract,
@@ -154,6 +159,7 @@ import type {
   Changes,
   AgentSignUps,
   DepsBuilder,
+  DeployTargets,
   Enrolments,
   EventFeed,
   FlowSpecSource,
@@ -353,6 +359,15 @@ function memoryBatchVerdictsHarness(): BatchVerdictsHarness {
     ]),
   );
   return { layer: lane.layer, laneId: "lane:prj:default", fence, candidateId };
+}
+
+/** The in-memory deploy targets, each project's held as its own Project DO would hold them. */
+function memoryDeployTargetsHarness(): DeployTargetsHarness {
+  const memory = delivery.makeDeployTargetsMemory();
+  return {
+    layer: memory.layer,
+    establish: (projectId) => Effect.sync(() => memory.establish(projectId)),
+  };
 }
 
 /** The in-memory Projects can fork from one source repo, which the suite names. */
@@ -745,9 +760,18 @@ export const PORTS = {
     () => delivery.makeDeployerMemory().layer,
     pending("Deployer", ["plan", "preview", "verify", "promote", "rollback", "teardown"]),
   ),
-  SecretsProvider: port(
-    () => storage.makeSecretsProviderMemory().layer,
-    pending("SecretsProvider", ["get"]),
+  // The real check asks Cloudflare's API, so no suite runs it: its mapping is unit-tested against a fetch double.
+  DeployTargetCheck: port(
+    () => delivery.makeDeployTargetCheckMemory().layer,
+    pending("DeployTargetCheck", ["reach"]),
+  ),
+  DeployTargets: harnessed<DeployTargets, DeployTargetsHarness>(
+    memoryDeployTargetsHarness,
+    describeDeployTargetsContract,
+  ),
+  CredentialStore: port(
+    () => delivery.makeCredentialStoreMemory().layer,
+    describeCredentialStoreContract,
   ),
   Background: port(() => storage.makeBackgroundMemory().layer, pending("Background", ["run"])),
   Metrics: port(() => storage.makeMetricsMemory().layer, pending("Metrics", ["count", "observe"])),

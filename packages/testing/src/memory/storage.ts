@@ -4,7 +4,6 @@ import {
   storedPlanText,
 } from "@keeltown/core/application/verification";
 import { BundleMissing } from "@keeltown/core/domain/verification";
-import { SecretMissing } from "@keeltown/core/domain/delivery";
 import type { ContentHash, EventEnvelope, NamespaceId, SessionId } from "@keeltown/core/kernel";
 import {
   canonicalJson,
@@ -26,7 +25,6 @@ import {
   PlanCorrupt,
   PlanMissing,
   PlanStore,
-  SecretsProvider,
   type SessionMessage,
   SessionStore,
   type Stored,
@@ -200,22 +198,6 @@ export function makeMetricsMemory() {
           Effect.sync(() => void samples.push({ name, value, kind: "count" })),
         observe: (name, value) =>
           Effect.sync(() => void samples.push({ name, value, kind: "observe" })),
-      }),
-    ),
-  };
-}
-
-export function makeSecretsProviderMemory(secrets: Readonly<Record<string, string>> = {}) {
-  return {
-    layer: Layer.succeed(
-      SecretsProvider,
-      SecretsProvider.of({
-        get: (name) => {
-          const value = secrets[name];
-          return value === undefined
-            ? Effect.fail(new SecretMissing({ name }))
-            : Effect.succeed(value);
-        },
       }),
     ),
   };

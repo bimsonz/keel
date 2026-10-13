@@ -6,8 +6,14 @@ import {
   wideningsOwed,
   widenEscalation,
 } from "@keeltown/core/application/coordination";
+import {
+  credentialRecords,
+  dropCredential,
+  heldCredential,
+  holdCredential,
+} from "@keeltown/core/application/delivery";
 import { acceptInvitation, endInvitation, inviteAgent } from "@keeltown/core/application/identity";
-import { EscalationId } from "@keeltown/core/kernel";
+import { CredentialId, EscalationId } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
 import { type NamespaceServices, namespaceServices } from "../../../composition/do.ts";
 import {
@@ -16,8 +22,11 @@ import {
   InviteAgentCommand,
   NamespaceCodecs,
   type NamespaceRpc,
+  PutCredentialCommand,
   RaiseCommand,
+  RemoveCredentialCommand,
   RuleCommand,
+  SealedSecret,
 } from "../../../rpc/index.ts";
 import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith } from "./keel-object.ts";
@@ -36,8 +45,10 @@ const wideningDeadline = (escalationId: EscalationId) => `escalation ${escalatio
  * the decision each ruling makes in the ruling's own transaction. Each event
  * carries the project its question is about, so the feed serves it there. It
  * holds the agents its members invited into it, one row an agent, and writes
- * the row the request gate reads after each move. It extends KeelObjectWith,
- * which builds its runtime and the event backbone.
+ * the row the request gate reads after each move. It keeps the namespace's
+ * credentials as the Worker sealed them, and hands a seal back only to the
+ * Worker that opens it: it never holds the key that does. It extends
+ * KeelObjectWith, which builds its runtime and the event backbone.
  */
 export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements NamespaceRpc {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -101,6 +112,43 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
     return this.answer(
       NamespaceCodecs.escalation,
       decoded(EscalationId, escalationId).pipe(Effect.flatMap(escalationRecord)),
+    );
+  }
+
+  async putCredential(command: typeof PutCredentialCommand.Encoded) {
+    const namespace = namespaceAt(this.ctx.id.name);
+    return this.answer(
+      NamespaceCodecs.putCredential,
+      decoded(PutCredentialCommand, command).pipe(
+        Effect.flatMap((keeping) => holdCredential(namespace, keeping)),
+      ),
+    );
+  }
+
+  async listCredentials() {
+    return this.answer(NamespaceCodecs.listCredentials, credentialRecords);
+  }
+
+  async getCredential(credentialId: string) {
+    return this.answer(
+      NamespaceCodecs.getCredential,
+      decoded(CredentialId, credentialId).pipe(
+        Effect.flatMap(heldCredential),
+        // What was kept is what was sent: a seal of any other shape is a defect, not an answer.
+        Effect.flatMap(({ meta, sealed }) =>
+          Effect.map(decoded(SealedSecret, sealed), (seal) => ({ meta, sealed: seal })),
+        ),
+      ),
+    );
+  }
+
+  async removeCredential(command: typeof RemoveCredentialCommand.Encoded) {
+    const namespace = namespaceAt(this.ctx.id.name);
+    return this.answer(
+      NamespaceCodecs.removeCredential,
+      decoded(RemoveCredentialCommand, command).pipe(
+        Effect.flatMap((removing) => dropCredential(namespace, removing)),
+      ),
     );
   }
 

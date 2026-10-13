@@ -1,6 +1,31 @@
 import { Schema } from "effect";
-import { CommitSha, DeploymentId, ProjectId, UserId } from "../kernel/index.ts";
+import {
+  CommitSha,
+  CredentialId,
+  DeploymentId,
+  NamespaceId,
+  ProjectId,
+  UserId,
+} from "../kernel/index.ts";
+import { CredentialMeta } from "./credential.ts";
 import { DeployProvider, DeployTarget, DeployTargetName } from "./deployment.ts";
+
+/**
+ * An owner stored a credential in the namespace's store. The record is what
+ * anyone may read of it: the secret was sealed before this was committed, and
+ * no event carries it.
+ */
+export const CredentialStored = Schema.TaggedStruct("CredentialStored", {
+  namespaceId: NamespaceId,
+  credential: CredentialMeta,
+  by: UserId,
+});
+/** An owner removed a credential from the namespace's store: its sealed secret is gone with it. */
+export const CredentialRemoved = Schema.TaggedStruct("CredentialRemoved", {
+  namespaceId: NamespaceId,
+  credentialId: CredentialId,
+  by: UserId,
+});
 
 /** An owner set one of the project's deploy targets, new or in place of the one of that name. */
 export const DeployTargetSet = Schema.TaggedStruct("DeployTargetSet", {
@@ -41,6 +66,8 @@ export const DeploymentRolledBack = Schema.TaggedStruct("DeploymentRolledBack", 
 });
 
 export const DeliveryEvent = Schema.Union([
+  CredentialStored,
+  CredentialRemoved,
   DeployTargetSet,
   DeployTargetCleared,
   PreviewDeployed,

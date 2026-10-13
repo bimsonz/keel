@@ -2,11 +2,13 @@ import type {
   AbandonRequest,
   ChangeState,
   ConflictState,
+  CreateCredentialRequest,
   CreateProjectRequest,
   DeclareRequest,
   EnrolAgentRequest,
   OpenSessionRequest,
   ProjectSettings,
+  PutDeployTargetRequest,
   RelyRequest,
   ResolveRequest,
   ReviseRequest,
@@ -27,7 +29,7 @@ import {
   runKey,
 } from "./agent-key.ts";
 import { KeelProblem, KeelTokenError } from "./problem.ts";
-import { type InputOf, ROUTES, type RoutedOperation } from "./routes.ts";
+import { type InputOf, type OutputOf, ROUTES, type RoutedOperation } from "./routes.ts";
 
 export interface KeelClientOptions {
   /** Keel's origin, e.g. `https://keel.example.workers.dev`; the client adds `/v1`. */
@@ -234,7 +236,7 @@ export class KeelClient {
     operation: Op,
     input: InputOf<Op>,
     options: CallOptions = {},
-  ): Promise<WireOutputs[Op]> {
+  ): Promise<OutputOf<Op>> {
     const request = this.#request(operation, input);
     const binding = this.#binding();
     /** How the token is presented: under the DPoP scheme with a proof for this request when it is bound to a key. */
@@ -266,8 +268,9 @@ export class KeelClient {
       response = await send(await this.token({ fresh: true }));
     if (!response.ok) throw await KeelProblem.from(response);
     // The body is the contract's: Keel validates every response against the published schemas.
-    // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's.
-    const answer: WireOutputs[Op] = JSON.parse(await response.text());
+    // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's. A 204 has none.
+    const text = await response.text();
+    const answer: OutputOf<Op> = response.status === 204 ? undefined : JSON.parse(text);
     return answer;
   }
 
@@ -910,6 +913,57 @@ export class KeelClient {
     options?: CallOptions,
   ): Promise<WireOutputs["Operator_putSettings"]> {
     return this.call("Operator_putSettings", { ...settings, projectId }, options);
+  }
+
+  /**
+   * Stores a provider's API token in a namespace, under a label: an owner's alone. The answer
+   * names it by a minted id; the secret is never answered again, here or anywhere.
+   */
+  createCredential(
+    namespace: string,
+    credential: CreateCredentialRequest,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Delivery_createCredential"]> {
+    return this.call("Delivery_createCredential", { ...credential, handle: namespace }, options);
+  }
+
+  /** A namespace's credentials, by label and id: never a secret. */
+  credentials(
+    namespace: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Delivery_listCredentials"]> {
+    return this.call("Delivery_listCredentials", { handle: namespace }, options);
+  }
+
+  /** Deletes a credential from a namespace: its secret is gone for good. */
+  deleteCredential(namespace: string, credentialId: string, options?: CallOptions): Promise<void> {
+    return this.call("Delivery_deleteCredential", { handle: namespace, credentialId }, options);
+  }
+
+  /**
+   * Sets a project's deploy target, new or in place of the one of that name. Its credential must
+   * be one of the project's own namespace, and must reach the account's Workers before anything is set.
+   */
+  putDeployTarget(
+    projectId: string,
+    name: string,
+    target: PutDeployTargetRequest,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Delivery_putDeployTarget"]> {
+    return this.call("Delivery_putDeployTarget", { ...target, projectId, name }, options);
+  }
+
+  /** A project's deploy targets, in name order. */
+  deployTargets(
+    projectId: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Delivery_listDeployTargets"]> {
+    return this.call("Delivery_listDeployTargets", { projectId }, options);
+  }
+
+  /** Clears a project's deploy target. */
+  deleteDeployTarget(projectId: string, name: string, options?: CallOptions): Promise<void> {
+    return this.call("Delivery_deleteDeployTarget", { projectId, name }, options);
   }
 
   /** A directory of a project's trunk at `ref` (trunk's head when absent); the root without `path`. */

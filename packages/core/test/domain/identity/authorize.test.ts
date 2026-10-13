@@ -403,6 +403,17 @@ const OWNED_ACTIONS = ACTION_NAMES.filter(
 );
 /** The actions decided on an agent's own account. */
 const ACCOUNT_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) === "Agent");
+/** The operations on a project's deploy targets, and those on a namespace's credentials. */
+const TARGET_ACTIONS = [
+  "Delivery_putDeployTarget",
+  "Delivery_listDeployTargets",
+  "Delivery_deleteDeployTarget",
+] as const satisfies readonly Action[];
+const CREDENTIAL_ACTIONS = [
+  "Delivery_createCredential",
+  "Delivery_listCredentials",
+  "Delivery_deleteCredential",
+] as const satisfies readonly Action[];
 
 /**
  * The policy on an agent's account, said again apart from `authorize`: anyone
@@ -1170,25 +1181,43 @@ describe("authorize", () => {
   it("[authz.deploy-owner-only] only an owner of the org, or the agent that governs it, sets a project's deploy targets or touches the org's credentials", () => {
     fc.assert(
       fc.property(principalArb, projectArb, orgResArb, (principal, proj, org) => {
-        const targets = outcome(decide(principal, "ManageDeployTargets", proj)).startsWith("ok:");
-        const credentials = outcome(decide(principal, "ManageCredentials", org)).startsWith("ok:");
+        const targets = TARGET_ACTIONS.some((action) =>
+          outcome(decide(principal, action, proj)).startsWith("ok:"),
+        );
+        const credentials = CREDENTIAL_ACTIONS.some((action) =>
+          outcome(decide(principal, action, org)).startsWith("ok:"),
+        );
         return (!targets || owns(principal, proj)) && (!credentials || owns(principal, org));
       }),
     );
     const owner = user({ memberships: [{ org: ORG_1, role: "owner" }] });
     const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
     const mine = project(PRJ_1, "private");
-    expect(outcome(authorize(owner, "ManageDeployTargets", mine))).toBe("ok:");
-    expect(outcome(authorize(owner, "ManageCredentials", into(ORG_1)))).toBe("ok:");
-    expect(outcome(authorize(maintainer, "ManageDeployTargets", mine))).toBe("403:role");
-    expect(outcome(authorize(maintainer, "ManageCredentials", into(ORG_1)))).toBe("403:role");
-    expect(outcome(authorize(owner, "ManageCredentials", into(ORG_2)))).not.toBe("ok:");
     const governor = agentOn(PRJ_1, { standing: GOVERNS });
-    expect(outcome(authorize(governor, "ManageDeployTargets", mine))).toBe("403:users-only");
-    expect(outcome(authorize(governor, "ManageCredentials", into(ORG_1)))).toBe("403:users-only");
-    expect(
-      outcome(authorize(governor, "ManageCredentials", into(ORG_1, { personOwned: false }))),
-    ).toBe("ok:");
+    for (const action of TARGET_ACTIONS) {
+      expect([action, outcome(authorize(owner, action, mine))]).toEqual([action, "ok:"]);
+      expect([action, outcome(authorize(maintainer, action, mine))]).toEqual([action, "403:role"]);
+      expect([action, outcome(authorize(governor, action, mine))]).toEqual([
+        action,
+        "403:users-only",
+      ]);
+    }
+    for (const action of CREDENTIAL_ACTIONS) {
+      expect([action, outcome(authorize(owner, action, into(ORG_1)))]).toEqual([action, "ok:"]);
+      expect([action, outcome(authorize(maintainer, action, into(ORG_1)))]).toEqual([
+        action,
+        "403:role",
+      ]);
+      expect(outcome(authorize(owner, action, into(ORG_2)))).not.toBe("ok:");
+      expect([action, outcome(authorize(governor, action, into(ORG_1)))]).toEqual([
+        action,
+        "403:users-only",
+      ]);
+      expect([
+        action,
+        outcome(authorize(governor, action, into(ORG_1, { personOwned: false }))),
+      ]).toEqual([action, "ok:"]);
+    }
   });
 
   it("[authz.handle-first] a user without a handle may only choose one", () => {
@@ -1723,7 +1752,7 @@ describe("authorize: a namespace by its kind", () => {
     return [
       decide(bea, "Operator_createProject", at),
       decide(bea, "Operator_putSettings", open),
-      decide(bea, "ManageCredentials", at),
+      decide(bea, "Delivery_createCredential", at),
     ].map((decision) =>
       Result.isFailure(decision) && decision.failure._tag === "AccessRefused"
         ? `${decision.failure.reason}: ${decision.failure.nextActions.map((n) => n.title).join()}`
@@ -1762,7 +1791,7 @@ describe("authorize: a namespace by its kind", () => {
     expect(rightsOf(ada, own())).toEqual(rightsOf(orgOwner, into(ORG_1)));
     expect(rightsOf(ada, hers)).toEqual(rightsOf(orgOwner, project(PRJ_1, "private")));
     expect(outcome(authorize(ada, "Operator_createProject", own()))).toBe("ok:");
-    expect(outcome(authorize(ada, "ManageCredentials", own()))).toBe("ok:");
+    expect(outcome(authorize(ada, "Delivery_createCredential", own()))).toBe("ok:");
     expect(outcome(authorize(ada, "Operator_putSettings", hers))).toBe("ok:");
     expect(outcome(authorize(ada, "DeleteProject", hers))).toBe("ok:");
     expect(outcome(authorize(ada, "Namespaces_getProject", hers))).toBe("ok:members");
@@ -1812,8 +1841,8 @@ describe("authorize: a namespace by its kind", () => {
       expect([action, outcome(decide(ANON, action, bots))]).toEqual([action, "401"]);
     }
     // What is not about members stays the owner's, and the agent's in its own namespace.
-    expect(outcome(authorize(ada, "ManageCredentials", own()))).toBe("ok:");
-    expect(outcome(authorize(governor, "ManageCredentials", bots))).toBe("ok:");
+    expect(outcome(authorize(ada, "Delivery_createCredential", own()))).toBe("ok:");
+    expect(outcome(authorize(governor, "Delivery_createCredential", bots))).toBe("ok:");
   });
 
   it("[authz.no-member-right-off-org] nobody but its own account holds a member's, a maintainer's or an owner's right in a person's or an agent's own namespace, or on its projects", () => {

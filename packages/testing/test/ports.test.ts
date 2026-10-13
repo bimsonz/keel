@@ -73,7 +73,9 @@ const CONTRACT_PORTS = [
   "Escalations",
   "ConflictMoves",
   "Deployer",
-  "SecretsProvider",
+  "CredentialStore",
+  "DeployTargetCheck",
+  "DeployTargets",
   "Background",
   "Metrics",
 ];

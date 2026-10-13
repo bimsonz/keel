@@ -1,7 +1,8 @@
 // Seeds an environment for S-0: node scripts/seed.ts staging [--agents N]
 //
-// 1. The fixture: keel-core/fixture-forge-lite holds fixtures/forge-lite as one
-//    commit, made with a fixed author and date so the same tree is the same
+// 1. The templates: keel-core/fixture-forge-lite holds fixtures/forge-lite, and
+//    keel-core/fixture-worker-lite holds fixtures/worker-lite, each as one
+//    commit made with a fixed author and date so the same tree is the same
 //    commit. A repo already at that commit is left alone; one at any other
 //    commit stops the seed rather than being overwritten.
 // 2. The seed's automation user, `keel-seed`, signs up with a passkey as any
@@ -47,6 +48,19 @@ if (!Number.isInteger(agentCount) || agentCount < 1 || agentCount > 16)
 
 const CORE = "keel-core";
 const FIXTURE = "fixture-forge-lite";
+/**
+ * Each template repo in the core namespace: the fixture directory it holds and
+ * its one commit's message. The message is part of the commit's id, so
+ * forge-lite's stays as it was first seeded.
+ */
+const TEMPLATES = {
+  [FIXTURE]: { dir: "fixtures/forge-lite", message: "forge-lite: the S-0 fixture" },
+  "fixture-worker-lite": {
+    dir: "fixtures/worker-lite",
+    message: "worker-lite: the deploy fixture",
+  },
+} as const;
+type Template = keyof typeof TEMPLATES;
 /** Each seeded project's declared settings. */
 const PROJECTS = {
   "forge-lite": { verification: "required", visibility: "private" },
@@ -80,27 +94,27 @@ function artifacts(args: readonly string[]): string {
   return wrangler(["artifacts", "repos", ...args, "--namespace", CORE], { quiet: true });
 }
 
-/** The fixture repo's remote, creating the repo the first time. */
-function fixtureRemote(): string {
+/** A template repo's remote, creating the repo the first time. */
+function fixtureRemote(repo: Template): string {
   const existing = spawnSync(
     join(root, "apps/keel/node_modules/.bin/wrangler"),
-    ["artifacts", "repos", "get", FIXTURE, "--namespace", CORE, "--json"],
+    ["artifacts", "repos", "get", repo, "--namespace", CORE, "--json"],
     {
       cwd: join(root, "apps/keel"),
       encoding: "utf8",
       env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
     },
   );
-  const json = existing.status === 0 ? existing.stdout : artifacts(["create", FIXTURE, "--json"]);
+  const json = existing.status === 0 ? existing.stdout : artifacts(["create", repo, "--json"]);
   const remote: unknown = Reflect.get(Object(JSON.parse(json)), "remote");
-  if (typeof remote !== "string") throw new Error(`no remote for ${CORE}/${FIXTURE}: ${json}`);
+  if (typeof remote !== "string") throw new Error(`no remote for ${CORE}/${repo}: ${json}`);
   return remote;
 }
 
-/** fixtures/forge-lite as one commit, its id fixed by the tree: the same files give the same commit. */
-function fixtureCommit(): { dir: string; sha: string } {
+/** A fixture directory as one commit, its id fixed by the tree: the same files give the same commit. */
+function fixtureCommit(repo: Template): { dir: string; sha: string } {
   const dir = mkdtempSync(join(tmpdir(), "keel-seed-"));
-  cpSync(join(root, "fixtures/forge-lite"), dir, {
+  cpSync(join(root, TEMPLATES[repo].dir), dir, {
     recursive: true,
     filter: (path) => !/\/(node_modules|\.wrangler|dist|coverage)(\/|$)/.test(path),
   });
@@ -114,31 +128,31 @@ function fixtureCommit(): { dir: string; sha: string } {
   };
   git(dir, ["init", "-q", "-b", "main"]);
   git(dir, ["add", "-A"]);
-  git(dir, ["commit", "-q", "-m", "forge-lite: the S-0 fixture"], fixed);
+  git(dir, ["commit", "-q", "-m", TEMPLATES[repo].message], fixed);
   return { dir, sha: git(dir, ["rev-parse", "HEAD"]) };
 }
 
-function seedFixture(): string {
-  const remote = fixtureRemote();
+function seedFixture(repo: Template): string {
+  const remote = fixtureRemote(repo);
   const token = JSON.parse(
-    artifacts(["issue-token", FIXTURE, "--scope", "write", "--ttl", "600", "--json"]),
+    artifacts(["issue-token", repo, "--scope", "write", "--ttl", "600", "--json"]),
   );
   const plaintext: unknown =
     Reflect.get(Object(token), "plaintext") ?? Reflect.get(Object(token), "token");
   if (typeof plaintext !== "string") throw new Error("issue-token answered no token");
-  const { dir, sha } = fixtureCommit();
+  const { dir, sha } = fixtureCommit(repo);
   try {
     const head =
       git(dir, ["ls-remote", remote, "refs/heads/main"], withToken(plaintext)).split(/\s/)[0] ?? "";
     if (head === sha) {
-      console.log(`ok   ${CORE}/${FIXTURE} already holds the fixture at ${sha.slice(0, 12)}`);
+      console.log(`ok   ${CORE}/${repo} already holds the fixture at ${sha.slice(0, 12)}`);
     } else if (head !== "") {
       throw new Error(
-        `${CORE}/${FIXTURE} is at ${head.slice(0, 12)}, not the fixture's ${sha.slice(0, 12)}: fixtures/forge-lite changed. Delete the repo (wrangler artifacts repos delete ${FIXTURE} --namespace ${CORE}) and seed again.`,
+        `${CORE}/${repo} is at ${head.slice(0, 12)}, not the fixture's ${sha.slice(0, 12)}: ${TEMPLATES[repo].dir} changed. Delete the repo (wrangler artifacts repos delete ${repo} --namespace ${CORE}) and seed again.`,
       );
     } else {
       git(dir, ["push", "-q", remote, "main:refs/heads/main"], withToken(plaintext));
-      console.log(`ok   pushed the fixture to ${CORE}/${FIXTURE} at ${sha.slice(0, 12)}`);
+      console.log(`ok   pushed the fixture to ${CORE}/${repo} at ${sha.slice(0, 12)}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -284,7 +298,8 @@ async function enrol(
 const keelUrl = process.env["KEEL_URL"] ?? `https://${siteHost(environment)}`;
 
 try {
-  const fixtureSha = seedFixture();
+  const fixtureSha = seedFixture(FIXTURE);
+  seedFixture("fixture-worker-lite");
   const { seedUser, seedPasskey } = await automationUser();
   const asSeed = new KeelClient({ baseUrl: keelUrl, session: seedUser.token });
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};

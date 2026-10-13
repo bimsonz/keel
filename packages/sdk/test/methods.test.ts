@@ -15,6 +15,7 @@ const SAMPLE: Readonly<Record<string, string>> = {
   projectId: "prj_1",
   agentId: "agt_1",
   escalationId: "esc_1",
+  credentialId: "crd_1",
   handle: "keel",
   namespace: "an-org",
   name: "forge-lite",
@@ -108,6 +109,18 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Operator_revokeAgent: (c) => c.revokeAgent("agt_1"),
   Operator_listEscalations: (c) => c.escalations({ state: "open" }),
   Operator_giveRuling: (c) => c.giveRuling("esc_1", { option: "opt_1" }),
+  Delivery_createCredential: (c) =>
+    c.createCredential("keel", { label: "ci", provider: "cloudflare", secret: "s" }),
+  Delivery_listCredentials: (c) => c.credentials("keel"),
+  Delivery_deleteCredential: (c) => c.deleteCredential("keel", "crd_1"),
+  Delivery_putDeployTarget: (c) =>
+    c.putDeployTarget("prj_1", "forge-lite", {
+      provider: "cloudflare",
+      accountId: "0".repeat(32),
+      credential: "crd_1",
+    }),
+  Delivery_listDeployTargets: (c) => c.deployTargets("prj_1"),
+  Delivery_deleteDeployTarget: (c) => c.deleteDeployTarget("prj_1", "forge-lite"),
 };
 
 const isRouted = (operation: string): operation is RoutedOperation => operation in ROUTES;

@@ -198,6 +198,8 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
+| `CredentialStored` | namespace object (`ns:<id>`), on `org:<id>` | `namespaceId, credential: {id, namespaceId, label, provider, createdAt, createdBy}, by: UserId` | — | Projector | An owner stored a credential. The secret was sealed in the Worker before it reached the object, and no event carries it. Members only |
+| `CredentialRemoved` | namespace object (`ns:<id>`), on `org:<id>` | `namespaceId, credentialId, by: UserId` | — | Projector | An owner removed a credential, seal and all. Members only |
 | `DeployTargetSet` | Project DO (`project:<id>`) | `projectId, target: {name, provider, accountId, credential}, by: UserId` | — | Projector | An owner set a deploy target, new or in place of the one of that name. `credential` is a `crd_` id, a reference into the org's credential store, never the secret. Members only |
 | `DeployTargetCleared` | Project DO (`project:<id>`) | `projectId, name, by: UserId` | — | Projector | An owner removed a deploy target. Members only |
 | `PreviewDeployed` | Change DO or Lane DO | `deploymentId, world, target, provider, url` | — | the agent(s), Projector | A preview is a World, so probes can target it live. `target` is the name of the project's deploy target |

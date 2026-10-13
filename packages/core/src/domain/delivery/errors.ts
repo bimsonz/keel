@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { DeploymentId } from "../kernel/index.ts";
+import { CredentialId, DeploymentId } from "../kernel/index.ts";
 import { DeployTargetName } from "./deployment.ts";
 
 export class DeploymentFailed extends Schema.TaggedError<DeploymentFailed>()("DeploymentFailed", {
@@ -8,9 +8,11 @@ export class DeploymentFailed extends Schema.TaggedError<DeploymentFailed>()("De
   reason: Schema.String,
 }) {}
 
-export class SecretMissing extends Schema.TaggedError<SecretMissing>()("SecretMissing", {
-  name: Schema.String,
-}) {}
+/** No credential of that id in the namespace's store: never stored there, or removed. */
+export class CredentialMissing extends Schema.TaggedError<CredentialMissing>()(
+  "CredentialMissing",
+  { id: CredentialId },
+) {}
 
 /**
  * A deploy target that was not set, cleared or found: its credential is not in

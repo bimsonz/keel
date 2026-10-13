@@ -17,6 +17,7 @@ import "./inbox.tsp";
 import "./views.tsp";
 import "./operator.tsp";
 import "./tenancy.tsp";
+import "./delivery.tsp";
 
 using Http;
 

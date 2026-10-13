@@ -44,6 +44,7 @@ import {
   sampleProjectId,
   sampleSponsorId,
   makeNamespaceUsageMemory,
+  deliveryMemoryLayer,
 } from "@keeltown/testing";
 import { ulid } from "ulid";
 import { Layer, ManagedRuntime, Schema } from "effect";
@@ -155,6 +156,7 @@ function grantedSurface() {
       makeStandingsMemory().layer.pipe(Layer.provide(directory)),
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
       invitationsMemoryLayer(),
+      deliveryMemoryLayer(),
       makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
       clock,
       makeIdsMemory().layer,

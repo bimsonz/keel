@@ -68,6 +68,9 @@ const TITLES: Record<ProblemCode, string> = {
   "project.import_refused": "Nothing was imported from that URL",
   "project.import_too_large": "The repository's history is larger than Keel imports",
   "quota.exceeded": "The namespace is at its quota",
+  "deploy_target.refused": "The project's deploy target was not set",
+  "deploy_target.unreachable": "The credential does not reach the account's Workers",
+  "deploy_target.no_workers_dev": "The account has no workers.dev subdomain",
 };
 
 export interface ProblemExtras {

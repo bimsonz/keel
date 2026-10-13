@@ -60,8 +60,8 @@ describe("a new project's source", () => {
     );
   });
 
-  it("[project.source-template] the fixture is the one template, read by its repo's name", () => {
-    expect([...PROJECT_TEMPLATES]).toEqual(["fixture-forge-lite"]);
+  it("[project.source-template] the fixtures are the templates, each read by its repo's name", () => {
+    expect([...PROJECT_TEMPLATES]).toEqual(["fixture-forge-lite", "fixture-worker-lite"]);
     for (const template of PROJECT_TEMPLATES)
       expect(projectSource({ kind: "template", name: template })).toEqual({
         _tag: "Template",

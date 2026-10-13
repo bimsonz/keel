@@ -1,5 +1,10 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import {
+  DeployTarget,
+  DeployTargetName,
+  DeployTargetRefused,
+} from "@keeltown/core/domain/delivery";
+import {
   IdempotencyConflict,
   Invitation,
   InvitationRefused,
@@ -170,6 +175,36 @@ export const EndProjectInvitationCommand = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/** A deploy target as the Project DO holds it: the record, and the workers.dev subdomain its account answered. */
+export const HeldDeployTargetView = Schema.Struct({
+  target: DeployTarget,
+  workersDev: Schema.optional(Schema.String),
+});
+
+/**
+ * Set one of the project's deploy targets (core's `SetProjectDeployTarget`):
+ * `credentialInOrg` is whether the credential is the project's namespace's,
+ * as the caller read it, and `workersDev` what the account answered. The
+ * Project DO decides with `setDeployTarget` over the targets it holds and
+ * commits DeployTargetSet; `requestId` keys the commit.
+ */
+export const SetDeployTargetCommand = Schema.Struct({
+  projectId: ProjectId,
+  target: DeployTarget,
+  by: UserId,
+  credentialInOrg: Schema.Boolean,
+  workersDev: Schema.optional(Schema.String),
+  requestId: Schema.NonEmptyString,
+});
+
+/** Clear one of the project's deploy targets (core's `ClearProjectDeployTarget`), committing DeployTargetCleared. */
+export const ClearDeployTargetCommand = Schema.Struct({
+  projectId: ProjectId,
+  name: DeployTargetName,
+  by: UserId,
+  requestId: Schema.NonEmptyString,
+});
+
 const invitationMove = exitCodec(
   Invitation,
   Schema.Union([InvitationRefused, IdempotencyConflict]),
@@ -183,6 +218,12 @@ export const ProjectCodecs = {
   liveAnchors: exitCodec(Schema.Array(SubjectAnchorsView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
   putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
+  deployTargets: exitCodec(Schema.Array(HeldDeployTargetView), ProjectNotFound),
+  setDeployTarget: exitCodec(
+    HeldDeployTargetView,
+    Schema.Union([ProjectNotFound, DeployTargetRefused, IdempotencyConflict]),
+  ),
+  clearDeployTarget: exitCodec(Schema.Void, Schema.Union([ProjectNotFound, DeployTargetRefused])),
   createProject: exitCodec(
     ProjectView,
     Schema.Union([IdempotencyConflict, RepoNotFound, ImportRefused, QuotaExceeded, ImportTooLarge]),
@@ -197,6 +238,12 @@ export interface ProjectRpc extends EventReceiverRpc {
   liveAnchors(): Promise<ExitJson>;
   settings(): Promise<ExitJson>;
   putSettings(command: typeof PutSettingsCommand.Encoded): Promise<ExitJson>;
+  /** The project's deploy targets, in name order, each with what its account answered. */
+  deployTargets(): Promise<ExitJson>;
+  /** Sets one of the project's deploy targets, committing DeployTargetSet. */
+  setDeployTarget(command: typeof SetDeployTargetCommand.Encoded): Promise<ExitJson>;
+  /** Clears one of the project's deploy targets, committing DeployTargetCleared. */
+  clearDeployTarget(command: typeof ClearDeployTargetCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;
   /** The person whose namespace the project is in invites an agent to it alone, idempotent by key. */
   inviteAgent(command: typeof InviteToProjectCommand.Encoded): Promise<ExitJson>;

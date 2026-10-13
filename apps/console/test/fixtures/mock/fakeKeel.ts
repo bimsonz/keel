@@ -127,6 +127,8 @@ export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
   "SessionOpened",
   "MessagesCaptured",
   "SessionRedacted",
+  "CredentialStored",
+  "CredentialRemoved",
   "DeployTargetSet",
   "DeployTargetCleared",
 ]);

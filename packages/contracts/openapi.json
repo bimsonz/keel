@@ -56,6 +56,9 @@
     },
     {
       "name": "Users"
+    },
+    {
+      "name": "Delivery"
     }
   ],
   "paths": {
@@ -5879,6 +5882,390 @@
         ]
       }
     },
+    "/namespaces/{handle}/credentials": {
+      "post": {
+        "operationId": "Delivery_createCredential",
+        "summary": "Store a credential",
+        "description": "Store a provider's API token in a namespace, under a label. The answer names it by a minted id and never\ncarries the secret; nothing does again.",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCredentialRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "Delivery_listCredentials",
+        "summary": "List a namespace's credentials",
+        "description": "A namespace's credentials, by label and id: never a secret.",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credentials"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/namespaces/{handle}/credentials/{credentialId}": {
+      "delete": {
+        "operationId": "Delivery_deleteCredential",
+        "summary": "Delete a credential",
+        "description": "Delete a credential: its secret is gone for good. A credential the namespace does not hold is not found (404).",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CredentialId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful. "
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/namespaces/{handle}/projects/{name}": {
       "get": {
         "operationId": "Namespaces_getProject",
@@ -7053,6 +7440,418 @@
         },
         "tags": [
           "Projects"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/deploy-targets": {
+      "get": {
+        "operationId": "Delivery_listDeployTargets",
+        "summary": "List a project's deploy targets",
+        "description": "A project's deploy targets, in name order.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployTargets"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/deploy-targets/{name}": {
+      "put": {
+        "operationId": "Delivery_putDeployTarget",
+        "summary": "Set a project's deploy target",
+        "description": "Set a project's deploy target, new or in place of the one of that name. Its credential must be one of the\nproject's own namespace (409 `deploy_target.refused` otherwise), and must reach the account's Workers before\nanything is set: a token the provider refuses or that does not reach the account is a 422\n`deploy_target.unreachable`, and an account with no workers.dev subdomain a 422 `deploy_target.no_workers_dev`.\nA project holds at most 16 targets (409 `deploy_target.refused`).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DeployTargetName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployTargetView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is well formed, but what it names cannot be used as it stands.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutDeployTargetRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "Delivery_deleteDeployTarget",
+        "summary": "Clear a project's deploy target",
+        "description": "Clear a project's deploy target. A name the project has no target by is not found (404).",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DeployTargetName"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful. "
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
         ],
         "security": [
           {
@@ -12661,6 +13460,31 @@
         },
         "description": "A move resting on one of the preflight's contradictions, by its index in that list."
       },
+      "CreateCredentialRequest": {
+        "type": "object",
+        "required": [
+          "label",
+          "provider",
+          "secret"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/CredentialLabel"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "The provider's API token. Stored sealed and never answered again, here or anywhere."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "CreateProjectRequest": {
         "type": "object",
         "required": [
@@ -12692,10 +13516,126 @@
           "not": {}
         }
       },
+      "Credential": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "provider",
+          "createdAt",
+          "createdBy"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/CredentialId"
+          },
+          "label": {
+            "$ref": "#/components/schemas/CredentialLabel"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A credential in a namespace's store as its owners read it: who stored it, when and for which provider. The\nsecret is write-only: it is sealed when stored, and no response, event or log ever carries it again."
+      },
       "CredentialId": {
         "type": "string",
         "pattern": "^crd_[0-9A-HJKMNP-TV-Z]{26}$",
         "description": "A credential in an org's store, named and never held: the id is minted when the secret is stored."
+      },
+      "CredentialLabel": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^\\S(?:.*\\S)?$",
+        "description": "What an owner calls a credential: shown in its place, since the secret never is."
+      },
+      "CredentialRemoved": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "namespaceId",
+          "credentialId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CredentialRemoved"
+            ]
+          },
+          "namespaceId": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "credentialId": {
+            "$ref": "#/components/schemas/CredentialId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An owner removed a credential from the namespace's store. Members only."
+      },
+      "CredentialStored": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "namespaceId",
+          "credential",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CredentialStored"
+            ]
+          },
+          "namespaceId": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/EventCredential"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An owner stored a credential in the namespace's store: its record, never its secret. Members only."
+      },
+      "Credentials": {
+        "type": "object",
+        "required": [
+          "credentials"
+        ],
+        "properties": {
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Credential"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "DecisionId": {
         "type": "string",
@@ -13156,6 +14096,54 @@
           "not": {}
         },
         "description": "An owner set one of the project's deploy targets, new or in place of the one of that name."
+      },
+      "DeployTargetView": {
+        "type": "object",
+        "required": [
+          "name",
+          "provider",
+          "accountId",
+          "credential"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/DeployTargetName"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "accountId": {
+            "$ref": "#/components/schemas/CloudflareAccountId"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/CredentialId"
+          },
+          "workersDev": {
+            "type": "string",
+            "description": "`<subdomain>.workers.dev`: where the account serves previews."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project's deploy target, with the workers.dev subdomain its account answered when the target was set."
+      },
+      "DeployTargets": {
+        "type": "object",
+        "required": [
+          "targets"
+        ],
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeployTargetView"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "DeploymentId": {
         "type": "string",
@@ -13937,6 +14925,41 @@
           "not": {}
         },
         "description": "A move resting on one of the preflight's contradictions, by its index in that list."
+      },
+      "EventCredential": {
+        "type": "object",
+        "required": [
+          "id",
+          "namespaceId",
+          "label",
+          "provider",
+          "createdAt",
+          "createdBy"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/CredentialId"
+          },
+          "namespaceId": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "label": {
+            "$ref": "#/components/schemas/CredentialLabel"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A credential as its event records it: core's shape, with `createdAt` an\nInstant (the published `Credential` gives a date-time). It names the\ncredential and never holds its secret."
       },
       "EventDecisionModelEffect": {
         "type": "object",
@@ -15324,6 +16347,12 @@
           },
           {
             "$ref": "#/components/schemas/SessionRedacted"
+          },
+          {
+            "$ref": "#/components/schemas/CredentialStored"
+          },
+          {
+            "$ref": "#/components/schemas/CredentialRemoved"
           },
           {
             "$ref": "#/components/schemas/DeployTargetSet"
@@ -18664,7 +19693,10 @@
           "project.name_taken",
           "project.import_refused",
           "project.import_too_large",
-          "quota.exceeded"
+          "quota.exceeded",
+          "deploy_target.refused",
+          "deploy_target.unreachable",
+          "deploy_target.no_workers_dev"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -19339,6 +20371,33 @@
           "repo-bytes-quota"
         ],
         "description": "Why Artifacts would not take a promotion's push: the pack is larger than one request may carry, or it would take the repo past its size quota."
+      },
+      "PutDeployTargetRequest": {
+        "type": "object",
+        "required": [
+          "provider",
+          "accountId",
+          "credential"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "accountId": {
+            "$ref": "#/components/schemas/CloudflareAccountId"
+          },
+          "credential": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CredentialId"
+              }
+            ],
+            "description": "A credential of the project's own namespace, by its id."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "Rebased": {
         "type": "object",

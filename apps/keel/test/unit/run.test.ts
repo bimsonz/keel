@@ -27,6 +27,7 @@ import {
   makeWorkspacePoolMemory,
   makeUsersMemory,
   makeNamespaceUsageMemory,
+  deliveryMemoryLayer,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -50,6 +51,7 @@ const runtime = ManagedRuntime.make(
     makeStandingsMemory().layer.pipe(Layer.provide(directory)),
     makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
     invitationsMemoryLayer(),
+    deliveryMemoryLayer(),
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
     makeIdsMemory().layer,

@@ -57,7 +57,8 @@ resource "cloudflare_r2_bucket_lifecycle" "sandbox_backups" {
   }]
 }
 
-# The account's Secrets Store (one per account), which holds per-Worker deploy tokens.
+# The account's Secrets Store (one per account), which holds the key that
+# wraps every credential an org stores in Keel.
 data "cloudflare_secrets_stores" "account" {
   account_id = var.account_id
 }
@@ -66,18 +67,22 @@ locals {
   secrets_store_id = data.cloudflare_secrets_stores.account.result[0].id
 }
 
-# The deploy token the Deployer adapters use. Inert until a real,
-# Worker-scoped token; its value never comes from this module.
-resource "cloudflare_secrets_store_secret" "deploy_token" {
+# The key-encryption key of the credential store: each credential an
+# org stores is sealed with a data key of its own, and that data key is wrapped
+# with this one (AES-KW), so a credential is never at rest unsealed. keel reads
+# it through its CREDENTIAL_KEK binding. Its value is made here, so no person
+# ever handles it, and is kept only in this state; replacing it makes every
+# stored credential unreadable, so it is never rotated in place.
+resource "random_bytes" "credential_kek" {
+  length = 32
+}
+
+resource "cloudflare_secrets_store_secret" "credential_kek" {
   account_id = var.account_id
   store_id   = local.secrets_store_id
-  name       = "${local.prefix}-deploy-token"
-  value      = "unset: replace with a Worker-scoped token"
+  name       = "${local.prefix}-credential-kek"
+  value      = random_bytes.credential_kek.base64
   scopes     = ["workers"]
-
-  lifecycle {
-    ignore_changes = [value]
-  }
 }
 
 # Better Auth's secret: it signs the session cookies and encrypts what Better
