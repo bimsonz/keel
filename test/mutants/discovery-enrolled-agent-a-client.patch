@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-client.test.ts
+# kills: discovery.client
+# why: an agent that holds no key is answered as a client with an empty key set, where the provider's own handling of a client it cannot authenticate is all that refuses it
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index c7c4bfd..3875cbc 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -94,7 +94,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
+     resolve: async (_ctx, clientId) => {
+       if (!isAgentId(clientId)) return null;
+       const agent = await agents.find(clientId);
+-      if (agent?.keys === undefined) return null;
++      if (agent === undefined) return null;
+       return {
+         clientId: agent.id,
+         clientDiscoveryId: AGENT_DISCOVERY,
+@@ -103,7 +103,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
+         tokenEndpointAuthMethod: "private_key_jwt",
+         grantTypes: ["client_credentials"],
+         redirectUris: [],
+-        jwks: JSON.stringify({ keys: agent.keys.map((key) => key.jwk) }),
++        jwks: JSON.stringify({ keys: (agent.keys ?? []).map((key) => key.jwk) }),
+         clientCredentialsScopes: agent.scopes.filter(isGrantable),
+         // A token is bound when its request carries a proof; a tool that cannot sign gets a plain one.
+         dpopBoundAccessTokens: false,

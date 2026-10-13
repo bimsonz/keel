@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts
+# kills: oauth.surface
+# why: the provider's own client registration answers again, a second and unproved way to make a client beside Keel's sign-up
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index c7c4bfd..7c85563 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -43,7 +43,6 @@ export const TOKEN_PATH = "/oauth2/token";
+ export const CLOSED_PATHS = [
+   "/token",
+   "/oauth2/authorize",
+-  "/oauth2/register",
+   "/oauth2/consent",
+   "/oauth2/continue",
+   "/oauth2/userinfo",

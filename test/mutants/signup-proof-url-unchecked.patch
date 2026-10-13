@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-sign-up.test.ts
+# kills: signup.key-proof
+# why: a sign-up's proof is checked against the URL the proof itself names, so a proof an agent made for any other request signs its key up here
+diff --git a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
+index 67d8181..e98b865 100644
+--- a/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
++++ b/apps/keel/src/adapters/driven/better-auth/key-proofs.ts
+@@ -1,6 +1,7 @@
+ import { KeyThumbprint, type PresentedKey, PublicJwk } from "@keeltown/core/domain/identity";
+ import { deriveDpopJkt, verifyDpopProof } from "better-auth/oauth2";
+ import { Schema } from "effect";
++import { decodeJwt } from "jose";
+ 
+ /** Why a sign-up's key or its proof was refused, in the codes RFC 7591 and RFC 9449 give them. */
+ export interface KeyRefusal {
+@@ -47,7 +48,7 @@ export async function provenKey(request: {
+     await verifyDpopProof({
+       proofJwt: request.proof,
+       method: "POST",
+-      url: request.url,
++      url: String(decodeJwt(request.proof).htu),
+       expectedJkt: jkt.value,
+       proofMaxAgeSeconds: PROOF_SECONDS,
+       signingAlgorithms: KEY_ALGORITHMS,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: dpop.bound-token
+# why: a bound token presented as a plain bearer skips the binding check, so a thief only has to drop the scheme
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e70ff90..85d711e 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -87,7 +87,7 @@ export async function verifyAgentToken(
+   }
+   try {
+     const { internalAdapter } = await auth.$context;
+-    await enforceDpopBinding({
++    if (presented.scheme === "DPoP") await enforceDpopBinding({
+       payload,
+       authorization: { scheme: presented.scheme, token: presented.token },
+       proofJwt: presented.proof,

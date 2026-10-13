@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-client.test.ts
+# kills: discovery.client
+# why: an agent's record is passed to the provider whole, so a record that holds a person's scope asks for it on an agent's token
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index c7c4bfd..85e9edd 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -104,7 +104,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
+         grantTypes: ["client_credentials"],
+         redirectUris: [],
+         jwks: JSON.stringify({ keys: agent.keys.map((key) => key.jwk) }),
+-        clientCredentialsScopes: agent.scopes.filter(isGrantable),
++        clientCredentialsScopes: [...agent.scopes],
+         // A token is bound when its request carries a proof; a tool that cannot sign gets a plain one.
+         dpopBoundAccessTokens: false,
+       };

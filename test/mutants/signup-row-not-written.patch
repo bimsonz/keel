@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-sign-up.test.ts
+# kills: signup.inline
+# why: sign-up answers before the directory knows the agent, so the token request that follows at once is refused as an unknown client
+diff --git a/packages/core/src/application/identity/sign-up.ts b/packages/core/src/application/identity/sign-up.ts
+index 730c411..0a76372 100644
+--- a/packages/core/src/application/identity/sign-up.ts
++++ b/packages/core/src/application/identity/sign-up.ts
+@@ -84,7 +84,6 @@ export const signUp: (
+     const agent = committed.duplicate
+       ? decodeAgent((yield* EntityStore).get(AGENT, agentId))
+       : committed.value;
+-    yield* (yield* AgentDirectory).upsertAccount(agent);
+     return agent;
+   });
+ 

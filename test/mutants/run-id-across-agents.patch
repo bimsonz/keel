@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/run.test.ts
+# kills: token.run
+# why: a run's id is made from its label alone, so two agents that both call a run `main` share one run
+diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
+index ee77446..ab4e448 100644
+--- a/packages/core/src/domain/identity/run.ts
++++ b/packages/core/src/domain/identity/run.ts
+@@ -18,7 +18,7 @@ export type RunName =
+  */
+ export function runIdOf(agentId: AgentId, name: RunName): RunId {
+   const named = name.label === undefined ? `key\n${name.runKey}` : `label\n${name.label}`;
+-  return makeId("run", idBody(BigInt(`0x${sha256Hex(`${agentId}\n${named}`).slice(0, 32)}`)));
++  return makeId("run", idBody(BigInt(`0x${sha256Hex(named).slice(0, 32)}`)));
+ }
+ 
+ /** The request's `project` is not a project id. Nothing is looked up, so it says nothing of what exists. */

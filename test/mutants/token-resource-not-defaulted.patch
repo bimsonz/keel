@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts
+# kills: token.resource
+# why: a token request that names no resource is passed on as it came, and the provider answers it with an opaque token stored against a client row an agent does not have
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index bb1b37f..396384f 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -276,9 +276,7 @@ export function authOptions(config: AuthConfig) {
+         // A token request that names no resource is for Keel's own API. Left unnamed, the
+         // provider issues an opaque token it stores against a client row, and an agent has none.
+         if (ctx.path === TOKEN_PATH)
+-          return ctx.body?.resource === undefined
+-            ? { context: { ...ctx, body: { ...ctx.body, resource: origin } } }
+-            : undefined;
++          return undefined;
+         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
+         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
+           const name: unknown = ctx.body?.username;

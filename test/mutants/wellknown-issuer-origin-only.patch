@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-discovery.test.ts
+# kills: wellknown.documents
+# why: the authorization server's document answers only at the bare well-known path, so a client that follows RFC 8414 from the issuer a token names finds nothing
+diff --git a/apps/keel/src/adapters/driving/http/well-known.ts b/apps/keel/src/adapters/driving/http/well-known.ts
+index 0fa5557..58b020d 100644
+--- a/apps/keel/src/adapters/driving/http/well-known.ts
++++ b/apps/keel/src/adapters/driving/http/well-known.ts
+@@ -27,7 +27,7 @@ const PROTECTED_RESOURCE = "/.well-known/oauth-protected-resource";
+  * endpoint is `/mcp` under it.
+  */
+ export function registerWellKnown(app: Hono<AppEnv>, wellKnown: WellKnown): void {
+-  for (const path of [AUTHORIZATION_SERVER, `${AUTHORIZATION_SERVER}${wellKnown.issuerPath}`])
++  for (const path of [AUTHORIZATION_SERVER])
+     app.get(path, (c) => wellKnown.authorizationServer(c.req.raw));
+   app.get(PROTECTED_RESOURCE, () => wellKnown.protectedResource(wellKnown.origin));
+   app.get(`${PROTECTED_RESOURCE}/mcp`, () =>

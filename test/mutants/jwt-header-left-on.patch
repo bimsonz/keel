@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts
+# kills: oauth.surface
+# why: every answer to a signed-in person carries their session as a signed token in a header, a second credential nothing in Keel accounts for
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index bb1b37f..c291c1b 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -378,7 +378,6 @@ export function authOptions(config: AuthConfig) {
+       // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
+       // is never turned into a token: no answer carries one in a header.
+       jwt({
+-        disableSettingJwtHeader: true,
+         jwks: { rotationInterval: TOKEN_KEY_SECONDS, gracePeriod: TOKEN_KEY_SECONDS },
+       }),
+       agentTokens({ origin, agents: config.agents }),

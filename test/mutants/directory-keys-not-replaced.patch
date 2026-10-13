@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: signup.directory
+# why: writing an account leaves its old keys in place, so a key the agent removed still gets its tokens
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index 17a8ec3..473a06a 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -192,12 +192,11 @@ export function AgentDirectoryD1(db: D1Database) {
+                 agent.revocationEpoch,
+                 agent.createdAt,
+               ),
+-            db.prepare("DELETE FROM agent_keys WHERE agent_id = ?").bind(agent.id),
+             ...(agent.keys ?? []).map((key) => {
+               const encoded = encodeKey(key);
+               return db
+                 .prepare(
+-                  "INSERT INTO agent_keys (jkt, agent_id, jwk, created_at) VALUES (?, ?, ?, ?)",
++                  "INSERT OR IGNORE INTO agent_keys (jkt, agent_id, jwk, created_at) VALUES (?, ?, ?, ?)",
+                 )
+                 .bind(encoded.jkt, agent.id, JSON.stringify(encoded.jwk), encoded.addedAt);
+             }),

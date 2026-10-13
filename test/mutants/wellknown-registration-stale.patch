@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-discovery.test.ts
+# kills: wellknown.documents
+# why: the document is the provider's own as it stands, so it sends an arriving agent to a registration route Keel has closed, and to every other closed route it names
+diff --git a/apps/keel/src/adapters/driven/better-auth/discovery.ts b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+index f75ff2f..0c04b0c 100644
+--- a/apps/keel/src/adapters/driven/better-auth/discovery.ts
++++ b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+@@ -45,7 +45,7 @@ export async function authorizationServerDocument(
+     ),
+   );
+   return Response.json(
+-    { ...served, registration_endpoint: where.signUpUrl },
++    Object(provided),
+     { status: answer.status, headers: CACHED },
+   );
+ }

@@ -128,27 +128,25 @@ describe("an agent signs itself up with a key", () => {
 
   it("[signup.key-refused] a private key, a key of a kind Keel does not take, and more than one key are refused before anything is made", async () => {
     const account = await newKey();
-    const { privateKey: extractable } = await generateKeyPair("EdDSA", {
-      crv: "Ed25519",
-      extractable: true,
-    });
-    const withPrivatePart = await exportJWK(extractable);
+    // The whole key, sent with a proof that same key made: nothing but its private part is wrong with it.
+    const whole = await newKey({ extractable: true });
+    const withPrivatePart = await exportJWK(whole.privateKey);
     expect("d" in withPrivatePart).toBe(true);
     const { publicKey: rsa } = await generateKeyPair("RS256");
-    const bodies: Record<string, unknown> = {
-      "a private key": { jwks: { keys: [withPrivatePart] } },
-      "an RSA key": { jwks: { keys: [await exportJWK(rsa)] } },
-      "two keys": { jwks: { keys: [account.publicJwk, (await newKey()).publicJwk] } },
-      "no key": { jwks: { keys: [] } },
-      "a client secret": {
-        jwks: { keys: [account.publicJwk] },
-        token_endpoint_auth_method: "client_secret_post",
-      },
+    const cases: Record<string, readonly [TestKey, unknown]> = {
+      "a private key": [whole, { jwks: { keys: [withPrivatePart] } }],
+      "an RSA key": [account, { jwks: { keys: [await exportJWK(rsa)] } }],
+      "two keys": [account, { jwks: { keys: [account.publicJwk, (await newKey()).publicJwk] } }],
+      "no key": [account, { jwks: { keys: [] } }],
+      "a client secret": [
+        account,
+        { jwks: { keys: [account.publicJwk] }, token_endpoint_auth_method: "client_secret_post" },
+      ],
     };
-    for (const [what, body] of Object.entries(bodies))
-      expect([what, (await signUp(account, { body })).status]).toEqual([what, 400]);
-    const none = await env.DB.prepare("SELECT COUNT(*) AS n FROM agents WHERE id = ?")
-      .bind(agentIdOf(account.key.jkt))
+    for (const [what, [key, body]] of Object.entries(cases))
+      expect([what, (await signUp(key, { body })).status]).toEqual([what, 400]);
+    const none = await env.DB.prepare("SELECT COUNT(*) AS n FROM agents WHERE id IN (?, ?)")
+      .bind(agentIdOf(account.key.jkt), agentIdOf(whole.key.jkt))
       .first<{ n: number }>();
     expect(none?.n).toBe(0);
   });

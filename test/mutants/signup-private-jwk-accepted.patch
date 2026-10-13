@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-sign-up.test.ts
+# kills: signup.key-refused
+# why: the sign-up's key model names the private member, so an agent that sends its whole key is signed up and its private half has crossed the wire unremarked
+# regen
+diff --git a/packages/spec/auth.tsp b/packages/spec/auth.tsp
+index 019d5e6..cc8fc1e 100644
+--- a/packages/spec/auth.tsp
++++ b/packages/spec/auth.tsp
+@@ -52,6 +52,7 @@ model RegistrationJwk {
+   use?: "sig";
+   alg?: "EdDSA" | "ES256";
+   key_ops?: string[];
++  d?: string;
+ }
+ 
+ model RegistrationJwks {

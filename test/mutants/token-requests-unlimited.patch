@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-limits.test.ts
+# kills: token.rate-limit
+# why: a token request is admitted whatever its limiter answers, so one address guesses at signed requests without end
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index 7922f0d..890c834 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -68,7 +68,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+       if (path === mount.tokenPath) {
+         // By address alone, as the token endpoint is limited: an agent's id is public.
+-        if (!(await mount.admitToken(`token:${ip}`))) {
++        if (!(await mount.admitToken(`token:${ip}`)) && request.method === "PUT") {
+           const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
+             detail: "Too many token requests from this address; wait a minute.",
+           });

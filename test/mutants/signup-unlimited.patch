@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-limits.test.ts
+# kills: signup.rate-limit
+# why: sign-up admits a request whatever its limiter answers, so one address makes accounts without end
+diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
+index c07e707..9719b95 100644
+--- a/apps/keel/src/adapters/driving/http/app.ts
++++ b/apps/keel/src/adapters/driving/http/app.ts
+@@ -71,7 +71,7 @@ export function makeApp(options: AppOptions) {
+   // An agent's sign-up is counted as a person's is: by address, under the sign-in limit.
+   app.use(REGISTER_PATH, async (c, next) => {
+     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+-    if (await options.auth.admit(`auth:${ip}`)) return next();
++    if ((await options.auth.admit(`auth:${ip}`)) || true) return next();
+     return problemResponse(429, "rate.limited", c.get("requestId"), {
+       detail: "Too many sign-ups from this address; wait a minute.",
+     });

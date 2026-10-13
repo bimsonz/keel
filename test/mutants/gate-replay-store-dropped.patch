@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: dpop.bound-token
+# why: a proof's id is never kept, so a captured request, token and proof together, is good again for the proof's whole minute
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e70ff90..65a7e97 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -93,7 +93,6 @@ export async function verifyAgentToken(
+       proofJwt: presented.proof,
+       method: presented.method,
+       url: presented.url,
+-      replayStore: createDpopReplayStore(internalAdapter),
+       proofMaxAgeSeconds: PROOF_SECONDS,
+       signingAlgorithms: KEY_ALGORITHMS,
+     });

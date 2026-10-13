@@ -21,8 +21,12 @@ export interface TestKey {
   readonly key: AgentKey;
 }
 
-export async function newKey(): Promise<TestKey> {
-  const { privateKey, publicKey } = await generateKeyPair("EdDSA", { crv: "Ed25519" });
+/** A new key pair. `extractable` lets a test read the private half, to send what an agent never should. */
+export async function newKey(options: { readonly extractable?: boolean } = {}): Promise<TestKey> {
+  const { privateKey, publicKey } = await generateKeyPair("EdDSA", {
+    crv: "Ed25519",
+    extractable: options.extractable ?? false,
+  });
   const publicJwk = await exportJWK(publicKey);
   const jkt = Schema.decodeUnknownSync(KeyThumbprint)(await calculateJwkThumbprint(publicJwk));
   const jwk = Schema.decodeUnknownSync(Schema.Struct({ x: Schema.NonEmptyString }))(publicJwk);

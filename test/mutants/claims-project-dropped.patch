@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts
+# kills: token.claims
+# why: the token names no project, so a token asked for one project stands wherever its agent may
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index c7c4bfd..8d58285 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -188,7 +188,6 @@ export async function agentClaims(
+   return {
+     epoch,
+     ...(handle === undefined ? {} : { handle }),
+-    ...(prj === undefined ? {} : { prj }),
+     ...(run === undefined ? {} : { run: run.id }),
+     ...(run?.label === undefined ? {} : { run_label: run.label }),
+   };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-discovery.test.ts
+# kills: wellknown.documents
+# why: a resource's document names Keel's origin as the server that issues its tokens, where no authorization server's document says so and no token's issuer matches
+diff --git a/apps/keel/src/adapters/driven/better-auth/discovery.ts b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+index f75ff2f..59bf70b 100644
+--- a/apps/keel/src/adapters/driven/better-auth/discovery.ts
++++ b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+@@ -66,7 +66,7 @@ export async function protectedResourceDocument(
+     .getActions()
+     .getProtectedResourceMetadata({
+       resource,
+-      authorization_servers: [`${origin}${AUTH_BASE_PATH}`],
++      authorization_servers: [origin],
+       scopes_supported: [...AGENT_SCOPES],
+       bearer_methods_supported: ["header"],
+       dpop_signing_alg_values_supported: [...KEY_ALGORITHMS],

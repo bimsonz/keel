@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-access-tokens.test.ts
+# kills: dpop.token
+# why: a token whose signature does not verify is read anyway, so anyone writes their own and is any agent they name
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index e70ff90..a5979a7 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -83,7 +83,8 @@ export async function verifyAgentToken(
+       },
+     });
+   } catch {
+-    return NOT_A_TOKEN;
++    const [, body = ""] = presented.token.split(".");
++    payload = JSON.parse(atob(body.replaceAll("-", "+").replaceAll("_", "/")));
+   }
+   try {
+     const { internalAdapter } = await auth.$context;
