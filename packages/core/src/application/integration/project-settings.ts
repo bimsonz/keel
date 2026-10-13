@@ -2,7 +2,7 @@ import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectNotFound, ProjectSettingsChanged } from "../../domain/integration/index.ts";
 import {
-  type Actor,
+  type CommandActor,
   canonicalJson,
   contentHashOf,
   type EntityRef,
@@ -68,7 +68,7 @@ export interface ChangeSettings {
   /** The id of whoever changes them: the event's `by`. */
   readonly by: string;
   /** The same actor as the envelope names it (`user:<id>`, `agent:<id>`): the commit's actor. */
-  readonly actor: Actor;
+  readonly actor: CommandActor;
   /** The run an agent changes them in, when its token named one: the run the event names. */
   readonly run?: RunRef | undefined;
   /** The request that carried the PUT. */

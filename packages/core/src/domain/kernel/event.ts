@@ -4,23 +4,34 @@ import { EntityRef } from "./entity.ts";
 import { AgentId, EventId, type Instant, InstantSchema, ProjectId, RunRef, UserId } from "./ids.ts";
 
 /**
- * The principal whose command an event records: an agent or a user, each by
- * id. Absent when the platform caused the event (Precheck, an alarm, a
- * reaction, the Lane landing a change). An agent is never notified of an event
- * it caused, because its own tool result already reports it.
- *
- * `operator:<name>` is how events named a person before users existed. The
- * events already stored carry it, so it is still read.
+ * Who a command is by, as it is written: an agent or a user, each by id. The
+ * helpers below return it, every machine's command that names its actor takes
+ * it and so does a commit, so nothing writes another form.
  */
-export const Actor = Schema.Union([
+export const CommandActor = Schema.Union([
   Schema.TemplateLiteral(["agent:", AgentId]),
   Schema.TemplateLiteral(["user:", UserId]),
+]);
+export type CommandActor = typeof CommandActor.Type;
+
+/**
+ * The principal whose command an event records, as it is read: a
+ * `CommandActor`, or `operator:<name>`, which is how events named a person
+ * before users existed. The events already stored carry that form, and the
+ * feed encodes an envelope again as it stores it, so it is read and encoded as
+ * it was: the command's type keeps it from being written, not this schema.
+ * Absent when the platform caused the event (Precheck, an alarm, a reaction,
+ * the Lane landing a change). An agent is never notified of an event it
+ * caused, because its own tool result already reports it.
+ */
+export const Actor = Schema.Union([
+  ...CommandActor.members,
   Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
 ]);
 export type Actor = typeof Actor.Type;
 
 /** The actor an agent's own commands commit under. */
-export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
+export const agentActor = (agentId: AgentId): CommandActor => `agent:${agentId}`;
 
 /**
  * Whose command an agent's commit is: the agent, and the run of it that asked
@@ -30,13 +41,13 @@ export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
 export const byAgent = (
   agentId: AgentId,
   run: RunRef | undefined,
-): { readonly actor: Actor; readonly run?: RunRef } => ({
+): { readonly actor: CommandActor; readonly run?: RunRef } => ({
   actor: agentActor(agentId),
   ...(run === undefined ? {} : { run }),
 });
 
 /** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */
-export const userActor = (userId: UserId): Actor => `user:${userId}`;
+export const userActor = (userId: UserId): CommandActor => `user:${userId}`;
 
 /**
  * The envelope every event is committed in (docs/domain/events.md). The payload

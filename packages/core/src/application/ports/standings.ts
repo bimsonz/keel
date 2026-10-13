@@ -18,7 +18,7 @@ export interface StandingInput {
 /**
  * An agent's standing, which its AgentSession DO holds: an actor the doorway
  * authorised suspends, reinstates or revokes it, recorded as
- * `operator:<actor's id>`. Each writes the agent's directory row before it
+ * `user:<actor's id>`. Each writes the agent's directory row before it
  * answers, so the agent's next request is judged by its new standing. The
  * same Idempotency-Key and body answers the agent again; another body is an
  * IdempotencyConflict. A move the agent's state refuses (reinstating an

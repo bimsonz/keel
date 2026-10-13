@@ -2,7 +2,7 @@ import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordin
 import { IdempotencyConflict, QuotaExceeded } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import {
-  Actor,
+  CommandActor,
   Anchor,
   ChangeId,
   Glob,
@@ -47,7 +47,7 @@ export const PutSettingsCommand = Schema.Struct({
     visibility: Schema.optional(Visibility),
   }),
   by: Schema.NonEmptyString,
-  actor: Actor,
+  actor: CommandActor,
   run: Schema.optional(RunRef),
   requestId: Schema.NonEmptyString,
 });
@@ -80,7 +80,7 @@ export const CreateProjectCommand = Schema.Struct({
     Schema.TaggedStruct("Template", { repo: Schema.NonEmptyString }),
   ]),
   by: Schema.NonEmptyString,
-  actor: Actor,
+  actor: CommandActor,
   run: Schema.optional(RunRef),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,

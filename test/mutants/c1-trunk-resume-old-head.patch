@@ -2,12 +2,12 @@
 # kills: trunk.resume
 # why: Resume confirms the head trunk knew, not the one it reads, so promotion freezes again at once
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cf9cea3..a1aaf0b 100644
+index 294479ba..8bf44bd2 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -510,7 +510,7 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
+@@ -572,7 +572,7 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
    projectId: ProjectId,
-   by: string,
+   by: CommandActor,
  ) {
 -  const head = yield* (yield* TrunkWriter).head;
 +  const head = trunkOf(yield* EntityStore, projectId)?.head ?? (yield* (yield* TrunkWriter).head);

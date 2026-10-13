@@ -1,5 +1,6 @@
 import { Result, Schema } from "effect";
 import {
+  type CommandActor,
   type Committed,
   type DecisionId,
   type EntityRef,
@@ -51,7 +52,7 @@ export type EscalationCommand =
   | {
       readonly _tag: "Rule";
       readonly option: string;
-      readonly by: string;
+      readonly by: CommandActor;
       readonly rationale?: string;
     }
   | { readonly _tag: "Withdraw"; readonly reason: string }

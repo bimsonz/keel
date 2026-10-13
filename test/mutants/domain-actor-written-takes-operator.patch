@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: actor.written-forms
+# why: a command may be by `operator:<name>` again, so the form that is only read can be written by anything that names its actor through the type.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index 83c6135e..65eea595 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -11,6 +11,7 @@ import { AgentId, EventId, type Instant, InstantSchema, ProjectId, RunRef, UserI
+ export const CommandActor = Schema.Union([
+   Schema.TemplateLiteral(["agent:", AgentId]),
+   Schema.TemplateLiteral(["user:", UserId]),
++  Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+ ]);
+ export type CommandActor = typeof CommandActor.Type;
+ 

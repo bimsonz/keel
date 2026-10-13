@@ -15,7 +15,7 @@ import {
   RulingOptionUnknown,
 } from "@keeltown/core/domain/verification";
 import {
-  Actor,
+  CommandActor,
   AgentId,
   DecisionId,
   EntityRef,
@@ -96,7 +96,7 @@ export const AcceptInvitationCommand = Schema.Struct({
  */
 export const EndInvitationCommand = Schema.Struct({
   agentId: AgentId,
-  by: Actor,
+  by: CommandActor,
   run: Schema.optional(RunRef),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,

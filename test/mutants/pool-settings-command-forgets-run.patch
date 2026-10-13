@@ -2,13 +2,13 @@
 # kills: run.pool-settings
 # why: the Project object's settings command has no run to carry, so the run the isolate sent is dropped at the object's door
 diff --git a/apps/keel/src/rpc/project.ts b/apps/keel/src/rpc/project.ts
-index 87544f62..254561d9 100644
+index 48cf4d1c..484cadd9 100644
 --- a/apps/keel/src/rpc/project.ts
 +++ b/apps/keel/src/rpc/project.ts
 @@ -48,7 +48,6 @@ export const PutSettingsCommand = Schema.Struct({
    }),
    by: Schema.NonEmptyString,
-   actor: Actor,
+   actor: CommandActor,
 -  run: Schema.optional(RunRef),
    requestId: Schema.NonEmptyString,
  });

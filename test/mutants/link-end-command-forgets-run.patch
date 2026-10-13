@@ -2,13 +2,13 @@
 # kills: run.pool-link-end
 # why: the agent's object's command for a link's end has no run to carry, so the run the isolate sent is dropped at the object's door
 diff --git a/apps/keel/src/rpc/agent-session.ts b/apps/keel/src/rpc/agent-session.ts
-index 8c129ed3..10ed57a6 100644
+index d803ff10..71371c4a 100644
 --- a/apps/keel/src/rpc/agent-session.ts
 +++ b/apps/keel/src/rpc/agent-session.ts
 @@ -158,7 +158,6 @@ export const ApproveSponsorCommand = Schema.Struct({
   */
  export const EndSponsorCommand = Schema.Struct({
-   by: Actor,
+   by: CommandActor,
 -  run: Schema.optional(RunRef),
    idempotencyKey: Schema.String,
    fingerprint: Schema.String,

@@ -6,7 +6,7 @@ import {
   evolveAgent,
   IdempotencyConflict,
 } from "@keeltown/core/domain/identity";
-import { Instant } from "@keeltown/core/kernel";
+import { type CommandActor, Instant } from "@keeltown/core/kernel";
 import { AgentDirectory, type StandingInput, Standings } from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option, Result } from "effect";
 
@@ -37,7 +37,7 @@ export function makeStandingsMemory() {
       Standings,
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
-        const move = (by: string, input: StandingInput, kind: Move) =>
+        const move = (by: CommandActor, input: StandingInput, kind: Move) =>
           Effect.gen(function* () {
             const now = Instant(yield* EffectClock.currentTimeMillis);
             const key = `${input.agentId} ${input.idempotencyKey}`;

@@ -4,7 +4,7 @@ import {
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
-import { CommitSha, type InstantSchema } from "@keeltown/core/kernel";
+import { type CommandActor, CommitSha, type InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { ImportTooLarge, RepoNotFound } from "./project.ts";
@@ -58,7 +58,7 @@ export interface TrunkRpc {
   /** Where trunk started, for a reader of the project: answers a trunk with no head yet too, with no origin. */
   origin(): Promise<ExitJson>;
   /** Releases a frozen promotion. Operator only. */
-  resume(by: string): Promise<ExitJson>;
+  resume(by: CommandActor): Promise<ExitJson>;
   /**
    * Names trunk's first head and where it came from (the Project DO's
    * createProject, once it has created trunk). A retry with the same head

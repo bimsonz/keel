@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Actor, ChangeId, type EntityRef, type EventEnvelope, RunRef } from "@keeltown/core/kernel";
+import {
+  ChangeId,
+  CommandActor,
+  type EntityRef,
+  type EventEnvelope,
+  RunRef,
+} from "@keeltown/core/kernel";
 import {
   type Clock,
   commit,
@@ -84,7 +90,7 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
         Effect.gen(function* () {
           const h = harness();
           const entity = change();
-          const actor = Schema.decodeUnknownSync(Actor)(`agent:agt_${randomUlid()}`);
+          const actor = Schema.decodeUnknownSync(CommandActor)(`agent:agt_${randomUlid()}`);
           const run = Schema.decodeUnknownSync(RunRef)({
             id: `run_${randomUlid()}`,
             label: "run-c",

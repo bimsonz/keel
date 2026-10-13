@@ -2,15 +2,15 @@
 # kills: tenancy.event-actor
 # why: a granted user is still named `operator:<id>`, the spelling from before users existed, so the feed cannot tell a person from the old instance operator.
 diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
-index 4777834..bf9d687 100644
+index 525d0426..70b4c928 100644
 --- a/packages/core/src/domain/identity/tenancy.ts
 +++ b/packages/core/src/domain/identity/tenancy.ts
-@@ -105,7 +105,7 @@ export const actorId = (actor: Actor): string =>
+@@ -131,7 +131,7 @@ export const actorId = (actor: Actor): string =>
  
  /** The actor as an event's envelope names it: `agent:<id>` or `user:<id>`. */
- export const eventActorOf = (actor: Actor): EventActor =>
+ export const eventActorOf = (actor: Actor): CommandActor =>
 -  actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
-+  actor._tag === "Agent" ? agentActor(actor.agentId) : `operator:${actor.userId}`;
++  actor._tag === "Agent" ? agentActor(actor.agentId) : (`operator:${actor.userId}` as CommandActor);
  
  /** The instance itself: what is asked of no org, project or account, such as signing in or creating an org. */
  export interface InstanceResource {

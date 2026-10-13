@@ -1,8 +1,8 @@
 import { Result } from "effect";
 import {
-  type Actor,
   agentActor,
   type AgentId,
+  type CommandActor,
   type Committed,
   IllegalTransition,
   type Instant,
@@ -48,13 +48,13 @@ export type AgentCommand =
       readonly key: PresentedKey;
       readonly name?: string;
     }
-  | { readonly _tag: "Suspend"; readonly reason: string; readonly by: string }
-  | { readonly _tag: "Reinstate"; readonly by: string }
-  | { readonly _tag: "Revoke"; readonly by: string }
+  | { readonly _tag: "Suspend"; readonly reason: string; readonly by: CommandActor }
+  | { readonly _tag: "Reinstate"; readonly by: CommandActor }
+  | { readonly _tag: "Revoke"; readonly by: CommandActor }
   /** A person stands behind the agent. The agent asked first: the caller holds that proof. */
   | { readonly _tag: "Sponsor"; readonly by: UserId }
   /** The sponsor switches the link off, or the agent leaves it: `by` is one of the two. */
-  | { readonly _tag: "EndSponsorship"; readonly by: Actor };
+  | { readonly _tag: "EndSponsorship"; readonly by: CommandActor };
 
 /** Facts from I/O: the time, and the agent this decision is about (the AgentSession DO's key). */
 export interface AgentFacts {

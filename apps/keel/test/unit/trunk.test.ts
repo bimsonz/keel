@@ -30,6 +30,7 @@ import {
   makeId,
   type NamespaceId,
   type ProjectId,
+  userActor,
 } from "@keeltown/core/kernel";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
 import type { TrunkOrigin } from "@keeltown/core/domain/integration";
@@ -59,6 +60,8 @@ const seed = process.env["FC_SEED"];
 fc.configureGlobal({ numRuns: 50, ...(seed === undefined ? {} : { seed: Number(seed) }) });
 
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
+/** Whoever releases a freeze: a person, as a command names one. */
+const RELEASER = userActor(makeId("usr", "01J9ZZZZZZZZZZZZZZZZZZZZZZ"));
 const ORG: NamespaceId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 /** An empty project's origin: the start that names no commit, for cases that are not about where trunk started. */
@@ -838,9 +841,9 @@ describe("the Trunk's promotion", () => {
           moved.writer.interfere(sha("f"));
           expect(yield* pushPromotion(PROJECT)).toBe("frozen");
           expect(yield* counted).toBe(held + 1_000);
-          yield* resumeTrunk(PROJECT, "operator");
+          yield* resumeTrunk(PROJECT, RELEASER);
           expect(yield* counted).toBe(held);
-          yield* resumeTrunk(PROJECT, "operator");
+          yield* resumeTrunk(PROJECT, RELEASER);
           expect(yield* counted).toBe(held);
         }).pipe(Effect.provide(moved.layer));
 
@@ -857,7 +860,7 @@ describe("the Trunk's promotion", () => {
           landed.writer.interfere(sha("f"));
           expect(yield* pushPromotion(PROJECT)).toBe("frozen");
           landed.writer.interfere(tip);
-          yield* resumeTrunk(PROJECT, "operator");
+          yield* resumeTrunk(PROJECT, RELEASER);
           expect(yield* counted).toBe(held + 1_000);
         }).pipe(Effect.provide(landed.layer));
 
@@ -877,7 +880,7 @@ describe("the Trunk's promotion", () => {
           refused.writer.interfere(sha("f"));
           expect(yield* pushPromotion(PROJECT)).toBe("frozen");
           expect(refused.writer.pushes()).toEqual([]);
-          yield* resumeTrunk(PROJECT, "operator");
+          yield* resumeTrunk(PROJECT, RELEASER);
           expect(yield* counted).toBe(held + 300);
         }).pipe(Effect.provide(refused.layer));
       }),
@@ -976,7 +979,7 @@ describe("the Trunk's promotion", () => {
         const moved = yield* w.composed(9, base);
         w.writer.interfere(moved);
         expect(yield* pushPromotion(PROJECT)).toBe("frozen");
-        const resumed = yield* resumeTrunk(PROJECT, "operator:zach");
+        const resumed = yield* resumeTrunk(PROJECT, RELEASER);
         expect(resumed).toMatchObject({ phase: "idle", head: moved });
         expect((yield* typesOf).slice(-2)).toEqual(["PromotionDeclined", "PromotionResumed"]);
         const tip = yield* w.composed(2, moved);

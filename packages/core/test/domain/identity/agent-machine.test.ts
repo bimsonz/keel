@@ -14,9 +14,9 @@ import {
   replayAgent,
 } from "../../../src/domain/identity/index.ts";
 import {
-  type Actor,
   agentActor,
   canonicalJson,
+  type CommandActor,
   type Committed,
   IllegalTransition,
   Instant,
@@ -53,6 +53,8 @@ const OTHER = makeId("usr", "2".repeat(26));
 /** A person who never stands behind the agent, and another agent: neither is a party to its link. */
 const STRANGER = makeId("usr", "3".repeat(26));
 const ELSEWHERE = makeId("agt", "9".repeat(26));
+/** Whoever moves an agent's standing: a person, named as a command names one. */
+const MODERATOR = userActor(makeId("usr", "4".repeat(26)));
 
 /** A key an agent signs up with, and the id and handle Keel makes from it. */
 const thumbprint = Schema.decodeUnknownSync(KeyThumbprint);
@@ -110,11 +112,11 @@ const build = (kind: Kind): AgentCommand => {
     case "SignUp":
       return { _tag: "SignUp", handle: HANDLE, key: KEY };
     case "Suspend":
-      return { _tag: "Suspend", reason: "runaway retries", by: "operator:zb" };
+      return { _tag: "Suspend", reason: "runaway retries", by: MODERATOR };
     case "Reinstate":
-      return { _tag: "Reinstate", by: "operator:zb" };
+      return { _tag: "Reinstate", by: MODERATOR };
     case "Revoke":
-      return { _tag: "Revoke", by: "operator:zb" };
+      return { _tag: "Revoke", by: MODERATOR };
     case "Sponsor":
       return { _tag: "Sponsor", by: SPONSOR };
     case "EndSponsorship":
@@ -223,7 +225,7 @@ const linked = (model: Linked, command: AgentCommand): Linked | "refused" => {
 };
 
 /** Whoever might ask to end the link: each person who may hold it, the agent, and two who are no party to it. */
-const ENDERS: readonly Actor[] = [
+const ENDERS: readonly CommandActor[] = [
   userActor(SPONSOR),
   userActor(OTHER),
   agentActor(AGENT),
@@ -294,7 +296,11 @@ const walk = (commands: readonly AgentCommand[]) => {
 };
 
 /** Whether an event an EndSponsorship committed names who ended the link, and the sponsor it ended. */
-const namesItsEnder = (event: AgentEvent, by: Actor, sponsor: UserId | undefined): boolean => {
+const namesItsEnder = (
+  event: AgentEvent,
+  by: CommandActor,
+  sponsor: UserId | undefined,
+): boolean => {
   if (event._tag === "AgentUnsponsored") return event.by === by && event.sponsor === sponsor;
   return event._tag === "AgentReinstated" && event.by === by;
 };
@@ -696,14 +702,15 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     const ended = { _tag: "AgentUnsponsored", agentId: AGENT, sponsor: SPONSOR };
 
     // A stranger, another agent and an operator of old are no party to the link.
-    const outsiders: readonly Actor[] = [
-      userActor(STRANGER),
-      userActor(OTHER),
-      agentActor(ELSEWHERE),
-      "operator:zb",
+    const outsiders: readonly AgentCommand[] = [
+      { _tag: "EndSponsorship", by: userActor(STRANGER) },
+      { _tag: "EndSponsorship", by: userActor(OTHER) },
+      { _tag: "EndSponsorship", by: agentActor(ELSEWHERE) },
+      // @ts-expect-error a command is by an agent or a user: `operator:` is read on stored events and written by none
+      { _tag: "EndSponsorship", by: "operator:zb" },
     ];
-    for (const by of outsiders) {
-      const tried = drive([build("Enroll"), sponsor, { _tag: "EndSponsorship", by }]);
+    for (const end of outsiders) {
+      const tried = drive([build("Enroll"), sponsor, end]);
       expect(reason(tried.results[2])).toBe("not-a-party");
       expect(seen(tried.state)).toBe(`active, ${SPONSOR}, epoch 0`);
     }

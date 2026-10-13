@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: actor.operator-still-read
+# why: the actor an event carries has no operator form, so every event stored before users existed stops decoding and a feed rebuilt over them fails.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index 83c6135e..a817c1ed 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -26,7 +26,6 @@ export type CommandActor = typeof CommandActor.Type;
+  */
+ export const Actor = Schema.Union([
+   ...CommandActor.members,
+-  Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+ ]);
+ export type Actor = typeof Actor.Type;
+ 

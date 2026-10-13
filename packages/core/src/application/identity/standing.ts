@@ -14,7 +14,7 @@ import {
   IdempotencyConflict,
 } from "../../domain/identity/index.ts";
 import {
-  type Actor as EventActor,
+  type CommandActor as EventActor,
   AgentId,
   type EventEnvelope,
   UserId,

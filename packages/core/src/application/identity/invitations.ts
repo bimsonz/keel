@@ -17,7 +17,7 @@ import {
   type AgentId,
   byAgent,
   type EntityRef,
-  type Actor as EventActor,
+  type CommandActor as EventActor,
   type EventEnvelope,
   IllegalTransition,
   InstantSchema,

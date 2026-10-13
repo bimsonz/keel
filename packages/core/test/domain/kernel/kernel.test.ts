@@ -7,6 +7,7 @@ import {
   byAgent,
   canBlock,
   canonicalJson,
+  CommandActor,
   contentHashOf,
   EventEnvelope,
   EvidenceClass,
@@ -20,6 +21,7 @@ import {
   userActor,
   weakest,
 } from "../../../src/domain/kernel/index.ts";
+import { eventActorOf } from "../../../src/domain/identity/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const reference = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
@@ -183,6 +185,7 @@ const ulidArb = fc.string({
   maxLength: 26,
 });
 const isActor = Schema.is(Actor);
+const isWritten = Schema.is(CommandActor);
 
 /** The actor an envelope carries once it has been encoded, sent as JSON and decoded. */
 const actorThroughTheWire = (actor: Actor): unknown => {
@@ -199,6 +202,28 @@ const actorThroughTheWire = (actor: Actor): unknown => {
     payload: {},
   });
   return Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(JSON.stringify(sent))).actor;
+};
+
+/**
+ * The actor of an envelope stored long ago once it has been read, encoded
+ * again and stored again, as a feed rebuilt over old events does, then read.
+ */
+const storedAgain = (actor: string): unknown => {
+  const stored = {
+    eventId: makeId("evt", ulid(4)),
+    type: "AgentSuspended",
+    entity: { kind: "agent", id: makeId("agt", ulid(3)) },
+    seq: 1,
+    at: 1_760_000_000_000,
+    dedupeKey: "suspend#1",
+    actor,
+    affected: [],
+    notified: [],
+    payload: {},
+  };
+  const read = Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(JSON.stringify(stored)));
+  const again = JSON.stringify(Schema.encodeSync(EventEnvelope)(read));
+  return Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(again)).actor;
 };
 
 describe("an event's actor", () => {
@@ -247,6 +272,60 @@ describe("an event's actor", () => {
           anAgent !== aUser &&
           actorThroughTheWire(anAgent) === anAgent &&
           actorThroughTheWire(aUser) === aUser
+        );
+      }),
+    );
+  });
+
+  it("[actor.written-forms] a command is by an agent or a user, each by its id, and never by an operator's name", () => {
+    const agent = makeId("agt", ulid(1));
+    const user = makeId("usr", ulid(1));
+    expect([`agent:${agent}`, `user:${user}`].filter((actor) => !isWritten(actor))).toEqual([]);
+
+    const unwritten = [
+      "operator:ops",
+      `operator:${agent}`,
+      `operator:${user}`,
+      agent,
+      user,
+      `agent:${user}`,
+      `user:${agent}`,
+      "agent:",
+      "user:",
+      "",
+    ];
+    expect(unwritten.filter((actor) => isWritten(actor))).toEqual([]);
+
+    // Whatever names an actor for a command names one of the two.
+    fc.assert(
+      fc.property(ulidArb, ulidArb, fc.string({ minLength: 1 }), (a, u, name) => {
+        const agentId = makeId("agt", a);
+        const userId = makeId("usr", u);
+        return (
+          isWritten(agentActor(agentId)) &&
+          isWritten(userActor(userId)) &&
+          isWritten(byAgent(agentId, undefined).actor) &&
+          isWritten(eventActorOf({ _tag: "Agent", agentId })) &&
+          isWritten(eventActorOf({ _tag: "User", userId })) &&
+          !isWritten(`operator:${name}`)
+        );
+      }),
+    );
+  });
+
+  it("[actor.operator-still-read] an operator's name on a stored event is read, and written back as it was", () => {
+    expect(isActor("operator:")).toBe(false);
+    fc.assert(
+      fc.property(ulidArb, ulidArb, fc.string({ minLength: 1 }), (a, u, name) => {
+        const stored = `operator:${name}`;
+        const read = Schema.decodeUnknownSync(Actor)(stored);
+        return (
+          read === stored &&
+          Schema.encodeSync(Actor)(read) === stored &&
+          storedAgain(stored) === stored &&
+          // What is written is read too.
+          isActor(agentActor(makeId("agt", a))) &&
+          isActor(userActor(makeId("usr", u)))
         );
       }),
     );

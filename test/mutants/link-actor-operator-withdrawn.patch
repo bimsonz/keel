@@ -2,15 +2,15 @@
 # kills: change.abandon-maintainer
 # why: a maintainer's withdrawal is recorded under the old operator spelling, not as the user who made it
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index f18a29b5..10cf1d3c 100644
+index 82b79e12..b26a689d 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1025,7 +1025,7 @@ const withdrawnBy = ({
+@@ -1026,7 +1026,7 @@ const withdrawnBy = ({
    authority,
- }: AbandonChange): { readonly actor: Actor; readonly run?: RunRef } =>
+ }: AbandonChange): { readonly actor: CommandActor; readonly run?: RunRef } =>
    authority._tag === "Maintainer"
 -    ? { actor: userActor(authority.by) }
-+    ? { actor: `operator:${authority.by}` }
++    ? { actor: `operator:${authority.by}` as CommandActor }
      : byAgent(authority.agentId, authority.run);
  
  /**

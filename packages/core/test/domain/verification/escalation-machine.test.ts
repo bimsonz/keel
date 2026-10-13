@@ -7,6 +7,7 @@ import {
   Instant,
   type Json,
   makeId,
+  userActor,
 } from "../../../src/domain/kernel/index.ts";
 import {
   decideEscalation,
@@ -39,6 +40,8 @@ const T0 = Instant(1_760_000_000_000);
 const ESCALATION = makeId("esc", "0".repeat(26));
 const CHANGE = makeId("chg", "0".repeat(26));
 const DECISION = makeId("dec", "0".repeat(26));
+/** Whoever rules: a person, named as a command names one. */
+const RULER = userActor(makeId("usr", "0".repeat(26)));
 const UNKNOWN = "not-an-option";
 
 type Kind = EscalationCommand["_tag"];
@@ -111,7 +114,7 @@ const build = (kind: Kind, state: Escalation | undefined, step: Step): Escalatio
       return {
         _tag: "Rule",
         option: chosen,
-        by: "operator:zb",
+        by: RULER,
         ...(step.pick % 2 === 0 ? { rationale: "the tenet still holds" } : {}),
       };
     }
@@ -204,7 +207,7 @@ const drive = (commands: readonly EscalationCommand[]) => {
 const rule = (chosen: string): EscalationCommand => ({
   _tag: "Rule",
   option: chosen,
-  by: "operator:zb",
+  by: RULER,
 });
 const terminal = (e: Escalation | undefined): boolean =>
   e?.state === "ruled" || e?.state === "withdrawn";

@@ -15,7 +15,7 @@ import {
 } from "@keeltown/core/domain/identity";
 import { Session } from "@keeltown/core/domain/memory";
 import {
-  Actor,
+  CommandActor,
   AgentId,
   ChangeId,
   InstantSchema,
@@ -128,7 +128,7 @@ export const SignUpCommand = Schema.Struct({
  * `standing:<idempotencyKey>`.
  */
 export const StandingCommand = Schema.Struct({
-  by: Actor,
+  by: CommandActor,
   reason: Schema.optional(Schema.NonEmptyString),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
@@ -157,7 +157,7 @@ export const ApproveSponsorCommand = Schema.Struct({
  * token. The commit's cause is `unsponsor:<idempotencyKey>`.
  */
 export const EndSponsorCommand = Schema.Struct({
-  by: Actor,
+  by: CommandActor,
   run: Schema.optional(RunRef),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,

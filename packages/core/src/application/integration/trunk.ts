@@ -17,6 +17,7 @@ import {
 import type {
   CandidateId,
   ChangeId,
+  CommandActor,
   CommitSha,
   EntityRef,
   EventEnvelope,
@@ -571,7 +572,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
  */
 export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
   projectId: ProjectId,
-  by: string,
+  by: CommandActor,
 ) {
   const head = yield* (yield* TrunkWriter).head;
   const now = yield* (yield* Clock).now;

@@ -40,7 +40,7 @@ import {
   TrunkAdvanced,
 } from "../../domain/integration/index.ts";
 import {
-  type Actor,
+  type CommandActor,
   type AgentId,
   byAgent,
   userActor,
@@ -1024,7 +1024,7 @@ export const submit: (
 /** Who withdraws: the agent under its lease, or a maintainer by user id. */
 const withdrawnBy = ({
   authority,
-}: AbandonChange): { readonly actor: Actor; readonly run?: RunRef } =>
+}: AbandonChange): { readonly actor: CommandActor; readonly run?: RunRef } =>
   authority._tag === "Maintainer"
     ? { actor: userActor(authority.by) }
     : byAgent(authority.agentId, authority.run);

@@ -2,15 +2,15 @@
 # kills: tenancy.event-actor
 # why: a granted agent is named `user:<agent id>`, so its own event no longer reads as its own and it is notified of what it just did.
 diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
-index 4777834..0d73754 100644
+index 525d0426..31319c95 100644
 --- a/packages/core/src/domain/identity/tenancy.ts
 +++ b/packages/core/src/domain/identity/tenancy.ts
-@@ -105,7 +105,7 @@ export const actorId = (actor: Actor): string =>
+@@ -131,7 +131,7 @@ export const actorId = (actor: Actor): string =>
  
  /** The actor as an event's envelope names it: `agent:<id>` or `user:<id>`. */
- export const eventActorOf = (actor: Actor): EventActor =>
+ export const eventActorOf = (actor: Actor): CommandActor =>
 -  actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
-+  actor._tag === "Agent" ? (`user:${actor.agentId}` as EventActor) : userActor(actor.userId);
++  actor._tag === "Agent" ? (`user:${actor.agentId}` as CommandActor) : userActor(actor.userId);
  
  /** The instance itself: what is asked of no org, project or account, such as signing in or creating an org. */
  export interface InstanceResource {

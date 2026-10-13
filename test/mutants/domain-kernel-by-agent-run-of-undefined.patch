@@ -2,12 +2,12 @@
 # kills: kernel.envelope-run
 # why: byAgent gives a token that named no run a `run` key holding undefined, so an absent run and a present one are told apart only by whoever remembers to look inside.
 diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
-index 1b248f6d..4228c93e 100644
+index 83c6135e..0fe6ba7c 100644
 --- a/packages/core/src/domain/kernel/event.ts
 +++ b/packages/core/src/domain/kernel/event.ts
-@@ -32,7 +32,7 @@ export const byAgent = (
+@@ -43,7 +43,7 @@ export const byAgent = (
    run: RunRef | undefined,
- ): { readonly actor: Actor; readonly run?: RunRef } => ({
+ ): { readonly actor: CommandActor; readonly run?: RunRef } => ({
    actor: agentActor(agentId),
 -  ...(run === undefined ? {} : { run }),
 +  run,

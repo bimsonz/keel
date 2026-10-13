@@ -31,6 +31,7 @@ import {
   Instant,
   type Json,
   makeId,
+  userActor,
 } from "../../../src/domain/kernel/index.ts";
 import { promotionChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
@@ -42,6 +43,8 @@ import { assertReaching } from "../../support/reach.ts";
 const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const PROJECT = makeId("prj", ulid(1));
+/** Whoever releases a freeze: a person, named as a command names one. */
+const RELEASER = userActor(makeId("usr", ulid(1)));
 const sha = (n: number): CommitSha => CommitSha.make(n.toString(16).padStart(40, "0"));
 const H0 = sha(1);
 const STRAY = sha(0xdead);
@@ -219,7 +222,7 @@ const build = (
     case "Resume":
       return {
         _tag: "Resume",
-        by: "operator:zb",
+        by: RELEASER,
         head: state?.frozen?.observed ?? state?.head ?? H0,
       };
     default: {
@@ -687,7 +690,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     const resumed = drive([
       ...l1Path,
       readBack(STRAY),
-      { _tag: "Resume", by: "operator:zb", head: STRAY },
+      { _tag: "Resume", by: RELEASER, head: STRAY },
     ]);
     expect(resumed.tags.at(-1)).toEqual(["PromotionDeclined", "PromotionResumed"]);
     expect(resumed.state).toMatchObject({ phase: "idle", head: STRAY });

@@ -2,7 +2,7 @@ import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectCreated, type TrunkOrigin } from "../../domain/integration/index.ts";
 import {
-  type Actor,
+  type CommandActor,
   type EntityRef,
   InstantSchema,
   ProjectId,
@@ -44,7 +44,7 @@ export interface CreateProject {
   /** Who creates it, by id: the events' `by`. A person, or an agent in a namespace of its own. */
   readonly by: string;
   /** The creator as the commit's envelope names it: `user:<by>` or `agent:<by>`. */
-  readonly actor: Actor;
+  readonly actor: CommandActor;
   /** The run the agent creates it in, when its token named one. */
   readonly run?: RunRef | undefined;
   readonly idempotencyKey: string;

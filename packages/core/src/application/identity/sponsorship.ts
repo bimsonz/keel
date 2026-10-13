@@ -12,7 +12,7 @@ import {
 } from "../../domain/identity/index.ts";
 import {
   type AgentId,
-  type Actor as EventActor,
+  type CommandActor as EventActor,
   Instant,
   type RunRef,
   type UserId,

@@ -1,6 +1,6 @@
 import { Context, Data, type Effect, Schema } from "effect";
 import {
-  type Actor,
+  type CommandActor,
   type EntityRef,
   EventEnvelope,
   type EventId,
@@ -63,7 +63,7 @@ export interface CommitSpec {
   /** The event that triggered this transition, when another entity's event did. */
   readonly causation?: EventId;
   /** Whose command this is, copied onto every event it commits. Absent when the platform caused it. */
-  readonly actor?: Actor;
+  readonly actor?: CommandActor;
   /** The run of the agent whose command this is, copied beside the actor. Absent when it names none. */
   readonly run?: RunRef;
   /** The project the entity belongs to, copied onto every event it commits. */

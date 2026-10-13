@@ -1,8 +1,8 @@
 import { Result, Schema } from "effect";
 import {
-  type Actor,
   agentActor,
   AgentId,
+  type CommandActor,
   type Committed,
   IllegalTransition,
   InstantSchema,
@@ -50,7 +50,7 @@ export type InvitationCommand =
    * The invitation ends. `by` is the agent itself, or a person: the member
    * who invited it, or a maintainer of the namespace (the policy's to decide).
    */
-  | { readonly _tag: "End"; readonly by: Actor };
+  | { readonly _tag: "End"; readonly by: CommandActor };
 
 /** Facts from I/O: the namespace whose record this is, and the agent the row is about. */
 export interface InvitationFacts {

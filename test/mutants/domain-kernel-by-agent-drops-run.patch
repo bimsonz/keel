@@ -2,12 +2,12 @@
 # kills: kernel.envelope-run
 # why: byAgent names the agent and loses its run, so every event an agent's command commits says which agent and never which of its runs.
 diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
-index 1b248f6d..141476b2 100644
+index 83c6135e..97f9c9cf 100644
 --- a/packages/core/src/domain/kernel/event.ts
 +++ b/packages/core/src/domain/kernel/event.ts
-@@ -32,7 +32,6 @@ export const byAgent = (
+@@ -43,7 +43,6 @@ export const byAgent = (
    run: RunRef | undefined,
- ): { readonly actor: Actor; readonly run?: RunRef } => ({
+ ): { readonly actor: CommandActor; readonly run?: RunRef } => ({
    actor: agentActor(agentId),
 -  ...(run === undefined ? {} : { run }),
  });

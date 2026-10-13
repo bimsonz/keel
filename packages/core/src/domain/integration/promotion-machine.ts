@@ -2,6 +2,7 @@ import { Result, Schema } from "effect";
 import type { PushRefusedReason } from "../coordination/index.ts";
 import {
   type BatchId,
+  type CommandActor,
   type CandidateId,
   type ChangeId,
   type CommitSha,
@@ -61,6 +62,7 @@ export type PromotionCommand =
   | {
       readonly _tag: "Initialize";
       readonly head: CommitSha;
+      /** The creator's id as given, recorded on TrunkInitialized: an id, not an actor's written form. */
       readonly by: string;
       /** Where the head came from, recorded on TrunkInitialized as given. */
       readonly origin?: TrunkOrigin;
@@ -102,7 +104,7 @@ export type PromotionCommand =
       readonly reason: PushRefusedReason;
       readonly observed: CommitSha;
     }
-  | { readonly _tag: "Resume"; readonly by: string; readonly head: CommitSha };
+  | { readonly _tag: "Resume"; readonly by: CommandActor; readonly head: CommitSha };
 
 /** Facts from I/O: the time, and the project whose trunk this is (the Trunk DO's key). */
 export interface PromotionFacts {

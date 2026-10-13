@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: actor.operator-still-read
+# why: an operator with no name is read as an actor, so an event can name nobody and still carry one.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index 83c6135e..4bfb1f24 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -26,7 +26,7 @@ export type CommandActor = typeof CommandActor.Type;
+  */
+ export const Actor = Schema.Union([
+   ...CommandActor.members,
+-  Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
++  Schema.TemplateLiteral(["operator:", Schema.String]),
+ ]);
+ export type Actor = typeof Actor.Type;
+ 

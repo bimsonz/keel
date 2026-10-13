@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import {
   type AgentId,
   agentActor,
-  type Actor as EventActor,
+  type CommandActor,
   type NamespaceId,
   type NamespaceKind,
   type OrgId,
@@ -129,7 +129,7 @@ export const actorId = (actor: Actor): string =>
   actor._tag === "Agent" ? actor.agentId : actor.userId;
 
 /** The actor as an event's envelope names it: `agent:<id>` or `user:<id>`. */
-export const eventActorOf = (actor: Actor): EventActor =>
+export const eventActorOf = (actor: Actor): CommandActor =>
   actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
 
 /** The instance itself: what is asked of no org, project or account, such as signing in or creating an org. */

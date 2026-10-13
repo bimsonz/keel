@@ -13,6 +13,7 @@ import {
   makeId,
   type NamespaceId,
   type ProjectId,
+  userActor,
 } from "@keeltown/core/kernel";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
@@ -470,9 +471,9 @@ describe("the Trunk DO's promotion", () => {
         Exit.succeed({ head: t.base, promotion: "frozen", redCount: 0, origin: EMPTY }),
       ),
     );
-    expect(decodeExit(TrunkCodecs.resume, await t.stub.resume("operator:zach"))).toEqual(
-      Exit.succeed({ head: moved, promotion: "debouncing", redCount: 0, origin: EMPTY }),
-    );
+    expect(
+      decodeExit(TrunkCodecs.resume, await t.stub.resume(userActor(makeId("usr", ulid())))),
+    ).toEqual(Exit.succeed({ head: moved, promotion: "debouncing", redCount: 0, origin: EMPTY }));
     // Batch 1 waited on the old head: it is declined, and batch 2, verified on the new one, lands.
     const tip = await t.composed(2, moved);
     await t.stub.receive([t.verified(2, moved)]);

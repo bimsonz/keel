@@ -15,7 +15,13 @@ import {
   trunkOf,
 } from "@keeltown/core/application/integration";
 import { type Trunk, TrunkOrigin } from "@keeltown/core/domain/integration";
-import { CommitSha, type EventEnvelope, InstantSchema, ProjectId } from "@keeltown/core/kernel";
+import {
+  type CommandActor,
+  CommitSha,
+  type EventEnvelope,
+  InstantSchema,
+  ProjectId,
+} from "@keeltown/core/kernel";
 import {
   EntityStore,
   REDELIVERY_CAP_MS,
@@ -107,7 +113,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     );
   }
 
-  async resume(by: string) {
+  async resume(by: CommandActor) {
     const answer = await this.answer(
       TrunkCodecs.resume,
       Effect.map(resumeTrunk(this.projectId, by), statusOf),

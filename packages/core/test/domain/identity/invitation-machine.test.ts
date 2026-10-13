@@ -14,9 +14,9 @@ import {
   replayInvitation,
 } from "../../../src/domain/identity/index.ts";
 import {
-  type Actor,
   agentActor,
   type AgentId,
+  type CommandActor,
   type Committed,
   IllegalTransition,
   Instant,
@@ -75,7 +75,7 @@ const decodes = (scopes: unknown) =>
     by: ANN,
     scopes,
   })._tag === "Some";
-const end = (by: Actor): InvitationCommand => ({ _tag: "End", by });
+const end = (by: CommandActor): InvitationCommand => ({ _tag: "End", by });
 
 const START = 1_760_000_000_000;
 const machine: Machine<Invitation, InvitationCommand, NamespaceAgentEvent, InvitationFacts> = {
