@@ -3,7 +3,7 @@
 // page links to.
 
 import { useEffect } from "react";
-import { type HeldChange, type RunSection, agentPageOf } from "../engine/agents.ts";
+import { type HeldChange, type RunSection, agentPageOf, couldBeHandle } from "../engine/agents.ts";
 import { PAGE } from "../engine/lists.ts";
 import { usePlayer, useSelected } from "../engine/react.tsx";
 import { Link } from "../router.tsx";
@@ -71,12 +71,17 @@ export function AgentPage({ name }: { name: string }) {
   const page = useSelected((world, from) => agentPageOf(world, from.cards, name), [name]);
   const agentId = page?.agent.id;
   // The log names an agent by its id. At its id the page asks for its card; at a handle it asks Keel whose the
-  // handle is, and says nothing until Keel has answered.
+  // handle is, and says nothing until Keel has answered. What could be no handle is an id the log has not named
+  // yet, or never will: Keel is asked nothing of it, and the page waits for the log to be read.
+  const handle = couldBeHandle(name);
   useEffect(() => {
     if (agentId !== undefined) player.wantCards([agentId]);
-    else player.wantAgentAt(name);
-  }, [player, agentId, name]);
-  const sought = useSelected((_, from) => from.sought.has(name), [name]);
+    else if (handle) player.wantAgentAt(name);
+  }, [player, agentId, name, handle]);
+  const sought = useSelected(
+    (_, from) => (handle ? from.sought.has(name) : from.loaded),
+    [name, handle],
+  );
   // A link to one run arrives with its place on the page: the run is brought into view once it is drawn.
   const drawn = page !== null;
   const place = window.location.hash.slice(1);

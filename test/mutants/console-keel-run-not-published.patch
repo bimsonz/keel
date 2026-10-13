@@ -2,11 +2,11 @@
 # kills: http.agents
 # why: the stand-in for Keel publishes no entry's run, so every page of an agent's runs would be tested against a log that names none
 diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
-index 032b8838..ab3c336b 100644
+index 932321fa..437c50d0 100644
 --- a/apps/console/test/fixtures/mock/fakeKeel.ts
 +++ b/apps/console/test/fixtures/mock/fakeKeel.ts
-@@ -645,7 +645,6 @@ export function createFakeKeel(
-               payload: unpriced(payload),
+@@ -1078,7 +1078,6 @@ export function createFakeKeel(
+                   : unpriced(payload),
                ...(label === undefined ? {} : { label }),
                ...(actor === undefined ? {} : { actor }),
 -              ...(run === undefined ? {} : { run }),

@@ -4567,6 +4567,100 @@ expectEqual(
 );
 await leaving.close();
 
+// A change's page on a Keel that answers of a verdict as Keel itself does today: no view of a verdict is served,
+// and its event has an outcome, its evidence and no sentence. The page says the verdict by Keel's outcome and
+// lists the evidence the event recorded; and at an agent's id it asks Keel nothing of handles.
+const asKeelServes = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  readerOf,
+  whose: whoseHandle,
+  verdictViews: false,
+});
+const plainly = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const sentPlainly: Sent[] = [];
+// Keel's log takes a second to read on a real Keel, and a page is up before it is: this one's can be held too.
+let logIsSlow = false;
+await asDeployed(plainly, {
+  keel: asKeelServes,
+  sent: sentPlainly,
+  hold: async (path) => {
+    if (logIsSlow && path === "/v1/events")
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+  },
+});
+const reader = watch(await plainly.newPage(), "a change's page, as Keel serves a verdict");
+// The change the address names, the agent that declared it and the verdict Keel last issued for it, from the
+// stand-in's own log. Nobody has ruled on its question here, so that verdict parked it.
+const declaredFirst = asKeelServes
+  .events()
+  .find((event) => event.type === "IntentDeclared" && event.label === "#1");
+const firstChange = declaredFirst?.type === "IntentDeclared" ? declaredFirst.payload : undefined;
+const itsVerdict = asKeelServes
+  .events()
+  .findLast(
+    (event) => event.type === "VerdictIssued" && event.payload.subject === firstChange?.changeId,
+  );
+await reader.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
+const verdictOn = reader.locator('main section[aria-label="Verdict"]');
+await verdictOn
+  .locator("p")
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await reader.waitForTimeout(500);
+expectEqual(
+  "as Keel serves: a verdict with no sentence of its own is said by Keel's outcome",
+  squash(
+    await verdictOn
+      .locator("p")
+      .first()
+      .innerText({ timeout: 2000 })
+      .catch(() => "nothing"),
+  ),
+  "Keel's verdict was to park it.",
+);
+await reader.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
+const recordedOn = reader.getByRole("list", { name: "Evidence Keel recorded with the verdict" });
+await reader
+  .getByText("Evidence behind the verdict")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await recordedOn.waitFor({ timeout: 4000 }).catch(() => undefined);
+expectEqual(
+  "as Keel serves: where no view of a verdict is served, the evidence its event recorded is listed as Keel wrote it",
+  (await recordedOn.getByRole("listitem").allInnerTexts()).map(squash).join(" | ") ||
+    "nothing listed",
+  itsVerdict?.type === "VerdictIssued" ? itsVerdict.payload.evidence.join(" | ") : "no verdict",
+);
+// The agent's page is up before the log has named the agent: until then the page has an id and nothing else.
+const declarer = firstChange?.agentId ?? "";
+sentPlainly.length = 0;
+logIsSlow = true;
+await reader.goto(`${built}/ada/demo/agents/${declarer}`, { waitUntil: "domcontentloaded" });
+await reader
+  .getByRole("main")
+  .getByRole("heading")
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await reader.waitForTimeout(1500);
+expectEqual(
+  "as Keel serves: at an agent's id the page asks Keel for its card, and nothing of whose a handle is",
+  [
+    ...new Set(
+      sentPlainly
+        .map((request) => request.path.replace(declarer, "{id}"))
+        .filter((path) => path.startsWith("/v1/agents") || path.startsWith("/v1/namespaces/{id}")),
+    ),
+  ]
+    .toSorted()
+    .join(" ") || "nothing asked of agents",
+  "/v1/agents/{id}",
+);
+logIsSlow = false;
+await plainly.close();
+
 // An agent invited into an org, on the org's members page. Two people who signed up by passkey on a Keel that
 // knows two agents by their handles: Noether makes an org and owns it, and Franklin joins it as a plain member.
 const inviting = createIdentity(built, { emailCodes: false });

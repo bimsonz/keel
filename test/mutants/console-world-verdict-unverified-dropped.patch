@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.as-keel-writes
+# why: the fold drops Keel's word that a verdict was issued with no plan run
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 2565d44c..34ad3d39 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -1202,7 +1202,7 @@ export class World {
+           ...(event.payload.planHash === undefined ? {} : { planHash: event.payload.planHash }),
+           issuedAt: event.at,
+           issuedT: t,
+-          unverified: event.payload.verified === false,
++          unverified: false,
+         });
+         const judged = this.changes.get(event.payload.subject);
+         if (judged !== undefined) {

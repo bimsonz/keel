@@ -345,6 +345,8 @@ export interface ChangePageState {
     state: ChangeState;
     revision: number;
     commit: string;
+    /** True once Keel has derived the effects of a commit of it, whether or not it found any. */
+    derived: boolean;
     workspace: string;
     declaredAt: string;
     submittedAt?: string;
@@ -371,10 +373,17 @@ export interface ChangePageState {
     id: string;
     outcome: VerdictOutcome;
     summary: string;
+    /** The verdict in a sentence: a fixture's own summary, or Keel's outcome said plainly. */
+    said: string;
     issuedAt: string;
     /** Absent for a ruling made at Precheck, before any plan is compiled. */
     planHash?: string;
     evidence: EvidenceItem[];
+    /**
+     * What the verdict's own event recorded as its evidence, as Keel wrote it. Present where Keel serves no
+     * view of the verdict, so there is no evidence by class to show.
+     */
+    recorded?: string[];
   };
   conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
   /**

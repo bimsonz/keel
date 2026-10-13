@@ -390,9 +390,14 @@ export class Player {
     const verdictId = this.world.changes.get(changeId)?.verdictIds.at(-1);
     if (verdictId === undefined || this.#requested.has(verdictId)) return;
     this.#requested.add(verdictId);
-    void this.#fetch(async () => {
-      this.verdicts.set(verdictId, await this.source.getVerdict(verdictId));
-    });
+    // Where Keel serves no view of the verdict, the page is told so: what the verdict's own event recorded is
+    // then all there is to show of its evidence.
+    void this.#fetch(
+      async () => {
+        this.verdicts.set(verdictId, await this.source.getVerdict(verdictId));
+      },
+      () => this.refused.add(verdictId),
+    );
   }
 
   async #fetch(load: () => Promise<void>, failed?: () => void): Promise<void> {

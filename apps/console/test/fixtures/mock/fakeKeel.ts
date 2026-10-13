@@ -56,6 +56,21 @@ function unpriced(payload: AnyEvent["payload"]): AnyEvent["payload"] {
   return (Object.keys(rest).length === 0 ? own : { ...own, x: rest }) as AnyEvent["payload"];
 }
 
+/**
+ * Keel's event for a verdict carries its outcome, whether a plan ran and the evidence it recorded, and no
+ * sentence of its own: a fixture's summary is the fixture's, and is left out where the stand-in answers as Keel
+ * does.
+ */
+function unsummarised(payload: AnyEvent["payload"]): AnyEvent["payload"] {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- any payload may carry the fixture's additions
+  const added = (payload as { x?: { summary?: unknown } }).x;
+  if (added?.summary === undefined) return payload;
+  const { summary: _summary, ...rest } = added;
+  const { x: _x, ...own } = payload as { x?: unknown };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same payload, less the fixture's sentence
+  return (Object.keys(rest).length === 0 ? own : { ...own, x: rest }) as AnyEvent["payload"];
+}
+
 export type Role = NonNullable<ProjectView["viewer"]>["role"];
 
 /**
@@ -311,6 +326,12 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
+    /**
+     * `false` answers of a verdict as Keel does today: it serves no view of one (a read of it is not found),
+     * and its event has no sentence of its own. Left out, a verdict's view is served and the fixture's
+     * sentence rides on its event, which is how the fixtures' own pages are drawn.
+     */
+    verdictViews?: boolean;
     /**
      * The role an account has in an org, by the account's id and the org's handle, for a test that has an
      * identity to ask. Where it names none, a reader's role in the project's own namespace is what `sessions`
@@ -1051,7 +1072,10 @@ export function createFakeKeel(
               entity,
               seq,
               at,
-              payload: unpriced(payload),
+              payload:
+                options.verdictViews === false
+                  ? unsummarised(unpriced(payload))
+                  : unpriced(payload),
               ...(label === undefined ? {} : { label }),
               ...(actor === undefined ? {} : { actor }),
               ...(run === undefined ? {} : { run }),
@@ -1081,7 +1105,7 @@ export function createFakeKeel(
 
       const verdict = /^\/v1\/verdicts\/([^/]+)$/.exec(url.pathname);
       if (verdict !== null && request.method === "GET") {
-        if (!visible) return gone();
+        if (!visible || options.verdictViews === false) return gone();
         const view = log.verdicts.get(decodeURIComponent(verdict[1] ?? ""));
         return view === undefined
           ? problem(404, "resource.not_found")

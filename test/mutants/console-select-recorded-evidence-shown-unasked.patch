@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.recorded
+# why: the event's evidence is listed in place of Keel's view before Keel has said it serves none
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index f3fc8d1e..1b76ceb4 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -715,7 +715,7 @@ export function changePageOf(
+             // The evidence by class comes from Keel's view of the verdict. Until that is read there is none to show.
+             evidence: (resources.verdicts.get(verdict.id)?.reasons ?? []).map(readable),
+             // Where Keel serves no view of it, what the verdict's own event recorded is all there is, as Keel wrote it.
+-            ...(resources.refused.has(verdict.id) ? { recorded: verdict.evidence } : {}),
++            recorded: verdict.evidence,
+           },
+         }),
+     ...(conflict === undefined

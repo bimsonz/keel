@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.unserved
+# why: the page is not told when Keel serves no view of a verdict, so its evidence panel stays empty
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index df9aba6c..48c746c7 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -396,7 +396,6 @@ export class Player {
+       async () => {
+         this.verdicts.set(verdictId, await this.source.getVerdict(verdictId));
+       },
+-      () => this.refused.add(verdictId),
+     );
+   }
+ 

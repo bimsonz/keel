@@ -104,6 +104,8 @@ export interface ChangeEntry {
   /** What the agent said the change would make true. Advisory. */
   declaredEffects: Proposition[];
   effects: DerivedEffect[];
+  /** True once Keel has derived the effects of a commit of this change, whether or not it found any. */
+  derived: boolean;
   drift: DriftEntry[];
   /** `spec` is the plan's flow when Keel publishes it; until then only `stepCount`, how many steps it has. */
   plan?: {
@@ -327,6 +329,8 @@ export interface VerdictEntry {
   evidence: string[];
   /** Absent for a ruling made at Precheck, before any plan is compiled. */
   planHash?: string;
+  /** Keel's own word that it issued this with no plan run: the project's verification is off. */
+  unverified: boolean;
   issuedAt: string;
   /** When it was issued, in the log's own milliseconds. */
   issuedT: number;
@@ -613,6 +617,7 @@ export class World {
           premises: event.payload.premises,
           declaredEffects: event.payload.declaredEffects ?? [],
           effects: [],
+          derived: false,
           drift: [],
           declaredAt: event.at,
           declaredT: t,
@@ -719,6 +724,7 @@ export class World {
       case "EffectsDerived": {
         const change = this.#change(event.payload.changeId);
         if (change !== undefined) change.effects = event.payload.effects;
+        if (change !== undefined) change.derived = true;
         break;
       }
       case "DriftDetected": {
@@ -1196,6 +1202,7 @@ export class World {
           ...(event.payload.planHash === undefined ? {} : { planHash: event.payload.planHash }),
           issuedAt: event.at,
           issuedT: t,
+          unverified: event.payload.verified === false,
         });
         const judged = this.changes.get(event.payload.subject);
         if (judged !== undefined) {

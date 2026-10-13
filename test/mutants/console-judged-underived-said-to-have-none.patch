@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.derived
+# why: a commit Keel has not derived from yet is said to have no effect
+diff --git a/apps/console/src/engine/judged.ts b/apps/console/src/engine/judged.ts
+index a5d0fc58..4b1e142e 100644
+--- a/apps/console/src/engine/judged.ts
++++ b/apps/console/src/engine/judged.ts
+@@ -45,7 +45,5 @@ export function unjudged(state: ChangeState): string {
+  */
+ export function noneDerived(change: { commit: string; derived: boolean }): string {
+   if (change.commit === "") return "This change pushed no commit, so Keel derived nothing.";
+-  return change.derived
+-    ? "Keel derived no effect from this commit."
+-    : "Keel has not derived what this commit does yet.";
++  return "Keel derived no effect from this commit.";
+ }

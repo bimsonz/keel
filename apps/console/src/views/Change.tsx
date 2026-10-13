@@ -16,6 +16,7 @@ import type {
   PlanStep,
   RulingBounce,
 } from "../domain/state.ts";
+import { noneDerived, unjudged } from "../engine/judged.ts";
 import type { ChangeTab } from "../route.ts";
 import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
@@ -282,6 +283,27 @@ function standing(state: ChangePageState): string {
   return OUTCOME_WORD[verdict.outcome];
 }
 
+/**
+ * What a verdict's own event recorded as its evidence, as Keel wrote it. It is all there is to show where Keel
+ * serves no view of the verdict, and it is listed under no class: the event names none.
+ */
+function Recorded({ lines }: { lines: readonly string[] }) {
+  return lines.length === 0 ? (
+    <p className="text-base text-kumo-subtle">Keel recorded no evidence with this verdict.</p>
+  ) : (
+    <ul className="flex flex-col gap-1.5" aria-label="Evidence Keel recorded with the verdict">
+      {lines.map((line) => (
+        <li
+          key={line}
+          className="rounded-lg bg-kumo-tint px-3 py-1.5 text-base leading-snug text-kumo-default [overflow-wrap:anywhere]"
+        >
+          {line}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function Change({
   state,
   mode,
@@ -405,9 +427,9 @@ export function Change({
                   ) : state.bounce?.refused !== undefined ? (
                     `Its batch was verified, and the push to trunk was refused: ${REFUSED[state.bounce.refused]}. Nothing landed, and no verdict was issued for the bounce.`
                   ) : verdict === undefined ? (
-                    `The change is ${change.state}. Keel has not issued a verdict yet.`
+                    unjudged(change.state)
                   ) : (
-                    `${verdict.summary}.`
+                    verdict.said
                   )}
                 </p>
                 {verdict !== undefined && (
@@ -569,10 +591,21 @@ export function Change({
                   <div className="flex flex-col">
                     <header className="flex items-center justify-between px-4 pb-1 pt-3.5">
                       <h3 className="text-base font-semibold text-kumo-strong">Derived by Keel</h3>
-                      <span className="text-sm text-kumo-subtle">
-                        from commit <span className="a-mono">{change.commit}</span>
-                      </span>
+                      {/* Keel derives from the commit a change pushed: one that pushed none has none to name. */}
+                      {change.commit !== "" && (
+                        <span className="text-sm text-kumo-subtle">
+                          from commit <span className="a-mono">{change.commit}</span>
+                        </span>
+                      )}
                     </header>
+                    {state.derived.length === 0 && (
+                      <p
+                        className="px-4 pb-3.5 text-base text-kumo-subtle"
+                        data-part="none-derived"
+                      >
+                        {noneDerived(change)}
+                      </p>
+                    )}
                     <ul className="divide-y divide-kumo-hairline">
                       {state.derived.map((effect) => (
                         <DerivedRow
@@ -940,13 +973,19 @@ export function Change({
               </Panel>
             }
             side={
-              <Panel title="Evidence behind the verdict" aside="by class" bodyClassName="p-3.5">
+              <Panel
+                title="Evidence behind the verdict"
+                aside={verdict?.recorded === undefined ? "by class" : "as Keel recorded it"}
+                bodyClassName="p-3.5"
+              >
                 {verdict === undefined ? (
                   <p className="text-base text-kumo-subtle">
                     Evidence is listed here once Keel issues a verdict.
                   </p>
-                ) : (
+                ) : verdict.recorded === undefined ? (
                   <EvidenceList items={verdict.evidence} />
+                ) : (
+                  <Recorded lines={verdict.recorded} />
                 )}
               </Panel>
             }

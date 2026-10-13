@@ -23,6 +23,7 @@ import type {
 } from "../domain/state.ts";
 import type { ChangeDiff, VerdictReasons } from "../source/types.ts";
 import { readable } from "./evidence.ts";
+import { verdictSaid } from "./judged.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
 import { contradictionsOf } from "./sides.ts";
@@ -668,6 +669,7 @@ export function changePageOf(
       revision: change.revision,
       unverified: change.unverified,
       commit: change.commit ?? "",
+      derived: change.derived,
       workspace:
         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
       declaredAt: change.declaredAt,
@@ -707,10 +709,13 @@ export function changePageOf(
             id: verdict.id,
             outcome: verdict.outcome,
             summary: verdict.summary,
+            said: verdictSaid(verdict),
             issuedAt: verdict.issuedAt,
             ...(verdict.planHash === undefined ? {} : { planHash: verdict.planHash }),
-            // The evidence itself comes from Keel's view of the verdict. Until that is read there is none to show.
+            // The evidence by class comes from Keel's view of the verdict. Until that is read there is none to show.
             evidence: (resources.verdicts.get(verdict.id)?.reasons ?? []).map(readable),
+            // Where Keel serves no view of it, what the verdict's own event recorded is all there is, as Keel wrote it.
+            ...(resources.refused.has(verdict.id) ? { recorded: verdict.evidence } : {}),
           },
         }),
     ...(conflict === undefined

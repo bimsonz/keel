@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.as-keel-writes
+# why: the fold does not keep that Keel derived from a change's commit when it found no effect
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 2565d44c..7bf3b601 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -724,7 +724,6 @@ export class World {
+       case "EffectsDerived": {
+         const change = this.#change(event.payload.changeId);
+         if (change !== undefined) change.effects = event.payload.effects;
+-        if (change !== undefined) change.derived = true;
+         break;
+       }
+       case "DriftDetected": {

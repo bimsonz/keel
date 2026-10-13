@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.as-keel-writes
+# why: the page is not told Keel derived from a change's commit
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index f3fc8d1e..36e202df 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -669,7 +669,7 @@ export function changePageOf(
+       revision: change.revision,
+       unverified: change.unverified,
+       commit: change.commit ?? "",
+-      derived: change.derived,
++      derived: false,
+       workspace:
+         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
+       declaredAt: change.declaredAt,

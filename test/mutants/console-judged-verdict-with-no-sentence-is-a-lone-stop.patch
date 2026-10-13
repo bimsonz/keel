@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.verdict
+# why: a verdict of Keel's own, which has no summary, is said as a full stop and nothing else
+diff --git a/apps/console/src/engine/judged.ts b/apps/console/src/engine/judged.ts
+index a5d0fc58..bb769046 100644
+--- a/apps/console/src/engine/judged.ts
++++ b/apps/console/src/engine/judged.ts
+@@ -25,7 +25,7 @@ export function verdictSaid(verdict: {
+   outcome: VerdictOutcome;
+   unverified: boolean;
+ }): string {
+-  if (verdict.summary !== "") return `${verdict.summary}.`;
++  if (verdict.summary !== "never") return `${verdict.summary}.`;
+   return `Keel's verdict was to ${TO[verdict.outcome]}${verdict.unverified ? ", without verification" : ""}.`;
+ }
+ 

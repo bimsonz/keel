@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.verdict
+# why: a verdict Keel issued with no plan run is said as if one had run
+diff --git a/apps/console/src/engine/judged.ts b/apps/console/src/engine/judged.ts
+index a5d0fc58..0f4eb43d 100644
+--- a/apps/console/src/engine/judged.ts
++++ b/apps/console/src/engine/judged.ts
+@@ -26,7 +26,7 @@ export function verdictSaid(verdict: {
+   unverified: boolean;
+ }): string {
+   if (verdict.summary !== "") return `${verdict.summary}.`;
+-  return `Keel's verdict was to ${TO[verdict.outcome]}${verdict.unverified ? ", without verification" : ""}.`;
++  return `Keel's verdict was to ${TO[verdict.outcome]}.`;
+ }
+ 
+ /**

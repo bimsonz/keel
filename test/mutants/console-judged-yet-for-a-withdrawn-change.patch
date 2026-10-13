@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.over
+# why: a withdrawn change is told a verdict has not been issued yet, though none will be
+diff --git a/apps/console/src/engine/judged.ts b/apps/console/src/engine/judged.ts
+index a5d0fc58..a7fedd24 100644
+--- a/apps/console/src/engine/judged.ts
++++ b/apps/console/src/engine/judged.ts
+@@ -13,7 +13,7 @@ const TO: Record<VerdictOutcome, string> = {
+ };
+ 
+ /** The states a change does not leave: Keel issues nothing more for one that is over. */
+-const OVER: ReadonlySet<ChangeState> = new Set(["landed", "withdrawn", "superseded"]);
++const OVER: ReadonlySet<ChangeState> = new Set(["landed", "superseded"]);
+ 
+ /**
+  * A verdict, in a sentence. A fixture's verdict has a summary and is said in it. Keel's own has none: it is

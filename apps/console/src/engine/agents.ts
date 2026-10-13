@@ -164,3 +164,11 @@ export function agentPageOf(world: World, cards: Cards, name: string): AgentPage
     ...(work.lastAt === undefined ? {} : { lastAt: work.lastAt }),
   };
 }
+
+/** A handle, as Keel's contract has one. An agent's id is none: it has an underscore and capitals in it. */
+const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
+
+/** Whether an address's name for an agent could be its handle, which only Keel can say whose it is. */
+export function couldBeHandle(name: string): boolean {
+  return HANDLE.test(name);
+}
