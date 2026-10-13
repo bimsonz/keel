@@ -166,7 +166,8 @@ export const ChangeLanded = Schema.TaggedStruct("ChangeLanded", {
 /**
  * The change went back to its agent, for one cause: the verdict that failed
  * it, the conflict proven against it under a `block` policy (proof, ADR 0005),
- * or the promotion that declined its batch because Artifacts refused the push.
+ * the promotion that declined its batch because Artifacts refused the push, or
+ * the decision of a ruling that went against it.
  */
 export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   changeId: ChangeId,
@@ -174,14 +175,17 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   conflictId: Schema.optional(ConflictId),
   /** The batch promotion declined, and why its push was refused. */
   declined: Schema.optional(Schema.Struct({ batchId: BatchId, reason: PushRefusedReason })),
+  /** The decision of the ruling that went against the change while it waited for it. */
+  decisionId: Schema.optional(DecisionId),
   reasons: Schema.Array(Schema.String),
   /** Always set, never empty, by `decideChange`; optional only so events committed before it was added still decode. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
 }).check(
   Schema.makeFilter(
     (e) =>
-      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined).length === 1 ||
-      "a bounce names exactly one cause: its verdict, its conflict or its declined batch",
+      [e.verdictId, e.conflictId, e.declined, e.decisionId].filter((cause) => cause !== undefined)
+        .length === 1 ||
+      "a bounce names exactly one cause: its verdict, its conflict, its declined batch or the decision that went against it",
   ),
 );
 /**

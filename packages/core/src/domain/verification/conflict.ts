@@ -133,6 +133,8 @@ export const Conflict = Schema.Struct({
   /** The Move that resolved it, and the Decision when a ruling did. */
   move: Schema.optional(Move),
   decisionId: Schema.optional(DecisionId),
+  /** The parties the ruling went against: each bounces, where every other party resumes. Absent when it favoured no side. */
+  against: Schema.optional(Schema.Array(ChangeId)),
   /** The suite cells of its world matrix (`WorldCheckRan`), in the order they were recorded. */
   checks: Schema.optional(
     Schema.Array(
@@ -146,3 +148,20 @@ export const Conflict = Schema.Struct({
   ),
 });
 export type Conflict = typeof Conflict.Type;
+
+/**
+ * The changes a ruling goes against, by the side it lets stand: the premise
+ * standing goes against the change that makes the effect, and the effect
+ * standing goes against the change that holds the premise. A ruling is between
+ * two sides, so a conflict that does not name both, or names one change on
+ * both, has no one to go against.
+ */
+export const sidesAgainst = (
+  conflict: Conflict,
+  stands: "premise" | "effect",
+): readonly ChangeId[] => {
+  const holder = conflict.premise?.holder;
+  const author = conflict.effect?.changeId;
+  if (holder === undefined || author === undefined || holder === author) return [];
+  return [stands === "premise" ? author : holder];
+};

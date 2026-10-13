@@ -243,10 +243,19 @@ export type BounceCause =
       readonly verdictId: VerdictId;
       readonly conflictId?: undefined;
       readonly declined?: undefined;
+      readonly decisionId?: undefined;
     }
   | {
       readonly conflictId: ConflictId;
       readonly verdictId?: undefined;
+      readonly declined?: undefined;
+      readonly decisionId?: undefined;
+    }
+  | {
+      /** The ruling the change was parked for went against it: from Parked awaiting-ruling only. */
+      readonly decisionId: DecisionId;
+      readonly verdictId?: undefined;
+      readonly conflictId?: undefined;
       readonly declined?: undefined;
     }
   | {
@@ -254,6 +263,7 @@ export type BounceCause =
       readonly declined: { readonly batchId: BatchId; readonly reason: PushRefusedReason };
       readonly verdictId?: undefined;
       readonly conflictId?: undefined;
+      readonly decisionId?: undefined;
     };
 
 /** Facts from I/O that every decision may read: the time, and the change this DO holds (its key). */
@@ -338,6 +348,22 @@ const defaultBounceActions = (changeId: ChangeId): readonly NextAction[] => [
     kind: "call",
     title: "Fix the change, then submit it again",
     operationId: "submit",
+    args: { changeId },
+  },
+];
+
+/** The ways forward when a ruling went against the change: say something the ruling allows, or give the work up. */
+const ruledAgainstActions = (changeId: ChangeId): readonly NextAction[] => [
+  {
+    kind: "call",
+    title: "Revise the change's intent so that it no longer contradicts what was ruled",
+    operationId: "revise",
+    args: { changeId },
+  },
+  {
+    kind: "call",
+    title: "Withdraw the change",
+    operationId: "abandon",
     args: { changeId },
   },
 ];
@@ -699,6 +725,21 @@ export const decideChange = (
           }),
         );
       }
+      if (command.decisionId !== undefined) {
+        // A ruling goes against a change only while the change waits for it.
+        if (!awaitingRuling) return refuse(change, command);
+        return intoAgentOwned(
+          change,
+          now,
+          ChangeBounced.make({
+            changeId: id,
+            decisionId: command.decisionId,
+            reasons: command.reasons,
+            nextActions:
+              command.nextActions.length > 0 ? command.nextActions : ruledAgainstActions(id),
+          }),
+        );
+      }
       const cause =
         command.conflictId === undefined
           ? { verdictId: command.verdictId }
@@ -963,6 +1004,16 @@ export const evolveChange = (
     case "ChangeBounced":
       if (event.declined !== undefined)
         return from("integrating") && event.declined.batchId === change.batchId
+          ? moveTo(change, "bounced", [
+              "parkReason",
+              "escalationId",
+              "parkedFrom",
+              "batchId",
+              "laneId",
+            ])
+          : illegal(change, event);
+      if (event.decisionId !== undefined)
+        return from("parked") && change.parkReason === "awaiting-ruling"
           ? moveTo(change, "bounced", [
               "parkReason",
               "escalationId",

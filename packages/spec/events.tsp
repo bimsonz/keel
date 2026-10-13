@@ -456,22 +456,25 @@ model ChangeLanded {
   proofId: string;
 }
 
-/** The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, or the promotion that declined its batch because the push was refused. */
+/** The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, the promotion that declined its batch because the push was refused, or the decision of a ruling that went against it. */
 model ChangeBounced {
   _tag: "ChangeBounced";
   changeId: ChangeId;
 
-  /** The verdict that failed the change. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
+  /** The verdict that failed the change. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set. */
   verdictId?: VerdictId;
 
-  /** The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
+  /** The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set. */
   conflictId?: ConflictId;
 
-  /** The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
+  /** The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set. */
   declined?: {
     batchId: BatchId;
     reason: PushRefusedReason;
   };
+
+  /** The decision of the ruling that went against the change while it was parked for it. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set. */
+  decisionId?: DecisionId;
 
   reasons: string[];
 
@@ -1021,6 +1024,9 @@ model ConflictResolved {
   conflictId: ConflictId;
   move: Move;
   decisionId?: DecisionId;
+
+  /** The parties the ruling went against, set only with `decisionId` and never empty: each bounces by that decision, and every other party resumes. */
+  against?: ChangeId[];
 }
 
 model GuardAdmitted {

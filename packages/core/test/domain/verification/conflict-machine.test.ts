@@ -12,6 +12,7 @@ import {
   evolveConflict,
   type ProbeCommand,
   replayConflict,
+  sidesAgainst,
 } from "../../../src/domain/verification/index.ts";
 import { conflictChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
@@ -523,6 +524,8 @@ describe("the Conflict chart", { timeout: PROPERTY_TIMEOUT }, () => {
 
 const ANOTHER = makeId("cfl", `${"0".repeat(25)}2`);
 const ANOTHER_PROBE = makeId("prb", `${"0".repeat(25)}2`);
+/** A change that is a party of no conflict here. */
+const OUTSIDER = makeId("chg", `${"0".repeat(25)}3`);
 
 /** The conflict's own half of the pair's tour: its states, and the events that fold into it. */
 const conflictTour = (): readonly Fold<Conflict, ConflictEvent>[] =>
@@ -537,6 +540,8 @@ interface Folded {
   readonly id: Conflict["id"];
   readonly kind: ConflictKind;
   readonly state: Conflict["state"];
+  /** Who the conflict is between: a ruling goes against none but these. */
+  readonly parties: readonly string[];
   readonly probe?: string;
   /** Each suite cell recorded, by world, check and run, with its answer. */
   readonly cells: Readonly<Record<string, string>>;
@@ -551,11 +556,29 @@ const PROOF_OF: Readonly<Partial<Record<ConflictKind, string>>> = {
   interaction: "interaction",
 };
 
+/** How a conflict ended, as its line shows it: the move, the decision of a ruling, and who the ruling went against. */
+const resolvedBy = (
+  move: string,
+  decisionId: string | undefined,
+  against: readonly string[] = [],
+): string =>
+  [
+    move,
+    ...(decisionId === undefined ? [] : [`by ${decisionId}`]),
+    ...(against.length === 0 ? [] : [`against ${against.join(" and ")}`]),
+  ].join(" ");
+
 /** The fold's from-table (state-machines.md § Conflict), typed apart from `evolveConflict`. */
 const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illegal" => {
   if (from === undefined)
     return event._tag === "ConflictSuspected"
-      ? { id: event.conflictId, kind: event.kind, state: "suspected", cells: {} }
+      ? {
+          id: event.conflictId,
+          kind: event.kind,
+          state: "suspected",
+          parties: event.parties,
+          cells: {},
+        }
       : "illegal";
   if (event.conflictId !== from.id) return "illegal";
   const undecided = from.state === "suspected" || from.state === "probing";
@@ -590,16 +613,23 @@ const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illega
       return (event.reason === "unprovable" ? undecided : from.state === "proven")
         ? { ...from, state: "escalated", escalation: event.escalationId }
         : "illegal";
-    case "ConflictResolved":
+    case "ConflictResolved": {
       // A proven conflict resolves by a move; an escalated one only on a ruling's decision.
-      return from.state === "proven" ||
-        (from.state === "escalated" && event.decisionId !== undefined)
+      const resolves =
+        from.state === "proven" || (from.state === "escalated" && event.decisionId !== undefined);
+      // Only a ruling goes against anyone, and only against the conflict's own parties.
+      const against = event.against ?? [];
+      const ruled =
+        against.length === 0 ||
+        (event.decisionId !== undefined && against.every((id) => from.parties.includes(id)));
+      return resolves && ruled
         ? {
             ...from,
             state: "resolved",
-            resolved: `${event.move}${event.decisionId === undefined ? "" : ` by ${event.decisionId}`}`,
+            resolved: resolvedBy(event.move, event.decisionId, against),
           }
         : "illegal";
+    }
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -610,8 +640,10 @@ const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illega
 /**
  * Each event in every form the fold could tell apart: another probe's cell, a
  * suite cell with the other answer and of another run, each kind of proof, each
- * reason to escalate, a resolution with and without a decision; and every one
- * of those as another conflict's.
+ * reason to escalate, a resolution with and without a decision, a ruling that
+ * goes against a party, against a party and an outsider, and a resolution
+ * against a party with no decision; and every one of those as another
+ * conflict's.
  */
 const conflictForms = (event: ConflictEvent): readonly ConflictEvent[] => {
   const forms = ((): readonly ConflictEvent[] => {
@@ -638,8 +670,15 @@ const conflictForms = (event: ConflictEvent): readonly ConflictEvent[] => {
           { ...event, reason: "unprovable" },
         ];
       case "ConflictResolved": {
-        const { decisionId: _decision, ...bare } = event;
-        return [bare, { ...bare, decisionId: DECISION }];
+        const { decisionId: _decision, against: _against, ...bare } = event;
+        const ruled = { ...bare, decisionId: DECISION };
+        return [
+          bare,
+          ruled,
+          { ...ruled, against: [CHANGE_A] },
+          { ...ruled, against: [CHANGE_A, OUTSIDER] },
+          { ...bare, against: [CHANGE_A] },
+        ];
       }
       default:
         return [event];
@@ -657,14 +696,13 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
         id: c.id,
         kind: c.kind,
         state: c.state,
+        parties: c.parties,
         ...(c.probeId === undefined ? {} : { probe: c.probeId }),
         cells: Object.fromEntries(
           (c.checks ?? []).map((k) => [`${k.world} ${k.check} run ${k.run}`, k.outcome]),
         ),
         ...(c.escalationId === undefined ? {} : { escalation: c.escalationId }),
-        ...(c.move === undefined
-          ? {}
-          : { resolved: `${c.move}${c.decisionId === undefined ? "" : ` by ${c.decisionId}`}` }),
+        ...(c.move === undefined ? {} : { resolved: resolvedBy(c.move, c.decisionId, c.against) }),
       }),
       shown: (f) =>
         [
@@ -681,7 +719,7 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 8968, refused: 8492, rows: 76 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9424, refused: 8925, rows: 76 });
   });
 });
 
@@ -797,5 +835,125 @@ describe("a suspicion's propositions", () => {
     expect(Result.isSuccess(decided) && decided.success).toMatchObject([
       { _tag: "ConflictSuspected", premise, effect },
     ]);
+  });
+});
+
+describe("a ruling's side", () => {
+  const between = { ...suspectSemantic, parties: [CHANGE_A, CHANGE_B] } satisfies ConflictCommand;
+  const facts = { now: T0, conflictId: CONFLICT };
+
+  it("[conflict.ruling-against] a ruling goes against the side it does not let stand: never the standing side, always the other, never both, and no one when the conflict does not name two sides", () => {
+    const CHANGES = [undefined, CHANGE_A, CHANGE_B, OUTSIDER];
+    const { premise: _p, effect: _e, ...bare } = between;
+    const pairs = CHANGES.flatMap((holder) => CHANGES.map((author) => ({ holder, author })));
+    const ruled = pairs.map(({ holder, author }) => {
+      const suspected = decideConflict(
+        undefined,
+        {
+          ...bare,
+          ...(holder === undefined ? {} : { premise: { holder, proposition: PREMISE } }),
+          ...(author === undefined
+            ? {}
+            : { effect: { changeId: author, proposition: EFFECTS[0] ?? PREMISE } }),
+        },
+        facts,
+      );
+      const conflict = replayConflict(
+        (Result.isSuccess(suspected) ? suspected.success : []).map((payload) => ({
+          at: T0,
+          payload,
+        })),
+      );
+      if (conflict === undefined) throw new Error("the suspicion was refused");
+      return {
+        holder,
+        author,
+        premiseStands: sidesAgainst(conflict, "premise"),
+        effectStands: sidesAgainst(conflict, "effect"),
+      };
+    });
+    expect(ruled).toEqual(
+      pairs.map(({ holder, author }) => {
+        const twoSides = holder !== undefined && author !== undefined && holder !== author;
+        return {
+          holder,
+          author,
+          premiseStands: twoSides ? [author] : [],
+          effectStands: twoSides ? [holder] : [],
+        };
+      }),
+    );
+  });
+
+  it("[conflict.resolution-against] who a ruling goes against reaches ConflictResolved and the Conflict, through the wire; none given, none appears; it is refused with no decision and for a change that is no party", () => {
+    const proven = [C(between), draft, ...cells(3), settle];
+    const starts = {
+      proven: drive(proven).state?.conflict,
+      escalated: drive([...proven, C({ _tag: "Escalate", escalationId: ESCALATION })]).state
+        ?.conflict,
+    };
+    expect([starts.proven?.state, starts.escalated?.state]).toEqual(["proven", "escalated"]);
+    const AGAINST = [
+      undefined,
+      [],
+      [CHANGE_A],
+      [CHANGE_B],
+      [CHANGE_B, CHANGE_A],
+      [OUTSIDER],
+      [CHANGE_A, OUTSIDER],
+    ];
+    const cases = (["proven", "escalated"] as const).flatMap((from) =>
+      [undefined, DECISION].flatMap((decisionId) =>
+        AGAINST.map((against) => ({ from, decisionId, against })),
+      ),
+    );
+    type Case = (typeof cases)[number];
+    /** What a resolution carried, or why it was refused. */
+    const outcome = ({ from, decisionId, against }: Case) => {
+      const decided = decideConflict(
+        starts[from],
+        {
+          _tag: "Resolve",
+          move: "escalate",
+          ...(decisionId === undefined ? {} : { decisionId }),
+          ...(against === undefined ? {} : { against }),
+        },
+        facts,
+      );
+      if (Result.isFailure(decided))
+        return "reason" in decided.failure ? decided.failure.reason : decided.failure._tag;
+      const [resolved] = decided.success;
+      const conflict = throughTheWire(
+        ConflictEvent,
+        decided.success.map((payload) => ({ at: T0, payload })),
+      ).reduce<Conflict | undefined>((state, event) => evolveConflict(state, event), starts[from]);
+      return {
+        events: decided.success.length,
+        onEvent: resolved?._tag === "ConflictResolved" ? resolved.against : "another event",
+        eventNamesIt: resolved !== undefined && "against" in resolved,
+        state: conflict?.state,
+        decisionId: conflict?.decisionId,
+        onConflict: conflict?.against,
+        conflictNamesIt: conflict !== undefined && "against" in conflict,
+      };
+    };
+    const expected = ({ from, decisionId, against }: Case) => {
+      const named = against ?? [];
+      if (decisionId === undefined && (from === "escalated" || named.length > 0))
+        return "no-ruling";
+      if (named.includes(OUTSIDER)) return "not-a-party";
+      return {
+        events: 1,
+        onEvent: named.length === 0 ? undefined : named,
+        eventNamesIt: named.length > 0,
+        state: "resolved",
+        decisionId,
+        onConflict: named.length === 0 ? undefined : named,
+        conflictNamesIt: named.length > 0,
+      };
+    };
+    expect(cases.map((c) => ({ ...c, outcome: outcome(c) }))).toEqual(
+      cases.map((c) => ({ ...c, outcome: expected(c) })),
+    );
   });
 });

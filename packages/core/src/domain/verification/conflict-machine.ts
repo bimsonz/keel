@@ -1,6 +1,7 @@
 import { Result, Schema } from "effect";
 import {
   type BatchId,
+  type ChangeId,
   type Committed,
   type ConflictId,
   type DecisionId,
@@ -88,7 +89,13 @@ export type ConflictCommand =
   | { readonly _tag: "Settle"; readonly escalationId?: EscalationId }
   /** The conflict is human-class: permission semantics, a destructive migration, an ambiguous requirement. */
   | { readonly _tag: "Escalate"; readonly escalationId: EscalationId }
-  | { readonly _tag: "Resolve"; readonly move: Move; readonly decisionId?: DecisionId }
+  | {
+      readonly _tag: "Resolve";
+      readonly move: Move;
+      readonly decisionId?: DecisionId;
+      /** The parties the ruling goes against (`sidesAgainst`): taken only with a decision, and only of this conflict's parties. */
+      readonly against?: readonly ChangeId[];
+    }
   /**
    * A project suite's cell in the world matrix. The suites finish after the
    * probe's deciding cell, so a cell is taken once a probe was drafted,
@@ -296,15 +303,20 @@ export const decideConflict = (
     case "Resolve": {
       const ruled = conflict.state === "escalated" && command.decisionId !== undefined;
       if (conflict.state === "escalated" && !ruled) return refuse("no-ruling", askAPerson);
-      return conflict.state === "proven" || ruled
-        ? Result.succeed([
-            ConflictResolved.make({
-              conflictId: conflict.id,
-              move: command.move,
-              ...(command.decisionId === undefined ? {} : { decisionId: command.decisionId }),
-            }),
-          ])
-        : refuse();
+      if (!(conflict.state === "proven" || ruled)) return refuse();
+      // Only a ruling goes against anyone, and only against a party of the conflict it rules on.
+      const against = command.against ?? [];
+      if (against.length > 0 && command.decisionId === undefined)
+        return refuse("no-ruling", askAPerson);
+      if (!against.every((id) => conflict.parties.includes(id))) return refuse("not-a-party");
+      return Result.succeed([
+        ConflictResolved.make({
+          conflictId: conflict.id,
+          move: command.move,
+          ...(command.decisionId === undefined ? {} : { decisionId: command.decisionId }),
+          ...(against.length === 0 ? {} : { against }),
+        }),
+      ]);
     }
     case "RecordCheck": {
       if (conflict.probeId === undefined) return refuse("no-probe-drafted", awaitProbe);
@@ -406,15 +418,20 @@ export const evolveConflict = (
         : illegal(conflict, event);
     }
     case "ConflictResolved": {
+      const against = event.against ?? [];
+      const ruledAgainst =
+        against.length === 0 ||
+        (event.decisionId !== undefined && against.every((id) => conflict.parties.includes(id)));
       const ok =
         conflict.state === "proven" ||
         (conflict.state === "escalated" && event.decisionId !== undefined);
-      return ok
+      return ok && ruledAgainst
         ? {
             ...conflict,
             state: "resolved",
             move: event.move,
             ...(event.decisionId === undefined ? {} : { decisionId: event.decisionId }),
+            ...(against.length === 0 ? {} : { against }),
           }
         : illegal(conflict, event);
     }

@@ -8847,7 +8847,7 @@
                 "$ref": "#/components/schemas/VerdictId"
               }
             ],
-            "description": "The verdict that failed the change. Exactly one of `verdictId`, `conflictId` and `declined` is set."
+            "description": "The verdict that failed the change. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set."
           },
           "conflictId": {
             "allOf": [
@@ -8855,7 +8855,7 @@
                 "$ref": "#/components/schemas/ConflictId"
               }
             ],
-            "description": "The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId` and `declined` is set."
+            "description": "The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set."
           },
           "declined": {
             "type": "object",
@@ -8874,7 +8874,15 @@
             "additionalProperties": {
               "not": {}
             },
-            "description": "The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId` and `declined` is set."
+            "description": "The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set."
+          },
+          "decisionId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DecisionId"
+              }
+            ],
+            "description": "The decision of the ruling that went against the change while it was parked for it. Exactly one of `verdictId`, `conflictId`, `declined` and `decisionId` is set."
           },
           "reasons": {
             "type": "array",
@@ -8893,7 +8901,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, or the promotion that declined its batch because the push was refused."
+        "description": "The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, the promotion that declined its batch because the push was refused, or the decision of a ruling that went against it."
       },
       "ChangeDrifted": {
         "type": "object",
@@ -10150,6 +10158,13 @@
           },
           "decisionId": {
             "$ref": "#/components/schemas/DecisionId"
+          },
+          "against": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "The parties the ruling went against, set only with `decisionId` and never empty: each bounces by that decision, and every other party resumes."
           }
         },
         "additionalProperties": {

@@ -145,6 +145,8 @@ export const ConflictResolved = Schema.TaggedStruct("ConflictResolved", {
   conflictId: ConflictId,
   move: Move,
   decisionId: Schema.optional(DecisionId),
+  /** The parties the ruling went against, never empty: each bounces by this decision, and every other party resumes. */
+  against: Schema.optional(Schema.Array(ChangeId)),
 });
 export const GuardAdmitted = Schema.TaggedStruct("GuardAdmitted", {
   guardId: GuardId,

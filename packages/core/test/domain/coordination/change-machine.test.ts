@@ -4,6 +4,7 @@ import {
   type Blockers,
   Change,
   type ChangeCommand,
+  ChangeBounced,
   ChangeEvent,
   ChangeResumed,
   decideChange,
@@ -473,6 +474,16 @@ const heldAfter = (
     : held;
 };
 
+/** The decision of a ruling that goes against the change. */
+const RULING = makeId("dec", ulid(77));
+/** The ruling a change was parked for went against it. No step of a plan draws it, so every step tries it. */
+const ruledAgainst: ChangeCommand = {
+  _tag: "Bounce",
+  decisionId: RULING,
+  reasons: ["the ruling let the other side stand"],
+  nextActions: [],
+};
+
 /** Plays a plan the way the Change DO would: decide, commit each event through evolve, renew the lease on an authorised call. */
 const play = (plan: Plan): Trace => {
   const mint = new Mint();
@@ -491,9 +502,12 @@ const play = (plan: Plan): Trace => {
           ? SIDE[keyOf(state)]
           : ALL;
     const before = state;
-    const probes = ALL.flatMap((k) =>
-      k === "Renew" ? [] : [attempt(before, build(k, before, step, plan, mint, issued), now)],
-    );
+    const probes = [
+      ...ALL.flatMap((k) =>
+        k === "Renew" ? [] : [attempt(before, build(k, before, step, plan, mint, issued), now)],
+      ),
+      attempt(before, ruledAgainst, now),
+    ];
     const kind = choices[step.pick % choices.length] ?? "Lapse";
     if (kind === "Renew") {
       const renewed =
@@ -615,6 +629,9 @@ const oracle = (
         return key === "integrating" && batchMatches(command.declined.batchId)
           ? intoAgent("bounced")
           : "refused";
+      // A ruling's decision bounces a change only while it is parked for that ruling.
+      if (command.decisionId !== undefined)
+        return key === "parked:awaiting-ruling" ? intoAgent("bounced") : "refused";
       // A conflict bounces a change only before it is batched; a verdict also from a batch or a ruling.
       return key === "deriving" ||
         key === "verifying" ||
@@ -1701,8 +1718,8 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
   walkedTour = tour(changeMachine, {
     start: T0,
     facts: (now) => ({ now, changeId: CHANGE }),
-    moves: (state) =>
-      KINDS.flatMap((kind) =>
+    moves: (state) => [
+      ...KINDS.flatMap((kind) =>
         [1, TTL].flatMap((dt) =>
           [false, true].map((operator) => ({
             command: build(
@@ -1726,6 +1743,9 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
           })),
         ),
       ),
+      // A ruling against the change, which `build` never draws.
+      ...[1, TTL].map((dt) => ({ command: ruledAgainst, dt })),
+    ],
     signature: (c) =>
       c === undefined
         ? "none"
@@ -1879,6 +1899,117 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
       /exactly one cause/,
     );
     expect(() => decode(base)).toThrow(/exactly one cause/);
+  });
+
+  it("[change.ruling-bounces] a ruling's decision bounces a change exactly while it is parked for a ruling, as the bounce's one cause and with a way forward; decide and the fold refuse it in every other state a run reaches", () => {
+    let bounced = 0;
+    const bounceByRuling = ChangeBounced.make({
+      changeId: CHANGE,
+      decisionId: RULING,
+      reasons: [],
+      nextActions: [{ kind: "call", title: "Revise", operationId: "revise" }],
+    });
+    /** Whether the fold takes a bounce by a decision from this state. */
+    const folds = (state: Change | undefined, now: Instant): boolean => {
+      try {
+        evolveChange(state, { at: now, payload: bounceByRuling });
+        return true;
+      } catch (error) {
+        if (!(error instanceof IllegalTransition)) throw error;
+        return false;
+      }
+    };
+    assertReaching(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) => {
+          const tried = r.probes.filter(
+            (p) => p.command._tag === "Bounce" && p.command.decisionId !== undefined,
+          );
+          const parked = keyOf(r.before) === "parked:awaiting-ruling";
+          return (
+            tried.length === 1 &&
+            folds(r.before, r.now) === parked &&
+            tried.every((p) => {
+              if (!parked || r.before === undefined) return Result.isFailure(p.result);
+              if (!Result.isSuccess(p.result)) return false;
+              const [first, ...rest] = p.result.success;
+              const lapsed = lapsedAt(r.before, r.now);
+              bounced++;
+              return (
+                first?._tag === "ChangeBounced" &&
+                first.decisionId === RULING &&
+                first.verdictId === undefined &&
+                first.conflictId === undefined &&
+                first.declined === undefined &&
+                (first.nextActions ?? []).length > 0 &&
+                // Handed back under a lapsed lease, it parks for adoption as any bounce does.
+                JSON.stringify(rest.map((e) => e._tag)) ===
+                  JSON.stringify(lapsed ? ["ChangeParked"] : []) &&
+                p.key === (lapsed ? "parked:lease-lapsed" : "bounced")
+              );
+            })
+          );
+        }),
+      ),
+    );
+    expect(bounced).toBeGreaterThan(0);
+    const verifying = [declare, start, submit, precheck, compile].map((c) => [c, 0] as const);
+    const park: ChangeCommand = { _tag: "Park", escalationId: makeId("esc", ulid(12)) };
+    const fromVerifying = drive([...verifying, [park, 0], [ruledAgainst, 0]]);
+    expect(fromVerifying.keys.slice(-2)).toEqual(["parked:awaiting-ruling", "bounced"]);
+    // Parked from its lane, it leaves as any bounce does: out of the lane, with nothing left of the wait.
+    const fromQueued = drive([...verifying, [queue, 0], [park, 0], [ruledAgainst, 0]]);
+    expect(fromQueued.keys.slice(-2)).toEqual(["parked:awaiting-ruling", "bounced"]);
+    for (const key of ["parkReason", "escalationId", "parkedFrom", "laneId"])
+      expect(fromQueued.state).not.toHaveProperty(key);
+    // The decision is the bounce's one cause, and with no actions given it names the two ways forward.
+    const event = fromQueued.log.at(-1);
+    expect(event).toMatchObject({ _tag: "ChangeBounced", decisionId: RULING });
+    for (const cause of ["verdictId", "conflictId", "declined"])
+      expect(event).not.toHaveProperty(cause);
+    // Through the wire it is the same bounce.
+    expect(
+      throughTheWire(fromQueued.log.map((payload) => ({ at: T0, payload }))).at(-1)?.payload,
+    ).toEqual(event);
+    expect(
+      event?._tag === "ChangeBounced" && event.nextActions?.map((a) => [a.kind, a.operationId]),
+    ).toEqual([
+      ["call", "revise"],
+      ["call", "abandon"],
+    ]);
+    // The actions a caller gives are the ones the agent reads.
+    const given = drive([
+      ...verifying,
+      [park, 0],
+      [{ ...ruledAgainst, nextActions: [{ kind: "wait", title: "Wait for the other change" }] }, 0],
+    ]).log.at(-1);
+    expect(given?._tag === "ChangeBounced" && given.nextActions).toEqual([
+      { kind: "wait", title: "Wait for the other change" },
+    ]);
+    // Queued and not parked, the change is not waiting for the ruling: refused, and it stays queued.
+    const queued = drive([...verifying, [queue, 0], [ruledAgainst, 0]]);
+    expect(failureTag(queued.results.at(-1))).toBe("ChangeStateRefused");
+    expect(queued.keys.at(-1)).toBe("queued");
+    // Parked for a lapsed lease is another park: refused, and it stays parked for adoption.
+    const orphaned = drive([
+      [declare, 0],
+      [start, 0],
+      [lapse, TTL],
+      [ruledAgainst, 0],
+    ]);
+    expect(failureTag(orphaned.results.at(-1))).toBe("ChangeStateRefused");
+    expect(orphaned.keys.slice(-2)).toEqual(["parked:lease-lapsed", "parked:lease-lapsed"]);
+    // The lease lapsed while the change waited: the ruling bounces it, and it parks for adoption.
+    const stale = drive([...verifying, [park, 0], [ruledAgainst, TTL]]);
+    expect(tags(stale.log).slice(-2)).toEqual(["ChangeBounced", "ChangeParked"]);
+    expect(stale.keys.at(-1)).toBe("parked:lease-lapsed");
+    // The decision is one cause among four: alone it decodes, beside another it does not.
+    const decode = Schema.decodeUnknownSync(ChangeEvent);
+    const base = { _tag: "ChangeBounced", changeId: CHANGE, reasons: [] };
+    expect(decode({ ...base, decisionId: RULING })).toMatchObject({ decisionId: RULING });
+    expect(() =>
+      decode({ ...base, decisionId: RULING, verdictId: makeId("vrd", ulid(6)) }),
+    ).toThrow(/exactly one cause/);
   });
 
   it("[change.conflict-noted] a conflict noted under advise or annotate is recorded in every non-terminal state and moves nothing; advise names the ways forward, annotate none", () => {
@@ -2216,6 +2347,14 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked = changeTour();
     expect(offChart(changeChart, walked, changeView)).toEqual([]);
     expect(uncovered(changeChart, walked, changeView)).toEqual([]);
+    // The edge out of the wait for a ruling is walked by a ruling's decision, and by nothing else a decision causes.
+    expect([
+      ...new Set(
+        walked
+          .filter((f) => f.event._tag === "ChangeBounced" && f.event.decisionId !== undefined)
+          .map((f) => `${changeView.from(f)} to ${changeView.to(f)}`),
+      ),
+    ]).toEqual(["parked.awaitingRuling to bounced"]);
   });
 
   it("[lease.chart] every change a run makes to a lease is an edge of the Lease chart, and a tour of the machine exercises every edge", () => {
