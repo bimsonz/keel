@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-passkeys.test.ts
+# kills: ba.passkey-last-used
+# why: a sign-in counts the passkey's row and writes nothing, so every passkey reads as never used however often it signs in
+diff --git a/apps/keel/src/adapters/driven/better-auth/passkeys.ts b/apps/keel/src/adapters/driven/better-auth/passkeys.ts
+index 8596eac2..3b3d8212 100644
+--- a/apps/keel/src/adapters/driven/better-auth/passkeys.ts
++++ b/apps/keel/src/adapters/driven/better-auth/passkeys.ts
+@@ -21,7 +21,7 @@ export const keyUse = () =>
+ 
+ /** Marks the passkey with this credential id as used now: the one that has just signed in. */
+ export async function usedNow(ctx: GenericEndpointContext, credentialId: string): Promise<void> {
+-  await ctx.context.adapter.update({
++  await ctx.context.adapter.count({
+     model: "passkey",
+     where: [{ field: "credentialID", value: credentialId }],
+     update: { lastUsedAt: new Date() },

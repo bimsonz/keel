@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-passkeys.test.ts
+# kills: ba.passkey-last-used-own
+# why: the write names no credential, so one sign-in marks every passkey as used now: a person's unused key, and everyone else's
+diff --git a/apps/keel/src/adapters/driven/better-auth/passkeys.ts b/apps/keel/src/adapters/driven/better-auth/passkeys.ts
+index 8596eac2..cb660f86 100644
+--- a/apps/keel/src/adapters/driven/better-auth/passkeys.ts
++++ b/apps/keel/src/adapters/driven/better-auth/passkeys.ts
+@@ -23,7 +23,7 @@ export const keyUse = () =>
+ export async function usedNow(ctx: GenericEndpointContext, credentialId: string): Promise<void> {
+   await ctx.context.adapter.update({
+     model: "passkey",
+-    where: [{ field: "credentialID", value: credentialId }],
++    where: [],
+     update: { lastUsedAt: new Date() },
+   });
+ }

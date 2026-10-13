@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-passkeys.test.ts
+# kills: ba.passkey-last-used
+# why: the column is declared to nobody, so the adapter neither writes a passkey's last use nor answers it in the list
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index ff4a02f5..9fc5b491 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -429,7 +429,6 @@ export function authOptions(config: AuthConfig) {
+       }),
+       bearer(),
+       ownSessions(),
+-      keyUse(),
+       // Signs the tokens `agentTokens` issues, and publishes the key at `/jwks`. A session
+       // is never turned into a token: no answer carries one in a header.
+       jwt({

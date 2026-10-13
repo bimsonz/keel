@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-passkeys.test.ts
+# kills: ba.passkey-rename
+# why: renaming a passkey is among the routes Keel does not serve, so a person's keys keep whatever name they were added under
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index ff4a02f5..8ce266a4 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -62,6 +62,7 @@ export const DISABLED_PATHS = [
+   "/forget-password/email-otp",
+   "/delete-user",
+   "/delete-user/callback",
++  "/passkey/update-passkey",
+ ] as const;
+ 
+ /**

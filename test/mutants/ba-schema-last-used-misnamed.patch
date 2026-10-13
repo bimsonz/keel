@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.schema
+# why: migration 0015 adds the column under another name, so a passkey sign-in writes a column D1 does not have
+diff --git a/apps/keel/migrations/0015_passkey_last_used.sql b/apps/keel/migrations/0015_passkey_last_used.sql
+index 695b9166..01ab7755 100644
+--- a/apps/keel/migrations/0015_passkey_last_used.sql
++++ b/apps/keel/migrations/0015_passkey_last_used.sql
+@@ -4,4 +4,4 @@
+ -- for it. A date as better-auth 1.7.7's compileMigrations writes one (0006's
+ -- `createdAt`), and held equal to the field `keyUse` declares by [ba.schema].
+ -- Expand-only: a nullable column.
+-alter table "passkey" add column "lastUsedAt" date;
++alter table "passkey" add column "lastUsed" date;
