@@ -7,6 +7,7 @@ import {
   EscalationId,
   GuardId,
   InstantSchema,
+  RunRef,
   SessionId,
   SubjectId,
   TenetId,
@@ -71,6 +72,8 @@ export const Session = Schema.Struct({
   model: Schema.optional(Schema.String),
   /** The user who sponsors the agent, from its enrolment, when it has one. */
   sponsor: Schema.optional(UserId),
+  /** The run of the agent that opened the session, when its token named one: a session is one run's. */
+  run: Schema.optional(RunRef),
   openedAt: InstantSchema,
 });
 export type Session = typeof Session.Type;

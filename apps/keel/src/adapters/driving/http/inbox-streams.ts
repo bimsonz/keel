@@ -1,5 +1,5 @@
 import { authorize, type InboxPage } from "@keeltown/core/domain/identity";
-import type { AgentId } from "@keeltown/core/kernel";
+import type { AgentId, RunId } from "@keeltown/core/kernel";
 import { Result } from "effect";
 import type { Hono } from "hono";
 import type { AppEnv, RouteDeps } from "../../../generated/http/runtime.gen.ts";
@@ -14,15 +14,20 @@ import { problemResponse } from "./problems.ts";
  * generated routes and use the same auth gate.
  */
 export interface InboxStreams {
-  /** Notices after `cursor`, waiting up to `waitSeconds` for one: the Inbox port. */
+  /** Notices after `cursor` for `run`, waiting up to `waitSeconds` for one: the Inbox port. */
   readonly read: (
     agentId: AgentId,
     cursor: string | undefined,
     waitSeconds: number,
     signal: AbortSignal,
+    run: RunId | undefined,
   ) => Promise<InboxPage>;
-  /** Hands a WebSocket upgrade to the agent's own AgentSession DO. */
-  readonly socket: (agentId: AgentId, request: Request) => Promise<Response>;
+  /** Hands a WebSocket upgrade to the agent's own AgentSession DO, to read as `run`. */
+  readonly socket: (
+    agentId: AgentId,
+    request: Request,
+    run: RunId | undefined,
+  ) => Promise<Response>;
 }
 
 export const INBOX_STREAM_PATH = "/v1/inbox/stream";
@@ -35,8 +40,9 @@ const encoder = new TextEncoder();
 
 /**
  * `GET /v1/inbox/stream` (SSE) and `GET /v1/inbox/socket` (WebSocket). The
- * principal comes only from the bearer token: a socket is forwarded to the
- * caller's own AgentSession, never to an object the request names.
+ * principal and its run come only from the token: a socket is forwarded to
+ * the caller's own AgentSession, never to an object the request names, and
+ * reads as the run the token names, never one the request names.
  */
 export function registerInboxStreams(
   app: Hono<AppEnv>,
@@ -67,6 +73,7 @@ export function registerInboxStreams(
             cursor,
             SSE_WAIT_SECONDS,
             caller.signal,
+            caller.token?.run?.id,
           );
           const frames =
             page.notices.length === 0 ? ": keep-alive\n\n" : page.notices.map(sseEvent).join("");
@@ -100,7 +107,7 @@ export function registerInboxStreams(
       });
     const cursor = c.req.query("cursor");
     if (cursor !== undefined && !isInboxCursor(cursor)) return badCursor(caller);
-    const upgraded = await streams.socket(principal.agentId, c.req.raw);
+    const upgraded = await streams.socket(principal.agentId, c.req.raw, caller.token?.run?.id);
     // The object's response has immutable headers, and the app's middleware adds its own afterwards.
     return new Response(upgraded.body, {
       status: upgraded.status,

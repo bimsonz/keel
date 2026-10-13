@@ -1,12 +1,13 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { InboxEntry, noticeOf, notifies } from "../../../src/domain/identity/index.ts";
+import { InboxEntry, noticeOf, notifies, shownTo } from "../../../src/domain/identity/index.ts";
 import {
   agentActor,
   type EventEnvelope,
   Instant,
   makeId,
   type NextAction,
+  RunLabel,
   userActor,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
@@ -17,6 +18,8 @@ const OTHER = makeId("agt", ulid(2));
 /** A user whose id has the agent's own ULID: an event they cause is not the agent's own. */
 const USER = makeId("usr", ulid(1));
 const CHANGE = makeId("chg", ulid(3));
+const LANE_B = makeId("run", ulid(6));
+const LANE_C = makeId("run", ulid(7));
 
 const envelope = (payload: object, actor?: EventEnvelope["actor"]): EventEnvelope => ({
   eventId: makeId("evt", ulid(4)),
@@ -154,5 +157,46 @@ describe("the inbox", () => {
     expect(notifies(AGENT, envelope(noted("advise")))).toBe(true);
     // Only a ConflictNoted is silenced: another event with the same field still notifies.
     expect(notifies(AGENT, envelope({ _tag: "ChangeBounced", policy: "annotate" }))).toBe(true);
+  });
+
+  it("[run.inbox-other-run] an event one of the agent's own runs caused is kept, for its other runs; one the agent caused under no run is dropped, as it always was", () => {
+    const bounced = { _tag: "ChangeBounced", changeId: CHANGE };
+    const own = envelope(bounced, agentActor(AGENT));
+    expect(notifies(AGENT, own)).toBe(false);
+    expect(notifies(AGENT, { ...own, run: { id: LANE_B } })).toBe(true);
+    expect(notifies(AGENT, { ...own, run: { id: LANE_B, label: RunLabel.make("run-b") } })).toBe(
+      true,
+    );
+    // Another agent's event notifies with or without a run, and annotate stays silent whoever caused it.
+    expect(notifies(AGENT, { ...envelope(bounced, agentActor(OTHER)), run: { id: LANE_C } })).toBe(
+      true,
+    );
+    expect(
+      notifies(AGENT, { ...envelope(noted("annotate"), agentActor(AGENT)), run: { id: LANE_B } }),
+    ).toBe(false);
+  });
+
+  it("[run.inbox-own] a run is never shown an entry it caused, whoever the entry is for", () => {
+    expect(shownTo({ ...bare, by: LANE_B }, LANE_B)).toBe(false);
+    expect(shownTo({ ...bare, by: LANE_B, for: LANE_B }, LANE_B)).toBe(false);
+    // The agent's other runs, and a reader with no run, are shown it.
+    expect(shownTo({ ...bare, by: LANE_B }, LANE_C)).toBe(true);
+    expect(shownTo({ ...bare, by: LANE_B }, undefined)).toBe(true);
+    expect(shownTo({ ...bare, by: LANE_B, for: LANE_C }, LANE_C)).toBe(true);
+  });
+
+  it("[run.inbox-for] an entry for one run is that run's alone; an entry for no run is every run's, and all a reader with no run is shown", () => {
+    expect(shownTo({ ...bare, for: LANE_C }, LANE_C)).toBe(true);
+    expect(shownTo({ ...bare, for: LANE_C }, LANE_B)).toBe(false);
+    expect(shownTo({ ...bare, for: LANE_C }, undefined)).toBe(false);
+    expect(shownTo(bare, LANE_B)).toBe(true);
+    expect(shownTo(bare, LANE_C)).toBe(true);
+    expect(shownTo(bare, undefined)).toBe(true);
+    // Both survive the entry being stored and read back.
+    const kept = stored({ ...bare, by: LANE_B, for: LANE_C });
+    expect(kept.by).toBe(LANE_B);
+    expect(kept.for).toBe(LANE_C);
+    expect(stored(bare)).not.toHaveProperty("by");
+    expect(stored(bare)).not.toHaveProperty("for");
   });
 });

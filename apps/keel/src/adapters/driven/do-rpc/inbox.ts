@@ -21,11 +21,12 @@ export function InboxRpc(
   return Layer.succeed(
     Inbox,
     Inbox.of({
-      read: (agentId, cursor, waitSeconds) =>
+      read: (agentId, cursor, waitSeconds, run) =>
         callHeldRead(AgentSessionCodecs.inbox, "inbox", waitSeconds * 1000, (waitMs) =>
           agentSession(agentId).inbox({
             ...(cursor === undefined ? {} : { cursor }),
             waitMs,
+            ...(run === undefined ? {} : { run }),
           }),
         ).pipe(
           Effect.catchTag("AgentNotKnown", (error) =>

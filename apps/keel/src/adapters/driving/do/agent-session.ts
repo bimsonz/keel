@@ -14,7 +14,7 @@ import {
   takeNotices,
   viewSession,
 } from "@keeltown/core/application/identity";
-import { AgentId, type EventEnvelope } from "@keeltown/core/kernel";
+import { AgentId, type EventEnvelope, RunId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
 import {
@@ -22,11 +22,13 @@ import {
   type AgentSessionRpc,
   ApproveSponsorCommand,
   AskSponsorCommand,
+  DescribeSession,
   EndSponsorCommand,
   EnrolCommand,
   InboxRead,
   OpenSession,
   ReserveChange,
+  RUN_HEADER,
   SignUpCommand,
   StandingCommand,
   TakeNotices,
@@ -39,15 +41,23 @@ import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 const agentIdOf = (name: string | undefined) =>
   Schema.decodeUnknownSync(AgentId)(name?.replace(/^agent:/, ""));
 
-/** The inbox cursor a socket has been sent up to, kept on the socket so it survives hibernation. */
-function cursorOf(socket: WebSocket): string | undefined {
-  const attached: unknown = socket.deserializeAttachment();
-  return typeof attached === "object" &&
-    attached !== null &&
-    "cursor" in attached &&
-    typeof attached.cursor === "string"
-    ? attached.cursor
-    : undefined;
+const isRunId = Schema.is(RunId);
+
+/**
+ * What a socket keeps across hibernation: the inbox cursor it has been sent up
+ * to, and the run it reads as, from the upgrade the isolate forwarded.
+ */
+function attachedOf(socket: WebSocket): {
+  readonly cursor: string | undefined;
+  readonly run: RunId | undefined;
+} {
+  const attached: object = Object(socket.deserializeAttachment());
+  const cursor: unknown = Reflect.get(attached, "cursor");
+  const run: unknown = Reflect.get(attached, "run");
+  return {
+    cursor: typeof cursor === "string" ? cursor : undefined,
+    run: isRunId(run) ? run : undefined,
+  };
 }
 
 /**
@@ -62,10 +72,12 @@ export class AgentSessionDO
     super(ctx, env, agentSessionServices(env));
   }
 
-  /** The agent's snapshot, computed from its rows. Declaration fidelity stays null until Keel derives effects. */
-  async describe() {
+  /** The agent's snapshot as the asking run sees it, computed from its rows. Declaration fidelity stays null until Keel derives effects. */
+  async describe(request: typeof DescribeSession.Encoded = {}) {
     const agentId = agentIdOf(this.ctx.id.name);
-    const program = viewSession(agentId).pipe(
+    const program = Schema.decodeUnknownEffect(DescribeSession)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ run }) => viewSession(agentId, run)),
       Effect.map((view) => ({ agentId, ...view, fidelity: null })),
     );
     return this.answer(AgentSessionCodecs.describe, program);
@@ -81,9 +93,10 @@ export class AgentSessionDO
   }
 
   /**
-   * Every event delivered to the agent joins its inbox, except one it caused
-   * itself, and moves the leases it holds (`hearEvent`). `answer` then wakes
-   * any inbox waiting on it.
+   * Every event delivered to the agent joins its inbox, for the run that
+   * holds the change it is about, except one it caused itself under no run or
+   * to a change the same run holds; and it moves the leases the agent holds
+   * (`hearEvent`). `answer` then wakes any inbox waiting on it.
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const agentId = agentIdOf(this.ctx.id.name);
@@ -100,13 +113,13 @@ export class AgentSessionDO
     return this.answer(AgentSessionCodecs.reserveChange, program);
   }
 
-  /** The notices after `cursor`; with `waitMs` above 0 and none yet, the first page a commit brings, or an empty one at the deadline. */
+  /** The notices after `cursor` for the run that reads; with `waitMs` above 0 and none yet, the first page a commit brings it, or an empty one at the deadline. */
   async inbox(request: typeof InboxRead.Encoded) {
     const waiters = this.waiters;
     const program = Schema.decodeUnknownEffect(InboxRead)(request).pipe(
       Effect.orDie,
-      Effect.flatMap(({ cursor, waitMs }) =>
-        waiters.until(waitMs, readInbox(cursor), (page) => page.notices.length > 0),
+      Effect.flatMap(({ cursor, waitMs, run }) =>
+        waiters.until(waitMs, readInbox(cursor, run), (page) => page.notices.length > 0),
       ),
     );
     return this.answer(AgentSessionCodecs.inbox, program);
@@ -115,10 +128,11 @@ export class AgentSessionDO
   /**
    * The agent's WebSocket, a projection of its inbox. The isolate has already
    * authenticated the upgrade (`agent:read`) and forwards it only to the
-   * caller's own object. The socket is accepted for hibernation and sent its
-   * snapshot (every notice after `?cursor`) in the same turn, so nothing
-   * committed in between is missed; later notices follow each committed
-   * delivery. A client reconciles by reconnecting with the last frame's cursor.
+   * caller's own object, naming the token's run in a header of its own. The
+   * socket is accepted for hibernation and sent its snapshot (every notice
+   * after `?cursor` for that run) in the same turn, so nothing committed in
+   * between is missed; later notices follow each committed delivery. A client
+   * reconciles by reconnecting with the last frame's cursor.
    */
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket")
@@ -126,9 +140,12 @@ export class AgentSessionDO
     const cursor = new URL(request.url).searchParams.get("cursor") ?? undefined;
     if (cursor !== undefined && !isInboxCursor(cursor))
       return new Response("cursor is not an inbox cursor.", { status: 400 });
+    const run = request.headers.get(RUN_HEADER) ?? undefined;
+    if (run !== undefined && !isRunId(run))
+      return new Response("run is not a run id.", { status: 400 });
     const { 0: client, 1: socket } = new WebSocketPair();
     this.ctx.acceptWebSocket(socket);
-    socket.serializeAttachment({ cursor });
+    socket.serializeAttachment({ cursor, run });
     this.project(socket, "snapshot");
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -160,27 +177,29 @@ export class AgentSessionDO
   }
 
   /**
-   * Sends the socket every notice after its cursor, a page a frame, and keeps
-   * the cursor it reached on the socket. Synchronous, so a snapshot shares the
-   * turn that accepted the socket. Reading marks the notices read, as an inbox
-   * read does: none of them then rides a tool result.
+   * Sends the socket every notice after its cursor for the run it reads as,
+   * a page a frame, and keeps the cursor it reached on the socket. Synchronous,
+   * so a snapshot shares the turn that accepted the socket. Reading marks the
+   * notices read for that run, as an inbox read does: none of them then rides
+   * one of its tool results.
    */
   private project(socket: WebSocket, first: "snapshot" | "notices"): void {
     let type = first;
     for (;;) {
-      const page = this.runtime.runSync(readInbox(cursorOf(socket)));
+      const { cursor, run } = attachedOf(socket);
+      const page = this.runtime.runSync(readInbox(cursor, run));
       if (type === "snapshot" || page.notices.length > 0) socket.send(socketFrame(type, page));
-      socket.serializeAttachment({ cursor: page.cursor });
+      socket.serializeAttachment({ cursor: page.cursor, run });
       if (page.notices.length < INBOX_PAGE) return;
       type = "notices";
     }
   }
 
-  /** The piggyback: up to 3 notices for the agent's next tool result, each taken once. */
+  /** The piggyback: up to 3 notices for the next tool result of the run that asks, each taken once by it. */
   async takeNotices(request: typeof TakeNotices.Encoded) {
     const program = Schema.decodeUnknownEffect(TakeNotices)(request).pipe(
       Effect.orDie,
-      Effect.flatMap(({ limit }) => takeNotices(limit)),
+      Effect.flatMap(({ limit, run }) => takeNotices(limit, run)),
     );
     return this.answer(AgentSessionCodecs.takeNotices, program);
   }

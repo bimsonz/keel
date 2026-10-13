@@ -64,7 +64,7 @@ function ridable(answer: unknown): answer is { readonly body: Readonly<Record<st
 
 /**
  * The piggyback: once an enveloped operation's answer is known, success or
- * typed refusal, up to 3 notices the agent has not seen ride it. They are
+ * typed refusal, up to 3 notices the caller's run has not seen ride it. They are
  * taken after the answer, never alongside it, and never for a defect. Taking
  * is at most once (the AgentSession marks them carried before the response
  * leaves), so a failed take answers without notices: the inbox still has them.
@@ -86,7 +86,9 @@ export function piggyback<H extends Operations<Caller>>(run: Runner, handlers: H
         if (principal._tag !== "Agent" || !ridable(answer)) return answer;
         const taken = await run(
           caller,
-          Notifier.use((notifier) => notifier.take(principal.agentId, MAX_NOTICES)).pipe(
+          Notifier.use((notifier) =>
+            notifier.take(principal.agentId, MAX_NOTICES, caller.token?.run?.id),
+          ).pipe(
             Effect.catchCause((cause) =>
               Effect.as(
                 Effect.logWarning("piggyback: no notices taken", {

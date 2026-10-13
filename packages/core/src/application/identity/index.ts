@@ -34,13 +34,13 @@ import {
 
 /** identity use-cases. `whoami` and `exchangeToken` are the exemplar for the rest. */
 
-/** Who the caller is: its admitted agent, with its org and sponsor, and its current session. */
+/** Who the caller is: its admitted agent, with its org and sponsor, and the current session of the run its token names. */
 export const whoami: (
   principal: AgentClaims,
 ) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
   Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
     const agent = yield* admit(principal);
-    const current = yield* (yield* Sessions).current(agent.id);
+    const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
     return { agent, session: current === null ? null : { id: current.id } };
   });
 

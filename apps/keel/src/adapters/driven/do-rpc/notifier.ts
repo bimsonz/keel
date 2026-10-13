@@ -16,9 +16,9 @@ export function NotifierRpc(
   return Layer.succeed(
     Notifier,
     Notifier.of({
-      take: (agentId, limit) =>
+      take: (agentId, limit, run) =>
         callObject(AgentSessionCodecs.takeNotices, () =>
-          agentSession(agentId).takeNotices({ limit }),
+          agentSession(agentId).takeNotices({ limit, ...(run === undefined ? {} : { run }) }),
         ),
     }),
   );

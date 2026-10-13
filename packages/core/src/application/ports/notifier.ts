@@ -1,6 +1,6 @@
 import { Context, type Effect } from "effect";
 import type { AgentNotice } from "../../domain/identity/index.ts";
-import type { AgentId } from "../../domain/kernel/index.ts";
+import type { AgentId, RunId } from "../../domain/kernel/index.ts";
 
 export type { AgentNotice } from "../../domain/identity/index.ts";
 
@@ -16,7 +16,13 @@ export class Notifier extends Context.Service<
      * Up to `limit` (at most 3) notices that no tool result has carried and no
      * inbox read has returned, oldest first, each with its cursor. Taking marks
      * them carried, so a notice rides at most one result; the inbox keeps them all.
+     * Taken as `run`, they are that run's notices and the mark is its own: one
+     * run's tool result never takes another's.
      */
-    readonly take: (agentId: AgentId, limit: number) => Effect.Effect<readonly AgentNotice[]>;
+    readonly take: (
+      agentId: AgentId,
+      limit: number,
+      run?: RunId,
+    ) => Effect.Effect<readonly AgentNotice[]>;
   }
 >()("keel/Notifier") {}

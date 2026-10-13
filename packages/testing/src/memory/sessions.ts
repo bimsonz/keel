@@ -4,18 +4,23 @@ import {
   IdempotencyConflict,
 } from "@keeltown/core/domain/identity";
 import type { Session } from "@keeltown/core/domain/memory";
-import { type AgentId, Instant, makeId } from "@keeltown/core/kernel";
+import { type AgentId, Instant, makeId, type RunId } from "@keeltown/core/kernel";
 import { AgentDirectory, Sessions } from "@keeltown/core/ports";
 import { Effect, Layer, Option } from "effect";
 import { ulidOf } from "./operator.ts";
 
+/** Where a run of an agent keeps its current session: under the agent alone when it names no run. */
+const slot = (agentId: AgentId, run: RunId | undefined) => `${agentId}\u0000${run ?? ""}`;
+
 /**
  * Sessions over an AgentDirectory, with the AgentSession DO's rules: the agent
  * must be known and active, the session's sponsor is the agent's from its
- * enrolment, and a key replayed with its body answers its session.
+ * enrolment, a key replayed with its body answers its session, and each run of
+ * an agent has a current session of its own.
  */
 export function makeSessionsMemory() {
-  const current = new Map<AgentId, Session>();
+  /** The current session of each run of each agent; of the agent itself under no run. */
+  const current = new Map<string, Session>();
   const byKey = new Map<string, { readonly session: Session; readonly fingerprint: string }>();
   let count = 0;
   return {
@@ -47,13 +52,14 @@ export function makeSessionsMemory() {
                 ...(input.harness === undefined ? {} : { harness: input.harness }),
                 ...(input.model === undefined ? {} : { model: input.model }),
                 ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+                ...(principal.run === undefined ? {} : { run: principal.run }),
                 openedAt: Instant(Date.now()),
               };
               byKey.set(key, { session, fingerprint });
-              current.set(agentId, session);
+              current.set(slot(agentId, principal.run?.id), session);
               return session;
             }),
-          current: (agentId) => Effect.sync(() => current.get(agentId) ?? null),
+          current: (agentId, run) => Effect.sync(() => current.get(slot(agentId, run)) ?? null),
         });
       }),
     ),

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, AgentToken } from "@keeltown/core/domain/identity";
-import { AgentId, NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { type Agent, type AgentToken, runIdOf } from "@keeltown/core/domain/identity";
+import {
+  AgentId,
+  NamespaceId,
+  ProjectId,
+  RunLabel,
+  type RunRef,
+  UserId,
+} from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
   Enrolments,
@@ -55,6 +62,12 @@ const principalOf = (agent: Agent): AgentToken => {
     revocationEpoch: agent.revocationEpoch,
     ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
   };
+};
+
+/** A run of the agent as its token names it: its label, and the id Keel makes from the two. */
+const runOf = (agent: AgentId, name: string): RunRef => {
+  const label = Schema.decodeUnknownSync(RunLabel)(name);
+  return { id: runIdOf(agent, { label }), label };
 };
 
 const asking = (overrides: Partial<OpenSessionInput> = {}): OpenSessionInput => ({
@@ -131,6 +144,38 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
             unclaimed,
           ])
             expect(yield* sessions.open(principal, asking())).toMatchObject({ sponsor });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[run.session] each run of an agent has a current session of its own, an agent that names no run has another, and a later session replaces only its own run's",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const sessions = yield* Sessions;
+          const { agent, principal } = yield* enrolled();
+          const [one, two] = [runOf(agent.id, "lane-one"), runOf(agent.id, "lane-two")];
+
+          const first = yield* sessions.open({ ...principal, run: one }, asking());
+          expect(first.run).toEqual(one);
+          expect(yield* sessions.current(agent.id, one.id)).toEqual(first);
+          expect(yield* sessions.current(agent.id, two.id)).toBeNull();
+          expect(yield* sessions.current(agent.id)).toBeNull();
+
+          const second = yield* sessions.open({ ...principal, run: two }, asking());
+          const own = yield* sessions.open(principal, asking());
+          expect(second.run).toEqual(two);
+          expect("run" in own).toBe(false);
+          expect(yield* sessions.current(agent.id, one.id)).toEqual(first);
+          expect(yield* sessions.current(agent.id, two.id)).toEqual(second);
+          expect(yield* sessions.current(agent.id)).toEqual(own);
+
+          const later = yield* sessions.open({ ...principal, run: one }, asking({ model: "next" }));
+          expect(later.id).not.toBe(first.id);
+          expect(yield* sessions.current(agent.id, one.id)).toEqual(later);
+          expect(yield* sessions.current(agent.id, two.id)).toEqual(second);
+          expect(yield* sessions.current(agent.id)).toEqual(own);
         }).pipe(Effect.provide(harness.layer));
       },
     );

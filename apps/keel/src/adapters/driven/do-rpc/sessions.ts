@@ -10,8 +10,9 @@ const encodeOpen = Schema.encodeSync(OpenSession);
 /**
  * `Sessions` over each agent's AgentSession DO. The fingerprint hashes the
  * request body, so a retry is told apart from a reused key; the DO takes the
- * session's sponsor from the agent's record. `current` reads the DO's
- * snapshot, and an agent the DO has never enrolled has no session.
+ * session's sponsor from the agent's record, and is told the run the
+ * principal's token names. `current` reads the DO's snapshot as that run, and
+ * an agent the DO has never enrolled has no session.
  */
 export function SessionsRpc(
   agentSession: (agentId: AgentId) => Pick<AgentSessionStub, "openSession" | "describe">,
@@ -30,14 +31,17 @@ export function SessionsRpc(
             agentSession(principal.agentId).openSession(
               encodeOpen({
                 ...body,
+                ...(principal.run === undefined ? {} : { run: principal.run }),
                 idempotencyKey: input.idempotencyKey,
                 fingerprint,
               }),
             ),
           );
         }),
-      current: (agentId) =>
-        callObject(AgentSessionCodecs.describe, () => agentSession(agentId).describe()).pipe(
+      current: (agentId, run) =>
+        callObject(AgentSessionCodecs.describe, () =>
+          agentSession(agentId).describe(run === undefined ? {} : { run }),
+        ).pipe(
           Effect.map((snapshot) => snapshot.session),
           Effect.catchTag("AgentNotKnown", () => Effect.succeed(null)),
         ),

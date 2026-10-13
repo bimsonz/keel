@@ -21,18 +21,30 @@ import {
   InstantSchema,
   NamespaceId,
   ProjectId,
+  RunId,
+  RunRef,
   UserId,
 } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
-/** What the AgentSession DO (`agent:<id>`) knows about its agent right now. */
+/**
+ * The header that names the run on a socket upgrade the isolate forwards to
+ * the object. The isolate sets it from the token the gate admitted and takes
+ * out whatever the client sent under it; the object reads the run from nowhere else.
+ */
+export const RUN_HEADER = "x-keel-run";
+
+/** Which of the agent's runs asks: none for an agent that names no run (a client secret, a plain token). */
+export const DescribeSession = Schema.Struct({ run: Schema.optional(RunId) });
+
+/** What the AgentSession DO (`agent:<id>`) knows about its agent right now, as the run that asks sees it. */
 export const SessionSnapshot = Schema.Struct({
   agentId: AgentId,
-  /** The agent's current session: the last it opened. */
+  /** The run's current session: the last it opened. */
   session: Schema.NullOr(Session),
-  /** Notices no inbox read or tool result has carried yet. */
+  /** Notices for the run that no inbox read or tool result of its own has carried yet. */
   inboxDepth: Schema.Int,
   /** Changes whose lease the agent holds. */
   openLeases: Schema.Int,
@@ -47,6 +59,8 @@ export type SessionSnapshot = typeof SessionSnapshot.Type;
  * body: the same key with another body is an IdempotencyConflict.
  */
 export const OpenSession = Schema.Struct({
+  /** The run that opens the session, from its token: the session is that run's current one. */
+  run: Schema.optional(RunRef),
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   idempotencyKey: Schema.String,
@@ -59,13 +73,15 @@ export const ReserveChange = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/** Read the inbox as one run of the agent: what is for it or for every run, never what it caused. */
 export const InboxRead = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   waitMs: Schema.Int,
+  run: Schema.optional(RunId),
 });
 
-/** Take the notices no tool result has carried yet: at most `limit`, and never more than 3. */
-export const TakeNotices = Schema.Struct({ limit: Schema.Int });
+/** Take the notices no tool result of this run has carried yet: at most `limit`, and never more than 3. */
+export const TakeNotices = Schema.Struct({ limit: Schema.Int, run: Schema.optional(RunId) });
 
 /**
  * Enrol the agent this DO is named for. The isolate derives the agent id from
@@ -169,10 +185,10 @@ export const AgentSessionCodecs = {
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
 export interface AgentSessionRpc extends EventReceiverRpc {
-  /** The agent's session, inbox depth and held leases, computed from its rows. AgentNotKnown before it is enrolled. */
-  describe(): Promise<ExitJson>;
+  /** The asking run's session and inbox depth and the agent's held leases, computed from its rows. AgentNotKnown before it is enrolled. */
+  describe(request?: typeof DescribeSession.Encoded): Promise<ExitJson>;
   /**
-   * Opens a session and makes it the agent's current one. Commits
+   * Opens a session and makes it the current one of the run that opens it. Commits
    * SessionOpened on the session's entity; a replayed key and body answers
    * the same session without committing.
    */
@@ -184,16 +200,17 @@ export interface AgentSessionRpc extends EventReceiverRpc {
    */
   reserveChange(request: typeof ReserveChange.Encoded): Promise<ExitJson>;
   /**
-   * Notices after `cursor`; with `waitMs` > 0, waits for the next one (an
-   * in-DO waiter with a deadline). The read also marks them read, so none of
-   * them rides a later tool result.
+   * Notices after `cursor` for the run that reads; with `waitMs` > 0, waits
+   * for the next one (an in-DO waiter with a deadline). The read also marks
+   * them read for that run, so none of them rides a later tool result of its.
    */
   inbox(request: typeof InboxRead.Encoded): Promise<ExitJson>;
   /**
-   * The piggyback: up to `limit` (at most 3) notices no tool result has
-   * carried and no inbox read has returned, oldest first, each with its
-   * cursor. Taking them marks them carried in the same commit, so each rides
-   * at most one tool result. The inbox still holds them all.
+   * The piggyback: up to `limit` (at most 3) notices for the run that no
+   * tool result of its own has carried and no inbox read of its own has
+   * returned, oldest first, each with its cursor. Taking them marks them
+   * carried for that run in the same commit, so each rides at most one of its
+   * tool results. The inbox still holds them all.
    */
   takeNotices(request: typeof TakeNotices.Encoded): Promise<ExitJson>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<ExitJson>;

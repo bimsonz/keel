@@ -224,13 +224,15 @@ export const submissionOf: (
 ) => Effect.Effect<SubmissionStatus, ChangeNotFound, Changes> = (changeId, waitSeconds) =>
   Changes.use((changes) => changes.awaitSubmission(changeId, clampWait(waitSeconds)));
 
-/** The caller's own inbox after `cursor`, waiting up to `waitSeconds` (0–30) for a notice. */
+/** The caller's own inbox after `cursor`, read as the run its token names, waiting up to `waitSeconds` (0–30) for a notice. */
 export const readInbox: (
   principal: AgentToken,
   cursor: string | undefined,
   waitSeconds?: number,
 ) => Effect.Effect<InboxPage, never, Inbox> = (principal, cursor, waitSeconds) =>
-  Inbox.use((inbox) => inbox.read(principal.agentId, cursor, clampWait(waitSeconds)));
+  Inbox.use((inbox) =>
+    inbox.read(principal.agentId, cursor, clampWait(waitSeconds), principal.run?.id),
+  );
 
 /**
  * Whether a reader who sees the event's project as `audience` reads it: all of

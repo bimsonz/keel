@@ -63,6 +63,7 @@ import { makeApp } from "../adapters/driving/http/app.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
 import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
+import { RUN_HEADER } from "../rpc/index.ts";
 import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
@@ -190,17 +191,25 @@ const isolates = new WeakMap<Env, Isolate>();
 /**
  * The agent's live inbox: the SSE loop reads through the Inbox port, and a
  * socket upgrade goes to the caller's own AgentSession DO, named here from the
- * principal and nothing else.
+ * principal and nothing else. The object is told the run in a header set
+ * here from the admitted token: whatever the request carried under that name
+ * is replaced, so a client never picks the run it reads as.
  */
 function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
   return {
-    read: (agentId, cursor, waitSeconds, signal) =>
+    read: (agentId, cursor, waitSeconds, signal, run) =>
       runtime.runPromise(
-        Inbox.use((inbox) => inbox.read(agentId, cursor, waitSeconds)),
+        Inbox.use((inbox) => inbox.read(agentId, cursor, waitSeconds, run)),
         { signal },
       ),
-    socket: (agentId, request) =>
-      env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)).fetch(request),
+    socket: (agentId, request, run) => {
+      const headers = new Headers(request.headers);
+      if (run === undefined) headers.delete(RUN_HEADER);
+      else headers.set(RUN_HEADER, run);
+      return env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)).fetch(
+        new Request(request, { headers }),
+      );
+    },
   };
 }
 

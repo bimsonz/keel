@@ -10,7 +10,9 @@ import {
 import {
   type AgentId,
   byAgent,
+  ChangeId,
   type EventEnvelope,
+  RunId,
   type RunRef,
   type SessionId,
 } from "../../domain/kernel/index.ts";
@@ -31,7 +33,8 @@ type Store = (typeof EntityStore)["Service"];
 /**
  * Where the AgentSession DO keeps its sessions: each one under the
  * Idempotency-Key that opened it, with that request's fingerprint, and the
- * agent's current session.
+ * current session of each of the agent's runs under the run's id (under
+ * `self` for an agent that names no run).
  */
 export const SESSION = {
   opened: "session",
@@ -40,6 +43,13 @@ export const SESSION = {
 
 /** One row per change whose lease the agent holds, by change id. */
 export const HELD_LEASE = "held-lease";
+
+/**
+ * One row per change a run of the agent holds, by change id: the run's id. It
+ * outlives the lease, so what becomes of the change still reaches the run that
+ * held it, and goes when another agent adopts the change.
+ */
+export const CHANGE_RUN = "change-run";
 
 const Opened = Schema.Struct({ session: Session, fingerprint: Schema.String });
 const decodeOpened = Schema.decodeUnknownSync(Opened);
@@ -111,13 +121,23 @@ export const openSession: (
         ...(command.model === undefined ? {} : { model: command.model }),
         ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
       };
-      const session: Session = { id: sessionId, agentId, ...details, openedAt: tx.at };
+      const session: Session = {
+        id: sessionId,
+        agentId,
+        ...details,
+        ...(command.run === undefined ? {} : { run: command.run }),
+        openedAt: tx.at,
+      };
       tx.store.put(
         SESSION.opened,
         command.idempotencyKey,
         asStored(encodeOpened({ session, fingerprint: command.fingerprint })),
       );
-      tx.store.put(SESSION.current.kind, SESSION.current.id, asStored(encodeSession(session)));
+      tx.store.put(
+        SESSION.current.kind,
+        command.run?.id ?? SESSION.current.id,
+        asStored(encodeSession(session)),
+      );
       const payload = SessionOpened.make({ sessionId, agentId, ...details });
       return Result.succeed({
         drafts: [{ payload: JSON.parse(JSON.stringify(encodeOpenedEvent(payload))) }],
@@ -130,10 +150,58 @@ export const openSession: (
   return committed.value;
 });
 
-/** The agent's current session, or null when it has opened none. */
-export function currentSession(store: Store): Session | null {
-  const stored = store.get(SESSION.current.kind, SESSION.current.id);
+/** The current session of a run of the agent (of the agent itself, for no run), or null when it has opened none. */
+export function currentSession(store: Store, run?: RunId): Session | null {
+  const stored = store.get(SESSION.current.kind, run ?? SESSION.current.id);
   return stored === undefined ? null : decodeSession(stored);
+}
+
+const isRunId = Schema.is(RunId);
+const isChangeId = Schema.is(ChangeId);
+
+/** The run of the agent that holds a change, when one does. */
+function runHolding(store: Store, changeId: string): RunId | undefined {
+  const run = store.get(CHANGE_RUN, changeId);
+  return isRunId(run) ? run : undefined;
+}
+
+/** The change now belongs to `run`: to no run when the token that took it named none. */
+function heldBy(store: Store, changeId: string, run: RunRef | undefined): void {
+  if (run === undefined) store.remove(CHANGE_RUN, changeId);
+  else store.put(CHANGE_RUN, changeId, run.id);
+}
+
+/**
+ * The change an event is about, when it names one: its payload's `changeId`
+ * (a change's own events, and a notice another entity commits for a change),
+ * a verdict's `subject`, or failing those the change it is an event of.
+ */
+function changeOf(event: EventEnvelope): ChangeId | undefined {
+  const payload: object =
+    typeof event.payload === "object" && event.payload !== null ? event.payload : {};
+  for (const field of ["changeId", "subject"]) {
+    const named: unknown = Reflect.get(payload, field);
+    if (isChangeId(named)) return named;
+  }
+  return event.entity.kind === "change" && isChangeId(event.entity.id)
+    ? event.entity.id
+    : undefined;
+}
+
+/**
+ * The one run that holds the changes an event affects, for an event that
+ * names no change of its own: a conflict put to a person or ruled on names
+ * its parties only there. None when no run holds any of them, and none when
+ * two runs each hold one: that event is for both, so for every run.
+ */
+function soleHolder(store: Store, event: EventEnvelope): RunId | undefined {
+  const holders = new Set<RunId>();
+  for (const affected of event.affected) {
+    const run = affected.kind === "change" ? runHolding(store, affected.id) : undefined;
+    if (run !== undefined) holders.add(run);
+  }
+  const [only, ...more] = holders;
+  return more.length === 0 ? only : undefined;
 }
 
 /**
@@ -143,7 +211,8 @@ export function currentSession(store: Store): Session | null {
  * IntentDeclared or its ChangeAdopted, and stops being so when another agent
  * adopts the change (which can precede the lapse's own event, as adoption
  * needs only the lease's time to have passed), the lease lapses, or the
- * change ends.
+ * change ends. The run that holds the change is kept beside the lease, from
+ * the same two events.
  */
 function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): void {
   if (event.entity.kind !== "change") return;
@@ -151,13 +220,21 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
   switch (event.type) {
     case "IntentDeclared": {
       const declared = Schema.decodeUnknownSync(IntentDeclared)(event.payload);
-      if (declared.agentId === agentId) store.put(HELD_LEASE, changeId, declared.leaseId);
+      if (declared.agentId === agentId) {
+        store.put(HELD_LEASE, changeId, declared.leaseId);
+        heldBy(store, changeId, declared.run);
+      }
       return;
     }
     case "ChangeAdopted": {
       const adopted = Schema.decodeUnknownSync(ChangeAdopted)(event.payload);
-      if (adopted.agentId === agentId) store.put(HELD_LEASE, changeId, adopted.leaseId);
-      else if (adopted.previousAgentId === agentId) store.remove(HELD_LEASE, changeId);
+      if (adopted.agentId === agentId) {
+        store.put(HELD_LEASE, changeId, adopted.leaseId);
+        heldBy(store, changeId, adopted.run);
+      } else if (adopted.previousAgentId === agentId) {
+        store.remove(HELD_LEASE, changeId);
+        store.remove(CHANGE_RUN, changeId);
+      }
       return;
     }
     case "ChangeParked": {
@@ -181,10 +258,24 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
  * transaction that receives it: the leases the agent holds follow every
  * event, its own included; the inbox takes only those it did not cause, since
  * its own tool result already reported those.
+ *
+ * An entry is for the run that holds the change the event is about: the run
+ * that held it before the event, or failing one the run that holds it after,
+ * so a run is told when another takes its change. An event that names no
+ * change is for the one run that holds what it affects. An event about no
+ * change at all, or about one no run holds, is for every run. What a run does
+ * to a change it holds is for that run alone, and it is never shown its own
+ * acts, so nothing is kept for it.
  */
 export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope): void {
+  const about = changeOf(event);
+  const before = about === undefined ? undefined : runHolding(store, about);
   foldHeldLeases(store, agentId, event);
-  if (notifies(agentId, event)) recordDelivery(store, event);
+  if (!notifies(agentId, event)) return;
+  const holder =
+    about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+  if (holder !== undefined && event.run?.id === holder) return;
+  recordDelivery(store, event, holder);
 }
 
 /** What the AgentSession DO knows about its agent right now. Fidelity arrives with effect derivation. */
@@ -194,16 +285,21 @@ export interface SessionView {
   readonly openLeases: number;
 }
 
-/** The agent's session state, computed from its rows. An agent never enrolled here is AgentNotKnown. */
+/**
+ * The agent's session state as one of its runs sees it, computed from its
+ * rows: that run's current session and the notices waiting for it, and the
+ * leases the agent holds. An agent never enrolled here is AgentNotKnown.
+ */
 export const viewSession: (
   agentId: AgentId,
+  run?: RunId,
 ) => Effect.Effect<SessionView, AgentNotKnown, EntityStore> = Effect.fn("identity/viewSession")(
-  function* (agentId: AgentId) {
+  function* (agentId: AgentId, run?: RunId) {
     const store = yield* EntityStore;
     if (store.get(AGENT, agentId) === undefined) return yield* new AgentNotKnown({ agentId });
     return store.transaction(() => ({
-      session: currentSession(store),
-      inboxDepth: inboxDepth(store),
+      session: currentSession(store, run),
+      inboxDepth: inboxDepth(store, run),
       openLeases: store.list(HELD_LEASE).length,
     }));
   },

@@ -5,14 +5,17 @@ import {
   InboxEntry as InboxEntrySchema,
   type InboxPage,
   noticeOf,
+  shownTo,
 } from "../../domain/identity/index.ts";
-import { type EventEnvelope, NextAction } from "../../domain/kernel/index.ts";
+import { type EventEnvelope, NextAction, type RunId } from "../../domain/kernel/index.ts";
 import { EntityStore, type Stored } from "../ports/index.ts";
 
 /**
  * Where an agent's inbox lives in its AgentSession DO's store: one entry per
  * delivered event, by position, and the `piggybacked` cursor: the last
- * position a tool result carried or an inbox read returned.
+ * position a tool result carried or an inbox read returned. The log is one for
+ * all the agent's runs; each run keeps a `piggybacked` cursor of its own, under
+ * its run id, and a reader with no run keeps the one under `self`.
  */
 export const INBOX = {
   kind: "inbox",
@@ -41,16 +44,26 @@ const headOf = (store: Store): number => {
   return typeof head === "number" ? head : 0;
 };
 
-const piggybackedOf = (store: Store): string => {
-  const at = store.get(INBOX.piggybacked.kind, INBOX.piggybacked.id);
+const piggybackedOf = (store: Store, run: RunId | undefined): string => {
+  const at = store.get(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id);
   return typeof at === "string" ? at : START;
 };
 
 /**
- * How many notices wait unread: those after the `piggybacked` cursor.
- * Positions are dense from 1 to the head, and reads clamp the cursor to it.
+ * How many notices wait unread for a run: the positions after its
+ * `piggybacked` cursor, less the entries there it is not shown. Positions are
+ * dense from 1 to the head, and reads clamp the cursor to it.
  */
-export const inboxDepth = (store: Store): number => headOf(store) - Number(piggybackedOf(store));
+export const inboxDepth = (store: Store, run?: RunId): number => {
+  const read = piggybackedOf(store, run);
+  const hidden = store
+    .list(INBOX.kind)
+    .filter(
+      (row) =>
+        row.id > read && !shownTo(Schema.decodeUnknownSync(InboxEntrySchema)(row.value), run),
+    ).length;
+  return headOf(store) - Number(read) - hidden;
+};
 
 /** The next actions an event's payload names, when it names any. */
 const decodeActionable = Schema.decodeUnknownOption(
@@ -155,10 +168,11 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
 
 /**
  * Records a delivered event as the inbox's next entry, with its detail and
- * the next actions its payload names. Synchronous: it runs inside the
- * reaction's transaction.
+ * the next actions its payload names, the run that caused it and the run it is
+ * for (`holder`: none when it is for every run). Synchronous: it runs inside
+ * the reaction's transaction.
  */
-export function recordDelivery(store: Store, event: EventEnvelope): void {
+export function recordDelivery(store: Store, event: EventEnvelope, holder?: RunId): void {
   const next = headOf(store) + 1;
   const detail = detailOf(event);
   const nextActions = actionsOf(event);
@@ -172,15 +186,18 @@ export function recordDelivery(store: Store, event: EventEnvelope): void {
     ...(nextActions === undefined
       ? {}
       : { nextActions: nextActions.map((action) => Schema.encodeSync(NextAction)(action)) }),
+    ...(event.run === undefined ? {} : { by: event.run.id }),
+    ...(holder === undefined ? {} : { for: holder }),
   };
   store.put(INBOX.kind, position(next), asStored(entry));
   store.put(INBOX.head.kind, INBOX.head.id, next);
 }
 
-/** The inbox's entries after `cursor`, oldest first, at most `limit`. */
+/** The entries after `cursor` that `run` is shown (`shownTo`), oldest first, at most `limit`. */
 export function entriesAfter(
   store: Store,
   cursor: string | undefined,
+  run?: RunId,
   limit = INBOX_PAGE,
 ): readonly { readonly position: string; readonly entry: InboxEntry }[] {
   const from = cursor ?? START;
@@ -188,66 +205,75 @@ export function entriesAfter(
     .list(INBOX.kind)
     .filter((row) => row.id > from)
     .toSorted((a, b) => (a.id < b.id ? -1 : 1))
-    .slice(0, limit)
     .map((row) => ({
       position: row.id,
       entry: Schema.decodeUnknownSync(InboxEntrySchema)(row.value),
-    }));
+    }))
+    .filter(({ entry }) => shownTo(entry, run))
+    .slice(0, limit);
 }
 
 /**
- * Moves `piggybacked` up to `cursor`: never back, and never past the newest
- * entry, so a cursor the agent made up cannot silence notices still to come.
+ * Moves the run's `piggybacked` up to `cursor`: never back, and never past the
+ * newest entry, so a cursor the agent made up cannot silence notices still to come.
  */
-function markRead(store: Store, cursor: string): void {
+function markRead(store: Store, cursor: string, run: RunId | undefined): void {
   if (!POSITION.test(cursor)) return;
   const head = position(headOf(store));
   const read = cursor > head ? head : cursor;
-  if (read > piggybackedOf(store)) store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, read);
+  if (read > piggybackedOf(store, run))
+    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, read);
 }
 
 /**
- * A page of notices after `cursor`. An empty page keeps the cursor where it
- * was. In the same transaction `piggybacked` moves up to the page's cursor, so
- * a notice the agent has read never rides a later tool result.
+ * A page of the notices after `cursor` that `run` is shown. An empty page
+ * keeps the cursor where it was. In the same transaction the run's
+ * `piggybacked` moves up to the page's cursor, so a notice the run has read
+ * never rides a later tool result of its own.
  */
 export const readInbox: (
   cursor: string | undefined,
+  run?: RunId,
 ) => Effect.Effect<InboxPage, never, EntityStore> = Effect.fn("identity/readInbox")(function* (
   cursor: string | undefined,
+  run?: RunId,
 ) {
   const store = yield* EntityStore;
   return store.transaction((): InboxPage => {
-    const entries = entriesAfter(store, cursor);
+    const entries = entriesAfter(store, cursor, run);
     const page = {
       notices: entries.map(({ entry, position: at }) => noticeOf(entry, at)),
       cursor: entries.at(-1)?.position ?? cursor ?? START,
     };
-    markRead(store, page.cursor);
+    markRead(store, page.cursor, run);
     return page;
   });
 });
 
 /**
- * The piggyback: up to `limit` (at most 3) notices that no tool result has
- * carried and no inbox read has returned, oldest first. Taking them moves
- * `piggybacked` past them in the same transaction, so each rides at most one
- * tool result; the inbox still holds every one.
+ * The piggyback: up to `limit` (at most 3) notices `run` is shown that no tool
+ * result of its own has carried and no inbox read of its own has returned,
+ * oldest first. Taking them moves the run's `piggybacked` past them in the
+ * same transaction, so each rides at most one of its tool results, and one
+ * run's taking leaves every other run's notices where they were; the inbox
+ * still holds every one.
  */
 export const takeNotices: (
   limit: number,
+  run?: RunId,
 ) => Effect.Effect<readonly AgentNotice[], never, EntityStore> = Effect.fn("identity/takeNotices")(
-  function* (limit: number) {
+  function* (limit: number, run?: RunId) {
     const store = yield* EntityStore;
     return store.transaction((): readonly AgentNotice[] => {
       const entries = entriesAfter(
         store,
-        piggybackedOf(store),
+        piggybackedOf(store, run),
+        run,
         Math.min(Math.max(limit, 0), PIGGYBACK_MAX),
       );
       const last = entries.at(-1);
       if (last !== undefined)
-        store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, last.position);
+        store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, last.position);
       return entries.map(({ entry, position: at }) => noticeOf(entry, at));
     });
   },

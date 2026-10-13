@@ -7,6 +7,7 @@ import {
   type EventEnvelope,
   InstantSchema,
   NextAction,
+  RunId,
 } from "../kernel/index.ts";
 
 /** One notice for an agent: what reaches its inbox, its next tool result, or its stream. */
@@ -42,6 +43,10 @@ export const InboxEntry = Schema.Struct({
   detail: Schema.optional(Schema.String),
   /** The event's next actions, kept when it is delivered so the notice can carry them. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
+  /** The run whose command caused the event, when it names one. */
+  by: Schema.optional(RunId),
+  /** The one run of the agent the entry is for: the run that holds the change it is about. Absent when it is for every run. */
+  for: Schema.optional(RunId),
 });
 export type InboxEntry = typeof InboxEntry.Type;
 
@@ -78,6 +83,18 @@ const isAnnotation = Schema.is(
  * own tool result already reported it. So it is never woken by its own push,
  * and a fix → notice → fix loop cannot form. A conflict noted under `annotate`
  * is recorded for the record only, so it notifies no one.
+ *
+ * An agent's runs are told of each other's acts: an event the agent caused
+ * under a run is kept, and `shownTo` keeps it from that run alone. Only one it
+ * caused under no run is dropped here.
  */
 export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
-  event.actor !== agentActor(agentId) && !isAnnotation(event.payload);
+  !(event.actor === agentActor(agentId) && event.run === undefined) && !isAnnotation(event.payload);
+
+/**
+ * Whether a run of the agent reads an entry: the entry is for that run or for
+ * every run, and that run did not cause it. A reader with no run (a client
+ * secret, a plain token) reads what is for every run.
+ */
+export const shownTo = (entry: InboxEntry, run: RunId | undefined): boolean =>
+  (entry.for === undefined || entry.for === run) && (entry.by === undefined || entry.by !== run);

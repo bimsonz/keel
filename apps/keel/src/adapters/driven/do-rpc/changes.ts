@@ -4,6 +4,7 @@ import { Effect, Layer, Schema } from "effect";
 import {
   AbandonCommand,
   AdoptCommand,
+  type DescribeSession,
   NearbyCommand,
   RebaseCommand,
   RelyCommand,
@@ -44,7 +45,7 @@ export interface AgentSessionStub {
   enrol(command: typeof EnrolCommand.Encoded): Promise<unknown>;
   signUp(command: typeof SignUpCommand.Encoded): Promise<unknown>;
   openSession(command: typeof OpenSession.Encoded): Promise<unknown>;
-  describe(): Promise<unknown>;
+  describe(request?: typeof DescribeSession.Encoded): Promise<unknown>;
 }
 
 export interface ChangeObjects {
