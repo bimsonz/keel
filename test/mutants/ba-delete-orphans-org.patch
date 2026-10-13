@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-only-owner
+# why: an org's one owner deletes their account, leaving an org with no owner: nobody can name one, and nobody can delete it
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..a77e3e55 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -312,7 +312,6 @@ export function authOptions(config: AuthConfig) {
+           const projects = await ownedProjects(db, user.id);
+           if (projects.length > 0) throw ownsProjects(projects);
+           const orgs = await soleOwnerOf(db, user.id);
+-          if (orgs.length > 0) throw onlyOwner(orgs);
+           await config.endSponsorships(user.id);
+         },
+         // Better Auth has deleted the user by now, and the foreign keys what hangs off it.

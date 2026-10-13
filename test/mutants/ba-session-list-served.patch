@@ -2,11 +2,11 @@
 # kills: ba.disabled
 # why: the session list is served, and its answers carry every session's token
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 02891af..394398c 100644
+index 2fbff68b..e196c9d9 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -37,8 +37,6 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
-  * is Better Auth's account deletion, which asks for one.
+@@ -49,8 +49,6 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
+  * their account at `DELETE_PATH`, on a fresh passkey sign-in and no other way.
   */
  export const DISABLED_PATHS = [
 -  "/list-sessions",

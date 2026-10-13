@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-unsponsors
+# why: an account is deleted with its sponsor links standing, so its agents go on naming a sponsor who no longer exists and are never told
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..16538d27 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -313,7 +313,6 @@ export function authOptions(config: AuthConfig) {
+           if (projects.length > 0) throw ownsProjects(projects);
+           const orgs = await soleOwnerOf(db, user.id);
+           if (orgs.length > 0) throw onlyOwner(orgs);
+-          await config.endSponsorships(user.id);
+         },
+         // Better Auth has deleted the user by now, and the foreign keys what hangs off it.
+         afterDelete: async (user) => {

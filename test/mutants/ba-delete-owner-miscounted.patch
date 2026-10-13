@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-only-owner
+# why: an org with any other member counts as having another owner, so its one owner is deleted and the members left hold no owner among them
+diff --git a/apps/keel/src/adapters/driven/better-auth/closing.ts b/apps/keel/src/adapters/driven/better-auth/closing.ts
+index d7e66fb3..985c1df4 100644
+--- a/apps/keel/src/adapters/driven/better-auth/closing.ts
++++ b/apps/keel/src/adapters/driven/better-auth/closing.ts
+@@ -43,7 +43,7 @@ export async function soleOwnerOf(db: D1Database, userId: string): Promise<reado
+     .bind(userId)
+     .all<{ id: string; slug: string; mine: string; others: string | null }>();
+   return results
+-    .filter((row) => owns(row.mine) && !owns(row.others))
++    .filter((row) => owns(row.mine) && row.others === null)
+     .map((row) => ({ id: row.id, slug: row.slug }));
+ }
+ 

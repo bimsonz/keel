@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-fresh
+# why: deleting an account needs no fresh sign-in, so any session a day old or less deletes it: a left-open browser, or a session no passkey signed in
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..c58b3703 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -111,7 +111,6 @@ const CHANGES_SIGN_IN = new Set([
+   "/change-email",
+   "/email-otp/request-email-change",
+   "/email-otp/change-email",
+-  DELETE_PATH,
+ ]);
+ 
+ /** Both steps of adding a passkey: all of them an account with no passkey may take (fresh.ts). */

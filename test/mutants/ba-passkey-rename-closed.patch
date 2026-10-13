@@ -2,14 +2,14 @@
 # kills: ba.passkey-rename
 # why: renaming a passkey is among the routes Keel does not serve, so a person's keys keep whatever name they were added under
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index ff4a02f5..8ce266a4 100644
+index 2fbff68b..bc89edff 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -62,6 +62,7 @@ export const DISABLED_PATHS = [
+@@ -63,6 +63,7 @@ export const DISABLED_PATHS = [
+   "/email-otp/reset-password",
    "/forget-password/email-otp",
-   "/delete-user",
    "/delete-user/callback",
 +  "/passkey/update-passkey",
  ] as const;
  
- /**
+ /** Where a person deletes their own account: Better Auth's route, with Keel's refusals before it (closing.ts). */

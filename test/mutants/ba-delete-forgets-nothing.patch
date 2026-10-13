@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-forgets
+# why: nothing runs after Better Auth's delete, so the device grants a deleted person approved and the invitations addressed to them stay, naming an account that is gone
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..888f0458 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -318,7 +318,7 @@ export function authOptions(config: AuthConfig) {
+         // Better Auth has deleted the user by now, and the foreign keys what hangs off it.
+         afterDelete: async (user) => {
+           const handle: unknown = Reflect.get(user, "username");
+-          await forget(db, {
++          await Promise.resolve({
+             id: user.id,
+             email: user.email,
+             handle: typeof handle === "string" ? handle : undefined,

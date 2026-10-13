@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-unsponsors
+# why: the sponsor links end before the refusals are read, so a person refused for a project they own keeps their account and loses every agent they stood behind
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..e187c7d1 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -309,6 +309,7 @@ export function authOptions(config: AuthConfig) {
+         enabled: true,
+         // Every refusal is read before anything changes; the sponsor links end last, as the person.
+         beforeDelete: async (user) => {
++          await config.endSponsorships(user.id);
+           const projects = await ownedProjects(db, user.id);
+           if (projects.length > 0) throw ownsProjects(projects);
+           const orgs = await soleOwnerOf(db, user.id);

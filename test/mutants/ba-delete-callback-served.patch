@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-own-way
+# why: the link Better Auth's deletion would mail is served, so a token deletes an account from any session of it, however old and however it was signed in
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..32009194 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -62,7 +62,6 @@ export const DISABLED_PATHS = [
+   "/email-otp/request-password-reset",
+   "/email-otp/reset-password",
+   "/forget-password/email-otp",
+-  "/delete-user/callback",
+ ] as const;
+ 
+ /** Where a person deletes their own account: Better Auth's route, with Keel's refusals before it (closing.ts). */

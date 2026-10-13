@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-unsponsors
+# why: each link is ended in the agent's own name, so the record says the agent left its sponsor and the agent is never told that nobody stands behind it
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 2de00515..67f784cb 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -260,7 +260,7 @@ const endSponsorships = (userId: UserId) =>
+           (agent) =>
+             links
+               .end(
+-                { _tag: "User", userId },
++                { _tag: "Agent", agentId: agent.id },
+                 { agentId: agent.id, idempotencyKey: `account-delete:${crypto.randomUUID()}` },
+               )
+               .pipe(

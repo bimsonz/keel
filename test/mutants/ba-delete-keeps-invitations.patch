@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete-forgets
+# why: the invitations addressed to a deleted person are left, so an org's list still names their handle and their address
+diff --git a/apps/keel/src/adapters/driven/better-auth/closing.ts b/apps/keel/src/adapters/driven/better-auth/closing.ts
+index d7e66fb3..83f7a8ba 100644
+--- a/apps/keel/src/adapters/driven/better-auth/closing.ts
++++ b/apps/keel/src/adapters/driven/better-auth/closing.ts
+@@ -84,8 +84,5 @@ export interface Gone {
+ export async function forget(db: D1Database, gone: Gone): Promise<void> {
+   await db.batch([
+     db.prepare(`DELETE FROM deviceCode WHERE userId = ?1`).bind(gone.id),
+-    db
+-      .prepare(`DELETE FROM invitation WHERE handle = ?1 OR lower(email) = lower(?2)`)
+-      .bind(gone.handle ?? null, gone.email),
+   ]);
+ }

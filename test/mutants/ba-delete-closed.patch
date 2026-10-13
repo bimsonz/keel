@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-account.test.ts
+# kills: ba.delete
+# why: Better Auth's account deletion is switched off, so a person's request to delete their own account answers 404
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2fbff68b..ce87b4b7 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -306,7 +306,7 @@ export function authOptions(config: AuthConfig) {
+     rateLimit: { enabled: false },
+     user: {
+       deleteUser: {
+-        enabled: true,
++        enabled: false,
+         // Every refusal is read before anything changes; the sponsor links end last, as the person.
+         beforeDelete: async (user) => {
+           const projects = await ownedProjects(db, user.id);

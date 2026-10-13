@@ -2,10 +2,10 @@
 # kills: token.resource
 # why: a token request that names no resource is passed on as it came, and the provider answers it with an opaque token stored against a client row an agent does not have
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index d061e011..aca0574c 100644
+index 5a0a0bed..2680a52e 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -329,9 +329,7 @@ export function authOptions(config: AuthConfig) {
+@@ -363,9 +363,7 @@ export function authOptions(config: AuthConfig) {
          // A token request that names no resource is for Keel's own API. Left unnamed, the
          // provider issues an opaque token it stores against a client row, and an agent has none.
          if (ctx.path === TOKEN_PATH)
@@ -15,4 +15,4 @@ index d061e011..aca0574c 100644
 +          return undefined;
          if (DISABLED.has(ctx.path))
            throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
-         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
+         // Better Auth would check a password, or hand a token to the mailed link's handler, past the router.
