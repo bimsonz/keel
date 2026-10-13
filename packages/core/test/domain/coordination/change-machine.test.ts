@@ -5,6 +5,7 @@ import {
   Change,
   type ChangeCommand,
   ChangeEvent,
+  ChangeResumed,
   decideChange,
   type DerivedEffect,
   evolveChange,
@@ -20,6 +21,7 @@ import {
   CommitSha,
   type Committed,
   ContentHash,
+  type EscalationId,
   IllegalTransition,
   Instant,
   type Json,
@@ -161,6 +163,8 @@ interface Step {
   readonly dt: number;
   readonly stale: boolean;
   readonly blocked: boolean;
+  /** A person has yet to rule on one of the change's conflicts when this step's blockers are read. */
+  readonly awaited: boolean;
   readonly flag: boolean;
   readonly operator: boolean;
 }
@@ -184,6 +188,7 @@ const stepArb: fc.Arbitrary<Step> = fc.record({
   ),
   stale: weighted(1, 7),
   blocked: weighted(1, 3),
+  awaited: weighted(1, 4),
   flag: weighted(7, 1),
   operator: weighted(1, 1),
 });
@@ -216,6 +221,12 @@ interface Played {
   readonly result?: Decision;
   readonly after: Change | undefined;
   readonly threw: boolean;
+  /**
+   * While `before` is parked awaiting a ruling: the change as it stood just
+   * before that park, kept by the harness as it happened and never read back
+   * from the change.
+   */
+  readonly held: Change | undefined;
 }
 
 interface Trace {
@@ -256,6 +267,7 @@ const blockersFor = (step: Step, mint: Mint) => {
             },
           ]
         : [],
+    awaitingRuling: step.awaited ? [mint.next("esc")] : [],
   };
 };
 
@@ -447,6 +459,19 @@ const leaseCarried = (command: ChangeCommand): LeaseId | undefined =>
       ? command.authority.leaseId
       : undefined;
 
+/** What the harness holds once a step is played: the change before a park that just happened, what it held while the wait goes on, nothing after it. */
+const heldAfter = (
+  held: Change | undefined,
+  before: Change | undefined,
+  after: Change | undefined,
+  events: readonly ChangeEvent[],
+): Change | undefined => {
+  if (keyOf(after) !== "parked:awaiting-ruling") return undefined;
+  return events.some((e) => e._tag === "ChangeParked" && e.reason === "awaiting-ruling")
+    ? before
+    : held;
+};
+
 /** Plays a plan the way the Change DO would: decide, commit each event through evolve, renew the lease on an authorised call. */
 const play = (plan: Plan): Trace => {
   const mint = new Mint();
@@ -454,6 +479,7 @@ const play = (plan: Plan): Trace => {
   const log: Committed<ChangeEvent>[] = [];
   const issued: LeaseId[] = [];
   let state: Change | undefined;
+  let held: Change | undefined;
   let now = T0;
   for (const step of plan.steps) {
     now = Instant(now + step.dt);
@@ -472,7 +498,7 @@ const play = (plan: Plan): Trace => {
       const renewed =
         state === undefined ? undefined : renew(state, tokenFor(state, step, issued), now);
       const after = renewed !== undefined && Result.isSuccess(renewed) ? renewed.success : state;
-      records.push({ kind, probes, before: state, now, step, after, threw: false });
+      records.push({ kind, probes, before: state, now, step, after, threw: false, held });
       state = after;
       continue;
     }
@@ -498,8 +524,9 @@ const play = (plan: Plan): Trace => {
         if (Result.isSuccess(renewed)) after = renewed.success;
       }
     }
-    records.push({ kind, probes, before: state, now, step, command, result, after, threw });
+    records.push({ kind, probes, before: state, now, step, command, result, after, threw, held });
     if (threw) break;
+    held = heldAfter(held, state, after, Result.isSuccess(result) ? result.success : []);
     state = after;
   }
   return { records, log, final: state };
@@ -516,6 +543,7 @@ const run = (plan: Parameters<typeof play>[0]): Trace => {
   return trace;
 };
 
+/** What stops a queueing. An awaited ruling is not one of them: it holds a change out of a batch only. */
 const anyBlocker = (b: Blockers): boolean =>
   b.openProvenConflicts.length + b.failingGuards.length + b.unresolvedHighDrift.length > 0;
 
@@ -527,6 +555,8 @@ const oracle = (
   before: Change | undefined,
   command: ChangeCommand,
   now: number,
+  /** The state a change parked awaiting a ruling was parked from, as the harness saw it. */
+  parkedFrom: Key,
 ): Key | "refused" | "noop" => {
   const key = keyOf(before);
   if (before === undefined) return command._tag === "Declare" ? "declared" : "refused";
@@ -571,7 +601,11 @@ const oracle = (
     case "Park":
       return key === "verifying" || key === "queued" ? "parked:awaiting-ruling" : "refused";
     case "Batch":
-      return key === "queued" && !anyBlocker(command.blockers) ? "integrating" : "refused";
+      return key === "queued" &&
+        !anyBlocker(command.blockers) &&
+        command.blockers.awaitingRuling.length === 0
+        ? "integrating"
+        : "refused";
     case "Requeue":
       return key === "integrating" && batchMatches(command.batchId) ? "queued" : "refused";
     case "Bounce":
@@ -595,7 +629,7 @@ const oracle = (
       return key === "integrating" ? "landed" : "refused";
     case "Resume":
       // Back to where it was parked from.
-      return key === "parked:awaiting-ruling" ? (before.parkedFrom ?? "verifying") : "refused";
+      return key === "parked:awaiting-ruling" ? parkedFrom : "refused";
     case "Adopt":
       if (!lapsedAt(before, now)) return "refused";
       return key === "parked:lease-lapsed"
@@ -712,7 +746,12 @@ const drifts: ChangeCommand = {
   ],
 };
 const tagsOf = (log: readonly ChangeEvent[]): readonly string[] => log.map((e) => e._tag);
-const clear = { openProvenConflicts: [], failingGuards: [], unresolvedHighDrift: [] };
+const clear = {
+  openProvenConflicts: [],
+  failingGuards: [],
+  unresolvedHighDrift: [],
+  awaitingRuling: [],
+};
 const queue: ChangeCommand = { _tag: "Queue", laneId: "lane:default", blockers: clear };
 const BATCH = makeId("bat", ulid(4));
 const batch: ChangeCommand = { _tag: "Batch", batchId: BATCH, blockers: clear };
@@ -823,7 +862,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) =>
           r.probes.every((probe) => {
-            const expected = oracle(r.before, probe.command, r.now);
+            const expected = oracle(r.before, probe.command, r.now, keyOf(r.held));
             if (expected === "refused") return Result.isFailure(probe.result);
             if (expected === "noop")
               return Result.isSuccess(probe.result) && probe.result.success.length === 0;
@@ -1063,6 +1102,181 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(refusedBatch.keys.at(-1)).toBe("queued");
     const bounced = drive([...queued, [bounce, 1]]);
     expect(bounced.keys.at(-1)).toBe("bounced");
+  });
+
+  it("[change.no-batch-past-escalation] a change enters no batch while a person has yet to rule on one of its conflicts, and is queued all the same", () => {
+    let held = 0;
+    let queuedAnyway = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) => {
+          const batched = eventsOf(r).some((e) => e._tag === "ChangeBatched");
+          const carried = r.command?._tag === "Batch" ? r.command.blockers.awaitingRuling : [];
+          // Whatever was played: no batch is joined by a command that carried an awaited ruling.
+          if (batched && carried.length > 0) return false;
+          return r.probes.every(({ command, result, key }) => {
+            if (command._tag === "Queue" && keyOf(r.before) === "verifying") {
+              if (anyBlocker(command.blockers)) return true;
+              // An awaited ruling never stops the queueing itself.
+              if (command.blockers.awaitingRuling.length > 0) queuedAnyway++;
+              return key === "queued";
+            }
+            if (command._tag !== "Batch" || keyOf(r.before) !== "queued") return true;
+            const awaited = command.blockers.awaitingRuling;
+            if (awaited.length === 0) return anyBlocker(command.blockers) || key === "integrating";
+            held++;
+            const refused = Result.isFailure(result) ? result.failure : undefined;
+            return (
+              refused?._tag === "ChangeBlocked" &&
+              refused.escalations?.join() === awaited.join() &&
+              refused.nextActions.some((a) => a.kind === "wait")
+            );
+          });
+        }),
+      ),
+    );
+    expect(held).toBeGreaterThan(0);
+    expect(queuedAnyway).toBeGreaterThan(0);
+
+    const E1 = makeId("esc", ulid(11));
+    const E2 = makeId("esc", ulid(12));
+    const D1 = makeId("dec", ulid(13));
+    const B2 = makeId("bat", ulid(14));
+    const awaiting = (...escalations: readonly EscalationId[]): Blockers => ({
+      ...clear,
+      awaitingRuling: escalations,
+    });
+    const verified = [declare, start, submit, precheck, compile].map((c) => [c, 1] as const);
+    const queued = [...verified, [queue, 1] as const];
+    // Two escalations: parked for the first, the second raised while it is parked, the first ruled.
+    const twice = drive([
+      ...queued,
+      [{ _tag: "Park", escalationId: E1 }, 1],
+      [{ _tag: "Park", escalationId: E2 }, 1],
+      [{ _tag: "Resume", decisionId: D1 }, 1],
+      [{ _tag: "Batch", batchId: BATCH, blockers: awaiting(E2) }, 1],
+      [batch, 1],
+    ]);
+    expect(twice.keys.slice(-5)).toEqual([
+      "parked:awaiting-ruling",
+      "parked:awaiting-ruling",
+      "queued",
+      "queued",
+      "integrating",
+    ]);
+    expect(twice.results.slice(-4).map(failureTag)).toEqual([
+      "ChangeStateRefused",
+      undefined,
+      "ChangeBlocked",
+      undefined,
+    ]);
+    // Escalated while in a batch, which it finishes; the batch fails and it is requeued.
+    const requeued = drive([
+      ...queued,
+      [batch, 1],
+      [{ _tag: "Park", escalationId: E1 }, 1],
+      [{ _tag: "Requeue", batchId: BATCH, reason: "infra-failure" }, 1],
+      [{ _tag: "Batch", batchId: B2, blockers: awaiting(E1) }, 1],
+      [{ _tag: "Batch", batchId: B2, blockers: clear }, 1],
+    ]);
+    expect(requeued.keys.slice(-5)).toEqual([
+      "integrating",
+      "integrating",
+      "queued",
+      "queued",
+      "integrating",
+    ]);
+    expect(failureTag(requeued.results.at(-2))).toBe("ChangeBlocked");
+    // The refusal names every escalation waited for, beside what else blocks, and says to wait.
+    const both = drive([
+      ...queued,
+      [
+        {
+          _tag: "Batch",
+          batchId: BATCH,
+          blockers: { ...awaiting(E1, E2), openProvenConflicts: [makeId("cfl", ulid(9))] },
+        },
+        1,
+      ],
+    ]).results.at(-1);
+    expect(both !== undefined && Result.isFailure(both) ? both.failure : undefined).toMatchObject({
+      _tag: "ChangeBlocked",
+      escalations: [E1, E2],
+      conflicts: [makeId("cfl", ulid(9))],
+      nextActions: [{ kind: "wait", args: { escalations: [E1, E2] } }, { kind: "read" }],
+    });
+    // A change whose conflict is already with a person is queued, then parked; a blocked one names no escalation.
+    const asked = drive([
+      ...verified,
+      [{ _tag: "Queue", laneId: "lane:default", blockers: awaiting(E1) }, 1],
+      [{ _tag: "Park", escalationId: E1 }, 0],
+    ]);
+    expect(asked.keys.slice(-2)).toEqual(["queued", "parked:awaiting-ruling"]);
+    const proven = drive([
+      ...queued,
+      [
+        {
+          _tag: "Batch",
+          batchId: BATCH,
+          blockers: { ...clear, openProvenConflicts: [makeId("cfl", ulid(9))] },
+        },
+        1,
+      ],
+    ]).results.at(-1);
+    expect(
+      proven !== undefined && Result.isFailure(proven) && "escalations" in proven.failure,
+    ).toBe(false);
+  });
+
+  it("[change.resume-returns] a resumed change is the change that was parked: back in the state it was parked from, in its lane and under its plan", () => {
+    let fromQueued = 0;
+    let fromVerifying = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) => {
+          if (keyOf(r.before) !== "parked:awaiting-ruling") return r.held === undefined;
+          const { held } = r;
+          if (held === undefined) return false;
+          // Wherever it waits, a resume tried there leads back to where the harness saw it parked.
+          const landsBack = r.probes.every(
+            (probe) => probe.command._tag !== "Resume" || probe.key === keyOf(held),
+          );
+          if (r.command?._tag !== "Resume" || !accepted(r) || r.after === undefined)
+            return landsBack;
+          if (held.state === "queued") fromQueued++;
+          else fromVerifying++;
+          // Only its lease may have moved while it waited: an adoption, a lapse, a renewal.
+          const waited = { ...r.after, lease: held.lease, agentId: held.agentId };
+          return landsBack && comparable(waited) === comparable(held);
+        }),
+      ),
+    );
+    expect(fromQueued).toBeGreaterThan(0);
+    expect(fromVerifying).toBeGreaterThan(0);
+
+    const park: ChangeCommand = { _tag: "Park", escalationId: makeId("esc", ulid(11)) };
+    const resume: ChangeCommand = { _tag: "Resume", decisionId: makeId("dec", ulid(13)) };
+    const verified = [declare, start, submit, precheck, compile].map((c) => [c, 1] as const);
+    const queued = [...verified, [queue, 1] as const];
+    const inQueue = drive(queued).state;
+    const backInQueue = drive([...queued, [park, 1], [resume, 1]]);
+    expect(backInQueue.keys.slice(-2)).toEqual(["parked:awaiting-ruling", "queued"]);
+    expect(backInQueue.state).toEqual(inQueue);
+    expect(backInQueue.state).toMatchObject({ laneId: "lane:default", planHash: PLAN_HASH });
+    const atVerifying = drive(verified).state;
+    const backAtVerifying = drive([...verified, [park, 1], [resume, 1]]);
+    expect(backAtVerifying.keys.slice(-2)).toEqual(["parked:awaiting-ruling", "verifying"]);
+    expect(backAtVerifying.state).toEqual(atVerifying);
+    // A change parked before the origin was recorded has none: it resumes to Verifying, as it always did.
+    const { parkedFrom: _unrecorded, ...older } = drive([...queued, [park, 1]]).state ?? {};
+    expect(
+      keyOf(
+        evolveChange(Schema.decodeUnknownSync(Change)(Schema.encodeUnknownSync(Change)(older)), {
+          at: T0,
+          payload: ChangeResumed.make({ changeId: CHANGE, decisionId: makeId("dec", ulid(13)) }),
+        }),
+      ),
+    ).toBe("verifying");
   });
 
   it("[change.refusals-guide] every refusal and every bounce tells the agent what to do next", () => {
@@ -1493,7 +1707,16 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
             command: build(
               kind,
               state,
-              { mode: "progress", pick: 0, dt, stale: false, blocked: false, flag: true, operator },
+              {
+                mode: "progress",
+                pick: 0,
+                dt,
+                stale: false,
+                blocked: false,
+                awaited: false,
+                flag: true,
+                operator,
+              },
               TOUR_PLAN,
               mint,
               [],

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.no-batch-past-escalation, change.transitions
+# why: an awaited ruling refuses the queueing too, so a change whose conflict is already with a person rests at verifying, where nothing moves it
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 312ec75c..e204a13e 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -635,7 +635,7 @@ export const decideChange = (
+     case "Queue":
+       if (!at("verifying")) return refuse(change, command);
+       return (
+-        blocked(change, command.blockers) ??
++        blocked(change, command.blockers, command.blockers.awaitingRuling) ??
+         Result.succeed([
+           ChangeQueued.make({ changeId: id, laneId: command.laneId, ...planOf(change) }),
+         ])

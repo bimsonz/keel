@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import {
   ChangeId,
   ConflictId,
+  EscalationId,
   GuardId,
   InstantSchema,
   LeaseId,
@@ -56,12 +57,15 @@ export class LeaseNotLapsed extends Schema.TaggedError<LeaseNotLapsed>()("LeaseN
 /**
  * The change may not be queued, or stay queued, while a Proven conflict is
  * open against it, a guard fails on it, or high-severity drift is unresolved.
+ * It may not enter a batch either while a person has yet to rule on one of its
+ * conflicts: `escalations` names what it waits for, and is absent otherwise.
  */
 export class ChangeBlocked extends Schema.TaggedError<ChangeBlocked>()("ChangeBlocked", {
   changeId: ChangeId,
   conflicts: Schema.Array(ConflictId),
   guards: Schema.Array(GuardId),
   drift: Schema.Array(Drift),
+  escalations: Schema.optional(Schema.Array(EscalationId)),
   nextActions: Schema.Array(NextAction),
 }) {}
 

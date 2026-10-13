@@ -2,15 +2,15 @@
 # kills: change.blocked-never-batched
 # why: A queued change with a Proven conflict is batched anyway
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 8b58b69..15ebbcb 100644
+index 312ec75c..310ec6db 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -484,10 +484,7 @@ export const decideChange = (
- 
+@@ -656,10 +656,7 @@ export const decideChange = (
      case "Batch":
        if (!at("queued")) return refuse(change, command);
+       // No party to a conflict a person was asked about enters a batch before the ruling.
 -      return (
--        blocked(change, command.blockers) ??
+-        blocked(change, command.blockers, command.blockers.awaitingRuling) ??
 -        Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })])
 -      );
 +      return Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })]);

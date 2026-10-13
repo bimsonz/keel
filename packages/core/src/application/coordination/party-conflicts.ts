@@ -137,7 +137,8 @@ export function partyConflictOf(store: Store, conflictId: ConflictId): PartyConf
 /**
  * What blocks the change from queueing or batching: each conflict proven
  * against it whose predicate's policy is `block`, and not since resolved.
- * Guards and drift do not block yet.
+ * Guards and drift do not block yet. `awaitingRuling` holds it out of a batch
+ * only: the escalation of each of its conflicts that is with a person.
  */
 export const blockersOf = (store: Store, policies: PredicatePolicies | undefined): Blockers => ({
   openProvenConflicts: store
@@ -147,7 +148,19 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
     .map((row) => row.conflictId),
   failingGuards: [],
   unresolvedHighDrift: [],
+  awaitingRuling: awaitedEscalations(store),
 });
+
+/** The escalations the change's conflicts wait on: each conflict with a person and not yet ruled on, by conflict id. */
+export function awaitedEscalations(store: Store): readonly EscalationId[] {
+  return store
+    .list(PARTY_CONFLICT)
+    .map((row) => decodeRow(row.value))
+    .filter((row) => row.state === "escalated")
+    .map((row) => row.conflictId)
+    .toSorted()
+    .map(escalationIdOf);
+}
 
 /**
  * The escalation the change must wait for: that of a conflict it is a party
@@ -155,11 +168,5 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
  * when there are several: the change waits for one ruling at a time.
  */
 export function awaitedEscalation(store: Store): EscalationId | undefined {
-  const [first] = store
-    .list(PARTY_CONFLICT)
-    .map((row) => decodeRow(row.value))
-    .filter((row) => row.state === "escalated")
-    .map((row) => row.conflictId)
-    .toSorted();
-  return first === undefined ? undefined : escalationIdOf(first);
+  return awaitedEscalations(store)[0];
 }

@@ -103,6 +103,12 @@ export interface Blockers {
   readonly openProvenConflicts: readonly ConflictId[];
   readonly failingGuards: readonly GuardId[];
   readonly unresolvedHighDrift: readonly Drift[];
+  /**
+   * The escalations of the change's conflicts that are with a person and not
+   * yet ruled on. They hold the change out of a batch and never out of the
+   * queue: it is queued, and waits there or parked, until the ruling.
+   */
+  readonly awaitingRuling: readonly EscalationId[];
 }
 
 /** Who withdraws a change: the holder of its lease, or a maintainer of its project (the doorway authorised them). */
@@ -281,10 +287,19 @@ const refuse = (change: Change, command: ChangeCommand): Decision =>
     }),
   );
 
-const blocked = (change: Change, blockers: Blockers): Decision | undefined =>
+/**
+ * The refusal of a blocked change, or undefined when nothing blocks it.
+ * `awaited` are the rulings a batch must wait for; queueing passes none.
+ */
+const blocked = (
+  change: Change,
+  blockers: Blockers,
+  awaited: readonly EscalationId[] = [],
+): Decision | undefined =>
   blockers.openProvenConflicts.length +
     blockers.failingGuards.length +
-    blockers.unresolvedHighDrift.length ===
+    blockers.unresolvedHighDrift.length +
+    awaited.length ===
   0
     ? undefined
     : Result.fail(
@@ -293,7 +308,18 @@ const blocked = (change: Change, blockers: Blockers): Decision | undefined =>
           conflicts: [...blockers.openProvenConflicts],
           guards: [...blockers.failingGuards],
           drift: [...blockers.unresolvedHighDrift],
+          ...(awaited.length === 0 ? {} : { escalations: [...awaited] }),
           nextActions: [
+            ...(awaited.length === 0
+              ? []
+              : [
+                  {
+                    kind: "wait" as const,
+                    title:
+                      "A person was asked about a conflict of this change: it joins a batch once they rule",
+                    args: { escalations: [...awaited] },
+                  },
+                ]),
             {
               kind: "read",
               title: "Read the conflicts open against the change",
@@ -629,8 +655,9 @@ export const decideChange = (
 
     case "Batch":
       if (!at("queued")) return refuse(change, command);
+      // No party to a conflict a person was asked about enters a batch before the ruling.
       return (
-        blocked(change, command.blockers) ??
+        blocked(change, command.blockers, command.blockers.awaitingRuling) ??
         Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })])
       );
 

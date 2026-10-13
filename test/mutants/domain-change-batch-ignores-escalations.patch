@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.no-batch-past-escalation, change.transitions
+# why: a batch is joined while a person has yet to rule on one of the change's conflicts, so a party lands past the question that was asked
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 312ec75c..7b76ad0e 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -657,7 +657,7 @@ export const decideChange = (
+       if (!at("queued")) return refuse(change, command);
+       // No party to a conflict a person was asked about enters a batch before the ruling.
+       return (
+-        blocked(change, command.blockers, command.blockers.awaitingRuling) ??
++        blocked(change, command.blockers) ??
+         Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })])
+       );
+ 

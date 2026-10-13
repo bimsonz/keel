@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.resume-returns, change.transitions
+# why: a resume always returns the change to verifying, where no change rests and nothing queues it again
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 312ec75c..218d7ec0 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -999,7 +999,7 @@ export const evolveChange = (
+         : illegal(change, event);
+     case "ChangeResumed":
+       return from("parked") && change.parkReason === "awaiting-ruling"
+-        ? moveTo(change, change.parkedFrom ?? "verifying", [
++        ? moveTo(change, "verifying", [
+             "parkReason",
+             "escalationId",
+             "parkedFrom",

@@ -273,7 +273,12 @@ const preflight: Preflight = {
   precedents: [],
   suggestedMove: "proceed",
 };
-const clear = { openProvenConflicts: [], failingGuards: [], unresolvedHighDrift: [] };
+const clear = {
+  openProvenConflicts: [],
+  failingGuards: [],
+  unresolvedHighDrift: [],
+  awaitingRuling: [],
+};
 const SHA = CommitSha.make("c".repeat(40));
 const encodeEvent = Schema.encodeSync(ChangeEvent);
 

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.resume-returns
+# why: a resumed change still names the escalation it waited for, so it reads as waiting on a question already answered
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 312ec75c..e16eb22a 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1001,7 +1001,6 @@ export const evolveChange = (
+       return from("parked") && change.parkReason === "awaiting-ruling"
+         ? moveTo(change, change.parkedFrom ?? "verifying", [
+             "parkReason",
+-            "escalationId",
+             "parkedFrom",
+           ])
+         : illegal(change, event);

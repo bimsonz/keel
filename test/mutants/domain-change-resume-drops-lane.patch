@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.resume-returns
+# why: a resumed change has lost its lane, so it is back in the queue of no lane
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 312ec75c..f4956485 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1000,6 +1000,7 @@ export const evolveChange = (
+     case "ChangeResumed":
+       return from("parked") && change.parkReason === "awaiting-ruling"
+         ? moveTo(change, change.parkedFrom ?? "verifying", [
++            "laneId",
+             "parkReason",
+             "escalationId",
+             "parkedFrom",
