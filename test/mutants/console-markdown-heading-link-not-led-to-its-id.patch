@@ -2,7 +2,7 @@
 # kills: markdown.anchored
 # why: a link to a heading is left at the words the README wrote, which is not the id the heading has
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..8b62cc33 100644
+index e23bb988..84998f25 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -31,7 +31,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {

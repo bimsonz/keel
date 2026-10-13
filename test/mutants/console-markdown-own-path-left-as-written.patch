@@ -2,7 +2,7 @@
 # kills: markdown.within
 # why: a README's link to a file beside it is left as written, which is no page of the project
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..07b31b70 100644
+index e23bb988..8deee071 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -36,7 +36,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {

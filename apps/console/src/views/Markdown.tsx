@@ -3,7 +3,7 @@
 // HTML written in the source is shown as the text it is and none of it is run, and the reader's own rule for
 // addresses is kept, which empties a `javascript:` address and its like.
 
-import { type ReactNode, createContext, useContext } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useRef } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
@@ -82,9 +82,25 @@ const PARTS: Components = {
   },
 };
 
+/** The id an address's fragment names, or none where it names nothing that can be read. */
+function named(hash: string): string {
+  try {
+    return decodeURIComponent(hash.slice(1));
+  } catch {
+    return "";
+  }
+}
+
 export function Markdown({ source, within }: { source: string; within?: Within }) {
+  const drawn = useRef<HTMLDivElement>(null);
+  // An address that names one of this text's headings was followed by the browser before the text had come,
+  // and so to nothing. Once the text is first drawn, the heading it names is brought into view.
+  useEffect(() => {
+    const heading = document.getElementById(named(window.location.hash));
+    if (heading !== null && drawn.current?.contains(heading) === true) heading.scrollIntoView();
+  }, []);
   return (
-    <div className="a-prose">
+    <div className="a-prose" ref={drawn}>
       <Place.Provider value={within}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

@@ -15,10 +15,10 @@ index f5bbfa5f..a917f537 100644
    const parts = written.startsWith("/") || dir === "" ? [] : dir.split("/");
    for (const part of written.split("/")) {
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..324998db 100644
+index e23bb988..4030a061 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
-@@ -90,6 +90,7 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+@@ -106,6 +106,7 @@ export function Markdown({ source, within }: { source: string; within?: Within }
            remarkPlugins={[remarkGfm]}
            rehypePlugins={[[rehypeSlug, { prefix: ANCHOR }]]}
            components={PARTS}

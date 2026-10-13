@@ -2,7 +2,7 @@
 # kills: markdown.anchored
 # why: a footnote's own link is given the opening a second time and reaches nothing
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..1af110e8 100644
+index e23bb988..88b34b9a 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -31,7 +31,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {

@@ -2,7 +2,7 @@
 # kills: markdown.code
 # why: a fenced block of code is not drawn
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..2d782b19 100644
+index e23bb988..b6fcce66 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -53,6 +53,9 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {

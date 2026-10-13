@@ -2,11 +2,11 @@
 # kills: markdown.table, legal.read
 # why: a table is left as lines of bars, in a README and in the privacy notice
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..8c464942 100644
+index e23bb988..43e06f04 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
-@@ -87,7 +87,6 @@ export function Markdown({ source, within }: { source: string; within?: Within }
-     <div className="a-prose">
+@@ -103,7 +103,6 @@ export function Markdown({ source, within }: { source: string; within?: Within }
+     <div className="a-prose" ref={drawn}>
        <Place.Provider value={within}>
          <ReactMarkdown
 -          remarkPlugins={[remarkGfm]}

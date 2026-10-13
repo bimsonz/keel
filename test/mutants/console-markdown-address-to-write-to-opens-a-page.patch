@@ -2,7 +2,7 @@
 # kills: markdown.elsewhere
 # why: an address to write to opens an empty page
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..99c789e6 100644
+index e23bb988..13e928d9 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -23,7 +23,7 @@ const Place = createContext<Within | undefined>(undefined);

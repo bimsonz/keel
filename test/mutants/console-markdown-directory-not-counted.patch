@@ -2,7 +2,7 @@
 # kills: markdown.within
 # why: a link in a directory's README is counted from the repository's root
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..017d0b81 100644
+index e23bb988..9a08cb24 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -28,7 +28,7 @@ const PAGE = /^(?:https?:)?\/\//i;

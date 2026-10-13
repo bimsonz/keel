@@ -2,7 +2,7 @@
 # kills: markdown.image
 # why: an image in a README is fetched from wherever the README says, which tells that host who is reading
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..2fe94fe0 100644
+index e23bb988..ac71d3f2 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -64,7 +64,7 @@ const PARTS: Components = {

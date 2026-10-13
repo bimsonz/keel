@@ -2,7 +2,7 @@
 # kills: markdown.elsewhere
 # why: another site is told which page its reader came from, and is handed that page's window
 diff --git a/apps/console/src/views/Markdown.tsx b/apps/console/src/views/Markdown.tsx
-index 27c3cc16..8869faf1 100644
+index e23bb988..8307dd79 100644
 --- a/apps/console/src/views/Markdown.tsx
 +++ b/apps/console/src/views/Markdown.tsx
 @@ -41,7 +41,7 @@ function Lead({ href, children }: { href: string; children: ReactNode }) {

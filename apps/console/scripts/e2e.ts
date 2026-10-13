@@ -886,6 +886,25 @@ expectEqual(
   "#user-content-run | Run",
 );
 page.off("request", noteImage);
+// An address that names a README's heading, opened cold on a screen too short to show it: the browser looks for
+// the heading before the README has come, and the page brings it into view once it has.
+const tall = page.viewportSize() ?? { width: 1920, height: 1080 };
+await page.setViewportSize({ width: 1280, height: 420 });
+await page.goto("about:blank");
+await page.goto(`${at("", "scenario=s1&t=700&play=0")}#user-content-run`, {
+  waitUntil: "networkidle",
+});
+await page.locator(".a-prose h2").first().waitFor();
+expectEqual(
+  "code: an address that names a README's heading, opened cold, brings that heading into view",
+  await page.evaluate(() => {
+    const top = document.getElementById("user-content-run")?.getBoundingClientRect().top;
+    if (top === undefined) return "no heading";
+    return top >= 0 && top < window.innerHeight ? "in view" : "out of view";
+  }),
+  "in view",
+);
+await page.setViewportSize(tall);
 const tree = page.getByRole("navigation", { name: "File tree" });
 // The root is the whole list of files already, so nothing stands beside it.
 expectEqual("code: no list of files beside the root", String(await tree.count()), "0");
