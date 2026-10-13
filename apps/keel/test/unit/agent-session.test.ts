@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   enrol,
+  INBOX_END,
   readInbox,
   recordDelivery,
   RESERVATION_TTL_MS,
   reserveChange,
+  takeNotices,
 } from "@keeltown/core/application/identity";
 import { AgentId, EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, EventOutbox } from "@keeltown/core/ports";
@@ -74,6 +76,9 @@ const delivered = (n: number) =>
     payload: { _tag: "ChangeBounced" },
   });
 
+const ids = (notices: readonly { readonly id: string }[]) => notices.map((notice) => notice.id);
+const eventIds = (...ns: number[]) => ns.map((n) => delivered(n).eventId);
+
 describe("readInbox", () => {
   it.effect("pages the inbox oldest first after a cursor, and an empty page keeps the cursor", () =>
     Effect.gen(function* () {
@@ -96,6 +101,70 @@ describe("readInbox", () => {
       });
       expect(later).toEqual({ notices: [], cursor: all.cursor });
       expect(fourth.notices.map((notice) => notice.id)).toEqual([delivered(4).eventId]);
+    }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
+  );
+
+  it.effect(
+    "[inbox.end] the cursor `end` answers the head's cursor and nothing before it, and moves no mark",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* EntityStore;
+        for (const n of [1, 2, 3]) recordDelivery(store, delivered(n));
+        const head = yield* readInbox(INBOX_END);
+        const waiting = yield* takeNotices(3);
+        recordDelivery(store, delivered(4));
+        const after = yield* readInbox(head.cursor);
+
+        expect(head).toEqual({ notices: [], cursor: "000000000003" });
+        expect(ids(waiting)).toEqual(eventIds(1, 2, 3));
+        expect(ids(after.notices)).toEqual(eventIds(4));
+      }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
+  );
+
+  it.effect(
+    "[inbox.empty-mark] an empty page moves no mark: after a read from the head's cursor, and one from a cursor made up, what waits still rides a tool result",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* EntityStore;
+        for (const n of [1, 2]) recordDelivery(store, delivered(n));
+        const head = yield* readInbox(INBOX_END);
+        const nothing = yield* readInbox(head.cursor);
+        const madeUp = yield* readInbox("999999999999");
+        const waiting = yield* takeNotices(3);
+
+        expect(nothing).toEqual({ notices: [], cursor: head.cursor });
+        expect(madeUp).toEqual({ notices: [], cursor: "999999999999" });
+        expect(ids(waiting)).toEqual(eventIds(1, 2));
+      }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
+  );
+
+  it.effect(
+    "[inbox.read-mark] a read counts the notices it answers as read, up to the last, and an earlier page never moves the mark back",
+    () =>
+      Effect.gen(function* () {
+        const store = yield* EntityStore;
+        for (let n = 1; n <= 52; n += 1) recordDelivery(store, delivered(n));
+        const newest = yield* readInbox("000000000050");
+        const first = yield* readInbox(undefined);
+        const riding = yield* takeNotices(3);
+
+        expect(ids(newest.notices)).toEqual(eventIds(51, 52));
+        expect(first.notices).toHaveLength(50);
+        expect(first.cursor).toBe("000000000050");
+        expect(riding).toEqual([]);
+      }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
+  );
+
+  it.effect("[inbox.peek] a peek answers the page a read would, and moves no mark", () =>
+    Effect.gen(function* () {
+      const store = yield* EntityStore;
+      for (const n of [1, 2]) recordDelivery(store, delivered(n));
+      const peeked = yield* readInbox(undefined, undefined, true);
+      const waiting = yield* takeNotices(3);
+
+      expect(ids(peeked.notices)).toEqual(eventIds(1, 2));
+      expect(peeked.cursor).toBe("000000000002");
+      expect(ids(waiting)).toEqual(eventIds(1, 2));
     }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
   );
 });

@@ -700,8 +700,9 @@ const withCursors = (notices: readonly AgentNotice[], from: number) =>
 /**
  * Agents' inboxes as lists, read by `Inbox` and piggybacked by `Notifier`.
  * `deliver` appends a notice and wakes a waiting read. A cursor is the count
- * already read; `piggybacked` is the count a tool result carried or a read
- * returned, so a notice rides at most one result and never one after a read.
+ * already read, or `end` for the count as it stands; `piggybacked` is the
+ * count a tool result carried or a read answered, so a notice rides at most
+ * one result and never one after a read. An empty page and a `peek` move nothing.
  */
 export function makeInboxMemory() {
   const inboxes = new Map<AgentId, AgentNotice[]>();
@@ -719,8 +720,7 @@ export function makeInboxMemory() {
     };
   };
   const markRead = (agentId: AgentId, upTo: number) => {
-    const read = Math.min(upTo, inboxes.get(agentId)?.length ?? 0);
-    piggybacked.set(agentId, Math.max(piggybacked.get(agentId) ?? 0, read));
+    piggybacked.set(agentId, Math.max(piggybacked.get(agentId) ?? 0, upTo));
   };
   return {
     inboxes,
@@ -728,12 +728,17 @@ export function makeInboxMemory() {
     layer: Layer.succeed(
       Inbox,
       Inbox.of({
-        read: (agentId, cursor, waitSeconds) =>
+        read: (agentId, cursor, waitSeconds, _run, peek) =>
           Effect.gen(function* () {
-            const from = cursor === undefined ? 0 : Math.max(0, Number.parseInt(cursor, 10) || 0);
+            const from =
+              cursor === "end"
+                ? (inboxes.get(agentId)?.length ?? 0)
+                : cursor === undefined
+                  ? 0
+                  : Math.max(0, Number.parseInt(cursor, 10) || 0);
             if (page(agentId, from).notices.length === 0) yield* waiters.wait(agentId, waitSeconds);
             const read = page(agentId, from);
-            markRead(agentId, Number(read.cursor));
+            if (read.notices.length > 0 && peek !== true) markRead(agentId, Number(read.cursor));
             return read;
           }),
       }),

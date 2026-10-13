@@ -18,7 +18,7 @@ import { EntityStore, type Stored } from "../ports/index.ts";
 /**
  * Where an agent's inbox lives in its AgentSession DO's store: one entry per
  * delivered event, by position, and the `piggybacked` cursor: the last
- * position a tool result carried or an inbox read returned. The log is one for
+ * position a tool result carried or an inbox read answered. The log is one for
  * all the agent's runs; each run keeps a `piggybacked` cursor of its own, under
  * its run id, and a reader with no run keeps the one under `self`.
  */
@@ -37,7 +37,9 @@ export const PIGGYBACK_MAX = 3;
 /** Positions sort as strings; the cursor is the last position read. */
 const position = (n: number) => String(n).padStart(12, "0");
 const START = position(0);
-const POSITION = /^\d{12}$/;
+
+/** The cursor that asks for the head: a read from it answers what lands after it, and nothing before. */
+export const INBOX_END = "end";
 
 type Store = (typeof EntityStore)["Service"];
 
@@ -57,7 +59,7 @@ const piggybackedOf = (store: Store, run: RunId | undefined): string => {
 /**
  * How many notices wait unread for a run: the positions after its
  * `piggybacked` cursor, less the entries there it is not shown. Positions are
- * dense from 1 to the head, and reads clamp the cursor to it.
+ * dense from 1 to the head, and that cursor is a notice's position or the start.
  */
 export const inboxDepth = (store: Store, run?: RunId): number => {
   const read = piggybackedOf(store, run);
@@ -322,40 +324,42 @@ export function entriesAfter(
     .slice(0, limit);
 }
 
-/**
- * Moves the run's `piggybacked` up to `cursor`: never back, and never past the
- * newest entry, so a cursor the agent made up cannot silence notices still to come.
- */
-function markRead(store: Store, cursor: string, run: RunId | undefined): void {
-  if (!POSITION.test(cursor)) return;
-  const head = position(headOf(store));
-  const read = cursor > head ? head : cursor;
-  if (read > piggybackedOf(store, run))
-    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, read);
+/** Moves the run's `piggybacked` up to `at`, the position of the last notice a read answered: never back. */
+function markRead(store: Store, at: string, run: RunId | undefined): void {
+  if (at > piggybackedOf(store, run))
+    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, at);
 }
 
 /**
  * A page of the notices after `cursor` that `run` is shown. An empty page
- * keeps the cursor where it was. In the same transaction the run's
- * `piggybacked` moves up to the page's cursor, so a notice the run has read
- * never rides a later tool result of its own.
+ * keeps the cursor where it was, and `end` is the head's cursor: a read from
+ * it answers nothing that was there before, and a reader holds on from the
+ * cursor it gives. In the same transaction the run's `piggybacked` moves up
+ * to the last notice the page answers, so a notice the run has read never
+ * rides a later tool result of its own. An empty page moves nothing: a cursor
+ * the run was never answered (the head's, another run's, one made up) counts
+ * no notice as read. A `peek` moves nothing either: it is a watch for what
+ * lands, not the run reading it.
  */
 export const readInbox: (
   cursor: string | undefined,
   run?: RunId,
+  peek?: boolean,
 ) => Effect.Effect<InboxPage, never, EntityStore> = Effect.fn("identity/readInbox")(function* (
   cursor: string | undefined,
   run?: RunId,
+  peek?: boolean,
 ) {
   const store = yield* EntityStore;
   return store.transaction((): InboxPage => {
-    const entries = entriesAfter(store, cursor, run);
-    const page = {
+    const from = cursor === INBOX_END ? position(headOf(store)) : cursor;
+    const entries = entriesAfter(store, from, run);
+    const last = entries.at(-1)?.position;
+    if (last !== undefined && peek !== true) markRead(store, last, run);
+    return {
       notices: entries.map(({ entry, position: at }) => noticeOf(entry, at)),
-      cursor: entries.at(-1)?.position ?? cursor ?? START,
+      cursor: last ?? from ?? START,
     };
-    markRead(store, page.cursor, run);
-    return page;
   });
 });
 

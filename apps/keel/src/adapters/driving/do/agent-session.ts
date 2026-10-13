@@ -5,6 +5,7 @@ import {
   endSponsorship,
   enrol,
   hearEvent,
+  INBOX_END,
   INBOX_PAGE,
   openSession,
   readInbox,
@@ -113,13 +114,24 @@ export class AgentSessionDO
     return this.answer(AgentSessionCodecs.reserveChange, program);
   }
 
-  /** The notices after `cursor` for the run that reads; with `waitMs` above 0 and none yet, the first page a commit brings it, or an empty one at the deadline. */
+  /**
+   * The notices after `cursor` for the run that reads; with `waitMs` above 0
+   * and none yet, the first page a commit brings it, or an empty one at the
+   * deadline. From `end` the head is found once, before the wait, so what
+   * lands under the hold is after it.
+   */
   async inbox(request: typeof InboxRead.Encoded) {
     const waiters = this.waiters;
     const program = Schema.decodeUnknownEffect(InboxRead)(request).pipe(
       Effect.orDie,
-      Effect.flatMap(({ cursor, waitMs, run }) =>
-        waiters.until(waitMs, readInbox(cursor, run), (page) => page.notices.length > 0),
+      Effect.flatMap(({ cursor, waitMs, run, peek }) =>
+        Effect.flatMap(
+          cursor === INBOX_END
+            ? Effect.map(readInbox(INBOX_END, run, true), (head) => head.cursor)
+            : Effect.succeed(cursor),
+          (from) =>
+            waiters.until(waitMs, readInbox(from, run, peek), (page) => page.notices.length > 0),
+        ),
       ),
     );
     return this.answer(AgentSessionCodecs.inbox, program);

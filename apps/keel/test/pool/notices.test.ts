@@ -167,3 +167,64 @@ describe("the piggyback, through the real handler", () => {
     expect(afterThat.notices).toEqual([later]);
   });
 });
+
+const ids = (notices: readonly WireNotice[] | undefined) =>
+  (notices ?? []).map((notice) => notice.id);
+
+describe("the inbox from its head, through the real handler", () => {
+  interface Read {
+    readonly result: { readonly notices: WireNotice[]; readonly cursor: string };
+    readonly notices?: WireNotice[];
+  }
+  const inboxAt = async (token: string, query: string) => {
+    const response = await exports.default.fetch(`${BASE}/v1/inbox?${query}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return { status: response.status, body: await response.json<Read>() };
+  };
+
+  it("[inbox.end-pool] `cursor=end` answers the head's cursor and no notice, and counts none as read: what waited rides that very response", async () => {
+    const seeded = await seedAgent();
+    const token = await tokenFor(seeded);
+    const waited = await deliver(seeded.agent.id, 2);
+
+    const head = await inboxAt(token, "cursor=end");
+    const [later] = await deliver(seeded.agent.id, 1);
+    const on = await inboxAt(token, `cursor=${head.body.result.cursor}`);
+
+    expect(head.status).toBe(200);
+    expect(head.body.result.notices).toEqual([]);
+    expect(head.body.result.cursor).toMatch(/^\d{12}$/);
+    expect(ids(head.body.notices)).toEqual(waited);
+    expect(ids(on.body.result.notices)).toEqual([later]);
+  });
+
+  it("[inbox.end-held] a read held from `end` is answered by what lands after it, and by nothing that was there", async () => {
+    const seeded = await seedAgent();
+    const token = await tokenFor(seeded);
+    await deliver(seeded.agent.id, 1);
+
+    const started = Date.now();
+    const waiting = inboxAt(token, "cursor=end&wait=20");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const [landed] = await deliver(seeded.agent.id, 1);
+    const page = await waiting;
+
+    expect(ids(page.body.result.notices)).toEqual([landed]);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it("[inbox.peek-pool] a peek held from `end` is answered by what lands and counts nothing as read: the notice still rides the next tool result", async () => {
+    const seeded = await seedAgent();
+    const token = await tokenFor(seeded);
+
+    const waiting = agentStub(seeded.agent.id).inbox({ cursor: "end", waitMs: 20_000, peek: true });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const [landed] = await deliver(seeded.agent.id, 1);
+    const page = decodeExit(AgentSessionCodecs.inbox, await waiting);
+    const next = await call(token, "/v1/agents/me");
+
+    expect(Exit.isSuccess(page) && page.value.notices.map((notice) => notice.id)).toEqual([landed]);
+    expect(next.notices).toEqual([landed]);
+  });
+});

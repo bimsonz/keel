@@ -73,11 +73,15 @@ export const ReserveChange = Schema.Struct({
   fingerprint: Schema.String,
 });
 
-/** Read the inbox as one run of the agent: what is for it or for every run, never what it caused. */
+/**
+ * Read the inbox as one run of the agent: what is for it or for every run, never what it caused.
+ * The cursor `end` is the head's, found once. With `peek` the read counts nothing as read.
+ */
 export const InboxRead = Schema.Struct({
   cursor: Schema.optional(Schema.String),
   waitMs: Schema.Int,
   run: Schema.optional(RunId),
+  peek: Schema.optional(Schema.Boolean),
 });
 
 /** Take the notices no tool result of this run has carried yet: at most `limit`, and never more than 3. */
