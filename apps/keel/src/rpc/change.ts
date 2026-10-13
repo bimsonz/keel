@@ -86,6 +86,62 @@ export const RebaseCommand = Schema.Struct({
 });
 export type RebaseCommand = typeof RebaseCommand.Type;
 
+/** One edit an agent commits: a file's new content (base64 on the wire), or its deletion. */
+export const CommitEdit = Schema.Union([
+  Schema.Struct({
+    path: Schema.String,
+    content: Schema.Uint8ArrayFromBase64,
+    executable: Schema.optional(Schema.Boolean),
+  }),
+  Schema.Struct({ path: Schema.String, delete: Schema.Literal(true) }),
+]);
+
+/** Commit edits in the change's workspace under its lease, with no clone. */
+export const CommitCommand = Schema.Struct({
+  agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
+  /** The agent's handle, which authors the commit. */
+  handle: Schema.optional(Schema.String),
+  leaseId: LeaseId,
+  expectedHead: CommitSha,
+  parent: Schema.optional(CommitSha),
+  edits: Schema.Array(CommitEdit),
+  message: Schema.String,
+  idempotencyKey: Schema.String,
+});
+export type CommitCommand = typeof CommitCommand.Type;
+
+/** The WorkspaceWriter port's errors, by shape (rule R15). */
+export const WorkspaceHeadMoved = Schema.TaggedStruct("WorkspaceHeadMoved", {
+  expected: Schema.String,
+  head: Schema.NullOr(Schema.String),
+});
+export const EditsRefused = Schema.TaggedStruct("EditsRefused", {
+  reason: Schema.Literals([
+    "bad-path",
+    "duplicate-path",
+    "nested-paths",
+    "through-file",
+    "is-directory",
+    "missing",
+    "not-a-file",
+    "nothing-changed",
+  ]),
+  path: Schema.String,
+});
+/** The Change's CommitParentRefused, by shape (rule R15): a parent that is neither the head read nor the change's base. */
+export const CommitParentRefused = Schema.TaggedStruct("CommitParentRefused", {
+  changeId: Schema.String,
+  parent: Schema.String,
+  expectedHead: Schema.String,
+  base: Schema.optional(Schema.String),
+});
+export const ObjectNotFound = Schema.TaggedStruct("ObjectNotFound", {
+  repo: RepoRef,
+  oid: Schema.String,
+});
+
 /** Revise a change's intent under its lease. `ifMatchRevision` is the revision the caller last read (If-Match). */
 export const ReviseCommand = Schema.Struct({
   agentId: AgentId,
@@ -319,6 +375,24 @@ export const ChangeCodecs = {
       PackTooLarge,
     ]),
   ),
+  // The writer's refusals by shape; the change answered has its lease renewed.
+  commit: exitCodec(
+    Schema.Struct({
+      change: Change,
+      commit: Schema.Struct({ commitSha: CommitSha, tree: Schema.String, changed: Schema.Number }),
+      parent: CommitSha,
+    }),
+    Schema.Union([
+      ChangeNotFound,
+      LeaseStale,
+      ChangeStateRefused,
+      CommitParentRefused,
+      WorkspaceHeadMoved,
+      EditsRefused,
+      ObjectNotFound,
+      PackTooLarge,
+    ]),
+  ),
   // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(
     Schema.Struct({ change: Change, grant: Schema.optional(WorkspaceGrant) }),
@@ -356,6 +430,8 @@ export interface ChangeRpc extends EventReceiverRpc {
   submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;
   /** Puts trunk's head on the workspace's keel/trunk and moves the change's base there. */
   rebase(command: typeof RebaseCommand.Encoded): Promise<ExitJson>;
+  /** Commits edits in the workspace under the lease: one commit on the head, never trunk. */
+  commit(command: typeof CommitCommand.Encoded): Promise<ExitJson>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<ExitJson>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<ExitJson>;
   /**

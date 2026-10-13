@@ -3,6 +3,7 @@ import {
   createProject,
   adoptChange,
   rebaseChange,
+  commitChange,
   declareChange,
   getSettings,
   nearbyOf,
@@ -191,6 +192,9 @@ import {
   statusOk,
   submitError,
   submitInput,
+  commitInput,
+  committedOk,
+  commitEditsError,
   submitOk,
 } from "./work-loop.ts";
 
@@ -756,6 +760,20 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               Effect.match({
                 onSuccess: rebaseOk,
                 onFailure: (error) => rebaseError(caller, error),
+              }),
+            ),
+          );
+        },
+        commit: (caller: Caller, input: Input<"commit">) => {
+          const decoded = commitInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => commitChange(principal, decoded.success)),
+              Effect.match({
+                onSuccess: committedOk,
+                onFailure: (error) => commitEditsError(caller, error),
               }),
             ),
           );

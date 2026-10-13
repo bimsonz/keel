@@ -9,7 +9,7 @@ import type {
 import type { AgentToken } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
-import type { Clock, Ids, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
+import type { Clock, Ids, WorkspaceEdit, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
 import type { Withdrawal } from "./change.ts";
 
 /**
@@ -90,6 +90,16 @@ export interface SubmitInput extends LeasedCall {
 
 /** Move a change onto trunk's head, after a textual bounce: the caller holds its lease. */
 export type RebaseInput = LeasedCall;
+
+/** Commit edits in a change's workspace through Keel, with no clone: the caller holds its lease. */
+export interface CommitInput extends LeasedCall {
+  /** The workspace head the agent read: the compare-and-swap. */
+  readonly expectedHead: CommitSha;
+  /** The commit the edits apply to; absent is `expectedHead`. */
+  readonly parent?: CommitSha;
+  readonly edits: readonly WorkspaceEdit[];
+  readonly message: string;
+}
 
 export interface Revised {
   readonly change: Change;

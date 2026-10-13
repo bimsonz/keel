@@ -2,7 +2,7 @@
 # kills: edit.differential, edit.through-file
 # why: A path through a file is walked as if the file were a directory
 diff --git a/packages/gitcore/src/edit.ts b/packages/gitcore/src/edit.ts
-index 3c1d8682..2d692d69 100644
+index 5fafd049..d97df2e3 100644
 --- a/packages/gitcore/src/edit.ts
 +++ b/packages/gitcore/src/edit.ts
 @@ -130,7 +130,7 @@ async function rebuild(
@@ -12,5 +12,5 @@ index 3c1d8682..2d692d69 100644
 -      if (existing !== undefined && existing.mode !== MODE_TREE)
 +      if (existing !== undefined && existing.mode === "0")
          throw new EditRefused("through-file", firstPath(child));
-       const below = await rebuild(reader, existing?.oid ?? null, child, joinPath(prefix, name), out);
-       changed += below.changed;
+       const below = await rebuild(
+         reader,

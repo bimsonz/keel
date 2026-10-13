@@ -1,9 +1,17 @@
+import { CommitParentRefused } from "@keeltown/core/application/coordination";
 import type { AgentId, ChangeId } from "@keeltown/core/kernel";
-import { Changes, PackTooLarge } from "@keeltown/core/ports";
+import {
+  Changes,
+  EditsRefused,
+  ObjectNotFound,
+  PackTooLarge,
+  WorkspaceHeadMoved,
+} from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import {
   AbandonCommand,
   AdoptCommand,
+  CommitCommand,
   type DescribeSession,
   NearbyCommand,
   RebaseCommand,
@@ -31,6 +39,7 @@ export interface ChangeStub {
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
   rebase(command: typeof RebaseCommand.Encoded): Promise<unknown>;
+  commit(command: typeof CommitCommand.Encoded): Promise<unknown>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
@@ -57,6 +66,7 @@ const encodeDeclare = Schema.encodeSync(DeclareCommand);
 const encodeSubmit = Schema.encodeSync(SubmitCommand);
 const encodeAdopt = Schema.encodeSync(AdoptCommand);
 const encodeRebase = Schema.encodeSync(RebaseCommand);
+const encodeCommit = Schema.encodeSync(CommitCommand);
 const encodeRevise = Schema.encodeSync(ReviseCommand);
 const encodeRely = Schema.encodeSync(RelyCommand);
 const encodeNearby = Schema.encodeSync(NearbyCommand);
@@ -155,6 +165,41 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           Effect.catchTag("PackTooLarge", (e) =>
             Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
           ),
+        ),
+      commit: (principal, input) =>
+        callObject(ChangeCodecs.commit, () =>
+          objects.change(input.changeId).commit(
+            encodeCommit({
+              agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
+              ...(principal.handle === undefined ? {} : { handle: principal.handle }),
+              leaseId: input.lease,
+              expectedHead: input.expectedHead,
+              ...(input.parent === undefined ? {} : { parent: input.parent }),
+              edits: input.edits,
+              message: input.message,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ).pipe(
+          // The RPC carries the writer's errors by shape (rule R15); the port's are its classes.
+          Effect.catchTags({
+            PackTooLarge: (e) =>
+              Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
+            CommitParentRefused: (e) =>
+              Effect.fail(
+                new CommitParentRefused({
+                  changeId: e.changeId,
+                  parent: e.parent,
+                  expectedHead: e.expectedHead,
+                  ...(e.base === undefined ? {} : { base: e.base }),
+                }),
+              ),
+            WorkspaceHeadMoved: (e) =>
+              Effect.fail(new WorkspaceHeadMoved({ expected: e.expected, head: e.head })),
+            EditsRefused: (e) => Effect.fail(new EditsRefused({ reason: e.reason, path: e.path })),
+            ObjectNotFound: (e) => Effect.fail(new ObjectNotFound({ repo: e.repo, oid: e.oid })),
+          }),
         ),
       revise: (principal, input) =>
         callObject(ChangeCodecs.revise, () =>

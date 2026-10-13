@@ -30,6 +30,9 @@ import type {
   AdoptInput,
   Declared,
   DeclareInput,
+  CommitInput,
+  CommitParentRefused,
+  CommittedChange,
   RebasedChange,
   RebaseInput,
   RelyInput,
@@ -37,7 +40,8 @@ import type {
   Revised,
   SubmitInput,
 } from "../coordination/index.ts";
-import type { RepoRef } from "./code-host.ts";
+import type { ObjectNotFound, RepoRef } from "./code-host.ts";
+import type { EditsRefused, WorkspaceHeadMoved } from "./workspace-writer.ts";
 
 /** What a bounce asked of the agent, verbatim: its cause (a verdict or a conflict), its reasons and its next actions. */
 export interface Remedy {
@@ -132,6 +136,29 @@ export class Changes extends Context.Service<
       | ChangeStateRefused
       | IdempotencyConflict
       | PushRejected
+      | PackTooLarge
+    >;
+    /**
+     * Commits edits in the change's workspace with no clone: the edits applied
+     * to `parent` (default `expectedHead`), one commit pushed with
+     * `expectedHead` as the old value, and the lease renewed. Working or
+     * Bounced, under the lease. WorkspaceHeadMoved: the workspace moved since
+     * the agent read it; EditsRefused: the edits cannot apply; ObjectNotFound:
+     * the workspace lacks the parent. A retry whose commit already sits at the
+     * head answers that commit.
+     */
+    readonly commit: (
+      principal: AgentToken,
+      input: CommitInput,
+    ) => Effect.Effect<
+      CommittedChange,
+      | ChangeNotFound
+      | LeaseStale
+      | ChangeStateRefused
+      | CommitParentRefused
+      | WorkspaceHeadMoved
+      | EditsRefused
+      | ObjectNotFound
       | PackTooLarge
     >;
     /**

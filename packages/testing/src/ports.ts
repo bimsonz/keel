@@ -83,6 +83,10 @@ import {
   type WorkspaceRebaserHarness,
 } from "./contracts/workspace-rebaser.ts";
 import {
+  describeWorkspaceWriterContract,
+  type WorkspaceWriterHarness,
+} from "./contracts/workspace-writer.ts";
+import {
   describeWorkspaceRefresherContract,
   type WorkspaceRefresherHarness,
 } from "./contracts/workspace-refresher.ts";
@@ -159,6 +163,7 @@ import type {
   ProjectViews,
   WorkspaceRebaser,
   WorkspaceRefresher,
+  WorkspaceWriter,
   Sessions,
   Sponsorships,
   Standings,
@@ -223,6 +228,11 @@ function memoryChangesHarness(): ChangesHarness {
       }),
     lapse: (changeId) => Effect.sync(() => memory.lapse(changeId)),
   };
+}
+
+function memoryWorkspaceWriterHarness(): WorkspaceWriterHarness {
+  const code = codeHost.makeCodeHostMemory();
+  return { layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceWriterMemory(code).layer) };
 }
 
 function memoryWorkspaceRebaserHarness(): WorkspaceRebaserHarness {
@@ -495,6 +505,10 @@ export const PORTS = {
     WorkspaceRebaser | CodeHost | CodeHostFixture,
     WorkspaceRebaserHarness
   >(memoryWorkspaceRebaserHarness, describeWorkspaceRebaserContract),
+  WorkspaceWriter: harnessed<WorkspaceWriter | CodeHost | CodeHostFixture, WorkspaceWriterHarness>(
+    memoryWorkspaceWriterHarness,
+    describeWorkspaceWriterContract,
+  ),
   WorkspaceRefresher: harnessed<
     WorkspaceRefresher | CodeHost | CodeHostFixture,
     WorkspaceRefresherHarness

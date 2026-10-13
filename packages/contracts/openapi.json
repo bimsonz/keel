@@ -3060,6 +3060,155 @@
         ]
       }
     },
+    "/changes/{changeId}/commits": {
+      "post": {
+        "operationId": "commit",
+        "summary": "Commit edits to your workspace",
+        "description": "Commit edits to your change's workspace without a clone: Keel applies them to `parent`\n(default `expectedHead`), makes one commit authored by you, and moves your workspace's\n`main` from `expectedHead` to it, renewing your lease. Then call `submit` with its\n`commitSha`. Only your own workspace is written, never trunk. Allowed while the change is\nworking or bounced, under your lease. Refusals: 409 `workspace.head_moved` (it names the\nhead now: read it and try again), 409 `commit.edits_refused` (an edit cannot apply, or\nnothing changed), 400 `commit.bad_edits` (a bad, duplicate or nested path), 404\n`commit.parent_not_found`. A retry whose commit already sits at `main` answers that commit.\nA commit records no event of the change's own: it is seen as a push to the workspace.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/LeaseHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommittedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Changes",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          }
+        ]
+      }
+    },
     "/changes/{changeId}/nearby": {
       "get": {
         "operationId": "nearby",
@@ -11307,10 +11456,177 @@
         "pattern": "^[0-9a-f]{32}$",
         "description": "A Cloudflare account's id."
       },
+      "CommitEdit": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "$ref": "#/components/schemas/RepoPath"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "The file's whole new content: UTF-8 text, or base64 when `encoding` is `base64`."
+          },
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf8",
+              "base64"
+            ],
+            "description": "How `content` is written. Absent is `utf8`."
+          },
+          "executable": {
+            "type": "boolean",
+            "description": "Absent keeps an existing file's mode and makes a new file plain."
+          },
+          "delete": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Delete the file at `path`."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One file's new content, or its deletion: set exactly one of `content` and `delete`."
+      },
+      "CommitRequest": {
+        "type": "object",
+        "required": [
+          "expectedHead",
+          "message",
+          "edits"
+        ],
+        "properties": {
+          "expectedHead": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The workspace's `main` as you last read it: from `declare` or `adopt` (the workspace's\n`baseSha`), or a previous `commit`. If `main` has moved since, the commit is refused with\n409 `workspace.head_moved` and nothing is written."
+          },
+          "parent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit your edits apply to and the new commit's one parent. Absent is `expectedHead`.\nAfter a `rebase`, pass the change's new `base` to rebuild your change on trunk's head."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommitEdit"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Edits to commit in your change's workspace, on a commit it holds."
+      },
       "CommitSha": {
         "type": "string",
         "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
         "description": "A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256)."
+      },
+      "Committed": {
+        "type": "object",
+        "required": [
+          "change",
+          "commitSha",
+          "parent",
+          "tree",
+          "changed"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "tree": {
+            "type": "string",
+            "description": "The commit's tree."
+          },
+          "changed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Paths whose content or mode the commit changed."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The commit now at your workspace's `main`: submit it with `submit`."
+      },
+      "CommittedEnvelope": {
+        "type": "object",
+        "required": [
+          "ok",
+          "summary",
+          "result",
+          "findings",
+          "next",
+          "notices",
+          "cost"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, written for the agent."
+          },
+          "result": {
+            "$ref": "#/components/schemas/Committed"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "maxItems": 3
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CallCost"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
       "ConflictChoice": {
         "type": "object",
@@ -18261,6 +18577,11 @@
           "workspace.pool_exhausted",
           "workspace.busy",
           "workspace.pack_too_large",
+          "workspace.head_moved",
+          "commit.bad_edits",
+          "commit.edits_refused",
+          "commit.parent_not_found",
+          "commit.parent_refused",
           "repo.ref_not_found",
           "repo.path_not_found",
           "agent.state_refused",

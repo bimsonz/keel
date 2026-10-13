@@ -16,6 +16,7 @@ import {
   makeTrunksMemory,
   makeWorkspacePoolMemory,
   makeWorkspaceRebaserMemory,
+  makeWorkspaceWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
@@ -110,7 +111,8 @@ export async function changeUnderTest(
   const code = makeCodeHostMemory();
   const trunks = makeTrunksMemory();
   const rebaser = makeWorkspaceRebaserMemory(code);
-  const fixed = Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer);
+  const writer = makeWorkspaceWriterMemory(code);
+  const fixed = Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer, writer.layer);
   await rewire(
     stub,
     (objectEnv) =>
@@ -134,6 +136,8 @@ export async function changeUnderTest(
     code,
     trunks,
     rebaser,
+    /** The workspace writer `commit` reaches, in memory over `code`. */
+    writer,
     get,
     /** The change as it stands; throws if it cannot be read. */
     current: async () => ok(await get()),

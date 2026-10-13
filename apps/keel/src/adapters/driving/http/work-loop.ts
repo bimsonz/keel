@@ -5,6 +5,9 @@ import type {
   Declared,
   DeclareInput,
   LeaseRequired,
+  CommitInput,
+  CommitParentRefused,
+  CommittedChange,
   RebasedChange,
   RebaseInput,
   RelyInput,
@@ -42,7 +45,16 @@ import {
   ConflictId,
   LeaseId,
 } from "@keeltown/core/kernel";
-import type { ConflictView, PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
+import type {
+  ConflictView,
+  EditsRefused,
+  ObjectNotFound,
+  PackTooLarge,
+  Remedy,
+  SubmissionStatus,
+  WorkspaceEdit,
+  WorkspaceHeadMoved,
+} from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AbandonResult,
@@ -52,6 +64,7 @@ import type {
   InboxResult,
   NearbyResult,
   Operations,
+  CommitResult,
   RebaseResult,
   RelyResult,
   ResolveResult,
@@ -545,6 +558,228 @@ export function rebaseError(
           detail: `Trunk's history since the change's base is ${error.bytes} bytes, over the ${error.limit}-byte relay limit; nothing moved.`,
           nextActions: [
             { kind: "escalate", title: "Ask an operator to move this change onto trunk by hand" },
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+const CommitFields = Schema.Struct({
+  changeId: ChangeId,
+  lease: LeaseId,
+  expectedHead: CommitSha,
+  parent: Schema.optional(CommitSha),
+});
+
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+/** Base64 text as bytes, or undefined when it is not base64. */
+function fromBase64(text: string): Uint8Array | undefined {
+  if (!BASE64.test(text)) return undefined;
+  const binary = atob(text);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+/** One edit as the writer takes it: exactly one of content and delete, with content decoded. */
+function editOf(
+  edit: Input<"commit">["edits"][number],
+  at: number,
+): Result.Result<WorkspaceEdit, Issues> {
+  const path = ["edits", at];
+  if ((edit.content === undefined) === (edit.delete === undefined))
+    return Result.fail([{ path, message: "Set exactly one of content and delete" }]);
+  if (edit.content === undefined) {
+    if (edit.encoding !== undefined || edit.executable !== undefined)
+      return Result.fail([{ path, message: "A delete carries no encoding or executable flag" }]);
+    return Result.succeed({ path: edit.path, delete: true });
+  }
+  const content =
+    edit.encoding === "base64" ? fromBase64(edit.content) : new TextEncoder().encode(edit.content);
+  if (content === undefined)
+    return Result.fail([{ path: [...path, "content"], message: "Not valid base64" }]);
+  return Result.succeed({
+    path: edit.path,
+    content,
+    ...(edit.executable === undefined ? {} : { executable: edit.executable }),
+  });
+}
+
+export function commitInput(input: Input<"commit">): Result.Result<CommitInput, Issues> {
+  const fields = decodeWith(CommitFields, {
+    changeId: input.changeId,
+    lease: input["keel-lease"],
+    expectedHead: input.expectedHead,
+    ...(input.parent === undefined ? {} : { parent: input.parent }),
+  });
+  if (Result.isFailure(fields)) return Result.fail(fields.failure);
+  const edits: WorkspaceEdit[] = [];
+  const issues: Issues[number][] = [];
+  for (const [at, edit] of input.edits.entries()) {
+    const decoded = editOf(edit, at);
+    if (Result.isFailure(decoded)) issues.push(...decoded.failure);
+    else edits.push(decoded.success);
+  }
+  if (issues.length > 0) return Result.fail(issues);
+  const { parent, ...heads } = fields.success;
+  return Result.succeed({
+    ...heads,
+    ...(parent === undefined ? {} : { parent }),
+    edits,
+    message: input.message,
+    idempotencyKey: input["idempotency-key"],
+  });
+}
+
+export function committedOk(committed: CommittedChange): CommitResult {
+  const { change, commit, parent } = committed;
+  return {
+    status: 200,
+    body: envelope(
+      `Committed ${commit.changed} path(s) to ${change.id}'s workspace as ${commit.commitSha.slice(0, 12)}. Submit it when the change is ready.`,
+      {
+        change: changeView(change),
+        commitSha: commit.commitSha,
+        parent,
+        tree: commit.tree,
+        changed: commit.changed,
+      },
+      [
+        {
+          kind: "call",
+          title: "Submit this commit",
+          operationId: "submit",
+          args: { changeId: change.id, commitSha: commit.commitSha },
+        },
+      ],
+    ),
+  };
+}
+
+/** Refusals of an edit that no repo state could make apply: the request itself is wrong. */
+const MALFORMED_EDITS: ReadonlySet<EditsRefused["reason"]> = new Set([
+  "bad-path",
+  "duplicate-path",
+  "nested-paths",
+]);
+
+export function commitEditsError(
+  caller: Caller,
+  error:
+    | ChangeNotFound
+    | LeaseStale
+    | ChangeStateRefused
+    | CommitParentRefused
+    | WorkspaceHeadMoved
+    | EditsRefused
+    | ObjectNotFound
+    | PackTooLarge,
+): CommitResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return {
+        status: 409,
+        body: problem(409, "change.lease_stale", caller.requestId, {
+          detail: `Lease ${error.leaseId} is not the active lease on ${error.changeId}.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "Read the change to see who holds its lease now",
+              operationId: "change",
+              args: { changeId: error.changeId },
+            },
+          ],
+        }),
+      };
+    case "ChangeStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "change.state_refused", caller.requestId, {
+          detail: `${error.changeId} is ${error.state}, where a commit is not allowed: it commits while working or bounced.`,
+          nextActions: [statusOf(error.changeId)],
+        }),
+      };
+    case "CommitParentRefused":
+      return {
+        status: 400,
+        body: problem(400, "commit.parent_refused", caller.requestId, {
+          detail: `A commit builds on your workspace's head (${error.expectedHead})${error.base === undefined ? "" : ` or your change's base (${error.base})`}, never on ${error.parent}.`,
+          nextActions: [
+            {
+              kind: "call",
+              title: "Commit again with no parent, or with the change's base after a rebase",
+              operationId: "commit",
+            },
+          ],
+        }),
+      };
+    case "WorkspaceHeadMoved":
+      return {
+        status: 409,
+        body: problem(409, "workspace.head_moved", caller.requestId, {
+          detail:
+            error.head === null
+              ? `Your workspace's main is not at ${error.expected}: it has no main now. Nothing was written.`
+              : `Your workspace's main moved from ${error.expected} to ${error.head} since you read it. Nothing was written.`,
+          nextActions: [
+            {
+              kind: "call",
+              title:
+                error.head === null
+                  ? "Read the change, then commit again"
+                  : `Commit again with expectedHead ${error.head}, after reading what it holds`,
+              operationId: "commit",
+            },
+          ],
+        }),
+      };
+    case "EditsRefused": {
+      const malformed = MALFORMED_EDITS.has(error.reason);
+      const status = malformed ? 400 : 409;
+      return {
+        status,
+        body: problem(
+          status,
+          malformed ? "commit.bad_edits" : "commit.edits_refused",
+          caller.requestId,
+          {
+            detail:
+              error.reason === "nothing-changed"
+                ? "These edits leave every file as it is: there is nothing to commit."
+                : `The edit at ${error.path} cannot apply (${error.reason}). Nothing was written.`,
+            nextActions: [
+              { kind: "call", title: "Fix the edits and commit again", operationId: "commit" },
+            ],
+          },
+        ),
+      };
+    }
+    case "ObjectNotFound":
+      return {
+        status: 404,
+        body: problem(404, "commit.parent_not_found", caller.requestId, {
+          detail: `Your workspace holds no commit ${error.oid} to build on.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "Read the change for its base, and commit on it",
+              operationId: "change",
+            },
+          ],
+        }),
+      };
+    case "PackTooLarge":
+      return {
+        status: 409,
+        body: problem(409, "workspace.pack_too_large", caller.requestId, {
+          detail: `The commit is ${error.bytes} bytes, over the ${error.limit}-byte push limit. Nothing was written.`,
+          nextActions: [
+            { kind: "call", title: "Commit the edits in smaller parts", operationId: "commit" },
           ],
         }),
       };

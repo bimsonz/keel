@@ -19,7 +19,7 @@ export type FileEdit =
       readonly path: string;
       readonly content: Uint8Array;
       /** Absent keeps an existing file's mode, and makes a new file plain. */
-      readonly executable?: boolean;
+      readonly executable?: boolean | undefined;
     }
   | { readonly path: string; readonly delete: true };
 

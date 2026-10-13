@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: commit.error-map
+# why: A bad, duplicate or nested path answers 409 like an edit that cannot apply
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 3e920247..6bf97ea0 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -675,9 +675,6 @@ export function committedOk(committed: CommittedChange): CommitResult {
+ 
+ /** Refusals of an edit that no repo state could make apply: the request itself is wrong. */
+ const MALFORMED_EDITS: ReadonlySet<EditsRefused["reason"]> = new Set([
+-  "bad-path",
+-  "duplicate-path",
+-  "nested-paths",
+ ]);
+ 
+ export function commitEditsError(

@@ -71,5 +71,6 @@ export * from "./verifier-runtime.ts";
 export * from "./work-queue.ts";
 export * from "./workspace-pool.ts";
 export * from "./workspace-rebaser.ts";
+export * from "./workspace-writer.ts";
 export * from "./workspace-refresher.ts";
 export * from "./world-checks.ts";

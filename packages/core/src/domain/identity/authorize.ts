@@ -148,6 +148,7 @@ export const SPEC_ACTIONS = {
   adopt: rule("Project", "work"),
   rely: rule("Project", "work"),
   rebase: rule("Project", "work"),
+  commit: rule("Project", "work"),
   revise: rule("Project", "work"),
   submit: rule("Project", "work"),
   resolve: rule("Project", "work"),

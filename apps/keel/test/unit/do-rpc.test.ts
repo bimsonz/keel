@@ -125,6 +125,9 @@ function objects(answers: {
       rebase: async () => {
         throw new Error("this test never rebases");
       },
+      commit: async () => {
+        throw new Error("this test never commits");
+      },
       revise: async () => {
         throw new Error("this test never revises");
       },

@@ -10,6 +10,8 @@ import {
   type ChangeOrigin,
   type ChangeRejection,
   ChangeStateRefused,
+  type ChangeState,
+  checkLease,
   type CommitNotInWorkspace,
   decideChange,
   type DerivedEffect,
@@ -91,6 +93,12 @@ import {
   WorkspacePool,
   type WorkspaceGrant,
   WorkspaceRebaser,
+  type CommittedEdits,
+  type EditsRefused,
+  type ObjectNotFound,
+  type WorkspaceEdit,
+  type WorkspaceHeadMoved,
+  WorkspaceWriter,
 } from "../ports/index.ts";
 import { planStateOf, submissionStateOf } from "../verification/index.ts";
 import { escalationIdOf } from "./escalations.ts";
@@ -317,6 +325,44 @@ export interface RebaseChange {
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
   readonly idempotencyKey: string;
+}
+
+/** Commit edits in the change's workspace, under its lease, with no clone. */
+export interface CommitEdits {
+  readonly agentId: AgentId;
+  /** The run of the agent that asks, when its token names one. */
+  readonly run?: RunRef | undefined;
+  /** The agent's handle, which authors the commit (its id while it has none). */
+  readonly handle?: string | undefined;
+  readonly leaseId: LeaseId;
+  readonly expectedHead: CommitSha;
+  /** The commit the edits apply to; absent is `expectedHead`. After a rebase, the change's new base. */
+  readonly parent?: CommitSha | undefined;
+  readonly edits: readonly WorkspaceEdit[];
+  readonly message: string;
+  readonly idempotencyKey: string;
+}
+
+/**
+ * A commit's parent that is neither the workspace head the agent read nor the
+ * change's base: a commit may only build on its own work or on the trunk its
+ * change is judged against, never graft other history onto the workspace.
+ */
+export class CommitParentRefused extends Schema.TaggedError<CommitParentRefused>()(
+  "CommitParentRefused",
+  {
+    changeId: Schema.String,
+    parent: Schema.String,
+    expectedHead: Schema.String,
+    base: Schema.optional(Schema.String),
+  },
+) {}
+
+/** What a commit answers: the change, its lease renewed, and the commit now at the workspace's head. */
+export interface CommittedChange {
+  readonly change: Change;
+  readonly commit: CommittedEdits;
+  readonly parent: CommitSha;
 }
 
 /** What rebasing answers: the change on its new base, and the workspace branch holding that base, to fetch and merge. */
@@ -1220,6 +1266,79 @@ export const rebase: (
       ),
   );
   return yield* answer(yield* settled(changeId, command.idempotencyKey, committed));
+});
+
+/** Where an agent may commit to its workspace: as for Submit and Rebase. */
+const COMMITTABLE: ReadonlySet<ChangeState> = new Set<ChangeState>(["working", "bounced"]);
+
+/**
+ * Commits an agent's edits in its change's workspace, with no clone: the
+ * lease and the state are checked first, so a refused call writes nothing;
+ * then the writer applies the edits to `parent` and pushes one commit with
+ * `expectedHead` as the old value; then the lease is renewed (state, not an
+ * event: the commit itself is seen as the workspace's push). Only the
+ * change's own workspace is written, never trunk.
+ */
+export const commitEdits: (
+  changeId: ChangeId,
+  command: CommitEdits,
+) => Effect.Effect<
+  CommittedChange,
+  | ChangeNotFound
+  | LeaseStale
+  | ChangeStateRefused
+  | CommitParentRefused
+  | WorkspaceHeadMoved
+  | EditsRefused
+  | ObjectNotFound
+  | PackTooLarge,
+  Clock | EntityStore | EventOutbox | WorkspaceWriter
+> = Effect.fn("coordination/commitEdits")(function* (changeId: ChangeId, command: CommitEdits) {
+  const change = yield* getChange(changeId);
+  const held = heldWorkspace(yield* EntityStore, changeId);
+  if (held === undefined || !COMMITTABLE.has(change.state)) return yield* refused(change, "commit");
+  const now = yield* (yield* Clock).now;
+  const lease = checkLease(change, command.leaseId, now);
+  if (Result.isFailure(lease)) return yield* Effect.fail(lease.failure);
+  const parent = command.parent ?? command.expectedHead;
+  if (parent !== command.expectedHead && parent !== change.baseSha)
+    return yield* Effect.fail(
+      new CommitParentRefused({
+        changeId,
+        parent,
+        expectedHead: command.expectedHead,
+        ...(change.baseSha === undefined ? {} : { base: change.baseSha }),
+      }),
+    );
+  // A live change's own workspace repo always exists: its absence is a defect.
+  const made = yield* (yield* WorkspaceWriter)
+    .commit(held.repo, {
+      expectedHead: command.expectedHead,
+      parent,
+      edits: command.edits,
+      message: command.message,
+      author: {
+        agentId: command.agentId,
+        ...(command.handle === undefined ? {} : { handle: command.handle }),
+      },
+      at: now,
+    })
+    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+  const renewed = yield* commit(
+    {
+      entity: changeRef(changeId),
+      cause: `${command.idempotencyKey}:${made.commitSha}`,
+      ...byAgent(command.agentId, command.run),
+      project: held.projectId,
+    },
+    (tx) =>
+      Result.map(transition(tx, changeId, ["ChangeNotFound"], [], command.leaseId), asTransition),
+  );
+  return {
+    change: renewed.duplicate ? yield* getChange(changeId) : renewed.value,
+    commit: made,
+    parent,
+  };
 });
 
 /**

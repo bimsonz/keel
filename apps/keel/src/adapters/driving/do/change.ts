@@ -17,6 +17,7 @@ import {
   precheckStarted,
   reactToBatch,
   rebase,
+  commitEdits,
   rely,
   revise,
   submissionStatus,
@@ -46,6 +47,7 @@ import {
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
   RebaseCommand,
+  CommitCommand,
   RelyCommand,
   ReviseCommand,
   SubmitCommand,
@@ -168,6 +170,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((rebasing) => rebase(changeId, rebasing)),
     );
     return this.answer(ChangeCodecs.rebase, program);
+  }
+
+  async commit(command: typeof CommitCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(CommitCommand, command).pipe(
+      Effect.flatMap((committing) => commitEdits(changeId, committing)),
+    );
+    return this.answer(ChangeCodecs.commit, program);
   }
 
   async abandon(command: typeof AbandonCommand.Encoded) {

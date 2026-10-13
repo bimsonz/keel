@@ -1,4 +1,10 @@
-import type { LeasedCall, RebasedChange, Revised } from "@keeltown/core/application/coordination";
+import type {
+  CommitInput,
+  LeasedCall,
+  RebasedChange,
+  Revised,
+} from "@keeltown/core/application/coordination";
+import { CommitParentRefused } from "@keeltown/core/application/coordination";
 import {
   AGENT_OWNED,
   type Change,
@@ -261,6 +267,8 @@ export function makeChangesMemory(
   /** A rebase replays by its key per change, as the DO's commit does. */
   const rebases = new Map<string, Change>();
   const commits = new Map<ChangeId, CommitSha>();
+  /** Each commit made through `commit`, in order: what a test reads back. */
+  const committedEdits: { readonly changeId: ChangeId; readonly input: CommitInput }[] = [];
   const workspaces = new Map<ChangeId, WorkspaceId>();
   const pushed = new Map<WorkspaceId, Set<string>>();
   const reservations = new Map<
@@ -349,6 +357,7 @@ export function makeChangesMemory(
   };
   return {
     changes,
+    committedEdits,
     commits,
     push,
     settle,
@@ -556,6 +565,35 @@ export function makeChangesMemory(
               baseSha: MEMORY_BASE,
               grantedSha: MEMORY_BASE,
               projectId: options.projectId ?? MEMORY_PROJECT,
+            };
+          }),
+        commit: (_principal, input) =>
+          Effect.gen(function* () {
+            const change = changes.get(input.changeId);
+            if (change === undefined)
+              return yield* new ChangeNotFound({ changeId: input.changeId });
+            if (change.lease.id !== input.lease || change.lease.state !== "active")
+              return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
+            if (!REBASABLE.has(change.state))
+              return yield* new ChangeStateRefused({
+                changeId: change.id,
+                state: change.state,
+                command: "commit",
+              });
+            const parent = input.parent ?? input.expectedHead;
+            if (parent !== input.expectedHead && parent !== change.baseSha)
+              return yield* new CommitParentRefused({
+                changeId: change.id,
+                parent,
+                expectedHead: input.expectedHead,
+                ...(change.baseSha === undefined ? {} : { base: change.baseSha }),
+              });
+            committedEdits.push({ changeId: change.id, input });
+            const commitSha = CommitSha.make(committedEdits.length.toString(16).padStart(40, "c"));
+            return {
+              change,
+              commit: { commitSha, tree: "d".repeat(40), changed: input.edits.length },
+              parent,
             };
           }),
         rebase: (_principal, input) =>

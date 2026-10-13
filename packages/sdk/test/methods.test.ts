@@ -67,6 +67,12 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   abandon: (c) => c.abandon("chg_1", { reason: "r" }, LEASE),
   adopt: (c) => c.adopt("chg_1"),
   rebase: (c) => c.rebase("chg_1", LEASE),
+  commit: (c) =>
+    c.commitEdits(
+      "chg_1",
+      { expectedHead: "a".repeat(40), message: "m", edits: [{ path: "x", content: "y" }] },
+      LEASE,
+    ),
   Workspaces_refreshWorkspaceToken: (c) => c.refreshWorkspaceToken("wsp_1"),
   inbox: (c) => c.inbox({ cursor: "000000000001" }),
   Inbox_listEvents: (c) => c.events({ limit: 1 }),

@@ -136,6 +136,11 @@ export const ROUTES = {
     path: "/changes/{changeId}/rebase",
     headers: ["keel-lease", "idempotency-key"],
   },
+  commit: {
+    method: "POST",
+    path: "/changes/{changeId}/commits",
+    headers: ["keel-lease", "idempotency-key"],
+  },
   Workspaces_refreshWorkspaceToken: {
     method: "POST",
     path: "/workspaces/{workspaceId}/token",

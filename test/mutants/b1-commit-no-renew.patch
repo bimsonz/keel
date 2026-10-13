@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: commit.writes
+# why: A written commit leaves the lease as it was
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 9b15cd9d..e95596a1 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1307,7 +1307,7 @@ export const commitEdits: (
+       project: held.projectId,
+     },
+     (tx) =>
+-      Result.map(transition(tx, changeId, ["ChangeNotFound"], [], command.leaseId), asTransition),
++      Result.map(transition(tx, changeId, ["ChangeNotFound"], []), asTransition),
+   );
+   return {
+     change: renewed.duplicate ? yield* getChange(changeId) : renewed.value,

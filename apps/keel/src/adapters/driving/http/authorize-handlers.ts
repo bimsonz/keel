@@ -349,6 +349,7 @@ export const RESOLVERS: Resolvers = {
   adopt: ownProject,
   rely: ownProject,
   rebase: ownProject,
+  commit: ownProject,
   revise: ownProject,
   submit: ownProject,
   resolve: ownProject,

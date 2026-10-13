@@ -103,6 +103,63 @@ model Rebased {
 
 model RebasedEnvelope is AgentEnvelope<Rebased>;
 
+/** One file's new content, or its deletion: set exactly one of `content` and `delete`. */
+model CommitEdit {
+  path: RepoPath;
+
+  /** The file's whole new content: UTF-8 text, or base64 when `encoding` is `base64`. */
+  @maxLength(1048576)
+  content?: string;
+
+  /** How `content` is written. Absent is `utf8`. */
+  encoding?: "utf8" | "base64";
+
+  /** Absent keeps an existing file's mode and makes a new file plain. */
+  executable?: boolean;
+
+  /** Delete the file at `path`. */
+  delete?: true;
+}
+
+/** Edits to commit in your change's workspace, on a commit it holds. */
+model CommitRequest {
+  /**
+   * The workspace's `main` as you last read it: from `declare` or `adopt` (the workspace's
+   * `baseSha`), or a previous `commit`. If `main` has moved since, the commit is refused with
+   * 409 `workspace.head_moved` and nothing is written.
+   */
+  expectedHead: CommitSha;
+
+  /**
+   * The commit your edits apply to and the new commit's one parent. Absent is `expectedHead`.
+   * After a `rebase`, pass the change's new `base` to rebuild your change on trunk's head.
+   */
+  parent?: CommitSha;
+
+  @minLength(1)
+  @maxLength(10000)
+  message: string;
+
+  @minItems(1)
+  @maxItems(500)
+  edits: CommitEdit[];
+}
+
+/** The commit now at your workspace's `main`: submit it with `submit`. */
+model Committed {
+  change: Change;
+  commitSha: CommitSha;
+  parent: CommitSha;
+
+  /** The commit's tree. */
+  tree: string;
+
+  /** Paths whose content or mode the commit changed. */
+  changed: int32;
+}
+
+model CommittedEnvelope is AgentEnvelope<Committed>;
+
 model ChangePath {
   @path changeId: ChangeId;
 }
@@ -266,4 +323,28 @@ interface Changes {
     ...LeaseHeader,
     ...IdempotencyKey,
   ): RebasedEnvelope | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Commit edits to your change's workspace without a clone: Keel applies them to `parent`
+   * (default `expectedHead`), makes one commit authored by you, and moves your workspace's
+   * `main` from `expectedHead` to it, renewing your lease. Then call `submit` with its
+   * `commitSha`. Only your own workspace is written, never trunk. Allowed while the change is
+   * working or bounced, under your lease. Refusals: 409 `workspace.head_moved` (it names the
+   * head now: read it and try again), 409 `commit.edits_refused` (an edit cannot apply, or
+   * nothing changed), 400 `commit.bad_edits` (a bad, duplicate or nested path), 404
+   * `commit.parent_not_found`. A retry whose commit already sits at `main` answers that commit.
+   * A commit records no event of the change's own: it is seen as a push to the workspace.
+   */
+  @summary("Commit edits to your workspace")
+  @tag("mcp")
+  @operationId("commit")
+  @useAuth(AgentWork)
+  @route("/{changeId}/commits")
+  @post
+  commit(
+    ...ChangePath,
+    ...LeaseHeader,
+    ...IdempotencyKey,
+    @body body: CommitRequest,
+  ): CommittedEnvelope | NotFound | Conflict | StandardErrors;
 }

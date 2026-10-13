@@ -13,6 +13,7 @@ const CONTRACT_PORTS = [
   "WorkspacePool",
   "WorkspaceRebaser",
   "WorkspaceRefresher",
+  "WorkspaceWriter",
   "RepoServer",
   "SubjectRegistry",
   "Recall",

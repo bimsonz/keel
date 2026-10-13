@@ -12,6 +12,7 @@ import type {
   ReviseRequest,
   RulingRequest,
   SubmitRequest,
+  CommitRequest,
   SuspendAgentRequest,
   TokenResponse,
   WireOutputs,
@@ -617,6 +618,23 @@ export class KeelClient {
     return this.call(
       "rebase",
       { changeId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /**
+   * Commits edits to the change's workspace with no clone: Keel applies them
+   * to `parent` (default `expectedHead`) and moves the workspace's main to the
+   * new commit, which `submit` then takes.
+   */
+  commitEdits(
+    changeId: string,
+    commit: CommitRequest,
+    options: Idempotent & { readonly lease: string },
+  ): Promise<WireOutputs["commit"]> {
+    return this.call(
+      "commit",
+      { changeId, ...commit, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
       options,
     );
   }

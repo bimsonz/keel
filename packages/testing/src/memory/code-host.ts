@@ -21,10 +21,18 @@ import {
   type UploadPackRequest,
   WorkspaceRebaser,
   WorkspaceRefresher,
+  EditsRefused,
+  WORKSPACE_BRANCH,
+  WorkspaceHeadMoved,
+  WorkspaceWriter,
 } from "@keeltown/core/ports";
 import {
+  applyEdits,
   compareTreeEntries,
   concat,
+  EditRefused,
+  encodeCommit,
+  hashObject,
   dec,
   decodeCommit,
   decodeTree,
@@ -394,6 +402,96 @@ export function makeWorkspaceRebaserMemory(
             target.refs.set(KEEL_TRUNK_REF, head);
             pushed.push({ workspace, to: head });
             return Effect.succeed("advanced");
+          }),
+      }),
+    ),
+  };
+}
+
+/** gitcore's object reads over a memory repo: a missing object, or one of another type, is MissingObject. */
+const memoryReader = (repo: MemoryRepo) => {
+  const object = (oid: string, type: GitObject["type"]) => {
+    const o = repo.objects.get(oid);
+    if (o?.type !== type) throw new MissingObject(oid);
+    return o.body;
+  };
+  return {
+    readTree: (oid: string) => Promise.resolve(decodeTree(object(oid, "tree"))),
+    readBlob: (oid: string) => Promise.resolve(object(oid, "blob")),
+    readCommit: (oid: string) => Promise.resolve(decodeCommit(object(oid, "commit"))),
+  };
+};
+
+/**
+ * WorkspaceWriter over a memory code host: the edits are applied to the
+ * parent's tree with gitcore, as the real writer does, and the workspace's
+ * main moves only if it is at `expectedHead`. A main elsewhere is
+ * WorkspaceHeadMoved, unless it already holds this commit's tree on this
+ * parent (a retry). `committed` records each commit in order.
+ */
+export function makeWorkspaceWriterMemory(
+  code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
+) {
+  const committed: { readonly workspace: RepoRef; readonly commit: CommitSha }[] = [];
+  return {
+    committed,
+    layer: Layer.succeed(
+      WorkspaceWriter,
+      WorkspaceWriter.of({
+        commit: (workspace, request) =>
+          Effect.gen(function* () {
+            const target = code.repos.get(repoKey(workspace));
+            if (target === undefined)
+              return yield* Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
+            const read = memoryReader(target);
+            const edited = yield* Effect.tryPromise({
+              try: async () => {
+                const parent = await read.readCommit(request.parent);
+                return applyEdits(read, parent.tree, request.edits);
+              },
+              catch: (cause) => cause,
+            }).pipe(
+              Effect.catch((cause): Effect.Effect<never, EditsRefused | ObjectNotFound> =>
+                cause instanceof EditRefused
+                  ? Effect.fail(new EditsRefused({ reason: cause.reason, path: cause.path }))
+                  : cause instanceof MissingObject
+                    ? Effect.fail(new ObjectNotFound({ repo: plain(workspace), oid: cause.oid }))
+                    : Effect.die(cause),
+              ),
+            );
+            if (edited.changed === 0)
+              return yield* Effect.fail(new EditsRefused({ reason: "nothing-changed", path: "" }));
+            const author = {
+              name: request.author.handle ?? request.author.agentId,
+              email: `${request.author.agentId}@agents.memory`,
+              time: Math.floor(request.at / 1000),
+            };
+            const body = encodeCommit({
+              tree: edited.tree,
+              parents: [request.parent],
+              author,
+              committer: { name: "Keel", email: "keel@memory", time: author.time },
+              message: request.message,
+            });
+            const sha = CommitSha.make(yield* Effect.promise(() => hashObject("commit", body)));
+            const answer = { commitSha: sha, tree: edited.tree, changed: edited.changed };
+            const head = target.refs.get(WORKSPACE_BRANCH) ?? null;
+            if (head !== request.expectedHead) {
+              const at = head === null ? undefined : target.objects.get(head);
+              const same =
+                at?.type === "commit" &&
+                decodeCommit(at.body).tree === edited.tree &&
+                decodeCommit(at.body).parents.join(",") === request.parent;
+              if (same && head !== null) return { ...answer, commitSha: head };
+              return yield* Effect.fail(
+                new WorkspaceHeadMoved({ expected: request.expectedHead, head }),
+              );
+            }
+            for (const [oid, o] of edited.newObjects) target.objects.set(oid, o);
+            target.objects.set(sha, { type: "commit", body });
+            target.refs.set(WORKSPACE_BRANCH, sha);
+            committed.push({ workspace, commit: sha });
+            return answer;
           }),
       }),
     ),

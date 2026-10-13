@@ -21,6 +21,7 @@ import {
   type TrunkWriter,
   type Trunks,
   type WorkspaceRebaser,
+  type WorkspaceWriter,
   type WorkspaceRefresher,
   type WorkspacePool,
   type LiveChanges,
@@ -46,6 +47,7 @@ import type { CommitSigningConfig } from "../adapters/driven/gitcore/commit-sign
 import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-rebaser.ts";
+import { WorkspaceWriterGitCore } from "../adapters/driven/gitcore/workspace-writer.ts";
 import { WorkspaceRefresherGitCore } from "../adapters/driven/gitcore/workspace-refresher.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
@@ -151,7 +153,13 @@ export function projectServices(env: Env): Layer.Layer<ProjectServices> {
 }
 
 /** The Change DO's driven adapters beyond the backbone. */
-export type ChangeServices = WorkspacePool | CodeHost | Trunks | WorkspaceRebaser | LiveChanges;
+export type ChangeServices =
+  | WorkspacePool
+  | CodeHost
+  | Trunks
+  | WorkspaceRebaser
+  | WorkspaceWriter
+  | LiveChanges;
 
 /**
  * The Change DO takes its workspace from its project's WorkspacePool DO and
@@ -166,6 +174,7 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
     host,
     TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspaceRebaserGitCore().pipe(Layer.provide(host)),
+    WorkspaceWriterGitCore(artifactsObjects(env), env.KEEL_HOST).pipe(Layer.provide(host)),
     liveChangesLayer(env),
   );
 }

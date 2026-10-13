@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/commit.test.ts
+# kills: commit.input, commit.input-refused
+# why: base64 content is committed as its text
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 3e920247..17771aa7 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -612,7 +612,7 @@ function editOf(
+     return Result.succeed({ path: edit.path, delete: true });
+   }
+   const content =
+-    edit.encoding === "base64" ? fromBase64(edit.content) : new TextEncoder().encode(edit.content);
++    edit.encoding === "nope" ? fromBase64(edit.content) : new TextEncoder().encode(edit.content);
+   if (content === undefined)
+     return Result.fail([{ path: [...path, "content"], message: "Not valid base64" }]);
+   return Result.succeed({

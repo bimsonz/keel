@@ -62,13 +62,19 @@ import {
   type ViewSnapshot,
 } from "../ports/index.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
-import type { PackTooLarge } from "../ports/index.ts";
+import type {
+  EditsRefused,
+  ObjectNotFound,
+  PackTooLarge,
+  WorkspaceHeadMoved,
+} from "../ports/index.ts";
 import { projectNamespace } from "../verification/index.ts";
-import type { RebasedChange, Withdrawal } from "./change.ts";
+import type { CommitParentRefused, CommittedChange, RebasedChange, Withdrawal } from "./change.ts";
 import type {
   AbandonCall,
   Adopted,
   AdoptInput,
+  CommitInput,
   Declared,
   DeclareInput,
   RebaseInput,
@@ -132,6 +138,23 @@ export const rebaseChange: (
   | PackTooLarge,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.rebase(principal, input));
+
+/** Commits edits in a change's workspace with no clone. The Change DO checks the lease and the state before anything is pushed. */
+export const commitChange: (
+  principal: AgentToken,
+  input: CommitInput,
+) => Effect.Effect<
+  CommittedChange,
+  | ChangeNotFound
+  | LeaseStale
+  | ChangeStateRefused
+  | CommitParentRefused
+  | WorkspaceHeadMoved
+  | EditsRefused
+  | ObjectNotFound
+  | PackTooLarge,
+  Changes
+> = (principal, input) => Changes.use((changes) => changes.commit(principal, input));
 
 /** Revises a change's intent at the revision the caller last read. The Change DO checks the lease and the revision. */
 export const reviseChange: (
