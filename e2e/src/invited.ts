@@ -1,6 +1,6 @@
-// An agent's invitation into an org on a deployed Keel, through the routes
-// anyone uses: what the invited agent can do, and what the agent beside it
-// cannot.
+// An agent's invitation on a deployed Keel, into an org and to one project of
+// a person's own namespace, through the routes anyone uses: what the invited
+// agent can do, and what the agent beside it cannot.
 //   KEEL_URL=<keel> node e2e/src/invited.ts <run>
 //
 // It takes no credential. A person, `inv-<run>-p`, signs up by passkey, makes
@@ -12,14 +12,21 @@
 //       and only the org's members see the invitation;
 //   (3) once it accepts, the token it asks for that project reads it, anyone
 //       sees it among the org's agents, and only members see who invited it;
-//   (4) taken out by the person, it is a stranger again.
+//   (4) taken out by the person, it is a stranger again;
+//   (5) the person makes two private projects in their own namespace and
+//       invites the guest to one: invited it reads nothing, and is told where
+//       it was asked;
+//   (6) once it accepts, its token for that project reads it, and its token
+//       for the person's other project reads nothing: the invitation is to
+//       one project, never to the namespace;
+//   (7) taken off by the person, it is a stranger there again.
 // Every "can" of the guest has the other agent's "cannot" beside it, read the
 // same way.
 //
 // Each run needs a run of its own, since a handle is taken for good. It
-// leaves behind the person's account, their org with one project, and the two
-// agents, whose keys are gone with the run. No session, passkey or key is
-// printed.
+// leaves behind the person's account with two projects of their own, their
+// org with one, and the two agents, whose keys are gone with the run. No
+// session, passkey or key is printed.
 import { generateAgentKey, KeelClient, KeelProblem, signUp as signUpByKey } from "@keeltown/sdk";
 import { AccountRefused, signUp } from "../../scripts/lib/account.ts";
 import { FIXTURE } from "./lib/s1.ts";
@@ -148,9 +155,12 @@ async function walk(): Promise<void> {
       (await listed(person)) === `joined by ${userId}`,
     "(3) anyone sees the guest among the org's agents, and only a member sees who invited it",
   );
-  // The card's orgs came after the invitation: a Keel deployed before them answers none, so this is said, not checked.
   const card = await visitor.agent(guest.agentId);
-  console.log(`     the guest's card names its orgs: ${JSON.stringify(card.orgs ?? "no field")}`);
+  check(
+    JSON.stringify(card.orgs) === JSON.stringify([{ handle: ORG, kind: "org" }]) &&
+      (await visitor.agent(other.agentId)).orgs === undefined,
+    `(3) the guest's card names the org it joined, and the other agent's names none: ${JSON.stringify(card.orgs ?? "no field")}`,
+  );
   check(!JSON.stringify(card).includes(userId), "(3) the guest's card names nobody who invited it");
 
   const removed = await person.removeAgent(ORG, guest.agentId, { idempotencyKey: key("remove") });
@@ -161,6 +171,97 @@ async function walk(): Promise<void> {
       (await listed(person)) === "absent" &&
       (await listed(visitor)) === "absent",
     "(4) no list names it: not its own, not the members', not a visitor's",
+  );
+  check(
+    (await visitor.agent(guest.agentId)).orgs === undefined,
+    "(4) its card names the org no longer",
+  );
+
+  // (5) to (7): one project of the person's own namespace, never the namespace.
+  const mine = await person.createProject(
+    { namespace: PERSON, name: "mine", source: { kind: "template", name: FIXTURE } },
+    { idempotencyKey: key("mine") },
+  );
+  const beside = await person.createProject(
+    { namespace: PERSON, name: "beside", source: { kind: "template", name: FIXTURE } },
+    { idempotencyKey: key("beside") },
+  );
+  console.log(`     projects ${PERSON}/mine ${mine.id} and ${PERSON}/beside ${beside.id}`);
+  /** What an agent's token for one of the person's own projects reads of it. */
+  const readsOf = async (agent: typeof guest, projectId: string) => {
+    const there = agent.in(projectId);
+    return [
+      await statusOf(there.commits(projectId, { limit: 1 })),
+      await statusOf(there.changes({ project: projectId, limit: 1 })),
+    ].join(" ");
+  };
+  const askedTo = async () =>
+    (await guest.own.projectInvitations()).items
+      .map((item) => `${item.project.name} ${item.state}`)
+      .join(", ");
+  const onProject = async (reader: KeelClient) => {
+    const row = (await reader.projectAgents(mine.id)).items.find(
+      (item) => item.id === guest.agentId,
+    );
+    return row === undefined ? "absent" : `${row.state} by ${row.invitedBy ?? "nobody named"}`;
+  };
+  check(
+    (await readsOf(guest, mine.id)) === "404 404" && (await readsOf(other, mine.id)) === "404 404",
+    "(5) before any invitation neither agent reads the person's own project",
+  );
+  const invitedTo = await person.inviteToProject(mine.id, guest.handle, {
+    idempotencyKey: key("invite-to"),
+  });
+  check(
+    invitedTo.state === "invited" && invitedTo.invitedBy === userId,
+    `(5) the person invites the guest to one project of their own: ${invitedTo.state}`,
+  );
+  check(
+    (await readsOf(guest, mine.id)) === "404 404" && (await askedTo()) === "mine invited",
+    "(5) invited and not yet joined, the guest reads nothing, and its own list names the project as asking",
+  );
+  check(
+    (await onProject(person)) === `invited by ${userId}` &&
+      (await statusOf(visitor.projectAgents(mine.id))) === 404,
+    "(5) the person sees the invitation they made; to a visitor the private project is not there",
+  );
+
+  const joinedIt = await guest.own.acceptProjectInvitation(mine.id, {
+    idempotencyKey: key("accept-to"),
+  });
+  check(joinedIt.state === "joined", `(6) the guest accepts: ${joinedIt.state}`);
+  check(
+    (await readsOf(guest, mine.id)) === "200 200" && (await readsOf(other, mine.id)) === "404 404",
+    "(6) the guest's token for that project reads it, and the other agent's does not",
+  );
+  check(
+    (await readsOf(guest, beside.id)) === "404 404" &&
+      (await statusOf(guest.in(mine.id).project(PERSON, "beside"))) === 404,
+    "(6) the person's other private project is not there for the guest, by a token that names it or by this one",
+  );
+  check(
+    (await guest.own.invitations()).items.length === 0 &&
+      (await visitor.agent(guest.agentId)).orgs === undefined,
+    "(6) it joined no namespace: its namespaces hold none, and its card names no org",
+  );
+  check(
+    (await onProject(person)) === `joined by ${userId}` &&
+      (await onProject(guest.in(mine.id))) === "joined by nobody named",
+    "(6) the person reads that they invited it; the guest reads that it joined, and not who invited it",
+  );
+
+  const takenOff = await person.removeFromProject(mine.id, guest.agentId, {
+    idempotencyKey: key("remove-from"),
+  });
+  check(
+    takenOff.state === "ended",
+    `(7) the person takes the guest off the project: ${takenOff.state}`,
+  );
+  check(
+    (await readsOf(guest, mine.id)) === "404 404" &&
+      (await askedTo()) === "" &&
+      (await onProject(person)) === "absent",
+    "(7) taken off, the guest reads nothing again, and no list names it",
   );
 }
 
