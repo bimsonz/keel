@@ -10,7 +10,7 @@ import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
 import { WorkspaceRefresherGitCore } from "../../src/adapters/driven/gitcore/workspace-refresher.ts";
-import { gitServer, type Reply } from "./git-server.ts";
+import { EMPTY_PACK, gitServer, type Reply } from "./git-server.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const PROJECT = makeId("prj", "01KRBSRCNTRCT0000000000000");
@@ -20,9 +20,9 @@ const MAIN = "refs/heads/main";
 const BASE = sha("a");
 const HEAD = sha("b");
 
-/** Trunk and the workspace in memory, every minted token recorded, and the server's requests. */
-function refreshing(replies: Reply[]) {
-  const server = gitServer(replies);
+/** Trunk and the workspace in memory, every minted token recorded, and the server's requests. `pack` is what trunk sends, when the test says. */
+function refreshing(replies: Reply[], pack?: Uint8Array) {
+  const server = gitServer(replies, pack);
   vi.stubGlobal("fetch", server.fetch);
   const code = makeCodeHostMemory();
   const minted: string[] = [];
@@ -117,6 +117,21 @@ describe("WorkspaceRefresher.advance", () => {
           _tag: "PushRejected",
           reason: "busy",
         });
+      }),
+  );
+
+  it.effect(
+    "[refresher.not-forward] a head trunk has nothing to send for past the commit the pool names is PushRejected stale, and nothing is pushed: a workspace is never taken back",
+    () =>
+      Effect.gen(function* () {
+        // Trunk answers an empty pack: everything the head reaches, the workspace's main reaches already.
+        const behind = refreshing(["ok"], EMPTY_PACK);
+        yield* behind.seeded;
+        expect(yield* Effect.flip(behind.advance(HEAD, BASE))).toMatchObject({
+          _tag: "PushRejected",
+          reason: "stale",
+        });
+        expect(behind.server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
       }),
   );
 

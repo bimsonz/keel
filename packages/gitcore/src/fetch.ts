@@ -27,6 +27,26 @@ export class PackTooLarge extends Error {
 /** Side-band framing and acknowledgements around a pack of `limit` bytes: 5 bytes per 65,515, and a margin. */
 const framing = (limit: number) => Math.ceil(limit / 65_515) * 5 + 65_536;
 
+/**
+ * A relay was asked to move a ref from one commit to another that is not
+ * ahead of it. With `from` as the only have, the source had no object to send
+ * for `to`: everything `to` reaches, `from` reaches already, so `to` is `from`'s
+ * ancestor. Nothing was pushed: a relay moves a ref forward or not at all.
+ */
+export class RelayNotForward extends Error {
+  constructor(
+    readonly from: string,
+    readonly to: string,
+  ) {
+    super(`a relay from ${from} to ${to} is not forward: nothing of ${to} lies past ${from}`);
+  }
+}
+
+/** Whether a pack's header (gitformat-pack: `PACK`, the version, the object count) counts no object. */
+const sendsNothing = (pack: Uint8Array): boolean =>
+  pack.byteLength >= 12 &&
+  new DataView(pack.buffer, pack.byteOffset, pack.byteLength).getUint32(8) === 0;
+
 /** receive-pack answered `busy` on every attempt: nothing was applied, and the same pack may be sent again later. */
 export class ReceivePackBusy extends Error {
   constructor(readonly attempts: number) {
@@ -206,7 +226,9 @@ export interface RelayMove {
   /**
    * Commits the target already holds, so the pack carries only what is past
    * them; `[from]` when omitted. A new ref (`from` null) in a repo that holds
-   * the history names it here, or the whole history is sent.
+   * the history names it here, or the whole history is sent. A move that
+   * names its own haves answers for its direction itself: a pack of no
+   * object then says only that the target holds `to` already.
    */
   readonly haves?: readonly string[];
 }
@@ -252,6 +274,10 @@ export async function relayPack(
  * explicit old value (zero for an empty target), so a target that moved
  * meanwhile refuses it. A pack over the cap throws `PackTooLarge`, and a
  * target still busy after the retries `ReceivePackBusy`.
+ *
+ * A ref is only ever moved forward. With `from` as the only have, a pack of
+ * no object means `to` is behind `from`, where the push would have taken the
+ * ref back: that throws `RelayNotForward` with nothing pushed.
  */
 export async function relay(
   source: GitRemote,
@@ -261,6 +287,8 @@ export async function relay(
 ): Promise<RelayOutcome> {
   if (move.from === move.to) return { kind: "unchanged" };
   const pack = await relayPack(source, move, options);
+  if (move.from !== null && move.haves === undefined && sendsNothing(pack))
+    throw new RelayNotForward(move.from, move.to);
   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
   const retries = options.busyRetries ?? 3;
   for (let attempt = 0; ; attempt += 1) {

@@ -8,7 +8,7 @@ import {
   type SyncOutcome,
   WorkspaceRefresher,
 } from "@keeltown/core/ports";
-import { type GitRemote, ReceivePackBusy, relay } from "@keeltown/gitcore";
+import { type GitRemote, ReceivePackBusy, relay, RelayNotForward } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 import { MAIN, TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
 
@@ -17,7 +17,9 @@ import { MAIN, TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
  * for the head is relayed into the workspace's main, with the commit the pool
  * names as the explicit old value and the only have, so a main that is
  * anywhere else refuses it. A refused push is `stale` at once: the pool reads
- * main back and decides, so nothing is read or retried here. It reads trunk
+ * main back and decides, so nothing is read or retried here. So is a head
+ * that is behind the commit the pool names: GitCore's relay sends nothing
+ * for it and pushes nothing, so a workspace is never taken back. It reads trunk
  * and writes the workspace, each with a token minted for the call; neither
  * the tokens nor the remotes, which carry the account id, are ever put in an
  * error or a log. `trunkOf` finds a project's trunk (`projectRepos` unless a
@@ -54,7 +56,9 @@ export const WorkspaceRefresherGitCore = (
               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
                 cause instanceof ReceivePackBusy
                   ? Effect.fail(new PushRejected({ reason: "busy" }))
-                  : tooLarge(workspace)(cause),
+                  : cause instanceof RelayNotForward
+                    ? Effect.fail(new PushRejected({ reason: "stale" }))
+                    : tooLarge(workspace)(cause),
               ),
             );
             if (outcome.kind === "rejected")

@@ -2,15 +2,15 @@
 # kills: refresher.contract.stale
 # why: the memory refresher moves main wherever it stands, so a test over it never sees a refused push
 diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
-index 77f20eb..a0e9585 100644
+index de8e943f..fce27729 100644
 --- a/packages/testing/src/memory/code-host.ts
 +++ b/packages/testing/src/memory/code-host.ts
-@@ -336,8 +336,6 @@ export function makeWorkspaceRefresherMemory(
+@@ -431,8 +431,6 @@ export function makeWorkspaceRefresherMemory(
              const target = code.repos.get(repoKey(workspace));
              if (target === undefined)
                return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
 -            if (target.refs.get(MAIN) !== from)
 -              return Effect.fail(new PushRejected({ reason: "stale" }));
-             const trunk = trunkOf(projectId);
-             const source = code.repos.get(repoKey(trunk));
-             if (source?.objects.get(to)?.type !== "commit")
+             // Behind where main is: a workspace is only ever moved forward.
+             if (reaches(target, from, to))
+               return Effect.fail(new PushRejected({ reason: "stale" }));

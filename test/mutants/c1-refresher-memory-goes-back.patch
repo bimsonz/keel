@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: refresher.contract.not-forward
+# why: the in-memory refresher takes a workspace's main back to a commit behind it
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index de8e943f..643b4654 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -434,8 +434,6 @@ export function makeWorkspaceRefresherMemory(
+             if (target.refs.get(MAIN) !== from)
+               return Effect.fail(new PushRejected({ reason: "stale" }));
+             // Behind where main is: a workspace is only ever moved forward.
+-            if (reaches(target, from, to))
+-              return Effect.fail(new PushRejected({ reason: "stale" }));
+             const trunk = trunkOf(projectId);
+             const source = code.repos.get(repoKey(trunk));
+             if (source?.objects.get(to)?.type !== "commit")

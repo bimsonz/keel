@@ -6,8 +6,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import { concat, dec, enc } from "../src/bytes.ts";
 import {
   PackTooLarge,
-  type RelayMove,
   relay,
+  type RelayMove,
+  RelayNotForward,
   relayPack,
   uploadPack,
   uploadPackBytes,
@@ -176,6 +177,49 @@ describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(sent).toEqual([3]);
     expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(tip);
     expect(connected(repos.target.dir, tip)).toEqual([]);
+  });
+
+  it("[relay.forward-only] a head behind the commit the target's ref holds is not relayed: nothing is pushed, and the ref stays where it was", async () => {
+    const older = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    const newer = commitFile(repos.source.dir, "f.txt", "trunk moved on again\n", older);
+    const ref = "refs/heads/forward-only";
+    const pushes: number[] = [];
+    const watched: GitRemote = {
+      ...target,
+      fetch: async (url, init) => {
+        const body = init?.body;
+        // Only a push carries a pack in its request.
+        if (body instanceof Uint8Array && dec.decode(body).includes("PACK")) pushes.push(1);
+        return http.fetch(url, init);
+      },
+    };
+    expect(await relay(source, watched, { ref, from: null, to: newer })).toEqual({
+      kind: "advanced",
+    });
+    expect(pushes).toHaveLength(1);
+
+    // The source has nothing of `older` to send past `newer`: the move would take the ref back.
+    await expect(relay(source, watched, { ref, from: newer, to: older })).rejects.toBeInstanceOf(
+      RelayNotForward,
+    );
+    expect(pushes).toHaveLength(1);
+    expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(newer);
+  });
+
+  it("[relay.haves-vouch] a move that names its own haves is relayed even when nothing is left to send: a ref behind what the repo already holds is brought forward", async () => {
+    const older = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    const newer = commitFile(repos.source.dir, "g.txt", "held under another ref\n", older);
+    const held = "refs/heads/vouch-held";
+    const ref = "refs/heads/vouch-trunk";
+    // The repo holds `newer` under one ref, and `older` under the ref to move.
+    await relay(source, target, { ref: held, from: null, to: newer });
+    await relay(source, target, { ref, from: null, to: older, haves: [newer] });
+    expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(older);
+
+    expect(
+      await relay(source, target, { ref, from: older, to: newer, haves: [newer, older] }),
+    ).toEqual({ kind: "advanced" });
+    expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(newer);
   });
 
   it("[relay.pack] relayPack answers the very pack a relay of the same move sends, byte for byte", async () => {

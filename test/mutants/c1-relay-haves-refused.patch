@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts
+# kills: relay.haves-vouch
+# why: a move that names its own haves is refused when nothing is left to send, so a ref behind what the repo already holds is never brought forward
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index c42d5927..beaae585 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -287,7 +287,7 @@ export async function relay(
+ ): Promise<RelayOutcome> {
+   if (move.from === move.to) return { kind: "unchanged" };
+   const pack = await relayPack(source, move, options);
+-  if (move.from !== null && move.haves === undefined && sendsNothing(pack))
++  if (move.from !== null && sendsNothing(pack))
+     throw new RelayNotForward(move.from, move.to);
+   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
+   const retries = options.busyRetries ?? 3;

@@ -4,8 +4,14 @@
 // recorded with its pkt-lines, so a test sees exactly what an adapter asked.
 import { concat, dec, FLUSH, pkt, readPkts } from "@keeltown/gitcore";
 
-/** An empty pack: the header and no objects. */
+/** A pack's header alone, counting one object as a forward move's pack does: no adapter reads past it. */
 export const PACK = concat([
+  new TextEncoder().encode("PACK"),
+  new Uint8Array([0, 0, 0, 2, 0, 0, 0, 1]),
+]);
+
+/** An empty pack, the header and no objects: what a server sends for a head its haves already reach. */
+export const EMPTY_PACK = concat([
   new TextEncoder().encode("PACK"),
   new Uint8Array([0, 0, 0, 2, 0, 0, 0, 0]),
 ]);

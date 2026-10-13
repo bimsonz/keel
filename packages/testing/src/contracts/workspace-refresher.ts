@@ -77,6 +77,29 @@ export function describeWorkspaceRefresherContract(
       },
     );
 
+    it.live(
+      "[refresher.contract.not-forward] a commit behind a workspace's main is refused with PushRejected stale, and its main stays where it was: a workspace is never taken back",
+      () => {
+        const { layer, projectId, trunk } = make();
+        return Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const refresher = yield* WorkspaceRefresher;
+          yield* host.create(trunk);
+          const base = yield* fixture.commit(trunk, MAIN, { "README.md": "base\n" });
+          const landed = yield* fixture.commit(trunk, MAIN, { "README.md": "landed\n" });
+          // Forked with the landing in it: trunk's earlier head is behind its main.
+          const workspace = yield* host.fork(trunk, fixture.scratch());
+          expect(yield* host.head(workspace, MAIN)).toBe(landed);
+
+          expect(
+            yield* Effect.flip(refresher.advance(projectId, workspace, landed, base)),
+          ).toMatchObject({ _tag: "PushRejected", reason: "stale" });
+          expect(yield* host.head(workspace, MAIN)).toBe(landed);
+        }).pipe(Effect.provide(layer));
+      },
+    );
+
     it.live("[refresher.contract.missing] a workspace that is gone fails RepoNotFound", () => {
       const { layer, projectId, trunk } = make();
       return Effect.gen(function* () {

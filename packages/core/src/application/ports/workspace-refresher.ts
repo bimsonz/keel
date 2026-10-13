@@ -20,9 +20,10 @@ export class WorkspaceRefresher extends Context.Service<
      * explicit old value and the only have: just what lies past it is sent,
      * and a main that is anywhere else refuses the push. `from` equal to `to`
      * is `unchanged` and sends nothing. RepoNotFound: the workspace is gone.
-     * PushRejected `stale`: main was not at `from`; `busy`: the workspace
-     * stayed busy. Nothing moved in either case. It never reads main back:
-     * the caller does, to learn where a refused or lost push left it.
+     * PushRejected `stale`: main was not at `from`, or `to` is behind `from`
+     * (a workspace is only ever moved forward); `busy`: the workspace stayed
+     * busy. Nothing moved in any of these. It never reads main back: the
+     * caller does, to learn where a refused or lost push left it.
      */
     readonly advance: (
       projectId: ProjectId,

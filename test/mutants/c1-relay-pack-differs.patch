@@ -2,15 +2,15 @@
 # kills: relay.pack
 # why: A relay sends a pack other than the one relayPack answers for the same move: the meter weighs one pack and trunk takes in another
 diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
-index c5d000b..6749f68 100644
+index c42d5927..b3d00d69 100644
 --- a/packages/gitcore/src/fetch.ts
 +++ b/packages/gitcore/src/fetch.ts
-@@ -166,7 +166,7 @@ export async function relay(
+@@ -286,7 +286,7 @@ export async function relay(
    options: RelayOptions = {},
  ): Promise<RelayOutcome> {
    if (move.from === move.to) return { kind: "unchanged" };
 -  const pack = await relayPack(source, move, options);
 +  const pack = await relayPack(source, { ...move, haves: [] }, options);
+   if (move.from !== null && move.haves === undefined && sendsNothing(pack))
+     throw new RelayNotForward(move.from, move.to);
    const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
-   const retries = options.busyRetries ?? 3;
-   for (let attempt = 0; ; attempt += 1) {

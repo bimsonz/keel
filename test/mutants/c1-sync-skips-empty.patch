@@ -2,15 +2,15 @@
 # kills: sync.empty-then-advance
 # why: An empty target is treated as already in sync, so a new project's staging and mirror never receive trunk
 diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
-index c5d000b..b8ff1a9 100644
+index c42d5927..76c51675 100644
 --- a/packages/gitcore/src/fetch.ts
 +++ b/packages/gitcore/src/fetch.ts
-@@ -165,7 +165,7 @@ export async function relay(
+@@ -285,7 +285,7 @@ export async function relay(
    move: RelayMove,
    options: RelayOptions = {},
  ): Promise<RelayOutcome> {
 -  if (move.from === move.to) return { kind: "unchanged" };
 +  if (move.from === move.to || move.from === null) return { kind: "unchanged" };
    const pack = await relayPack(source, move, options);
-   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
-   const retries = options.busyRetries ?? 3;
+   if (move.from !== null && move.haves === undefined && sendsNothing(pack))
+     throw new RelayNotForward(move.from, move.to);

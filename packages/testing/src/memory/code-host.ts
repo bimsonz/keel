@@ -397,6 +397,20 @@ export function makeWorkspaceRebaserMemory(
  * and nothing moves; `from` equal to `to` is `unchanged`; a missing workspace
  * is `RepoNotFound`. `advanced` records each move in order.
  */
+/** Whether `tip`'s history in `repo` holds `ancestor`. */
+function reaches(repo: MemoryRepo, tip: string, ancestor: string): boolean {
+  const seen = new Set<string>();
+  const stack = [tip];
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    if (id === ancestor) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const found = repo.objects.get(id);
+    if (found?.type === "commit") stack.push(...decodeCommit(found.body).parents);
+  }
+  return false;
+}
+
 export function makeWorkspaceRefresherMemory(
   code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
   trunkOf: (projectId: ProjectId) => RepoRef = (projectId) => projectRepos(projectId).trunk,
@@ -418,6 +432,9 @@ export function makeWorkspaceRefresherMemory(
             if (target === undefined)
               return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
             if (target.refs.get(MAIN) !== from)
+              return Effect.fail(new PushRejected({ reason: "stale" }));
+            // Behind where main is: a workspace is only ever moved forward.
+            if (reaches(target, from, to))
               return Effect.fail(new PushRejected({ reason: "stale" }));
             const trunk = trunkOf(projectId);
             const source = code.repos.get(repoKey(trunk));

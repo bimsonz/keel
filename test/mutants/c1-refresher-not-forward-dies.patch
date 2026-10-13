@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-refresher.test.ts
+# kills: refresher.not-forward
+# why: a relay refused as not forward is a defect to the refresher, so the pool's pass dies instead of reading the workspace's main back
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+index 282fe8cd..a0c21b96 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+@@ -56,9 +56,7 @@ export const WorkspaceRefresherGitCore = (
+               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
+                 cause instanceof ReceivePackBusy
+                   ? Effect.fail(new PushRejected({ reason: "busy" }))
+-                  : cause instanceof RelayNotForward
+-                    ? Effect.fail(new PushRejected({ reason: "stale" }))
+-                    : tooLarge(workspace)(cause),
++                  : tooLarge(workspace)(cause),
+               ),
+             );
+             if (outcome.kind === "rejected")
