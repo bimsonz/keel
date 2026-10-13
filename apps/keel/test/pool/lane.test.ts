@@ -20,14 +20,15 @@ import {
   type VerificationJob,
 } from "@keeltown/core/ports";
 import {
+  makeAgentDirectoryMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makeOrgUsageMemory,
   makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
-  makeOrgUsageMemory,
   makeTrunkWriterMemory,
   suitePlan,
 } from "@keeltown/testing";
@@ -138,6 +139,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
     code.layer,
     changes,
     makeCandidateComposerMemory().layer,
+    makeAgentDirectoryMemory().layer,
     makeCandidateBundlesMemory().layer,
     verification.layer,
     makeStagingWriterMemory({

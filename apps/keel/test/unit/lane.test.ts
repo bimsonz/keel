@@ -23,8 +23,10 @@ import {
   verificationDue,
 } from "@keeltown/core/application/integration";
 import type { Change } from "@keeltown/core/domain/coordination";
+import type { Agent } from "@keeltown/core/domain/identity";
 import type { VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
+  type AgentId,
   type BatchId,
   type CandidateId,
   type ChangeId,
@@ -49,6 +51,7 @@ import {
 } from "@keeltown/core/ports";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
+  makeAgentDirectoryMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
@@ -71,7 +74,19 @@ const LANE = `lane:${PROJECT}:main`;
 const STAGING = projectRepos(PROJECT).staging;
 const MAIN = "refs/heads/main";
 const AGENT = makeId("agt", "01J9AAAAAAAAAAAAAAAAAAAAAA");
+const OTHER_AGENT = makeId("agt", "01J9BBBBBBBBBBBBBBBBBBBBBB");
+const RUN = makeId("run", "01J9RRRRRRRRRRRRRRRRRRRRRR");
 const FAR = Instant(9_999_999_999_999);
+/** An agent as the directory holds one that signed up by key: with the handle it was given. */
+const signedUp = (id: AgentId, handle: string): Agent => ({
+  id,
+  handle,
+  name: handle,
+  scopes: ["agent:read", "agent:work"],
+  state: "active",
+  revocationEpoch: 0,
+  createdAt: Instant(0),
+});
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const change = (n: number): ChangeId => makeId("chg", `01J9C${String(n).padStart(21, "0")}`);
 
@@ -162,6 +177,7 @@ function world(options: WorldOptions = {}) {
     }),
   ).pipe(Layer.provide(Layer.merge(verification.layer, outbox.layer)));
   const composing = makeCandidateComposerMemory({ refuse: options.refuseCompose ?? [] });
+  const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
   const layer = Layer.mergeAll(
     outbox.layer,
@@ -181,6 +197,7 @@ function world(options: WorldOptions = {}) {
       : staging.layer,
     projects.layer,
     makePlacedProject(PROJECT).layer,
+    directory.layer,
     changesLayer,
   );
   const seeded = Effect.gen(function* () {
@@ -195,6 +212,8 @@ function world(options: WorldOptions = {}) {
     bundles,
     staging,
     changes,
+    /** The agent directory the Lane reads handles from: empty until a test writes an agent. */
+    agents: directory.agents,
     startedIn,
     hooks,
     layer,
@@ -540,7 +559,7 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.member-author] names each member's agent to the composer as the change records it: not its lease's holder, and nothing its commit says",
+    "[lane.member-author] names each member's agent to the composer as the change records it, with the handle the directory holds for it and the run that holds the change: not its lease's holder, and nothing its commit says",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -551,11 +570,29 @@ describe("the Lane", () => {
         // Another agent holds the lease: the author is the change's own agent all the same.
         w.changes.set(change(1), {
           ...queued,
-          lease: { ...queued.lease, agentId: makeId("agt", "01J9BBBBBBBBBBBBBBBBBBBBBB") },
+          run: { id: RUN },
+          lease: { ...queued.lease, agentId: OTHER_AGENT },
         });
+        w.agents.set(AGENT, signedUp(AGENT, "agent-01j9aaaaaaaaaaaa"));
+        w.agents.set(OTHER_AGENT, signedUp(OTHER_AGENT, "agent-01j9bbbbbbbbbbbb"));
         yield* toVerifying(w);
-        expect(w.composed.map((request) => request.members.map((m) => m.agent))).toEqual([
-          [{ id: AGENT }],
+        expect(w.composed.map((request) => request.members.map((m) => m.agent))).toStrictEqual([
+          [{ id: AGENT, handle: "agent-01j9aaaaaaaaaaaa", run: RUN }],
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.member-plain] names an agent the directory holds no handle for by its id alone, and no run for a change that none holds",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* toVerifying(w);
+        expect(w.composed.map((request) => request.members.map((m) => m.agent))).toStrictEqual([
+          [{ id: AGENT, handle: undefined, run: undefined }],
         ]);
       }).pipe(Effect.provide(w.layer));
     },

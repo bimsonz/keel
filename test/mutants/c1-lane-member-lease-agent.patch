@@ -2,15 +2,15 @@
 # kills: lane.member-author
 # why: The Lane names the lease's holder as the author, not the agent the change belongs to
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 488d418..52c7142 100644
+index 6e114fe0..0c7d2c43 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -652,7 +652,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-         head: change.commitSha,
-         title: change.intent.goal,
-         // The agent the change belongs to, as the gate authenticated it: never what its commit says.
--        agent: { id: change.agentId },
-+        agent: { id: change.lease.agentId },
-       } satisfies CandidateMember;
-     }).pipe(Effect.orDie),
-   );
+@@ -659,7 +659,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+         // member reads the same one (an agent a person enrolled has none, and is written by its id).
+         // The run is the one that holds the change.
+         agent: {
+-          id: change.agentId,
++          id: change.lease.agentId,
+           handle: Option.getOrUndefined(agent)?.handle,
+           run: change.run?.id,
+         },

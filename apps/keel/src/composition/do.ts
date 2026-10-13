@@ -186,6 +186,7 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
 export type LaneServices =
   | CodeHost
   | Changes
+  | AgentDirectory
   | CandidateComposer
   | CandidateBundles
   | BatchVerification
@@ -197,7 +198,7 @@ export type LaneServices =
  * The Lane DO reads its members from their Change DOs and its project's
  * settings from the Project DO (verification may be off), composes and bundles
  * candidates through GitCore over the Artifacts bindings (one handle per repo
- * per compose), stores bundles in R2 for the namespace D1's `projects` table
+ * per compose), names each member's agent by the handle D1's directory holds, stores bundles in R2 for the namespace D1's `projects` table
  * places its project in, starts KeelVerify, and moves staging's
  * main after trunk. It never holds a trunk write token. `projectId` is read
  * lazily, on first use, from the object's name.
@@ -217,6 +218,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       ChangesRpc({ change, agentSession }),
       ProjectsRpc(project),
       ProjectNamespacesD1(env.DB),
+      AgentDirectoryD1(env.DB),
       CandidateComposerGitCore(objects, commitSigning(env)).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW),

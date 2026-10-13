@@ -7,14 +7,15 @@ import { TrunkAdvanced } from "@keeltown/core/domain/integration";
 import { type CommitSha, makeId, type NextAction, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, EventOutbox, type VerificationJob } from "@keeltown/core/ports";
 import {
+  makeAgentDirectoryMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makeOrgUsageMemory,
   makePlacedProject,
   makeProjectsMemory,
   makeStagingWriterMemory,
-  makeOrgUsageMemory,
   makeTrunkWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
@@ -500,6 +501,7 @@ async function realLane(projectId: ProjectId) {
   const driven: Layer.Layer<LaneServices> = Layer.mergeAll(
     code.layer,
     changes,
+    makeAgentDirectoryMemory().layer,
     makeCandidateComposerMemory().layer,
     makeCandidateBundlesMemory().layer,
     verification.layer,

@@ -25,10 +25,11 @@ import {
   Trunks,
 } from "@keeltown/core/ports";
 import {
+  freshOrg,
+  makeAgentDirectoryMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
-  freshOrg,
   makeCodeHostMemory,
   makeOrgUsageMemory,
   makePlacedProject,
@@ -308,6 +309,7 @@ async function promoting(placed?: { readonly org: NamespaceId; readonly history:
   const stagingRefs = () => code.repos.get(`${staging.namespace}/${staging.name}`)?.refs;
   const laneServices: Layer.Layer<LaneServices> = Layer.mergeAll(
     code.layer,
+    makeAgentDirectoryMemory().layer,
     Layer.succeed(
       Changes,
       Changes.of({

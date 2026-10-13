@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import {
   ChangeBounced,
   ChangeParked,
@@ -39,6 +39,7 @@ import {
 } from "../../domain/kernel/index.ts";
 import { type VerdictOutcome, VerdictIssued } from "../../domain/verification/index.ts";
 import {
+  AgentDirectory,
   type BatchVerdict,
   BatchVerification,
   CandidateBundles,
@@ -639,10 +640,12 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
     return;
   }
   const changes = yield* Changes;
+  const directory = yield* AgentDirectory;
   const members = yield* Effect.forEach(batch.members, (changeId) =>
     Effect.gen(function* () {
       const { change } = yield* changes.get(changeId);
       const workspace = yield* changes.workspace(changeId);
+      const agent = yield* directory.findAgent(change.agentId);
       if (change.commitSha === undefined)
         return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
       return {
@@ -652,7 +655,14 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
         head: change.commitSha,
         title: change.intent.goal,
         // The agent the change belongs to, as the gate authenticated it: never what its commit says.
-        agent: { id: change.agentId },
+        // Its handle is the directory's: given at sign-up and never after, so every compose of a
+        // member reads the same one (an agent a person enrolled has none, and is written by its id).
+        // The run is the one that holds the change.
+        agent: {
+          id: change.agentId,
+          handle: Option.getOrUndefined(agent)?.handle,
+          run: change.run?.id,
+        },
       } satisfies CandidateMember;
     }).pipe(Effect.orDie),
   );
