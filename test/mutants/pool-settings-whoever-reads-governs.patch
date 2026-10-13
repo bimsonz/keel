@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: replacing a project's settings asks only for a read, so an agent replaces the settings of another agent's public project
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index bd9f562f..4b81b02d 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -137,7 +137,7 @@ export const SPEC_ACTIONS = {
+   Operator_suspendAgent: rule("Agent", "sponsor"),
+   Operator_reinstateAgent: rule("Agent", "sponsor"),
+   Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
+-  Operator_putSettings: rule("Project", "maintain"),
++  Operator_putSettings: rule("Project", "read"),
+ } as const satisfies Record<string, ActionRule>;
+ 
+ /**

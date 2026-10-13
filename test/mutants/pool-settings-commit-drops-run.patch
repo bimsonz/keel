@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: the Project object commits ProjectSettingsChanged under the actor with no run, so nothing says which of an agent's runs turned verification off
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 6bb84ecd..6b5f65dc 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -154,7 +154,6 @@ export const changeSettings: (
+       cause: `settings:${requestId}`,
+       fingerprint,
+       actor,
+-      ...(run === undefined ? {} : { run }),
+       project: projectId,
+     },
+     (tx): Result.Result<Transition<ProjectSettings>, ProjectNotFound | IdempotencyConflict> => {

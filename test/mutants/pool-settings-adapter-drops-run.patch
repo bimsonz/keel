@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: the isolate sends the Project object a change of settings without the run, so it is committed under the agent and no run
+diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+index 5c589f9e..f903f1e6 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+@@ -67,7 +67,6 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+               settings,
+               by: actorId(actor),
+               actor: eventActorOf(actor),
+-              ...(run === undefined ? {} : { run }),
+               requestId,
+             }),
+           ),

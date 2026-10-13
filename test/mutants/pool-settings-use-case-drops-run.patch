@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: the use-case asks the Projects port to replace the settings without the run it was given, so the run is lost before it leaves the isolate
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+index 7a366e58..4f7c41ab 100644
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -108,4 +108,4 @@ export const putSettings: (
+   settings,
+   requestId,
+   run,
+-) => Projects.use((projects) => projects.putSettings(actor, projectId, settings, requestId, run));
++) => Projects.use((projects) => projects.putSettings(actor, projectId, settings, requestId));

@@ -2,15 +2,15 @@
 # kills: b12.settings-operator
 # why: a project's settings change is recorded under the old operator spelling, not as the user who made it
 diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-index b9937273..2bd9eeee 100644
+index 5c589f9e..0424672c 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-@@ -61,7 +61,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+@@ -66,7 +66,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
                projectId,
                settings,
                by: actorId(actor),
 -              actor: eventActorOf(actor),
 +              actor: `operator:${actorId(actor)}`,
+               ...(run === undefined ? {} : { run }),
                requestId,
              }),
-           ),

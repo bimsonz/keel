@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: the settings doorway takes a person and nobody else, so an agent the policy granted in its own namespace gets a 500 where its settings should change
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index fadd3d93..df9733ae 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -272,7 +272,6 @@ function creatorOf(caller: Caller): Actor {
+ /** Who changes a project's settings: a person, or an agent in a namespace of its own, as the policy granted. */
+ function settingsActorOf(caller: Caller): Actor {
+   const { principal } = caller;
+-  if (principal._tag === "Agent") return { _tag: "Agent", agentId: principal.agentId };
+   if (principal._tag === "User") return { _tag: "User", userId: principal.userId };
+   throw new Error("a project's settings were put for neither an agent nor a user");
+ }

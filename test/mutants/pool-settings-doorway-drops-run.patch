@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.pool-settings
+# kills: run.pool-settings
+# why: the settings doorway passes the agent and not its token's run, so the audit of a change of settings says which agent and never which run
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index fadd3d93..a1533aff 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -1116,7 +1116,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 projectId,
+                 settings,
+                 caller.requestId,
+-                caller.token?.run,
+               ),
+             ).pipe(
+               Effect.match({
