@@ -120,7 +120,7 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 | `/N` | The namespace's own page: its projects |
 | `/N/P`, `/N/P/tree/<ref>/<path>`, `/N/P/blob/<ref>/<path>` | The code. `ref` is a commit, or `trunk` for wherever trunk's head is |
 | `/N/P/commits`, `/N/P/commit/<sha>` | Trunk's history, and one commit's diff |
-| `/N/P/changes`, `/N/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked |
+| `/N/P/changes`, `/N/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked A verdict is said by Keel's own outcome, and with it that no plan ran where Keel says so; the evidence its event recorded is listed as Keel wrote it where Keel serves no view of the verdict; and what Keel derived names the commit it derived from, or says that none was pushed |
 | `/N/P/conflicts`, `/N/P/conflicts/<C-n>`, `…/probe`, `…/evidence` | The conflicts, and one conflict. `?state=` is `open` or `settled` |
 | `/N/P/escalations`, `/N/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/N/P/mission-control`, `/N/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
