@@ -2,15 +2,15 @@
 # kills: image.box-size
 # why: the suite box keeps one vCPU, where Keel's own suite needs more than keel.test's 20 minutes: no code change on Keel's repository lands
 diff --git a/apps/keel-verify/wrangler.jsonc b/apps/keel-verify/wrangler.jsonc
-index 90843af4..4ac3597e 100644
+index 5683bb78..4b1c1e10 100644
 --- a/apps/keel-verify/wrangler.jsonc
 +++ b/apps/keel-verify/wrangler.jsonc
-@@ -36,7 +36,7 @@
+@@ -38,7 +38,7 @@
      {
        "class_name": "KeelSandbox",
        "image": "./containers/sandbox/Dockerfile",
 -      "instance_type": "standard-4",
 +      "instance_type": "standard-2",
-       "max_instances": 10,
+       "max_instances": 330,
      },
      // The deps box: the same image, with the registry reachable through its own outbound handler.

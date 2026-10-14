@@ -32,12 +32,14 @@
   ],
   // Tier 2 (ExecBox): a classic Sandbox container, so its instances are capped here; the account is shared.
   // Four vCPUs, as CI's runner has: Keel's own suite takes 20 minutes on one, its step's whole timeout.
+  // 330 boxes are 1,320 of the account's 1,500 vCPU: the other container apps' caps hold 111.25, and
+  // the rest is MergeBox's, which has no cap of its own (half a vCPU a box).
   "containers": [
     {
       "class_name": "KeelSandbox",
       "image": "./containers/sandbox/Dockerfile",
       "instance_type": "standard-4",
-      "max_instances": 10,
+      "max_instances": 330,
     },
     // The deps box: the same image, with the registry reachable through its own outbound handler.
     {
