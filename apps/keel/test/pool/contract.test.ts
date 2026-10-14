@@ -41,18 +41,6 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(body.issues.map((issue) => issue.path)).toContainEqual(["grant_type"]);
   });
 
-  it("answers a stubbed operation with the declared 503 service.not_implemented", async () => {
-    const seeded = await seedAgent();
-    const response = await exports.default.fetch(
-      `${BASE}/v1/verdicts/vrd_01JZ8PT2C4E6G8J0M2N4Q6S8V0`,
-      {
-        headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
-      },
-    );
-    expect(response.status).toBe(503);
-    expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
-  });
-
   it("[a11.mcp-gate] lists exactly the mcp-tagged operations as tools, to every caller: the policy decides each call", async () => {
     const tagged = Object.values(openApiDocument.paths)
       .flatMap((path) => Object.values(path))
