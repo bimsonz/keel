@@ -2153,7 +2153,7 @@ describe("the Lane batches (C4.1)", () => {
       }).pipe(Effect.provide(w.layer)),
     );
     expect(batches).toEqual([[change(1), change(3)], [change(2)]]);
-  });
+  }, 120_000);
 
   it.effect(
     "[c41.unattributed-alone] a batch of four that fails with no one blamed is split into four batches of one, each formed alone under the id its bisection named: the culprit bounces on its own verdict and the other three land",

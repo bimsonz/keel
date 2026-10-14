@@ -150,7 +150,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
     });
 
     it.live(
-      "holds the defaults until a PUT: no protected paths, batches of one, verified, private",
+      "holds the defaults until a PUT: no protected paths, batches of up to 8, verified, private",
       () => {
         const harness = make();
         return Effect.gen(function* () {
@@ -158,7 +158,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
           const project = yield* projects.create(creator(), creating(harness.source));
           expect(yield* projects.settings(project.id)).toEqual({
             protectedPaths: [],
-            maxBatchSize: 1,
+            maxBatchSize: 8,
             verification: "required",
             visibility: "private",
           });
