@@ -2,7 +2,7 @@
 # kills: derive.attribution-anchors-only
 # why: an anchor covers any symbol whose name starts with its own
 diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
-index fa3c459..03e354a 100644
+index d4c033cb..efc12777 100644
 --- a/packages/core/src/domain/coordination/derive.ts
 +++ b/packages/core/src/domain/coordination/derive.ts
 @@ -199,7 +199,7 @@ const covers = (anchor: Anchor, ref: SymbolRef): boolean =>
@@ -12,5 +12,5 @@ index fa3c459..03e354a 100644
 -    ref.symbol.startsWith(`${anchor.symbol}.`));
 +    ref.symbol.startsWith(anchor.symbol));
  
- type Attributed = {
-   readonly subject: SubjectKey;
+ /** Each subject's anchors, gathered from every row that names it. */
+ const anchorsBySubject = (

@@ -2,7 +2,7 @@
 # kills: derive.attribution-anchors-only, derive.forge-lite
 # why: an anchor covers every symbol in its file, so a sibling symbol's cache is put on the subject
 diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
-index fa3c459..c7a3544 100644
+index d4c033cb..f2eaf7f8 100644
 --- a/packages/core/src/domain/coordination/derive.ts
 +++ b/packages/core/src/domain/coordination/derive.ts
 @@ -196,10 +196,7 @@ export const storeClaims = (
@@ -15,5 +15,5 @@ index fa3c459..c7a3544 100644
 -    ref.symbol.startsWith(`${anchor.symbol}.`));
 +  anchor.path === ref.path;
  
- type Attributed = {
-   readonly subject: SubjectKey;
+ /** Each subject's anchors, gathered from every row that names it. */
+ const anchorsBySubject = (
