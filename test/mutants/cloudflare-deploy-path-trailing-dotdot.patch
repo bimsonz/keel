@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.bounds
+# why: a deploy path ending in .. is taken, so apps/.. reads the Worker's config from the repo's root
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..2bc0c55f 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -35,7 +35,7 @@ export const DeploySpec = Schema.Struct({
+   worker: WorkerName,
+   /** The directory holding the Worker's wrangler config, from the repo's root; the root itself when absent. */
+   path: Schema.optional(
+-    Schema.String.check(Schema.isPattern(/^(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))[\w./-]{1,200}$/)),
++    Schema.String.check(Schema.isPattern(/^(?!\/)(?!.*(?:^|\/)\.\.?\/)[\w./-]{1,200}$/)),
+   ),
+   smoke: Schema.Array(SmokeCheck).check(Schema.isMinLength(1), Schema.isMaxLength(8)),
+ });

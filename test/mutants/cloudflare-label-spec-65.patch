@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/credential.test.ts
+# kills: credential.label-contract
+# why: the published API takes a 65-character label, which the domain then refuses
+# regen
+diff --git a/packages/spec/delivery.tsp b/packages/spec/delivery.tsp
+index 5c1575b2..83d82b81 100644
+--- a/packages/spec/delivery.tsp
++++ b/packages/spec/delivery.tsp
+@@ -8,7 +8,7 @@ namespace Keel;
+ 
+ /** What an owner calls a credential: shown in its place, since the secret never is. */
+ @minLength(1)
+-@maxLength(64)
++@maxLength(65)
+ @pattern("^\\S(?:.*\\S)?$")
+ scalar CredentialLabel extends string;
+ 

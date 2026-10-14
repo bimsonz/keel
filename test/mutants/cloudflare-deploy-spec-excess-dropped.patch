@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.unknown-keys
+# why: a misspelt key in .keel/deploy.json is dropped, so a typo like Path deploys the repo root
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..7ea51327 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -59,7 +59,7 @@ export const parseDeploySpec = (source: string): Result.Result<DeploySpec, Deplo
+       }),
+     );
+   }
+-  const decoded = Schema.decodeUnknownResult(DeploySpec)(json, { onExcessProperty: "error" });
++  const decoded = Schema.decodeUnknownResult(DeploySpec)(json);
+   return Result.isFailure(decoded)
+     ? Result.fail(
+         new DeploySpecInvalid({ detail: `${DEPLOY_SPEC_PATH}: ${decoded.failure.message}` }),

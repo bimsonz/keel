@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.field-shapes
+# why: a compatibility date in any form is taken, and Cloudflare refuses the upload instead of Keel naming the field
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..da5a1f1a 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -216,7 +216,7 @@ export const wranglerFacts = (
+   const missing = [
+     typeof name === "string" ? undefined : "name",
+     typeof main === "string" && main.length > 0 ? undefined : "main",
+-    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? undefined : "compatibility_date",
++    typeof date === "string" && date.length > 0 ? undefined : "compatibility_date",
+     isStringArray(flags) ? undefined : "compatibility_flags",
+     typeof vars === "object" && vars !== null && !Array.isArray(vars) ? undefined : "vars",
+   ].filter((key) => key !== undefined);

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.jsonc-comma-comment
+# why: a trailing comma before a comment is kept, so a wrangler config wrangler reads is called unreadable
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..efa80c49 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -154,7 +154,8 @@ export const jsoncToJson = (source: string): string => {
+       const end = source.indexOf("*/", i + 2);
+       i = end === -1 ? source.length : end + 2;
+     } else if (c === ",") {
+-      const j = pastBlank(source, i + 1);
++      let j = i + 1;
++      while (j < source.length && /\s/.test(source[j] ?? "")) j += 1;
+       if (source[j] !== "}" && source[j] !== "]") out += c;
+       i += 1;
+     } else {

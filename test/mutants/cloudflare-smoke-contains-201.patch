@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.bounds
+# why: a smoke check's text may be longer than the 200 characters the spec allows
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..f000ac22 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -19,7 +19,7 @@ export type WorkerName = typeof WorkerName.Type;
+ export const SmokeCheck = Schema.Struct({
+   path: Schema.String.check(Schema.isPattern(/^\/(?!\/)[\x21-\x5b\x5d-\x7e]{0,255}$/)),
+   status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
+-  contains: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
++  contains: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(201))),
+ });
+ export type SmokeCheck = typeof SmokeCheck.Type;
+ 

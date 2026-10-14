@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: smoke.same-host, smoke.same-host-any
+# why: a path that does not start with / is joined to the preview's origin, so @evil.example names a host of its own
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..99984016 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -286,6 +286,6 @@ export const smokeUrl = (
+   preview: string,
+   check: SmokeCheck,
+ ): Result.Result<string, SmokePathOffHost> =>
+-  check.path.startsWith("/")
++  check.path.length > 0
+     ? Result.succeed(`${preview}${check.path}`)
+     : Result.fail(new SmokePathOffHost({ path: check.path, preview }));

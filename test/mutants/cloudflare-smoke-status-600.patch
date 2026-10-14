@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.bounds
+# why: a smoke check may expect status 600, which no HTTP answer has, so the check can never pass
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..9c150fd0 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -18,7 +18,7 @@ export type WorkerName = typeof WorkerName.Type;
+  */
+ export const SmokeCheck = Schema.Struct({
+   path: Schema.String.check(Schema.isPattern(/^\/(?!\/)[\x21-\x5b\x5d-\x7e]{0,255}$/)),
+-  status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
++  status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 600 })),
+   contains: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+ });
+ export type SmokeCheck = typeof SmokeCheck.Type;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/credential.test.ts
+# kills: credential.label
+# why: a label of 65 characters is taken by the domain, past the 64 the API publishes
+diff --git a/packages/core/src/domain/delivery/credential.ts b/packages/core/src/domain/delivery/credential.ts
+index f16dcf49..b0933f4c 100644
+--- a/packages/core/src/domain/delivery/credential.ts
++++ b/packages/core/src/domain/delivery/credential.ts
+@@ -5,7 +5,7 @@ import { DeployProvider } from "./deployment.ts";
+ /** What an owner calls a credential: shown in its place, since the secret never is. */
+ export const CredentialLabel = Schema.String.check(
+   Schema.isMinLength(1),
+-  Schema.isMaxLength(64),
++  Schema.isMaxLength(65),
+   Schema.isPattern(/^\S(?:.*\S)?$/),
+ );
+ export type CredentialLabel = typeof CredentialLabel.Type;

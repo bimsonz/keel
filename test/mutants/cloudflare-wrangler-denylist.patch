@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.carries-only-known
+# why: only the bindings someone listed are refused, so a binding wrangler adds later is dropped from the preview without a word
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 89609eeb..ab8e4d9b 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -200,7 +200,7 @@ export const wranglerFacts = (
+     return Result.fail(
+       new WranglerConfigRefused({ reason: "unreadable", detail: `${fileName} is not an object` }),
+     );
+-  const uncarried = Object.keys(config).filter((key) => !TAKEN_KEYS.includes(key));
++  const uncarried = ["durable_objects", "kv_namespaces", "d1_databases"].filter((key) => Object.hasOwn(config, key));
+   if (uncarried.length > 0)
+     return Result.fail(
+       new WranglerConfigRefused({
