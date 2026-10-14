@@ -152,6 +152,24 @@ function placement({ agent, invitations, joined }: Identity) {
   };
 }
 
+/**
+ * What `whoami` tells an agent that has joined an org or a project: where to
+ * read the projects it can work in, each with the id a token names.
+ */
+function reach({ joined }: Identity) {
+  return joined.namespaces + joined.projects === 0
+    ? { next: [] }
+    : {
+        next: [
+          {
+            kind: "call" as const,
+            title: "List the projects you can work in: each project's id is what a token names",
+            operationId: "Agents_listReachableProjects",
+          },
+        ],
+      };
+}
+
 export function whoamiOk(identity: Identity): WhoamiResult {
   const { agent, run, invitations } = identity;
   const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
@@ -170,7 +188,7 @@ export function whoamiOk(identity: Identity): WhoamiResult {
         invitations,
       },
       findings: [],
-      next: [...sponsor.next, ...waiting.next, ...placed.next],
+      next: [...sponsor.next, ...waiting.next, ...placed.next, ...reach(identity).next],
       notices: [],
       cost: {},
     },

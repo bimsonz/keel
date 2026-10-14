@@ -329,6 +329,7 @@ export const RESOLVERS: Resolvers = {
   Agents_acceptInvitation: self,
   Agents_leaveNamespace: self,
   Agents_listProjects: self,
+  Agents_listReachableProjects: self,
   Agents_acceptProjectInvitation: self,
   Agents_leaveProject: self,
 

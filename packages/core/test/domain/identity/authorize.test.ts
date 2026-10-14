@@ -1617,6 +1617,7 @@ describe("authorize: the rows an invitation is made, read and answered by", () =
     "Agents_listProjects: Self agent",
     "Agents_acceptProjectInvitation: Self agent",
     "Agents_leaveProject: Self agent",
+    "Agents_listReachableProjects: Self agent",
   ];
   const rows = INVITATION_ROWS.map((row) => row.slice(0, row.indexOf(":"))).filter(isAction);
   const itsOwn = rows.filter((a) => kindOf(a) === "Self");
@@ -1626,8 +1627,8 @@ describe("authorize: the rows an invitation is made, read and answered by", () =
 
   it("[authz.invitation-rows] an invitation is made and ended by people and read, accepted and left by the agent it names: a person is refused the agent's rows, and an agent the org's two", () => {
     expect(rows.map((a) => `${a}: ${kindOf(a)} ${needOf(a)}`)).toEqual(INVITATION_ROWS);
-    expect(itsOwn).toHaveLength(6);
-    // These six are every row that asks for an agent, and what a person reads of themselves still asks `self`.
+    expect(itsOwn).toHaveLength(7);
+    // These seven (the six an invitation is read, accepted and left by, and what the accepted ones reach) are every row that asks for an agent, and what a person reads of themselves still asks `self`.
     expect(ACTION_NAMES.filter((a) => needOf(a) === "agent").toSorted()).toEqual(itsOwn.toSorted());
     expect(ACTION_NAMES.filter((a) => needOf(a) === "self").toSorted()).toEqual([
       "askSponsor",
@@ -1635,7 +1636,7 @@ describe("authorize: the rows an invitation is made, read and answered by", () =
       "whoami",
     ]);
 
-    // The agent's own six: any agent that is not paused, and no person, whoever they are.
+    // The agent's own seven: any agent that is not paused, and no person, whoever they are.
     fc.assert(
       fc.property(agentArb, (agent) => answers({ ...agent, paused: false }) === all("ok:")),
     );

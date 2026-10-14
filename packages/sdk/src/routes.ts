@@ -55,6 +55,7 @@ export const ROUTES = {
     headers: ["idempotency-key"],
   },
   Agents_listProjects: { method: "GET", path: "/agents/me/projects" },
+  Agents_listReachableProjects: { method: "GET", path: "/agents/me/reachable-projects" },
   Agents_acceptProjectInvitation: {
     method: "PUT",
     path: "/agents/me/projects/{projectId}",

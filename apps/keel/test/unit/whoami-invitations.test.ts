@@ -72,6 +72,20 @@ describe("whoami's answer", () => {
     });
   });
 
+  it("[whoami.reach-next] points an agent that has joined an org or a project at the projects it can reach, last, and an agent that has joined nothing at none", () => {
+    const reads = (joined: { namespaces: number; projects: number }, invitations = none) =>
+      answer({ agent, session: null, invitations, joined }).next.map(
+        (action) => action.operationId,
+      );
+    expect(reads(none)).toEqual([]);
+    expect(reads({ namespaces: 1, projects: 0 })).toEqual(["Agents_listReachableProjects"]);
+    expect(reads({ namespaces: 0, projects: 1 })).toEqual(["Agents_listReachableProjects"]);
+    expect(reads({ namespaces: 1, projects: 0 }, { namespaces: 0, projects: 1 })).toEqual([
+      "Agents_listProjects",
+      "Agents_listReachableProjects",
+    ]);
+  });
+
   it("[whoami.sponsor-next] tells an agent nobody stands behind to ask a person, askSponsor first, and says nothing of it once someone does", () => {
     const { sponsor: _, ...unsponsored } = agent;
     const alone = answer({ agent: unsponsored, session: null, invitations: none, joined: none });

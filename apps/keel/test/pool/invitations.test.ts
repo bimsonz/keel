@@ -941,7 +941,7 @@ const told = async (token: string) => {
 };
 
 describe("whoami says an invitation is waiting, through the real Worker", () => {
-  it("[whoami.invited] an agent invited into an org and to a project is told one of each and the read for each; accepted, and ended, it is told none", async () => {
+  it("[whoami.invited] an agent invited into an org and to a project is told one of each and the read for each; accepted, and ended, it is told none, and once in the org it is pointed at the projects it can reach", async () => {
     const { slug, member } = await anOrg();
     const { person, projectId } = await aSoloPerson();
     const agent = await keyAgent();
@@ -968,14 +968,14 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     expect((await http(own, "PUT", `/agents/me/namespaces/${slug}`)).status).toBe(200);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 1 },
-      reads: ["askSponsor", "Agents_listProjects"],
+      reads: ["askSponsor", "Agents_listProjects", "Agents_listReachableProjects"],
     });
     expect(
       (await http(person.token, "DELETE", `/projects/${projectId}/agents/${agent.agentId}`)).status,
     ).toBe(200);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 0 },
-      reads: ["askSponsor"],
+      reads: ["askSponsor", "Agents_listReachableProjects"],
     });
   });
 
@@ -1011,7 +1011,7 @@ const tool = async (token: string, name: string, args: Record<string, unknown> =
 };
 
 describe("an agent sets itself up through Keel's MCP alone", () => {
-  it("[mcp.set-up] signed up by key, it is told to ask a person to sponsor it and an org's member to invite it by its handle; invited, it reads the invitation and accepts it through Keel's tools", async () => {
+  it("[mcp.set-up] signed up by key, it is told to ask a person to sponsor it and an org's member to invite it by its handle; invited, it reads the invitation and accepts it through Keel's tools, and is then pointed at the projects it can reach", async () => {
     const { slug, member } = await anOrg();
     const agent = await keyAgent();
     // Its client's token names a project of its own namespace, as a key agent's MCP token does before any org takes it in.
@@ -1064,7 +1064,91 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
 
     const placed = await tool(own, "whoami");
     expect(placed.body["summary"]).not.toMatch(/invitation|own namespace/);
-    expect(placed.body["next"]).toMatchObject([{ operationId: "askSponsor" }]);
-    expect(placed.body["next"]).toHaveLength(1);
+    expect(placed.body["next"]).toMatchObject([
+      { operationId: "askSponsor" },
+      { operationId: "Agents_listReachableProjects" },
+    ]);
+    expect(placed.body["next"]).toHaveLength(2);
+  });
+});
+
+const byFirst = (a: readonly unknown[], b: readonly unknown[]) =>
+  String(a[0]).localeCompare(String(b[0]));
+
+describe("an agent lists the projects it can reach, through the real Worker", () => {
+  it("[agents.reach] its own namespace's projects, every project of each org it joined and each person's project it joined, with their ids, over REST and MCP; a pending invitation, an org that never asked, an org whose inviter left and an org that took it out reach nothing", async () => {
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const mine: ProjectId = makeId("prj", ulid());
+    await placeProject(mine, Schema.decodeUnknownSync(NamespaceId)(agent.agentId));
+    const joined = await anOrg();
+    const second: ProjectId = makeId("prj", ulid());
+    await placeProject(second, joined.org);
+    const pending = await anOrg();
+    const stranger = await anOrg();
+    const left = await anOrg();
+    const revoked = await anOrg();
+    const { person, projectId: personal, other } = await aSoloPerson();
+
+    for (const org of [joined, pending, left, revoked])
+      expect(
+        (
+          await http(org.member.token, "POST", `/namespaces/${org.slug}/agents`, {
+            agent: agent.handle,
+          })
+        ).status,
+      ).toBe(201);
+    expect(
+      (await http(person.token, "POST", `/projects/${personal}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    for (const org of [joined, left, revoked])
+      expect((await http(own, "PUT", `/agents/me/namespaces/${org.slug}`)).status).toBe(200);
+    expect((await http(own, "PUT", `/agents/me/projects/${personal}`)).status).toBe(200);
+    // The member who invited it into `left` leaves that org: the agent reaches none of it any more.
+    await env.DB.prepare("DELETE FROM member WHERE organizationId = ? AND userId = ?")
+      .bind(left.org, left.member.userId)
+      .run();
+    // The member who invited it into `revoked` takes it out again.
+    expect(
+      (
+        await http(
+          revoked.member.token,
+          "DELETE",
+          `/namespaces/${revoked.slug}/agents/${agent.agentId}`,
+        )
+      ).status,
+    ).toBe(200);
+
+    const listed = await http(own, "GET", "/agents/me/reachable-projects");
+    expect(listed.status).toBe(200);
+    const both = ["agent:read", "agent:work"];
+    const reached = items(listed).map((item) => [
+      String(Object(item["project"])["id"]),
+      item["through"],
+      item["scopes"],
+    ]);
+    expect(reached.toSorted(byFirst)).toEqual(
+      [
+        [mine, "own", both],
+        [joined.projectId, "org", both],
+        [second, "org", both],
+        [personal, "project", both],
+      ].toSorted(byFirst),
+    );
+    const ids = reached.map(([id]) => id);
+    for (const unreached of [
+      pending.projectId,
+      stranger.projectId,
+      left.projectId,
+      revoked.projectId,
+      other,
+    ])
+      expect(ids).not.toContain(unreached);
+
+    const door = await agent.token(undefined, undefined, `${BASE}/mcp`);
+    const tooled = await tool(door, "Agents_listReachableProjects");
+    expect(tooled.refused).toBe(false);
+    expect(tooled.body["items"]).toEqual(listed.body["items"]);
   });
 });

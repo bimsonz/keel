@@ -1,6 +1,7 @@
 import {
   type Actor,
   type Agent,
+  answers,
   type Audience,
   type IdempotencyConflict,
   INVITED_SCOPES,
@@ -12,6 +13,7 @@ import { AgentId, NamespaceId, ProjectId, type UserId } from "@keeltown/core/ker
 import {
   AgentDirectory,
   Invitations,
+  Memberships,
   NamespaceAgents,
   type NamespaceRecord,
   Namespaces,
@@ -27,6 +29,7 @@ import type {
   Agents_leaveProjectResult,
   Agents_listNamespacesResult,
   Agents_listProjectsResult,
+  Agents_listReachableProjectsResult,
   Namespaces_inviteAgentResult,
   Namespaces_listAgentsResult,
   Namespaces_removeAgentResult,
@@ -119,6 +122,104 @@ export const joinedOrgs = (agentId: AgentId) =>
         onSome: (found) => [{ handle: found.handle, kind: found.kind }],
       }),
     );
+  });
+
+/** Whether whoever made an invitation still answers for the agent it invited, as the gate reads it. */
+const answered = (invitation: Invitation) =>
+  Memberships.use((memberships) => memberships.standing(invitation.by, invitation.namespace)).pipe(
+    Effect.map(answers),
+  );
+
+/**
+ * The projects an agent can read and work in now, by the facts the gate
+ * decides a token on: every project of its own namespace, every project of
+ * each org whose invitation it accepted, and each project it accepted an
+ * invitation to by itself, while whoever invited it still answers for it
+ * there. A pending invitation reaches nothing. By namespace handle, then name.
+ */
+export const reachableProjects = (agentId: AgentId) =>
+  Effect.gen(function* () {
+    const places = yield* ProjectNamespaces;
+    const namespaces = yield* Namespaces;
+    // An agent governs its own namespace: it reads and works on every project there.
+    const own = places
+      .inNamespace(agentId)
+      .pipe(
+        Effect.map((projects) =>
+          projects.map((place) => ({ place, through: "own" as const, scopes: INVITED_SCOPES })),
+        ),
+      );
+    const orgs = NamespaceAgents.use((agents) => agents.ofAgent(agentId)).pipe(
+      Effect.flatMap((rows) =>
+        Effect.forEach(
+          rows.filter((row) => row.state === "joined"),
+          (row) =>
+            Effect.flatMap(answered(row), (stands) =>
+              stands
+                ? places.inNamespace(row.namespace).pipe(
+                    Effect.map((projects) =>
+                      projects.map((place) => ({
+                        place,
+                        through: "org" as const,
+                        scopes: row.scopes,
+                      })),
+                    ),
+                  )
+                : Effect.succeed([]),
+            ),
+        ),
+      ),
+      Effect.map((lists) => lists.flat()),
+    );
+    const projects = ProjectAgents.use((agents) => agents.ofAgent(agentId)).pipe(
+      Effect.flatMap((rows) =>
+        Effect.forEach(
+          rows.filter((row) => row.state === "joined"),
+          (row) => {
+            const { projectId } = row;
+            return projectId === undefined
+              ? Effect.succeed([])
+              : Effect.flatMap(answered(row), (stands) =>
+                  stands
+                    ? places.byId(projectId).pipe(
+                        Effect.map((place) =>
+                          Option.toArray(place).map((found) => ({
+                            place: found,
+                            through: "project" as const,
+                            scopes: row.scopes,
+                          })),
+                        ),
+                      )
+                    : Effect.succeed([]),
+                );
+          },
+        ),
+      ),
+      Effect.map((lists) => lists.flat()),
+    );
+    const reached = [...(yield* own), ...(yield* orgs), ...(yield* projects)];
+    const named = yield* Effect.forEach(reached, (item) =>
+      namespaces.byId(item.place.namespace).pipe(
+        Effect.map(
+          Option.map((namespace) => ({
+            project: {
+              id: item.place.projectId,
+              namespace: namespace.handle,
+              name: item.place.name,
+            },
+            through: item.through,
+            scopes: [...item.scopes],
+          })),
+        ),
+      ),
+    );
+    return named
+      .flatMap((item) => Option.toArray(item))
+      .toSorted(
+        (a, b) =>
+          a.project.namespace.localeCompare(b.project.namespace) ||
+          a.project.name.localeCompare(b.project.name),
+      );
   });
 
 /**
@@ -644,6 +745,20 @@ export function projectInvitationHandlers(
               body: { items: found.flatMap((item) => Option.toArray(item)) },
             } satisfies Agents_listProjectsResult;
           }),
+        ),
+      ),
+    Agents_listReachableProjects: (caller: Caller) =>
+      asAgent(caller, (agentId) =>
+        run(
+          caller,
+          Effect.map(
+            reachableProjects(agentId),
+            (items) =>
+              ({
+                status: 200 as const,
+                body: { items },
+              }) satisfies Agents_listReachableProjectsResult,
+          ),
         ),
       ),
     Agents_acceptProjectInvitation: (

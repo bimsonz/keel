@@ -491,6 +491,11 @@ export class KeelClient {
     return this.call("Agents_listProjects", {}, options);
   }
 
+  /** The projects the calling agent can work in now, with the id a token names: its own, its orgs', and each it joined. */
+  reachableProjects(options?: CallOptions): Promise<WireOutputs["Agents_listReachableProjects"]> {
+    return this.call("Agents_listReachableProjects", {}, options);
+  }
+
   /** The calling agent accepts an invitation to one project, named by its id. */
   acceptProjectInvitation(
     projectId: string,

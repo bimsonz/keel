@@ -170,6 +170,7 @@ export const SPEC_ACTIONS = {
   Agents_acceptInvitation: rule("Self", "agent"),
   Agents_leaveNamespace: rule("Self", "agent"),
   Agents_listProjects: rule("Self", "agent"),
+  Agents_listReachableProjects: rule("Self", "agent"),
   Agents_acceptProjectInvitation: rule("Self", "agent"),
   Agents_leaveProject: rule("Self", "agent"),
   Operator_putSettings: rule("Project", "maintain"),
@@ -327,7 +328,7 @@ const isTokenProject = (agent: AgentPrincipal, resource: Resource): boolean =>
   resource.projectId === agent.projectId;
 
 /** Whether whoever invited an agent still answers for it: holding a role in the namespace, not suspended. */
-const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
+export const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
 
 /**
  * The standing an agent brings to a resource. A token is for at most one

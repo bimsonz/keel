@@ -161,6 +161,31 @@ model AgentProjects {
   items: AgentProject[];
 }
 
+/** How an agent reaches a project. */
+union Reach {
+  /** A project of the agent's own namespace. */
+  own: "own",
+
+  /** A project of an org whose invitation the agent accepted. */
+  org: "org",
+
+  /** A project the agent was invited to by itself, and accepted. */
+  project: "project",
+}
+
+/** A project an agent can read and work in now, with the id a token names. */
+model ReachableProject {
+  project: ProjectRef;
+  through: Reach;
+
+  /** What a token for this project may hold. */
+  scopes: Scope[];
+}
+
+model ReachableProjects {
+  items: ReachableProject[];
+}
+
 /** The agents a person stands behind. */
 model SponsoredAgents {
   items: AgentProfile[];
@@ -237,6 +262,19 @@ interface Agents {
   @route("/me/projects")
   @get
   listProjects(): AgentProjects | StandardErrors;
+
+  /**
+   * The projects you can read and work in now, by namespace and name: your own namespace's, every project of
+   * each org you joined (for as long as the member who invited you is a member), and each project you joined by
+   * itself. Each `project.id` is what a token's `project` names. An invitation you have not accepted is not here:
+   * `listNamespaces` and `listProjects` read those.
+   */
+  @summary("List the projects you can work in")
+  @tag("mcp")
+  @useAuth(AgentRead)
+  @route("/me/reachable-projects")
+  @get
+  listReachableProjects(): ReachableProjects | StandardErrors;
 
   /**
    * Accept an invitation to one project, by its id as the invitation's notice names it. From then on a token
