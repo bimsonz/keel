@@ -27,6 +27,7 @@ const CONTRACT_PORTS = [
   "EventFeed",
   "ProjectViews",
   "Decisions",
+  "Verdicts",
   "EventLog",
   "WorkQueue",
   "DecisionModel",

@@ -5,10 +5,11 @@ import { VERDICT_INDEX } from "@keeltown/core/application/verification";
 import type { FlowPlan } from "@keeltown/core/domain/verification";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, PlanStore } from "@keeltown/core/ports";
-import { guardedPlan, TEST_DECISION } from "@keeltown/testing";
+import { guardedPlan, PORTS, TEST_DECISION } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { VerdictsRpc } from "../../src/adapters/driven/do-rpc/verdicts.ts";
 import { PlanStoreR2 } from "../../src/adapters/driven/r2/plan-store.ts";
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
 import { PROJECTOR_REFOLD, type ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
@@ -57,6 +58,15 @@ async function issue(project: ProjectId, evidence: readonly string[], planHash?:
   await projector().receive([Schema.encodeSync(EventEnvelope)(event)]);
   return event.entity.id;
 }
+
+// The real index passes the same contract as the in-memory one, walked over the real feed.
+PORTS.Verdicts.contract("Projector DO over RPC", () => ({
+  layer: VerdictsRpc(projector),
+  arrive: (event) =>
+    Effect.promise(async () => {
+      await projector().receive([Schema.encodeSync(EventEnvelope)(event)]);
+    }),
+}));
 
 type ProjectorStub = DurableObjectStub<ProjectorDO>;
 

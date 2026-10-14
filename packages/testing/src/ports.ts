@@ -81,6 +81,7 @@ import {
   type ProjectViewsHarness,
 } from "./contracts/project-views.ts";
 import { type DecisionsHarness, describeDecisionsContract } from "./contracts/decisions.ts";
+import { describeVerdictsContract, type VerdictsHarness } from "./contracts/verdicts.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
@@ -188,6 +189,7 @@ import type {
   Trunks,
   Users,
   NamespaceUsage,
+  Verdicts,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -294,6 +296,11 @@ function memoryProjectViewsHarness(): ProjectViewsHarness {
 
 function memoryDecisionsHarness(): DecisionsHarness {
   const memory = projectViews.makeDecisionsMemory();
+  return { layer: memory.layer, arrive: memory.arrive };
+}
+
+function memoryVerdictsHarness(): VerdictsHarness {
+  const memory = projectViews.makeVerdictsMemory();
   return { layer: memory.layer, arrive: memory.arrive };
 }
 
@@ -651,6 +658,7 @@ export const PORTS = {
     memoryDecisionsHarness,
     describeDecisionsContract,
   ),
+  Verdicts: harnessed<Verdicts, VerdictsHarness>(memoryVerdictsHarness, describeVerdictsContract),
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),
   WorkQueue: port(() => storage.makeWorkQueueMemory().layer, pending("WorkQueue", ["enqueue"])),
   DecisionModel: port(
