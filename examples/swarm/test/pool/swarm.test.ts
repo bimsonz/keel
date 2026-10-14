@@ -13,6 +13,23 @@ const director = () => env.DIRECTOR.get(env.DIRECTOR.idFromName("director"));
 
 afterEach(() => vi.restoreAllMocks());
 
+/** The bodies of the token exchanges the stand-in Keel has been sent, oldest first. */
+async function seenTokens(): Promise<string[]> {
+  const seen: unknown = await (await fetch("https://keel.test/_seen")).json();
+  if (!Array.isArray(seen)) throw new Error("the stand-in answers its requests as a list");
+  return seen.flatMap((r: unknown) =>
+    typeof r === "object" &&
+    r !== null &&
+    "url" in r &&
+    "body" in r &&
+    typeof r.url === "string" &&
+    typeof r.body === "string" &&
+    new URL(r.url).pathname === "/token"
+      ? [r.body]
+      : [],
+  );
+}
+
 describe("the swarm's Worker", () => {
   it("[swarm.admin-gate] answers only its root without the admin bearer, the agents' route among the rest", async () => {
     expect((await SELF.fetch(`${SWARM}/`)).status).toBe(200);
@@ -75,6 +92,19 @@ describe("the swarm's Worker", () => {
       ["a log line", logged.join("\n")],
     ] as const)
       expect({ where, holdsKey: text.includes(d) }).toEqual({ where, holdsKey: false });
+  });
+
+  it("[swarm.mcp-door] mints a worker's token for Keel's MCP door, and for no other", async () => {
+    await SELF.fetch(`${SWARM}/admin/agents`, {
+      method: "POST",
+      headers: { ...ADMIN, "content-type": "application/json" },
+      body: JSON.stringify({ shape: "one" }),
+    });
+    const before = await seenTokens();
+    await keyring().token({ project: "prj_MCP", run: "r-mcp" });
+    const minted = (await seenTokens()).slice(before.length);
+    expect(minted).toHaveLength(1);
+    expect(new URLSearchParams(minted[0]).get("resource")).toBe("https://keel.test/mcp");
   });
 
   it("[swarm.forget] wipes every key on DELETE /admin/agents", async () => {

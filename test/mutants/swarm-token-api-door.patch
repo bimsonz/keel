@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.mcp-door
+# why: A worker's token is minted for Keel's API door: a worker holds a key to more of Keel than its MCP tools
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index d4e3d207..049b0989 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -58,7 +58,7 @@ export class Keyring extends DurableObject<Env> {
+ 
+   /** A five-minute bearer for one project and one run, at Keel's MCP door: a worker's only way in. */
+   async token(scope: Scope): Promise<string> {
+-    return (await this.#client(scope, "mcp")).token();
++    return (await this.#client(scope, "api")).token();
+   }
+ 
+   /** Accepts the account's invitation to `project`; answers the invitation's state after. */
