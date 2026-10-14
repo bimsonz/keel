@@ -1950,6 +1950,55 @@ const toldAt = async (shown: Page, namespace: string, name: string): Promise<str
 };
 const NO_PROJECT = "There is no project <namespace>/<name> here";
 
+// ── A project's frame, before Keel has found the project ──
+// What a project is called and its tabs are its address's: they are drawn while Keel is still finding it, as a code
+// host draws a repository's structure before its contents. Keel's answer is held back until they have been read.
+const unfound = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+// A Keel of its own, so what this reader asks is not counted among what the visitor below is answered.
+const unfoundKeel = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  readerOf,
+  whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
+  ahead: AHEAD,
+});
+let answerTheFind = (): void => {};
+const findHeld = new Promise<void>((resolve) => {
+  answerTheFind = resolve;
+});
+await asDeployed(unfound, {
+  keel: unfoundKeel,
+  hold: (path) => (path === "/v1/namespaces/ada/projects/demo" ? findHeld : Promise.resolve()),
+});
+const beforeFound = watch(await unfound.newPage(), "built, before the project is found");
+await beforeFound.goto(`${built}/ada/demo`, { waitUntil: "domcontentloaded" });
+// A page that draws no header yet is a failed check below, and not a wait that runs out.
+const shownHeader = async (): Promise<string> =>
+  (await beforeFound.locator("header").count()) === 0 ? "no header" : headerOf(beforeFound);
+await tabsOf(beforeFound)
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "built: a project's name and tabs are drawn while Keel has yet to find it, with nothing counted on them",
+  `${await shownHeader()} | ${(await tabsOf(beforeFound).allInnerTexts()).map(squash).join(" | ")}; found ${unfoundKeel.calls.some((call) => call.path === "/v1/namespaces/ada/projects/demo") ? "answered" : "not answered"}`,
+  "Keel (mark) → / | ada → /ada | demo → /ada/demo | Sign in → /login || ada / demo | Code | Changes | Conflicts | Escalations | Decisions | Mission Control | Insights; found not answered",
+);
+answerTheFind();
+await beforeFound
+  .getByRole("navigation", { name: "Project" })
+  .getByText(/\d/)
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "built: once Keel has found the project and its log is read, the same frame says what Keel says of it",
+  `${await shownHeader()} | ${(await tabsOf(beforeFound).allInnerTexts()).map(squash).join(" | ")}`,
+  "Keel (mark) → / | ada → /ada | demo → /ada/demo | Fork → /ada/demo/fork | Sign in → /login || ada / demo public | Code | Changes 2 open | Conflicts 1 open | Escalations | Decisions | Mission Control | Insights",
+);
+await unfound.close();
+
 // ── A visitor, on a project its org has made public ──
 // Public is live: anyone reads its code, its log and what is folded from it. Nothing can be answered.
 const street = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
@@ -2030,6 +2079,12 @@ expectEqual(
   "visitor: the code is on the page while Keel has yet to answer about the log",
   `${await filesOn(visitor)}; the log ${open.calls.some((call) => call.path === "/v1/events") ? "answered" : "not answered"}`,
   "src | package.json | README.md; the log not answered",
+);
+// The project's tabs are drawn as soon as Keel has found it: what each counts comes once the log is read.
+expectEqual(
+  "visitor: a project's tabs are up while Keel has yet to answer about the log, with nothing counted on them yet",
+  `${(await tabsOf(visitor).allInnerTexts()).map(squash).join(" | ")}; the log ${open.calls.some((call) => call.path === "/v1/events") ? "answered" : "not answered"}`,
+  "Code | Changes | Conflicts | Escalations | Decisions | Mission Control | Insights; the log not answered",
 );
 // A directory draws a list and no code: its page is up before the viewer is asked for, and the viewer comes a
 // moment after, so the first file opened has it. No graph is asked for at all.

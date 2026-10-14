@@ -344,7 +344,21 @@ function Project({
     };
   }, [reading, namespace, name, params]);
 
-  if (opened.is === "reading") return null;
+  // A project's frame is up while Keel finds it, as a code host draws a repository's structure before its contents:
+  // what it is called and its tabs are the address's. What Keel says of it fills in once it is found.
+  if (opened.is === "reading")
+    return (
+      <WhereProvider namespace={namespace} project={name} route={route}>
+        <Frame
+          source={{ mode: reading.mode, seed }}
+          // Keel remembers every project's decisions; a test fixture says whether it has any once it is read.
+          decisions={reading.mode === "live"}
+          {...(reader === undefined ? {} : { reader })}
+        >
+          {null}
+        </Frame>
+      </WhereProvider>
+    );
   if (opened.is === "failed") return <Unreachable said={opened.said} />;
   if (opened.is === "missing") {
     // A project Keel does not show this reader and one that is not there are the same answer, and the same page.

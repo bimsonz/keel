@@ -193,7 +193,7 @@ export function Frame({
   /** The project this one was forked from, where Keel names it to this reader: it names none they may not read. */
   forkedFrom?: { namespace: string; name: string };
   source: SourceMark;
-  /** How many of each are still open. Absent where there is no project to count in. */
+  /** How many of each are still open. Absent until the project's log has been read, and where there is no project. */
   counts?: OpenCounts;
   /** Whether the project's settings are this reader's to change: the Settings tab is offered to them alone. */
   settings?: boolean;
@@ -279,7 +279,8 @@ export function Frame({
             {reader !== undefined && <ReaderLink reader={reader} />}
           </span>
         </div>
-        {counts !== undefined && (
+        {/* A project's tabs are drawn as soon as it is found: their counts come once its log has been read. */}
+        {project !== "" && (
           <TabBar label="Project">
             {TABS.filter(
               (tab) => (tab.id !== "settings" || settings) && (tab.id !== "decisions" || decisions),
@@ -296,7 +297,7 @@ export function Frame({
                   Icon={tab.Icon}
                   label={tab.label}
                   open={tab.id === active}
-                  count={<Count tab={tab.id} counts={counts} />}
+                  count={counts === undefined ? null : <Count tab={tab.id} counts={counts} />}
                 />
               </Link>
             ))}
