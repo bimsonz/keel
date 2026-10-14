@@ -21,6 +21,8 @@ import {
   otherNamespace,
   sampleNamespace,
 } from "@keeltown/testing";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
 import {
@@ -527,6 +529,15 @@ describe("CandidateBundles over gitcore", () => {
         expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain("after 1 tries");
       }),
   );
+});
+
+describe("the Worker's limits", () => {
+  it("[bundles.subrequests] lets one alarm ask twice the subrequests a 15-minute walk at the pace can, two to a read", () => {
+    const config = readFileSync(join(import.meta.dirname, "../../wrangler.jsonc"), "utf8");
+    const limit = Number(/"subrequests":\s*(\d+)/.exec(config)?.[1] ?? 0);
+    const reads = (15 * 60_000 * READ_PACE.perSecond) / 1_000;
+    expect(limit).toBeGreaterThanOrEqual(2 * 2 * reads);
+  });
 });
 
 /** What the binding throws when Artifacts fails a read. */

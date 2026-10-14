@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.subrequests"
+# kills: bundles.subrequests
+# why: Keel's Worker runs at the default 10,000 subrequests, two to a read, so every bundle of a tree over about 5,000 objects stops part-way, retries and all
+diff --git a/apps/keel/wrangler.jsonc b/apps/keel/wrangler.jsonc
+index de370460..fc7caac2 100644
+--- a/apps/keel/wrangler.jsonc
++++ b/apps/keel/wrangler.jsonc
+@@ -13,7 +13,6 @@
+   // (readTree, readBlob or readCommit), and a blob's body read after it. The platform counts two subrequests a
+   // read: under the default 10,000 every bundle of Keel's own tree stopped at read 5,004 (14 Oct). 200,000 covers
+   // 100,000 reads; a 15-minute alarm at the walk's pace (READ_PACE, 50 a second) asks at most 45,000.
+-  "limits": { "subrequests": 200000 },
+   "vars": {
+     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
+     "KEEL_HOST": "keel.localhost",
