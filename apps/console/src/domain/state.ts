@@ -336,6 +336,17 @@ export interface RulingBounce {
   reasons: string[];
 }
 
+/** A bounce, by the one cause Keel named for it. */
+export interface ChangeBounce {
+  at: string;
+  conflict?: { id: string; label: string; predicate?: string };
+  refused?: "pack-too-large" | "repo-bytes-quota";
+  ruling?: RulingBounce;
+  next: string[];
+  /** The decision the bounce cites, by its id, the one Keel's next actions say to read, and by its label. */
+  cites?: { id: string; label: string };
+}
+
 export interface ChangePageState {
   change: {
     /** True where the project has verification switched off: its verdict or its landing was not verified. */
@@ -400,14 +411,15 @@ export interface ChangePageState {
    * it, the conflict whose resolution names the same decision, and the reasons Keel gave, in its words. No
    * verdict is issued for any of the three. `next` is the ways forward Keel gave its agent.
    */
-  bounce?: {
-    at: string;
-    conflict?: { id: string; label: string; predicate?: string };
-    refused?: "pack-too-large" | "repo-bytes-quota";
-    ruling?: RulingBounce;
-    next: string[];
-    /** The decision the bounce cites, by its id, the one Keel's next actions say to read, and by its label. */
-    cites?: { id: string; label: string };
+  bounce?: ChangeBounce;
+  /**
+   * Once it has moved on from its latest bounce: that bounce, as Keel recorded it. `after` says whether it was
+   * withdrawn after, landed after or is taken on again, and `verdict` is the verdict it bounced on where the
+   * page leads with another.
+   */
+  bounced?: ChangeBounce & {
+    after: "withdrawn" | "landed" | "taken-on";
+    verdict?: { said: string; issuedAt: string };
   };
   /**
    * Conflicts Keel proved against it and let it go on from: its plan advises or annotates on that predicate.

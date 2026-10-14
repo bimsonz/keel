@@ -2,15 +2,15 @@
 # kills: s2.as-keel-commits
 # why: the fixture's bounce gives reasons of its own, not the verdict's evidence
 diff --git a/apps/console/test/fixtures/mock/s2.ts b/apps/console/test/fixtures/mock/s2.ts
-index e5e06908..9143e9fb 100644
+index 4d45847f..36049dee 100644
 --- a/apps/console/test/fixtures/mock/s2.ts
 +++ b/apps/console/test/fixtures/mock/s2.ts
-@@ -581,7 +581,7 @@ export function generateS2(seed: number): GeneratedLog {
+@@ -588,7 +588,7 @@ export function generateS2(
    b.at(144.6).emit({
      type: "ChangeBounced",
      entity: changeRef(changeH),
 -    payload: { changeId: changeH, verdictId: verdictH, reasons: evidence, nextActions },
 +    payload: { changeId: changeH, verdictId: verdictH, reasons: [failed], nextActions },
    });
- 
-   // History's question was answered nine days ago: nothing holds this story.
+   if (withdrawn) {
+     b.at(150).emit({

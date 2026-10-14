@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-kept, change.bounce-kept-on
+# why: the verdict a past bounce was on is said again where the page leads with it, and not where another leads
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 467268ca..e5b8984a 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -688,7 +688,7 @@ export function changePageOf(
+   const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");
+   // The verdict a bounce it moved on from was on is said with it, unless it is the one the page leads with.
+   const onVerdict = world.verdicts.get(past?.verdictId ?? "");
+-  const bouncedOn = onVerdict?.id === verdict?.id ? undefined : onVerdict;
++  const bouncedOn = onVerdict?.id === verdict?.id ? onVerdict : undefined;
+   const escalation =
+     change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
+   const diff = resources.diffs.get(change.id);

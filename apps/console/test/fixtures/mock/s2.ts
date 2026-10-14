@@ -36,7 +36,14 @@ const NUMBER_H = "#1205";
 
 const changeRef = (id: string): EntityRef => ({ kind: "change", id });
 
-export function generateS2(seed: number): GeneratedLog {
+/**
+ * Scenario 2. `withdrawn` tells it to the end S-2's run on keel.town reaches: the careless change is withdrawn
+ * after its bounce, by its own agent here.
+ */
+export function generateS2(
+  seed: number,
+  { withdrawn = false }: { withdrawn?: boolean } = {},
+): GeneratedLog {
   const b = new ScriptBuilder(S2_EPOCH, createRng(seed).fork("s2"));
 
   // ── History: the conflict, the ruling, the guard, both changes landed ──
@@ -583,6 +590,18 @@ export function generateS2(seed: number): GeneratedLog {
     entity: changeRef(changeH),
     payload: { changeId: changeH, verdictId: verdictH, reasons: evidence, nextActions },
   });
+  if (withdrawn) {
+    b.at(150).emit({
+      type: "ChangeWithdrawn",
+      entity: changeRef(changeH),
+      payload: { changeId: changeH, by: agentH },
+    });
+    b.at(150.1).emit({
+      type: "WorkspaceCollected",
+      entity: { kind: "workspace", id: workspaceH },
+      payload: { workspaceId: workspaceH, reason: "withdrawn" },
+    });
+  }
 
   // History's question was answered nine days ago: nothing holds this story.
   return { ...b.build(), gates: [] };

@@ -15,6 +15,7 @@ import type {
   IntentRow,
   PlanStep,
   RulingBounce,
+  ChangeBounce,
 } from "../domain/state.ts";
 import { noneDerived, unjudged } from "../engine/judged.ts";
 import type { ChangeTab } from "../route.ts";
@@ -245,6 +246,93 @@ function RuledAgainst({ ruling }: { ruling: RulingBounce }) {
   );
 }
 
+/** Whether Keel named the bounce's cause as something other than a verdict: a ruling, a conflict, a refused push. */
+function causeNamed(bounce: ChangeBounce): boolean {
+  return (
+    bounce.ruling !== undefined || bounce.conflict !== undefined || bounce.refused !== undefined
+  );
+}
+
+/** The cause Keel named for a bounce, where it is not a verdict. */
+function BounceCause({ bounce }: { bounce: ChangeBounce }) {
+  return bounce.ruling !== undefined ? (
+    <RuledAgainst ruling={bounce.ruling} />
+  ) : bounce.conflict !== undefined ? (
+    <>
+      Keel proved{" "}
+      <ConflictLink id={bounce.conflict.id} className="a-link">
+        conflict {bounce.conflict.label}
+      </ConflictLink>{" "}
+      against this change, and its plan blocks on{" "}
+      {bounce.conflict.predicate ?? "that conflict's predicate"}. It bounced on the conflict itself:
+      no verdict was issued.
+    </>
+  ) : bounce.refused !== undefined ? (
+    `Its batch was verified, and the push to trunk was refused: ${REFUSED[bounce.refused]}. Nothing landed, and no verdict was issued for the bounce.`
+  ) : null;
+}
+
+/** What Keel said with a bounce besides its cause: a ruling's reasons, the ways on, the decision it cites. */
+function BounceSaid({ bounce }: { bounce: ChangeBounce }) {
+  return (
+    <>
+      {bounce.ruling !== undefined && bounce.ruling.reasons.length > 0 && (
+        <p className="text-base text-kumo-default" data-part="ruling-reasons">
+          <span className="text-sm text-kumo-subtle">Keel gave this reason: </span>
+          {bounce.ruling.reasons.join(" ")}
+        </p>
+      )}
+      {bounce.next.length > 0 && (
+        <div className="mt-2 border-t border-kumo-line pt-3 text-base text-kumo-default">
+          <p className="text-sm text-kumo-subtle">Keel told its agent how to go on:</p>
+          <ul className="mt-1 list-disc pl-5" aria-label="Ways forward Keel gave its agent">
+            {bounce.next.map((title) => (
+              <li key={title}>{title}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {bounce.cites !== undefined && (
+        // The decision is the one Keel's next action names, by its id: no sentence is read for it.
+        <p className="mt-2 text-base text-kumo-default" data-part="cited-decision">
+          This bounce cites{" "}
+          <DecisionLink id={bounce.cites.id} className="a-link font-semibold">
+            decision {bounce.cites.label}
+          </DecisionLink>
+          .
+        </p>
+      )}
+    </>
+  );
+}
+
+/** What became of a change after a bounce it moved on from. */
+const AFTER_BOUNCE = {
+  withdrawn: " and was withdrawn after.",
+  landed: " and landed on a later try.",
+  "taken-on": ", and has been taken on again since.",
+} as const;
+
+/** A bounce the change has moved on from, as Keel recorded it: a withdrawal or another try does not undo it. */
+function Bounced({ bounce }: { bounce: NonNullable<ChangePageState["bounced"]> }) {
+  return (
+    <div className="mt-2 border-t border-kumo-line pt-3" data-part="past-bounce">
+      <p className="text-base text-kumo-default">
+        It bounced at <time className="a-num">{dateTime(bounce.at)}</time>
+        {AFTER_BOUNCE[bounce.after]}{" "}
+        {causeNamed(bounce) ? (
+          <BounceCause bounce={bounce} />
+        ) : bounce.verdict === undefined ? (
+          "It bounced on the verdict above."
+        ) : (
+          `It bounced on a verdict issued at ${dateTime(bounce.verdict.issuedAt)}: ${bounce.verdict.said}`
+        )}
+      </p>
+      <BounceSaid bounce={bounce} />
+    </div>
+  );
+}
+
 /** The one line that says where the change stands. */
 function standing(state: ChangePageState): string {
   const { change, verdict, escalation } = state;
@@ -392,20 +480,8 @@ export function Change({
                   {standing(state)}
                 </h2>
                 <p className="text-lg text-kumo-default">
-                  {state.bounce?.ruling !== undefined ? (
-                    <RuledAgainst ruling={state.bounce.ruling} />
-                  ) : state.bounce?.conflict !== undefined ? (
-                    <>
-                      Keel proved{" "}
-                      <ConflictLink id={state.bounce.conflict.id} className="a-link">
-                        conflict {state.bounce.conflict.label}
-                      </ConflictLink>{" "}
-                      against this change, and its plan blocks on{" "}
-                      {state.bounce.conflict.predicate ?? "that conflict's predicate"}. It bounced
-                      on the conflict itself: no verdict was issued.
-                    </>
-                  ) : state.bounce?.refused !== undefined ? (
-                    `Its batch was verified, and the push to trunk was refused: ${REFUSED[state.bounce.refused]}. Nothing landed, and no verdict was issued for the bounce.`
+                  {state.bounce !== undefined && causeNamed(state.bounce) ? (
+                    <BounceCause bounce={state.bounce} />
                   ) : verdict === undefined ? (
                     unjudged(change.state)
                   ) : (
@@ -423,35 +499,8 @@ export function Change({
                     )}
                   </p>
                 )}
-                {state.bounce?.ruling !== undefined && state.bounce.ruling.reasons.length > 0 && (
-                  <p className="text-base text-kumo-default" data-part="ruling-reasons">
-                    <span className="text-sm text-kumo-subtle">Keel gave this reason: </span>
-                    {state.bounce.ruling.reasons.join(" ")}
-                  </p>
-                )}
-                {state.bounce !== undefined && state.bounce.next.length > 0 && (
-                  <div className="mt-2 border-t border-kumo-line pt-3 text-base text-kumo-default">
-                    <p className="text-sm text-kumo-subtle">Keel told its agent how to go on:</p>
-                    <ul
-                      className="mt-1 list-disc pl-5"
-                      aria-label="Ways forward Keel gave its agent"
-                    >
-                      {state.bounce.next.map((title) => (
-                        <li key={title}>{title}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {state.bounce?.cites !== undefined && (
-                  // The decision is the one Keel's next action names, by its id: no sentence is read for it.
-                  <p className="mt-2 text-base text-kumo-default" data-part="cited-decision">
-                    This bounce cites{" "}
-                    <DecisionLink id={state.bounce.cites.id} className="a-link font-semibold">
-                      decision {state.bounce.cites.label}
-                    </DecisionLink>
-                    .
-                  </p>
-                )}
+                {state.bounce !== undefined && <BounceSaid bounce={state.bounce} />}
+                {state.bounced !== undefined && <Bounced bounce={state.bounced} />}
                 {escalation !== undefined && waiting && (
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-kumo-line pt-3">
                     <p className="min-w-0 flex-1 text-base text-kumo-default">
@@ -626,8 +675,8 @@ export function Change({
                   <Empty
                     size="sm"
                     icon={<BooksIcon size={32} className="text-kumo-inactive" />}
-                    title="No decision covers this subject yet"
-                    description={`${escalation === undefined ? "When a person rules on a question here" : `When ${escalation.label} is ruled`}, the decision is recorded with its date, its scope and the alternatives it rejected. Later changes meet it as precedent.`}
+                    title="Keel surfaced no precedent to this change"
+                    description={`${escalation === undefined ? "" : `When ${escalation.label} is ruled, its decision is recorded, and later changes meet it as precedent. `}A decision Keel surfaces to this change is listed here, with its date and its scope.`}
                   />
                 ) : (
                   <ul>

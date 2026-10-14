@@ -2,21 +2,21 @@
 # kills: change.bounce-cites
 # why: the change's page is not handed the decision its bounce cites
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 503fbaa4..c2bade4d 100644
+index 467268ca..e111c742 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -754,14 +754,6 @@ export function changePageOf(
-             next: bounce.next,
-             // Its label is read with the page, as the decision's own link is: an id is drawn only where the log
-             // has no label for it.
--            ...(bounce.cites === undefined
--              ? {}
--              : {
--                  cites: {
--                    id: bounce.cites,
--                    label: world.decisions.get(bounce.cites)?.label || bounce.cites,
--                  },
--                }),
-           },
-         }),
-     noted: change.noted.flatMap((note) => {
+@@ -652,14 +652,6 @@ function bounceOf(world: World, bounce: NonNullable<ChangeEntry["bounce"]>): Cha
+     next: bounce.next,
+     // Its label is read with the page, as the decision's own link is: an id is drawn only where the log has no
+     // label for it.
+-    ...(bounce.cites === undefined
+-      ? {}
+-      : {
+-          cites: {
+-            id: bounce.cites,
+-            label: world.decisions.get(bounce.cites)?.label || bounce.cites,
+-          },
+-        }),
+   };
+ }
+ 

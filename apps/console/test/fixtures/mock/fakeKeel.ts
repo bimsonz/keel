@@ -368,6 +368,8 @@ export function createFakeKeel(
      * scenario 2's, which opens nine days after that question was ruled and bounces a change on the guard.
      */
     story?: "s1" | "s2";
+    /** Scenario 2 told to its end on keel.town: its careless change is withdrawn after its bounce. */
+    withdrawn?: boolean;
     /** The namespace the project is in: an org called `acme`, unless a test says whose. */
     namespace?: NamespaceRef;
     /**
@@ -429,7 +431,10 @@ export function createFakeKeel(
   const pageSize = options.pageSize ?? 500;
   const decisionPage = options.decisionPage ?? 50;
   const ahead = options.ahead ?? 0;
-  let log = options.story === "s2" ? generateS2(seed) : generateS1(seed);
+  let log =
+    options.story === "s2"
+      ? generateS2(seed, { withdrawn: options.withdrawn === true })
+      : generateS1(seed);
   const repository = createMockRepository(() => log);
   /** Every event of one kind the log holds, in its order. */
   const of = <Type extends AnyEvent["type"]>(type: Type) =>

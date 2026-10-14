@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Player } from "../../../src/engine/player.ts";
+import { verdictSaid } from "../../../src/engine/judged.ts";
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
@@ -91,6 +92,75 @@ describe("a conflict proven against a change", () => {
       first.payload.changeId,
     );
     expect(page?.verdict?.id).toBe(first.payload.verdictId);
+  });
+
+  it("[change.bounce-kept] keeps a bounce, its verdict and the decision it cites on the page of a change withdrawn after it", async () => {
+    const log = generateS2(42, { withdrawn: true });
+    // History bounced a change too, which landed after: the careless change's is the story's last bounce.
+    const at = log.events.findLastIndex((event) => event.type === "ChangeBounced");
+    const first = log.events[at];
+    if (first?.type !== "ChangeBounced") throw new Error("scenario 2 bounces nothing");
+    const player = showing(createMockSource({ scenario: "s2", seed: 42 }));
+    await player.load();
+    player.seek(player.end);
+    // While it stands bounced, the bounce is the page's lead and nothing is kept beside it.
+    expect(changePageOf(player.world, first.payload.changeId, player)).not.toHaveProperty(
+      "bounced",
+    );
+    const withdrawal = log.events.find((event) => event.type === "ChangeWithdrawn");
+    if (withdrawal === undefined) throw new Error("scenario 2 withdraws nothing");
+    player.world.apply(withdrawal, player.end + 1);
+    const page = changePageOf(player.world, first.payload.changeId, player);
+    expect(page?.change.state).toBe("withdrawn");
+    expect(page).not.toHaveProperty("bounce");
+    expect(page?.bounced).toEqual({
+      at: first.at,
+      next: first.payload.nextActions?.map((action) => action.title),
+      cites: {
+        id: [...player.world.decisions.keys()][0],
+        label: [...player.world.decisions.values()][0]?.label,
+      },
+      after: "withdrawn",
+    });
+    expect(page?.bounced?.cites?.label).toBe("D-1");
+    // The page leads with the verdict it bounced on, so the bounce does not say it again.
+    expect(page?.verdict?.id).toBe(first.payload.verdictId);
+  });
+
+  it("[change.bounce-kept-on] keeps a bounce once its change is taken on again, with the verdict it bounced on where a later one leads", async () => {
+    const player = showing(createMockSource({ scenario: "s2", seed: 42 }));
+    await player.load();
+    player.seek(player.end);
+    const change = [...player.world.changes.values()].find((held) => held.state === "bounced");
+    if (change === undefined) throw new Error("scenario 2 bounces nothing");
+    const bouncedOn = player.world.verdicts.get(change.bounce?.verdictId ?? "");
+    if (bouncedOn === undefined) throw new Error("scenario 2's bounce names no verdict it holds");
+    then(player, (b) => {
+      b.at(1).emit({
+        type: "ChangeSubmitted",
+        entity: { kind: "change", id: change.id },
+        payload: {
+          changeId: change.id,
+          revision: change.revision,
+          commitSha: "5e1f0a2",
+          workspaceId: change.workspaceId ?? "",
+        },
+      });
+      b.at(2).emit({
+        type: "VerdictIssued",
+        entity: { kind: "verdict", id: "vrd_again" },
+        payload: { verdictId: "vrd_again", subject: change.id, outcome: "land", evidence: [] },
+      });
+    });
+    const page = changePageOf(player.world, change.id, player);
+    expect(page?.change.state).toBe("submitted");
+    expect(page?.verdict?.id).toBe("vrd_again");
+    expect(page?.bounced).toMatchObject({
+      at: change.bounce?.at,
+      after: "taken-on",
+      cites: { label: "D-1" },
+      verdict: { said: verdictSaid(bouncedOn), issuedAt: bouncedOn.issuedAt },
+    });
   });
 
   it("[change.bounce-cites] names the decision a verdict's bounce cites, from Keel's next action, and leaves the bounce the verdict's", async () => {

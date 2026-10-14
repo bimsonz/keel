@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: change.bounce-kept
+# why: a change withdrawn after its bounce is said to be taken on again
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 467268ca..691506fc 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -778,7 +778,7 @@ export function changePageOf(
+           bounced: {
+             ...bounceOf(world, past),
+             after:
+-              change.state === "withdrawn" || change.state === "landed" ? change.state : "taken-on",
++              "taken-on",
+             ...(bouncedOn === undefined
+               ? {}
+               : { verdict: { said: verdictSaid(bouncedOn), issuedAt: bouncedOn.issuedAt } }),

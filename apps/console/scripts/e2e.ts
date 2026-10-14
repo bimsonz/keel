@@ -4145,6 +4145,105 @@ expectEqual(
   "1 | /ada/demo/decisions/D-1 | Decision D-1 | quiet",
 );
 await recollecting.close();
+// ── A bounce, once the change has moved on from it ──
+// S-2's run on keel.town ends with the careless change withdrawn after its bounce. The bounce is still Keel's record
+// of it: the page keeps it, with the decision it cites, under the state that followed.
+const moved = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "public",
+  story: "s2",
+  withdrawn: true,
+  readerOf,
+  whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
+});
+const movingOn = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(movingOn, { keel: moved });
+const movedOn = watch(await movingOn.newPage(), "a bounce moved on from, a visitor");
+const pastBounce = movedOn.locator('[data-part="past-bounce"]');
+/** The verdict's headline, the past bounce's first line with its time taken out, and its cited decision's link. */
+const pastBounceSaid = async (): Promise<string> => {
+  await pastBounce.waitFor({ timeout: 15_000 }).catch(() => undefined);
+  const cited = pastBounce.locator('[data-part="cited-decision"]');
+  await cited
+    .locator('a[href$="/decisions/D-1"]')
+    .waitFor({ timeout: 5_000 })
+    .catch(() => undefined);
+  return `${squash(
+    await movedOn
+      .getByRole("region", { name: "Verdict" })
+      .getByRole("heading", { level: 2 })
+      .innerText()
+      .catch(() => "no heading"),
+  )} | ${squash(
+    await pastBounce
+      .locator("p")
+      .first()
+      .innerText()
+      .catch(() => "no bounce"),
+  ).replace(
+    /at \d{4}-\d\d-\d\d \d\d:\d\d(:\d\d)?/,
+    "at <time>",
+  )} | ${squash(await cited.innerText().catch(() => "no line"))} | ${String(
+    await cited
+      .getByRole("link")
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )}`;
+};
+await movedOn.goto(`${built}/ada/demo/changes/1205`, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "change: a change withdrawn after its bounce keeps the bounce and the decision it cites",
+  await pastBounceSaid(),
+  "Withdrawn | It bounced at <time> and was withdrawn after. It bounced on the verdict above. | This bounce cites decision D-1. | /ada/demo/decisions/D-1",
+);
+expectEqual(
+  "change: a change withdrawn after its bounce keeps the ways forward Keel gave its agent",
+  String(
+    await pastBounce
+      .getByRole("list", { name: "Ways forward Keel gave its agent" })
+      .getByRole("listitem")
+      .count()
+      .catch(() => 0),
+  ),
+  "2",
+);
+await shot(movedOn, "bounce-withdrawn");
+// History's change bounced on the ruling and landed after: its page keeps that bounce too.
+await movedOn.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
+await pastBounce.waitFor({ timeout: 15_000 }).catch(() => undefined);
+expectEqual(
+  "change: a change that landed after a ruling's bounce keeps the bounce, by its decision",
+  squash(
+    await pastBounce
+      .locator("p")
+      .first()
+      .innerText()
+      .catch(() => "no bounce"),
+  ).replace(/at \d{4}-\d\d-\d\d \d\d:\d\d(:\d\d)?/, "at <time>"),
+  "It bounced at <time> and landed on a later try. A ruling went against this change: decision D-1 chose “Cache allowed if revocation invalidates it”, on conflict C-1. It bounced on the ruling: no verdict was issued.",
+);
+// The other side of history's conflict was surfaced no precedent, though D-1 covers its subject now: the panel says
+// what Keel recorded for the change.
+await movedOn.goto(`${built}/ada/demo/changes/2`, { waitUntil: "domcontentloaded" });
+await movedOn
+  .getByRole("region", { name: "Verdict" })
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+const precedents = movedOn.locator("section.a-panel", {
+  has: movedOn.getByRole("heading", { name: "Precedents", exact: true }),
+});
+expectEqual(
+  "change: the Precedents panel says Keel surfaced no precedent to the change, not that no decision covers its subject",
+  `${squash(
+    await precedents
+      .locator("header")
+      .innerText()
+      .catch(() => "no panel"),
+  )} | ${(await precedents.innerText().catch(() => "")).includes("Keel surfaced no precedent to this change")} | ${await precedents.getByRole("listitem").count()} listed`,
+  "Precedents decisions this change met | true | 0 listed",
+);
+await movingOn.close();
 
 // ── A namespace's credentials, and a project's Cloudflare account ──
 // A token is typed once, leaves the page in the body of the one call that stores it, and is shown again nowhere.

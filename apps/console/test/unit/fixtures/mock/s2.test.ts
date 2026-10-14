@@ -18,6 +18,8 @@ async function playerAt(seconds: number): Promise<Player> {
 describe("scenario 2: memory", () => {
   it("conforms to the catalogue and the state machines, history included", () => {
     expect(checkLog(generateS2(42).events)).toEqual([]);
+    // Told to the end S-2 reaches on keel.town, its careless change withdrawn after the bounce.
+    expect(checkLog(generateS2(42, { withdrawn: true }).events)).toEqual([]);
     expect(JSON.stringify(generateS2(42).events)).toBe(JSON.stringify(generateS2(42).events));
   });
 

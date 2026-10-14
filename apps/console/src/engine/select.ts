@@ -8,6 +8,7 @@ import type { Predicate } from "../contract/mfp.ts";
 import type { FlowNode, StepSpec } from "../contract/provisional.ts";
 import type {
   AlternativeRow,
+  ChangeBounce,
   ChangePageState,
   IntentRow,
   DiffAnnotation,
@@ -630,6 +631,38 @@ function sameIntentOf(
   return others.length === 0 ? undefined : { self: intentRowOf(world, cards, change), others };
 }
 
+/** A bounce as the change's page tells it: the one cause Keel named, the ways on it gave, the decision it cites. */
+function bounceOf(world: World, bounce: NonNullable<ChangeEntry["bounce"]>): ChangeBounce {
+  const cause = world.conflicts.get(bounce.conflictId ?? "");
+  return {
+    at: bounce.at,
+    ...(cause === undefined
+      ? {}
+      : {
+          conflict: {
+            id: cause.id,
+            label: cause.label,
+            ...(cause.predicate === undefined ? {} : { predicate: cause.predicate }),
+          },
+        }),
+    ...(bounce.declined === undefined ? {} : { refused: bounce.declined }),
+    ...(bounce.decisionId === undefined
+      ? {}
+      : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
+    next: bounce.next,
+    // Its label is read with the page, as the decision's own link is: an id is drawn only where the log has no
+    // label for it.
+    ...(bounce.cites === undefined
+      ? {}
+      : {
+          cites: {
+            id: bounce.cites,
+            label: world.decisions.get(bounce.cites)?.label || bounce.cites,
+          },
+        }),
+  };
+}
+
 export function changePageOf(
   world: World,
   changeId: string,
@@ -641,6 +674,8 @@ export function changePageOf(
   const sameIntent = sameIntentOf(world, cards, change);
   const by = world.agents.get(change.agentId);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
+  // A bounce it has moved on from is still Keel's record of it: a withdrawal or another try does not undo it.
+  const past = change.state === "bounced" ? undefined : change.bounce;
   const cause = world.conflicts.get(bounce?.conflictId ?? "");
   // A change bounced on a conflict, on its batch's refused push or on a ruling was given no verdict for that:
   // an earlier one is not this bounce's.
@@ -651,6 +686,9 @@ export function changePageOf(
       ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
       : undefined;
   const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");
+  // The verdict a bounce it moved on from was on is said with it, unless it is the one the page leads with.
+  const onVerdict = world.verdicts.get(past?.verdictId ?? "");
+  const bouncedOn = onVerdict?.id === verdict?.id ? undefined : onVerdict;
   const escalation =
     change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
   const diff = resources.diffs.get(change.id);
@@ -733,35 +771,17 @@ export function changePageOf(
           },
         }),
     ...(sameIntent === undefined ? {} : { sameIntent }),
-    ...(bounce === undefined
+    ...(bounce === undefined ? {} : { bounce: bounceOf(world, bounce) }),
+    ...(past === undefined
       ? {}
       : {
-          bounce: {
-            at: bounce.at,
-            ...(cause === undefined
+          bounced: {
+            ...bounceOf(world, past),
+            after:
+              change.state === "withdrawn" || change.state === "landed" ? change.state : "taken-on",
+            ...(bouncedOn === undefined
               ? {}
-              : {
-                  conflict: {
-                    id: cause.id,
-                    label: cause.label,
-                    ...(cause.predicate === undefined ? {} : { predicate: cause.predicate }),
-                  },
-                }),
-            ...(bounce.declined === undefined ? {} : { refused: bounce.declined }),
-            ...(bounce.decisionId === undefined
-              ? {}
-              : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
-            next: bounce.next,
-            // Its label is read with the page, as the decision's own link is: an id is drawn only where the log
-            // has no label for it.
-            ...(bounce.cites === undefined
-              ? {}
-              : {
-                  cites: {
-                    id: bounce.cites,
-                    label: world.decisions.get(bounce.cites)?.label || bounce.cites,
-                  },
-                }),
+              : { verdict: { said: verdictSaid(bouncedOn), issuedAt: bouncedOn.issuedAt } }),
           },
         }),
     noted: change.noted.flatMap((note) => {
