@@ -18,6 +18,7 @@ import {
   Probe,
   ProbeNotFound,
   ProbeOutcome,
+  VerdictIssued,
   VerdictNotFound,
   World,
   WorldCheck,
@@ -41,7 +42,6 @@ import {
   UserId,
   VerdictId,
 } from "@keeltown/core/kernel";
-import { IndexedVerdict } from "@keeltown/core/ports";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -263,6 +263,13 @@ export const DecisionPage = Schema.Struct({
 export const DecisionRead = Schema.Struct({ decisionId: DecisionId });
 
 export const VerdictRead = Schema.Struct({ verdictId: VerdictId });
+
+/** A verdict as the Projector's index reads it: the VerdictIssued, its project and when (the port's `IndexedVerdict`). */
+export const IndexedVerdict = Schema.Struct({
+  verdict: VerdictIssued,
+  project: ProjectId,
+  issuedAt: InstantSchema,
+});
 
 export const DecisionsRead = Schema.Struct({
   project: ProjectId,

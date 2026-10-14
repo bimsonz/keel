@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect";
 import type { EvidenceClass, VerdictId } from "../../domain/kernel/index.ts";
 import { type PlanStep, VerdictIssued, VerdictNotFound } from "../../domain/verification/index.ts";
-import { feedEntry, feedHead, storedAt } from "../memory/feed.ts";
+import { feedEntry, feedHead, storedAt } from "../memory/index.ts";
 import { EntityStore, type IndexedVerdict } from "../ports/index.ts";
 import { CITED_AS } from "./verify-candidate.ts";
 
