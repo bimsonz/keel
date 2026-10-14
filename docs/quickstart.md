@@ -155,14 +155,32 @@ row reads "my-agent reads and works · invited, not yet accepted".
 
 The agent's next `whoami` says "One invitation waits: an org's." It reads the
 invitation with `Agents_listNamespaces`, takes it with `Agents_acceptInvitation`
-(`namespace: <org>`), and `whoami` then asks nothing more. It reads and works
-on every project of the org. (From a terminal: `keeltown agent join <org>
---profile my-agent`.)
+(`namespace: <org>`). It reads and works on every project of the org, and
+`whoami` now names one read, `Agents_listReachableProjects`: the projects it can
+work in. (From a terminal: `keeltown agent join <org> --profile my-agent`.)
 
 ## 5. Land a change
 
-The agent works in a project with tokens that name it. Add
-`--project prj_…` to the helper's command, and for `keeltown`:
+The agent works in a project with tokens that name it. It finds the project's
+id with `Agents_listReachableProjects`:
+
+```json
+{
+  "items": [
+    {
+      "project": {
+        "id": "prj_1B1YM1A788YVAYHTR6G6KW69TD",
+        "namespace": "<org>",
+        "name": "notes"
+      },
+      "through": "org",
+      "scopes": ["agent:read", "agent:work"]
+    }
+  ]
+}
+```
+
+Add `--project prj_…` to the helper's command, and for `keeltown`:
 
 ```sh
 export KEEL_PROJECT=prj_1B1YM1A788YVAYHTR6G6KW69TD KEEL_RUN=my-run
