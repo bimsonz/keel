@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts packages/cli/test/key.test.ts
+# kills: cli.login-client, cli.key-work
+# why: keeltown whoami run as a person asks for an agent's own record, which Keel refuses a person, so a person signed in cannot learn who the terminal is
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 9d73f53f..dcf8652d 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -633,10 +633,7 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
+     const { client } = acting;
+     if (positionals.join(" ") === "why") return await whyCommand(io, client, values);
+     // `whoami` answers for whoever the command runs as: an agent's own record, or the person's.
+-    const answer =
+-      positionals.join(" ") === "whoami" && acting.as === "person"
+-        ? await client.me()
+-        : await dispatch(client, positionals, values);
++    const answer = await dispatch(client, positionals, values);
+     io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : summaryOf(answer));
+     return 0;
+   } catch (error) {
