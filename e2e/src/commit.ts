@@ -15,6 +15,14 @@
 //   (2) it reads that file at the base through the repo API and commits one
 //       edit with the base as `expectedHead`: 200, a commit whose parent is
 //       the base;
+//   (2a) a second agent, invited to the same project, commits on that change
+//       and refreshes its workspace's token, the lease's id in hand: each
+//       is 404, change.not_found and workspace.not_found;
+//   (2b) the change's own agent refreshes the token: 200, the same
+//       workspace and remote with a new token, and a stock `git ls-remote`
+//       of the remote with that token shows the workspace's main at the
+//       first commit;
+//   (2c) the file read at the base again is the same answer;
 //   (3) it commits other edits on the base again, now stale, under another
 //       key: refused 409 workspace.head_moved, naming the first commit as
 //       the head now;
@@ -31,6 +39,8 @@
 // leaves behind the person's account with its one project, whose trunk holds
 // the landed commit, and the agent, joined to that project, whose key is gone
 // with the run. No session, passkey, key or token is printed.
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { generateAgentKey, KeelClient, KeelProblem, signUp as signUpByKey } from "@keeltown/sdk";
 import { AccountRefused, signUp } from "../../scripts/lib/account.ts";
 import { declareWhenPooled } from "./lib/live.ts";
@@ -84,6 +94,35 @@ async function keyAgent(name: string) {
       ...(project === undefined ? {} : { project }),
     });
   return { ...account, own: client(), in: client };
+}
+
+/** The problem `act` was refused with, or undefined when it was answered. */
+async function refusalOf(act: () => Promise<unknown>): Promise<KeelProblem | undefined> {
+  try {
+    await act();
+    return undefined;
+  } catch (error) {
+    if (!(error instanceof KeelProblem)) throw error;
+    return error;
+  }
+}
+
+/** The refs a stock git sees at `remote`, presenting `token` as git's bearer. */
+async function lsRemote(remote: string, token: string): Promise<Map<string, string>> {
+  const { stdout } = await promisify(execFile)(
+    "git",
+    ["-c", `http.extraHeader=Authorization: Bearer ${token}`, "ls-remote", remote],
+    { env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
+  );
+  return new Map(
+    stdout
+      .split("\n")
+      .filter((line) => line !== "")
+      .map((line) => {
+        const [sha = "", ref = ""] = line.split("\t");
+        return [ref, sha] as const;
+      }),
+  );
 }
 
 /** Long-polls a submitted change's status until it settles or `ms` passes, reading again past a server fault or two. */
@@ -197,6 +236,72 @@ async function walk(): Promise<void> {
       first.commitSha !== base &&
       first.changed === 1,
     `(2) commitEdits on expectedHead ${short(base)}: ${answered}, commitSha ${short(first.commitSha)}, parent ${short(first.parent)}, ${first.changed} path(s) changed`,
+  );
+
+  // (2a) another agent in the project, holding the lease's id.
+  const stranger = await keyAgent(`cmt-${run}-other`);
+  await person.inviteToProject(project.id, stranger.handle, {
+    idempotencyKey: key("invite:other"),
+  });
+  await stranger.own.acceptProjectInvitation(project.id, { idempotencyKey: key("accept:other") });
+  const other = stranger.in(project.id);
+  const strangersCommit = await refusalOf(() =>
+    other.commitEdits(
+      changeId,
+      {
+        expectedHead: first.commitSha,
+        message: `Note in ${FILE} something, as another agent`,
+        edits: [{ path: FILE, content: refused }],
+      },
+      { lease, idempotencyKey: key("commit:other") },
+    ),
+  );
+  const strangersRefresh = await refusalOf(() =>
+    other.refreshWorkspaceToken(declared.workspace.id, {
+      lease,
+      idempotencyKey: key("refresh:other"),
+    }),
+  );
+  check(
+    strangersCommit?.status === 404 &&
+      strangersCommit.code === "change.not_found" &&
+      strangersRefresh?.status === 404 &&
+      strangersRefresh.code === "workspace.not_found",
+    `(2a) another agent in the project, with the lease's id: commitEdits ${strangersCommit === undefined ? "answered" : `${strangersCommit.status} ${strangersCommit.code}`}, refreshWorkspaceToken ${strangersRefresh === undefined ? "answered" : `${strangersRefresh.status} ${strangersRefresh.code}`}`,
+  );
+
+  // (2b) the change's own agent refreshes its token, and git reads the workspace with it.
+  const refreshed = await worker.refreshWorkspaceToken(declared.workspace.id, {
+    lease,
+    idempotencyKey: key("refresh"),
+  });
+  const refreshedWith = answered;
+  const refs =
+    refreshed.token === undefined
+      ? new Map<string, string>()
+      : await lsRemote(refreshed.remote, refreshed.token);
+  check(
+    refreshedWith === 200 &&
+      refreshed.id === declared.workspace.id &&
+      refreshed.remote === declared.workspace.remote &&
+      refreshed.token !== undefined &&
+      refreshed.token !== declared.workspace.token &&
+      refreshed.baseSha === base,
+    `(2b) refreshWorkspaceToken: ${refreshedWith}, the same workspace and remote, ${refreshed.token === undefined ? "no token" : refreshed.token === declared.workspace.token ? "the same token" : "a new token"}, expiring ${refreshed.expiresAt}`,
+  );
+  check(
+    refs.get("refs/heads/main") === first.commitSha,
+    `(2b) git ls-remote with the new token: main at ${short(refs.get("refs/heads/main"))} (the first commit is ${short(first.commitSha)}), ${refs.size} ref(s)`,
+  );
+
+  // (2c) the file at the base, read again.
+  const again = await worker.blob(project.id, FILE, { ref: base });
+  check(
+    answered === 200 &&
+      again.commit === base &&
+      again.content === before &&
+      again.size === blob.size,
+    `(2c) ${FILE} at the base read again: ${answered}, ${again.content === before ? "the same" : "other"} content at ${short(again.commit)}`,
   );
 
   // (3) the same expectedHead again, now stale, with other edits under another key.
