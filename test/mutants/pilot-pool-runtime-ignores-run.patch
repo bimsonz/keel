@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t pilot.pool.own-command
+# kills: pilot.pool.own-command
+# why: KeelVerify never runs a step's own command: such a step abstains and the change parks
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index a4560ee7..4cd1d7e9 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -391,7 +391,7 @@ export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
+ export const tier2RunnerFor = (
+   step: PlanStep,
+ ): (Tier2Runner & { readonly config: SuiteRunnerOptions["config"] }) | undefined => {
+-  if (step.run !== undefined)
++  if (step.run !== undefined && false)
+     return {
+       command: projectCommand(step.run),
+       judge: judgeCommandOutput,

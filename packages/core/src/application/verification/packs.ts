@@ -123,10 +123,12 @@ export const TIER2_STEP_IDS: readonly string[] = [JS_TS_SUITE.id, WORKER_APP_TYP
 
 /**
  * Whether KeelVerify can run the step on a candidate: a guard step (its
- * pinned probe, on a VerifierDO), or a Tier 2 step it has a runner for.
+ * pinned probe, on a VerifierDO), a Tier 2 step it has a runner for, or a
+ * Tier 2 step carrying a command of the project's own (`run`).
  * Nothing else runs yet: not a human step, until rulings reach a running
  * plan, and not any other Tier 0 or Tier 1 step. Precheck refuses a
  * plan holding such a step, so no change parks by design.
  */
 export const executable = (step: PlanStep): boolean =>
-  step.guards !== undefined || (step.tier.tier === 2 && TIER2_STEP_IDS.includes(step.id));
+  step.guards !== undefined ||
+  (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id)));

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.step-run
+# why: A suite step's command is dropped from its plan step (the domain's survivor 3)
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 31776714..878d7b97 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -494,7 +494,7 @@ export const compile = (
+         outcomes: s.outcomes,
+         optional: s.optional,
+         ...(w === undefined ? {} : { worlds: w }),
+-        ...(s.run === undefined
++        ...(s.run === undefined || s.suite
+           ? {}
+           : {
+               run: {

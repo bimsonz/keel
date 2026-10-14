@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.run-refused
+# why: The refusal names the first step, whichever step is refused (the domain's survivor 2)
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index 471d99f8..54ec387a 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -98,7 +98,7 @@ export const parseFlow = (
+     return invalid(": steps are declared, but there is no flow to run them");
+   for (const step of steps ?? []) {
+     const refused = runRefusal(step);
+-    if (refused !== undefined) return invalid(`: step ${step.id}'s run ${refused}`);
++    if (refused !== undefined) return invalid(`: step ${steps?.[0]?.id}'s run ${refused}`);
+   }
+   // JSON.parse answers JSON, so each step as written can be hashed as it stands.
+   const written: readonly Json[] = Array.isArray(Reflect.get(Object(json), "steps"))

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-in-place
+# why: The command runs in the runner's own shell, where an exit or a set in it ends the run before its markers
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index a4560ee7..d2f202f6 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -171,7 +171,7 @@ export const projectCommand = (run: StepRun): string =>
+     NO_DEPS_CHECK,
+     `echo ${base64Of(run.command)} | base64 -d >$K/command.sh`,
+     "start=$(date +%s%3N)",
+-    "sh $K/command.sh >$K/output.log 2>&1 </dev/null",
++    ". $K/command.sh >$K/output.log 2>&1 </dev/null",
+     "code=$?",
+     "end=$(date +%s%3N)",
+     'echo "KEEL_EXIT $code"',

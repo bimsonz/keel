@@ -77,6 +77,12 @@ export const ReadJson: Schema.Codec<Read> = Schema.Union([
   Schema.Struct({ _tag: Schema.Literal("fact"), fact: Schema.String }),
 ]);
 
+/** A step's command as the flow file writes it: the timeout may be left out. */
+const StepRunJson = Schema.Struct({
+  command: Schema.NonEmptyString,
+  timeoutMs: Schema.optionalKey(Schema.Int),
+});
+
 const stepFields = {
   id: Schema.NonEmptyString,
   kind: StepKind,
@@ -85,6 +91,7 @@ const stepFields = {
   worlds: Schema.optionalKey(Schema.Array(FlowWorld)),
   budget: BudgetJson,
   tier: Schema.optionalKey(Tier),
+  run: Schema.optionalKey(StepRunJson),
 };
 
 const AppliesTo = Schema.Struct({

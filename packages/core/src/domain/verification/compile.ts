@@ -47,6 +47,7 @@ import type {
   PlanPreimage,
   StepSpec,
 } from "./flow.ts";
+import { STEP_RUN_TIMEOUT_MS } from "./flow.ts";
 import type { PlanStep } from "./plan.ts";
 
 /**
@@ -329,6 +330,8 @@ const prune = (flow: Flow, keep: ReadonlySet<string>): Flow | undefined => {
 // ---------------------------------------------------------------- planning
 
 const tierFor = (spec: StepSpec, policy: FlowPolicy): TierChoice => {
+  if (spec.run !== undefined)
+    return { tier: 2, reason: "a command of the project's own runs in a container" };
   if (spec.tier !== undefined)
     return { tier: spec.tier, reason: "pinned by the project's flow spec" };
   if (spec.kind === "human")
@@ -491,6 +494,14 @@ export const compile = (
         outcomes: s.outcomes,
         optional: s.optional,
         ...(w === undefined ? {} : { worlds: w }),
+        ...(s.run === undefined
+          ? {}
+          : {
+              run: {
+                command: s.run.command,
+                timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+              },
+            }),
         ...(s.guards === undefined
           ? {}
           : {

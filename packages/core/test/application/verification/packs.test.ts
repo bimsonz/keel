@@ -4,11 +4,12 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   detectPack,
+  executable,
   JS_TS_SUITE,
   WORKER_APP_PACK,
   WORKER_APP_TYPECHECK,
 } from "../../../src/application/verification/index.ts";
-import { compile } from "../../../src/domain/verification/index.ts";
+import { compile, type PlanStep } from "../../../src/domain/verification/index.ts";
 import { base } from "../../arbitraries/flow.ts";
 
 const pkg = (deps: Record<string, string>, dev: Record<string, string> = {}) =>
@@ -69,5 +70,21 @@ describe("verifier packs: defaults chosen by detection, never rules", () => {
       [JS_TS_SUITE.id, 2, "proof"],
       [WORKER_APP_TYPECHECK.id, 2, "proof"],
     ]);
+  });
+
+  it("[packs.executable-run] a Tier 2 step with a command of its own is executable whatever its id, and only in Tier 2", () => {
+    const own: PlanStep = {
+      id: "keel.check",
+      kind: "deterministic",
+      evidenceCeiling: "proof",
+      appliesTo: [],
+      tier: { tier: 2, reason: "a command of the project's own runs in a container" },
+      because: "applies to every change",
+    };
+    const run = { command: "pnpm test", timeoutMs: 240_000 };
+    expect(executable(own)).toBe(false);
+    expect(executable({ ...own, run })).toBe(true);
+    expect(executable({ ...own, run, tier: { tier: 1, reason: "policy" } })).toBe(false);
+    expect(executable({ ...own, id: JS_TS_SUITE.id })).toBe(true);
   });
 });

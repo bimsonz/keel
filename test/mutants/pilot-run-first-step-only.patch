@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.run-refused
+# why: Only the first step's command is checked (the domain's survivor 1)
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index 471d99f8..2a35d554 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -96,7 +96,7 @@ export const parseFlow = (
+     );
+   if (flow === undefined && steps !== undefined)
+     return invalid(": steps are declared, but there is no flow to run them");
+-  for (const step of steps ?? []) {
++  for (const step of (steps ?? []).slice(0, 1)) {
+     const refused = runRefusal(step);
+     if (refused !== undefined) return invalid(`: step ${step.id}'s run ${refused}`);
+   }

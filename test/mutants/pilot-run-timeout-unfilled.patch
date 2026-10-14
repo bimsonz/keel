@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.step-run
+# why: A step that leaves its timeout out is given none instead of the suite's four minutes
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 31776714..c0fa3631 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -499,7 +499,7 @@ export const compile = (
+           : {
+               run: {
+                 command: s.run.command,
+-                timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
++                timeoutMs: s.run.timeoutMs ?? 0,
+               },
+             }),
+         ...(s.guards === undefined

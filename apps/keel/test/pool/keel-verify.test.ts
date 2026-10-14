@@ -1,11 +1,13 @@
 import { introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
+  JS_TS_SUITE_PACK,
+  parseFlow,
   SettledVerdict,
   StoredStepReport,
   storedPlanText,
 } from "@keeltown/core/application/verification";
-import type { FlowPlan } from "@keeltown/core/domain/verification";
+import { compile, type FlowPlan } from "@keeltown/core/domain/verification";
 import { BatchId, CandidateId, ContentHash, makeId } from "@keeltown/core/kernel";
 import { EvidenceStore, PlanStore } from "@keeltown/core/ports";
 import {
@@ -21,7 +23,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { evidenceKey, EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
 import { PlanStoreR2, planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { type KeelVerifyJob, keelVerifyParams } from "../../src/rpc/index.ts";
-import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import { commandStdout, suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
 import { bundled, mockDepsReady } from "./deps-ready.ts";
 import { OTHER_ORG, placeProject, POOL_ORG } from "./helpers.ts";
 
@@ -395,6 +397,84 @@ const runDeps = async (id: string, bundle: ContentHash, stdout?: string) => {
     verdict: Schema.decodeUnknownSync(SettledVerdict)(JSON.parse(String(verdict))),
   };
 };
+
+/**
+ * A project's own flow: one step, a command of its own, on code only. Compiled
+ * for a change at the suite plan's base, as Precheck compiles it.
+ */
+const OWN_FLOW = JSON.stringify({
+  flow: { _tag: "step", step: "keel.check" },
+  steps: [
+    {
+      id: "keel.check",
+      kind: "deterministic",
+      evidenceCeiling: "proof",
+      outcomes: ["pass", "fail", "abstain"],
+      budget: { usd: 0.05, cpuMs: 300_000, tokens: 0 },
+      appliesTo: { paths: ["src/**"], subjects: [] },
+      run: { command: "pnpm gen && pnpm test" },
+    },
+  ],
+});
+const ownPlan = (touchedPaths: readonly string[]): FlowPlan =>
+  Result.getOrThrow(
+    compile(
+      Result.getOrThrow(parseFlow(OWN_FLOW, SUITE.baseCommit)).definition,
+      { baseCommit: SUITE.baseCommit, touchedPaths, subjects: [], facts: {} },
+      JS_TS_SUITE_PACK,
+    ),
+  );
+
+describe("KeelVerify on a project's own flow", () => {
+  it("[pilot.pool.no-step] a plan with no step (a docs-only change the flow prunes) lands under its hash, citing nothing and asking no runner", async () => {
+    const plan = await stored(ownPlan(["docs/guide.md"]));
+    expect(plan.steps).toEqual([]);
+    // No runner step is mocked: a step that asked one could never answer in the pool.
+    const verdict = await runWith(
+      "keel-verify-no-step",
+      {},
+      keelVerifyParams(job({ planHash: plan.planHash })),
+    );
+    expect([verdict.outcome, verdict.planHash, verdict.evidence]).toEqual([
+      "land",
+      plan.planHash,
+      [],
+    ]);
+  });
+
+  it("[pilot.pool.own-command] the step's own command, read from the stored plan, lands on exit 0 and bounces on exit 1 citing the exit and the tail", async () => {
+    const plan = await stored(ownPlan(["src/a.ts"]));
+    expect(plan.steps.map((s) => [s.id, s.run])).toEqual([
+      ["keel.check", { command: "pnpm gen && pnpm test", timeoutMs: 240_000 }],
+    ]);
+    const params = keelVerifyParams(job({ planHash: plan.planHash }));
+    const green = await runWith(
+      "keel-verify-own-green",
+      { "keel.check": runnerOutput(commandStdout(0, "Tests 12 passed\n")) },
+      params,
+    );
+    expect(green.outcome).toBe("land");
+    expect(green.evidence[0]).toMatch(/^keel\.check: pass /);
+    expect(await storedEvidence(green)).toMatchObject({
+      outcome: "pass",
+      why: "the command exited 0",
+      exit: 0,
+    });
+    const red = await runWith(
+      "keel-verify-own-red",
+      { "keel.check": runnerOutput(commandStdout(1, "FAIL test/a.test.ts > adds\n")) },
+      params,
+    );
+    expect(red.outcome).toBe("bounce");
+    expect(red.evidence[0]).toMatch(/^keel\.check: fail /);
+    expect(await storedEvidence(red)).toMatchObject({
+      outcome: "fail",
+      why: "the command exited 1",
+      exit: 1,
+      tail: "FAIL test/a.test.ts > adds\n",
+    });
+  });
+});
 
 /** What the suite step stored for a verdict that cites its evidence first. */
 const storedEvidence = async (verdict: SettledVerdict): Promise<unknown> => {

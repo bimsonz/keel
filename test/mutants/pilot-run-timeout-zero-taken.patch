@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.run-refused
+# why: A timeout of zero is taken
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index 471d99f8..440460ee 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -46,7 +46,7 @@ const runRefusal = (step: StepFileJson): string | undefined => {
+   if (step.run.command.length > STEP_RUN_COMMAND_MAX)
+     return `command is ${step.run.command.length} characters, over ${STEP_RUN_COMMAND_MAX}`;
+   const timeout = step.run.timeoutMs;
+-  if (timeout !== undefined && (timeout < 1 || timeout > STEP_RUN_TIMEOUT_MAX_MS))
++  if (timeout !== undefined && (timeout < 0 || timeout > STEP_RUN_TIMEOUT_MAX_MS))
+     return `timeoutMs is ${timeout}, outside 1 to ${STEP_RUN_TIMEOUT_MAX_MS}`;
+   return undefined;
+ };

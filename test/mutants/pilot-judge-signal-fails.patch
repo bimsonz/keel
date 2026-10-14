@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/command.test.ts
+# kills: command.judge
+# why: Exit 128, a signal, fails the change as if the project had answered
+diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
+index aa09f896..16aa5d02 100644
+--- a/packages/core/src/application/verification/command.ts
++++ b/packages/core/src/application/verification/command.ts
+@@ -125,7 +125,7 @@ const judgeRun = (
+     evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
+   });
+   if (output.exit === 0) return decide("pass", "the command exited 0");
+-  if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);
++  if (output.exit <= 128) return decide("fail", `the command exited ${output.exit}`);
+   return abstain(
+     "timeout",
+     `the command was killed by signal ${output.exit - 128} (exit ${output.exit})`,

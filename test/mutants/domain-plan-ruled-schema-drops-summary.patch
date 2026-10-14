@@ -2,10 +2,10 @@
 # kills: plan-codec.ruled
 # why: the stored plan's schema keeps a decision's id and drops what was decided
 diff --git a/packages/core/src/domain/verification/plan.ts b/packages/core/src/domain/verification/plan.ts
-index e11029f6..8291e38b 100644
+index 202b41e9..df211c6b 100644
 --- a/packages/core/src/domain/verification/plan.ts
 +++ b/packages/core/src/domain/verification/plan.ts
-@@ -61,7 +61,7 @@ export const PlanStep = Schema.Struct({
+@@ -73,7 +73,7 @@ export const PlanStep = Schema.Struct({
        predicate: Predicate,
        policy: PredicatePolicy,
        probe: ContentHash,
@@ -13,4 +13,4 @@ index e11029f6..8291e38b 100644
 +      decision: Schema.optional(Schema.Struct({ id: DecisionId })),
      }),
    ),
- });
+   /** Set when the project's flow gives the step a command of its own: the verifier runs it and judges its exit. */

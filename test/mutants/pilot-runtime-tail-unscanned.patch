@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.project-command-leak
+# why: A command's output is never scanned, so a secret it printed is judged and stored
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index a4560ee7..0c4732e7 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -360,7 +360,7 @@ export const judgeCommandOutput = (
+     const tail =
+       output._tag === "ran" && output.tail !== undefined ? decodedText(output.tail) : undefined;
+     const diagnosis = diagnosisOf(output);
+-    const credentialScan = scanCredentials([stdout, tail ?? "", diagnosis.diagnosis ?? ""], {
++    const credentialScan = scanCredentials([diagnosis.diagnosis ?? ""], {
+       literals,
+     });
+     const judged = judgeCommand(step, output, { tail, ...diagnosis, credentialScan });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.deps-in-place
+# why: The switch is given under a name pnpm 11 does not read from the environment, so every pnpm run in a box starts an install that hangs
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index a4560ee7..712e93ae 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -61,7 +61,7 @@ export const DEPS_IN_PLACE = [
+  * the check off, overriding a project's own `verifyDepsBeforeRun` only here,
+  * where no setting of it can work. Exported, so it reaches a nested `pnpm run`.
+  */
+-export const NO_DEPS_CHECK = "export pnpm_config_verify_deps_before_run=false";
++export const NO_DEPS_CHECK = "export npm_config_verify_deps_before_run=false";
+ 
+ /**
+  * The js-ts suite command (POSIX sh). It always exits 0: a non-zero exit would

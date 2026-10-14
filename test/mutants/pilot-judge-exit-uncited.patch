@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/command.test.ts
+# kills: command.judge
+# why: The stored evidence of a pass or fail does not say what the command exited
+diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
+index aa09f896..12c1605d 100644
+--- a/packages/core/src/application/verification/command.ts
++++ b/packages/core/src/application/verification/command.ts
+@@ -122,7 +122,7 @@ const judgeRun = (
+   const tail = text ?? "";
+   const decide = (outcome: "pass" | "fail", why: string): CommandJudgement => ({
+     report: { ...base, outcome, durationMs: output.durationMs },
+-    evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
++    evidence: { stepId: step.id, outcome, why, tail },
+   });
+   if (output.exit === 0) return decide("pass", "the command exited 0");
+   if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);

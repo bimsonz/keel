@@ -99,7 +99,19 @@ export type StepSpec = {
   readonly optional: boolean;
   /** The step guards a tenet (it runs an admitted probe), so its fail takes that predicate's policy. */
   readonly guards?: GuardSpec;
+  /**
+   * A command of the project's own, run in a container and judged by its exit
+   * status; the timeout, when left out, is the suite's (STEP_RUN_TIMEOUT_MS).
+   */
+  readonly run?: { readonly command: string; readonly timeoutMs?: number };
 };
+
+/** A step command's timeout when the flow leaves it out: the suite's own. */
+export const STEP_RUN_TIMEOUT_MS = 4 * 60_000;
+/** The longest a step command may be given to run. */
+export const STEP_RUN_TIMEOUT_MAX_MS = 20 * 60_000;
+/** The longest a step command may be, in UTF-16 code units (a character outside the BMP counts two). */
+export const STEP_RUN_COMMAND_MAX = 4096;
 
 /** A project's flow, read from `.keel/flow` at the change's base commit. */
 export type FlowDefinition = {

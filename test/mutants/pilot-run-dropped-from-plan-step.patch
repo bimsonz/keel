@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.step-run
+# why: Compile drops the step's command: the plan step carries no run, the plan's hash does not cover it, and KeelVerify has nothing to run
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 31776714..dfdc5b6f 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -494,14 +494,6 @@ export const compile = (
+         outcomes: s.outcomes,
+         optional: s.optional,
+         ...(w === undefined ? {} : { worlds: w }),
+-        ...(s.run === undefined
+-          ? {}
+-          : {
+-              run: {
+-                command: s.run.command,
+-                timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+-              },
+-            }),
+         ...(s.guards === undefined
+           ? {}
+           : {

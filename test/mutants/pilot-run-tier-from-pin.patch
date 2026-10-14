@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.step-run
+# why: A step's command takes its tier from the pin or the policy, so a command can be planned outside a container
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 31776714..3b1afade 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -330,8 +330,6 @@ const prune = (flow: Flow, keep: ReadonlySet<string>): Flow | undefined => {
+ // ---------------------------------------------------------------- planning
+ 
+ const tierFor = (spec: StepSpec, policy: FlowPolicy): TierChoice => {
+-  if (spec.run !== undefined)
+-    return { tier: 2, reason: "a command of the project's own runs in a container" };
+   if (spec.tier !== undefined)
+     return { tier: spec.tier, reason: "pinned by the project's flow spec" };
+   if (spec.kind === "human")

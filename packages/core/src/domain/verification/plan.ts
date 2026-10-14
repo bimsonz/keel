@@ -31,6 +31,18 @@ export const FlowSpec = Schema.Struct({
 });
 export type FlowSpec = typeof FlowSpec.Type;
 
+/**
+ * A command of the project's own, run in a Tier 2 container and judged by its
+ * exit status alone. It rides on the plan step, so the plan's hash covers the
+ * command and its timeout, and the verifier runs what the plan says, never
+ * what the candidate's flow file says.
+ */
+export const StepRun = Schema.Struct({
+  command: Schema.NonEmptyString,
+  timeoutMs: Schema.Int,
+});
+export type StepRun = typeof StepRun.Type;
+
 export const PlanStep = Schema.Struct({
   id: Schema.NonEmptyString,
   kind: StepKind,
@@ -64,6 +76,8 @@ export const PlanStep = Schema.Struct({
       decision: Schema.optional(Schema.Struct({ id: DecisionId, summary: Schema.String })),
     }),
   ),
+  /** Set when the project's flow gives the step a command of its own: the verifier runs it and judges its exit. */
+  run: Schema.optional(StepRun),
 });
 export type PlanStep = typeof PlanStep.Type;
 

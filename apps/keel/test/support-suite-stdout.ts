@@ -2,7 +2,11 @@
 // in for a Tier 2 runner (unit and pool): markers, a base64 tail, and vitest's
 // JSON report gzipped and base64'd, exactly as the command prints them. Also
 // the typecheck command's, with tsc's output gzipped and base64'd.
-import { SUITE_PROTOCOL, TYPECHECK_PROTOCOL } from "@keeltown/core/application/verification";
+import {
+  COMMAND_PROTOCOL,
+  SUITE_PROTOCOL,
+  TYPECHECK_PROTOCOL,
+} from "@keeltown/core/application/verification";
 
 const b64 = (bytes: Uint8Array) => {
   let text = "";
@@ -66,6 +70,19 @@ export const typecheckStdout = async (exit: number, output: string): Promise<str
     "KEEL_DURATION_MS 2100",
     `KEEL_OUTPUT_BYTES ${new TextEncoder().encode(output).length}`,
     output.length === 0 ? "KEEL_OUTPUT none" : `KEEL_OUTPUT ${b64(await gzip(output))}`,
+    "KEEL_END",
+    "",
+  ].join("\n");
+
+/** A project command's stdout: its exit and the end of its output, base64'd as the command prints it. */
+export const commandStdout = (exit: number, tail = ""): string =>
+  [
+    COMMAND_PROTOCOL,
+    "KEEL_HYDRATION ok",
+    "KEEL_DEPS ok",
+    `KEEL_EXIT ${exit}`,
+    "KEEL_DURATION_MS 2100",
+    `KEEL_TAIL ${tail === "" ? "none" : b64(new TextEncoder().encode(tail))}`,
     "KEEL_END",
     "",
   ].join("\n");

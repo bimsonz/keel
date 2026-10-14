@@ -1,0 +1,82 @@
+{
+  "flow": {
+    "_tag": "par",
+    "items": [
+      { "_tag": "step", "step": "keel.check" },
+      { "_tag": "step", "step": "keel.test" },
+      { "_tag": "step", "step": "keel.docs" }
+    ]
+  },
+  "steps": [
+    {
+      "id": "keel.check",
+      "kind": "deterministic",
+      "evidenceCeiling": "proof",
+      "outcomes": ["pass", "fail", "abstain"],
+      "budget": { "usd": 0.05, "cpuMs": 1200000, "tokens": 0 },
+      "appliesTo": {
+        "paths": [
+          "apps/**",
+          "packages/**",
+          "examples/**",
+          "e2e/**",
+          "scripts/**",
+          "test/**",
+          "fixtures/**",
+          "infra/**",
+          ".github/**",
+          "*.json",
+          "*.jsonc",
+          "*.yaml",
+          "*.ts",
+          ".*"
+        ],
+        "subjects": []
+      },
+      "run": {
+        "command": "pnpm gen && pnpm lint && pnpm format:check && pnpm typecheck && pnpm guards",
+        "timeoutMs": 1200000
+      }
+    },
+    {
+      "id": "keel.test",
+      "kind": "deterministic",
+      "evidenceCeiling": "proof",
+      "outcomes": ["pass", "fail", "abstain"],
+      "budget": { "usd": 0.05, "cpuMs": 1200000, "tokens": 0 },
+      "suite": true,
+      "appliesTo": {
+        "paths": [
+          "apps/**",
+          "packages/**",
+          "examples/**",
+          "e2e/**",
+          "scripts/**",
+          "test/**",
+          "fixtures/**",
+          "infra/**",
+          ".github/**",
+          "*.json",
+          "*.jsonc",
+          "*.yaml",
+          "*.ts",
+          ".*"
+        ],
+        "subjects": []
+      },
+      "run": { "command": "pnpm gen && pnpm test", "timeoutMs": 1200000 }
+    },
+    {
+      "id": "keel.docs",
+      "kind": "deterministic",
+      "evidenceCeiling": "proof",
+      "outcomes": ["pass", "fail", "abstain"],
+      "budget": { "usd": 0.01, "cpuMs": 600000, "tokens": 0 },
+      "appliesTo": { "paths": ["docs/**", "spikes/**", "*.md", "LICENSE"], "subjects": [] },
+      "run": {
+        "command": "pnpm gen && pnpm format:check && pnpm guards",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

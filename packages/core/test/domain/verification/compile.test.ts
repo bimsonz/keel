@@ -642,6 +642,34 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     expect(planHashOf({ ...plan, humanClass: false })).not.toBe(plan.planHash);
   });
 
+  it("[flow.step-run] a step's command rides on its plan step, in a container, its timeout filled in, and the plan's hash covers both", () => {
+    const check = suiteStep("check", { suite: false, run: { command: "pnpm test" } });
+    const plan = ok(single([check]));
+    expect(plan.steps.map((s) => [s.id, s.run, s.tier])).toEqual([
+      [
+        "check",
+        { command: "pnpm test", timeoutMs: 240_000 },
+        { tier: 2, reason: "a command of the project's own runs in a container" },
+      ],
+    ]);
+    // A pinned tier gives way: a command runs nowhere but a container.
+    expect(ok(single([{ ...check, tier: 1 }])).steps[0]?.tier.tier).toBe(2);
+    const hashWith = (run: NonNullable<StepSpec["run"]>) =>
+      ok(single([{ ...check, run }])).planHash;
+    expect(hashWith({ command: "pnpm test --bail" })).not.toBe(plan.planHash);
+    expect(hashWith({ command: "pnpm test", timeoutMs: 300_000 })).not.toBe(plan.planHash);
+    // At compile the default written out is the same plan; through parseFlow it is not, since the step's version is the hash of the step as written.
+    expect(hashWith({ command: "pnpm test", timeoutMs: 240_000 })).toBe(plan.planHash);
+    // A suite step may carry a command of its own (ruled 14 Oct): it rides, in a container.
+    expect(
+      ok(single([suiteStep("check", { run: { command: "pnpm test" } })])).steps.map((s) => [
+        s.run,
+        s.tier.tier,
+      ]),
+    ).toEqual([[{ command: "pnpm test", timeoutMs: 240_000 }, 2]]);
+    expect(ok(single([suiteStep("check")])).steps[0]).not.toHaveProperty("run");
+  });
+
   it("[flow.guard-policy] a guard step carries its predicate's policy, and a predicate the change's policy leaves out is advise", () => {
     let defaulted = 0;
     let named = 0;

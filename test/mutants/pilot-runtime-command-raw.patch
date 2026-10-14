@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-decodes
+# why: The project's command goes into the box as quoted text, which a quote in it breaks out of
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index a4560ee7..1a579687 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -169,7 +169,7 @@ export const projectCommand = (run: StepRun): string =>
+     'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+     DEPS_IN_PLACE,
+     NO_DEPS_CHECK,
+-    `echo ${base64Of(run.command)} | base64 -d >$K/command.sh`,
++    `printf '%s' '${run.command}' >$K/command.sh`,
+     "start=$(date +%s%3N)",
+     "sh $K/command.sh >$K/output.log 2>&1 </dev/null",
+     "code=$?",

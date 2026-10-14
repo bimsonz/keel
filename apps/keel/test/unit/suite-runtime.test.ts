@@ -6,7 +6,8 @@ import {
   TIER2_STEP_IDS,
   TYPECHECK_PROTOCOL,
 } from "@keeltown/core/application/verification";
-import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import { execFileSync } from "node:child_process";
+import { commandStdout, suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
@@ -24,6 +25,7 @@ import { Effect, Layer, Schema } from "effect";
 import {
   type Durable,
   JS_TS_SUITE_COMMAND,
+  projectCommand,
   type SuiteRunner,
   type SuiteRunnerOptions,
   SuiteRuntimeCi,
@@ -558,10 +560,11 @@ describe("a Tier 2 step and the deps its Workflow ensured", () => {
       }),
   );
 
-  it("[suite-runtime.deps-in-place] both commands fetch the deps after hydrating and before their tool, stop on a bundle that is not put there, and drop the deps before every end that follows", () => {
+  it("[suite-runtime.deps-in-place] every Tier 2 command fetches the deps after hydrating and before its tool, stops on a bundle that is not put there, switches pnpm's own install off, and drops the deps before every end that follows", () => {
     for (const [command, tool] of [
       [JS_TS_SUITE_COMMAND, "node_modules/vitest/vitest.mjs run"],
       [TYPECHECK_COMMAND, "node_modules/typescript/bin/tsc --noEmit"],
+      [projectCommand({ command: "pnpm test", timeoutMs: 1 }), "sh $K/command.sh"],
     ] as const) {
       const lines = command.split("\n");
       const at = (text: string) => lines.findIndex((l) => l.includes(text));
@@ -577,7 +580,9 @@ describe("a Tier 2 step and the deps its Workflow ensured", () => {
       expect(lines[fetch - 1]).toBe("set -f");
       expect(lines[fetch + 1]).toBe("set +f");
       expect(lines[fetch + 2]).toBe("echo KEEL_DEPS ok");
-      expect(fetch).toBeLessThan(at(tool));
+      // [suite-runtime.no-deps-check] The name pnpm 11 reads, as tried in the box's image: npm_config_* and .npmrc are not read.
+      expect(lines[fetch + 3]).toBe("export pnpm_config_verify_deps_before_run=false");
+      expect(fetch + 3).toBeLessThan(at(tool));
       // Every KEEL_END after the fetch has the deps dropped before it, on its own line or the same one.
       const ends = lines.flatMap((l, i) => (i > fetch && l.includes("echo KEEL_END") ? [i] : []));
       expect(ends.length).toBeGreaterThan(0);
@@ -587,6 +592,91 @@ describe("a Tier 2 step and the deps its Workflow ensured", () => {
             (lines[end] ?? "").includes("keel_deps_drop /workspace; "),
         ).toBe(true);
     }
+  });
+});
+
+describe("a step command of the project's own", () => {
+  const run = { command: "pnpm gen && pnpm test", timeoutMs: 600_000 };
+  const own = (id = "keel.check") => ({
+    ...step,
+    id,
+    tier: { tier: 2 as const, reason: "a command of the project's own runs in a container" },
+    run,
+  });
+  const ranWith = (stdout: string, id?: string) =>
+    Effect.gen(function* () {
+      const rt = runtime(stdoutRunner(stdout));
+      const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
+        v.run(sampleNamespace, { ...job(), steps: [own(id)] }, READY),
+      ).pipe(Effect.provide(rt.layer));
+      const documents = [...rt.store.documents.values()].map(String);
+      return { rt, results, documents };
+    });
+
+  it.effect(
+    "[suite-runtime.project-command] runs the plan's command in one runner, given the step's time, judges it by its exit and stores why",
+    () =>
+      Effect.gen(function* () {
+        for (const [exit, outcome, why] of [
+          [0, "pass", "the command exited 0"],
+          [3, "fail", "the command exited 3"],
+          [137, "abstain", "the command was killed by signal 9 (exit 137)"],
+        ] as const) {
+          const { rt, results, documents } = yield* ranWith(
+            commandStdout(exit, "FAIL a.test.ts\n"),
+          );
+          expect(results.map((r) => [r.stepId, r.outcome])).toEqual([["keel.check", outcome]]);
+          expect(
+            rt.calls.map((c) => [c.name, c.command, c.config.commandTimeoutMs, c.config.timeout]),
+          ).toEqual([["keel.check", projectCommand(run), 600_000, 660_000]]);
+          expect(rt.steps).toEqual(["keel.check:evidence"]);
+          expect(documents.map((d) => JSON.parse(d))).toEqual([
+            {
+              stepId: "keel.check",
+              outcome,
+              why,
+              exit,
+              tail: "FAIL a.test.ts\n",
+              credentialScan: { token: 0, expiry: 0, remote: 0, host: 0, literal: 0 },
+            },
+          ]);
+          expect(results[0]?.resultRef).toBeDefined();
+        }
+      }),
+  );
+
+  it.effect(
+    "[suite-runtime.project-command-wins] a step that reuses a pack's id with a command of its own runs its command, not the pack's",
+    () =>
+      Effect.gen(function* () {
+        const { rt, results } = yield* ranWith(commandStdout(0), "js-ts.suite");
+        expect(rt.calls.map((c) => c.command)).toEqual([projectCommand(run)]);
+        expect(results.map((r) => r.outcome)).toEqual(["pass"]);
+      }),
+  );
+
+  it.effect(
+    "[suite-runtime.project-command-leak] a tail holding a secret abstains, and the stored evidence never holds it",
+    () =>
+      Effect.gen(function* () {
+        const { results, documents } = yield* ranWith(commandStdout(0, `account ${ACCOUNT}\n`));
+        expect(results.map((r) => r.outcome)).toEqual(["abstain"]);
+        expect(documents).toHaveLength(1);
+        expect(documents[0]).not.toContain(ACCOUNT);
+        expect(JSON.parse(documents[0] ?? "{}").why).toMatch(/^credential-leak: /);
+      }),
+  );
+
+  it("[suite-runtime.command-decodes] the plan's command is in the runner's command only as base64, and the box's own decode gives it back byte for byte", () => {
+    const tricky = `printf '%s\\n' "it's $HOME" && echo "\u00fcn\u00ef \u20ac" \`date\`\nexit 3`;
+    const command = projectCommand({ command: tricky, timeoutMs: 1 });
+    expect(command).not.toContain("it's");
+    const line = command.split("\n").find((l) => l.includes("| base64 -d >$K/command.sh"));
+    if (line === undefined) throw new Error("no decode line");
+    const decoded = execFileSync("sh", ["-c", line.replace(" >$K/command.sh", "")], {
+      encoding: "utf8",
+    });
+    expect(decoded).toBe(tricky);
   });
 });
 

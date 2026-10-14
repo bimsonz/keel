@@ -12,8 +12,11 @@ packages/syntax/src/generated/
 packages/testing/src/generated/
 packages/spec/tsp-output/
 
-# Seeded credentials and run transcripts (scripts/seed.ts, e2e): never committed
-.keel/
+# Seeded credentials and run transcripts (scripts/seed.ts, e2e): never committed.
+# At any depth. Only the repository's own flow and the worker-lite fixture's deploy file are.
+**/.keel/*
+!/.keel/flow.json
+!/fixtures/worker-lite/.keel/deploy.json
 
 # Wrangler
 .wrangler/

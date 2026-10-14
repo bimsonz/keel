@@ -2,14 +2,14 @@
 # kills: plan-codec.ruled
 # why: the stored plan's schema has no decision, so a ruled guard's plan reads back without the ruling it holds
 diff --git a/packages/core/src/domain/verification/plan.ts b/packages/core/src/domain/verification/plan.ts
-index e11029f6..6d493108 100644
+index 202b41e9..3f714337 100644
 --- a/packages/core/src/domain/verification/plan.ts
 +++ b/packages/core/src/domain/verification/plan.ts
-@@ -61,7 +61,6 @@ export const PlanStep = Schema.Struct({
+@@ -73,7 +73,6 @@ export const PlanStep = Schema.Struct({
        predicate: Predicate,
        policy: PredicatePolicy,
        probe: ContentHash,
 -      decision: Schema.optional(Schema.Struct({ id: DecisionId, summary: Schema.String })),
      }),
    ),
- });
+   /** Set when the project's flow gives the step a command of its own: the verifier runs it and judges its exit. */

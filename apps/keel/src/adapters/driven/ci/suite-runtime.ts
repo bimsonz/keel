@@ -1,9 +1,14 @@
 import {
+  COMMAND_PROTOCOL,
+  COMMAND_TAIL_LIMIT,
+  type CommandJudgement,
   type DepsAnswer,
   depsStop,
   JS_TS_SUITE,
+  judgeCommand,
   judgeSuite,
   judgeTypecheck,
+  parseCommandOutput,
   parseSuiteOutput,
   parseTypecheckOutput,
   redact,
@@ -18,7 +23,7 @@ import {
   WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
 import type { ContentHash, Json, NamespaceId } from "@keeltown/core/kernel";
-import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
+import type { PlanStep, StepResult, StepRun } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import {
   BUNDLE_URL_TTL_SECONDS,
@@ -44,6 +49,19 @@ export const DEPS_IN_PLACE = [
   "set +f",
   "echo KEEL_DEPS ok",
 ].join("\n");
+
+/**
+ * pnpm 11 checks a project's dependencies before every `pnpm run`, `pnpm
+ * exec` and `pnpm -r run`, and when the check fails (as it does on a
+ * checkout whose package.json files are newer than the install) it starts
+ * `pnpm install`. A Tier 2 box has no route out, so that install can never
+ * succeed: it only hangs until the step times out. The dependencies in the
+ * box are Keel's own guarantee instead (built for the candidate's install
+ * digest, every part checked by its hash), so every Tier 2 command switches
+ * the check off, overriding a project's own `verifyDepsBeforeRun` only here,
+ * where no setting of it can work. Exported, so it reaches a nested `pnpm run`.
+ */
+export const NO_DEPS_CHECK = "export pnpm_config_verify_deps_before_run=false";
 
 /**
  * The js-ts suite command (POSIX sh). It always exits 0: a non-zero exit would
@@ -73,6 +91,7 @@ export const JS_TS_SUITE_COMMAND = [
   "cd /workspace 2>/dev/null || stop no-workspace",
   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
   DEPS_IN_PLACE,
+  NO_DEPS_CHECK,
   "start=$(date +%s%3N)",
   "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=$K/report.json >$K/console.log 2>&1",
   "code=$?",
@@ -107,6 +126,7 @@ export const TYPECHECK_COMMAND = [
   "cd /workspace 2>/dev/null || stop no-workspace",
   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
   DEPS_IN_PLACE,
+  NO_DEPS_CHECK,
   "if [ ! -f tsconfig.json ]; then keel_deps_drop /workspace; echo KEEL_TSCONFIG none; echo KEEL_END; exit 0; fi",
   "echo KEEL_TSCONFIG ok",
   "start=$(date +%s%3N)",
@@ -121,6 +141,46 @@ export const TYPECHECK_COMMAND = [
   "echo KEEL_END",
   "exit 0",
 ].join("\n");
+
+/** Base64 of a string's UTF-8 bytes, on one line. */
+const base64Of = (text: string): string =>
+  btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(""));
+
+/**
+ * The command (POSIX sh) for a step command of the project's own
+ * (`PlanStep.run`), per COMMAND_PROTOCOL. It hydrates, puts the deps in place
+ * and drops them as the suite command does, and always exits 0. The project's
+ * command goes in as one base64 literal, so nothing in it is quoted or read
+ * by this shell, and it runs as a script under its own `sh` with no stdin:
+ * an `exit` or a `set` in it ends only that `sh`. Its output goes to a file
+ * and only its last COMMAND_TAIL_LIMIT bytes are printed, base64'd, so
+ * nothing it prints can forge a marker.
+ */
+export const projectCommand = (run: StepRun): string =>
+  [
+    "set -u",
+    "K=/tmp/keel; rm -rf $K; mkdir -p $K",
+    `echo ${COMMAND_PROTOCOL}`,
+    'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
+    HYDRATE_SH,
+    DEPS_FETCH_SH,
+    DEPS_DROP_SH,
+    "cd /workspace 2>/dev/null || stop no-workspace",
+    'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+    DEPS_IN_PLACE,
+    NO_DEPS_CHECK,
+    `echo ${base64Of(run.command)} | base64 -d >$K/command.sh`,
+    "start=$(date +%s%3N)",
+    "sh $K/command.sh >$K/output.log 2>&1 </dev/null",
+    "code=$?",
+    "end=$(date +%s%3N)",
+    'echo "KEEL_EXIT $code"',
+    'echo "KEEL_DURATION_MS $((end - start))"',
+    `if [ -s $K/output.log ]; then echo "KEEL_TAIL $(tail -c ${COMMAND_TAIL_LIMIT} $K/output.log | base64 -w0)"; else echo "KEEL_TAIL none"; fi`,
+    "keel_deps_drop /workspace",
+    "echo KEEL_END",
+    "exit 0",
+  ].join("\n");
 
 /** What a suite runner is asked: never a credential, one infra retry, bounded time, short-lived snapshots. */
 export interface SuiteRunnerOptions {
@@ -177,6 +237,14 @@ export type Durable = (
 
 const bytesOf = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const textOf = (b64: string): string => new TextDecoder().decode(bytesOf(b64));
+/** The text base64 encodes, or undefined when it does not decode. */
+const decodedText = (b64: string): string | undefined => {
+  try {
+    return textOf(b64);
+  } catch {
+    return undefined;
+  }
+};
 
 const gunzipText = (b64: string | undefined): Effect.Effect<string | undefined> =>
   b64 === undefined
@@ -278,6 +346,27 @@ export const judgeTypecheckOutput = (
     return { ...judged, evidence, document: redactJson(evidence, literals) };
   });
 
+/**
+ * Reads one project command runner's stdout into a judgement, as for a
+ * typecheck: parse, decode the output's tail, scan it all raw, judge, redact.
+ */
+export const judgeCommandOutput = (
+  step: PlanStep,
+  stdout: string,
+  literals: readonly string[],
+): Effect.Effect<CommandJudgement & { readonly document: Json }> =>
+  Effect.sync(() => {
+    const output = parseCommandOutput(stdout);
+    const tail =
+      output._tag === "ran" && output.tail !== undefined ? decodedText(output.tail) : undefined;
+    const diagnosis = diagnosisOf(output);
+    const credentialScan = scanCredentials([stdout, tail ?? "", diagnosis.diagnosis ?? ""], {
+      literals,
+    });
+    const judged = judgeCommand(step, output, { tail, ...diagnosis, credentialScan });
+    return { ...judged, document: redactJson({ ...judged.evidence }, literals) };
+  });
+
 /** A Tier 2 step this runtime can run: the command a runner executes, and how its stdout is judged. */
 export interface Tier2Runner {
   readonly command: string;
@@ -292,6 +381,28 @@ export interface Tier2Runner {
 export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
   [JS_TS_SUITE.id]: { command: JS_TS_SUITE_COMMAND, judge: judgeSuiteOutput },
   [WORKER_APP_TYPECHECK.id]: { command: TYPECHECK_COMMAND, judge: judgeTypecheckOutput },
+};
+
+/**
+ * The runner for a Tier 2 step, with the time it is given: the plan's own
+ * command when the step carries one (whatever its id, so it wins over a
+ * pack's runner of the same id), else the pack's runner for its id.
+ */
+export const tier2RunnerFor = (
+  step: PlanStep,
+): (Tier2Runner & { readonly config: SuiteRunnerOptions["config"] }) | undefined => {
+  if (step.run !== undefined)
+    return {
+      command: projectCommand(step.run),
+      judge: judgeCommandOutput,
+      config: {
+        ...SUITE_CONFIG,
+        commandTimeoutMs: step.run.timeoutMs,
+        timeout: step.run.timeoutMs + SUITE_CONFIG.timeout - SUITE_CONFIG.commandTimeoutMs,
+      },
+    };
+  const runner = TIER2_RUNNERS[step.id];
+  return runner === undefined ? undefined : { ...runner, config: SUITE_CONFIG };
 };
 
 const abstained = (step: PlanStep): StepResult => ({
@@ -330,7 +441,7 @@ export const SuiteRuntimeCi = (deps: {
       const runStep =
         (namespace: NamespaceId, bundle: ContentHash, handed: DepsAnswer) => (step: PlanStep) =>
           Effect.gen(function* () {
-            const tier2 = TIER2_RUNNERS[step.id];
+            const tier2 = tier2RunnerFor(step);
             if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
             if (handed._tag !== "DepsReady") {
               const stop = depsStop(step, handed);
@@ -357,7 +468,7 @@ export const SuiteRuntimeCi = (deps: {
                 name: step.id,
                 command: tier2.command,
                 env: suiteEnv(url, parts),
-                config: SUITE_CONFIG,
+                config: tier2.config,
                 cloudflareCredentials: false,
                 sourceControlCredentials: false,
               }),

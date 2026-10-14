@@ -2,14 +2,14 @@
 # kills: runner.typecheck-routed
 # why: The runtime has no runner for worker-app.typecheck, so every worker-app change abstains and parks
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 5301016..e501157 100644
+index a4560ee7..8f03c1dd 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -258,7 +258,6 @@ export interface Tier2Runner {
+@@ -380,7 +380,6 @@ export interface Tier2Runner {
  /** Every Tier 2 step this runtime can run, by step id. Any other step abstains here. */
  export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
    [JS_TS_SUITE.id]: { command: JS_TS_SUITE_COMMAND, judge: judgeSuiteOutput },
 -  [WORKER_APP_TYPECHECK.id]: { command: TYPECHECK_COMMAND, judge: judgeTypecheckOutput },
  };
  
- const abstained = (step: PlanStep): StepResult => ({
+ /**
