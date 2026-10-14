@@ -91,6 +91,14 @@ A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what
 
 `node scripts/level.ts <origin> <namespace> <project>` sets the console's fold of a public project's log beside Keel's own read of each of its conflicts, and says where the two differ. It reads only, as a visitor.
 
+## A change's Verification Plan
+
+Keel commits only how many steps a change's plan has (`PlanCompiled.steps`). The plan itself comes with a verdict issued under it, in Keel's view of that verdict (`GET /v1/verdicts/{id}`), which the page reads when a change's page is opened.
+
+- **The steps are Keel's, in Keel's order**, listed as a CI run lists its steps: each one's id and kind, its tier with Keel's reason for it, the strongest evidence it can give, why it is in this plan, and for a guard the predicate it guards, its policy and the decision it holds.
+- **Each line of the verdict's evidence is under the step it names**, as Keel names it. A line that names no step is listed by its class beside the plan. A step no line names says nothing of how it went: on a bounce Keel describes only what failed.
+- **No plan is drawn where Keel's view has none**: a refusal at Precheck, a plan no longer stored, or a Keel that serves no view. The tab then says how many steps Keel compiled.
+
 ## A project's decisions
 
 Keel remembers what each ruling settled, and the Decisions tab reads that memory: `GET /v1/decisions` for the list and `GET /v1/decisions/{id}` for one, each asked of Keel with nothing added. Keel reads them to whoever reads the project, so a visitor reads a public project's.
