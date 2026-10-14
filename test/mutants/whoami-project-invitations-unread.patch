@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t whoami.invited
+# kills: whoami.invited
+# why: a project's invitation is never counted, so an agent invited to one project is told nothing waits
+diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
+index 70ad04a3..6dedd4ad 100644
+--- a/packages/core/src/application/identity/index.ts
++++ b/packages/core/src/application/identity/index.ts
+@@ -57,7 +57,7 @@ export const whoami: (
+     agent,
+     ...(principal.run === undefined ? {} : { run: principal.run }),
+     session: current === null ? null : { id: current.id },
+-    invitations: { namespaces: waiting(namespaces), projects: waiting(projects) },
++    invitations: { namespaces: waiting(namespaces), projects: 0 },
+   };
+ });
+ 

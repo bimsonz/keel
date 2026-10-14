@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/identity.test.ts -t whoami.invitations
+# kills: whoami.invitations
+# why: an accepted invitation is counted as waiting, so an agent is told to accept what it already has
+diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
+index 70ad04a3..556a53b1 100644
+--- a/packages/core/src/application/identity/index.ts
++++ b/packages/core/src/application/identity/index.ts
+@@ -39,7 +39,7 @@ import {
+ 
+ /** How many invitations wait for the agent's word: an accepted one is a place it stands, not news. */
+ const waiting = (invitations: readonly Invitation[]): number =>
+-  invitations.filter((invitation) => invitation.state === "invited").length;
++  invitations.filter((invitation) => invitation.state !== "ended").length;
+ 
+ /** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, that run's current session, and how many invitations wait for its word. */
+ export const whoami: (

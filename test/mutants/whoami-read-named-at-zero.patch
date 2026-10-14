@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.invited-next
+# kills: whoami.invited-next
+# why: the project's read is named when nothing waits, so every whoami sends the agent to an empty list
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 2b07cbca..ec913cd0 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -94,7 +94,7 @@ function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
+             },
+           ]
+         : []),
+-      ...(projects > 0
++      ...(projects >= 0
+         ? [
+             {
+               kind: "read" as const,

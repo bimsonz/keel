@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.invited-next
+# kills: whoami.invited-next
+# why: an org's invitation is counted but its read is never named, so the agent is not told where to find it
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 2b07cbca..1e67db4a 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -84,7 +84,7 @@ function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
+         ? ""
+         : ` ${count === 1 ? "One invitation waits" : `${count} invitations wait`}: ${kinds.join(" and ")}.`,
+     next: [
+-      ...(namespaces > 0
++      ...(namespaces > 9
+         ? [
+             {
+               kind: "read" as const,

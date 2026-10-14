@@ -2,7 +2,7 @@
 # kills: run.pool-views
 # why: a run is shown by its id alone, without the label the agent gave it
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index f584f090..cbedbdd4 100644
+index 2b07cbca..22955c59 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
 @@ -68,7 +68,6 @@ export function latticesOk(): Lattices_listLatticesResult {
@@ -12,4 +12,4 @@ index f584f090..cbedbdd4 100644
 -  ...(run.label === undefined ? {} : { label: run.label }),
  });
  
- export function whoamiOk(identity: Identity): WhoamiResult {
+ /** What `whoami` says of the invitations that wait: a clause of its summary, and the read for each kind. */

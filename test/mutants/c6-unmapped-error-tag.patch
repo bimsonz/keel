@@ -1,18 +1,14 @@
 # expect-red: pnpm --filter @keeltown/keel typecheck
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index f8146fd6..1b3808fe 100644
+index 70ad04a3..5635ac89 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
-@@ -37,7 +37,11 @@ import {
- /** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, and that run's current session. */
- export const whoami: (
+@@ -46,7 +46,7 @@ export const whoami: (
    principal: AgentClaims,
--) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
-+) => Effect.Effect<
-+  Identity,
+ ) => Effect.Effect<
+   Identity,
+-  AgentNotKnown | AgentNotAdmitted,
 +  AgentNotKnown | AgentNotAdmitted | CredentialRejected,
-+  AgentDirectory | Sessions
-+> =
-   Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
-     const agent = yield* admit(principal);
-     const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
+   AgentDirectory | Sessions | NamespaceAgents | ProjectAgents
+ > = Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
+   const agent = yield* admit(principal);
