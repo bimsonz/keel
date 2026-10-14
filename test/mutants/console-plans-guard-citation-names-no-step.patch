@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.verdict-plan
+# why: the fixtures' view names no step for a guard's citation, where Keel's verdictReasons names the guard's
+diff --git a/apps/console/test/fixtures/mock/plans.ts b/apps/console/test/fixtures/mock/plans.ts
+index 9a6afa2d..d0a1e00a 100644
+--- a/apps/console/test/fixtures/mock/plans.ts
++++ b/apps/console/test/fixtures/mock/plans.ts
+@@ -94,7 +94,7 @@ export function described(
+  */
+ export function reasonOf(line: string, steps: readonly VerdictPlanStep[]): VerdictReason {
+   const step = steps.find(
+-    (s) => line.startsWith(`${s.id}: `) || line.startsWith(`guard failed: ${s.id} (`),
++    (s) => line.startsWith(`${s.id}: `),
+   );
+   return step === undefined
+     ? { line, class: "proof" }

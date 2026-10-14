@@ -2,15 +2,15 @@
 # kills: s2.as-keel-commits
 # why: the fixture cites the decision otherwise than Keel's verdict does
 diff --git a/apps/console/test/fixtures/mock/s2.ts b/apps/console/test/fixtures/mock/s2.ts
-index e5e06908..b90bad4e 100644
+index 39a3ad26..6d4bf63e 100644
 --- a/apps/console/test/fixtures/mock/s2.ts
 +++ b/apps/console/test/fixtures/mock/s2.ts
-@@ -514,7 +514,7 @@ export function generateS2(seed: number): GeneratedLog {
+@@ -474,7 +474,7 @@ export function generateS2(
  
    // The verdict's evidence and the ways forward are worded as Keel's `settleVerdict` words them: the failed
    // step, then the guard cited with the decision it holds, and a next action that reads that decision.
 -  const failed = `guard:${p.guard} (freshness): a role revoked mid-session is still allowed; it holds decision ${decisionId}: ${S2_DECIDED}`;
 +  const failed = `guard:${p.guard} (freshness): a role revoked mid-session is still allowed; it breaks decision ${decisionId}`;
-   const evidence = [
-     `guard:${p.guard}: fail (proof, tier 1: one throwaway isolate per world)`,
-     `guard failed: ${failed}`,
+   // Only what failed is described on a bounce: the suite and the typecheck passed and have no line.
+   const guard = planH.steps.find((step) => step.guards !== undefined);
+   if (guard === undefined) throw new Error("the plan runs no guard");

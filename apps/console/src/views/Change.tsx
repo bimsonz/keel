@@ -7,6 +7,7 @@ import type {
   ChangePageState,
   DiffAnnotation,
   IntentRow,
+  PlanStepRow,
   RulingBounce,
   ChangeBounce,
 } from "../domain/state.ts";
@@ -333,6 +334,79 @@ function Recorded({ lines }: { lines: readonly string[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Where a step runs, as Keel names its tiers. */
+const TIER_WHERE: Record<PlanStepRow["tier"], string> = {
+  0: "the Worker",
+  1: "a fresh isolate",
+  2: "a container",
+};
+
+/**
+ * The plan a verdict was issued under, as Keel's view of the verdict gives it: its steps in Keel's order, as a CI run
+ * lists its steps. Under a step are the lines of the verdict's evidence that name it. A step no line names says
+ * nothing of how it went: Keel's evidence says only what it says.
+ */
+function PlanSteps({ steps }: { steps: PlanStepRow[] }) {
+  return (
+    <ol className="flex flex-col" aria-label="The plan's steps, in Keel's order">
+      {steps.map((step, index) => (
+        <li
+          key={step.id}
+          className="flex flex-col gap-1 border-t border-kumo-line px-4 py-3 first:border-t-0"
+          data-step={step.id}
+        >
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="a-num text-sm text-kumo-subtle">{index + 1}</span>
+            <span className="a-mono font-semibold text-kumo-strong [overflow-wrap:anywhere]">
+              {step.id}
+            </span>
+            <span className="text-sm text-kumo-subtle">{step.kind}</span>
+            <span className="ml-auto">
+              <ClassTag evidenceClass={step.evidenceCeiling} />
+            </span>
+          </div>
+          <p className="text-sm text-kumo-default">
+            Tier {step.tier}, in {TIER_WHERE[step.tier]}{" "}
+            <span className="text-kumo-subtle">· {step.tierReason}</span>
+          </p>
+          <p className="text-sm text-kumo-subtle [overflow-wrap:anywhere]">
+            <span className="text-kumo-default">Why it runs:</span> {step.because}
+          </p>
+          {step.guards !== undefined && (
+            <p className="text-sm text-kumo-default [overflow-wrap:anywhere]">
+              Guards {step.guards.predicate}, policy {step.guards.policy}
+              {step.guards.decision !== undefined && (
+                <>
+                  , holding{" "}
+                  <DecisionLink id={step.guards.decision.id} className="a-link font-semibold">
+                    decision {step.decisionLabel ?? step.guards.decision.id}
+                  </DecisionLink>
+                  : {step.guards.decision.summary}
+                </>
+              )}
+            </p>
+          )}
+          {step.lines.length > 0 && (
+            <ul
+              className="mt-1 flex flex-col gap-1"
+              aria-label={`What the verdict says of ${step.id}`}
+            >
+              {step.lines.map((line) => (
+                <li
+                  key={line}
+                  className="rounded-lg bg-kumo-tint px-3 py-1.5 text-sm leading-snug text-kumo-default [overflow-wrap:anywhere]"
+                >
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -921,12 +995,26 @@ export function Change({
                 <p className="px-4 py-3 text-base text-kumo-subtle">
                   Keel has not compiled a Verification Plan for this change yet.
                 </p>
-              ) : (
+              ) : verdict?.plan === undefined ? (
                 <p className="px-4 py-3 text-base text-kumo-default">
                   Keel compiled a plan of {plan.stepCount} {plan.stepCount === 1 ? "step" : "steps"}{" "}
-                  for this change. It does not publish what the steps are yet, so none is listed
-                  here.
+                  for this change. Keel lists a plan&apos;s steps with a verdict issued under it
+                  {verdict === undefined
+                    ? ", and has issued none yet"
+                    : ", and has listed none for this one"}
+                  .
                 </p>
+              ) : (
+                <>
+                  {!verdict.plan.own && (
+                    <p className="px-4 pt-3 text-base text-kumo-default [overflow-wrap:anywhere]">
+                      Keel issued the verdict under its batch&apos;s plan,{" "}
+                      <span className="a-mono">{verdict.plan.hash}</span>, not the one it compiled
+                      for this change.
+                    </p>
+                  )}
+                  <PlanSteps steps={verdict.plan.steps} />
+                </>
               )}
             </Panel>
           }
@@ -939,6 +1027,13 @@ export function Change({
               {verdict === undefined ? (
                 <p className="text-base text-kumo-subtle">
                   Evidence is listed here once Keel issues a verdict.
+                </p>
+              ) : verdict.recorded === undefined &&
+                verdict.plan !== undefined &&
+                verdict.evidence.length === 0 ? (
+                <p className="text-base text-kumo-subtle">
+                  Each line of the verdict&apos;s evidence names a step of its plan, and is listed
+                  under that step.
                 </p>
               ) : verdict.recorded === undefined ? (
                 <EvidenceList items={verdict.evidence} />

@@ -242,7 +242,8 @@ describe("a change's page, in Keel's own fields", () => {
     await Promise.resolve();
     const served = changePageOf(serving.world, id, serving)?.verdict;
     expect(served?.recorded).toBeUndefined();
-    expect(served?.evidence.length).toBeGreaterThan(0);
+    // Each line of a landing's evidence names the step it describes, so it is shown under that step.
+    expect(served?.plan?.steps.flatMap((step) => step.lines).length).toBeGreaterThan(0);
 
     const refusing = showing({
       ...createMockSource({ scenario: "s1", seed: 42 }),

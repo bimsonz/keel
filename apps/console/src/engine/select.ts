@@ -3,7 +3,14 @@
 
 import { shownAgent } from "./audience.ts";
 import { type Cards, heldUnder } from "./holder.ts";
-import type { ConflictDetail, ConflictSide, Lattice, ProbeSource } from "../contract/keel/index.ts";
+import type {
+  ConflictDetail,
+  ConflictSide,
+  Lattice,
+  ProbeSource,
+  VerdictReason,
+  VerdictView,
+} from "../contract/keel/index.ts";
 import type { Predicate } from "../contract/mfp.ts";
 import type {
   AlternativeRow,
@@ -19,8 +26,7 @@ import type {
   TimelineItem,
   World as WorldId,
 } from "../domain/state.ts";
-import type { ChangeDiff, VerdictReasons } from "../source/types.ts";
-import { readable } from "./evidence.ts";
+import type { ChangeDiff } from "../source/types.ts";
 import { verdictSaid } from "./judged.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
@@ -32,7 +38,7 @@ export interface Resources {
   probes: ReadonlyMap<string, ProbeSource>;
   diffs: ReadonlyMap<string, ChangeDiff>;
   /** A verdict's evidence, by verdict id: the event that issued it carries only references. */
-  verdicts: ReadonlyMap<string, VerdictReasons>;
+  verdicts: ReadonlyMap<string, VerdictView>;
   /** Keel's lattices, by predicate. */
   lattices: ReadonlyMap<string, Lattice>;
   /** What Keel was asked for and would not give, by the id of the thing it was asked about. */
@@ -465,6 +471,52 @@ export function conflictPageOf(
   return detail === null ? null : conflictPageFrom(detail, world, resources);
 }
 
+/**
+ * Keel's view of a verdict, as a change's page shows it: the plan the verdict was issued under, each step with the
+ * lines of the evidence that name it, and the lines that name no step by their class. A step no line names is shown
+ * with nothing of how it went: Keel's evidence says only what it says.
+ */
+function viewed(
+  world: World,
+  view: VerdictView | undefined,
+  compiled: string | undefined,
+): Pick<NonNullable<ChangePageState["verdict"]>, "evidence" | "plan"> {
+  if (view === undefined) return { evidence: [] };
+  const steps = view.plan?.steps ?? [];
+  const named = new Set(steps.map((step) => step.id));
+  const item = (reason: VerdictReason): EvidenceItem => ({
+    class: reason.class,
+    summary: reason.line,
+    by: reason.step ?? "",
+    ref: reason.step ?? reason.line,
+    at: view.issuedAt,
+  });
+  return {
+    evidence: view.reasons.filter((reason) => !named.has(reason.step ?? "")).map(item),
+    ...(view.plan === undefined
+      ? {}
+      : {
+          plan: {
+            hash: view.plan.hash,
+            // Keel runs a batch of one on its member's plan, hash and all.
+            own: view.plan.hash === compiled,
+            steps: steps.map((step) => {
+              const held = step.guards?.decision?.id;
+              return {
+                ...step,
+                lines: view.reasons
+                  .filter((reason) => reason.step === step.id)
+                  .map((reason) => reason.line),
+                ...(held === undefined
+                  ? {}
+                  : { decisionLabel: world.decisions.get(held)?.label || held }),
+              };
+            }),
+          },
+        }),
+  };
+}
+
 function changedLines(
   before: string | null,
   after: string | null,
@@ -687,8 +739,9 @@ export function changePageOf(
             said: verdictSaid(verdict),
             issuedAt: verdict.issuedAt,
             ...(verdict.planHash === undefined ? {} : { planHash: verdict.planHash }),
-            // The evidence by class comes from Keel's view of the verdict. Until that is read there is none to show.
-            evidence: (resources.verdicts.get(verdict.id)?.reasons ?? []).map(readable),
+            // The evidence by class and the plan come from Keel's view of the verdict. Until that is read there is
+            // none of either to show.
+            ...viewed(world, resources.verdicts.get(verdict.id), change.plan?.hash),
             // Where Keel serves no view of it, what the verdict's own event recorded is all there is, as Keel wrote it.
             ...(resources.refused.has(verdict.id) ? { recorded: verdict.evidence } : {}),
           },

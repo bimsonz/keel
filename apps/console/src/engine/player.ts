@@ -4,7 +4,7 @@
 // tail. The story never runs past a question nobody has answered.
 
 import type { AnyEvent } from "../contract/events.ts";
-import type { AgentCard, Lattice, ProbeSource } from "../contract/keel/index.ts";
+import type { AgentCard, Lattice, ProbeSource, VerdictView } from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
 import type {
   KeelAgents,
@@ -16,7 +16,6 @@ import type {
   KeelEventSource,
   KeelResources,
   ChangeDiff,
-  VerdictReasons,
 } from "../source/types.ts";
 import type { KeelRepository } from "../source/repository.ts";
 import { Projects, type Visibility, projectOf } from "./projects.ts";
@@ -50,7 +49,7 @@ export class Player {
   readonly sought = new Set<string>();
   /** What Keel was asked for beside the log and would not give, by the id of the thing it was asked about. */
   readonly refused = new Set<string>();
-  readonly verdicts = new Map<string, VerdictReasons>();
+  readonly verdicts = new Map<string, VerdictView>();
   /** Keel's lattices, by predicate. Empty until they have been read, and for good if they cannot be. */
   readonly lattices = new Map<string, Lattice>();
   /** The project's repository, read as the repository view asks for it. */

@@ -918,9 +918,9 @@ describe("Keel's read models, from the page", () => {
     });
   });
 
-  it("reads a verdict's evidence from Keel's view of the verdict: the event carries only references", async () => {
+  it("[http.verdict-plan] reads the plan a verdict was issued under from Keel's view of it, each line of its evidence under the step it names", async () => {
     // Nine days on, a careless change has bounced on its batch's verdict. The verdict names the batch, and the
-    // bounce ties it to the change.
+    // bounce ties it to the change. The verdict's event carries the lines of its evidence and the plan's hash.
     const { player, keel } = await opened("member", "private", 0, { story: "s2" });
     await player.load();
     player.seek(player.end);
@@ -934,15 +934,38 @@ describe("Keel's read models, from the page", () => {
           ? [event.payload]
           : [],
       )[0];
-    expect(issued?.evidence.every((reference) => typeof reference === "string")).toBe(true);
-    expect(changePageOf(player.world, change, player)?.verdict?.evidence).toEqual([]);
+    const unread = changePageOf(player.world, change, player)?.verdict;
+    expect(unread?.evidence).toEqual([]);
+    expect(unread?.plan).toBeUndefined();
     player.wantVerdict(change);
     await settled();
-    const evidence = changePageOf(player.world, change, player)?.verdict?.evidence ?? [];
-    expect(evidence.map((item) => item.class)).toEqual(["proof", "ruling", "ruling"]);
-    expect(evidence[0]?.summary).toBe(
-      "Guard G-1 fails against this change, three runs out of three",
-    );
+    const verdict = changePageOf(player.world, change, player)?.verdict;
+    // The plan the change compiled at Precheck: Keel runs a batch of one on its member's plan.
+    expect(verdict?.plan?.hash).toBe(issued?.planHash);
+    expect(verdict?.plan?.own).toBe(true);
+    const [suite, typecheck, guard] = verdict?.plan?.steps ?? [];
+    expect([suite?.id, typecheck?.id, guard?.id?.replace(/grd_\w+/, "<guard>")]).toEqual([
+      "js-ts.suite",
+      "worker-app.typecheck",
+      "guard:<guard>",
+    ]);
+    // Only what failed is described on a bounce: both lines name the guard, and none is left without a step.
+    expect(suite?.lines).toEqual([]);
+    expect(guard?.lines).toEqual(issued?.evidence);
+    expect(verdict?.evidence).toEqual([]);
+    expect(guard?.guards).toMatchObject({
+      predicate: "freshness",
+      policy: "block",
+      decision: {
+        id:
+          bounced?.type === "ChangeBounced"
+            ? bounced.payload.nextActions?.[1]?.args?.["decisionId"]
+            : undefined,
+      },
+    });
+    expect(guard).toMatchObject({ tier: 1, kind: "probe", evidenceCeiling: "proof" });
+    // The decision it holds is named by its label, as the page has read it.
+    expect(guard?.decisionLabel).toBe("D-1");
   });
 });
 

@@ -7,13 +7,18 @@ import type { EntityRef, EventType } from "../../../src/contract/envelope.ts";
 import type { AnyEvent, EventOf } from "../../../src/contract/events.ts";
 import type { VerdictOutcome } from "../../../src/contract/mfp.ts";
 import type { Observation } from "../../../src/contract/observations.ts";
-import type { EvidenceLine } from "../../../src/contract/provisional.ts";
 import type { LandedFile, Landing } from "../repo.ts";
 import { type Rng, ulidAt } from "../prng.ts";
 import { funnelFrames } from "./funnel.ts";
 import type { ScriptedEvent } from "./scripted.ts";
-import type { ProbeSource, RunRef } from "../../../src/contract/keel/index.ts";
-import type { ChangeDiff, VerdictReasons } from "../../../src/source/types.ts";
+import type {
+  ProbeSource,
+  RunRef,
+  VerdictPlan,
+  VerdictView,
+} from "../../../src/contract/keel/index.ts";
+import type { ChangeDiff } from "../../../src/source/types.ts";
+import { reasonOf } from "./plans.ts";
 
 type EventInput = {
   [Type in EventType]: {
@@ -60,7 +65,7 @@ export interface GeneratedLog {
   diffs: Map<string, ChangeDiff>;
   probes: Map<string, ProbeSource>;
   /** Each verdict's evidence, as Keel's read model would serve it. */
-  verdicts: Map<string, VerdictReasons>;
+  verdicts: Map<string, VerdictView>;
   /** The repository the story is about, where the script has one: what trunk starts with, and what each change lands. */
   repository?: ScriptedRepository;
   /** The story's last instant, in ms from the epoch. */
@@ -126,7 +131,7 @@ export class ScriptBuilder {
   readonly #gates: Gate[] = [];
   readonly diffs = new Map<string, ChangeDiff>();
   readonly probes = new Map<string, ProbeSource>();
-  readonly verdicts = new Map<string, VerdictReasons>();
+  readonly verdicts = new Map<string, VerdictView>();
   /** Set by a script whose story has a repository to browse. */
   repository: ScriptedRepository | undefined;
   /** The project the story is told in. Every event from here on is stamped with it, as Keel stamps its own. */
@@ -182,12 +187,24 @@ export class ScriptBuilder {
   }
 
   /**
-   * A verdict's evidence. The event that issues a verdict carries references to it, and Keel's read model
-   * serves the evidence itself: this records the second and gives back the first.
+   * A verdict's evidence. The event that issues a verdict carries its lines, and Keel's read model serves each line
+   * with the plan step it names and that step's class, and the plan the verdict was issued under: this records the
+   * second, as Keel's `verdictReasons` reads it, and gives back the first.
    */
-  reasons(verdictId: string, outcome: VerdictOutcome, reasons: EvidenceLine[]): string[] {
-    this.verdicts.set(verdictId, { id: verdictId, outcome, reasons, issuedAt: this.iso() });
-    return reasons.map((reason) => reason.ref);
+  reasons(
+    verdictId: string,
+    outcome: VerdictOutcome,
+    lines: string[],
+    plan?: VerdictPlan,
+  ): string[] {
+    this.verdicts.set(verdictId, {
+      id: verdictId,
+      outcome,
+      reasons: lines.map((line) => reasonOf(line, plan?.steps ?? [])),
+      issuedAt: this.iso(),
+      ...(plan === undefined ? {} : { plan }),
+    });
+    return lines;
   }
 
   /** Mint an id at the current instant, e.g. `id("chg")`. */

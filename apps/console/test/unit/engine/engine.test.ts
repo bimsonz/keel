@@ -199,7 +199,8 @@ describe("the console's picture of scenario 1", () => {
     // The first revision's silent retraction, and the comparison it failed, are not this revision's.
     expect(file?.drift).toEqual([]);
     // Its plan is the second revision's: Keel says how many steps it has, and not what they are.
-    expect(file?.plan).toEqual({ hash: "plan:c07e…41aa", costEstimateUsd: 0.004, stepCount: 8 });
+    // Its suite, its typecheck and guard G-1.
+    expect(file?.plan).toEqual({ hash: "plan:c07e…41aa", costEstimateUsd: 0.004, stepCount: 3 });
     // What it landed on is the verdict of the batch that carried it.
     expect(file?.verdict).toMatchObject({
       outcome: "land",
@@ -435,7 +436,7 @@ describe("the console's picture of scenario 1", () => {
     // Keel parks it on the question and issues no verdict for that: a verdict judges a batch, and it is in none.
     expect(file?.verdict).toBeUndefined();
     expect(file?.escalation).toMatchObject({ label: "E-1", state: "open" });
-    expect(file?.plan).toEqual({ hash: "plan:3f9a…d27e", costEstimateUsd: 0.006, stepCount: 9 });
+    expect(file?.plan).toEqual({ hash: "plan:3f9a…d27e", costEstimateUsd: 0.006, stepCount: 2 });
     expect(file?.diff.files.map((entry) => entry.path)).toEqual([
       "src/authz/check.ts",
       "src/authz/cache.ts",

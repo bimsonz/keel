@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/plan.test.ts
+# kills: http.verdict-plan, plan.own
+# why: the plan Keel's view of a verdict gives is never drawn
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 421c7c6c..683e5c84 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -493,7 +493,7 @@ function viewed(
+   });
+   return {
+     evidence: view.reasons.filter((reason) => !named.has(reason.step ?? "")).map(item),
+-    ...(view.plan === undefined
++    ...(view.plan !== undefined
+       ? {}
+       : {
+           plan: {

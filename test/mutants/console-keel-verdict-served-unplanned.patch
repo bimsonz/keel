@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.verdict-plan
+# why: the stand-in Keel serves a verdict's view with no plan, where Keel serves the stored one
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 3ca39836..ef55adc7 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1636,7 +1636,7 @@ export function createFakeKeel(
+         const view = log.verdicts.get(decodeURIComponent(verdict[1] ?? ""));
+         return view === undefined
+           ? problem(404, "resource.not_found")
+-          : Response.json(view satisfies VerdictView);
++          : Response.json({ ...view, plan: undefined } satisfies VerdictView);
+       }
+ 
+       // A project's settings are read by a member of its namespace and replaced, whole, by a maintainer or an owner.

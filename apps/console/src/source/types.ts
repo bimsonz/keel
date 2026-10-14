@@ -9,7 +9,6 @@
 import type { AnyEvent } from "../contract/events.ts";
 import type * as Keel from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
-import type { EvidenceLine } from "../contract/provisional.ts";
 
 /** An opaque position in a log. */
 export type Cursor = string;
@@ -106,20 +105,16 @@ export interface ChangeDiff {
   }[];
 }
 
-/**
- * A verdict as Keel's read model gives it (`GET /v1/verdicts/{id}`): the event that issued it carries only
- * references to its evidence, and this carries the evidence itself.
- */
-export interface VerdictReasons extends Omit<Keel.VerdictView, "reasons"> {
-  reasons: EvidenceLine[];
-}
-
 /** Things the console fetches on demand rather than folds from the log. */
 export interface KeelResources {
   getDiff(changeId: string, signal?: AbortSignal): Promise<ChangeDiff>;
   /** A probe's source, file by file, as its bundle holds it (`GET /v1/probes/{probeId}/source`). */
   getProbeSource(probeId: string, signal?: AbortSignal): Promise<Keel.ProbeSource>;
-  getVerdict(verdictId: string, signal?: AbortSignal): Promise<VerdictReasons>;
+  /**
+   * A verdict as Keel's read model gives it (`GET /v1/verdicts/{id}`): its event carries only the lines of its
+   * evidence, and this each line with the plan step it names and that step's class, and the plan it was issued under.
+   */
+  getVerdict(verdictId: string, signal?: AbortSignal): Promise<Keel.VerdictView>;
   /** Every predicate's lattice, as Keel's domain has it (`GET /v1/lattices`). */
   getLattices(signal?: AbortSignal): Promise<Keel.LatticeSet>;
 }

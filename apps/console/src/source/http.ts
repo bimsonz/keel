@@ -94,7 +94,6 @@ import {
   type ReadRequest,
   type RulingCommand,
   type SourceDescriptor,
-  type VerdictReasons,
 } from "./types.ts";
 
 export interface HttpOptions {
@@ -561,21 +560,10 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       const lattices: LatticeSet = await response.json();
       return lattices;
     },
-    async getVerdict(verdictId: string, signal?: AbortSignal): Promise<VerdictReasons> {
+    async getVerdict(verdictId: string, signal?: AbortSignal): Promise<VerdictView> {
       const response = await read(`/v1/verdicts/${encodeURIComponent(verdictId)}`, signal);
       if (!response.ok) throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
-      const view: VerdictView = await response.json();
-      // Each line of the verdict's evidence, as the page shows it, with the class of the plan step it names.
-      return {
-        ...view,
-        reasons: view.reasons.map((r) => ({
-          class: r.class,
-          ref: r.step ?? r.line,
-          at: view.issuedAt,
-          summary: r.line,
-          ...(r.step === undefined ? {} : { by: r.step }),
-        })),
-      };
+      return answered<VerdictView>(response);
     },
     // An agent's card is Keel's one read of it, whoever asks and from whichever page.
     findAgent: (agentId, signal) => createHttpSponsorship(options).findAgent(agentId, signal),

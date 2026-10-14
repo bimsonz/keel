@@ -57,7 +57,7 @@ describe("scenario 2: memory", () => {
     expect(player.world.trunk.advances).toBe(1144);
   });
 
-  it("bounces the careless change on its batch's verdict, citing the decision, and trunk stays green", async () => {
+  it("[s2.bounce] bounces the careless change on its batch's verdict, citing the decision, and trunk stays green", async () => {
     const player = await playerAt(200);
     const h = [...player.world.changes.values()].find((change) => change.label === "#1205");
     const [decision] = [...player.world.decisions.values()];
@@ -74,10 +74,17 @@ describe("scenario 2: memory", () => {
     expect(file?.bounce?.cites).toEqual({ id: decision?.id, label: decision?.label });
     expect(decision?.label).toMatch(/^D-\d+$/);
     expect(player.world.citing.get(decision?.id ?? "")).toEqual([h?.id]);
-    expect(file?.verdict?.evidence.map((item) => item.class)).toEqual([
-      "proof",
-      "ruling",
-      "ruling",
+    // Both lines of the verdict's evidence name the guard's step, and are shown under it in the plan.
+    expect(file?.verdict?.evidence).toEqual([]);
+    expect(
+      file?.verdict?.plan?.steps.map((step) => [
+        step.id.replace(/grd_\w+/, "<guard>"),
+        step.lines.length,
+      ]),
+    ).toEqual([
+      ["js-ts.suite", 0],
+      ["worker-app.typecheck", 0],
+      ["guard:<guard>", 2],
     ]);
     expect(file?.precedents[0]).toMatchObject({ decisionLabel: "D-1" });
     expect(file?.precedents[0]?.stance).toBeUndefined();
@@ -126,7 +133,7 @@ describe("scenario 2: memory", () => {
     );
   });
 
-  it("takes a plan as the count of its steps Keel commits, and lists none", async () => {
+  it("takes a plan as the count of its steps Keel commits, which a verdict's view lists", async () => {
     const bare = new World();
     const { items } = await createMockSource({ scenario: "s2", seed: 42 }).readEvents({
       limit: 500,
@@ -140,6 +147,6 @@ describe("scenario 2: memory", () => {
       lattices: new Map(),
       refused: new Set<string>(),
     })?.plan;
-    expect(plan).toEqual({ hash: "plan:1b7e…90ad", costEstimateUsd: 0.004, stepCount: 8 });
+    expect(plan).toEqual({ hash: "plan:1b7e…90ad", costEstimateUsd: 0.004, stepCount: 3 });
   });
 });

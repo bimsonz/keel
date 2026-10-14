@@ -2,10 +2,10 @@
 # kills: conflict.no-sides
 # why: a conflict Keel suspected without naming a premise and an effect has no page
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 13e869d4..232b4793 100644
+index 421c7c6c..4fba147f 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -462,7 +462,9 @@ export function conflictPageOf(
+@@ -468,7 +468,9 @@ export function conflictPageOf(
    resources: Resources,
  ): ConflictPageState | null {
    const detail = conflictDetailOf(world, conflictId);
@@ -15,4 +15,4 @@ index 13e869d4..232b4793 100644
 +    : conflictPageFrom(detail, world, resources);
  }
  
- function changedLines(
+ /**

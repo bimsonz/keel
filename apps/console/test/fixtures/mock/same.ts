@@ -20,6 +20,7 @@ import type { Proposition } from "../../../src/contract/mfp.ts";
 import { createRng } from "../prng.ts";
 import { type GeneratedLog, PLATFORM_PROJECT, ScriptBuilder } from "./builder.ts";
 import { land } from "./s1.ts";
+import { SUITE, TYPECHECK, planOf } from "./plans.ts";
 
 export const S5_EPOCH = "2026-10-14T09:30:00.000Z";
 
@@ -261,14 +262,16 @@ export function generateS5(seed: number): GeneratedLog {
       derivationRef: `mfp:derivation:${one.change}:1`,
     },
   });
+  // The project is a Worker app: Keel's plan runs its suite and its typecheck.
+  const plan = planOf("plan:5e1a…77c0", [SUITE, TYPECHECK]);
   b.at(105).emit({
     type: "PlanCompiled",
     entity: changeRef(one.change),
     payload: {
       changeId: one.change,
       revision: 1,
-      planHash: "plan:5e1a…77c0",
-      steps: 9,
+      planHash: plan.hash,
+      steps: plan.steps.length,
       costEstimate: 0.003,
     },
   });
@@ -284,6 +287,7 @@ export function generateS5(seed: number): GeneratedLog {
       to: HEAD_1,
       height: 1,
       label: "L1·1",
+      plan,
     },
   );
   // The live changes with its intent are told it landed.

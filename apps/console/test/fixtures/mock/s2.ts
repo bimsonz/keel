@@ -16,7 +16,8 @@ import type { EntityRef } from "../../../src/contract/envelope.ts";
 import type { NextAction, PrecedentRef } from "../../../src/contract/events.ts";
 import { createRng } from "../prng.ts";
 import { type GeneratedLog, ScriptBuilder } from "./builder.ts";
-import { B_STEPS, HEAD_2, continueInvalidate, land, prelude } from "./s1.ts";
+import { HEAD_2, continueInvalidate, guardedPlan, land, prelude } from "./s1.ts";
+import { described } from "./plans.ts";
 
 export const S2_EPOCH = "2026-10-22T10:14:00.000Z";
 
@@ -259,14 +260,16 @@ export function generateS2(
       derivationRef: `mfp:derivation:${changeC}:1`,
     },
   });
+  // Near the tenet G-1 guards, so Keel's plan runs the guard, which holds D-1.
+  const planC = guardedPlan("plan:8d02…f31c", p.guard, { id: decisionId, summary: S2_DECIDED });
   b.at(100).emit({
     type: "PlanCompiled",
     entity: changeRef(changeC),
     payload: {
       changeId: changeC,
       revision: 1,
-      planHash: "plan:8d02…f31c",
-      steps: B_STEPS.guarded,
+      planHash: planC.hash,
+      steps: planC.steps.length,
       costEstimate: 0.004,
     },
   });
@@ -279,6 +282,7 @@ export function generateS2(
     to: HEAD_1144,
     height: 1144,
     label: "L1·3",
+    plan: planC,
   });
 
   // ── A careless hosted agent, H, strips the invalidation ──
@@ -403,14 +407,15 @@ export function generateS2(
       ],
     },
   });
+  const planH = guardedPlan("plan:1b7e…90ad", p.guard, { id: decisionId, summary: S2_DECIDED });
   b.at(135).emit({
     type: "PlanCompiled",
     entity: changeRef(changeH),
     payload: {
       changeId: changeH,
       revision: 1,
-      planHash: "plan:1b7e…90ad",
-      steps: B_STEPS.guarded,
+      planHash: planH.hash,
+      steps: planH.steps.length,
       costEstimate: 0.004,
     },
   });
@@ -459,7 +464,8 @@ export function generateS2(
     },
   });
   const instance = `keelverify:${batch}:1`;
-  const planHash = `plan:${batch.slice(-6).toLowerCase()}`;
+  // Keel runs a batch of one on its member's plan, hash and all.
+  const planHash = planH.hash;
   b.at(140.6).emit({
     type: "VerificationStarted",
     entity: candidateRef,
@@ -469,8 +475,15 @@ export function generateS2(
   // The verdict's evidence and the ways forward are worded as Keel's `settleVerdict` words them: the failed
   // step, then the guard cited with the decision it holds, and a next action that reads that decision.
   const failed = `guard:${p.guard} (freshness): a role revoked mid-session is still allowed; it holds decision ${decisionId}: ${S2_DECIDED}`;
+  // Only what failed is described on a bounce: the suite and the typecheck passed and have no line.
+  const guard = planH.steps.find((step) => step.guards !== undefined);
+  if (guard === undefined) throw new Error("the plan runs no guard");
   const evidence = [
-    `guard:${p.guard}: fail (proof, tier 1: one throwaway isolate per world)`,
+    described(
+      guard,
+      "fail",
+      "sha256:90797da7ca407aa60c45f95da887411bdf655c78e2340e27c1e1f429401d1999",
+    ),
     `guard failed: ${failed}`,
   ];
   const nextActions: NextAction[] = [
@@ -488,32 +501,8 @@ export function generateS2(
     },
   ];
   const verdictH = b.at(144.4).id("vrd");
-  // What a verdict's own view would list, for the fixtures' pages that read one: Keel serves no such view yet.
-  b.reasons(verdictH, "bounce", [
-    {
-      class: "proof",
-      summary: "Guard G-1 fails against this change, three runs out of three",
-      by: "Verification Plan · Tier 1 isolate",
-      ref: `grd:${p.guard}`,
-      at: b.isoAt(143.4),
-    },
-    {
-      class: "ruling",
-      summary: "Decision D-1: cache allowed if revocation invalidates it",
-      by: "A person's ruling, nine days and 1,143 advances ago",
-      ref: `dec:${decisionId}`,
-      at: decidedAt,
-      detail:
-        "Surfaced to this change at preflight as evidence. It was not followed, distinguished, or asked to be overruled.",
-    },
-    {
-      class: "ruling",
-      summary: "Derived effect: roles are cached for the session and never dropped",
-      by: "Effect derivation · extractor",
-      ref: "src/authz/cache.ts#PermissionCache",
-      at: b.isoAt(134),
-    },
-  ]);
+  // Keel's view of the verdict: each line with the step it names, and the plan it was issued under.
+  b.reasons(verdictH, "bounce", evidence, planH);
   b.emit({
     type: "VerdictIssued",
     entity: { kind: "verdict", id: verdictH },

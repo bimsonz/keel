@@ -19,6 +19,8 @@ import type { EventPredicatePolicies } from "../../../src/contract/keel/index.ts
 import type { DerivedEffect, Proposition } from "../../../src/contract/mfp.ts";
 import type { EscalationOption } from "../../../src/contract/events.ts";
 import type { EvidenceLine } from "../../../src/contract/provisional.ts";
+import type { VerdictPlan } from "../../../src/contract/keel/index.ts";
+import { SUITE, TYPECHECK, described, guardStep, planOf } from "./plans.ts";
 import { type Rng, createRng } from "../prng.ts";
 import {
   BASE_ANCHORS,
@@ -78,7 +80,33 @@ const changeRef = (id: string): EntityRef => ({ kind: "change", id });
  * How many steps B's Verification Plan has, which is all Keel commits of a plan. While the conflict is open
  * they include the probe's world matrix and the ruling; once the guard is admitted, it runs in their place.
  */
-export const B_STEPS = { open: 9, guarded: 8 } as const;
+/**
+ * The plans Keel compiles for scenario 1's changes. The project is a Worker app, so each runs its suite and its
+ * typecheck; once guard G-1 is admitted, a change near the tenet it guards runs that guard as well.
+ */
+export const PLAN_A = [
+  planOf("plan:81c2…0b6f", [SUITE, TYPECHECK]),
+  planOf("plan:5d18…e9c3", [SUITE, TYPECHECK]),
+] as const;
+export const PLAN_B = planOf("plan:3f9a…d27e", [SUITE, TYPECHECK]);
+
+/** The admitted probe G-1 runs, pinned under each plan that runs it. */
+const PROBE_G1 = "sha256:1a81db6ecc93e16c6eaa26dcdb31f68d6d0128348a9f7be7d98396ca01d52c6e";
+/** Where a passing step's evidence is stored, by its hash. */
+const PASSED = "sha256:39f94c9015ba2a59863b0ccd23a0979a4c20ec07df0fac7764df0ec70229fad8";
+
+/** A plan that runs guard G-1, which holds the decision that settled C-1. Its policy is then to block. */
+export function guardedPlan(
+  hash: string,
+  guard: string,
+  decision: { id: string; summary: string },
+): VerdictPlan {
+  return planOf(hash, [
+    SUITE,
+    TYPECHECK,
+    guardStep({ id: guard, predicate: "freshness", probe: PROBE_G1, near: SUBJECT_KEY, decision }),
+  ]);
+}
 
 /**
  * Everything up to the proof: both changes submitted, and the conflict between them probed and proven. With
@@ -470,8 +498,8 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     payload: {
       changeId: changeB,
       revision: 1,
-      planHash: "plan:3f9a…d27e",
-      steps: B_STEPS.open,
+      planHash: PLAN_B.hash,
+      steps: PLAN_B.steps.length,
       costEstimate: 0.006,
       ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
@@ -525,8 +553,8 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     payload: {
       changeId: changeA,
       revision: 1,
-      planHash: "plan:81c2…0b6f",
-      steps: 2,
+      planHash: PLAN_A[0].hash,
+      steps: PLAN_A[0].steps.length,
       costEstimate: 0.002,
       ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
@@ -799,6 +827,8 @@ export function land(
     height: number;
     label: string;
     landing?: Landing;
+    /** The plan its change compiled: Keel runs a batch of one on its member's plan, hash and all. */
+    plan: VerdictPlan;
   },
 ): void {
   // What this change puts on trunk, for the repository the story can be browsed in.
@@ -852,7 +882,7 @@ export function land(
       candidateId: candidate,
       batchId: batch,
       instanceId: instance,
-      planHash: `plan:${batch.slice(-6).toLowerCase()}`,
+      planHash: input.plan.hash,
     },
   });
   // KeelVerify runs the batch's plan, and its verdict follows.
@@ -864,16 +894,14 @@ export function land(
       verdictId: verdict,
       subject: batch,
       outcome: "land",
-      evidence: b.reasons(verdict, "land", [
-        {
-          class: "proof",
-          summary: "Every step of the batch's Verification Plan passed",
-          by: "KeelVerify · Tier 0 and Tier 1",
-          ref: `cnd:${candidate}`,
-          at: b.iso(),
-        },
-      ]),
-      planHash: `plan:${batch.slice(-6).toLowerCase()}`,
+      // One line for each result, in the plan's order.
+      evidence: b.reasons(
+        verdict,
+        "land",
+        input.plan.steps.map((step) => described(step, "pass", PASSED)),
+        input.plan,
+      ),
+      planHash: input.plan.hash,
       x: { summary: "Verified: nothing it could have broken is broken" },
     },
   });
@@ -1023,6 +1051,7 @@ function landA(
   from: string,
   to: string,
   height: number,
+  plan: VerdictPlan,
 ): void {
   land(b, p, {
     at,
@@ -1034,6 +1063,7 @@ function landA(
     height,
     label: `L1·${height}`,
     landing: LANDED_A,
+    plan,
   });
 }
 
@@ -1101,7 +1131,7 @@ export function continueInvalidate(b: ScriptBuilder, p: Prelude): { decisionId: 
     causation: given,
   });
   bounce(b, 472.8, p.changeB, { option: "invalidate", decisionId }, given);
-  landA(b, p, 474, p.head0, HEAD_1, 1);
+  landA(b, p, 474, p.head0, HEAD_1, 1, PLAN_A[0]);
 
   // Keel surfaces the decision to B as precedent, and B comes back revised to keep to it.
   b.at(480).emit({
@@ -1237,14 +1267,18 @@ export function continueInvalidate(b: ScriptBuilder, p: Prelude): { decisionId: 
       derivationRef: `mfp:derivation:${p.changeB}:2`,
     },
   });
+  const planB = guardedPlan("plan:c07e…41aa", p.guard, {
+    id: decisionId,
+    summary: "Cache allowed if revocation invalidates it",
+  });
   b.at(647).emit({
     type: "PlanCompiled",
     entity: changeRef(p.changeB),
     payload: {
       changeId: p.changeB,
       revision: 2,
-      planHash: "plan:c07e…41aa",
-      steps: B_STEPS.guarded,
+      planHash: planB.hash,
+      steps: planB.steps.length,
       costEstimate: 0.004,
     },
   });
@@ -1260,6 +1294,7 @@ export function continueInvalidate(b: ScriptBuilder, p: Prelude): { decisionId: 
     height: 2,
     label: "L1·2",
     landing: LANDED_B_INVALIDATING,
+    plan: planB,
   });
   return { decisionId };
 }
@@ -1287,7 +1322,7 @@ function continueNoCache(b: ScriptBuilder, p: Prelude): void {
     causation: given,
   });
   bounce(b, 472.8, p.changeB, { option: "no-cache", decisionId }, given);
-  landA(b, p, 474, p.head0, HEAD_1, 1);
+  landA(b, p, 474, p.head0, HEAD_1, 1, PLAN_A[0]);
   b.at(520).emit({
     type: "ChangeWithdrawn",
     entity: changeRef(p.changeB),
@@ -1336,6 +1371,7 @@ function continueAllowStale(b: ScriptBuilder, p: Prelude): void {
     height: 1,
     label: "L1·1",
     landing: LANDED_B_AS_WRITTEN,
+    plan: PLAN_B,
   });
   b.at(505).emit({
     type: "IntentRevised",
@@ -1375,12 +1411,12 @@ function continueAllowStale(b: ScriptBuilder, p: Prelude): void {
     payload: {
       changeId: p.changeA,
       revision: 2,
-      planHash: "plan:5d18…e9c3",
-      steps: 2,
+      planHash: PLAN_A[1].hash,
+      steps: PLAN_A[1].steps.length,
       costEstimate: 0.002,
     },
   });
-  landA(b, p, 568, HEAD_1, HEAD_2, 2);
+  landA(b, p, 568, HEAD_1, HEAD_2, 2, PLAN_A[1]);
 }
 
 /**

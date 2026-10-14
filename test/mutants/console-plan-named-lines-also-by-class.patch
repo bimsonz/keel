@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/fixtures/mock/s2.test.ts
+# kills: http.verdict-plan, s2.bounce
+# why: a line that names a step is listed by its class too, so the page says it twice
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 421c7c6c..13d7e1ab 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -492,7 +492,7 @@ function viewed(
+     at: view.issuedAt,
+   });
+   return {
+-    evidence: view.reasons.filter((reason) => !named.has(reason.step ?? "")).map(item),
++    evidence: view.reasons.map(item),
+     ...(view.plan === undefined
+       ? {}
+       : {

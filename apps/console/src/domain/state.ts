@@ -18,6 +18,7 @@ import type {
   Drift,
   ProbeDiscard,
   SuspectEvidence,
+  VerdictPlanStep,
 } from "../contract/keel/index.ts";
 
 // ─── Shared vocabulary ──────────────────────────────────────────────────────
@@ -241,6 +242,13 @@ export interface ConflictPageState {
 /** One way a change's diff departs from what its agent declared: Keel's own shape. */
 export type DriftItem = Drift;
 
+/** One step of a compiled plan, as Keel's view of a verdict gives it, and the verdict's lines that name it. */
+export interface PlanStepRow extends VerdictPlanStep {
+  lines: string[];
+  /** The `D-n` of the decision a guard step holds, where the page has read it; its id until then. */
+  decisionLabel?: string;
+}
+
 export interface DiffAnnotation {
   path: string;
   side: "additions" | "deletions";
@@ -353,12 +361,20 @@ export interface ChangePageState {
     issuedAt: string;
     /** Absent for a ruling made at Precheck, before any plan is compiled. */
     planHash?: string;
+    /** The lines of its evidence that name no step of the plan it was issued under, by class. */
     evidence: EvidenceItem[];
     /**
      * What the verdict's own event recorded as its evidence, as Keel wrote it. Present where Keel serves no
      * view of the verdict, so there is no evidence by class to show.
      */
     recorded?: string[];
+    /**
+     * The plan it was issued under, as Keel's view of the verdict gives it: its steps in Keel's order, each with
+     * the lines of the verdict's evidence that name it. Absent until that view is read, and where it has none: a
+     * refusal at Precheck, which no plan was compiled for, or a plan no longer stored. `own` says the plan is the
+     * one compiled for this change, as it is for a batch of one.
+     */
+    plan?: { hash: string; own: boolean; steps: PlanStepRow[] };
   };
   conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
   /**

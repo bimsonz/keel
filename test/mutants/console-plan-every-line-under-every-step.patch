@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.verdict-plan
+# why: every line of the verdict's evidence is drawn under every step, not under the one it names
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 421c7c6c..6981ace9 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -505,7 +505,6 @@ function viewed(
+               return {
+                 ...step,
+                 lines: view.reasons
+-                  .filter((reason) => reason.step === step.id)
+                   .map((reason) => reason.line),
+                 ...(held === undefined
+                   ? {}

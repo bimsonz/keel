@@ -4,7 +4,12 @@
 // continuation to the log.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
-import type { NamespaceRef, ProbeSource, ProjectView } from "../../../src/contract/keel/index.ts";
+import type {
+  NamespaceRef,
+  ProbeSource,
+  ProjectView,
+  VerdictView,
+} from "../../../src/contract/keel/index.ts";
 import type { Observation } from "../../../src/contract/observations.ts";
 import { Projects } from "../../../src/engine/projects.ts";
 import type {
@@ -14,7 +19,6 @@ import type {
   KeelEventSource,
   KeelResources,
   Page,
-  VerdictReasons,
   ReadRequest,
   RulingCommand,
   SourceDescriptor,
@@ -192,7 +196,7 @@ export function createMockSource(options: MockOptions): MockSource {
     // The repository follows the log, so a ruling that replaces the log changes what trunk holds.
     ...createMockRepository(() => log),
     getLattices: () => Promise.resolve(LATTICES),
-    getVerdict(verdictId: string): Promise<VerdictReasons> {
+    getVerdict(verdictId: string): Promise<VerdictView> {
       const verdict = log.verdicts.get(verdictId);
       return verdict === undefined
         ? Promise.reject(new Error(`no verdict ${verdictId}`))

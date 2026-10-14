@@ -5,13 +5,31 @@
 // The mock is the only producer. When Keel settles a question, the shape
 // moves into events.ts (or is deleted) and its QUESTIONS.md entry closes.
 
-import type { Cost, Evidence } from "./mfp.ts";
+import type { EvidenceClass } from "./mfp.ts";
 
-/** A piece of evidence, and two things the console shows when it has them. */
-export interface EvidenceLine extends Evidence {
+/**
+ * A piece of evidence, as a fixture's question carries it: its class in Keel's terms, what it refers to, when, one
+ * sentence from whoever produced it, and what produced it. MFP 0.2 carries no evidence of its own.
+ */
+export interface EvidenceLine {
+  class: EvidenceClass;
+  /** A reference to the evidence itself: a probe run, a test result, a message. */
+  ref: string;
+  at: string;
+  summary?: string;
   /** What produced it: a probe, an extractor, the lattice, Clef, an agent. */
   by?: string;
   detail?: string;
+}
+
+/** What a step or a call cost, as a fixture says it. Keel's events carry no cost of their own. */
+export interface Cost {
+  /** Wall-clock milliseconds. */
+  ms?: number;
+  /** Model tokens consumed. */
+  tokens?: number;
+  /** Spend in US dollars. */
+  usd?: number;
 }
 
 /**

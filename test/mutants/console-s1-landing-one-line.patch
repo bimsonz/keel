@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.landed
+# why: a landing's verdict says one line of its own, where Keel describes each result in the plan's order
+diff --git a/apps/console/test/fixtures/mock/s1.ts b/apps/console/test/fixtures/mock/s1.ts
+index 9042aa56..e30db39a 100644
+--- a/apps/console/test/fixtures/mock/s1.ts
++++ b/apps/console/test/fixtures/mock/s1.ts
+@@ -898,7 +898,7 @@ export function land(
+       evidence: b.reasons(
+         verdict,
+         "land",
+-        input.plan.steps.map((step) => described(step, "pass", PASSED)),
++        ["every step passed"],
+         input.plan,
+       ),
+       planHash: input.plan.hash,

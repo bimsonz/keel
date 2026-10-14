@@ -2,10 +2,10 @@
 # kills: judged.as-keel-writes
 # why: the page is handed a verdict's summary where Keel's event has none
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index f3fc8d1e..068faba0 100644
+index 421c7c6c..8d765ace 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -709,7 +709,7 @@ export function changePageOf(
+@@ -736,7 +736,7 @@ export function changePageOf(
              id: verdict.id,
              outcome: verdict.outcome,
              summary: verdict.summary,
@@ -13,4 +13,4 @@ index f3fc8d1e..068faba0 100644
 +            said: `${verdict.summary}.`,
              issuedAt: verdict.issuedAt,
              ...(verdict.planHash === undefined ? {} : { planHash: verdict.planHash }),
-             // The evidence by class comes from Keel's view of the verdict. Until that is read there is none to show.
+             // The evidence by class and the plan come from Keel's view of the verdict. Until that is read there is

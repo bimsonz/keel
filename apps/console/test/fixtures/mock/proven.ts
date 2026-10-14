@@ -21,7 +21,7 @@ import type { NextAction } from "../../../src/contract/events.ts";
 import { createRng } from "../prng.ts";
 import { LANDED_B_AS_WRITTEN } from "../repo.ts";
 import { type GeneratedLog, ScriptBuilder } from "./builder.ts";
-import { HEAD_1, type Opening, S1_EPOCH, land, opening } from "./s1.ts";
+import { HEAD_1, type Opening, PLAN_B, S1_EPOCH, land, opening } from "./s1.ts";
 
 const changeRef = (id: string): EntityRef => ({ kind: "change", id });
 
@@ -84,6 +84,7 @@ export function generateS3(seed: number): GeneratedLog {
     height: 1,
     label: "L1·1",
     landing: LANDED_B_AS_WRITTEN,
+    plan: PLAN_B,
   });
   return b.build();
 }

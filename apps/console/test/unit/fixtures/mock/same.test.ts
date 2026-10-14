@@ -94,7 +94,8 @@ describe("scenario 5: the same intent", () => {
     expect(one).toMatchObject({
       label: "#1",
       state: "landed",
-      verdict: { outcome: "land", evidence: 1 },
+      // A line for each step of its plan: its suite and its typecheck.
+      verdict: { outcome: "land", evidence: 2 },
       conflicts: 0,
       next: WAYS_FORWARD,
     });

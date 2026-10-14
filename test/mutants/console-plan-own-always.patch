@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/plan.test.ts
+# kills: plan.own
+# why: a verdict issued under another plan is said to be under the change's own
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 421c7c6c..97bfe5ae 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -499,7 +499,7 @@ function viewed(
+           plan: {
+             hash: view.plan.hash,
+             // Keel runs a batch of one on its member's plan, hash and all.
+-            own: view.plan.hash === compiled,
++            own: true,
+             steps: steps.map((step) => {
+               const held = step.guards?.decision?.id;
+               return {

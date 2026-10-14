@@ -384,7 +384,7 @@ const parts = page.getByRole("navigation", { name: "Change" }).getByRole("link")
 expectEqual(
   "change: its parts",
   (await parts.allInnerTexts()).map(squash).join(" | "),
-  "Overview | Verification 8 | Files changed 2",
+  "Overview | Verification 3 | Files changed 2",
 );
 await parts.filter({ hasText: "Files changed" }).click();
 await page.locator("section.a-panel[aria-label]").first().waitFor();
@@ -411,23 +411,42 @@ expectEqual(
   String(squash(await page.getByRole("heading", { level: 1 }).innerText()).endsWith("#1205")),
   "true",
 );
-// The verdict's event carries references. The evidence shown was read from Keel's view of the verdict.
+// The verdict's event carries the lines of its evidence. The plan it was issued under, and the step each line
+// names, are read from Keel's view of the verdict.
 await page
   .getByRole("navigation", { name: "Change" })
   .getByRole("link", { name: /Verification/ })
   .click();
-await page
-  .getByText("Guard G-1 fails against this change, three runs out of three")
-  .first()
-  .waitFor({ timeout: 10_000 })
-  .catch(() => undefined);
+const planSteps = page.getByRole("list", { name: "The plan's steps, in Keel's order" });
+await planSteps.waitFor({ timeout: 10_000 }).catch(() => undefined);
+/** Each step of a plan on the page, by its id, with how many of the verdict's lines are under it. */
+const stepsOf = async (steps: Locator): Promise<string> =>
+  (
+    await steps
+      .locator(":scope > li")
+      .evaluateAll((items) =>
+        items.map(
+          (item) =>
+            `${(item.getAttribute("data-step") ?? "").replace(/grd_\w+/, "<guard>")} ${item.querySelectorAll("ul > li").length}`,
+        ),
+      )
+      .catch(() => [])
+  ).join(" | ") || "no steps";
 expectEqual(
-  "change: the verdict's evidence, read from the verdict's view",
-  String(
-    (await page.getByText("Guard G-1 fails against this change, three runs out of three").count()) >
-      0,
+  "change: the plan the verdict was issued under, each step with the lines that name it, from the verdict's view",
+  await stepsOf(planSteps),
+  "js-ts.suite 0 | worker-app.typecheck 0 | guard:<guard> 2",
+);
+expectEqual(
+  "change: a guard's step names its predicate, its policy and the decision it holds",
+  squash(
+    await planSteps
+      .locator('li[data-step^="guard:"]')
+      .getByText(/^Guards /)
+      .innerText({ timeout: 2000 })
+      .catch(() => "none"),
   ),
-  "true",
+  "Guards freshness, policy block, holding decision D-1: Cache allowed if revocation invalidates it",
 );
 
 // A proof, and what it does to a change. Where the changes' plans block on the conflict's predicate, both
@@ -710,7 +729,7 @@ const rowsOf = async (): Promise<string> =>
 expectEqual(
   "alternatives: this change and the others side by side, by state, verdict and conflicts, never ranked",
   `${pathOf(page)} | ${await rowsOf()}`,
-  "/acme/demo/changes/2/alternatives | #2 this change “Add a rate limit to collaborator routes” hosted-112 HOSTED withdrawn none yet 0 09:30:24, revision 1 | #1 “Rate-limit the collaborators API” hosted-041 HOSTED landed Land, on 1 piece of evidence 0 09:30:10, revision 1 | #3 “Throttle the collaborators endpoints” hosted-207 HOSTED working none yet 0 09:30:41, revision 1",
+  "/acme/demo/changes/2/alternatives | #2 this change “Add a rate limit to collaborator routes” hosted-112 HOSTED withdrawn none yet 0 09:30:24, revision 1 | #1 “Rate-limit the collaborators API” hosted-041 HOSTED landed Land, on 2 pieces of evidence 0 09:30:10, revision 1 | #3 “Throttle the collaborators endpoints” hosted-207 HOSTED working none yet 0 09:30:41, revision 1",
 );
 expectEqual(
   "alternatives: the claim they share is given whole, with its unit and its scope",
@@ -4001,17 +4020,34 @@ expectEqual(
   pathOf(recall),
   "/ada/demo/decisions/D-1",
 );
-// The verdict the change bounced on names its batch. Its evidence is read from Keel's view of that verdict.
+// The verdict the change bounced on names its batch. The plan it was issued under is read from Keel's view of it.
 await recall.goto(`${built}/ada/demo/changes/1205/verification`, { waitUntil: "domcontentloaded" });
-await recall
-  .getByText("Guard G-1 fails against this change, three runs out of three")
+const builtSteps = recall.getByRole("list", { name: "The plan's steps, in Keel's order" });
+await builtSteps.waitFor({ timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "built: the plan a verdict was issued under, read from Keel's view of the verdict",
+  `${await stepsOf(builtSteps)} | ${remembers.calls.some((call) => call.path.startsWith("/v1/verdicts/"))}`,
+  "js-ts.suite 0 | worker-app.typecheck 0 | guard:<guard> 2 | true",
+);
+const heldDecision = builtSteps.locator('li[data-step^="guard:"]').getByRole("link");
+await heldDecision
   .first()
-  .waitFor({ timeout: 10_000 })
+  .waitFor({ timeout: 5_000 })
   .catch(() => undefined);
 expectEqual(
-  "built: a verdict's evidence, read from Keel's view of the verdict",
-  `${await recall.getByText("Guard G-1 fails against this change, three runs out of three").count()} | ${remembers.calls.some((call) => call.path.startsWith("/v1/verdicts/"))}`,
-  "1 | true",
+  "built: a guard's step links the decision it holds",
+  `${squash(
+    await heldDecision
+      .first()
+      .innerText({ timeout: 2000 })
+      .catch(() => "none"),
+  )} | ${String(
+    await heldDecision
+      .first()
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )}`,
+  "decision D-1 | /ada/demo/decisions/D-1",
 );
 // A decision is one link away wherever the project names it: the chip on a settled conflict's row, and the
 // conflict's own page. Each address calls it by its label a moment after the row is drawn, so that is waited for.

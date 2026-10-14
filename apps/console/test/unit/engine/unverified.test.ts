@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
-import { readable } from "../../../src/engine/evidence.ts";
 import { lanesOf } from "../../../src/engine/lanes.ts";
 import { changePageOf, trunkStatsOf } from "../../../src/engine/select.ts";
 import { World } from "../../../src/engine/world.ts";
@@ -114,29 +113,6 @@ describe("a project with verification switched off", () => {
           .find((node) => node.kind === "change"),
       ).not.toHaveProperty("unverified");
     }
-  });
-});
-
-describe("evidence, made readable", () => {
-  it("shows the producer's sentence, and falls back to the class and the reference", () => {
-    const at = "2026-10-13T16:00:00.000Z";
-    expect(
-      readable({
-        class: "proof",
-        ref: "prb:1/AB",
-        at,
-        summary: "Probe P-1 fails in A+B",
-        by: "World matrix",
-      }),
-    ).toMatchObject({ summary: "Probe P-1 fails in A+B", by: "World matrix" });
-    expect(readable({ class: "proof", ref: "prb:1/AB", at, source: "tool-result" })).toMatchObject({
-      summary: "proof: prb:1/AB",
-      by: "tool-result",
-    });
-    expect(readable({ class: "opinion", ref: "drv:1", at })).toMatchObject({
-      summary: "opinion: drv:1",
-      by: "",
-    });
   });
 });
 
