@@ -137,7 +137,7 @@ Keel remembers what each ruling settled, and the Decisions tab reads that memory
 
 | Address | What is there |
 |---|---|
-| `/` | The home: the projects Keel names to the reader, each under its namespace, and the reader's orgs where someone is signed in |
+| `/` | The home. A visitor is told what Keel is, in Keel's own words, with links to its source, its quickstart, its API and sign-up, and then the projects anyone may read, or that none is public yet. Someone signed in is shown what waits for them, their projects and their orgs |
 | `/N` | The namespace's own page: its projects |
 | `/N/P`, `/N/P/tree/<ref>/<path>`, `/N/P/blob/<ref>/<path>` | The code. `ref` is a commit, or `trunk` for wherever trunk's head is. A directory's README is drawn beneath its files: `README.md`, `README.markdown` or `README`, in any letter case. HTML written in it is shown as text, an image in it is a link, and a path it names is this project's page of that path at the ref shown |
 | `/N/P/commits`, `/N/P/commit/<sha>` | Trunk's history, and one commit's diff |
@@ -164,10 +164,10 @@ route  →  pages  →  views  →  engine (playhead, world, projections)  →  
 - `src/source/http.ts` is Keel as the page reaches it: `/v1` on the page's own origin, with nothing added. `src/source/repository.ts` is the repository port, in Keel's own shapes.
 - `src/engine/` is the playhead and the projections each page reads. `src/views/` draws them and never touches a transport.
 - `src/account/` is the pages above every project, on Keel's identity at `/v1/auth`.
-- `src/worker/` is the Worker: `/healthz`, and the page for everything else. `handler.ts` needs nothing of the Workers runtime but fetch, so it is tested as it is, in Node; `index.ts` is its entry.
+- `src/worker/` is the Worker: `/healthz`, a clone address and Keel's own paths handed to Keel as they came, 404 with the page for a path nothing here answers, and the page for everything else. `handler.ts` needs nothing of the Workers runtime but fetch, so it is tested as it is, in Node; `index.ts` is its entry.
 - `test/fixtures/` holds the scripted logs, held to Keel's catalogue and state machines, a stand-in for Keel's API that knows a reader by their session and reads a non-member the public part of the log alone, as Keel's read scope does, and the real Better Auth standing in for Keel's identity. They are test code. The page reaches a scripted log only in development, through a dynamic import that is not in the build.
 
-`wrangler.jsonc` serves `dist` as static assets with `not_found_handling: "single-page-application"` and runs the Worker first only for `/healthz` and a clone address's three git paths. `public/_headers`, which the build copies into `dist`, puts `Link: </.well-known/api-catalog>; rel="api-catalog"` on `/` and on nothing else: Cloudflare applies it to the assets it answers, and the Worker never sees a request for the page. It has no binding but those files, and no secret.
+`wrangler.jsonc` serves `dist` as static assets with `not_found_handling: "single-page-application"` and runs the Worker first only for `/healthz`, a clone address's three git paths, Keel's own paths and the paths nothing here answers. **A path nothing here answers** is one under a first segment Keel reserves that has no page, no file and none of Keel's paths on this site (`/api`, `/auth`, `/logout`, `/install`, `/admin`, `/favicon.ico`, and everything under them), and `/sitemap.xml`: the Worker answers it 404 with the page, which draws its own not-found. Who answers each reserved segment is one table, `ANSWERS` in `src/worker/handler.ts`, typed by Keel's list, so a segment Keel adds is placed there before the console builds; `/rule`, the retired ruling page's path, stays out of the config (the build guard refuses it there) and the page draws it as not found. `public/robots.txt` lets crawlers read every page but Keel's API (`Disallow: /v1/`), and `public/_redirects` sends `/openapi.json` on to `/v1/openapi.json` (301). `public/_headers`, which the build copies into `dist`, puts `Link: </.well-known/api-catalog>; rel="api-catalog"` on `/` and on nothing else: Cloudflare applies it to the assets it answers, and the Worker never sees a request for the page. It has no binding but those files, and no secret.
 
 ## Run it
 
@@ -196,7 +196,7 @@ All of these run in the repository's `pnpm check`:
 |---|---|
 | The page's and the Worker's TypeScript projects, and the console's own lint (React and accessibility rules the root lint does not carry, `oxlint.console.json`) | `typecheck` |
 | Unit tests: the engine, the fixtures' conformance to Keel's state machines, the page's source against the stand-in Keel, the account pages against the real Better Auth, the Worker's handler | `test/unit`, in the `unit` project |
-| The Worker in workerd, with its real config and the built page as its assets: the page for any path, `/healthz`, nothing bound to it but its files and its host, and the page where its proxy once was | `test/pool`, project `pool:console` |
+| The Worker in workerd, with its real config and the built page as its assets: the page for any path, `/healthz`, nothing bound to it but its files and its host, 404 with the page where nothing answers (its old proxy's path among them), `robots.txt` and the redirect of `/openapi.json` | `test/pool`, project `pool:console` |
 | The build contains no fixture and no playback control; and neither it, the Worker's code nor its config names a credential or a path the console once read Keel through | `scripts/guard-build.ts`, in `deploy:dry` |
 | No retired name for a view comes back | `test/unit/names.test.ts` |
 
