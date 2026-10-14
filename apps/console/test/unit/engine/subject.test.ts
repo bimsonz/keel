@@ -78,7 +78,8 @@ describe("one subject, read off the world", () => {
     ]);
     expect(detail?.conflicts).toMatchObject([{ label: "C-1", state: "resolved" }]);
     expect(detail?.changes).toEqual({ total: 0, byState: [], listed: [] });
-    expect(detail?.tenets).toBe(1);
+    // Keel establishes no tenet when the premise's holder lands: it keeps the decision and its guard.
+    expect(detail?.tenets).toBe(0);
   });
 
   it("nine days on: history's one conflict, since a failing guard opens none, and the change the guard bounced", async () => {
@@ -131,25 +132,34 @@ describe("one subject, read off the world", () => {
   it("at swarm scale, on a subject with a history: conflicts newest first, both parties of the open ones named first", async () => {
     const player = await playerAt("swarm", 110);
     const detail = subjectDetailOf(player.world, "authz.permission-evaluation");
-    // Two false alarms are being looked at; two real conflicts were settled earlier and left a guard each.
-    expect(detail?.tone).toBe("suspected");
+    // Two false alarms are being looked at. Two real conflicts were proven earlier and left a guard each: nobody
+    // was asked about them, so nothing resolved them, and a proven conflict is what the subject's tone says.
+    expect(detail?.tone).toBe("proven");
     expect(detail?.conflicts.map((conflict) => `${conflict.label} ${conflict.state}`)).toEqual([
       "C-19 suspected",
       "C-18 probing",
-      "C-6 resolved",
-      "C-4 resolved",
+      "C-6 proven",
+      "C-4 proven",
     ]);
     expect(detail?.guards.map((guard) => `${guard.label} ${guard.state}`)).toEqual([
       "G-2 admitted",
       "G-3 admitted",
     ]);
-    const open = new Set(["C-19", "C-18"]);
-    const parties = [...player.world.conflicts.values()]
-      .filter((conflict) => open.has(conflict.label))
-      .flatMap((conflict) => conflict.parties);
+    // Every party of an open conflict that is still going is named first: both sides of each being probed, and
+    // of each proven one the side its proof bounced, back in its lane. The other side of each proof has landed.
+    const open = new Set(["C-19", "C-18", "C-6", "C-4"]);
+    const parties = [
+      ...new Set(
+        [...player.world.conflicts.values()]
+          .filter((conflict) => open.has(conflict.label))
+          .flatMap((conflict) => conflict.parties)
+          .filter((id) => player.world.changes.get(id)?.state !== "landed"),
+      ),
+    ];
+    expect(parties).toHaveLength(6);
     expect(
       detail?.changes.listed
-        .slice(0, 4)
+        .slice(0, parties.length)
         .map((change) => change.id)
         .toSorted(),
     ).toEqual(parties.toSorted());

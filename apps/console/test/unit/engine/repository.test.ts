@@ -160,7 +160,7 @@ describe("the repository view", () => {
         view.notes.map(
           (note) => `${note.from} ${note.kind} ${note.label ?? note.holder?.label ?? ""}`,
         ),
-    ).toEqual(["5 decision D-1", "5 guard G-1", "5 tenet T-1", "5 premise #1", "5 premise #2"]);
+    ).toEqual(["5 decision D-1", "5 guard G-1", "5 premise #1", "5 premise #2"]);
   });
 
   it("reads at trunk's head as the log has it: before anything lands there is no cache to show", async () => {
@@ -351,7 +351,7 @@ describe("the repository view", () => {
     release();
     await settled();
     const { view } = ready(repositoryOf(player.world, player.repository, address));
-    expect(view.kind === "file" && view.notes.length).toBe(5);
+    expect(view.kind === "file" && view.notes.length).toBe(4);
   });
 
   it("asks Keel once for each thing, however often the page asks", async () => {

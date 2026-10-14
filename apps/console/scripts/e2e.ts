@@ -419,7 +419,8 @@ await page
 await page
   .getByText("Guard G-1 fails against this change, three runs out of three")
   .first()
-  .waitFor({ timeout: 10_000 });
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
   "change: the verdict's evidence, read from the verdict's view",
   String(
@@ -896,7 +897,7 @@ expectEqual(
 expectEqual(
   "code: why a line is as it is",
   (await page.locator("[data-why] li").allInnerTexts()).map(squash).join(" | "),
-  "Decision D-1 Cache allowed if revocation invalidates it | Guard G-1 guards this since conflict C-1 was proven | Tenet T-1 trunk holds freshness per-request | Premise #1 relies on invariant is unchanged | Premise #2 relies on freshness at most per-request",
+  "Decision D-1 Cache allowed if revocation invalidates it | Guard G-1 guards this since conflict C-1 was proven | Premise #1 relies on invariant is unchanged | Premise #2 relies on freshness at most per-request",
 );
 // Beside a file stand the files it sits among: the directories on the way to it open, the rest closed, and the file marked.
 expectEqual(
@@ -1075,7 +1076,8 @@ expectEqual(
   "Keel did not list its projects What answered at /v1 was not Keel. | 0",
 );
 
-// Mission Control on the swarm, with six conflicts open at once. There is one lane to a subject and one column to
+// Mission Control on the swarm, with thirteen conflicts open at once: a proof nobody was asked about stays open, as
+// Keel counts a conflict, until a ruling resolves it. There is one lane to a subject and one column to
 // each kind of thing; what a person is being asked about comes first; and nothing is left out for good.
 const graph = at("/mission-control", "scenario=swarm&t=100&play=0");
 await page.goto(graph, { waitUntil: "networkidle" });
@@ -1108,7 +1110,7 @@ expectEqual(
 expectEqual(
   "swarm: conflicts drawn",
   String(await page.locator('.a-fn[data-kind="conflict"]').count()),
-  "6",
+  "13",
 );
 expectEqual(
   "swarm: the lane of what a person is being asked about comes first",
@@ -1645,7 +1647,7 @@ expectEqual(
 expectEqual(
   "funnel: precheck, with what left there under the cause Keel named",
   await stage("changes", 1),
-  "1,057 | 3 0.3% 3 left here, 358 still here, 696 went on 3 bounced on a verdict · 358 still here, 1 of them parked | 696 | —",
+  "1,057 | 3 0.3% 3 left here, 358 still here, 696 went on 3 bounced on a proven conflict · 358 still here, 1 of them parked | 696 | —",
 );
 expectEqual(
   "funnel: verified, with Keel's estimate for its plans worded as an estimate",
@@ -1685,10 +1687,11 @@ expectEqual(
   await stage("comparisons", 3),
   "16 | 0 0% 1 still here, 15 passed on 1 still here | 15 | $0.014",
 );
+// A proof nobody was asked about settles nothing: its conflict stays open, as Keel counts one, until a ruling.
 expectEqual(
-  "probe, four still deciding",
+  "probe, the conflicts it proved still open beside four still deciding",
   await stage("conflicts", 0),
-  "15 | 10 66.7% 10 settled here, 4 still here, 1 passed on 3 dismissed as false alarms · 7 proven · 4 still here | 1 | $0.011",
+  "15 | 3 20.0% 3 settled here, 11 still here, 1 passed on 3 dismissed as false alarms · 7 proven · 11 still here | 1 | $0.011",
 );
 expectEqual(
   "a person, being asked",
@@ -1975,16 +1978,15 @@ await asDeployed(street, {
   hold: (path) => (path === "/v1/events" ? logHeld : Promise.resolve()),
 });
 const visitor = watch(await street.newPage(), "built, a visitor");
-// The scripts the page asks for: the code viewer and the graphs are files of their own, asked for by the pages
-// that draw them. The names are the build's, with a hash after each.
+// The scripts the page asks for: the code viewer and Mission Control's graph are files of their own, asked for by
+// the pages that draw them. The names are the build's, with a hash after each.
 const scripts: string[] = [];
 visitor.on("request", (request) => {
   const file = /\/assets\/([A-Za-z]+)-[^/]+\.js$/.exec(new URL(request.url()).pathname)?.[1];
   if (file !== undefined) scripts.push(file);
 });
 const heavy = (): string =>
-  ["CodeDiff", "MissionGraph", "PlanGraph"].filter((name) => scripts.includes(name)).join(" ") ||
-  "none";
+  ["CodeDiff", "MissionGraph"].filter((name) => scripts.includes(name)).join(" ") || "none";
 await visitor.goto(`${built}/`, { waitUntil: "domcontentloaded" });
 // The home lists the projects Keel names to anyone, each under its org.
 await visitor.getByRole("list", { name: "Projects" }).getByRole("link").first().waitFor();
@@ -2184,7 +2186,7 @@ expectEqual(
   "— | — shown to members |  | a person's time | —",
 );
 
-// The conflict's line is drawn from the lattices the page read from Keel, and a verdict's evidence from Keel's view of it.
+// The conflict's line is drawn from the lattices the page read from Keel.
 await visitor.goto(`${built}/ada/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { name: "World matrix" }).waitFor();
 await visitor.locator("[data-lattice-value]").first().waitFor({ timeout: 10_000 });
@@ -2227,15 +2229,18 @@ expectEqual(
   ),
   "1",
 );
+// Keel parks a change on the question it puts to a person, and issues no verdict for that: the change's page has
+// no verdict's evidence to show, and Keel is asked for none.
 await visitor.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
 await visitor
-  .getByText("Probe P-1 fails in A+B, three runs out of three")
+  .getByText("Evidence is listed here once Keel issues a verdict.")
   .first()
-  .waitFor({ timeout: 10_000 });
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
-  "built: a verdict's evidence and the lattices, read from Keel",
-  `${open.calls.some((call) => call.path.startsWith("/v1/verdicts/"))} ${open.calls.some((call) => call.path === "/v1/lattices")}`,
-  "true true",
+  "built: a change parked on a question has no verdict, and Keel is asked for none; the lattices are read from Keel",
+  `${await visitor.getByText("Evidence is listed here once Keel issues a verdict.").count()} | ${open.calls.some((call) => call.path.startsWith("/v1/verdicts/"))} ${open.calls.some((call) => call.path === "/v1/lattices")}`,
+  "1 | false true",
 );
 
 // Keel's contract has no way to read a change's diff either. Its page says so, and counts no files.
@@ -2483,7 +2488,7 @@ expectEqual(
   ]
     .toSorted()
     .join(" "),
-  "/v1/agents/{id} /v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/agents/{id} /v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(
@@ -3996,6 +4001,18 @@ expectEqual(
   pathOf(recall),
   "/ada/demo/decisions/D-1",
 );
+// The verdict the change bounced on names its batch. Its evidence is read from Keel's view of that verdict.
+await recall.goto(`${built}/ada/demo/changes/1205/verification`, { waitUntil: "domcontentloaded" });
+await recall
+  .getByText("Guard G-1 fails against this change, three runs out of three")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "built: a verdict's evidence, read from Keel's view of the verdict",
+  `${await recall.getByText("Guard G-1 fails against this change, three runs out of three").count()} | ${remembers.calls.some((call) => call.path.startsWith("/v1/verdicts/"))}`,
+  "1 | true",
+);
 // A decision is one link away wherever the project names it: the chip on a settled conflict's row, and the
 // conflict's own page. Each address calls it by its label a moment after the row is drawn, so that is waited for.
 const decisionChip = async (shown: Page): Promise<string> => {
@@ -5239,6 +5256,7 @@ await leaving.close();
 const asKeelServes = createFakeKeel({
   namespace: NAMESPACE,
   visibility: "public",
+  story: "s2",
   readerOf,
   whose: whoseHandle,
   verdictViews: false,
@@ -5256,18 +5274,27 @@ await asDeployed(plainly, {
   },
 });
 const reader = watch(await plainly.newPage(), "a change's page, as Keel serves a verdict");
-// The change the address names, the agent that declared it and the verdict Keel last issued for it, from the
-// stand-in's own log. Nobody has ruled on its question here, so that verdict parked it.
-const declaredFirst = asKeelServes
+// The change the address names, the agent that declared it and the verdict it bounced on, from the stand-in's
+// own log: nine days on, the careless change bounced on its batch's verdict. The verdict names the batch, and the
+// bounce names the verdict.
+const declaredCareless = asKeelServes
   .events()
-  .find((event) => event.type === "IntentDeclared" && event.label === "#1");
-const firstChange = declaredFirst?.type === "IntentDeclared" ? declaredFirst.payload : undefined;
-const itsVerdict = asKeelServes
+  .find((event) => event.type === "IntentDeclared" && event.label === "#1205");
+const careless = declaredCareless?.type === "IntentDeclared" ? declaredCareless.payload : undefined;
+const itsBounce = asKeelServes
   .events()
   .findLast(
-    (event) => event.type === "VerdictIssued" && event.payload.subject === firstChange?.changeId,
+    (event) => event.type === "ChangeBounced" && event.payload.changeId === careless?.changeId,
   );
-await reader.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
+const itsVerdict = asKeelServes
+  .events()
+  .find(
+    (event) =>
+      event.type === "VerdictIssued" &&
+      itsBounce?.type === "ChangeBounced" &&
+      event.payload.verdictId === itsBounce.payload.verdictId,
+  );
+await reader.goto(`${built}/ada/demo/changes/1205`, { waitUntil: "domcontentloaded" });
 const verdictOn = reader.locator('main section[aria-label="Verdict"]');
 await verdictOn
   .locator("p")
@@ -5284,9 +5311,9 @@ expectEqual(
       .innerText({ timeout: 2000 })
       .catch(() => "nothing"),
   ),
-  "Keel's verdict was to park it.",
+  "Keel's verdict was to bounce it.",
 );
-await reader.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
+await reader.goto(`${built}/ada/demo/changes/1205/verification`, { waitUntil: "domcontentloaded" });
 const recordedOn = reader.getByRole("list", { name: "Evidence Keel recorded with the verdict" });
 await reader
   .getByText("Evidence behind the verdict")
@@ -5300,7 +5327,7 @@ expectEqual(
   itsVerdict?.type === "VerdictIssued" ? itsVerdict.payload.evidence.join(" | ") : "no verdict",
 );
 // The agent's page is up before the log has named the agent: until then the page has an id and nothing else.
-const declarer = firstChange?.agentId ?? "";
+const declarer = careless?.agentId ?? "";
 sentPlainly.length = 0;
 logIsSlow = true;
 await reader.goto(`${built}/ada/demo/agents/${declarer}`, { waitUntil: "domcontentloaded" });

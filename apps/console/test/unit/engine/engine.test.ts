@@ -198,32 +198,13 @@ describe("the console's picture of scenario 1", () => {
     expect(file?.change).toMatchObject({ state: "landed", revision: 2 });
     // The first revision's silent retraction, and the comparison it failed, are not this revision's.
     expect(file?.drift).toEqual([]);
-    expect(file?.plan.steps.map((step) => [step.id, step.outcome])).toEqual([
-      ["diff", "pass"],
-      ["protected", "pass"],
-      ["extract", "pass"],
-      ["clef", "annotate"],
-      ["lattice", "pass"],
-      ["typecheck", "pass"],
-      ["unit", "pass"],
-      ["guard", "pass"],
-    ]);
+    // Its plan is the second revision's: Keel says how many steps it has, and not what they are.
+    expect(file?.plan).toEqual({ hash: "plan:c07e…41aa", costEstimateUsd: 0.004, stepCount: 8 });
     // What it landed on is the verdict of the batch that carried it.
     expect(file?.verdict).toMatchObject({
       outcome: "land",
       summary: "Verified: nothing it could have broken is broken",
     });
-
-    // Part-way through the second revision's check, a step it has not reached is still to come: the first
-    // revision's failure is not carried over to it.
-    const during = await playerAt(642, "invalidate");
-    const steps = new Map(
-      changePageOf(during.world, b?.id ?? "", during)?.plan.steps.map((step) => [
-        step.id,
-        step.outcome,
-      ]),
-    );
-    expect([steps.get("diff"), steps.get("lattice")]).toEqual(["pass", "pending"]);
   });
 
   it("takes short labels and the advance count from Keel, and numbers nothing itself", async () => {
@@ -435,7 +416,7 @@ describe("the console's picture of scenario 1", () => {
     );
   });
 
-  it("builds B's page from the log: drift, verdict, plan and the notes pinned to the diff", async () => {
+  it("builds B's page from the log: drift, no verdict, plan and the notes pinned to the diff", async () => {
     const player = await playerAt(460);
     const b = [...player.world.changes.values()].find((change) => change.label === "#1");
     player.wantDiff(b?.id ?? "");
@@ -451,19 +432,10 @@ describe("the console's picture of scenario 1", () => {
     // The workspace it started in: Keel says which when the change starts.
     expect(file?.change.workspace).toMatch(/^ws-[0-9a-z]{8}$/);
     expect(file?.drift.map((item) => item.class)).toEqual(["silent-retraction"]);
-    expect(file?.verdict).toMatchObject({ outcome: "park" });
+    // Keel parks it on the question and issues no verdict for that: a verdict judges a batch, and it is in none.
+    expect(file?.verdict).toBeUndefined();
     expect(file?.escalation).toMatchObject({ label: "E-1", state: "open" });
-    expect(file?.plan.steps.map((step) => [step.id, step.outcome])).toEqual([
-      ["diff", "pass"],
-      ["protected", "pass"],
-      ["extract", "pass"],
-      ["clef", "annotate"],
-      ["lattice", "fail"],
-      ["typecheck", "pass"],
-      ["unit", "pass"],
-      ["probe", "fail"],
-      ["ruling", "waiting"],
-    ]);
+    expect(file?.plan).toEqual({ hash: "plan:3f9a…d27e", costEstimateUsd: 0.006, stepCount: 9 });
     expect(file?.diff.files.map((entry) => entry.path)).toEqual([
       "src/authz/check.ts",
       "src/authz/cache.ts",

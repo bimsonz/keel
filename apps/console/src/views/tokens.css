@@ -33,14 +33,6 @@
   /* n/a is neutral ink: readable, never the pass colour. */
   --a-na-ink: var(--text-color-kumo-subtle);
   --a-na-line: light-dark(oklch(72% 0 0), oklch(46% 0 0));
-
-  /* Execution tier: one hue, heavier as cost rises. */
-  --a-tier-0: light-dark(oklch(93% 0.012 255), oklch(30% 0.02 255));
-  --a-tier-0-ink: light-dark(oklch(36% 0.03 255), oklch(86% 0.02 255));
-  --a-tier-1: light-dark(oklch(80% 0.035 255), oklch(46% 0.05 255));
-  --a-tier-1-ink: light-dark(oklch(24% 0.04 255), oklch(97% 0.01 255));
-  --a-tier-2: light-dark(oklch(42% 0.07 255), oklch(84% 0.05 255));
-  --a-tier-2-ink: light-dark(oklch(98% 0.005 255), oklch(20% 0.04 255));
 }
 
 :root .a-root {
@@ -200,47 +192,6 @@
   :root .a-spin {
     animation: none;
   }
-}
-
-/* ── Tier badge ─────────────────────────────────────────────────────────── */
-
-:root .a-tier {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 8px 0 6px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-:root .a-tier > b {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-:root .a-tier[data-tier="0"] {
-  background: var(--a-tier-0);
-  color: var(--a-tier-0-ink);
-}
-
-:root .a-tier[data-tier="1"] {
-  background: var(--a-tier-1);
-  color: var(--a-tier-1-ink);
-}
-
-:root .a-tier[data-tier="2"] {
-  background: var(--a-tier-2);
-  color: var(--a-tier-2-ink);
-}
-
-:root .a-tier[data-tier="none"] {
-  padding: 0 8px;
-  border: 1px dashed var(--color-kumo-line);
-  color: var(--text-color-kumo-subtle);
 }
 
 /* ── Panels ─────────────────────────────────────────────────────────────── */
@@ -473,85 +424,6 @@
 :root .a-option[aria-busy="true"] {
   border-color: var(--color-kumo-brand);
   opacity: 1;
-}
-
-/* ── Verification Plan graph ── */
-:root .a-plan-graph {
-  --xy-background-color: transparent;
-  --xy-edge-stroke: var(--color-kumo-interact);
-  --xy-edge-stroke-width: 1.5;
-  --xy-handle-background-color: transparent;
-  --xy-handle-border-color: transparent;
-}
-
-:root .a-plan-graph .react-flow__handle {
-  width: 1px;
-  height: 1px;
-  min-width: 0;
-  min-height: 0;
-  opacity: 0;
-}
-
-:root .a-step {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 214px;
-  height: 124px;
-  padding: 9px 11px;
-  border: 1px solid var(--color-kumo-line);
-  border-radius: 10px;
-  background: var(--color-kumo-base);
-  font-size: 14px;
-}
-
-:root .a-step[data-outcome="pending"] {
-  opacity: 0.55;
-}
-
-:root .a-step[data-outcome="running"] {
-  border-color: var(--text-color-kumo-strong);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--text-color-kumo-strong) 14%, transparent);
-}
-
-:root .a-step[data-outcome="fail"] {
-  border-color: var(--a-fail);
-  background: var(--a-fail-tint);
-}
-
-:root .a-step[data-outcome="waiting"] {
-  border-color: var(--a-person);
-  background: var(--a-person-tint);
-}
-
-:root .a-step-waiting {
-  color: var(--a-person-ink);
-}
-
-:root .a-step-because {
-  overflow: hidden;
-  color: var(--text-color-kumo-subtle);
-  font-size: 13px;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-:root .a-step-frame {
-  width: 100%;
-  height: 100%;
-  border: 1px dashed var(--color-kumo-interact);
-  border-radius: 12px;
-  padding: 5px 12px;
-  font-size: 13px;
-  color: var(--text-color-kumo-subtle);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root .a-plan-graph .react-flow__edge.animated path {
-    animation: none;
-  }
 }
 
 /* ── Mission Control's graph ── */

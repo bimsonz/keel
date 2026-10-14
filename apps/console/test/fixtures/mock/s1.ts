@@ -18,7 +18,7 @@ import type { AnyEvent, DriftEntry, ProbeWorld } from "../../../src/contract/eve
 import type { EventPredicatePolicies } from "../../../src/contract/keel/index.ts";
 import type { DerivedEffect, Proposition } from "../../../src/contract/mfp.ts";
 import type { EscalationOption } from "../../../src/contract/events.ts";
-import type { EvidenceLine, FlowNode, StepSpec } from "../../../src/contract/provisional.ts";
+import type { EvidenceLine } from "../../../src/contract/provisional.ts";
 import { type Rng, createRng } from "../prng.ts";
 import {
   BASE_ANCHORS,
@@ -74,173 +74,11 @@ const SUBJECT_KEY = "authz.permission-evaluation";
 const subjectRef = (id: string): EntityRef => ({ kind: "subject", id });
 const changeRef = (id: string): EntityRef => ({ kind: "change", id });
 
-const step = (spec: StepSpec): FlowNode => ({ op: "step", step: spec });
-
-/** B's Verification Plan. With `guard`, it also runs the admitted guard, citing the decision. */
-export function planForB(guard: { label: string; decision: string } | null): FlowNode {
-  const steps: FlowNode[] = [
-    step({
-      id: "diff",
-      title: "Tree diff against trunk",
-      kind: "deterministic",
-      tier: 0,
-      tierReason: "Pure git",
-      evidenceCeiling: "proof",
-      because: { text: "Every change is diffed against the head it will land on" },
-    }),
-    step({
-      id: "protected",
-      title: "Protected and guard paths untouched",
-      kind: "deterministic",
-      tier: 0,
-      tierReason: "Pure git",
-      evidenceCeiling: "ruling",
-      because: { text: "A change may not edit its own checks" },
-    }),
-    {
-      op: "cascade",
-      of: [
-        step({
-          id: "extract",
-          title: "Derive effects: extractors",
-          kind: "deterministic",
-          tier: 1,
-          tierReason: "Reads repository text, runs none of it",
-          evidenceCeiling: "proof",
-          because: { text: "Effects are derived from the diff, never taken from the agent" },
-        }),
-        step({
-          id: "clef",
-          title: "Derive effects: Clef",
-          kind: "decision-model",
-          tier: 1,
-          tierReason: "One budgeted model call",
-          evidenceCeiling: "opinion",
-          because: { text: "The extractors left requirePermission's freshness unresolved" },
-        }),
-      ],
-    },
-    step({
-      id: "lattice",
-      title: `Compare propositions on ${SUBJECT_KEY}`,
-      kind: "deterministic",
-      tier: 0,
-      tierReason: "A table lookup",
-      evidenceCeiling: "ruling",
-      because: {
-        text: `${NUMBER_A} relies on freshness at most per-request`,
-        cites: `premise:${NUMBER_A}`,
-      },
-    }),
-    {
-      op: "par",
-      of: [
-        step({
-          id: "typecheck",
-          title: "Typecheck",
-          kind: "deterministic",
-          tier: 1,
-          tierReason: "Fits in an isolate",
-          evidenceCeiling: "proof",
-          because: { text: "The footprint is TypeScript" },
-        }),
-        step({
-          id: "unit",
-          title: "Project tests, 27 selected",
-          kind: "deterministic",
-          tier: 1,
-          tierReason: "Worker-native tests",
-          evidenceCeiling: "proof",
-          because: { text: "The footprint touches src/authz" },
-        }),
-      ],
-    },
-  ];
-  if (guard === null) {
-    steps.push({
-      op: "worlds",
-      over: ["trunk", "A", "B", "AB"],
-      of: step({
-        id: "probe",
-        title: "World matrix: probe P-1",
-        kind: "probe",
-        tier: 1,
-        tierReason: "One throwaway isolate per world",
-        evidenceCeiling: "proof",
-        because: {
-          text: "Conflict C-1 was suspected, and only a probe can prove it",
-          cites: "conflict:C-1",
-        },
-      }),
-    });
-    steps.push(
-      step({
-        id: "ruling",
-        title: "Ruling on E-1",
-        kind: "human",
-        tier: null,
-        tierReason: "A person",
-        evidenceCeiling: "ruling",
-        because: { text: "Permission semantics are human-class" },
-      }),
-    );
-  } else {
-    steps.push({
-      op: "worlds",
-      over: ["trunk", "AB"],
-      of: step({
-        id: "guard",
-        title: `Guard ${guard.label}`,
-        kind: "probe",
-        tier: 1,
-        tierReason: "One throwaway isolate per world",
-        evidenceCeiling: "proof",
-        because: {
-          text: `Decision ${guard.decision}: cache allowed if revocation invalidates it`,
-          cites: "decision:D-1",
-        },
-      }),
-    });
-  }
-  return { op: "seq", of: steps };
-}
-
-/** Records one step of a run as Keel's step observations: running, then how it ended. */
-export function stepRunOn(b: ScriptBuilder) {
-  return (
-    at: number,
-    instanceId: string,
-    subjectId: string,
-    stepId: string,
-    tier: 0 | 1 | 2 | null,
-    seconds: number,
-    status: "passed" | "failed" | "annotated",
-    usd?: number,
-  ): void => {
-    const sandboxId = tier === 1 ? `iso-${stepId}-${Math.round(at)}` : undefined;
-    b.at(at).observe({
-      kind: "step",
-      instanceId,
-      subject: subjectId,
-      stepId,
-      status: "running",
-      tier,
-      attempt: 1,
-      ...(sandboxId === undefined ? {} : { sandboxId }),
-    });
-    b.at(at + seconds).observe({
-      kind: "step",
-      instanceId,
-      subject: subjectId,
-      stepId,
-      status,
-      tier,
-      attempt: 1,
-      ...(sandboxId === undefined ? {} : { sandboxId }),
-      cost: { ms: Math.round(seconds * 1000), ...(usd === undefined ? {} : { usd }) },
-    });
-  };
-}
+/**
+ * How many steps B's Verification Plan has, which is all Keel commits of a plan. While the conflict is open
+ * they include the probe's world matrix and the ruling; once the guard is admitted, it runs in their place.
+ */
+export const B_STEPS = { open: 9, guarded: 8 } as const;
 
 /**
  * Everything up to the proof: both changes submitted, and the conflict between them probed and proven. With
@@ -542,11 +380,6 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     payload: { changeId: changeB, revision: 1, instanceId: precheckB },
     causation: submittedB,
   });
-  const stepRun = stepRunOn(b);
-  stepRun(391.1, precheckB, changeB, "diff", 0, 0.1, "passed");
-  stepRun(391.3, precheckB, changeB, "protected", 0, 0.1, "passed");
-  stepRun(391.6, precheckB, changeB, "extract", 1, 1.8, "passed");
-  stepRun(393.5, precheckB, changeB, "clef", 1, 1.3, "annotated", 0.0004);
 
   const effectsB: DerivedEffect[] = [
     {
@@ -599,7 +432,6 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     entity: changeRef(changeB),
     payload: { changeId: changeB, revision: 1, drift: driftB },
   });
-  stepRun(396, precheckB, changeB, "lattice", 0, 0.1, "failed");
 
   const conflict = b.at(396.2).id("cfl");
   const conflictRef: EntityRef = { kind: "conflict", id: conflict };
@@ -639,13 +471,11 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       changeId: changeB,
       revision: 1,
       planHash: "plan:3f9a…d27e",
-      steps: planForB(null),
+      steps: B_STEPS.open,
       costEstimate: 0.006,
       ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
   });
-  stepRun(397.2, precheckB, changeB, "typecheck", 1, 2.1, "passed");
-  stepRun(397.2, precheckB, changeB, "unit", 1, 3.4, "passed");
 
   // A has finished too, and submits. Its plan passes; the open conflict keeps it from queueing.
   const submittedA = b.at(400).emit({
@@ -696,29 +526,7 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       changeId: changeA,
       revision: 1,
       planHash: "plan:81c2…0b6f",
-      steps: {
-        op: "seq",
-        of: [
-          step({
-            id: "diff",
-            title: "Tree diff against trunk",
-            kind: "deterministic",
-            tier: 0,
-            tierReason: "Pure git",
-            evidenceCeiling: "proof",
-            because: { text: "Every change is diffed against the head it will land on" },
-          }),
-          step({
-            id: "unit",
-            title: "Project tests, 31 selected",
-            kind: "deterministic",
-            tier: 1,
-            tierReason: "Worker-native tests",
-            evidenceCeiling: "proof",
-            because: { text: "The footprint touches src/collaborators" },
-          }),
-        ],
-      },
+      steps: 2,
       costEstimate: 0.002,
       ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
@@ -866,7 +674,6 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     guard,
     probeRef,
     proven,
-    stepRun,
   };
 }
 
@@ -927,24 +734,9 @@ export function prelude(b: ScriptBuilder) {
     },
   ];
 
-  const verdictPark = b.at(448).id("vrd");
-  b.emit({
-    type: "VerdictIssued",
-    entity: { kind: "verdict", id: verdictPark },
-    payload: {
-      verdictId: verdictPark,
-      subject: changeB,
-      outcome: "park",
-      // The event carries references. The evidence itself is what Keel's read model serves for this verdict.
-      evidence: b.reasons(verdictPark, "park", evidence),
-      planHash: "plan:3f9a…d27e",
-      x: {
-        summary:
-          "Conflict C-1 is proven and authz is human-class, so the change waits for a ruling",
-      },
-    },
-  });
-  const escalation = b.after(0.2).id("esc");
+  // Authz is human-class: Keel puts the proven conflict to a person, and parks both changes on the question.
+  // It issues no verdict for that. A verdict judges a batch, and neither change is in one.
+  const escalation = b.at(448.2).id("esc");
   const escalationRef: EntityRef = { kind: "escalation", id: escalation };
   const raised = b.emit({
     type: "EscalationRaised",
@@ -996,7 +788,7 @@ export type Prelude = ReturnType<typeof prelude>;
 /** One change through its lane and onto trunk: batch, candidate, verification, advance, landing. */
 export function land(
   b: ScriptBuilder,
-  p: Pick<Opening, "project" | "trunkRef" | "stepRun">,
+  p: Pick<Opening, "project" | "trunkRef">,
   input: {
     at: number;
     change: string;
@@ -1063,8 +855,8 @@ export function land(
       planHash: `plan:${batch.slice(-6).toLowerCase()}`,
     },
   });
-  p.stepRun(b.now / 1000 - b.offset + 0.2, instance, batch, "unit", 1, 5.5, "passed");
-  const verdict = b.after(7).id("vrd");
+  // KeelVerify runs the batch's plan, and its verdict follows.
+  const verdict = b.after(12.7).id("vrd");
   b.emit({
     type: "VerdictIssued",
     entity: { kind: "verdict", id: verdict },
@@ -1223,7 +1015,7 @@ function ruled(
   return { given, decisionId };
 }
 
-/** A lands, and its premise becomes a tenet backed by the guard. */
+/** A lands. */
 function landA(
   b: ScriptBuilder,
   p: Prelude,
@@ -1231,8 +1023,7 @@ function landA(
   from: string,
   to: string,
   height: number,
-  withTenet: boolean,
-): string | undefined {
+): void {
   land(b, p, {
     at,
     change: p.changeA,
@@ -1244,22 +1035,6 @@ function landA(
     label: `L1·${height}`,
     landing: LANDED_A,
   });
-  if (!withTenet) return undefined;
-  const tenet = b.at(at + 9.2).id("tnt");
-  b.emit({
-    type: "TenetEstablished",
-    entity: { kind: "tenet", id: tenet },
-    payload: {
-      tenetId: tenet,
-      subjectId: p.subject,
-      predicate: "freshness",
-      value: "per-request",
-      changeId: p.changeA,
-      guardIds: [p.guard],
-      x: { label: "T-1" },
-    },
-  });
-  return tenet;
 }
 
 /**
@@ -1304,10 +1079,7 @@ function bounce(
 }
 
 /** The scripted ruling: cache allowed if revocation invalidates it. B revises; both land. */
-export function continueInvalidate(
-  b: ScriptBuilder,
-  p: Prelude,
-): { decisionId: string; tenetId: string | undefined } {
+export function continueInvalidate(b: ScriptBuilder, p: Prelude): { decisionId: string } {
   const { given, decisionId } = ruled(b, p, "invalidate", {
     against: p.changeB,
     chosen: "Cache allowed if revocation invalidates it",
@@ -1329,9 +1101,9 @@ export function continueInvalidate(
     causation: given,
   });
   bounce(b, 472.8, p.changeB, { option: "invalidate", decisionId }, given);
-  const tenetId = landA(b, p, 474, p.head0, HEAD_1, 1, true);
+  landA(b, p, 474, p.head0, HEAD_1, 1);
 
-  // B meets the decision as precedent, follows it, and comes back.
+  // Keel surfaces the decision to B as precedent, and B comes back revised to keep to it.
   b.at(480).emit({
     type: "PrecedentSurfaced",
     entity: changeRef(p.changeB),
@@ -1440,14 +1212,6 @@ export function continueInvalidate(
     payload: { changeId: p.changeB, revision: 2, instanceId: precheck },
     causation: resubmitted,
   });
-  // The second revision's own check, step by step.
-  p.stepRun(641.1, precheck, p.changeB, "diff", 0, 0.1, "passed");
-  p.stepRun(641.3, precheck, p.changeB, "protected", 0, 0.1, "passed");
-  p.stepRun(641.6, precheck, p.changeB, "extract", 1, 1.8, "passed");
-  p.stepRun(643.2, precheck, p.changeB, "clef", 1, 1.3, "annotated", 0.0004);
-  p.stepRun(646, precheck, p.changeB, "lattice", 0, 0.1, "passed");
-  p.stepRun(647.2, precheck, p.changeB, "typecheck", 1, 2.1, "passed");
-  p.stepRun(647.2, precheck, p.changeB, "unit", 1, 3.6, "passed");
   b.at(645).emit({
     type: "EffectsDerived",
     entity: changeRef(p.changeB),
@@ -1473,11 +1237,6 @@ export function continueInvalidate(
       derivationRef: `mfp:derivation:${p.changeB}:2`,
     },
   });
-  b.after(1).emit({
-    type: "PrecedentFollowed",
-    entity: { kind: "decision", id: decisionId },
-    payload: { decisionId, changeId: p.changeB },
-  });
   b.at(647).emit({
     type: "PlanCompiled",
     entity: changeRef(p.changeB),
@@ -1485,13 +1244,12 @@ export function continueInvalidate(
       changeId: p.changeB,
       revision: 2,
       planHash: "plan:c07e…41aa",
-      steps: planForB({ label: "G-1", decision: "D-1" }),
+      steps: B_STEPS.guarded,
       costEstimate: 0.004,
     },
   });
-  // Nothing is run in the matrix's worlds again: the conflict is settled. The revised change's own plan runs,
-  // with the admitted guard a step of it like any other, and the verdict it lands by is what Keel records.
-  p.stepRun(650, precheck, p.changeB, "guard", 1, 12, "passed");
+  // Nothing is run in the matrix's worlds again: the conflict is settled. The revised change's plan runs the
+  // admitted guard as a step like any other, and the verdict it lands by is its batch's.
   land(b, p, {
     at: 663.5,
     change: p.changeB,
@@ -1503,7 +1261,7 @@ export function continueInvalidate(
     label: "L1·2",
     landing: LANDED_B_INVALIDATING,
   });
-  return { decisionId, tenetId };
+  return { decisionId };
 }
 
 /** Never cache: A lands, B cannot land as written and withdraws. */
@@ -1529,7 +1287,7 @@ function continueNoCache(b: ScriptBuilder, p: Prelude): void {
     causation: given,
   });
   bounce(b, 472.8, p.changeB, { option: "no-cache", decisionId }, given);
-  landA(b, p, 474, p.head0, HEAD_1, 1, true);
+  landA(b, p, 474, p.head0, HEAD_1, 1);
   b.at(520).emit({
     type: "ChangeWithdrawn",
     entity: changeRef(p.changeB),
@@ -1618,11 +1376,11 @@ function continueAllowStale(b: ScriptBuilder, p: Prelude): void {
       changeId: p.changeA,
       revision: 2,
       planHash: "plan:5d18…e9c3",
-      steps: { op: "seq", of: [] },
+      steps: 2,
       costEstimate: 0.002,
     },
   });
-  landA(b, p, 568, HEAD_1, HEAD_2, 2, false);
+  landA(b, p, 568, HEAD_1, HEAD_2, 2);
 }
 
 /**

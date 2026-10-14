@@ -1,8 +1,9 @@
 // The heaviest things the page draws, loaded when a page first draws one: the
-// code viewer, which carries the highlighter, the reader of Markdown, and the
-// two graphs. The home, a handle's page, the account pages and every list draw
-// none of them, so they are not in the script those pages wait for. Each is asked for by the pages
-// that draw it and by nothing else; while it comes, its place is empty.
+// code viewer, which carries the highlighter, the reader of Markdown, and
+// Mission Control's graph. The home, a handle's page, the account pages and
+// every list draw none of them, so they are not in the script those pages wait
+// for. Each is asked for by the pages that draw it and by nothing else; while it
+// comes, its place is empty.
 
 import { type ComponentProps, Suspense, lazy } from "react";
 import type { LineNote } from "../code/CodeDiff.tsx";
@@ -12,18 +13,16 @@ export type { LineNote };
 
 const code = () => import("../code/CodeDiff.tsx");
 const mission = () => import("./MissionGraph.tsx");
-const plan = () => import("./PlanGraph.tsx");
 const prose = () => import("./Markdown.tsx");
 const DiffLater = lazy(async () => ({ default: (await code()).CodeDiff }));
 const FileLater = lazy(async () => ({ default: (await code()).CodeFile }));
 const MissionLater = lazy(async () => ({ default: (await mission()).MissionGraph }));
-const PlanLater = lazy(async () => ({ default: (await plan()).PlanGraph }));
 const MarkdownLater = lazy(async () => ({ default: (await prose()).Markdown }));
 
 /** Which of them a page at each place draws. A place not listed draws none. */
 const DRAWN: Partial<Record<Route["at"], readonly (() => Promise<unknown>)[]>> = {
   commit: [code],
-  change: [code, plan],
+  change: [code],
   conflict: [code],
   "mission-control": [mission],
 };
@@ -70,14 +69,6 @@ export function MissionGraph(props: ComponentProps<typeof MissionLater>) {
   return (
     <Suspense fallback={null}>
       <MissionLater {...props} />
-    </Suspense>
-  );
-}
-
-export function PlanGraph(props: ComponentProps<typeof PlanLater>) {
-  return (
-    <Suspense fallback={null}>
-      <PlanLater {...props} />
     </Suspense>
   );
 }

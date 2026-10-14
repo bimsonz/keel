@@ -5,7 +5,7 @@
 // The mock is the only producer. When Keel settles a question, the shape
 // moves into events.ts (or is deleted) and its QUESTIONS.md entry closes.
 
-import type { Cost, Evidence, EvidenceClass } from "./mfp.ts";
+import type { Cost, Evidence } from "./mfp.ts";
 
 /** A piece of evidence, and two things the console shows when it has them. */
 export interface EvidenceLine extends Evidence {
@@ -13,39 +13,6 @@ export interface EvidenceLine extends Evidence {
   by?: string;
   detail?: string;
 }
-
-export type StepKind =
-  | "deterministic"
-  | "decision-model"
-  | "generative"
-  | "probe"
-  | "human"
-  | "deploy";
-
-/** QUESTIONS A1: one leaf of a compiled Verification Plan. */
-export interface StepSpec {
-  id: string;
-  title: string;
-  kind: StepKind;
-  /** Human steps run nowhere. */
-  tier: 0 | 1 | 2 | null;
-  tierReason: string;
-  evidenceCeiling: EvidenceClass;
-  /** Why this step exists for this change, and what it cites. */
-  because: { text: string; cites?: string };
-}
-
-/** QUESTIONS A1: the flow grammar, as a tree. */
-export type FlowNode =
-  | { op: "step"; step: StepSpec }
-  | { op: "seq"; of: FlowNode[] }
-  | { op: "par"; of: FlowNode[] }
-  | { op: "cascade"; of: FlowNode[] }
-  | { op: "worlds"; over: ("trunk" | "A" | "B" | "AB")[]; of: FlowNode }
-  | { op: "when"; predicate: string; of: FlowNode }
-  | { op: "budget"; usd: number; of: FlowNode };
-
-export type PlanSpec = FlowNode;
 
 /**
  * What rides in `payload.x` of each event type, beside the catalogue's own

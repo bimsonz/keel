@@ -195,11 +195,20 @@ describe("Mission Control at the scale of a swarm", () => {
   it("puts first what a person is being asked about, then what is contested, and opens those lanes", async () => {
     const { world, t } = await worldAt("swarm", 100);
     const lanes = lanesOf(world, t);
+    // Open as Keel counts it: neither resolved nor dismissed. A proof nobody was asked about leaves its conflict
+    // proven, and open: only a ruling resolves one.
     const open = [...world.conflicts.values()].filter(
       (conflict) => conflict.state !== "resolved" && conflict.state !== "dismissed",
     );
     expect(open.map((conflict) => `${conflict.label} ${conflict.state}`)).toEqual([
+      "C-1 proven",
+      "C-4 proven",
+      "C-6 proven",
       "C-7 escalated",
+      "C-8 proven",
+      "C-9 proven",
+      "C-10 proven",
+      "C-11 proven",
       "C-13 probing",
       "C-14 probing",
       "C-15 probing",

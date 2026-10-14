@@ -2,15 +2,15 @@
 # kills: funnel.once
 # why: a change that was verified and came round again is counted as never verified once its next precheck starts, so the verified stage loses a change Keel's events took that far
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index ade5ea9e..3c5d6762 100644
+index de5600e0..aa4e5cf1 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -608,7 +608,7 @@ export class World {
+@@ -713,7 +713,7 @@ export class World {
        case "PrecheckStarted": {
          const change = this.#change(event.payload.changeId, "deriving");
          if (change === undefined) break;
 -        change.reached.precheck = true;
 +        change.reached = { precheck: true, verified: false };
-         // Drift and step runs belong to one revision's check. The next revision's starts clean.
+         // Drift belongs to one revision's check. The next revision's starts clean.
          change.drift = [];
-         for (const key of this.steps.keys())
+         break;

@@ -63,7 +63,10 @@ export interface FunnelRow {
   open: number;
   /** What the stage has cost. Absent where there is no price (a person's answer) and where Keel has recorded none. */
   usd?: number;
-  /** For the probe: how the settled ones went. */
+  /**
+   * For the probe: what it dismissed, which it settled, and what it proved and no person was asked about, which
+   * stays open as Keel counts a conflict: only a ruling resolves one.
+   */
   dismissed?: number;
   proven?: number;
 }
@@ -214,7 +217,7 @@ export function funnelOf(world: World, people = true): FunnelState {
   );
   const dismissed = conflicts.filter((conflict) => conflict.state === "dismissed").length;
   const proven = conflicts.filter(
-    (conflict) => conflict.state === "resolved" && conflict.escalationId === undefined,
+    (conflict) => conflict.proven !== undefined && conflict.escalationId === undefined,
   ).length;
   const escalated = conflicts.filter((conflict) => conflict.escalationId !== undefined).length;
   // A probe's runs are priced one by one. A guard that settles a conflict without a new probe is priced on the conflict.
@@ -226,9 +229,9 @@ export function funnelOf(world: World, people = true): FunnelState {
     stage: 4,
     reported: true,
     reached: conflicts.length,
-    settled: dismissed + proven,
+    settled: dismissed,
     passedOn: escalated,
-    open: conflicts.length - dismissed - proven - escalated,
+    open: conflicts.length - dismissed - escalated,
     ...(probeCosts.length === 0 ? {} : { usd: total(probeCosts) }),
     dismissed,
     proven,

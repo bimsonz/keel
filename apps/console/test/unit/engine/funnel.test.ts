@@ -37,7 +37,7 @@ describe("the review funnel, read off the swarm", () => {
   // One replay serves every test that reads the end of the run.
   const finished = playerAt("swarm", 9999);
 
-  it("ends with almost everything settled before a model is asked, and two questions for a person", async () => {
+  it("[funnel.probe] ends with almost everything settled before a model is asked, and two questions for a person", async () => {
     const state = funnelOf((await finished).world);
     expect(state.rows.map((entry) => entry.stage)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(state.changesCompared).toBe(1876);
@@ -46,12 +46,15 @@ describe("the review funnel, read off the swarm", () => {
     expect(state.perChange?.compared).toBeGreaterThan(2);
     expect(state.perChange?.compared).toBeLessThan(3);
     expect(state.settledBeforeModels).toBeGreaterThan(0.999);
+    // A proof settles no conflict by itself: Keel bounces the change on it, and the conflict stays proven, which
+    // is open as Keel counts it, until a ruling resolves it. So the probe settles only the false alarms it
+    // dismissed, and passes on the two put to a person; the ten it proved are still here.
     expect(row(state, 4)).toMatchObject({
       reported: true,
       reached: 20,
-      settled: 18,
+      settled: 8,
       passedOn: 2,
-      open: 0,
+      open: 10,
       dismissed: 8,
       proven: 10,
     });
@@ -117,7 +120,7 @@ describe("the review funnel, read off the swarm", () => {
     expect(state.perChange).toBeUndefined();
     expect(state.settledBeforeModels).toBeUndefined();
     // Probes and questions are events, so they are still counted.
-    expect(row(state, 4)).toMatchObject({ reported: true, reached: 20, settled: 18, passedOn: 2 });
+    expect(row(state, 4)).toMatchObject({ reported: true, reached: 20, settled: 8, passedOn: 2 });
     expect(state.usd).toBeCloseTo(row(state, 4)?.usd ?? -1, 9);
   });
 });

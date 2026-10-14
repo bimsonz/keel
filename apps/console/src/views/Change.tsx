@@ -1,19 +1,12 @@
 import { Empty, Table, buttonVariants } from "@cloudflare/kumo";
-import {
-  BooksIcon,
-  HandPalmIcon,
-  NotePencilIcon,
-  WarningOctagonIcon,
-  XCircleIcon,
-} from "@phosphor-icons/react";
+import { BooksIcon, HandPalmIcon, WarningOctagonIcon, XCircleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { CodeDiff, PlanGraph } from "./later.tsx";
+import { CodeDiff } from "./later.tsx";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
 import type {
   ChangePageState,
   DiffAnnotation,
   IntentRow,
-  PlanStep,
   RulingBounce,
   ChangeBounce,
 } from "../domain/state.ts";
@@ -36,11 +29,9 @@ import {
   AgentTag,
   ClassTag,
   EvidenceList,
-  OutcomeWord,
   Panel,
   PropositionLine,
   RELATION_WORD,
-  TierBadge,
   Unverified,
   clockTime,
   dateTime,
@@ -93,33 +84,6 @@ function DerivedRow({ effect }: { effect: ChangePageState["derived"][number] }) 
         )}
       </div>
     </li>
-  );
-}
-
-function ms(value: number | undefined): string {
-  if (value === undefined) return "";
-  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} s`;
-}
-
-function StepOutcome({ step }: { step: PlanStep }) {
-  if (step.outcome === "pass" || step.outcome === "fail" || step.outcome === "n/a") {
-    return <OutcomeWord outcome={step.outcome} />;
-  }
-  if (step.outcome === "running" || step.outcome === "pending")
-    return <OutcomeWord outcome={step.outcome} />;
-  if (step.outcome === "waiting") {
-    return (
-      <span className="a-chip" data-tone="person">
-        <HandPalmIcon size={13} weight="fill" />
-        waiting for a person
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-kumo-default">
-      <NotePencilIcon size={16} />
-      {step.outcome === "annotate" ? "annotated" : "abstained"}
-    </span>
   );
 }
 
@@ -393,7 +357,6 @@ export function Change({
       ...state.derived.map((effect) => effect.proposition.subject),
     ]),
   ];
-  const steps = plan.steps.length > 0 ? plan.steps.length : plan.stepCount;
   return (
     <Detail>
       <Head
@@ -441,7 +404,7 @@ export function Change({
             id: "verification",
             label: "Verification",
             to: { at: "change", name, tab: "verification" },
-            ...(steps === undefined ? {} : { count: steps }),
+            ...(plan.stepCount === undefined ? {} : { count: plan.stepCount }),
           },
           // How many is not known until Keel has answered with them.
           {
@@ -942,108 +905,49 @@ export function Change({
         ))}
 
       {tab === "verification" && (
-        <>
-          {plan.spec !== undefined && (
+        <Split
+          main={
             <Panel
               title="Verification Plan"
-              aside="compiled for this change alone: each step says where it runs and why it exists"
+              aside={
+                <>
+                  <span className="a-mono">{plan.hash}</span> · estimated $
+                  {plan.costEstimateUsd.toFixed(3)}
+                </>
+              }
               bodyClassName=""
             >
-              <PlanGraph spec={plan.spec} steps={plan.steps} mode={mode} />
+              {plan.stepCount === undefined ? (
+                <p className="px-4 py-3 text-base text-kumo-subtle">
+                  Keel has not compiled a Verification Plan for this change yet.
+                </p>
+              ) : (
+                <p className="px-4 py-3 text-base text-kumo-default">
+                  Keel compiled a plan of {plan.stepCount} {plan.stepCount === 1 ? "step" : "steps"}{" "}
+                  for this change. It does not publish what the steps are yet, so none is listed
+                  here.
+                </p>
+              )}
             </Panel>
-          )}
-          <Split
-            main={
-              <Panel
-                title="Steps"
-                aside={
-                  <>
-                    <span className="a-mono">{plan.hash}</span> · estimated $
-                    {plan.costEstimateUsd.toFixed(3)}
-                  </>
-                }
-                bodyClassName=""
-              >
-                <Table layout="fixed">
-                  <colgroup>
-                    <col style={{ width: "25%" }} />
-                    <col style={{ width: 112 }} />
-                    <col />
-                    <col style={{ width: 150 }} />
-                    <col style={{ width: 112 }} />
-                    <col style={{ width: 124 }} />
-                  </colgroup>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.Head>Step</Table.Head>
-                      <Table.Head>Tier</Table.Head>
-                      <Table.Head>This step exists because</Table.Head>
-                      <Table.Head>Outcome</Table.Head>
-                      <Table.Head>Class</Table.Head>
-                      <Table.Head>Time, cost</Table.Head>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {plan.steps.map((step) => (
-                      <Table.Row key={step.id}>
-                        <Table.Cell>
-                          <span className="font-medium text-kumo-strong">{step.title}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <TierBadge tier={step.tier} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span className="text-kumo-default">{step.because}</span>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <StepOutcome step={step} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <ClassTag evidenceClass={step.evidenceClass} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span className="a-num text-kumo-default">
-                            {ms(step.ms)}
-                            {step.usd === undefined ? "" : ` · $${step.usd.toFixed(4)}`}
-                          </span>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table>
-                {plan.steps.length === 0 && plan.stepCount === undefined && (
-                  <p className="px-4 py-3 text-base text-kumo-subtle">
-                    Keel has not compiled a Verification Plan for this change yet.
-                  </p>
-                )}
-                {plan.spec === undefined && plan.stepCount !== undefined && (
-                  <p className="border-t border-kumo-hairline px-4 py-3 text-base text-kumo-default">
-                    Keel compiled a plan of {plan.stepCount}{" "}
-                    {plan.stepCount === 1 ? "step" : "steps"} for this change. It does not publish
-                    what the steps are yet, so none is listed here.
-                  </p>
-                )}
-              </Panel>
-            }
-            side={
-              <Panel
-                title="Evidence behind the verdict"
-                aside={verdict?.recorded === undefined ? "by class" : "as Keel recorded it"}
-                bodyClassName="p-3.5"
-              >
-                {verdict === undefined ? (
-                  <p className="text-base text-kumo-subtle">
-                    Evidence is listed here once Keel issues a verdict.
-                  </p>
-                ) : verdict.recorded === undefined ? (
-                  <EvidenceList items={verdict.evidence} />
-                ) : (
-                  <Recorded lines={verdict.recorded} />
-                )}
-              </Panel>
-            }
-          />
-        </>
+          }
+          side={
+            <Panel
+              title="Evidence behind the verdict"
+              aside={verdict?.recorded === undefined ? "by class" : "as Keel recorded it"}
+              bodyClassName="p-3.5"
+            >
+              {verdict === undefined ? (
+                <p className="text-base text-kumo-subtle">
+                  Evidence is listed here once Keel issues a verdict.
+                </p>
+              ) : verdict.recorded === undefined ? (
+                <EvidenceList items={verdict.evidence} />
+              ) : (
+                <Recorded lines={verdict.recorded} />
+              )}
+            </Panel>
+          }
+        />
       )}
 
       {tab === "files" &&

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.resolution-by-ruling
+# why: the fixtures may resolve a conflict with no ruling's decision
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 54b00ace..71f7b576 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -503,8 +503,6 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+       }
+       case "ConflictResolved": {
+         const { conflictId, decisionId, against } = event.payload;
+-        if (decisionId === undefined)
+-          problems.push(`${where}: Keel resolves a conflict only by a ruling's decision`);
+         if (against === undefined) break;
+         if (decisionId === undefined || against.length === 0)
+           problems.push(

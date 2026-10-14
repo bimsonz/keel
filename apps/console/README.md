@@ -6,7 +6,7 @@ A Keel holds namespaces and a namespace holds projects, so a project's address i
 
 It reads Keel and nothing else. There is no replay in it and no recorded stand-in: what the console shows is what Keel says, and where Keel does not say something yet the console leaves that place empty and says so.
 
-It is a Vite single-page app (React, Tailwind, Cloudflare's Kumo components, React Flow for Mission Control and for Verification Plans, `@pierre/diffs` for code) and a small Worker, `keel-console`, that serves the built page and does nothing else.
+It is a Vite single-page app (React, Tailwind, Cloudflare's Kumo components, React Flow for Mission Control, `@pierre/diffs` for code) and a small Worker, `keel-console`, that serves the built page and does nothing else.
 
 ## Who may read what
 
@@ -152,7 +152,7 @@ A project's log is asked for by the project's id, and the page folds only the ev
 route  →  pages  →  views  →  engine (playhead, world, projections)  →  source  →  contract (types)
 ```
 
-- `src/contract/keel/` names `@keeltown/contracts`: every request, response, model and event the console reads is Keel's own generated type. `src/contract/events.ts` lays over that the short list of what has been decided and Keel has not built (`Ahead`); `pnpm typecheck` fails there the day Keel builds one.
+- `src/contract/keel/` names `@keeltown/contracts`: every request, response, model and event the console reads is Keel's own generated type.
 - `src/source/http.ts` is Keel as the page reaches it: `/v1` on the page's own origin, with nothing added. `src/source/repository.ts` is the repository port, in Keel's own shapes.
 - `src/engine/` is the playhead and the projections each page reads. `src/views/` draws them and never touches a transport.
 - `src/account/` is the pages above every project, on Keel's identity at `/v1/auth`.

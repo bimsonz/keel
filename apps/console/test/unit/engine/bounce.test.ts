@@ -44,6 +44,37 @@ function then(player: Player, emit: (b: ScriptBuilder) => void): void {
   log.events.forEach((event, index) => player.world.apply(event, log.eventTimes[index] ?? 0));
 }
 
+/**
+ * A change bounced in verification, as Keel commits it: the verdict names the change's batch, the batch's failure
+ * blames the change, and the change bounces naming that verdict.
+ */
+function bouncedOnItsBatch(b: ScriptBuilder, changeId: string, at: number): string {
+  const verdictId = `vrd_${changeId}`;
+  const batchId = `bat_${changeId}`;
+  const reasons = ["suite:trunk failed in the batch's candidate"];
+  b.at(at).emit({
+    type: "VerdictIssued",
+    entity: { kind: "verdict", id: verdictId },
+    payload: { verdictId, subject: batchId, outcome: "bounce", evidence: reasons },
+  });
+  b.at(at + 0.1).emit({
+    type: "BatchFailed",
+    entity: { kind: "batch", id: batchId },
+    payload: { batchId, candidateId: `cnd_${changeId}`, verdictId, attribution: changeId },
+  });
+  b.at(at + 0.2).emit({
+    type: "ChangeBounced",
+    entity: { kind: "change", id: changeId },
+    payload: {
+      changeId,
+      verdictId,
+      reasons,
+      nextActions: [{ kind: "call", title: "Revise the change" }],
+    },
+  });
+  return verdictId;
+}
+
 describe("a conflict proven against a change", () => {
   it("[change.bounce-conflict] ties a bounce to the conflict Keel names, and gives it no verdict", async () => {
     const { player, conflictId, changeId } = await proven();
@@ -206,7 +237,7 @@ describe("a conflict proven against a change", () => {
     expect(changePageOf(player.world, changeId, player)?.bounce).not.toHaveProperty("cites");
   });
 
-  it("[change.bounce-ruling] says a ruling went against a change by its decision, with the conflict that decision settled and Keel's reason, and shows no earlier verdict as the cause", async () => {
+  it("[change.bounce-ruling] says a ruling went against a change by its decision, with the conflict that decision settled and Keel's reason, and shows no verdict as the cause", async () => {
     const log = generateS1(42, "invalidate");
     const at = log.events.findIndex((event) => event.type === "ChangeBounced");
     const first = log.events[at];
@@ -228,8 +259,35 @@ describe("a conflict proven against a change", () => {
       next: first.payload.nextActions?.map((action) => action.title),
     });
     expect(page?.bounce?.next.length).toBeGreaterThan(0);
-    // The verdict that sent it to its wait was given before the ruling, and is not this bounce's.
-    expect(player.world.changes.get(first.payload.changeId)?.verdictIds.length).toBeGreaterThan(0);
+    // Keel parked it for the ruling with no verdict, and bounces it by the decision with none.
+    expect(player.world.changes.get(first.payload.changeId)?.verdictIds).toEqual([]);
+    expect(page?.verdict).toBeUndefined();
+  });
+
+  it("[change.bounce-ruling] shows no verdict as the cause of a ruling's bounce, though an earlier bounce of the change was on its batch's verdict", async () => {
+    const { player, conflictId, changeId } = await proven();
+    then(player, (b) => {
+      bouncedOnItsBatch(b, changeId, 1);
+      b.at(2).emit({
+        type: "IntentRevised",
+        entity: { kind: "change", id: changeId },
+        payload: { changeId, revision: 2, premisesAdded: [], premisesRetracted: [] },
+      });
+      b.at(3).emit({
+        type: "ConflictResolved",
+        entity: { kind: "conflict", id: conflictId },
+        payload: { conflictId, move: "escalate", decisionId: "dec_1", against: [changeId] },
+      });
+      b.at(3.1).emit({
+        type: "ChangeBounced",
+        entity: { kind: "change", id: changeId },
+        payload: { changeId, decisionId: "dec_1", reasons: ["It cannot land as written."] },
+      });
+    });
+    // The earlier verdict is the change's own record still, and not this bounce's cause.
+    expect(player.world.changes.get(changeId)?.verdictIds).toEqual([`vrd_${changeId}`]);
+    const page = changePageOf(player.world, changeId, player);
+    expect(page?.bounce?.ruling?.reasons).toEqual(["It cannot land as written."]);
     expect(page?.verdict).toBeUndefined();
   });
 
@@ -364,7 +422,7 @@ describe("a conflict, once settled", () => {
       return conflictPageOf(player.world, conflict?.id ?? "", player);
     };
     const after = () => page()?.after.map((side) => [side.label, side.revision, side.outcome]);
-    // Just settled: the verdict that parked #1 was given before, and is not what came of the conflict.
+    // Just settled: Keel parked both sides on the question with no verdict, and has issued neither one since.
     player.seek(settled + 10);
     expect(page()?.conflict.state).toBe("resolved");
     expect(after()).toEqual([]);
@@ -383,5 +441,27 @@ describe("a conflict, once settled", () => {
       "fail",
       "fail",
     ]);
+  });
+
+  it("[conflict.after] says nothing came of a side whose latest verdict was given before the conflict was settled", async () => {
+    const { player, conflictId } = await proven();
+    const sides = conflictPageOf(player.world, conflictId, player)?.named.map(
+      (side) => side.changeId,
+    );
+    const holder = sides?.find((id) => id !== undefined);
+    if (holder === undefined) throw new Error("C-1 names no change");
+    // The side bounced on its batch's verdict while the conflict was open, and nothing was issued since it was settled.
+    then(player, (b) => {
+      bouncedOnItsBatch(b, holder, 1);
+      b.at(2).emit({
+        type: "ConflictResolved",
+        entity: { kind: "conflict", id: conflictId },
+        payload: { conflictId, move: "escalate", decisionId: "dec_1" },
+      });
+    });
+    const page = conflictPageOf(player.world, conflictId, player);
+    expect(page?.conflict.state).toBe("resolved");
+    expect(player.world.changes.get(holder)?.verdictIds).toEqual([`vrd_${holder}`]);
+    expect(page?.after).toEqual([]);
   });
 });

@@ -1,36 +1,9 @@
 // PROVISIONAL. Timed facts the console shows that are not catalogue events:
-// step progress (Keel routes it through a workflow subscription),
-// the review funnel's cheaper levels and
-// aggregate metrics. They form a second log beside the events, addressable by
-// time in the same way, so a deep link can show "steps as of 2:10". See
-// QUESTIONS.md, section B.
+// the review funnel's cheaper levels and aggregate metrics. They form a second
+// log beside the events, addressable by time in the same way, so a deep link
+// can show "the funnel as of 2:10". See QUESTIONS.md, section B.
 
-import type { Cost, Predicate } from "./mfp.ts";
-
-export type StepStatus =
-  | "running"
-  | "passed"
-  | "failed"
-  | "annotated"
-  | "abstained"
-  | "skipped"
-  | "waiting";
-
-/** B1: one transition of one step of a running Verification Plan. */
-export interface StepObservation {
-  kind: "step";
-  at: string;
-  instanceId: string;
-  /** The change or batch the plan belongs to. */
-  subject: string;
-  stepId: string;
-  status: StepStatus;
-  tier: 0 | 1 | 2 | null;
-  attempt: number;
-  /** The throwaway isolate or container the step ran in. */
-  sandboxId?: string;
-  cost?: Cost;
-}
+import type { Predicate } from "./mfp.ts";
 
 /** The review funnel's stages, cheapest first. "Stage" on screen, so they never read as execution Tier 0 to 2. */
 export type FunnelStage = 0 | 1 | 2 | 3 | 4 | 5;
@@ -122,7 +95,6 @@ export interface UnsealObservation {
 }
 
 export type Observation =
-  | StepObservation
   | FunnelObservation
   | MetricsObservation
   | BetObservation

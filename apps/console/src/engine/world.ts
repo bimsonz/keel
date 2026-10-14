@@ -28,11 +28,9 @@ import type {
   MetricsObservation,
   Observation,
   SealObservation,
-  StepObservation,
   UnsealObservation,
 } from "../contract/observations.ts";
 import type { EscalationCategory, EscalationOption } from "../contract/events.ts";
-import type { FlowNode } from "../contract/provisional.ts";
 import type { EvidenceItem } from "../domain/state.ts";
 import type {
   AgentClass,
@@ -108,13 +106,11 @@ export interface ChangeEntry {
   /** True once Keel has derived the effects of a commit of this change, whether or not it found any. */
   derived: boolean;
   drift: DriftEntry[];
-  /** `spec` is the plan's flow when Keel publishes it; until then only `stepCount`, how many steps it has. */
+  /** Keel says how many steps the plan has, and not what they are. */
   plan?: {
     hash: string;
-    spec?: FlowNode;
-    stepCount?: number;
+    stepCount: number;
     costEstimate: number;
-    instanceId?: string;
   };
   laneId?: string;
   batchId?: string;
@@ -136,8 +132,6 @@ export interface ChangeEntry {
   /** True once it has a verdict, or has landed in an advance, that was not verified. */
   unverified: boolean;
   conflictIds: string[];
-  /** Each time a guard failed in this change's own plan: Keel's fact, with the revision it was at. */
-  guardFailures: { guardId: string; revision: number; at: string }[];
   /**
    * Its latest bounce, and the one thing Keel named as its cause: a verdict, a conflict proven against it, its
    * batch's push being refused, or the decision of a ruling that went against it. `reasons` is why and `next`
@@ -437,8 +431,6 @@ export class World {
    * bounce for another cause replaces a change's latest bounce and not this: it was still bounced citing it.
    */
   readonly citing = new Map<string, string[]>();
-  /** The latest status of each step, keyed `subject/stepId`. */
-  readonly steps = new Map<string, StepObservation>();
   /** The latest counters only the platform knows. */
   metrics: MetricsObservation | undefined;
   /** The review funnel's cheaper levels, as last reported. Absent when the source does not count them. */
@@ -509,9 +501,7 @@ export class World {
 
   observe(observation: Observation): void {
     this.version += 1;
-    if (observation.kind === "step") {
-      this.steps.set(`${observation.subject}/${observation.stepId}`, observation);
-    } else if (observation.kind === "metrics") {
+    if (observation.kind === "metrics") {
       this.metrics = observation;
     } else if (observation.kind === "funnel") {
       this.funnel = observation;
@@ -634,7 +624,6 @@ export class World {
           verdictIds: [],
           unverified: false,
           conflictIds: [],
-          guardFailures: [],
           bounces: { verdict: 0, conflict: 0, declined: 0, ruling: 0 },
           reached: { precheck: false, verified: false },
           noted: [],
@@ -725,10 +714,8 @@ export class World {
         const change = this.#change(event.payload.changeId, "deriving");
         if (change === undefined) break;
         change.reached.precheck = true;
-        // Drift and step runs belong to one revision's check. The next revision's starts clean.
+        // Drift belongs to one revision's check. The next revision's starts clean.
         change.drift = [];
-        for (const key of this.steps.keys())
-          if (key.startsWith(`${change.id}/`)) this.steps.delete(key);
         break;
       }
       case "EffectsDerived": {
@@ -749,10 +736,9 @@ export class World {
       case "PlanCompiled": {
         const change = this.#change(event.payload.changeId, "verifying");
         if (change !== undefined) {
-          const { steps } = event.payload;
           change.plan = {
             hash: event.payload.planHash,
-            ...(typeof steps === "number" ? { stepCount: steps } : { spec: steps }),
+            stepCount: event.payload.steps,
             costEstimate: event.payload.costEstimate,
           };
           this.planned.plans += 1;
@@ -1133,19 +1119,6 @@ export class World {
           `Guard ${label} admitted`,
           `${probe?.label ?? "The probe"} discriminates, in ${event.payload.runs} ${event.payload.runs === 1 ? "run" : "runs"}`,
         );
-        break;
-      }
-      case "GuardFailed": {
-        // In a change's own plan it is a fact of that change. In a batch's candidate it feeds the batch's verdict.
-        const change =
-          event.payload.changeId === undefined
-            ? undefined
-            : this.changes.get(event.payload.changeId);
-        change?.guardFailures.push({
-          guardId: event.payload.guardId,
-          revision: change.revision,
-          at: event.at,
-        });
         break;
       }
       case "GuardRetired": {

@@ -26,7 +26,7 @@ import { HEAD_1, type Opening, S1_EPOCH, land, opening } from "./s1.ts";
 const changeRef = (id: string): EntityRef => ({ kind: "change", id });
 
 /** The ways forward Keel names to a change a conflict was proven against: read it, revise around it, resolve it. */
-function conflictActions(changeId: string, conflictId: string): NextAction[] {
+export function conflictActions(changeId: string, conflictId: string): NextAction[] {
   return [
     {
       kind: "read",

@@ -39,11 +39,12 @@ describe("scenario 2: memory", () => {
     ]);
   });
 
-  it("surfaces the decision to the fresh agent as dated evidence, and records that it followed it", async () => {
+  it("surfaces the decision to the fresh agent as dated evidence, and records no stance it took on it", async () => {
     const player = await playerAt(125);
     const c = [...player.world.changes.values()].find((change) => change.label === "#1204");
     const file = changePageOf(player.world, c?.id ?? "", player);
     expect(file?.change.state).toBe("landed");
+    // Keel commits nothing of a change's following a precedent: the change keeps to it, and lands, with no stance.
     expect(file?.precedents).toEqual([
       {
         decisionId: [...player.world.decisions.keys()][0],
@@ -51,13 +52,8 @@ describe("scenario 2: memory", () => {
         summary: "Cache allowed if revocation invalidates it",
         decidedAt: "2026-10-13T10:21:52.400Z",
         scope: "authz.permission-evaluation",
-        stance: "followed",
       },
     ]);
-    expect(file?.plan.steps.find((step) => step.id === "guard")).toMatchObject({
-      outcome: "pass",
-      because: "Decision D-1: cache allowed if revocation invalidates it",
-    });
     expect(player.world.trunk.advances).toBe(1144);
   });
 
@@ -83,14 +79,12 @@ describe("scenario 2: memory", () => {
       "ruling",
       "ruling",
     ]);
-    expect(file?.plan.steps.find((step) => step.id === "guard")?.outcome).toBe("fail");
     expect(file?.precedents[0]).toMatchObject({ decisionLabel: "D-1" });
     expect(file?.precedents[0]?.stance).toBeUndefined();
     expect(player.world.trunk).toMatchObject({ advances: 1144, redCount: 0 });
+    // Keel establishes no tenet: what history keeps of its ruling is the decision and the guard.
     const states = finalStates(generateS2(42).events);
-    expect(
-      [...states].filter(([key]) => key.startsWith("tenet:")).map(([, state]) => state),
-    ).toEqual(["established"]);
+    expect([...states].filter(([key]) => key.startsWith("tenet:"))).toEqual([]);
   });
 
   it("[s2.as-keel-commits] tells the guard's bounce in the events Keel commits and in its words, and in no other", () => {
@@ -132,20 +126,12 @@ describe("scenario 2: memory", () => {
     );
   });
 
-  it("takes a plan that is only a count of steps, as Keel's code commits one today, and lists none", async () => {
+  it("takes a plan as the count of its steps Keel commits, and lists none", async () => {
     const bare = new World();
     const { items } = await createMockSource({ scenario: "s2", seed: 42 }).readEvents({
       limit: 500,
     });
-    for (const event of items) {
-      // What Keel's core commits today: how many steps the plan has, and not the steps.
-      bare.apply(
-        event.type === "PlanCompiled"
-          ? { ...event, payload: { ...event.payload, steps: 9 } }
-          : event,
-        0,
-      );
-    }
+    for (const event of items) bare.apply(event, 0);
     const h = [...bare.changes.values()].find((change) => change.label === "#1205");
     const plan = changePageOf(bare, h?.id ?? "", {
       diffs: new Map(),
@@ -154,58 +140,6 @@ describe("scenario 2: memory", () => {
       lattices: new Map(),
       refused: new Set<string>(),
     })?.plan;
-    expect(plan).toMatchObject({ hash: "plan:1b7e…90ad", steps: [], stepCount: 9 });
-    expect(plan).not.toHaveProperty("spec");
-  });
-
-  it("reads the plan's guard step as failed from Keel's fact alone, with no step observation to go on", async () => {
-    // As a live Keel publishes it: events, and nothing of the console's own beside them. Keel's domain has an
-    // event for a guard that failed in a change's own plan and commits none yet, so one is written here by hand.
-    const bare = new World();
-    const { items } = await createMockSource({ scenario: "s2", seed: 42 }).readEvents({
-      limit: 500,
-    });
-    for (const event of items) bare.apply(event, 0);
-    const h = [...bare.changes.values()].find((change) => change.label === "#1205");
-    const admitted = items.find((event) => event.type === "GuardAdmitted");
-    const last = items.at(-1);
-    if (admitted?.type !== "GuardAdmitted" || last === undefined || h === undefined)
-      throw new Error("scenario 2 admits no guard, or bounces no change");
-    bare.apply(
-      {
-        ...last,
-        type: "GuardFailed",
-        entity: { kind: "change", id: h.id },
-        payload: {
-          _tag: "GuardFailed",
-          guardId: admitted.payload.guardId,
-          changeId: h.id,
-          world: "A",
-        },
-      },
-      0,
-    );
-    const steps =
-      changePageOf(bare, h?.id ?? "", {
-        diffs: new Map(),
-        probes: new Map(),
-        verdicts: new Map(),
-        lattices: new Map(),
-        refused: new Set<string>(),
-      })?.plan.steps ?? [];
-    expect(bare.steps.size).toBe(0);
-    expect(steps.find((step) => step.id === "guard")?.outcome).toBe("fail");
-    expect(steps.find((step) => step.id === "unit")?.outcome).toBe("pending");
-    // The change that kept the invalidation never failed it.
-    const c = [...bare.changes.values()].find((change) => change.label === "#1204");
-    expect(
-      changePageOf(bare, c?.id ?? "", {
-        diffs: new Map(),
-        probes: new Map(),
-        verdicts: new Map(),
-        lattices: new Map(),
-        refused: new Set<string>(),
-      })?.plan.steps.find((step) => step.id === "guard")?.outcome,
-    ).toBe("pending");
+    expect(plan).toEqual({ hash: "plan:1b7e…90ad", costEstimateUsd: 0.004, stepCount: 8 });
   });
 });

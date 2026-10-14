@@ -4,7 +4,7 @@
 import { CheckIcon, CircleNotchIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { EvidenceClass } from "../contract/mfp.ts";
-import type { EvidenceItem, Outcome, Pending, ShownClass, Tier } from "../domain/state.ts";
+import type { EvidenceItem, Outcome, Pending, ShownClass } from "../domain/state.ts";
 
 // ─── Outcome ────────────────────────────────────────────────────────────────
 
@@ -227,26 +227,6 @@ export function EvidenceList({ items }: { items: EvidenceItem[] }) {
         );
       })}
     </div>
-  );
-}
-
-// ─── Execution tier ─────────────────────────────────────────────────────────
-
-const TIER_NOUN: Record<Tier, string> = { 0: "git", 1: "isolate", 2: "container" };
-
-export function TierBadge({ tier }: { tier: Tier | null }) {
-  if (tier === null) {
-    return (
-      <span className="a-tier" data-tier="none">
-        no tier
-      </span>
-    );
-  }
-  return (
-    <span className="a-tier" data-tier={tier}>
-      <b>{tier}</b>
-      {TIER_NOUN[tier]}
-    </span>
   );
 }
 

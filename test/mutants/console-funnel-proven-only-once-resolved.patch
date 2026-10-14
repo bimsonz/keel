@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.probe
+# why: the probe's row counts as proven only conflicts resolved with no person asked, which Keel never does, so the ones it proved and left open are not counted
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index f79bff95..0c2c3525 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -217,7 +217,7 @@ export function funnelOf(world: World, people = true): FunnelState {
+   );
+   const dismissed = conflicts.filter((conflict) => conflict.state === "dismissed").length;
+   const proven = conflicts.filter(
+-    (conflict) => conflict.proven !== undefined && conflict.escalationId === undefined,
++    (conflict) => conflict.state === "resolved" && conflict.escalationId === undefined,
+   ).length;
+   const escalated = conflicts.filter((conflict) => conflict.escalationId !== undefined).length;
+   // A probe's runs are priced one by one. A guard that settles a conflict without a new probe is priced on the conflict.

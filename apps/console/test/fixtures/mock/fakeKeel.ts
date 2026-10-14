@@ -8,9 +8,8 @@
 // project is made public or private. What a reader may not see is answered as
 // what is not there. Its answers are typed by Keel's own generated
 // wire types, but for the project, whose shape is the console's read of it
-// the read (source/types.ts). An event's payload it serves as
-// Keel's design settles it (contract/events.ts, `Ahead`). Nothing in the
-// built console imports this.
+// (source/types.ts). An event's payload it serves as Keel commits it. Nothing
+// commits it. Nothing in the built console imports this.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {

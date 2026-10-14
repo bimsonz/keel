@@ -144,8 +144,10 @@ const RULES: Record<EventType, Rule[]> = {
   ConflictEscalated: [
     { kind: "conflict", idField: "conflictId", from: ["proven"], to: "escalated" },
   ],
-  // From Proven, or from Escalated once a decision is named. See `rulesFor`.
-  ConflictResolved: [{ kind: "conflict", idField: "conflictId", from: ["proven"], to: "resolved" }],
+  // Keel resolves a conflict only by the decision of a ruling on the question it was put to a person in.
+  ConflictResolved: [
+    { kind: "conflict", idField: "conflictId", from: ["escalated"], to: "resolved" },
+  ],
   // The probe's own Calibrating → Admitted. From here the admitted probe is the guard, named by `guardId`.
   GuardAdmitted: [
     { kind: "probe", idField: "probeId", from: ["calibrating"], to: "admitted" },
@@ -278,10 +280,6 @@ function rulesFor(event: AnyEvent): Rule[] {
       return event.payload.reason === "unprovable"
         ? conflict(["suspected", "probing"], "escalated")
         : RULES.ConflictEscalated;
-    case "ConflictResolved":
-      return event.payload.decisionId === undefined
-        ? RULES.ConflictResolved
-        : conflict(["proven", "escalated"], "resolved");
     case "ChangeBounced":
       // A ruling goes against a change only while it waits for that ruling.
       if (event.payload.decisionId !== undefined) return [change(["parked"], "bounced")];
@@ -507,6 +505,8 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
       }
       case "ConflictResolved": {
         const { conflictId, decisionId, against } = event.payload;
+        if (decisionId === undefined)
+          problems.push(`${where}: Keel resolves a conflict only by a ruling's decision`);
         if (against === undefined) break;
         if (decisionId === undefined || against.length === 0)
           problems.push(

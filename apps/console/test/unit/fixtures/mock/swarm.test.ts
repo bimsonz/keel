@@ -130,7 +130,7 @@ describe("the swarm", () => {
     expect(thin.reduce((sum, audit) => sum + audit.disagreements.length, 0)).toBeGreaterThan(20);
   });
 
-  it("has its runner seal the ground truth before the run, and publish it once every disagreement is settled", async () => {
+  it("has its runner seal the ground truth before the run, and publish it once every disagreement is decided", async () => {
     const seal = log.observations.flatMap((observation) =>
       observation.kind === "seal" ? [observation] : [],
     )[0];
@@ -157,13 +157,16 @@ describe("the swarm", () => {
         (observation) => observation.kind === "seal",
       ),
     ).not.toMatchObject({ commitment: seal?.commitment });
-    // Nothing is still being argued when the truth comes out.
-    const settled = log.events.flatMap((event, index) =>
-      event.type === "ConflictResolved" || event.type === "ConflictDismissed"
+    // Nothing is still being argued when the truth comes out: every disagreement was proven or dismissed by its
+    // probe, and each one put to a person was resolved by the ruling. A proof nobody was asked about stays proven.
+    const decided = log.events.flatMap((event, index) =>
+      event.type === "ConflictProven" ||
+      event.type === "ConflictDismissed" ||
+      event.type === "ConflictResolved"
         ? [log.eventTimes[index] ?? 0]
         : [],
     );
-    expect(log.observationTimes[unsealIndex]).toBeGreaterThan(Math.max(...settled));
+    expect(log.observationTimes[unsealIndex]).toBeGreaterThan(Math.max(...decided));
     // One arranged pair never became a conflict: the one Keel does not notice. Both its changes landed.
     const opened = new Set(
       log.events.flatMap((event) =>

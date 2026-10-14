@@ -3,7 +3,7 @@
 // Nine days and 1,143 trunk advances after the ruling in scenario 1, its
 // authors are gone. A fresh REAL session is asked to simplify the permissions
 // code: preflight surfaces Decision D-1 as dated, scoped evidence, the agent
-// keeps the invalidation, and lands with the stance "followed". A careless
+// keeps the invalidation, and its change lands through its batch. A careless
 // hosted agent strips the invalidation: its batch's verification runs guard
 // G-1, which holds D-1 and fails, and the change bounces on that verdict,
 // citing D-1 and pointing its agent to it. That is all Keel commits of it: no
@@ -16,7 +16,7 @@ import type { EntityRef } from "../../../src/contract/envelope.ts";
 import type { NextAction, PrecedentRef } from "../../../src/contract/events.ts";
 import { createRng } from "../prng.ts";
 import { type GeneratedLog, ScriptBuilder } from "./builder.ts";
-import { HEAD_2, continueInvalidate, land, planForB, prelude } from "./s1.ts";
+import { B_STEPS, HEAD_2, continueInvalidate, land, prelude } from "./s1.ts";
 
 export const S2_EPOCH = "2026-10-22T10:14:00.000Z";
 
@@ -92,7 +92,6 @@ export function generateS2(
     scope: SUBJECT_KEY,
   };
   const subject: EntityRef = { kind: "subject", id: p.subject };
-  const decision: EntityRef = { kind: "decision", id: decisionId };
 
   const workspaceC = b.at(1).id("wsp");
   const workspaceH = b.id("wsp");
@@ -235,9 +234,6 @@ export function generateS2(
     payload: { changeId: changeC, revision: 1, instanceId: precheckC },
     causation: submittedC,
   });
-  p.stepRun(96.1, precheckC, changeC, "diff", 0, 0.1, "passed");
-  p.stepRun(96.3, precheckC, changeC, "protected", 0, 0.1, "passed");
-  p.stepRun(96.6, precheckC, changeC, "extract", 1, 1.6, "passed");
   b.at(99).emit({
     type: "EffectsDerived",
     entity: changeRef(changeC),
@@ -263,11 +259,6 @@ export function generateS2(
       derivationRef: `mfp:derivation:${changeC}:1`,
     },
   });
-  b.at(99.5).emit({
-    type: "PrecedentFollowed",
-    entity: decision,
-    payload: { decisionId, changeId: changeC },
-  });
   b.at(100).emit({
     type: "PlanCompiled",
     entity: changeRef(changeC),
@@ -275,44 +266,8 @@ export function generateS2(
       changeId: changeC,
       revision: 1,
       planHash: "plan:8d02…f31c",
-      steps: planForB({ label: "G-1", decision: "D-1" }),
+      steps: B_STEPS.guarded,
       costEstimate: 0.004,
-    },
-  });
-  p.stepRun(100.1, precheckC, changeC, "lattice", 0, 0.1, "passed");
-  p.stepRun(100.3, precheckC, changeC, "typecheck", 1, 2.0, "passed");
-  p.stepRun(100.3, precheckC, changeC, "unit", 1, 3.2, "passed");
-  p.stepRun(103.6, precheckC, changeC, "guard", 1, 2.1, "passed", 0.0005);
-  const verdictC = b.at(106).id("vrd");
-  b.emit({
-    type: "VerdictIssued",
-    entity: { kind: "verdict", id: verdictC },
-    payload: {
-      verdictId: verdictC,
-      subject: changeC,
-      outcome: "land",
-      evidence: b.reasons(verdictC, "land", [
-        {
-          class: "proof",
-          summary: "Guard G-1 passes against this change, three runs out of three",
-          by: "Verification Plan · Tier 1 isolate",
-          ref: `grd:${p.guard}`,
-          at: b.iso(),
-        },
-        {
-          class: "ruling",
-          summary:
-            "Decision D-1 is followed: the cache still drops a session's roles on revocation",
-          by: "Stance recorded · followed",
-          ref: `dec:${decisionId}`,
-          at: b.iso(),
-        },
-      ]),
-      planHash: "plan:8d02…f31c",
-      x: {
-        summary:
-          "Verified. The invalidation Decision D-1 asks for is still there, and guard G-1 passes",
-      },
     },
   });
   land(b, p, {
@@ -409,9 +364,6 @@ export function generateS2(
     payload: { changeId: changeH, revision: 1, instanceId: precheckH },
     causation: submittedH,
   });
-  p.stepRun(131.1, precheckH, changeH, "diff", 0, 0.1, "passed");
-  p.stepRun(131.3, precheckH, changeH, "protected", 0, 0.1, "passed");
-  p.stepRun(131.6, precheckH, changeH, "extract", 1, 1.7, "passed");
   b.at(134).emit({
     type: "EffectsDerived",
     entity: changeRef(changeH),
@@ -446,7 +398,7 @@ export function generateS2(
         {
           class: "silent-retraction",
           severity: "high",
-          detail: `Derived freshness is per-session with nothing dropping it on revocation. ${NUMBER_H} declared no effect here, and trunk holds a tenet that guard G-1 protects.`,
+          detail: `Derived freshness is per-session with nothing dropping it on revocation. ${NUMBER_H} declared no effect here, and guard G-1 holds the decision that it be dropped.`,
         },
       ],
     },
@@ -458,14 +410,10 @@ export function generateS2(
       changeId: changeH,
       revision: 1,
       planHash: "plan:1b7e…90ad",
-      steps: planForB({ label: "G-1", decision: "D-1" }),
+      steps: B_STEPS.guarded,
       costEstimate: 0.004,
     },
   });
-  p.stepRun(135.1, precheckH, changeH, "lattice", 0, 0.1, "passed");
-  p.stepRun(135.3, precheckH, changeH, "typecheck", 1, 1.9, "passed");
-  p.stepRun(135.3, precheckH, changeH, "unit", 1, 3.0, "passed");
-  p.stepRun(138.4, precheckH, changeH, "guard", 1, 2.6, "failed", 0.0005);
 
   // Keel judges a batch's candidate, never a change alone: the verdict that bounces this change is its batch's.
   // The guard holds an active decision, so its failure blocks whatever the project's policy for the predicate.
@@ -517,7 +465,6 @@ export function generateS2(
     entity: candidateRef,
     payload: { candidateId: candidate, batchId: batch, instanceId: instance, planHash },
   });
-  p.stepRun(140.8, instance, batch, "unit", 1, 3.0, "passed");
 
   // The verdict's evidence and the ways forward are worded as Keel's `settleVerdict` words them: the failed
   // step, then the guard cited with the decision it holds, and a next action that reads that decision.

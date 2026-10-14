@@ -2,14 +2,14 @@
 # kills: funnel.whole
 # why: a change whose precheck Keel started is counted as only declared until it is verified, so the precheck stage is short by every change still in it or bounced from it
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index ade5ea9e..c947948d 100644
+index de5600e0..0a9ae689 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -608,7 +608,6 @@ export class World {
+@@ -713,7 +713,6 @@ export class World {
        case "PrecheckStarted": {
          const change = this.#change(event.payload.changeId, "deriving");
          if (change === undefined) break;
 -        change.reached.precheck = true;
-         // Drift and step runs belong to one revision's check. The next revision's starts clean.
+         // Drift belongs to one revision's check. The next revision's starts clean.
          change.drift = [];
-         for (const key of this.steps.keys())
+         break;

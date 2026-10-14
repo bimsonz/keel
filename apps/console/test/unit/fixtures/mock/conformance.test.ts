@@ -443,6 +443,38 @@ describe("what a ruling does to the change it goes against, held to Keel's rule"
   });
 });
 
+describe("how a conflict is resolved, held to Keel's rule", () => {
+  it("[conformance.resolution-by-ruling] refuses a conflict resolved with no ruling's decision, or before it was put to a person", () => {
+    // Scenario 4's conflict is proven and bounces its change, and nobody is asked: Keel leaves it proven.
+    expect(checkLog(generateS4(42).events)).toEqual([]);
+    expect(
+      told(generateS4, (events) => {
+        const proof = events.findLast((event) => event.type === "ConflictProven");
+        const last = events.at(-1);
+        if (proof?.type !== "ConflictProven" || last === undefined)
+          throw new Error("scenario 4 proves nothing");
+        events.push({
+          eventId: `${last.eventId}_resolved`,
+          at: last.at,
+          seq: events.filter((event) => event.entity.id === proof.payload.conflictId).length + 1,
+          entity: proof.entity,
+          type: "ConflictResolved",
+          payload: {
+            _tag: "ConflictResolved",
+            conflictId: proof.payload.conflictId,
+            move: "escalate",
+          },
+        });
+      }),
+    ).toEqual([
+      "ConflictResolved: Keel resolves a conflict only by a ruling's decision",
+      expect.stringMatching(
+        /^ConflictResolved: conflict:cfl_\w+ is proven, which this event cannot follow$/,
+      ),
+    ]);
+  });
+});
+
 describe("what a proof does to a change, held to Keel's rule", () => {
   it("[conformance.bounce-cause] refuses a bounce that names two causes, or a verdict nobody issued", () => {
     expect(

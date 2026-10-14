@@ -118,8 +118,7 @@ const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 /** An entry of the log, as the console reads one. An event its catalogue does not know yet is left out, not guessed at. */
 function toEvent(record: EventRecord): AnyEvent | null {
   if (!KNOWN.has(record.type)) return null;
-  // Keel validates each payload against its catalogue, and `type` is the payload's own tag. Where the console
-  // reads a field that is decided and not built yet (events.ts, `Ahead`), the field is simply not there.
+  // Keel validates each payload against its catalogue, and `type` is the payload's own tag.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a wire boundary: the type was checked by name above
   return record as unknown as AnyEvent;
 }

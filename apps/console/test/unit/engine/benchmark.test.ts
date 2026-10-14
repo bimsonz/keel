@@ -96,12 +96,15 @@ describe("the benchmark, on the swarm", () => {
   it("ties each caught disagreement to the conflict and the guard that came of it", async () => {
     const state = benchmarkOf((await finished).world);
     const caught = state.rows.filter((row) => row.outcome === "caught");
+    expect(caught.every((row) => /^G-\d+$/.test(row.conflict?.guard ?? ""))).toBe(true);
+    // Only a ruling resolves a conflict. The two put to a person are resolved by its decision; the rest, which
+    // nobody was asked about, stay proven.
     expect(
-      caught.every(
-        (row) => row.conflict?.state === "resolved" && /^G-\d+$/.test(row.conflict.guard ?? ""),
+      caught.filter(
+        (row) => row.conflict?.state === "resolved" && row.conflict.decision !== undefined,
       ),
-    ).toBe(true);
-    expect(caught.filter((row) => row.conflict?.decision !== undefined)).toHaveLength(2);
+    ).toHaveLength(2);
+    expect(caught.filter((row) => row.conflict?.state === "proven")).toHaveLength(10);
     const dismissed = state.rows.filter((row) => row.outcome === "dismissed");
     expect(
       dismissed.every((row) => row.entry.kind === "decoy" && row.conflict?.state === "dismissed"),

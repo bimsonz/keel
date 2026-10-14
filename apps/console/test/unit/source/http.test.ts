@@ -170,8 +170,16 @@ function reading(
   who: Who,
   visibility: "public" | "private" = "private",
   ahead = 0,
-  /** Who the question's agent names, where it names anyone, Keel's clock, and the agents that signed themselves up. */
-  put: { sponsor?: Role; now?: () => number; signedUp?: Record<string, string> } = {},
+  /**
+   * Who the question's agent names, where it names anyone, Keel's clock, the agents that signed themselves up,
+   * and which story the project's log tells.
+   */
+  put: {
+    sponsor?: Role;
+    now?: () => number;
+    signedUp?: Record<string, string>;
+    story?: "s1" | "s2";
+  } = {},
 ) {
   const keel = createFakeKeel({
     visibility,
@@ -226,7 +234,7 @@ async function opened(
   who: Who,
   visibility: "public" | "private" = "private",
   ahead = 0,
-  put: { sponsor?: Role; now?: () => number; signedUp?: Record<string, string> } = {},
+  put: Parameters<typeof reading>[3] = {},
 ) {
   const r = reading(who, visibility, ahead, put);
   const found = await r.directory.findProject("acme", "demo");
@@ -911,25 +919,30 @@ describe("Keel's read models, from the page", () => {
   });
 
   it("reads a verdict's evidence from Keel's view of the verdict: the event carries only references", async () => {
-    const { player, keel } = await opened("member");
+    // Nine days on, a careless change has bounced on its batch's verdict. The verdict names the batch, and the
+    // bounce ties it to the change.
+    const { player, keel } = await opened("member", "private", 0, { story: "s2" });
     await player.load();
     player.seek(player.end);
-    const issued = keel.events().find((event) => event.type === "VerdictIssued");
-    expect(issued?.payload.evidence.every((reference) => typeof reference === "string")).toBe(true);
-    const change = issued?.payload.subject ?? "";
+    const bounced = keel.events().findLast((event) => event.type === "ChangeBounced");
+    const { changeId: change = "", verdictId } =
+      bounced?.type === "ChangeBounced" ? bounced.payload : {};
+    const issued = keel
+      .events()
+      .flatMap((event) =>
+        event.type === "VerdictIssued" && event.payload.verdictId === verdictId
+          ? [event.payload]
+          : [],
+      )[0];
+    expect(issued?.evidence.every((reference) => typeof reference === "string")).toBe(true);
     expect(changePageOf(player.world, change, player)?.verdict?.evidence).toEqual([]);
     player.wantVerdict(change);
     await settled();
     const evidence = changePageOf(player.world, change, player)?.verdict?.evidence ?? [];
-    expect(evidence.map((item) => item.class)).toEqual([
-      "proof",
-      "ruling",
-      "ruling",
-      "proof",
-      "testimony",
-      "opinion",
-    ]);
-    expect(evidence[0]?.summary).toBe("Probe P-1 fails in A+B, three runs out of three");
+    expect(evidence.map((item) => item.class)).toEqual(["proof", "ruling", "ruling"]);
+    expect(evidence[0]?.summary).toBe(
+      "Guard G-1 fails against this change, three runs out of three",
+    );
   });
 });
 

@@ -2,12 +2,12 @@
 # kills: conformance.resolution-against
 # why: the fixtures' check lets a resolution name nobody as the parties its ruling went against
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 722b6de2..68e676d6 100644
+index a14e016c..c286d2da 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
-@@ -496,7 +496,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
-       case "ConflictResolved": {
-         const { conflictId, decisionId, against } = event.payload;
+@@ -512,7 +512,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+         if (decisionId === undefined)
+           problems.push(`${where}: Keel resolves a conflict only by a ruling's decision`);
          if (against === undefined) break;
 -        if (decisionId === undefined || against.length === 0)
 +        if (decisionId === undefined)

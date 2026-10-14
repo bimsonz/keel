@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.resolution-by-ruling
+# why: the fixtures may resolve a proven conflict nobody was asked about, which Keel never does
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 54b00ace..cae97611 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -146,7 +146,7 @@ const RULES: Record<EventType, Rule[]> = {
+   ],
+   // Keel resolves a conflict only by the decision of a ruling on the question it was put to a person in.
+   ConflictResolved: [
+-    { kind: "conflict", idField: "conflictId", from: ["escalated"], to: "resolved" },
++    { kind: "conflict", idField: "conflictId", from: ["proven", "escalated"], to: "resolved" },
+   ],
+   // The probe's own Calibrating → Admitted. From here the admitted probe is the guard, named by `guardId`.
+   GuardAdmitted: [

@@ -19,7 +19,6 @@ import type {
   ProbeDiscard,
   SuspectEvidence,
 } from "../contract/keel/index.ts";
-import type { FlowNode } from "../contract/provisional.ts";
 
 // ─── Shared vocabulary ──────────────────────────────────────────────────────
 
@@ -31,9 +30,6 @@ export type Pending = "running" | "pending";
 
 /** `A-noop` is the control: the premise holder's world with what it relies on removed. A probe must fail there. */
 export type World = "trunk" | "A-noop" | "A" | "B" | "AB";
-
-/** Where a step runs: 0 pure git, 1 a throwaway isolate, 2 a container. */
-export type Tier = 0 | 1 | 2;
 
 /**
  * Every agent is one of three, and says which: REAL is a person's own session, HOSTED one Keel runs,
@@ -245,40 +241,6 @@ export interface ConflictPageState {
 /** One way a change's diff departs from what its agent declared: Keel's own shape. */
 export type DriftItem = Drift;
 
-export type StepKind =
-  | "deterministic"
-  | "decision-model"
-  | "generative"
-  | "probe"
-  | "human"
-  | "deploy";
-
-export type StepOutcome =
-  | "pass"
-  | "fail"
-  | "n/a"
-  | "annotate"
-  | "abstain"
-  | "waiting"
-  | "running"
-  | "pending";
-
-export interface PlanStep {
-  id: string;
-  title: string;
-  kind: StepKind;
-  /** Human steps run nowhere. */
-  tier: Tier | null;
-  /** Why this step exists for this change. */
-  because: string;
-  outcome: StepOutcome;
-  evidenceClass: EvidenceClass;
-  ms?: number;
-  usd?: number;
-  /** The worlds a `worlds(...)` step ran over. */
-  worlds?: World[];
-}
-
 export interface DiffAnnotation {
   path: string;
   side: "additions" | "deletions";
@@ -442,10 +404,7 @@ export interface ChangePageState {
   plan: {
     hash: string;
     costEstimateUsd: number;
-    steps: PlanStep[];
-    /** The compiled flow, as the tree it was written in. Absent until the plan is compiled, or while Keel publishes only a count. */
-    spec?: FlowNode;
-    /** How many steps the plan has, where that is all Keel has said of it. */
+    /** How many steps the plan has: all Keel says of them. Absent until the plan is compiled. */
     stepCount?: number;
   };
   /** `state`: Keel has answered with it, has not yet, or would not. Until it is read there are no files to count. */

@@ -2,13 +2,13 @@
 # kills: funnel.no-cost
 # why: where Keel has recorded no cost the funnel shows a cost of nothing, which Keel never said
 diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
-index 9630550..6ee8528 100644
+index f79bff95..6a363278 100644
 --- a/apps/console/src/engine/funnel.ts
 +++ b/apps/console/src/engine/funnel.ts
-@@ -89,7 +89,7 @@ export function funnelOf(world: World): FunnelState {
-     settled: dismissed + proven,
+@@ -232,7 +232,7 @@ export function funnelOf(world: World, people = true): FunnelState {
+     settled: dismissed,
      passedOn: escalated,
-     open: conflicts.length - dismissed - proven - escalated,
+     open: conflicts.length - dismissed - escalated,
 -    ...(probeCosts.length === 0 ? {} : { usd: total(probeCosts) }),
 +    usd: total(probeCosts),
      dismissed,

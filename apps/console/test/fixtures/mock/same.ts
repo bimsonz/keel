@@ -19,7 +19,7 @@ import type { NextAction } from "../../../src/contract/events.ts";
 import type { Proposition } from "../../../src/contract/mfp.ts";
 import { createRng } from "../prng.ts";
 import { type GeneratedLog, PLATFORM_PROJECT, ScriptBuilder } from "./builder.ts";
-import { land, planForB, stepRunOn } from "./s1.ts";
+import { land } from "./s1.ts";
 
 export const S5_EPOCH = "2026-10-14T09:30:00.000Z";
 
@@ -268,13 +268,13 @@ export function generateS5(seed: number): GeneratedLog {
       changeId: one.change,
       revision: 1,
       planHash: "plan:5e1a…77c0",
-      steps: planForB(null),
+      steps: 9,
       costEstimate: 0.003,
     },
   });
   land(
     b,
-    { project, trunkRef, stepRun: stepRunOn(b) },
+    { project, trunkRef },
     {
       at: 108,
       change: one.change,

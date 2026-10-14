@@ -147,7 +147,6 @@ function notesOn(log: GeneratedLog, until: number, subjectKey: string, line: num
   const premises = new Map<string, RepoNote>();
   const conflictsHere = new Map<string, string>();
   const guards = new Map<string, RepoNote>();
-  const tenets = new Map<string, RepoNote>();
   const decisions = new Map<string, RepoNote>();
   for (const event of log.events.slice(0, until + 1)) {
     if (event.type === "SubjectMinted" && event.payload.key === subjectKey)
@@ -177,16 +176,6 @@ function notesOn(log: GeneratedLog, until: number, subjectKey: string, line: num
         summary: `guards this since conflict ${conflictsHere.get(event.payload.conflictId) ?? ""} was proven`,
       });
     } else if (event.type === "GuardRetired") guards.delete(event.payload.guardId);
-    else if (event.type === "TenetEstablished" && event.payload.subjectId === subjectId) {
-      const label = event.payload.x?.label;
-      tenets.set(event.payload.tenetId, {
-        ...at,
-        kind: "tenet",
-        ...(label === undefined ? {} : { label }),
-        summary: `trunk holds ${event.payload.predicate} ${String(event.payload.value)}`,
-      });
-    } else if (event.type === "TenetRetracted" || event.type === "TenetSuperseded")
-      tenets.delete(event.payload.tenetId);
     else if (event.type === "DecisionRecorded" && event.payload.scope === subjectKey) {
       decisions.set(event.payload.decisionId, {
         ...at,
@@ -197,7 +186,7 @@ function notesOn(log: GeneratedLog, until: number, subjectKey: string, line: num
     } else if (event.type === "DecisionSuperseded" || event.type === "DecisionOverruled")
       decisions.delete(event.payload.decisionId);
   }
-  return [...decisions.values(), ...guards.values(), ...tenets.values(), ...premises.values()];
+  return [...decisions.values(), ...guards.values(), ...premises.values()];
 }
 
 /** Rejects, as a transport would, when there is nothing to answer with. */

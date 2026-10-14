@@ -161,7 +161,6 @@ describe("the repository a fixture's story is about", () => {
     expect(await told(undefined, "src/authz/cache.ts")).toEqual([
       "5 decision D-1: Cache allowed if revocation invalidates it",
       "5 guard G-1: guards this since conflict C-1 was proven",
-      "5 tenet T-1: trunk holds freshness per-request",
       "5 premise #1: relies on invariant is unchanged",
       "5 premise #2: relies on freshness at most per-request",
     ]);

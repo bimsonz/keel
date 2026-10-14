@@ -13,12 +13,12 @@ import type { EntityRef } from "../../../src/contract/envelope.ts";
 import type { AnyEvent, ProbeWorld } from "../../../src/contract/events.ts";
 import type { ManifestEntry } from "../../../src/contract/observations.ts";
 import type { DerivedEffect, Predicate, Proposition } from "../../../src/contract/mfp.ts";
-import type { FlowNode, StepKind } from "../../../src/contract/provisional.ts";
 import { LANES, SUBJECTS } from "../subjects.ts";
 import { type Rng, createRng, hash32 } from "../prng.ts";
 import { sha256Hex } from "../sha256.ts";
 import { type GeneratedLog, PLATFORM_PROJECT, ScriptBuilder } from "./builder.ts";
 import { UNIT_USD } from "./funnel.ts";
+import { conflictActions } from "./proven.ts";
 
 export const SWARM_EPOCH = "2026-10-13T16:38:00.000Z";
 
@@ -160,25 +160,6 @@ interface LaneState {
 }
 
 const changeRef = (id: string): EntityRef => ({ kind: "change", id });
-const step = (
-  id: string,
-  title: string,
-  tier: 0 | 1 | 2,
-  because: string,
-  kind: StepKind = "deterministic",
-): FlowNode => ({
-  op: "step",
-  step: {
-    id,
-    title,
-    kind,
-    tier,
-    tierReason: ["Pure git", "Fits in an isolate", "Needs a full toolchain"][tier] ?? "",
-    // A model's answer is an opinion, whatever it says.
-    evidenceCeiling: kind === "decision-model" ? "opinion" : "proof",
-    because: { text: because },
-  },
-});
 
 /** What settling one disagreement costs: Clef picks the probe's template, the code model drafts it, and it runs this many cells. */
 const disputeUsd = (cells: number): number =>
@@ -525,45 +506,14 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
         changeId: live.id,
         revision: live.revision,
         planHash: `plan:${hex(rng, 8)}`,
-        steps: {
-          op: "seq",
-          of: [
-            step(
-              "diff",
-              "Tree diff against trunk",
-              0,
-              "Every change is diffed against the head it will land on",
-            ),
-            byClef
-              ? step(
-                  "clef",
-                  "Derive effects: Clef",
-                  1,
-                  "No extractor applies to this footprint",
-                  "decision-model",
-                )
-              : step(
-                  "extract",
-                  "Derive effects: extractors",
-                  1,
-                  "Effects are derived from the diff, never taken from the agent",
-                ),
-            tier2
-              ? step(
-                  "build",
-                  "Build and test in a container",
-                  2,
-                  `The footprint needs the ${subject.namespace} toolchain`,
-                )
-              : step(
-                  "unit",
-                  "Project tests, selected",
-                  1,
-                  `The footprint touches src/${subject.namespace}`,
-                ),
-          ],
-        },
+        // The tree diff, the derivation, and the project's tests or a build. Keel commits how many, not which.
+        steps: 3,
         costEstimate: tier2 ? 0.02 : 0.004,
+        // The project blocks on a proof against a change, but where the answer is a person's call: there the
+        // change waits for the ruling.
+        ...(HUMAN_CLASS.has(subject.key)
+          ? {}
+          : { predicatePolicy: { [subject.predicate]: "block" } }),
       },
     });
     if (partner === undefined) {
@@ -712,51 +662,8 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
           x: { cost: { ms: 14_000, usd: cost } },
         },
       });
-      const bounce = (when: number, summary: string, decisionId?: string): void => {
-        const verdict = b.at(when).id("vrd");
-        b.emit({
-          type: "VerdictIssued",
-          entity: { kind: "verdict", id: verdict },
-          payload: {
-            verdictId: verdict,
-            subject: live.id,
-            outcome: "bounce",
-            evidence: b.reasons(verdict, "bounce", [
-              {
-                class: "proof",
-                summary: `Probe P-${counters.probe} fails in the combined world, three runs out of three`,
-                by: "World matrix · Tier 1 isolate",
-                ref: `prb:${probe}/AB`,
-                at: b.iso(),
-              },
-            ]),
-            x: { summary },
-          },
-        });
-        b.at(when + 0.1).emit({
-          type: "ChangeBounced",
-          entity: changeRef(live.id),
-          payload: {
-            changeId: live.id,
-            verdictId: verdict,
-            reasons: [],
-            nextActions: [
-              {
-                kind: "call",
-                title: `Keep ${subject.predicate} at most ${holds}`,
-                operationId: "revise",
-              },
-            ],
-          },
-        });
-        if (decisionId === undefined) {
-          b.at(when + 0.2).emit({
-            type: "ConflictResolved",
-            entity: conflictRef,
-            payload: { conflictId: conflict, move: "escalate" },
-          });
-        }
-        // The agent revises to keep what the other change relies on, and comes back.
+      // The agent revises to keep what the other change relies on, and comes back.
+      const revise = (when: number): void => {
         live.revision = 2;
         live.commit = hex(rng, 7);
         const revised = when + 6 + rng.next() * 8;
@@ -768,7 +675,22 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
         agenda.add(revised + 6 + rng.next() * 8, (later) => submit(live, later));
       };
       if (!HUMAN_CLASS.has(subject.key)) {
-        bounce(now + 0.3, `Conflict ${label} is proven: the change alters what another relies on`);
+        // The change's plan blocks on the predicate: Keel bounces it on the conflict itself, and issues no
+        // verdict. Nobody is asked, and nobody resolves the conflict: it stays proven.
+        b.at(now + 0.3).emit({
+          type: "ChangeBounced",
+          entity: changeRef(live.id),
+          payload: {
+            changeId: live.id,
+            conflictId: conflict,
+            reasons: [
+              `Proven against this change, whose plan blocks on its predicate: ${conflict}.`,
+            ],
+            nextActions: conflictActions(live.id, conflict),
+          },
+          causation: proven,
+        });
+        revise(now + 0.3);
         return;
       }
       // Human-class: both the question and the wait are shown. The default while open is hold.
@@ -848,7 +770,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
       b.emit({
         type: "ConflictResolved",
         entity: conflictRef,
-        payload: { conflictId: conflict, move: "escalate", decisionId },
+        payload: { conflictId: conflict, move: "escalate", decisionId, against: [live.id] },
         causation: given,
       });
       b.at(ruledAt + 0.2).emit({
@@ -871,11 +793,33 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
         },
         causation: given,
       });
-      bounce(
-        ruledAt + 0.3,
-        `Decision D-${counters.decision}: ${choices[0]?.label ?? ""}`,
-        decisionId,
-      );
+      // The ruling kept what the other change relies on. Keel bounces this one by its decision, with no verdict,
+      // and gives as its reason the consequence the question showed for that option.
+      b.at(ruledAt + 0.3).emit({
+        type: "ChangeBounced",
+        entity: changeRef(live.id),
+        payload: {
+          changeId: live.id,
+          decisionId,
+          reasons: [choices[0]?.consequence ?? ""],
+          nextActions: [
+            {
+              kind: "call",
+              title: "Revise the change's intent so that it no longer contradicts what was ruled",
+              operationId: "revise",
+              args: { changeId: live.id },
+            },
+            {
+              kind: "call",
+              title: "Withdraw the change",
+              operationId: "abandon",
+              args: { changeId: live.id },
+            },
+          ],
+        },
+        causation: given,
+      });
+      revise(ruledAt + 0.3);
     });
   };
 

@@ -5,7 +5,6 @@ import { shownAgent } from "./audience.ts";
 import { type Cards, heldUnder } from "./holder.ts";
 import type { ConflictDetail, ConflictSide, Lattice, ProbeSource } from "../contract/keel/index.ts";
 import type { Predicate } from "../contract/mfp.ts";
-import type { FlowNode, StepSpec } from "../contract/provisional.ts";
 import type {
   AlternativeRow,
   ChangeBounce,
@@ -16,8 +15,6 @@ import type {
   MatrixRow,
   Party,
   RulingBounce,
-  PlanStep,
-  StepOutcome,
   ConflictPageState,
   TimelineItem,
   World as WorldId,
@@ -28,13 +25,7 @@ import { verdictSaid } from "./judged.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
 import { contradictionsOf } from "./sides.ts";
-import {
-  type ChangeEntry,
-  type ConflictEntry,
-  type EscalationEntry,
-  outcomesIn,
-  type World,
-} from "./world.ts";
+import { type ChangeEntry, type ConflictEntry, type EscalationEntry, type World } from "./world.ts";
 
 /** What the console has fetched from Keel's read models, on demand, beside the log. */
 export interface Resources {
@@ -474,62 +465,6 @@ export function conflictPageOf(
   return detail === null ? null : conflictPageFrom(detail, world, resources);
 }
 
-function leaves(node: FlowNode, worlds?: WorldId[]): { step: StepSpec; worlds?: WorldId[] }[] {
-  if (node.op === "step") return [{ step: node.step, ...(worlds === undefined ? {} : { worlds }) }];
-  if (node.op === "worlds") return leaves(node.of, node.over);
-  if (node.op === "when" || node.op === "budget") return leaves(node.of, worlds);
-  return node.of.flatMap((child) => leaves(child, worlds));
-}
-
-const STEP_OUTCOME: Record<string, StepOutcome> = {
-  running: "running",
-  passed: "pass",
-  failed: "fail",
-  annotated: "annotate",
-  abstained: "abstain",
-  skipped: "n/a",
-  waiting: "waiting",
-};
-
-function planSteps(world: World, change: ChangeEntry): PlanStep[] {
-  if (change.plan?.spec === undefined) return [];
-  const conflict = world.conflicts.get(change.conflictIds.at(-1) ?? "");
-  const probe = conflict?.probeId === undefined ? undefined : world.probes.get(conflict.probeId);
-  const escalation =
-    change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
-  return leaves(change.plan.spec).map(({ step, worlds }) => {
-    const seen = world.steps.get(`${change.id}/${step.id}`);
-    let outcome: StepOutcome =
-      seen === undefined ? "pending" : (STEP_OUTCOME[seen.status] ?? "pending");
-    // The probe and the ruling are told by events, not by step observations.
-    if (step.kind === "probe" && step.id === "probe" && probe !== undefined) {
-      const composed = outcomesIn(conflict, "AB");
-      outcome =
-        composed.length < 3 ? "running" : composed.every((run) => run === "fail") ? "fail" : "pass";
-    } else if (step.kind === "probe" && step.id === "guard") {
-      // Keel's own fact comes first: a guard that failed in this revision's plan has failed, whatever else is
-      // known. Keel says nothing of a guard that held, so otherwise the step's own observation stands.
-      if (change.guardFailures.some((failure) => failure.revision === change.revision))
-        outcome = "fail";
-    } else if (step.kind === "human") {
-      outcome =
-        escalation === undefined ? "pending" : escalation.state === "open" ? "waiting" : "pass";
-    }
-    return {
-      id: step.id,
-      title: step.title,
-      kind: step.kind,
-      tier: step.tier,
-      because: step.because.text,
-      outcome,
-      evidenceClass: step.evidenceCeiling,
-      ...(seen?.cost?.ms === undefined ? {} : { ms: seen.cost.ms }),
-      ...(seen?.cost?.usd === undefined ? {} : { usd: seen.cost.usd }),
-      ...(worlds === undefined ? {} : { worlds }),
-    };
-  });
-}
-
 function changedLines(
   before: string | null,
   after: string | null,
@@ -812,9 +747,7 @@ export function changePageOf(
     plan: {
       hash: change.plan?.hash ?? "",
       costEstimateUsd: change.plan?.costEstimate ?? 0,
-      steps: planSteps(world, change),
-      ...(change.plan?.spec === undefined ? {} : { spec: change.plan.spec }),
-      ...(change.plan?.stepCount === undefined ? {} : { stepCount: change.plan.stepCount }),
+      ...(change.plan === undefined ? {} : { stepCount: change.plan.stepCount }),
     },
     diff: {
       state: diff !== undefined ? "read" : resources.refused.has(change.id) ? "refused" : "reading",
