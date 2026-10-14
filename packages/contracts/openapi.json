@@ -14561,6 +14561,13 @@
           },
           "derivationRef": {
             "type": "string"
+          },
+          "touched": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventTouchedAnchor"
+            },
+            "description": "The live anchors the submitted diff touches; absent when there are none."
           }
         },
         "additionalProperties": {
@@ -15703,6 +15710,25 @@
         "type": "string",
         "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
         "description": "A subject key as events carry it: the API's `SubjectKey` without its length cap."
+      },
+      "EventTouchedAnchor": {
+        "type": "object",
+        "required": [
+          "subject",
+          "anchor"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/EventSubjectKey"
+          },
+          "anchor": {
+            "$ref": "#/components/schemas/EventAnchor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A live anchor a change's submitted diff touches: code a premise on `subject` rests on."
       },
       "EvidenceClass": {
         "type": "string",
@@ -20424,15 +20450,18 @@
               },
               "effect": {
                 "$ref": "#/components/schemas/EventProposition"
+              },
+              "anchor": {
+                "$ref": "#/components/schemas/EventAnchor"
               }
             },
             "required": [
-              "changeId",
-              "effect"
+              "changeId"
             ],
             "additionalProperties": {
               "not": {}
-            }
+            },
+            "description": "The change that put the premise in doubt: by an effect judged against it, or by editing code it is anchored to (`anchor`, with no effect)."
           }
         },
         "additionalProperties": {

@@ -15,6 +15,7 @@ import {
   type CommitNotInWorkspace,
   decideChange,
   type DerivedEffect,
+  type TouchedAnchor,
   evolveChange,
   type FootprintEntry,
   type LeaseNotLapsed,
@@ -460,6 +461,8 @@ export interface CompiledPlan extends PrecheckStep {
 export interface DerivedEffects extends PrecheckStep {
   readonly effects: readonly DerivedEffect[];
   readonly derivationRef: string;
+  /** The live anchors the submitted diff touches. */
+  readonly touched?: readonly TouchedAnchor[] | undefined;
 }
 
 type Store = Transaction["store"];
@@ -1788,20 +1791,37 @@ export const effectsDerived: (
       proposition: canonicalProposition(effect.proposition),
     }));
     const named = { premises: [], declaredEffects: effects.map((effect) => effect.proposition) };
+    const touched = derived.touched ?? [];
+    // A subject whose anchor the diff touches hears the derivation too, to judge its premises against the edit.
+    const touchedKeys = [...new Set(touched.map((each) => each.subject))].filter(
+      (key) => !intentSubjects(named).includes(key),
+    );
     const recorded = yield* precheckCommand(
       changeId,
       "effectsDerived",
       derived,
-      [{ _tag: "DeriveEffects", effects, derivationRef: derived.derivationRef }],
+      [
+        {
+          _tag: "DeriveEffects",
+          effects,
+          derivationRef: derived.derivationRef,
+          ...(touched.length === 0 ? {} : { touched }),
+        },
+      ],
       {
         affected:
           project === undefined
             ? []
-            : intentSubjects(named).map((key) => ({
+            : [...intentSubjects(named), ...touchedKeys].map((key) => ({
                 kind: "subject",
                 id: subjectIdOf(project, key),
               })),
-        alongside: (tx) => subscribeSubjects(tx, changeId, named),
+        alongside: (tx) => {
+          subscribeSubjects(tx, changeId, named);
+          if (project !== undefined)
+            for (const key of touchedKeys)
+              tx.outbox.subscribe(subjectAddress(project, key), SUBJECT_HEARS, changeRef(changeId));
+        },
       },
     );
     return recorded.change;

@@ -19,6 +19,7 @@ import {
   isAncestorOrSelf,
   Proposition,
   SubjectKey,
+  type TouchedAnchor,
 } from "@keeltown/core/domain/coordination";
 import {
   type AgentId,
@@ -28,6 +29,7 @@ import {
   Instant,
   makeId,
 } from "@keeltown/core/kernel";
+import { detailOf } from "@keeltown/core/application/identity";
 import { makeEventOutboxMemory, sampleProjectId, ulidOf } from "@keeltown/testing";
 import { Schema } from "effect";
 import * as fc from "fast-check";
@@ -751,5 +753,143 @@ describe("[b21.derived-origin] a conflict's origin is the evidence class of the 
       originsOf(declaredToo.declare(declaredEnvelope(0, [relied], []))),
       originsOf(both.declare(declaredEnvelope(0, [relied], []))),
     ]).toEqual([["fallout"], ["fallout"]]);
+  });
+});
+
+/** A change's EffectsDerived naming the live anchors its diff touched, with the effects it derived (none by default). */
+const touchingEnvelope = (
+  i: number,
+  seq: number,
+  touched: readonly TouchedAnchor[],
+  effects: readonly DerivedEffect[] = [],
+): EventEnvelope => ({
+  eventId: makeId("evt", ulidOf(900 + i * 20 + seq)),
+  type: "EffectsDerived",
+  entity: { kind: "change", id: changeOf(i) },
+  seq,
+  at: Instant(Date.UTC(2026, 9, 12)),
+  dedupeKey: `touch-${i}-${seq}`,
+  affected: [],
+  notified: [],
+  payload: Schema.encodeSync(EffectsDerived)(
+    EffectsDerived.make({
+      changeId: changeOf(i),
+      revision: 1,
+      effects,
+      derivationRef: `derivation-${i}-${seq}`,
+      ...(touched.length === 0 ? {} : { touched }),
+    }),
+  ),
+});
+
+const PRICE = key("billing.price");
+const PINNED = Schema.decodeUnknownSync(CommitSha)("d".repeat(40));
+const PRICE_AT = { path: "src/price.ts", symbol: "price", commit: PINNED };
+const TOTAL_AT = { path: "src/price.ts", symbol: "total", commit: PINNED };
+/** A premise that the price is pure, anchored to the code it rests on. */
+const pure = (anchor: typeof PRICE_AT) =>
+  Schema.decodeUnknownSync(Proposition)({
+    subject: PRICE,
+    predicate: "purity",
+    relation: "is",
+    value: true,
+    anchors: [anchor],
+  });
+
+/** The PremiseSuspected drafts a delivery committed, as holder and cause. */
+const suspicions = (heard: readonly { draft: { payload: { _tag: string } } }[]) =>
+  heard
+    .filter(({ draft }) => draft.payload._tag === "PremiseSuspected")
+    .map(({ draft }) => ({
+      holder: Reflect.get(draft.payload, "changeId"),
+      cause: Reflect.get(draft.payload, "cause"),
+    }));
+
+describe("a premise anchored to code another change edits", () => {
+  it("[anchor.suspected] a change whose diff touches the code another change's premise rests on puts that premise in doubt, with the anchor as its cause, once; a premise anchored elsewhere is not told", () => {
+    const world = subjects();
+    world.declare(declaredEnvelope(1, [pure(PRICE_AT)], []));
+    world.declare(declaredEnvelope(2, [pure(TOTAL_AT)], []));
+    const touched = [{ subject: PRICE, anchor: PRICE_AT }];
+    const heard = world.deliver([PRICE], touchingEnvelope(3, 2, touched));
+    expect(suspicions(heard)).toEqual([
+      {
+        holder: changeOf(1),
+        cause: { changeId: changeOf(3), anchor: { ...PRICE_AT } },
+      },
+    ]);
+    // A redelivery, and a later derivation that touches the same code, put nothing in doubt again.
+    expect(suspicions(world.deliver([PRICE], touchingEnvelope(3, 2, touched)))).toEqual([]);
+    expect(suspicions(world.deliver([PRICE], touchingEnvelope(3, 5, touched)))).toEqual([]);
+  });
+
+  it("[anchor.suspected] a premise relied on after the diff touched its code is put in doubt as it arrives; the touching change's own premise never is", () => {
+    const world = subjects();
+    world.declare(declaredEnvelope(3, [pure(PRICE_AT)], []));
+    world.deliver([PRICE], touchingEnvelope(3, 2, [{ subject: PRICE, anchor: PRICE_AT }]));
+    const heard = world.declare(declaredEnvelope(1, [pure(PRICE_AT)], []));
+    expect(suspicions(heard)).toEqual([
+      { holder: changeOf(1), cause: { changeId: changeOf(3), anchor: { ...PRICE_AT } } },
+    ]);
+  });
+
+  it("[anchor.judged-effect] a touching change with an effect on the premise's predicate is fallout's to judge, not the anchor's", () => {
+    const world = subjects();
+    world.declare(declaredEnvelope(1, [pure(PRICE_AT)], []));
+    const impure = Schema.decodeUnknownSync(Proposition)({
+      subject: PRICE,
+      predicate: "purity",
+      relation: "is",
+      value: false,
+      anchors: [PRICE_AT],
+    });
+    const effect: DerivedEffect = {
+      proposition: impure,
+      anchors: [PRICE_AT],
+      declared: false,
+      method: "extractor",
+      evidenceClass: "ruling",
+    };
+    const heard = world.deliver(
+      [PRICE],
+      touchingEnvelope(3, 2, [{ subject: PRICE, anchor: PRICE_AT }], [effect]),
+    );
+    expect(
+      suspicions(heard).filter(({ cause }) => Reflect.get(Object(cause), "anchor") !== undefined),
+    ).toEqual([]);
+  });
+});
+
+describe("what the holder is told of a premise in doubt", () => {
+  it("[anchor.notice] a premise put in doubt by an edit is told as a suspicion that holds nothing, naming the change, the code and what to do; one an effect put in doubt is told as before", () => {
+    const envelopeOf = (cause: Record<string, unknown>): EventEnvelope => ({
+      eventId: makeId("evt", ulidOf(990)),
+      type: "PremiseSuspected",
+      entity: { kind: "subject", id: subjectIdOf(sampleProjectId, PRICE) },
+      seq: 1,
+      at: Instant(Date.UTC(2026, 9, 12)),
+      dedupeKey: "suspected-1",
+      affected: [],
+      notified: [],
+      payload: {
+        _tag: "PremiseSuspected",
+        subjectId: subjectIdOf(sampleProjectId, PRICE),
+        changeId: changeOf(1),
+        premise: Schema.encodeSync(Proposition)(pure(PRICE_AT)),
+        cause,
+      },
+    });
+    const byEdit = detailOf(envelopeOf({ changeId: changeOf(3), anchor: PRICE_AT }));
+    expect(byEdit).toContain(`${changeOf(3)} edits src/price.ts (price)`);
+    expect(byEdit).toContain("billing.price");
+    expect(byEdit).toContain("a suspicion, not a conflict: nothing is held or bounced");
+    expect(byEdit).toContain("why");
+    const byEffect = detailOf(
+      envelopeOf({
+        changeId: changeOf(3),
+        effect: Schema.encodeSync(Proposition)(pure(PRICE_AT)),
+      }),
+    );
+    expect(byEffect).toBeUndefined();
   });
 });

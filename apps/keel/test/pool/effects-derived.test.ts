@@ -10,7 +10,13 @@ import {
   subjectIdOf,
 } from "@keeltown/core/application/coordination";
 import { DerivedEffect, Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
-import { type EntityRef, type EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
+import {
+  CommitSha,
+  type EntityRef,
+  type EventEnvelope,
+  makeId,
+  type ProjectId,
+} from "@keeltown/core/kernel";
 import { ChangePrecheck, EventOutbox, type PrecheckDerived } from "@keeltown/core/ports";
 import { CodeHostFixture } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
@@ -207,6 +213,65 @@ describe("[b21.fallout-derived] an effect Precheck derives, at a subject the cha
       effect: { changeId: b.changeId, proposition: effect.proposition },
     });
     expect(await logAt(projectId, LEAF, { kind: "conflict", id: conflictId })).toEqual([]);
+    await vi.waitFor(async () => expect(await held.get()).toHaveLength(1), WAIT);
+  });
+});
+
+describe("[anchor.through-objects] a diff that touches code a premise rests on", () => {
+  it("[anchor.through-objects] the derivation names the touched subject, which hears it and puts the premise anchored there in doubt with the anchor as cause, opening no conflict; a premise anchored elsewhere is not told", async () => {
+    await using held = await inertPrecheck();
+    const { projectId, change } = await project();
+    const [a, decoy, b] = [await change(), await change(), await change()];
+    const evaluateAt = {
+      path: "src/authz/evaluate.ts",
+      symbol: "evaluate",
+      commit: CommitSha.make("c".repeat(40)),
+    };
+    const elsewhere = { ...evaluateAt, symbol: "explain" };
+    ok(
+      await a.declare(`declare-${a.changeId}`, {
+        premises: [{ ...relied, anchors: [evaluateAt] }],
+      }),
+    );
+    ok(
+      await decoy.declare(`declare-${decoy.changeId}`, {
+        premises: [{ ...relied, anchors: [elsewhere] }],
+      }),
+    );
+    await drainOutbox(a.stub);
+    await drainOutbox(decoy.stub);
+    await deriving(b, "p-1");
+
+    // The edit derives no effect at all: only the touched anchor says what it reached.
+    const touchedOnly: PrecheckDerived = {
+      ...derivation("p-1", []),
+      touched: [{ subject: LEAF, anchor: evaluateAt }],
+    };
+    expect(outcomeOf(await precheck((p) => p.derived(b.changeId, touchedOnly)))).toBe("ok");
+    await drainOutbox(b.stub);
+
+    const [recorded] = await derivedIn(b);
+    expect(recorded).toMatchObject({
+      affected: [{ kind: "subject", id: subjectIdOf(projectId, LEAF) }],
+      payload: { effects: [], touched: [{ subject: LEAF, anchor: evaluateAt }] },
+    });
+    expect(recorded?.notified).toEqual(expect.arrayContaining([subjectAddress(projectId, LEAF)]));
+    await vi.waitFor(async () => {
+      const told = (
+        await logAt(projectId, LEAF, { kind: "subject", id: subjectIdOf(projectId, LEAF) })
+      ).filter((event) => event.type === "PremiseSuspected");
+      expect(told.map((event) => event.payload)).toEqual([
+        expect.objectContaining({
+          changeId: a.changeId,
+          cause: { changeId: b.changeId, anchor: evaluateAt },
+        }),
+      ]);
+    }, WAIT);
+    expect(
+      (await logAt(projectId, LEAF, { kind: "subject", id: subjectIdOf(projectId, LEAF) })).filter(
+        (event) => event.type === "ConflictSuspected",
+      ),
+    ).toEqual([]);
     await vi.waitFor(async () => expect(await held.get()).toHaveLength(1), WAIT);
   });
 });

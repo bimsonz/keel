@@ -43,6 +43,7 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
               instanceId: derived.instanceId,
               effects: derived.effects,
               derivationRef: derived.derivationRef,
+              ...(derived.touched === undefined ? {} : { touched: derived.touched }),
             }),
           ),
         ).pipe(Effect.asVoid),

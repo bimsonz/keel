@@ -362,12 +362,21 @@ model PrecheckStarted {
   instanceId: string;
 }
 
+/** A live anchor a change's submitted diff touches: code a premise on `subject` rests on. */
+model EventTouchedAnchor {
+  subject: EventSubjectKey;
+  anchor: EventAnchor;
+}
+
 model EffectsDerived {
   _tag: "EffectsDerived";
   changeId: ChangeId;
   revision: integer;
   effects: EventDerivedEffect[];
   derivationRef: string;
+
+  /** The live anchors the submitted diff touches; absent when there are none. */
+  touched?: EventTouchedAnchor[];
 }
 
 model DriftDetected {
@@ -580,9 +589,11 @@ model PremiseSuspected {
   subjectId: SubjectId;
   changeId: ChangeId;
   premise: EventProposition;
+  /** The change that put the premise in doubt: by an effect judged against it, or by editing code it is anchored to (`anchor`, with no effect). */
   cause: {
     changeId: ChangeId;
-    effect: EventProposition;
+    effect?: EventProposition;
+    anchor?: EventAnchor;
   };
 }
 

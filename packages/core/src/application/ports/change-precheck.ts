@@ -6,6 +6,7 @@ import type {
   Intent,
   PredicatePolicies,
   SubjectKey,
+  TouchedAnchor,
 } from "../../domain/coordination/index.ts";
 import type {
   ChangeId,
@@ -62,6 +63,8 @@ export interface PrecheckCompiled extends PrecheckCall {
 export interface PrecheckDerived extends PrecheckCall {
   readonly effects: readonly DerivedEffect[];
   readonly derivationRef: string;
+  /** The live anchors the submitted diff touches: each such subject hears the derivation too. */
+  readonly touched?: readonly TouchedAnchor[] | undefined;
 }
 
 type Refusal = ChangeNotFound | ChangeStateRefused;

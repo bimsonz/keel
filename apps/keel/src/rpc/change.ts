@@ -6,6 +6,7 @@ import {
   ChangeStateRefused,
   CommitNotInWorkspace,
   DerivedEffect,
+  TouchedAnchor,
   FootprintEntry,
   Intent,
   LeaseNotLapsed,
@@ -335,6 +336,8 @@ export const EffectsDerivedCommand = Schema.Struct({
   instanceId: Schema.NonEmptyString,
   effects: Schema.Array(DerivedEffect),
   derivationRef: Schema.NonEmptyString,
+  /** The live anchors the submitted diff touches; absent from a Precheck from before they were kept. */
+  touched: Schema.optional(Schema.Array(TouchedAnchor)),
 });
 export type EffectsDerivedCommand = typeof EffectsDerivedCommand.Type;
 

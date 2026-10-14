@@ -64,6 +64,7 @@ import {
   PrecheckStarted,
   PreflightIssued,
   type RequeueReason,
+  type TouchedAnchor,
 } from "./events.ts";
 import { reviseIntent } from "./intent.ts";
 import { checkLease, isLapsed, lapsesAt } from "./lease.ts";
@@ -176,6 +177,8 @@ export type ChangeCommand =
       readonly _tag: "DeriveEffects";
       readonly effects: readonly DerivedEffect[];
       readonly derivationRef: string;
+      /** The live anchors the submitted diff touches. */
+      readonly touched?: readonly TouchedAnchor[];
     }
   | { readonly _tag: "Drift"; readonly blocking: readonly Drift[] }
   | {
@@ -649,6 +652,9 @@ export const decideChange = (
                 proposition: canonicalProposition(effect.proposition),
               })),
               derivationRef: command.derivationRef,
+              ...(command.touched === undefined || command.touched.length === 0
+                ? {}
+                : { touched: command.touched }),
             }),
           ])
         : refuse(change, command);

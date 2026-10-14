@@ -16,6 +16,7 @@ import {
 } from "../../domain/coordination/index.ts";
 import {
   AgentId,
+  Anchor,
   ChangeId,
   type EntityRef,
   type EventEnvelope,
@@ -24,7 +25,13 @@ import {
 import type { EntityStore, EventDraft, Stored, Transaction } from "../ports/index.ts";
 import { CHANGE_ENDS } from "./change.ts";
 import { subjectIdOf } from "./hashed-id.ts";
-import { falloutPairs, type HeldBy, judgeFallout } from "./subject-fallout.ts";
+import {
+  anchorPairs,
+  falloutPairs,
+  type HeldBy,
+  judgeAnchors,
+  judgeFallout,
+} from "./subject-fallout.ts";
 
 export { hashedIdBody, subjectIdOf } from "./hashed-id.ts";
 
@@ -65,7 +72,12 @@ const Held = Schema.Struct({
    * position orders them.
    */
   derived: Schema.optional(
-    Schema.Struct({ seq: Schema.Int, effects: Schema.Array(DerivedEffect) }),
+    Schema.Struct({
+      seq: Schema.Int,
+      effects: Schema.Array(DerivedEffect),
+      /** The anchors on this subject its diff touched; absent on a row kept before they were. */
+      touched: Schema.optional(Schema.Array(Anchor)),
+    }),
   ),
 });
 type Held = typeof Held.Type;
@@ -113,6 +125,7 @@ const heldOf = (changeId: ChangeId, held: Held): HeldBy => ({
   premises: held.premises,
   declaredEffects: held.declaredEffects,
   derived: held.derived?.effects ?? [],
+  touched: held.derived?.touched ?? [],
 });
 
 /** The held propositions as an intent, so a revision folds through the domain's `reviseIntent`. */
@@ -189,6 +202,9 @@ export function hearSubject(
           effects: derived.effects.filter((effect) =>
             isAncestorOrSelf(key, effect.proposition.subject),
           ),
+          touched: (derived.touched ?? [])
+            .filter((each) => each.subject === key)
+            .map((each) => each.anchor),
         },
       };
       relier = derived.changeId;
@@ -252,6 +268,17 @@ export function hearSubject(
     ),
   );
   drafts.push(...judged.drafts);
+  drafts.push(
+    ...judgeAnchors(
+      tx,
+      { id: subjectId },
+      anchorPairs(
+        key,
+        { changeId, before: heldOf(changeId, before), after: heldOf(changeId, after) },
+        others,
+      ),
+    ),
+  );
   const problems = judged.problems.length === 0 ? {} : { problems: judged.problems };
   return drafts.length === 0
     ? { drafts: [], ...problems }

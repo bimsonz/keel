@@ -98,11 +98,20 @@ export const PrecheckStarted = Schema.TaggedStruct("PrecheckStarted", {
   revision: Schema.Int,
   instanceId: Schema.String,
 });
+/**
+ * A live anchor a change's submitted diff touches: code a premise on
+ * `subject` is anchored to, which the change edits whether or not anything
+ * was derived from the edit.
+ */
+export const TouchedAnchor = Schema.Struct({ subject: SubjectKey, anchor: Anchor });
+export type TouchedAnchor = typeof TouchedAnchor.Type;
 export const EffectsDerived = Schema.TaggedStruct("EffectsDerived", {
   changeId: ChangeId,
   revision: Schema.Int,
   effects: Schema.Array(DerivedEffect),
   derivationRef: Schema.String,
+  /** The live anchors the submitted diff touches; absent on a derivation from before they were kept, and when there are none. */
+  touched: Schema.optional(Schema.Array(TouchedAnchor)),
 });
 export const DriftDetected = Schema.TaggedStruct("DriftDetected", {
   changeId: ChangeId,
@@ -269,7 +278,16 @@ export const PremiseSuspected = Schema.TaggedStruct("PremiseSuspected", {
   subjectId: SubjectId,
   changeId: ChangeId,
   premise: Proposition,
-  cause: Schema.Struct({ changeId: ChangeId, effect: Proposition }),
+  /**
+   * The change that put the premise in doubt: by an effect the subject judged
+   * against it, or (with no effect to judge) by editing code the premise is
+   * anchored to.
+   */
+  cause: Schema.Struct({
+    changeId: ChangeId,
+    effect: Schema.optional(Proposition),
+    anchor: Schema.optional(Anchor),
+  }),
 });
 export const PremiseReaffirmed = Schema.TaggedStruct("PremiseReaffirmed", {
   subjectId: SubjectId,

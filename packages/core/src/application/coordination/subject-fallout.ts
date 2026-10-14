@@ -12,6 +12,7 @@ import {
   type SubjectKey,
 } from "../../domain/coordination/index.ts";
 import {
+  type Anchor,
   canonicalJson,
   type ChangeId,
   ConflictId,
@@ -42,6 +43,8 @@ export interface HeldBy {
   readonly premises: readonly Proposition[];
   readonly declaredEffects: readonly Proposition[];
   readonly derived: readonly DerivedEffect[];
+  /** The anchors on this subject the change's last derivation found its diff touching. */
+  readonly touched?: readonly Anchor[];
 }
 
 /** Each pair is judged once, by the subject that judges it: its row, by the pair's identity. */
@@ -216,4 +219,105 @@ export function judgeFallout(
     }
   }
   return { drafts, problems };
+}
+
+/**
+ * One change's premise anchored to code another change's diff touched, where
+ * no effect of that change was judged against the premise: a suspicion with
+ * no effect behind it.
+ */
+export interface AnchorPair {
+  readonly premise: { readonly holder: ChangeId; readonly proposition: Proposition };
+  readonly changeId: ChangeId;
+  readonly anchor: Anchor;
+}
+
+/** Two anchors on the same code: one path and one symbol (or none), whatever commit each was pinned at. */
+const sameCode = (a: Anchor, b: Anchor): boolean =>
+  a.path === b.path && (a.symbol ?? null) === (b.symbol ?? null);
+
+/**
+ * The anchor pairs a change's derivation or revision brings to the subject at
+ * `key`: the anchors its diff newly touched against every other change's
+ * premises on `key` anchored there, and its new premises against the anchors
+ * every other change's diff touched. A pair whose touching change has an
+ * effect on the premise's subject and predicate is fallout's to judge, and is
+ * left out. Whichever side arrives second brings the pair.
+ */
+export function anchorPairs(
+  key: SubjectKey,
+  change: { readonly changeId: ChangeId; readonly before: HeldBy; readonly after: HeldBy },
+  others: readonly HeldBy[],
+): readonly AnchorPair[] {
+  const touchedNow = (change.after.touched ?? []).filter(
+    (anchor) => !(change.before.touched ?? []).some((was) => sameCode(was, anchor)),
+  );
+  const premises = fresh(change.after.premises, change.before.premises);
+  const restsOn = (premise: Proposition, anchor: Anchor): boolean =>
+    premise.subject === key && (premise.anchors ?? []).some((at) => sameCode(at, anchor));
+  const judgedBy = (held: HeldBy, premise: Proposition): boolean =>
+    judgedEffects(held).some(
+      (effect) =>
+        effect.proposition.subject === premise.subject &&
+        effect.proposition.predicate === premise.predicate,
+    );
+  const pairs: AnchorPair[] = [];
+  for (const other of others) {
+    if (other.changeId === change.changeId) continue;
+    for (const anchor of touchedNow)
+      for (const premise of other.premises)
+        if (restsOn(premise, anchor) && !judgedBy(change.after, premise))
+          pairs.push({
+            premise: { holder: other.changeId, proposition: premise },
+            changeId: change.changeId,
+            anchor,
+          });
+    for (const premise of premises)
+      for (const anchor of other.touched ?? [])
+        if (restsOn(premise, anchor) && !judgedBy(other, premise))
+          pairs.push({
+            premise: { holder: change.changeId, proposition: premise },
+            changeId: other.changeId,
+            anchor,
+          });
+  }
+  return pairs;
+}
+
+/**
+ * Tells each premise's holder that a change edits code the premise rests on:
+ * PremiseSuspected with the anchor as its cause, once per pair (its row by the
+ * pair's identity). It opens no conflict and holds nothing: the holder checks
+ * its premise against the change, and revises or relies again if it no longer
+ * holds.
+ */
+export function judgeAnchors(
+  tx: Pick<Transaction, "store">,
+  subject: { readonly id: SubjectId },
+  pairs: readonly AnchorPair[],
+): readonly EventDraft[] {
+  const drafts: EventDraft[] = [];
+  for (const pair of pairs) {
+    const judged = hashedIdBody(
+      canonicalJson({
+        holder: pair.premise.holder,
+        premise: claimKey(pair.premise.proposition),
+        changeId: pair.changeId,
+        anchor: { path: pair.anchor.path, symbol: pair.anchor.symbol ?? null },
+      }),
+    );
+    if (tx.store.get(FALLOUT_JUDGED, judged) !== undefined) continue;
+    tx.store.put(FALLOUT_JUDGED, judged, true);
+    const suspected = PremiseSuspected.make({
+      subjectId: subject.id,
+      changeId: pair.premise.holder,
+      premise: pair.premise.proposition,
+      cause: { changeId: pair.changeId, anchor: pair.anchor },
+    });
+    drafts.push({
+      payload: payloadOf(Schema.encodeSync(PremiseSuspected)(suspected)),
+      affected: [changeRef(pair.premise.holder)],
+    });
+  }
+  return drafts;
 }

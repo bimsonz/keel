@@ -6,8 +6,10 @@ import {
   planSubjects,
   type PrecheckSubmission,
   startPrecheck,
+  touchedAnchors,
 } from "@keeltown/core/application/verification";
 import {
+  FootprintEntry,
   type Intent,
   IntentDeclared,
   type Proposition,
@@ -505,6 +507,17 @@ describe("Precheck's derivation", () => {
               reason: "holder-unknown",
             },
           ],
+          // The guard's file is in the diff, and a premise of the subject is anchored there.
+          touched: [
+            {
+              subject: "authz.permission-evaluation",
+              anchor: {
+                path: "src/authz/require-permission.ts",
+                symbol: "callerRole",
+                commit: PINNED,
+              },
+            },
+          ],
         };
         expect(world.record(answer.derivationRef)).toEqual(record);
         expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);
@@ -615,6 +628,17 @@ describe("Precheck's derivation", () => {
           instanceId: INSTANCE,
           effects: [perSession(head.sha, false)],
           derivationRef: answer.derivationRef,
+          // What the diff touched is the record's too: the anchor moved on since, and is still named.
+          touched: [
+            {
+              subject: "authz.permission-evaluation",
+              anchor: {
+                path: "src/authz/require-permission.ts",
+                symbol: "callerRole",
+                commit: PINNED,
+              },
+            },
+          ],
         };
         expect(world.committed).toEqual([payload, payload]);
         expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);
@@ -720,4 +744,48 @@ describe("Precheck's derivation", () => {
     },
     { timeout: PROPERTY_TIMEOUT },
   );
+});
+
+/** An anchor in `path`, on `symbol` or the whole file. */
+const anchorIn = (path: string, symbol?: string): Anchor => ({
+  path,
+  ...(symbol === undefined ? {} : { symbol }),
+  commit: PINNED,
+});
+/** A footprint entry editing `path`, or `symbol` in it. */
+const editOf = (path: string, symbol?: string) =>
+  Schema.decodeUnknownSync(FootprintEntry)({
+    path,
+    op: "edit",
+    ...(symbol === undefined ? {} : { symbol }),
+  });
+/** Each touched anchor as subject, path and symbol. */
+const touchedNames = (found: ReturnType<typeof touchedAnchors>) =>
+  found.map((each) => `${each.subject}:${each.anchor.path}:${each.anchor.symbol ?? "*"}`);
+
+describe("the live anchors a diff touches", () => {
+  it("[anchor.touched] every anchor in an edited file is touched, unless the change's footprint names only other symbols there; a whole-file anchor always is", () => {
+    const anchors: readonly SubjectAnchors[] = [
+      {
+        subject: INVOICES,
+        anchors: [anchorIn("p.ts", "price"), anchorIn("p.ts", "total"), anchorIn("q.ts", "tax")],
+      },
+      { subject: EVALUATION, anchors: [anchorIn("p.ts")] },
+    ];
+    // No footprint for the file: everything anchored in it is touched.
+    expect(touchedNames(touchedAnchors(["p.ts"], [], anchors))).toEqual([
+      "authz.permission-evaluation:p.ts:*",
+      "billing.invoices:p.ts:price",
+      "billing.invoices:p.ts:total",
+    ]);
+    // The footprint names `price` there: `total` is left alone, the whole-file anchor is not.
+    expect(touchedNames(touchedAnchors(["p.ts"], [editOf("p.ts", "price")], anchors))).toEqual([
+      "authz.permission-evaluation:p.ts:*",
+      "billing.invoices:p.ts:price",
+    ]);
+    // A footprint of the whole file, or a glob over it, names every symbol in it.
+    expect(touchedNames(touchedAnchors(["p.ts"], [editOf("*.ts")], anchors))).toHaveLength(3);
+    // An untouched file's anchors are not touched, whatever the footprint says.
+    expect(touchedNames(touchedAnchors(["r.ts"], [editOf("q.ts", "tax")], anchors))).toEqual([]);
+  });
 });

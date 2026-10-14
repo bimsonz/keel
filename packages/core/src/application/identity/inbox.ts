@@ -106,6 +106,16 @@ const decodeSuspected = Schema.decodeUnknownOption(
   }),
 );
 
+const decodeAnchorSuspicion = Schema.decodeUnknownOption(
+  Schema.Struct({
+    premise: Schema.Struct({ subject: Schema.String }),
+    cause: Schema.Struct({
+      changeId: Schema.String,
+      anchor: Schema.Struct({ path: Schema.String, symbol: Schema.optional(Schema.String) }),
+    }),
+  }),
+);
+
 const decodePreview = Schema.decodeUnknownOption(
   Schema.Struct({ url: Schema.String, aliasUrl: Schema.optional(Schema.String) }),
 );
@@ -118,6 +128,13 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onNone: () => undefined,
         onSome: (p) =>
           `Keel suspects a conflict between ${p.parties.join(" and ")}${p.subjectKey === undefined ? "" : ` on ${p.subjectKey}`} and is proving it: nothing is asked of you until it has`,
+      });
+    case "PremiseSuspected":
+      // An effect judged against the premise speaks for itself; an edit of the code it rests on is only a suspicion.
+      return Option.match(decodeAnchorSuspicion(event.payload), {
+        onNone: () => undefined,
+        onSome: ({ premise, cause }) =>
+          `${cause.changeId} edits ${cause.anchor.path}${cause.anchor.symbol === undefined ? "" : ` (${cause.anchor.symbol})`}, the code your premise on ${premise.subject} rests on. This is a suspicion, not a conflict: nothing is held or bounced. Check your premise against that change with why, and revise or rely again if it no longer holds`,
       });
     case "ConflictNoted":
       return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;

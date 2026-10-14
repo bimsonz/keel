@@ -3,18 +3,22 @@ import {
   type Derivation,
   DerivedEffect,
   deriveEffects,
+  type FootprintEntry,
   type SubjectAnchors,
   SubjectKey,
   subjectsNear,
   SymbolRef,
+  TouchedAnchor,
   type Undecided,
 } from "../../domain/coordination/index.ts";
 import {
   Anchor,
+  canonicalJson,
   ChangeId,
   CommitSha,
   type ContentHash,
   type Json,
+  matchesGlob,
   type NamespaceId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -83,6 +87,8 @@ export const DerivationRecord = Schema.Struct({
   readings: Schema.Struct({ base: RecordedReading, head: RecordedReading }),
   effects: Schema.Array(DerivedEffect),
   undecided: Schema.Array(UndecidedJson),
+  /** The live anchors the diff touches; absent from a record kept before they were. */
+  touched: Schema.optional(Schema.Array(TouchedAnchor)),
 });
 export type DerivationRecord = typeof DerivationRecord.Type;
 
@@ -128,6 +134,52 @@ export const derivationSeeds = (
   const focus = [...declared, ...at.map((row) => row.subject)];
   const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
   return [...new Set([...touched, ...near.flatMap(pathsOf)])].toSorted();
+};
+
+const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Whether a footprint entry names `symbol`, or code inside it (a class's member). */
+const namesSymbol = (entry: FootprintEntry, symbol: string): boolean =>
+  entry.symbol === symbol || symbol.startsWith(`${entry.symbol ?? ""}.`);
+
+/**
+ * The live anchors a change's diff touches: each anchor, of any subject, in a
+ * file the diff changes, whether or not Keel derived an effect from the edit.
+ * The change's footprint sharpens it: when every entry covering the file names
+ * symbols and none names the anchored one, the change says it edits other code
+ * there, and the anchor is not touched. An anchor on a whole file always is.
+ * Each subject and anchor once, in subject and path order.
+ */
+export const touchedAnchors = (
+  touched: readonly string[],
+  footprint: readonly FootprintEntry[],
+  anchors: readonly SubjectAnchors[],
+): readonly TouchedAnchor[] => {
+  const edited = new Set(touched);
+  const found = new Map<string, TouchedAnchor>();
+  for (const row of anchors)
+    for (const anchor of row.anchors) {
+      if (!edited.has(anchor.path)) continue;
+      const covering = footprint.filter((entry) => matchesGlob(entry.path, anchor.path));
+      const elsewhere =
+        anchor.symbol !== undefined &&
+        covering.length > 0 &&
+        covering.every((entry) => entry.symbol !== undefined) &&
+        !covering.some((entry) => anchor.symbol !== undefined && namesSymbol(entry, anchor.symbol));
+      if (elsewhere) continue;
+      found.set(
+        canonicalJson({ subject: row.subject, path: anchor.path, symbol: anchor.symbol ?? null }),
+        { subject: row.subject, anchor },
+      );
+    }
+  return [...found.values()].toSorted((a, b) =>
+    a.subject === b.subject
+      ? byCodePoint(
+          `${a.anchor.path}\n${a.anchor.symbol ?? ""}`,
+          `${b.anchor.path}\n${b.anchor.symbol ?? ""}`,
+        )
+      : byCodePoint(a.subject, b.subject),
+  );
 };
 
 /**
@@ -192,6 +244,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
           subjects: anchors,
           intent: workspace.intent,
         });
+  const touchedHere = touchedAnchors(touched, workspace.intent.footprint, anchors);
   const derivationRef = yield* (yield* EvidenceStore).put(
     namespace,
     recordJson({
@@ -206,6 +259,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
       readings: { base: recorded(before), head: recorded(after) },
       effects: derivation.effects,
       undecided: derivation.undecided,
+      ...(touchedHere.length === 0 ? {} : { touched: touchedHere }),
     }),
   );
   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();
@@ -234,5 +288,6 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
     instanceId: submission.instanceId,
     effects: record.success.effects,
     derivationRef,
+    ...(record.success.touched === undefined ? {} : { touched: record.success.touched }),
   });
 });
