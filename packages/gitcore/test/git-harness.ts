@@ -122,6 +122,33 @@ export function gitBeside(args: readonly string[], timeoutMs = GIT_TIMEOUT_MS): 
   });
 }
 
+/**
+ * The door to a shell script the product runs (the MergeBox compose), under
+ * the same timeout and kill as every git child. Its environment is the
+ * caller's whole, as the box hands the script its own: no GIT_ENV under it.
+ * Answers how the script ended (its exit status, or the signal it died on by
+ * itself) and what it wrote.
+ */
+export function scriptSync(
+  shell: "bash" | "sh",
+  args: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+  timeoutMs = GIT_TIMEOUT_MS,
+) {
+  const run = spawnSync(shell, [...args], {
+    env,
+    maxBuffer: 1 << 24,
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
+  });
+  if (run.error !== undefined) {
+    if ("code" in run.error && run.error.code === "ETIMEDOUT")
+      throw new Error(`${shell} script timed out after ${timeoutMs} ms and was killed`);
+    throw run.error;
+  }
+  return run;
+}
+
 export function git(cwd: string, args: string[], input?: string | Uint8Array): string {
   const run = gitSync(args, { cwd, input });
   if (run.status !== 0)

@@ -3,7 +3,6 @@
 // pushed to staging's scratch ref; a conflict is refused with its paths, and a
 // git that dies by a signal is told apart from both. The remotes here are
 // paths: in the box they are HTTPS, with the token added on the way out.
-import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +24,7 @@ import {
   git,
   gitMergeTree,
   oracleGit,
+  scriptSync,
   tempRepo,
   type TreeModel,
 } from "./git-harness.ts";
@@ -91,20 +91,18 @@ function compose(
   members: BoxMember[],
   path?: string,
 ) {
-  const run = spawnSync(
+  const run = scriptSync(
     "bash",
     ["-c", BOX_COMPOSE_SCRIPT, "box", ...boxComposeArgs(staging, base, scratch, members)],
     {
-      env: {
-        ...process.env,
-        HOME: home,
-        GIT_TERMINAL_PROMPT: "0",
-        GIT_AUTHOR_NAME: "keel-mergebox",
-        GIT_AUTHOR_EMAIL: "mergebox@keel.invalid",
-        GIT_COMMITTER_NAME: "keel-mergebox",
-        GIT_COMMITTER_EMAIL: "mergebox@keel.invalid",
-        ...(path === undefined ? {} : { PATH: `${path}:${process.env["PATH"] ?? ""}` }),
-      },
+      ...process.env,
+      HOME: home,
+      GIT_TERMINAL_PROMPT: "0",
+      GIT_AUTHOR_NAME: "keel-mergebox",
+      GIT_AUTHOR_EMAIL: "mergebox@keel.invalid",
+      GIT_COMMITTER_NAME: "keel-mergebox",
+      GIT_COMMITTER_EMAIL: "mergebox@keel.invalid",
+      ...(path === undefined ? {} : { PATH: `${path}:${process.env["PATH"] ?? ""}` }),
     },
   );
   return {
@@ -199,7 +197,7 @@ describe("the MergeBox compose script", () => {
 
   it("[mergebox.git-crash] a git that dies by a signal is read as crashed, not as a refusal or the box's transport", () => {
     const w = world([(t) => t.set("run.sh", file("#!/bin/sh\necho run\n", "100755"))]);
-    const real = spawnSync("sh", ["-c", "command -v git"]).stdout.toString().trim();
+    const real = scriptSync("sh", ["-c", "command -v git"], process.env).stdout.toString().trim();
     const bin = mkdtempSync(join(tmpdir(), "mergebox-bin-"));
     writeFileSync(
       join(bin, "git"),
