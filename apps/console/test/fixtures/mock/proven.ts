@@ -85,6 +85,7 @@ export function generateS3(seed: number): GeneratedLog {
     label: "L1·1",
     landing: LANDED_B_AS_WRITTEN,
     plan: PLAN_B,
+    preview: "https://change-b-demo.keel-previews.workers.dev",
   });
   return b.build();
 }

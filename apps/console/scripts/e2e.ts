@@ -544,6 +544,16 @@ expectEqual(
   `${landedSaid.replace(/[0-9a-f]{7}$/, "<sha>")} | ${new URL(landedLink, dev).pathname.replace(/[0-9a-f]{7,40}$/, "<sha>")} | ${String(landedSha.length === 40 && landedSaid.endsWith(landedSha.slice(0, 7)))}`,
   "landed on trunk as commit <sha> | /acme/demo/commit/<sha> | true",
 );
+// Keel previews a candidate on the project's own account and tells the change where: by the change's own address.
+const previewed = page.locator('[data-part="preview"]');
+expectEqual(
+  "change: where Keel previewed a change, its page says where, at the change's own address, as a link",
+  `${squash(await previewed.innerText({ timeout: 3000 }).catch(() => "no preview"))} | ${await previewed
+    .getByRole("link")
+    .getAttribute("href", { timeout: 3000 })
+    .catch(() => "no link")}`,
+  "previewed at https://change-b-demo.keel-previews.workers.dev | https://change-b-demo.keel-previews.workers.dev",
+);
 const noted = page.locator("section", { has: page.getByRole("heading", { name: "Noted" }) }).last();
 const notedText = async (): Promise<string> =>
   (await noted.count()) === 0 ? "nothing noted" : squash(await noted.innerText());

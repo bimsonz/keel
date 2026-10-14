@@ -697,6 +697,9 @@ export function changePageOf(
       commit: change.commit ?? "",
       derived: change.derived,
       ...(change.landedAs === undefined ? {} : { landedAs: change.landedAs }),
+      ...(change.preview === undefined
+        ? {}
+        : { preview: { url: change.preview.url, down: change.preview.down } }),
       workspace:
         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
       declaredAt: change.declaredAt,

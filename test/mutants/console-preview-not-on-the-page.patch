@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.preview
+# why: a change's page says nothing of where Keel previewed it
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index b8061d7a..e14dbcb3 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -699,7 +699,7 @@ export function changePageOf(
+       ...(change.landedAs === undefined ? {} : { landedAs: change.landedAs }),
+       ...(change.preview === undefined
+         ? {}
+-        : { preview: { url: change.preview.url, down: change.preview.down } }),
++        : {}),
+       workspace:
+         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
+       declaredAt: change.declaredAt,

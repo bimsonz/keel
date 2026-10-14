@@ -868,6 +868,21 @@ export function Change({
                     </Link>
                   </span>
                 )}
+                {/* Keel previews a candidate on the project's own Cloudflare account, and tells the change where. */}
+                {change.preview !== undefined && (
+                  <span data-part="preview">
+                    previewed at{" "}
+                    {/* An address Keel wrote is linked only where it is a web page's, and only while it answers. */}
+                    {change.preview.down || !change.preview.url.startsWith("https://") ? (
+                      <span className="a-mono">{change.preview.url}</span>
+                    ) : (
+                      <a href={change.preview.url} className="a-mono a-link" rel="noreferrer">
+                        {change.preview.url}
+                      </a>
+                    )}
+                    {change.preview.down && ", taken down since"}
+                  </span>
+                )}
                 {change.commit !== "" && (
                   <span>
                     {/* Beside the commit it landed as, the change's own is said to be the one it pushed. */}

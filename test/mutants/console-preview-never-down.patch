@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.preview
+# why: a preview Keel took down is still offered as answering
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index ac57bc05..b7e7716d 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -1418,7 +1418,7 @@ export class World {
+       case "PreviewTornDown": {
+         for (const change of this.changes.values())
+           if (change.preview?.deploymentId === event.payload.deploymentId)
+-            change.preview.down = true;
++            change.preview.down = false;
+         break;
+       }
+       case "AuditCompleted": {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.preview
+# why: a change's preview is named by its candidate's version, where Keel gives the change's own address
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index ac57bc05..4fcae837 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -1410,7 +1410,7 @@ export class World {
+         if (change === undefined) break;
+         change.preview = {
+           deploymentId: event.payload.deploymentId,
+-          url: event.payload.aliasUrl ?? event.payload.url,
++          url: event.payload.url,
+           down: false,
+         };
+         break;

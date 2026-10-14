@@ -24,6 +24,8 @@ const BATCH = "bat_00000000000000000000000001";
 const COMMIT = "c96bc39b527c51c1bf0bef6d65d660c5ccb70b7d";
 /** The commit Keel composed on trunk for the change: another than the one its workspace pushed. */
 const ON_TRUNK = "8b1f34de3eb2f8ffec648f7741698ee62ad3f138";
+const PREVIEW = "dpl_00000000000000000000000001";
+const ALIAS = "https://chg-landed-forge.example.workers.dev";
 const OFF = "verification-off: the project's verification is off, so no plan ran";
 
 /**
@@ -97,6 +99,21 @@ function asKeelWrites(): World {
       verdictId: VERDICT,
       members: [LANDED],
       verified: false,
+    },
+  });
+  // Keel's verification previews the candidate on the project's account, and tells the change where.
+  b.emit({
+    type: "PreviewDeployed",
+    entity: { kind: "change", id: LANDED },
+    payload: {
+      deploymentId: PREVIEW,
+      changeId: LANDED,
+      candidateId: "cnd_1",
+      world: "candidate",
+      target: "production",
+      provider: "cloudflare",
+      url: "https://3f2a9c1e-forge.example.workers.dev",
+      aliasUrl: ALIAS,
     },
   });
   b.emit({
@@ -217,6 +234,27 @@ describe("a change's page, in Keel's own fields", () => {
     });
     expect(changePageOf(world, WITHDRAWN, NO_RESOURCES)?.change.landedAs).toBeUndefined();
     expect(changePageOf(world, WAITING, NO_RESOURCES)?.change.landedAs).toBeUndefined();
+  });
+
+  it("[judged.preview] says where Keel previewed a change, by the change's own address where Keel gives one, and that it was taken down once Keel says so", () => {
+    const world = asKeelWrites();
+    expect(changePageOf(world, LANDED, NO_RESOURCES)?.change.preview).toEqual({
+      url: ALIAS,
+      down: false,
+    });
+    expect(changePageOf(world, WAITING, NO_RESOURCES)?.change.preview).toBeUndefined();
+    const later = new ScriptBuilder("2026-10-13T16:30:00.000Z", createRng(4));
+    later.emit({
+      type: "PreviewTornDown",
+      entity: { kind: "deployment", id: PREVIEW },
+      payload: { deploymentId: PREVIEW },
+    });
+    const [down] = later.build().events;
+    if (down !== undefined) world.apply(down, 99);
+    expect(changePageOf(world, LANDED, NO_RESOURCES)?.change.preview).toEqual({
+      url: ALIAS,
+      down: true,
+    });
   });
 
   it("[judged.recorded] lists what the verdict's own event recorded where Keel serves no view of the verdict, and nothing of it where Keel serves one or has not answered", () => {

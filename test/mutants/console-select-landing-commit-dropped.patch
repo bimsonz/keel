@@ -2,14 +2,14 @@
 # kills: judged.landed-as
 # why: the page is not handed the commit a change landed as
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 54f7bbf1..f3fc8d1e 100644
+index b8061d7a..dbefcbad 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -670,7 +670,6 @@ export function changePageOf(
+@@ -696,7 +696,6 @@ export function changePageOf(
        unverified: change.unverified,
        commit: change.commit ?? "",
        derived: change.derived,
 -      ...(change.landedAs === undefined ? {} : { landedAs: change.landedAs }),
-       workspace:
-         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
-       declaredAt: change.declaredAt,
+       ...(change.preview === undefined
+         ? {}
+         : { preview: { url: change.preview.url, down: change.preview.down } }),

@@ -330,6 +330,8 @@ export interface ChangePageState {
     derived: boolean;
     /** The commit on trunk it landed as, where it has landed: Keel's own name for it, and a page of its own. */
     landedAs?: string;
+    /** Where the latest preview of its candidate answers, and whether Keel has taken it down. */
+    preview?: { url: string; down: boolean };
     workspace: string;
     declaredAt: string;
     submittedAt?: string;

@@ -2,15 +2,15 @@
 # kills: judged.as-keel-writes
 # why: the page is not told Keel derived from a change's commit
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 54f7bbf1..4426f1c6 100644
+index b8061d7a..265c3276 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -669,7 +669,7 @@ export function changePageOf(
+@@ -695,7 +695,7 @@ export function changePageOf(
        revision: change.revision,
        unverified: change.unverified,
        commit: change.commit ?? "",
 -      derived: change.derived,
 +      derived: false,
        ...(change.landedAs === undefined ? {} : { landedAs: change.landedAs }),
-       workspace:
-         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
+       ...(change.preview === undefined
+         ? {}

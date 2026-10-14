@@ -125,6 +125,12 @@ export interface ChangeEntry {
   landedT?: number;
   /** The commit on trunk the change landed as, as Keel's `ChangeLanded` names it. Not its own workspace's commit. */
   landedAs?: string;
+  /**
+   * Where the latest preview of the change's candidate answers, as Keel's `PreviewDeployed` tells the change:
+   * the change's own stable address where Keel gives one, else the candidate's version; `down` once Keel has
+   * taken that preview down.
+   */
+  preview?: { deploymentId: string; url: string; down: boolean };
   escalationId?: string;
   verdictIds: string[];
   /** The revision the change stood at when its latest verdict reached it. A verdict names no revision itself. */
@@ -1397,6 +1403,22 @@ export class World {
           verifiedAt: event.payload.x?.commuted[0]?.verifiedAtHeight ?? this.trunk.advances,
         });
         if (this.trunk.recent.length > 12) this.trunk.recent.length = 12;
+        break;
+      }
+      case "PreviewDeployed": {
+        const change = this.#change(event.payload.changeId);
+        if (change === undefined) break;
+        change.preview = {
+          deploymentId: event.payload.deploymentId,
+          url: event.payload.aliasUrl ?? event.payload.url,
+          down: false,
+        };
+        break;
+      }
+      case "PreviewTornDown": {
+        for (const change of this.changes.values())
+          if (change.preview?.deploymentId === event.payload.deploymentId)
+            change.preview.down = true;
         break;
       }
       case "AuditCompleted": {

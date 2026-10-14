@@ -137,6 +137,21 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     entity: { kind: "project", id: project },
     payload: { projectId: project, name: "demo", by: operator },
   });
+  // An owner connects the project's own Cloudflare account, so Keel previews each candidate there (members only).
+  b.emit({
+    type: "DeployTargetSet",
+    entity: { kind: "project", id: project },
+    payload: {
+      projectId: project,
+      target: {
+        name: "production",
+        provider: "cloudflare",
+        accountId: "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+        credential: "crd_01JZ8PT2C4E6G8J0M2N4Q6S8V1",
+      },
+      by: "usr_01JZ8PT2C4E6G8J0M2N4Q6S8V2",
+    },
+  });
   b.repository = { base: BASE_FILES, anchors: BASE_ANCHORS, landings: new Map() };
   // Nothing is queued or promoted before trunk's first head is known.
   b.emit({
@@ -829,6 +844,8 @@ export function land(
     landing?: Landing;
     /** The plan its change compiled: Keel runs a batch of one on its member's plan, hash and all. */
     plan: VerdictPlan;
+    /** The change's stable preview address, where its candidate is previewed on the project's account. */
+    preview?: string;
   },
 ): void {
   // What this change puts on trunk, for the repository the story can be browsed in.
@@ -885,8 +902,24 @@ export function land(
       planHash: input.plan.hash,
     },
   });
-  // KeelVerify runs the batch's plan, and its verdict follows.
-  const verdict = b.after(12.7).id("vrd");
+  // KeelVerify runs the batch's plan, and its verdict follows. Where the project has an account to deploy to, it
+  // previews the candidate there first and tells the change where (no draw from the story's ids: nothing else moves).
+  if (input.preview !== undefined)
+    b.after(12.6).emit({
+      type: "PreviewDeployed",
+      entity: changeRef(input.change),
+      payload: {
+        deploymentId: `dpl_${candidate.slice(4)}`,
+        changeId: input.change,
+        candidateId: candidate,
+        world: "candidate",
+        target: "production",
+        provider: "cloudflare",
+        url: `https://${candidate.slice(-8).toLowerCase()}-demo.keel-previews.workers.dev`,
+        aliasUrl: input.preview,
+      },
+    });
+  const verdict = b.after(input.preview === undefined ? 12.7 : 0.1).id("vrd");
   b.emit({
     type: "VerdictIssued",
     entity: { kind: "verdict", id: verdict },
@@ -1064,6 +1097,7 @@ function landA(
     label: `L1·${height}`,
     landing: LANDED_A,
     plan,
+    preview: "https://change-a-demo.keel-previews.workers.dev",
   });
 }
 
