@@ -315,9 +315,15 @@ describe("project bootstrap", () => {
     expect(missing.status).toBe(404);
     expect(missing.body.code).toBe("resource.not_found");
     expect(missing.body.detail).toContain("no-such-repo");
-    expect(missing.body.nextActions).toEqual([
-      expect.objectContaining({ operationId: "Operator_createProject" }),
-    ]);
+    // One next action for each template the instance offers.
+    expect(missing.body.nextActions).toEqual(
+      ["fixture-forge-lite", "fixture-worker-lite"].map((template) =>
+        expect.objectContaining({
+          operationId: "Operator_createProject",
+          args: expect.objectContaining({ source: { kind: "template", name: template } }),
+        }),
+      ),
+    );
   });
 
   it("[a11b.starts] an empty project and an import reach the Project DO as the doorway read them: the import's URL as it will be recorded, and its branch", async () => {
