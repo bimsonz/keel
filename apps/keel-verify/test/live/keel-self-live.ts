@@ -146,7 +146,9 @@ function describeVerify(id: string): { status: string; steps: string[]; verdict:
   const took = (s: unknown): string => {
     const start = Date.parse(String(Reflect.get(Object(s), "start") ?? ""));
     const end = Date.parse(String(Reflect.get(Object(s), "end") ?? ""));
-    return Number.isFinite(start) && Number.isFinite(end) ? ` ${((end - start) / 1000).toFixed(1)} s` : "";
+    return Number.isFinite(start) && Number.isFinite(end)
+      ? ` ${((end - start) / 1000).toFixed(1)} s`
+      : "";
   };
   return {
     status: String(Reflect.get(Object(body), "status")),
@@ -195,7 +197,10 @@ const CASES: readonly Case[] = [
     op: "create",
     write: (dir) => {
       mkdirSync(join(dir, "docs/self-proof"), { recursive: true });
-      writeFileSync(join(dir, `docs/self-proof/${run}.md`), `# Self proof ${run}\n\nA docs-only change Keel verified on its own repository.\n`);
+      writeFileSync(
+        join(dir, `docs/self-proof/${run}.md`),
+        `# Self proof ${run}\n\nA docs-only change Keel verified on its own repository.\n`,
+      );
     },
   },
   {
@@ -286,7 +291,12 @@ try {
     let commitSha: string;
     try {
       c.write(dir);
-      commitSha = commitAndPush(dir, workspace.token, "keel-self-agent", `Keel verifies Keel ${run}: ${c.name}`);
+      commitSha = commitAndPush(
+        dir,
+        workspace.token,
+        "keel-self-agent",
+        `Keel verifies Keel ${run}: ${c.name}`,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -338,7 +348,10 @@ try {
       `${c.name}: the plan ran ${c.steps.join(" and ")} alone (ran ${flowRan.join(", ") || "none"})`,
     );
     if (c.expect === "land") {
-      check(advanced !== undefined, `${c.name}: TrunkAdvanced ${advanced?.eventId ?? "(none)"} lands it`);
+      check(
+        advanced !== undefined,
+        `${c.name}: TrunkAdvanced ${advanced?.eventId ?? "(none)"} lands it`,
+      );
       check(bounced === undefined, `${c.name}: never bounced`);
     } else {
       check(bounced !== undefined, `${c.name}: ChangeBounced ${bounced?.eventId ?? "(none)"}`);
