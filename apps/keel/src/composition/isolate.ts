@@ -59,6 +59,7 @@ import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
 import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
+import { VerdictsRpc } from "../adapters/driven/do-rpc/verdicts.ts";
 import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { AgentSignUpsRpc } from "../adapters/driven/do-rpc/sign-ups.ts";
@@ -79,6 +80,7 @@ import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
+import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { ClockLive, IdsLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
@@ -126,9 +128,11 @@ export function isolateLayer(
     overrides.eventFeed ?? EventFeedRpc(projector),
     ProjectViewsRpc(projector),
     DecisionsRpc(projector),
+    VerdictsRpc(projector),
     EscalationsRpc(projector, (address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
     ConflictMovesRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
     ProbeStoreR2(env.BUNDLES),
+    PlanStoreR2(env.ARCHIVE),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     // A project's deploy targets, held by its own object; a target's account is asked before one is set.

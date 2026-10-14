@@ -22,6 +22,7 @@ import {
   namespaceKind,
   ProjectId,
   type UserId,
+  VerdictId,
 } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
@@ -32,11 +33,13 @@ import {
   Namespaces,
   ProjectNamespaces,
   Projects,
+  Verdicts,
 } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { decisionNotFound } from "./decisions.ts";
+import { verdictNotFound } from "./verdicts.ts";
 import { askedIn, nothingToExplain } from "./why.ts";
 import { escalationNotFound } from "./escalations.ts";
 import { problem, type ProblemBody } from "./problems.ts";
@@ -64,6 +67,7 @@ type ResolverServices =
   | Projects
   | Changes
   | Decisions
+  | Verdicts
   | AgentDirectory
   | Escalations
   | NamespaceAgents;
@@ -128,6 +132,7 @@ const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
 const decodeEscalationId = Schema.decodeUnknownOption(EscalationId);
 const decodeDecisionId = Schema.decodeUnknownOption(DecisionId);
+const decodeVerdictId = Schema.decodeUnknownOption(VerdictId);
 
 /** The project an id names, or missing when it names none. */
 const projectNamed = (id: unknown) =>
@@ -168,6 +173,17 @@ const decisionProject = (id: unknown) =>
       Decisions.use((decisions) => decisions.get(decisionId)).pipe(
         Effect.flatMap((read) => projectResource(read.project)),
         Effect.catchTag("DecisionNotFound", () => Effect.succeed(MISSING)),
+      ),
+  });
+
+/** The project a verdict was issued in, from the Projector's verdict index: what a read of it is decided on. */
+const verdictProject = (id: unknown) =>
+  Option.match(decodeVerdictId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (verdictId) =>
+      Verdicts.use((verdicts) => verdicts.get(verdictId)).pipe(
+        Effect.flatMap((read) => projectResource(read.project)),
+        Effect.catchTag("VerdictNotFound", () => Effect.succeed(MISSING)),
       ),
   });
 
@@ -350,7 +366,7 @@ export const RESOLVERS: Resolvers = {
   Repo_compare: (input) => projectNamed(input.projectId),
   Views_getTrunk: (input) => projectNamed(input.projectId),
   Views_listLanes: (input) => projectNamed(input.projectId),
-  Views_getVerdict: ownProject,
+  Views_getVerdict: (input) => verdictProject(input.verdictId),
   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
@@ -425,6 +441,8 @@ export function refusalResult(
         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
       if (action === "Memory_getDecision")
         return decisionNotFound({ requestId }, String(Object(input).decisionId));
+      if (action === "Views_getVerdict")
+        return verdictNotFound({ requestId }, String(Object(input).verdictId));
       if (action === "Probes_getProbeSource")
         return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
       if (action === "Operator_giveRuling")

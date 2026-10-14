@@ -115,7 +115,7 @@ describe("mappers", () => {
  * The operations still answering 503 service.not_implemented to a caller the
  * policy grants them. Shrinks, visibly, as lanes land each one.
  */
-const STUBBED = ["Views_getVerdict"];
+const STUBBED: string[] = [];
 
 /**
  * A project placed in its org with settings, so the policy sees it, and the

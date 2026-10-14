@@ -29,6 +29,7 @@ import { noteVisibility, repairVisibility } from "@keeltown/core/application/int
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
+import { getVerdict } from "@keeltown/core/application/verification";
 import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
@@ -48,6 +49,7 @@ import {
   SnapshotRead,
   SubjectDecisionsRead,
   WhyRead,
+  VerdictRead,
 } from "../../../rpc/index.ts";
 import { armedAlarms, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
@@ -277,5 +279,13 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, target }) => explaining(project, target)),
     );
     return this.answer(ProjectorCodecs.explaining, program);
+  }
+
+  async verdict(request: typeof VerdictRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(VerdictRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ verdictId }) => getVerdict(verdictId)),
+    );
+    return this.answer(ProjectorCodecs.verdict, program);
   }
 }

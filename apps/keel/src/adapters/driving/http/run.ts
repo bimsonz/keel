@@ -19,6 +19,8 @@ import type {
   Notifier,
   Namespaces,
   ProbeStore,
+  PlanStore,
+  Verdicts,
   NamespaceUsage,
   ProjectNamespaces,
   Projects,
@@ -67,9 +69,11 @@ export type IsolateServices =
   | Projects
   | ProjectViews
   | Decisions
+  | Verdicts
   | Escalations
   | ConflictMoves
   | ProbeStore
+  | PlanStore
   | Enrolments
   | CodeHost
   | Sessions

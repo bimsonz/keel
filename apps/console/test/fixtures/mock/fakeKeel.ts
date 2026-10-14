@@ -1637,7 +1637,13 @@ export function createFakeKeel(
         const view = log.verdicts.get(decodeURIComponent(verdict[1] ?? ""));
         return view === undefined
           ? problem(404, "resource.not_found")
-          : Response.json(view satisfies VerdictView);
+          : Response.json({
+              ...view,
+              reasons: view.reasons.map((e) => ({
+                line: e.summary ?? e.ref,
+                class: e.class,
+              })),
+            } satisfies VerdictView);
       }
 
       // A project's settings are read by a member of its namespace and replaced, whole, by a maintainer or an owner.

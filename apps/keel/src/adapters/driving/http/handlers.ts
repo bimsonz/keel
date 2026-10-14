@@ -162,6 +162,7 @@ import {
   sponsoredOk,
 } from "./sponsorship.ts";
 import { decisionHandlers } from "./decisions.ts";
+import { verdictHandlers } from "./verdicts.ts";
 import { whyHandlers } from "./why.ts";
 import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
 import { deliveryHandlers } from "./delivery.ts";
@@ -666,6 +667,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         ...invitationHandlers(run, touchedForStanding),
         ...projectInvitationHandlers(run, touchedForStanding),
         ...decisionHandlers(run),
+        ...verdictHandlers(run),
         ...deliveryHandlers(run),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
@@ -1007,7 +1009,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             }).pipe(Effect.match({ onSuccess: compareOk, onFailure: (e) => repoError(caller, e) })),
           );
         },
-        Views_getVerdict: notYet,
         // One lane a project, so one page: no cursor is given out, and any presented is not Keel's.
         Views_listLanes: (caller: Caller, input: Input<"Views_listLanes">) => {
           const projectId = settingsProject(input.projectId);

@@ -18,6 +18,7 @@ import {
   Probe,
   ProbeNotFound,
   ProbeOutcome,
+  VerdictNotFound,
   World,
   WorldCheck,
   WorldCheckRan,
@@ -38,7 +39,9 @@ import {
   ProjectId,
   SubjectId,
   UserId,
+  VerdictId,
 } from "@keeltown/core/kernel";
+import { IndexedVerdict } from "@keeltown/core/ports";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -259,6 +262,8 @@ export const DecisionPage = Schema.Struct({
 
 export const DecisionRead = Schema.Struct({ decisionId: DecisionId });
 
+export const VerdictRead = Schema.Struct({ verdictId: VerdictId });
+
 export const DecisionsRead = Schema.Struct({
   project: ProjectId,
   subject: Schema.optional(SubjectKey),
@@ -306,6 +311,7 @@ export const ProjectorCodecs = {
   escalations: exitCodec(EscalationPage, Schema.Never),
   escalation: exitCodec(LabelledEscalation, EscalationNotFound),
   decision: exitCodec(IndexedDecision, DecisionNotFound),
+  verdict: exitCodec(IndexedVerdict, VerdictNotFound),
   decisions: exitCodec(DecisionPage, Schema.Never),
   guardDecisions: exitCodec(
     Schema.Array(Schema.Struct({ guardId: GuardId, decision: IndexedDecision })),
@@ -353,4 +359,6 @@ export interface ProjectorRpc extends EventReceiverRpc {
   pathDecisions(request: typeof PathDecisionsRead.Encoded): Promise<ExitJson>;
   /** A project's active decisions on a subject or at a path, newest first, each with its conflict and the changes it names, in one read. */
   explaining(request: typeof WhyRead.Encoded): Promise<ExitJson>;
+  /** One verdict, by its id alone. VerdictNotFound for one the feed does not hold. */
+  verdict(request: typeof VerdictRead.Encoded): Promise<ExitJson>;
 }
