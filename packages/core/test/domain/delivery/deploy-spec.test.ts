@@ -34,6 +34,8 @@ const CONFIG = `{
   "vars": { "GREETING": "hi // not a comment", "URL": "https://x.example/*y*/", },
 }`;
 
+const takesOrigin = (url: string) =>
+  Result.isSuccess(Schema.decodeUnknownResult(PreviewOrigin)(url));
 const check = (path: string): SmokeCheck => ({ path, status: 200 });
 const pathOf = (path: string) => parse({ ...SPEC, smoke: [check(path)] });
 
@@ -267,7 +269,6 @@ describe("a smoke check's address", () => {
   });
 
   it("[smoke.preview-origin] a preview's address is a bare https origin: no trailing slash, path, user or port", () => {
-    const takes = (url: string) => Result.isSuccess(Schema.decodeUnknownResult(PreviewOrigin)(url));
     const cases: readonly (readonly [string, boolean])[] = [
       [PREVIEW, true],
       ["https://abcd1234-worker-lite.owner.workers.dev", true],
@@ -278,7 +279,7 @@ describe("a smoke check's address", () => {
       ["https://worker-lite.owner.workers.dev:8443", false],
       ["https://localhost", false],
     ];
-    expect(cases.map(([url]) => [url, takes(url)])).toEqual(cases);
+    expect(cases.map(([url]) => [url, takesOrigin(url)])).toEqual(cases);
   });
 
   it("[smoke.same-host-any] any address made is on the preview's host, and a path the spec takes is the same address a URL resolves it to", () => {
@@ -301,8 +302,9 @@ describe("a smoke check's address", () => {
       " ",
     );
     fc.assert(
-      fc.property(fc.array(piece, { maxLength: 8 }), (pieces) => {
-        const path = pieces.join("");
+      // Half the paths start with a slash, as the spec's do, so what follows the first one is tried often.
+      fc.property(fc.boolean(), fc.array(piece, { maxLength: 8 }), (rooted, pieces) => {
+        const path = `${rooted ? "/" : ""}${pieces.join("")}`;
         const url = smokeUrl(PREVIEW, check(path));
         const made = Result.isSuccess(url) ? URL.parse(url.success) : null;
         expect({
@@ -313,6 +315,7 @@ describe("a smoke check's address", () => {
           resolved: Result.isSuccess(pathOf(path)) ? URL.parse(path, PREVIEW)?.href : "not taken",
         });
       }),
+      { numRuns: 1000 },
     );
   });
 });
