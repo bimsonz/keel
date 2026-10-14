@@ -14,12 +14,12 @@ const actionLine = (action: NextAction) =>
  * `why`'s answer as `keeltown why` prints it: Keel's summary, then each
  * decision in turn (`why` answers each decision's links with the decision's
  * record first): its links' summaries, the next actions Keel gives for it, and
- * its links' records, one a line.
+ * Keel's record of each link's MFP message, one a line.
  */
 export function chainText(answer: WhyAnswer): string {
   const decisions: { id: string; links: Link[] }[] = [];
   for (const link of answer.result.chain) {
-    if (link.record.kind === "decision") decisions.push({ id: link.record.id, links: [] });
+    if (link.record.message.kind === "decision") decisions.push({ id: link.record.id, links: [] });
     decisions.at(-1)?.links.push(link);
   }
   const blocks = decisions.map(({ id, links }) => {
@@ -28,7 +28,7 @@ export function chainText(answer: WhyAnswer): string {
       first?.summary ?? id,
       ...rest.map((link) => `- ${link.summary}`),
       ...answer.next.filter((action) => decisionIdOf(action) === id).map(actionLine),
-      "MFP records:",
+      "Records (Keel's record of each MFP message):",
       ...links.map((link) => JSON.stringify(link.record)),
     ].join("\n");
   });

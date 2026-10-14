@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/mfp.test.ts
+# kills: mfp.record-refuses
+# why: A message may leave out profile, so Keel holds one that reads as the core profile's, which MFP refuses under Keel's
+diff --git a/packages/core/src/domain/memory/mfp.ts b/packages/core/src/domain/memory/mfp.ts
+index e8633033..555f2d58 100644
+--- a/packages/core/src/domain/memory/mfp.ts
++++ b/packages/core/src/domain/memory/mfp.ts
+@@ -30,7 +30,7 @@ const NonEmptyCitations = Citations.check(Schema.isMinLength(1));
+ const header = <K extends string>(kind: K) => ({
+   mfp: Schema.Literal("0.2"),
+   kind: Schema.Literal(kind),
+-  profile: Schema.Literal(KEEL_MFP_PROFILE),
++  profile: Schema.optionalKey(Schema.Literal(KEEL_MFP_PROFILE)),
+ });
+ 
+ /** The model's own confidence in a message. It never carries weight. */

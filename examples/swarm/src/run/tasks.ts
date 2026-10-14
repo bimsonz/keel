@@ -13,6 +13,8 @@
  *     neighbours by subject as well as by footprint.
  */
 
+import type { KeelClient } from "@keeltown/sdk";
+
 /** A function of the fixture and where it lives, from the repository root. */
 export interface Target {
   readonly module: string;
@@ -30,14 +32,8 @@ export interface Case {
 
 export type TaskKind = "disjoint" | "shared" | "premise";
 
-/** A premise in Keel's proposition shape, declared with the change. */
-export interface Premise {
-  readonly subject: string;
-  readonly predicate: "authority" | "invariant";
-  readonly relation: "is";
-  readonly value: string;
-  readonly gloss: string;
-}
+/** A premise as Keel's API takes it (MFP 0.2), declared with the change. */
+export type Premise = Parameters<KeelClient["rely"]>[1]["premise"];
 
 export interface Task {
   readonly index: number;
@@ -157,7 +153,7 @@ export const PREMISE_BANK: readonly {
       subject: "authz.permission-evaluation",
       predicate: "authority",
       relation: "is",
-      value: "role-lattice",
+      value: ["role-lattice"],
       gloss: "allows() decides every action but a public read by the role lattice",
     },
   },

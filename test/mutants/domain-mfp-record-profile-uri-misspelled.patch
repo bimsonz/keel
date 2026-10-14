@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/mfp.test.ts
+# kills: mfp.record-spec-agrees, mfp.record-refuses
+# why: Core names a profile URI the published profile does not have: core holds every message naming it, and MFP's check finds each names another profile
+diff --git a/packages/core/src/domain/memory/mfp.ts b/packages/core/src/domain/memory/mfp.ts
+index e8633033..ccc95ce5 100644
+--- a/packages/core/src/domain/memory/mfp.ts
++++ b/packages/core/src/domain/memory/mfp.ts
+@@ -17,7 +17,7 @@ import {
+  */
+ 
+ /** Keel's MFP profile, by the URI every message Keel states names. */
+-export const KEEL_MFP_PROFILE = "https://keel.town/mfp/profile/1";
++export const KEEL_MFP_PROFILE = "https://keel.town/mfp/profiles/1";
+ 
+ /** Text a reader is meant to read: at least one non-space character. */
+ const Text = Schema.String.check(Schema.isPattern(/\S/));

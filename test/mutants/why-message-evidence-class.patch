@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts -t "why.mfp"
+# kills: why.mfp
+# why: the decision's message carries its evidence class, a trust field MFP 0.2 left to the receiver's record
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 8a300180..35008b67 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -156,6 +156,7 @@ export function whyChain({
+       ...(decision.scope === undefined ? {} : { scope: decision.scope }),
+       message: {
+         ...stated("decision"),
++        evidenceClass: "ruling",
+         ...(escalation === undefined ? {} : { question: escalation.question }),
+         chosen: decision.option,
+         rationale: decision.summary === "" ? decision.option : decision.summary,

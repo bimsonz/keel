@@ -81,10 +81,16 @@ model Change {
   revision: int32;
   goal: string;
   footprint: MFP.FootprintEntry[];
-  premises: MFP.Proposition[];
+
+  /**
+   * What the change relies on, in MFP 0.2, each with its strength written. A
+   * stored premise with no 0.2 form is left out, never repaired; a work-loop
+   * envelope names each in its notices.
+   */
+  premises: MFP.PremiseProposition[];
 
   /** Effects the agent declared it expects to cause. Advisory only: Keel derives effects from the diff. */
-  declaredEffects?: MFP.Proposition[];
+  declaredEffects?: MFP.EffectProposition[];
 
   /** The commit last submitted; it is the commit that lands. */
   commitSha?: CommitSha;
@@ -105,8 +111,8 @@ model Neighbour {
 
 /** A premise and the proposition contradicting it: one change's premise (or a tenet) against another change's premise or effect. */
 model Contradiction {
-  premise: MFP.Proposition;
-  with: MFP.Proposition;
+  premise: MFP.PremiseProposition;
+  with: MFP.PremiseProposition | MFP.EffectProposition;
 
   /** The change or tenet holding the premise. */
   holder: string;
@@ -210,10 +216,12 @@ model VerdictView {
 }
 
 /**
- * How strongly a piece of evidence bears on a verdict (ADR 0005): only proof
- * and rulings may fail one. Keel's own record-layer fact, never an MFP field.
+ * How strongly a piece of evidence bears on a verdict (ADR 0005), strongest
+ * first: only proof and rulings may fail or clear a change. Keel's own
+ * record-layer fact, never an MFP field: a verdict's reasons and a `KeelRecord`
+ * both carry it.
  */
-union VerdictEvidenceClass {
+union EvidenceClass {
   proof: "proof",
   ruling: "ruling",
   testimony: "testimony",
@@ -229,7 +237,7 @@ model VerdictReason {
   step?: string;
 
   /** The class of the step it names; proof when it names none, since a verifier reports only what ran. */
-  class: VerdictEvidenceClass;
+  class: EvidenceClass;
 }
 
 /** What kind of check a plan step is. */
@@ -263,7 +271,7 @@ model VerdictPlanStep {
   tierReason: string;
 
   /** The strongest evidence the step can give. */
-  evidenceCeiling: VerdictEvidenceClass;
+  evidenceCeiling: EvidenceClass;
 
   /** Why this step exists for this change: the premise, effect or rule that put it here. */
   because: string;

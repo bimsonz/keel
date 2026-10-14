@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: a revision holds its premises with no working commit, so an anchor with no commit is refused though the change has a base
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..ee27ae95 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1039,7 +1039,7 @@ export function revising(
+   stored: readonly Proposition[],
+   request: ReviseRequest,
+ ): Result.Result<ReviseInput, Issues> {
+-  const ctx = working(base);
++  const ctx = {};
+   const added = holding(request.added, ["premisesAdded"], premiseOfMfp, ctx, NO_BASE);
+   const effects = holding(request.effects ?? [], ["declaredEffects"], effectOfMfp, ctx, NO_BASE);
+   if (Result.isFailure(added) || Result.isFailure(effects))

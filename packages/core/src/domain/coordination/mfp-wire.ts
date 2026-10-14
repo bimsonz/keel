@@ -82,8 +82,8 @@ export const MfpShape: Schema.Codec<MfpShape> = Schema.Union([
 /** A code anchor. With no commit it means the driver's working commit. */
 export const MfpAnchor = Schema.Struct({
   path: Schema.NonEmptyString,
-  symbol: Schema.optional(Schema.String),
-  commit: Schema.optional(CommitSha),
+  symbol: Schema.optionalKey(Schema.String),
+  commit: Schema.optionalKey(CommitSha),
 });
 export type MfpAnchor = typeof MfpAnchor.Type;
 
@@ -97,12 +97,12 @@ export const MfpCitation = Schema.Union([
 export type MfpCitation = typeof MfpCitation.Type;
 
 const propositionFields = {
-  scope: Schema.optional(MfpScope),
-  gloss: Schema.optional(Schema.String),
-  anchors: Schema.optional(Schema.Array(MfpAnchor)),
-  cites: Schema.optional(Schema.Array(MfpCitation)),
+  scope: Schema.optionalKey(MfpScope),
+  gloss: Schema.optionalKey(Schema.String),
+  anchors: Schema.optionalKey(Schema.Array(MfpAnchor)),
+  cites: Schema.optionalKey(Schema.Array(MfpCitation)),
 };
-const premiseFields = { strength: Schema.optional(Strength), ...propositionFields };
+const premiseFields = { strength: Schema.optionalKey(Strength), ...propositionFields };
 
 const at = <P extends string>(predicate: P) => ({
   subject: SubjectKey,

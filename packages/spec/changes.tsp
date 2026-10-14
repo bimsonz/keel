@@ -19,10 +19,10 @@ model DeclareRequest {
   footprint?: MFP.FootprintEntry[];
 
   /** What it relies on, about code it does not own. */
-  premises: MFP.Proposition[];
+  premises: MFP.PremiseProposition[];
 
   /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
-  declaredEffects?: MFP.Proposition[];
+  declaredEffects?: MFP.EffectProposition[];
 }
 
 model Declared {
@@ -37,11 +37,11 @@ model DeclaredEnvelope is AgentEnvelope<Declared>;
 model ReviseRequest {
   goal?: string;
   footprint?: MFP.FootprintEntry[];
-  premisesAdded?: MFP.Proposition[];
-  premisesRetracted?: MFP.Proposition[];
+  premisesAdded?: MFP.PremiseProposition[];
+  premisesRetracted?: MFP.PremiseProposition[];
 
   /** Replaces the declared effects. Advisory only. */
-  declaredEffects?: MFP.Proposition[];
+  declaredEffects?: MFP.EffectProposition[];
 }
 
 model Revised {
@@ -52,7 +52,7 @@ model Revised {
 model RevisedEnvelope is AgentEnvelope<Revised>;
 
 model RelyRequest {
-  premise: MFP.Proposition;
+  premise: MFP.PremiseProposition;
 }
 
 model Relied {

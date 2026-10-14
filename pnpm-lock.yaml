@@ -370,6 +370,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@bimsonz/mfp':
+        specifier: 0.2.1
+        version: 0.2.1(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
       '@cloudflare/vitest-plugin':
         specifier: 'catalog:'
         version: 1.4.0(@cloudflare/workers-types@5.20261013.1)(@types/node@22.20.5)(vitest@5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
@@ -609,8 +612,8 @@ importers:
   packages/spec:
     dependencies:
       '@bimsonz/mfp':
-        specifier: 0.1.0-pre.3
-        version: 0.1.0-pre.3(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
+        specifier: 0.2.1
+        version: 0.2.1(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
     devDependencies:
       '@typespec/compiler':
         specifier: 'catalog:'
@@ -1057,12 +1060,6 @@ packages:
   '@better-fetch/fetch@1.3.2':
     resolution: {integrity: sha512-Gs7n99b5tqUC6cQAPbV0uED3IraHB6xQbHLQ/C3l7ZFafHScOx9pQ+DYmP5blbLFShVWLqxNUlI9wi4xU/X+ow==}
 
-  '@bimsonz/mfp@0.1.0-pre.3':
-    resolution: {integrity: sha512-FI19JQoG/nv0rVw6C86KQtbM+Rq5mnwH737NdhhOzY61fyZX8KkIDf4RLyRUDmZFuqRHxY7cSW9uxQIUpC/P1A==}
-    peerDependencies:
-      '@typespec/compiler': ^1.17.0
-      '@typespec/json-schema': ^1.17.0
-
   '@bimsonz/mfp@0.2.1':
     resolution: {integrity: sha512-q85f1QqC8U8SGUW9AWY5wo+xV9pkUseK/ZoLhK8fugSjwlxZ82GrgvjjbXap5U/UzB3DFW24h0FrfnbMHQbDhA==}
     hasBin: true
@@ -1392,8 +1389,8 @@ packages:
   '@hexagon/base64@1.1.28':
     resolution: {integrity: sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw==}
 
-  '@hono/node-server@2.1.4':
-    resolution: {integrity: sha512-2g1qeHl4BduwDn6L8nkAvDrPUWPMlkQ//a5NhP/zIyaXKMjZNRV+cG9Csu+BiJFf6+68pqzjf4Hi5sJGKHuS1g==}
+  '@hono/node-server@2.1.5':
+    resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4 || ^5.0.0-0
@@ -3134,8 +3131,8 @@ packages:
     resolution: {integrity: sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==}
     engines: {node: '>= 0.4'}
 
-  caniuse-lite@1.0.30001815:
-    resolution: {integrity: sha512-uDybUEyfgbyJJ93J1vikTylBX31AkdVYeVPeffMQpf8XN7hSfr0oZOn4VFOIMNvtU5+rHvC5Udg2TgtJKHm23Q==}
+  caniuse-lite@1.0.30001816:
+    resolution: {integrity: sha512-+8Yx7BXCoqk6IF8yTicjfUR6D/ldJzdlsodlEOiOSPmhK844WIgk67/zIQaGAOxNkZyyvBlrRFnLvqKIoqbAFw==}
 
   capnweb@0.8.0:
     resolution: {integrity: sha512-BK/TuXUiyfLSKsmjojn70yN7oYG/JJzoURZ3tckjg5Zj2KcygPm0A5jyOlswK7SYB4f0Gh9tt+RZ132b80iLfA==}
@@ -5660,11 +5657,6 @@ snapshots:
 
   '@better-fetch/fetch@1.3.2': {}
 
-  '@bimsonz/mfp@0.1.0-pre.3(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))':
-    dependencies:
-      '@typespec/compiler': 1.17.0(@types/node@22.20.5)
-      '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5))
-
   '@bimsonz/mfp@0.2.1(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))':
     dependencies:
       '@typespec/compiler': 1.17.0(@types/node@22.20.5)
@@ -5940,7 +5932,7 @@ snapshots:
     dependencies:
       '@earendil-works/pi-agent-core': 1.2.0(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@10.2.2)(undici@7.29.1)(ws@8.21.0)(zod@4.6.5)
       '@earendil-works/pi-ai': 1.2.0(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@10.2.2)(undici@7.29.1)(ws@8.21.0)(zod@4.6.5)
-      '@hono/node-server': 2.1.4(hono@4.13.13)
+      '@hono/node-server': 2.1.5(hono@4.13.13)
       '@modelcontextprotocol/client': 2.0.0
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@7.0.2))
       hono: 4.13.13
@@ -5964,7 +5956,7 @@ snapshots:
   '@flue/vite@2.3.0(@aws-sdk/credential-provider-node@3.972.86)(@babel/core@8.0.7)(@babel/runtime@8.0.7)(@cloudflare/workers-types@5.20261013.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@modelcontextprotocol/server@2.0.0)(@smithy/signature-v4@5.7.4)(hono@4.13.13)(react@19.3.0)(rolldown@1.2.13)(supports-color@10.2.2)(typescript@7.0.2)(undici@7.29.1)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(ws@8.21.0)(zod@4.6.5)':
     dependencies:
       '@flue/runtime': 2.3.0(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@10.2.2)(typescript@7.0.2)(undici@7.29.1)(ws@8.21.0)(zod@4.6.5)
-      '@hono/node-server': 2.1.4(hono@4.13.13)
+      '@hono/node-server': 2.1.5(hono@4.13.13)
       agents: 0.20.1(@babel/core@8.0.7)(@babel/runtime@8.0.7)(@cloudflare/workers-types@5.20261013.1)(@modelcontextprotocol/client@2.0.0)(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@modelcontextprotocol/server@2.0.0)(react@19.3.0)(rolldown@1.2.13)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))(zod@4.6.5)
       magic-string: 1.4.3
       tinyglobby: 0.2.17
@@ -6016,7 +6008,7 @@ snapshots:
 
   '@hexagon/base64@1.1.28': {}
 
-  '@hono/node-server@2.1.4(hono@4.13.13)':
+  '@hono/node-server@2.1.5(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
 
@@ -6248,7 +6240,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5)':
     dependencies:
-      '@hono/node-server': 2.1.4(hono@4.13.13)
+      '@hono/node-server': 2.1.5(hono@4.13.13)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -7353,7 +7345,7 @@ snapshots:
   browserslist@4.29.3:
     dependencies:
       baseline-browser-mapping: 2.11.28
-      caniuse-lite: 1.0.30001815
+      caniuse-lite: 1.0.30001816
       electron-to-chromium: 1.5.453
       node-releases: 2.0.58
       update-browserslist-db: 1.3.4(browserslist@4.29.3)
@@ -7372,7 +7364,7 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       get-intrinsic: 1.3.0
 
-  caniuse-lite@1.0.30001815: {}
+  caniuse-lite@1.0.30001816: {}
 
   capnweb@0.8.0: {}
 

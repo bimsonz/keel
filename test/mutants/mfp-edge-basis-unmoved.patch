@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-view"
+# kills: mfp.edge-view
+# why: a move keeps its contradiction's index after one before it is left out, so it points at another
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 80640429..7169cc10 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -334,7 +334,7 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+     ];
+   });
+   const rests = preflight.basis?._tag === "contradiction" ? preflight.basis.index : undefined;
+-  const index = rests === undefined ? undefined : position.get(rests);
++  const index = rests;
+   const basis =
+     rests === undefined
+       ? preflight.basis

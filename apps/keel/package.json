@@ -35,6 +35,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@bimsonz/mfp": "0.2.1",
     "@cloudflare/vitest-plugin": "catalog:",
     "@effect/vitest": "catalog:",
     "@keeltown/sdk": "workspace:*",

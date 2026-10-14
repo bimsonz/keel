@@ -58,7 +58,9 @@ import {
   type ProjectResource,
   roleOf,
 } from "@keeltown/core/domain/identity";
+import type { Change, ChangeNotFound } from "@keeltown/core/domain/coordination";
 import {
+  type ChangeId,
   ConflictId,
   type NamespaceId,
   namespaceKind,
@@ -68,6 +70,7 @@ import {
 } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
+  type Changes,
   type EscalationReader,
   Namespaces,
   ProjectNamespaces,
@@ -181,9 +184,13 @@ import {
   relyError,
   relyInput,
   relyOk,
+  reliesAgainstChange,
+  relying,
   reviseError,
   reviseInput,
   reviseOk,
+  revisesAgainstChange,
+  revising,
   nearbyError,
   nearbyOk,
   changeIdInput,
@@ -294,6 +301,13 @@ function settingsActorOf(caller: Caller): Actor {
 }
 
 /** The project a read was granted, and who it reads as. */
+/** The change a revision or a rely is held against, read only when it needs one. */
+const against = (
+  changeId: ChangeId,
+  needed: boolean,
+): Effect.Effect<Change | undefined, ChangeNotFound, Changes> =>
+  needed ? Effect.map(readChange(changeId), (read) => read.change) : Effect.succeed(undefined);
+
 const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audience: Audience } => ({
   project: projectOf(caller).projectId,
   audience: caller.audience ?? "public",
@@ -714,12 +728,26 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         revise: (caller: Caller, input: Input<"revise">) => {
           const decoded = reviseInput(input);
           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          const request = decoded.success;
           return run(
             caller,
             tokenOf(caller).pipe(
-              Effect.flatMap((principal) => reviseChange(principal, decoded.success)),
+              Effect.flatMap((principal) =>
+                against(request.revise.changeId, revisesAgainstChange(request)).pipe(
+                  Effect.flatMap((change) => {
+                    const command = revising(
+                      change?.baseSha,
+                      change?.intent.premises ?? [],
+                      request,
+                    );
+                    return Result.isFailure(command)
+                      ? Effect.succeed(invalid(caller, command.failure))
+                      : reviseChange(principal, command.success).pipe(Effect.map(reviseOk));
+                  }),
+                ),
+              ),
               Effect.match({
-                onSuccess: reviseOk,
+                onSuccess: (answer) => answer,
                 onFailure: (error) => reviseError(caller, error),
               }),
             ),
@@ -728,11 +756,24 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         rely: (caller: Caller, input: Input<"rely">) => {
           const decoded = relyInput(input);
           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          const request = decoded.success;
           return run(
             caller,
             tokenOf(caller).pipe(
-              Effect.flatMap((principal) => relyOn(principal, decoded.success)),
-              Effect.match({ onSuccess: relyOk, onFailure: (error) => relyError(caller, error) }),
+              Effect.flatMap((principal) =>
+                against(request.rely.changeId, reliesAgainstChange(request)).pipe(
+                  Effect.flatMap((change) => {
+                    const command = relying(change?.baseSha, request);
+                    return Result.isFailure(command)
+                      ? Effect.succeed(invalid(caller, command.failure))
+                      : relyOn(principal, command.success).pipe(Effect.map(relyOk));
+                  }),
+                ),
+              ),
+              Effect.match({
+                onSuccess: (answer) => answer,
+                onFailure: (error) => relyError(caller, error),
+              }),
             ),
           );
         },

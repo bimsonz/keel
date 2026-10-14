@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/why.test.ts
+# kills: why.cli
+# why: keeltown why reads a decision where MFP 0.1 kept its kind, so it finds none in a 0.2 record
+diff --git a/packages/cli/src/why.ts b/packages/cli/src/why.ts
+index 82553041..4c15db25 100644
+--- a/packages/cli/src/why.ts
++++ b/packages/cli/src/why.ts
+@@ -19,7 +19,7 @@ const actionLine = (action: NextAction) =>
+ export function chainText(answer: WhyAnswer): string {
+   const decisions: { id: string; links: Link[] }[] = [];
+   for (const link of answer.result.chain) {
+-    if (link.record.message.kind === "decision") decisions.push({ id: link.record.id, links: [] });
++    if (Reflect.get(link.record, "kind") === "decision") decisions.push({ id: link.record.id, links: [] });
+     decisions.at(-1)?.links.push(link);
+   }
+   const blocks = decisions.map(({ id, links }) => {

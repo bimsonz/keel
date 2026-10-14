@@ -123,5 +123,4 @@ minimumReleaseAgeExclude:
   - "@oxlint-tsgolint/win32-arm64@7.0.2004"
   - "@oxlint-tsgolint/win32-x64@7.0.2004"
   - oxlint-tsgolint@7.0.2004
-  - "@bimsonz/mfp@0.1.0-pre.3"
   - "@bimsonz/mfp@0.2.1"

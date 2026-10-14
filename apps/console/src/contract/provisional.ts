@@ -7,7 +7,7 @@
 
 import type { Cost, Evidence, EvidenceClass } from "./mfp.ts";
 
-/** MFP's Evidence, and two things the console shows when it has them that MFP does not carry. */
+/** A piece of evidence, and two things the console shows when it has them. */
 export interface EvidenceLine extends Evidence {
   /** What produced it: a probe, an extractor, the lattice, Clef, an agent. */
   by?: string;

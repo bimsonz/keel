@@ -14,8 +14,9 @@ namespace Keel;
 // Shapes the API already publishes are reused where core's match them exactly
 // (`MFP.FootprintEntry`, `Move`, `Scope`, the id scalars). Where they differ, an
 // `Event*` model carries core's shape and the published one keeps its own:
-// `EventProposition` (subject a key, not any string; `_tag` citations, not `kind`;
-// no default strength), `EventAnchor` (a commit SHA, not any 4+ characters),
+// `EventProposition` (one shape for every predicate, its value a string, number or
+// boolean, not MFP 0.2's per-predicate premise and effect shapes; `_tag` citations,
+// not `kind`; no default strength), `EventAnchor` (its commit required, not optional),
 // `EventSubjectKey` and `EventNeighbour` (no length cap on a subject key),
 // `EventContradiction` (through the proposition), `EventPrecedentRef` (`decidedAt`
 // in epoch milliseconds, not a date-time), `EventNextAction` (a non-empty title,
@@ -72,7 +73,7 @@ model EventProposition {
   predicate: MFP.Predicate;
   relation: MFP.Relation;
 
-  /** Read on the predicate's lattice, as in `MFP.Proposition.value`. */
+  /** Read on the predicate's lattice. */
   value: string | float64 | boolean;
 
   /** The unit of a `bound` value, e.g. `ms`. */

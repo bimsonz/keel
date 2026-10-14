@@ -465,7 +465,12 @@ export function makeChangesMemory(
               createdAt: now,
             };
             const workspace = grant(change.id, now);
-            const stored: Change = { ...change, workspaceId: workspace.workspaceId };
+            // Working on its workspace's base, as the Change DO's Start leaves it.
+            const stored: Change = {
+              ...change,
+              workspaceId: workspace.workspaceId,
+              baseSha: workspace.baseSha,
+            };
             changes.set(stored.id, stored);
             projects.set(stored.id, principal.projectId);
             reservations.set(key, { changeId: stored.id, fingerprint });

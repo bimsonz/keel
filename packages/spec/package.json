@@ -9,7 +9,7 @@
     "gen": "tsp compile . --pretty=false"
   },
   "dependencies": {
-    "@bimsonz/mfp": "0.1.0-pre.3"
+    "@bimsonz/mfp": "0.2.1"
   },
   "devDependencies": {
     "@typespec/compiler": "catalog:",

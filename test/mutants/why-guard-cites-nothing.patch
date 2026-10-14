@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts -t "why.mfp"
+# kills: why.mfp
+# why: a guard's observation cites nothing it rests on, which MFP refuses of an observation
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 8a300180..381fa21c 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -134,10 +134,7 @@ export function whyChain({
+           importance: "high",
+           summary: `Guard ${guard.id} asserts the premise ${label} upheld, from probe ${guard.probeId}`,
+           // What it rests on: the premise it asserts, and the probe that proved it.
+-          cites: [
+-            ...(premiseRecord === undefined ? [] : [cite(premiseRecord)]),
+-            { kind: "record", ref: guard.probeId },
+-          ],
++          cites: [],
+         },
+       },
+     });

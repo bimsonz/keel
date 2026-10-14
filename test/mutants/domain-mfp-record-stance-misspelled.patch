@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/mfp.test.ts
+# kills: mfp.record-spec-agrees
+# why: Core spells a stance overruled where 0.2 says overrule-requested: core holds the stance it states, and only MFP's own check refuses it
+diff --git a/packages/core/src/domain/memory/mfp.ts b/packages/core/src/domain/memory/mfp.ts
+index e8633033..9e0b7f8a 100644
+--- a/packages/core/src/domain/memory/mfp.ts
++++ b/packages/core/src/domain/memory/mfp.ts
+@@ -85,7 +85,7 @@ export type MfpObservation = typeof MfpObservation.Type;
+ export const MfpStance = Schema.Struct({
+   ...header("stance"),
+   decision: Schema.NonEmptyString,
+-  stance: Schema.Literals(["followed", "distinguished", "overrule-requested"]),
++  stance: Schema.Literals(["followed", "distinguished", "overruled"]),
+   argument: Text,
+   cites: Schema.optionalKey(Citations),
+   confidence,

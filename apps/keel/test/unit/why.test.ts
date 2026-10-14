@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { why, whyChain } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import type { WhyLink } from "@keeltown/core/domain/memory";
+import { KEEL_MFP_PROFILE, type WhyLink } from "@keeltown/core/domain/memory";
 import {
   CommitSha,
   type EventEnvelope,
@@ -15,6 +15,7 @@ import { Decisions, type WhySource, type WhyTarget } from "@keeltown/core/ports"
 import { makeDecisionsMemory, projectEvents, ruledConflict } from "@keeltown/testing";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
+import { checkMessages, loadWire, type Profile } from "@bimsonz/mfp/profile";
 import { Effect, Layer, Result, Schema } from "effect";
 import { ulid } from "ulid";
 
@@ -73,7 +74,7 @@ const whyAfter = (arrivals: readonly EventEnvelope[], project: ProjectId, target
 };
 
 const shape = (chain: readonly WhyLink[]) =>
-  chain.map((link) => [link.record.kind, link.record.id]);
+  chain.map((link) => [link.record.message.kind, link.record.id]);
 
 describe("why", () => {
   it.effect(
@@ -111,32 +112,54 @@ describe("why", () => {
         expect(decision).toMatchObject({
           author: { kind: "platform", id: "keel" },
           evidenceClass: "ruling",
-          cites: [
-            { kind: "record", id: premiseId },
-            { kind: "record", id: intentId },
-            { kind: "record", id: conflict.guardId },
-          ],
-          payload: { chosen: "premise-holds", rationale: "The premise holds", reversible: true },
+          message: {
+            mfp: "0.2",
+            profile: KEEL_MFP_PROFILE,
+            chosen: "premise-holds",
+            rationale: "The premise holds",
+            reversible: true,
+            cites: [
+              { kind: "record", ref: premiseId },
+              { kind: "record", ref: intentId },
+              { kind: "record", ref: conflict.guardId },
+            ],
+          },
         });
         expect(premise).toMatchObject({
           change: conflict.holder,
           author: { kind: "agent", id: s.agents.holder },
-          payload: { proposition: { ...conflict.premise, strength: "must" } },
+          message: { premise: conflict.premise },
         });
         expect(intent).toMatchObject({
           change: conflict.other,
           author: { kind: "agent", id: s.agents.other },
-          payload: { revision: 1, goal: "Cache sessions for an hour", premises: [] },
+          message: { goal: "Cache sessions for an hour", premises: [] },
         });
+        expect(intent?.message).not.toHaveProperty("revision");
         expect(guard).toMatchObject({
           evidenceClass: "proof",
-          cites: [{ kind: "record", id: premiseId }],
-          payload: { category: "guard", importance: "high", evidence: [{ class: "proof" }] },
+          message: {
+            category: "guard",
+            importance: "high",
+            // The premise it asserts, and the probe that proved it.
+            cites: [
+              { kind: "record", ref: premiseId },
+              { kind: "record", ref: expect.stringMatching(/^prb_/) },
+            ],
+          },
         });
         expect(verdict).toMatchObject({
           change: conflict.holder,
-          cites: [{ kind: "record", id: conflict.decisionId }],
-          payload: { outcome: "land", reasons: [{ class: "proof", ref: s.commits.holder }] },
+          evidenceClass: "proof",
+          message: {
+            outcome: "land",
+            reasons: [
+              {
+                summary: expect.stringContaining(`Landed as ${s.commits.holder}`),
+                cites: [{ kind: "record", ref: conflict.decisionId }],
+              },
+            ],
+          },
         });
         expect(chain[0]?.summary).toMatch(/^D-\d+ ruled premise-holds: The premise holds$/);
       }),
@@ -196,10 +219,12 @@ describe("why", () => {
         expect(noted.at).toBeGreaterThan(landing.at);
         const at = new Date(landing.at).toISOString();
         expect(late.at(-1)?.record).toMatchObject({
-          kind: "verdict",
           id: `${holder}.landed.${after.conflict.decisionId}`,
           at,
-          payload: { reasons: [{ class: "proof", ref: after.commits.holder, at }] },
+          message: {
+            kind: "verdict",
+            reasons: [{ summary: expect.stringContaining(`Landed as ${after.commits.holder}`) }],
+          },
         });
       }),
   );
@@ -354,7 +379,7 @@ describe("why", () => {
   );
 });
 
-/** The spec's `MFP.MfpRecord`, as the published document has it, compiled with its formats. */
+/** The spec's `KeelRecord`, as the published document has it, compiled with its formats. */
 function recordValidator() {
   const document: unknown = JSON.parse(
     readFileSync(join(import.meta.dirname, "../../../../packages/contracts/openapi.json"), "utf8"),
@@ -364,22 +389,44 @@ function recordValidator() {
   // OpenAPI's numeric formats only name a width; the schema's own bounds carry what MFP asks.
   for (const format of ["int32", "int64", "double"]) ajv.addFormat(format, true);
   ajv.addSchema(Object(document), "openapi.json");
-  const validate = ajv.compile({ $ref: "openapi.json#/components/schemas/MFP.MfpRecord" });
+  const validate = ajv.compile({ $ref: "openapi.json#/components/schemas/KeelRecord" });
   return (record: unknown) => ({ valid: validate(record), errors: validate.errors ?? [] });
 }
 
-/** Every record of a chain that the spec's schema refuses, with why. */
-const refusedOf = (validate: ReturnType<typeof recordValidator>, chain: readonly WhyLink[]) =>
-  chain.flatMap((link) => {
+/** Keel's MFP profile, as the spec publishes it. */
+const PROFILE: Profile = JSON.parse(
+  readFileSync(
+    join(import.meta.dirname, "../../../../packages/spec/mfp/keel.profile.json"),
+    "utf8",
+  ),
+);
+const WIRE = loadWire();
+
+/** What MFP's own checker, under Keel's profile, refuses in each message: none, for a message that conforms. */
+const problemsOf = (messages: readonly (readonly [string, unknown])[]) =>
+  checkMessages(
+    WIRE,
+    PROFILE,
+    messages.map(([id, message]) => [id, message]),
+  );
+
+/** Whether MFP's checker refuses one message under Keel's profile. */
+const refused = (message: unknown) => problemsOf([["m", message]]).length > 0;
+
+/** Every record of a chain that the spec's schema refuses, or whose message MFP refuses, with why. */
+const refusedOf = (validate: ReturnType<typeof recordValidator>, chain: readonly WhyLink[]) => [
+  ...chain.flatMap((link) => {
     const { valid, errors } = validate(link.record);
     return valid ? [] : [{ id: link.record.id, errors }];
-  });
+  }),
+  ...problemsOf(chain.map((link) => [link.record.id, link.record.message])),
+];
 
 describe("why's MFP records", () => {
   const validate = recordValidator();
 
   it.effect(
-    "[why.mfp] every record a chain holds is an MFP 0.1 record by the spec's own schema: with a guard and landings, without either, and with every optional field the mapper writes",
+    "[why.mfp] every record a chain holds is the spec's KeelRecord, and its message conforms to MFP 0.2 under Keel's profile by MFP's own checker: with a guard and landings, without either, and with every optional field the mapper writes",
     () =>
       Effect.gen(function* () {
         const guarded = ruled("premise-holds", ["holder", "other"]);
@@ -428,6 +475,8 @@ describe("why's MFP records", () => {
                   ...premise,
                   proposition: {
                     ...premise.proposition,
+                    predicate: "bound" as const,
+                    relation: "at-most" as const,
                     value: 30,
                     unit: "s",
                     scope: "tenant:t1",
@@ -480,15 +529,78 @@ describe("why's MFP records", () => {
         expect(everything?.[0]?.record).toMatchObject({
           author: { kind: "human" },
           scope: "env:prod",
-          payload: { question: "Does the premise hold?", rationale: "premise-holds" },
+          message: { question: "Does the premise hold?", rationale: "premise-holds" },
+        });
+        expect(everything?.[1]?.record.message).toMatchObject({
+          premise: { predicate: "bound", value: 30, unit: "s", strength: "should" },
         });
         expect(chains.flatMap((chain) => refusedOf(validate, chain))).toEqual([]);
-        // The schema is the spec's and refuses what MFP refuses: it is no `{}`.
-        const decision = withBoth?.[0]?.record;
-        expect(validate({ ...decision, cites: [] }).valid).toBe(false);
-        expect(validate({ ...decision, author: { kind: "agent", id: "" } }).valid).toBe(false);
+        // The checks are the spec's and MFP's, and refuse what each refuses: neither is `{}`.
+        const [decision, , , guard, landing] = (withBoth ?? []).map((link) => link.record);
         expect(validate({ ...decision, extra: true }).valid).toBe(false);
         expect(validate({ ...decision, at: "yesterday" }).valid).toBe(false);
+        expect(refused(decision?.message)).toBe(false);
+        expect(refused({ ...decision?.message, cites: [] })).toBe(true);
+        // What MFP 0.2 dropped is Keel's record's, never the message's.
+        expect(refused({ ...decision?.message, evidenceClass: "ruling" })).toBe(true);
+        expect(refused({ ...guard?.message, cites: [] })).toBe(true);
+        expect(refused({ ...landing?.message, outcome: "accept" })).toBe(true);
+      }),
+  );
+
+  it.effect(
+    "[why.untellable] a premise with no 0.2 form is not stated, never repaired: the decision still cites the intent and the guard, and the guard its probe",
+    () =>
+      Effect.gen(function* () {
+        const guarded = ruled("premise-holds", ["holder", "other"]);
+        const memory = makeDecisionsMemory();
+        const [source] = yield* Effect.gen(function* () {
+          for (const event of guarded.arrivals) yield* memory.arrive(event);
+          return yield* (yield* Decisions).explaining(guarded.events.project, {
+            kind: "subject",
+            subject: SUBJECT,
+          });
+        }).pipe(Effect.provide(memory.layer));
+        const record = source?.conflict;
+        const premise = record?.conflict.premise;
+        if (source === undefined || record === undefined || premise === undefined)
+          throw new Error("no conflict folded");
+        // Stored before 0.2: a writer with a space in it, which 0.2's `Writer` cannot hold.
+        const chain = whyChain({
+          ...source,
+          conflict: {
+            ...record,
+            conflict: {
+              ...record.conflict,
+              premise: {
+                ...premise,
+                proposition: {
+                  ...premise.proposition,
+                  predicate: "authority" as const,
+                  relation: "at-most" as const,
+                  value: "release team,alice",
+                },
+              },
+            },
+          },
+        });
+        expect(shape(chain).map(([kind]) => kind)).toEqual([
+          "decision",
+          "intent",
+          "observation",
+          "verdict",
+        ]);
+        const [decision, intent, guard] = chain.map((link) => link.record);
+        expect(decision?.message).toMatchObject({
+          cites: [
+            { kind: "record", ref: intent?.id },
+            { kind: "record", ref: guard?.id },
+          ],
+        });
+        expect(guard?.message).toMatchObject({
+          cites: [{ kind: "record", ref: expect.stringMatching(/^prb_/) }],
+        });
+        expect(refusedOf(validate, chain)).toEqual([]);
       }),
   );
 });

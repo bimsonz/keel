@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts -t "why.untellable"
+# kills: why.untellable
+# why: a premise with no 0.2 form is stated anyway, as Keel stores it
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 8a300180..06ba80e6 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -99,7 +99,7 @@ export function whyChain({
+   const conflict = record?.conflict;
+   const grounds: WhyLink[] = [];
+   const premise = conflict?.premise;
+-  const premiseTold = premise === undefined ? [] : told(premiseToMfp(premise.proposition));
++  const premiseTold = premise === undefined ? [] : [premise.proposition as never];
+   if (conflict !== undefined && premise !== undefined && premiseTold[0] !== undefined) {
+     const holder = changes.get(premise.holder)?.change;
+     grounds.push({

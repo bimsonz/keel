@@ -2,13 +2,13 @@
 # kills: b12.get-change
 # why: the change answers without the commit it submitted
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index dbab9d13..3d91e5e5 100644
+index 80640429..4e2aa89b 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -234,7 +234,6 @@ function changeView(change: Change) {
+@@ -285,7 +285,6 @@ function changeView(change: Change, tell: Teller) {
      ...(change.intent.declaredEffects === undefined
        ? {}
-       : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
+       : { declaredEffects: change.intent.declaredEffects.flatMap((p) => tell.effect(ref, p)) }),
 -    ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
      ...(change.run === undefined ? {} : { run: runView(change.run) }),
      createdAt: iso(change.createdAt),

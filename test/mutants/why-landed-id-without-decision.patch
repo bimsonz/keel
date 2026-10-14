@@ -2,15 +2,15 @@
 # kills: why.chain
 # why: a landing's verdict is named by its change alone, so a party two decisions favoured has two records under one id
 diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
-index 093a2670..e4e07a3b 100644
+index 8a300180..8234bdf1 100644
 --- a/packages/core/src/application/memory/why.ts
 +++ b/packages/core/src/application/memory/why.ts
-@@ -219,7 +219,7 @@ export function whyChain({
-           mfp: "0.1",
-           kind: "verdict",
+@@ -188,7 +188,7 @@ export function whyChain({
+         summary: `${party} landed as ${commit} under ${label}`,
+         record: {
            // A party favoured by two decisions landed under each: one record apiece.
 -          id: `${party}.landed.${decision.id}`,
 +          id: `${party}.landed`,
-           change: party,
+           change: view.change.id,
            author: KEEL_AUTHOR,
-           at,
+           at: iso(landedAt),

@@ -1,12 +1,9 @@
 import { Context, type Effect } from "effect";
 import type { CommitSha } from "../../domain/kernel/index.ts";
+import type { KeelRecord } from "../../domain/memory/index.ts";
 
-/** An MFP record, already validated against the published schema. */
-export type MfpRecord = Readonly<Record<string, unknown>> & {
-  readonly mfp: "0.1";
-  readonly kind: string;
-  readonly id: string;
-};
+/** Keel's record of an MFP 0.2 message, as the writer stores it. */
+export type MfpRecord = KeelRecord;
 
 /** Writes MFP claims: the record store, commit trailers and `refs/notes/mfp`. */
 export class MfpWriter extends Context.Service<

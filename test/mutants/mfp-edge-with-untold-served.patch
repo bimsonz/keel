@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-view"
+# kills: mfp.edge-view
+# why: a contradiction whose other side has no 0.2 form is served with no other side
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..c683294b 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -346,7 +346,7 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+     const premise = tell.premise(`change:${changeId}`, c.premise);
+     const other =
+       c.withRole === "premise" ? tell.premise(c.holder, c.with) : tell.effect(c.holder, c.with);
+-    if (premise[0] === undefined || other[0] === undefined) return [];
++    if (premise[0] === undefined) return [];
+     position.set(i, position.size);
+     return [
+       {

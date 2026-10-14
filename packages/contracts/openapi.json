@@ -9669,7 +9669,7 @@
       "get": {
         "operationId": "why",
         "summary": "Why is it like this?",
-        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.1 record. A subject's anchors name a file and\nno lines, so `line` does not narrow: a path with a line answers every\nsubject anchored in that file. An agent reads its own project unless it\nnames another; anyone else names one. Nothing to explain in the project\nread is 404 `why.nothing_to_explain`. Without a token only a public project\nis read, and a private or unknown one, like any the caller may not see, is\nthe same 404. A refusal about the caller itself (a token's scope, a\nsuspension, a paused agent) is 403 with its next action.",
+        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.2 message in Keel's record. A subject's\nanchors name a file and no lines, so `line` does not narrow: a path with a\nline answers every subject anchored in that file. An agent reads its own\nproject unless it names another; anyone else names one. Nothing to explain\nin the project read is 404 `why.nothing_to_explain`. Without a token only a\npublic project is read, and a private or unknown one, like any the caller\nmay not see, is the same 404. A refusal about the caller itself (a token's\nscope, a suspension, a paused agent) is 403 with its next action.",
         "parameters": [
           {
             "name": "project",
@@ -11548,13 +11548,14 @@
           "premises": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
-            }
+              "$ref": "#/components/schemas/MFP.PremiseProposition"
+            },
+            "description": "What the change relies on, in MFP 0.2, each with its strength written. A\nstored premise with no 0.2 form is left out, never repaired; a work-loop\nenvelope names each in its notices."
           },
           "declaredEffects": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.EffectProposition"
             },
             "description": "Effects the agent declared it expects to cause. Advisory only: Keel derives effects from the diff."
           },
@@ -13467,10 +13468,17 @@
         ],
         "properties": {
           "premise": {
-            "$ref": "#/components/schemas/MFP.Proposition"
+            "$ref": "#/components/schemas/MFP.PremiseProposition"
           },
           "with": {
-            "$ref": "#/components/schemas/MFP.Proposition"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MFP.PremiseProposition"
+              },
+              {
+                "$ref": "#/components/schemas/MFP.EffectProposition"
+              }
+            ]
           },
           "holder": {
             "type": "string",
@@ -13958,14 +13966,14 @@
           "premises": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.PremiseProposition"
             },
             "description": "What it relies on, about code it does not own."
           },
           "declaredEffects": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.EffectProposition"
             },
             "description": "Effects the agent expects to cause. Advisory only: Keel derives effects from the diff."
           }
@@ -15382,7 +15390,7 @@
                 "type": "boolean"
               }
             ],
-            "description": "Read on the predicate's lattice, as in `MFP.Proposition.value`."
+            "description": "Read on the predicate's lattice."
           },
           "unit": {
             "type": "string",
@@ -15537,6 +15545,16 @@
         "type": "string",
         "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
         "description": "A subject key as events carry it: the API's `SubjectKey` without its length cap."
+      },
+      "EvidenceClass": {
+        "type": "string",
+        "enum": [
+          "proof",
+          "ruling",
+          "testimony",
+          "opinion"
+        ],
+        "description": "How strongly a piece of evidence bears on a verdict (ADR 0005), strongest\nfirst: only proof and rulings may fail or clear a change. Keel's own\nrecord-layer fact, never an MFP field: a verdict's reasons and a `KeelRecord`\nboth carry it."
       },
       "FeedSnapshot": {
         "type": "object",
@@ -16409,6 +16427,43 @@
         ],
         "description": "Any event in the catalogue. `_tag` names it."
       },
+      "KeelRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "author",
+          "at",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/RecordAuthor"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "change": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "evidenceClass": {
+            "$ref": "#/components/schemas/EvidenceClass"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MFP.Message"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Keel's own record of an MFP message: who stated it, when, for which change,\nthe class of evidence it rests on and where it holds, which MFP 0.2 leaves to\nthe receiver. The message itself is MFP 0.2."
+      },
       "LanePage": {
         "type": "object",
         "required": [
@@ -16638,23 +16693,6 @@
           "not": {}
         }
       },
-      "MFP.Actor": {
-        "type": "object",
-        "properties": {
-          "harness": {
-            "type": "string",
-            "description": "The harness the agent ran in, e.g. a coding assistant or a hosted runner."
-          },
-          "model": {
-            "type": "string",
-            "description": "The model identifier, pinned to a revision where the provider allows."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "What produced the record on the author's behalf."
-      },
       "MFP.Alternative": {
         "type": "object",
         "required": [
@@ -16663,12 +16701,10 @@
         ],
         "properties": {
           "option": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/components/schemas/MFP.Text"
           },
           "reasonRejected": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/components/schemas/MFP.Text"
           }
         },
         "additionalProperties": {
@@ -16678,8 +16714,7 @@
       "MFP.Anchor": {
         "type": "object",
         "required": [
-          "path",
-          "commit"
+          "path"
         ],
         "properties": {
           "path": {
@@ -16692,21 +16727,24 @@
             "description": "A symbol within the file, e.g. a function or class name."
           },
           "commit": {
-            "type": "string",
-            "minLength": 4,
-            "description": "The commit the anchor was resolved against."
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.CommitId"
+              }
+            ],
+            "description": "The commit the anchor was read at. Absent means the commit the driver is working against."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "A code symbol pinned to a commit."
+        "description": "A path, and optionally a symbol, in the repository, optionally pinned to a commit."
       },
       "MFP.AnchorCitation": {
         "type": "object",
         "required": [
           "kind",
-          "anchor"
+          "path"
         ],
         "properties": {
           "kind": {
@@ -16715,149 +16753,617 @@
               "anchor"
             ]
           },
-          "anchor": {
-            "$ref": "#/components/schemas/MFP.Anchor"
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository-relative path."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "A symbol within the file, e.g. a function or class name."
+          },
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.CommitId"
+              }
+            ],
+            "description": "The commit the anchor was read at. Absent means the commit the driver is working against."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A code location the claim rests on."
+      },
+      "MFP.ArrayShape": {
+        "type": "object",
+        "required": [
+          "type",
+          "items"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "array"
+            ]
+          },
+          "items": {
+            "$ref": "#/components/schemas/MFP.Shape"
           }
         },
         "additionalProperties": {
           "not": {}
         }
       },
-      "MFP.Author": {
+      "MFP.AuthorityEffect": {
         "type": "object",
         "required": [
-          "kind",
-          "id"
+          "subject",
+          "predicate",
+          "relation",
+          "value"
         ],
         "properties": {
-          "kind": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
             "type": "string",
             "enum": [
-              "agent",
-              "platform",
-              "human"
+              "authority"
             ]
           },
-          "id": {
+          "relation": {
             "type": "string",
-            "minLength": 1,
-            "description": "The author's stable identifier within the producing platform."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "Who made the claim. A platform-derived record never reads as something an agent said."
-      },
-      "MFP.Citation": {
-        "anyOf": [
-          {
-            "$ref": "#/components/schemas/MFP.MessageCitation"
+            "enum": [
+              "is",
+              "at-most",
+              "at-least"
+            ]
           },
-          {
-            "$ref": "#/components/schemas/MFP.AnchorCitation"
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Writer"
+            },
+            "uniqueItems": true
           },
-          {
-            "$ref": "#/components/schemas/MFP.RecordCitation"
-          }
-        ],
-        "description": "A pointer to what a claim rests on."
-      },
-      "MFP.CodeModelEffect": {
-        "type": "object",
-        "required": [
-          "proposition",
-          "anchors",
-          "declared",
-          "method",
-          "evidenceClass"
-        ],
-        "properties": {
-          "proposition": {
-            "$ref": "#/components/schemas/MFP.Proposition"
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
           },
           "anchors": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MFP.Anchor"
-            },
-            "minItems": 1,
-            "description": "Code locations the derivation rests on."
+            }
           },
-          "declared": {
-            "type": "boolean",
-            "description": "Whether the change's author had declared this effect."
-          },
-          "contradicts": {
-            "type": "string",
-            "description": "A premise or tenet this effect contradicts, by reference."
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "code-model"
-            ]
-          },
-          "evidenceClass": {
-            "type": "string",
-            "enum": [
-              "opinion"
-            ]
-          },
-          "p": {
-            "type": "number",
-            "format": "double",
-            "minimum": 0,
-            "maximum": 1
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "Proposed by a code model: opinion."
-      },
-      "MFP.Cost": {
-        "type": "object",
-        "properties": {
-          "ms": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Wall-clock milliseconds."
-          },
-          "tokens": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Model tokens consumed."
-          },
-          "usd": {
-            "type": "number",
-            "format": "double",
-            "description": "Spend in US dollars."
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
           }
         },
         "additionalProperties": {
           "not": {}
         }
       },
+      "MFP.AuthorityPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "authority"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least"
+            ]
+          },
+          "value": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Writer"
+            },
+            "uniqueItems": true
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.BoundEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "bound"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/MFP.Unit"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.BoundPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "bound"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/MFP.Unit"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.CardinalityEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "cardinality"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.CardinalityValue"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.CardinalityPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "cardinality"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.CardinalityValue"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.CardinalityValue": {
+        "type": "string",
+        "enum": [
+          "exactly-once",
+          "at-most-once",
+          "at-least-once",
+          "any"
+        ],
+        "description": "How many times something happens, from strongest guarantee to weakest."
+      },
+      "MFP.Citation": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MFP.AnchorCitation"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.MessageCitation"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ToolResultCitation"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.RecordCitation"
+          }
+        ],
+        "description": "What a claim rests on."
+      },
+      "MFP.Citations": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MFP.Citation"
+        },
+        "minItems": 1,
+        "description": "A citation list that must not be empty."
+      },
+      "MFP.CommitId": {
+        "type": "string",
+        "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+        "description": "A git object id: 40 lowercase hex digits (SHA-1) or 64 (SHA-256)."
+      },
+      "MFP.ConsistencyEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "consistency"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.ConsistencyValue"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.ConsistencyPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "consistency"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.ConsistencyValue"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.ConsistencyValue": {
+        "type": "string",
+        "pattern": "^(?:eventual|read-your-writes|linearizable|bounded:[0-9]+(?:\\.[0-9]+)?)$",
+        "description": "How strong a reader's view of the subject is, from weakest to strongest:\n`eventual`, `bounded:<seconds>` (a smaller bound is stronger),\n`read-your-writes` and `linearizable`."
+      },
       "MFP.Decision": {
         "type": "object",
         "required": [
+          "mfp",
+          "kind",
           "chosen",
           "rationale",
           "alternatives",
-          "reversible"
+          "reversible",
+          "cites"
         ],
         "properties": {
+          "mfp": {
+            "type": "string",
+            "enum": [
+              "0.2"
+            ],
+            "description": "The wire version."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "decision"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
+          },
           "question": {
             "type": "string"
           },
           "chosen": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/components/schemas/MFP.Text"
           },
           "rationale": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/components/schemas/MFP.Text"
           },
           "alternatives": {
             "type": "array",
@@ -16867,379 +17373,65 @@
           },
           "reversible": {
             "type": "boolean"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "MFP.DecisionModelEffect": {
-        "type": "object",
-        "required": [
-          "proposition",
-          "anchors",
-          "declared",
-          "method",
-          "evidenceClass",
-          "p"
-        ],
-        "properties": {
-          "proposition": {
-            "$ref": "#/components/schemas/MFP.Proposition"
-          },
-          "anchors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Anchor"
-            },
-            "minItems": 1,
-            "description": "Code locations the derivation rests on."
-          },
-          "declared": {
-            "type": "boolean",
-            "description": "Whether the change's author had declared this effect."
-          },
-          "contradicts": {
-            "type": "string",
-            "description": "A premise or tenet this effect contradicts, by reference."
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "clef"
-            ]
-          },
-          "evidenceClass": {
-            "type": "string",
-            "enum": [
-              "opinion"
-            ]
-          },
-          "p": {
-            "type": "number",
-            "format": "double",
-            "minimum": 0,
-            "maximum": 1
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "Answered by a decision model: opinion, always with its probability."
-      },
-      "MFP.DecisionRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
-            "type": "string",
-            "enum": [
-              "0.1"
-            ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "decision"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
           },
           "cites": {
-            "$ref": "#/components/schemas/MFP.NonEmptyCitations"
+            "$ref": "#/components/schemas/MFP.Citations"
           },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
-            "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Decision"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "The fields every record carries."
-      },
-      "MFP.Derivation": {
-        "type": "object",
-        "required": [
-          "commit",
-          "effects"
-        ],
-        "properties": {
-          "commit": {
-            "type": "string",
-            "minLength": 4,
-            "description": "The commit the diff was taken at."
-          },
-          "effects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.DerivedEffect"
-            },
-            "minItems": 1
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "What a platform derived from a diff. A derivation interprets a fact, so it\nis a claim; each effect carries how it was derived and its evidence class."
-      },
-      "MFP.DerivationRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
+          "confidence": {
             "type": "string",
             "enum": [
-              "0.1"
+              "low",
+              "medium",
+              "high"
             ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "derivation"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.PlatformAuthor"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
-          },
-          "cites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Citation"
-            }
-          },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
-            "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Derivation"
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "Derivations are always platform-authored."
+        "description": "A choice the model made, why, and what it rejected."
       },
-      "MFP.DerivedEffect": {
+      "MFP.EffectProposition": {
         "anyOf": [
           {
-            "$ref": "#/components/schemas/MFP.ExtractedEffect"
+            "$ref": "#/components/schemas/MFP.FreshnessEffect"
           },
           {
-            "$ref": "#/components/schemas/MFP.DecisionModelEffect"
+            "$ref": "#/components/schemas/MFP.InvalidationEffect"
           },
           {
-            "$ref": "#/components/schemas/MFP.CodeModelEffect"
+            "$ref": "#/components/schemas/MFP.ConsistencyEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.CardinalityEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.BoundEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.PresenceEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.PurityEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.IdempotentEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.AuthorityEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ShapeEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.OrderingEffect"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.InvariantEffect"
           }
-        ]
-      },
-      "MFP.Evidence": {
-        "type": "object",
-        "required": [
-          "class",
-          "ref",
-          "at"
         ],
-        "properties": {
-          "class": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "source": {
-            "$ref": "#/components/schemas/MFP.EvidenceSource"
-          },
-          "ref": {
-            "type": "string",
-            "minLength": 1,
-            "description": "A reference to the evidence itself: a probe run, a test result, a message."
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "scope": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "MFP.EvidenceClass": {
-        "type": "string",
-        "enum": [
-          "proof",
-          "ruling",
-          "testimony",
-          "opinion"
-        ],
-        "description": "How much weight a piece of evidence carries. Only proof and rulings may\nblock or clear a change; testimony and opinion only route work."
-      },
-      "MFP.EvidenceSource": {
-        "type": "string",
-        "enum": [
-          "source",
-          "tool-result",
-          "prior-record",
-          "external",
-          "reasoning"
-        ],
-        "description": "Where a piece of evidence came from. A separate axis from its class."
-      },
-      "MFP.ExtractedEffect": {
-        "type": "object",
-        "required": [
-          "proposition",
-          "anchors",
-          "declared",
-          "method",
-          "evidenceClass"
-        ],
-        "properties": {
-          "proposition": {
-            "$ref": "#/components/schemas/MFP.Proposition"
-          },
-          "anchors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Anchor"
-            },
-            "minItems": 1,
-            "description": "Code locations the derivation rests on."
-          },
-          "declared": {
-            "type": "boolean",
-            "description": "Whether the change's author had declared this effect."
-          },
-          "contradicts": {
-            "type": "string",
-            "description": "A premise or tenet this effect contradicts, by reference."
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "extractor"
-            ]
-          },
-          "evidenceClass": {
-            "type": "string",
-            "enum": [
-              "proof"
-            ]
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "Found by a deterministic extractor: proof."
+        "description": "What a model expects a change to alter."
       },
       "MFP.FootprintEntry": {
         "type": "object",
@@ -17269,497 +17461,7 @@
         },
         "description": "A path or symbol a change edits, creates or deletes."
       },
-      "MFP.Intent": {
-        "type": "object",
-        "required": [
-          "revision",
-          "goal",
-          "premises"
-        ],
-        "properties": {
-          "revision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
-          "goal": {
-            "type": "string",
-            "minLength": 1
-          },
-          "footprint": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.FootprintEntry"
-            }
-          },
-          "premises": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
-            },
-            "description": "What the change relies on, about code it does not own."
-          },
-          "declaredEffects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
-            },
-            "description": "Effects the agent expects to cause. Advisory only: effects are derived, never trusted."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "What an agent declares before writing code. Each revision is immutable."
-      },
-      "MFP.IntentRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
-            "type": "string",
-            "enum": [
-              "0.1"
-            ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "intent"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
-          },
-          "cites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Citation"
-            }
-          },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
-            "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Intent"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "The fields every record carries."
-      },
-      "MFP.MessageCitation": {
-        "type": "object",
-        "required": [
-          "kind",
-          "session",
-          "seq"
-        ],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "message"
-            ]
-          },
-          "session": {
-            "type": "string"
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "A numbered message in a session. Session messages are immutable."
-      },
-      "MFP.MfpRecord": {
-        "anyOf": [
-          {
-            "$ref": "#/components/schemas/MFP.IntentRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.PremiseRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.DecisionRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.ObservationRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.StanceRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.VerdictRecord"
-          },
-          {
-            "$ref": "#/components/schemas/MFP.DerivationRecord"
-          }
-        ],
-        "description": "Any MFP 0.1 record."
-      },
-      "MFP.NonEmptyCitations": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/MFP.Citation"
-        },
-        "minItems": 1,
-        "description": "A citation list that must not be empty: decisions and verdicts cite what they rest on."
-      },
-      "MFP.Observation": {
-        "type": "object",
-        "required": [
-          "category",
-          "importance",
-          "summary",
-          "evidence"
-        ],
-        "properties": {
-          "category": {
-            "type": "string",
-            "minLength": 1
-          },
-          "importance": {
-            "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high"
-            ]
-          },
-          "summary": {
-            "type": "string",
-            "minLength": 1
-          },
-          "evidence": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Evidence"
-            }
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "MFP.ObservationRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
-            "type": "string",
-            "enum": [
-              "0.1"
-            ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "observation"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
-          },
-          "cites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Citation"
-            }
-          },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
-            "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Observation"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "The fields every record carries."
-      },
-      "MFP.PlatformAuthor": {
-        "type": "object",
-        "required": [
-          "kind",
-          "id"
-        ],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "platform"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "MFP.Predicate": {
-        "type": "string",
-        "enum": [
-          "freshness",
-          "cardinality",
-          "ordering",
-          "consistency",
-          "shape",
-          "presence",
-          "authority",
-          "purity",
-          "idempotent",
-          "bound",
-          "invariant"
-        ],
-        "description": "The dimension a proposition talks about. Each predicate orders its values on a lattice."
-      },
-      "MFP.Premise": {
-        "type": "object",
-        "required": [
-          "proposition"
-        ],
-        "properties": {
-          "proposition": {
-            "$ref": "#/components/schemas/MFP.Proposition"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "A single premise claimed after the intent, e.g. when relying on one more subject."
-      },
-      "MFP.PremiseRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
-            "type": "string",
-            "enum": [
-              "0.1"
-            ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "premise"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
-          },
-          "cites": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Citation"
-            }
-          },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
-            "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Premise"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "The fields every record carries."
-      },
-      "MFP.Privacy": {
-        "type": "object",
-        "required": [
-          "class"
-        ],
-        "properties": {
-          "class": {
-            "type": "string",
-            "enum": [
-              "public",
-              "internal",
-              "restricted"
-            ]
-          },
-          "redactions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MFP.Redaction"
-            }
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "MFP.Proposition": {
+      "MFP.FreshnessEffect": {
         "type": "object",
         "required": [
           "subject",
@@ -17769,15 +17471,491 @@
         ],
         "properties": {
           "subject": {
-            "type": "string",
-            "minLength": 1,
-            "description": "A named concept in the codebase, e.g. `authz.permission-evaluation`."
+            "$ref": "#/components/schemas/MFP.SubjectKey"
           },
           "predicate": {
-            "$ref": "#/components/schemas/MFP.Predicate"
+            "type": "string",
+            "enum": [
+              "freshness"
+            ]
           },
           "relation": {
-            "$ref": "#/components/schemas/MFP.Relation"
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.FreshnessValue"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.FreshnessPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "freshness"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least",
+              "not"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.FreshnessValue"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.FreshnessValue": {
+        "type": "string",
+        "pattern": "^(?:per-call|per-request|per-session|static|ttl:[0-9]+(?:\\.[0-9]+)?)$",
+        "description": "How stale a reader of the subject can be, from least to most:\n`per-call`, `per-request`, `per-session`, `ttl:<seconds>` and `static`."
+      },
+      "MFP.IdempotentEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "idempotent"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.IdempotentPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "idempotent"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.Intent": {
+        "type": "object",
+        "required": [
+          "mfp",
+          "kind",
+          "goal",
+          "premises"
+        ],
+        "properties": {
+          "mfp": {
+            "type": "string",
+            "enum": [
+              "0.2"
+            ],
+            "description": "The wire version."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "intent"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
+          },
+          "goal": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.Text"
+              }
+            ],
+            "description": "What the change will achieve, in one or two sentences."
+          },
+          "footprint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.FootprintEntry"
+            },
+            "description": "The paths and symbols it expects to edit, create or delete."
+          },
+          "premises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.PremiseProposition"
+            },
+            "description": "What it relies on, about code it does not own."
+          },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.EffectProposition"
+            },
+            "description": "Effects it expects to cause. A receiver derives effects; these are advisory."
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What a model will do, and what it relies on, before it writes code."
+      },
+      "MFP.InvalidationEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "freshness"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.InvalidationValue"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Only an effect takes the invalidation form: a premise states the freshness it relies on."
+      },
+      "MFP.InvalidationValue": {
+        "type": "string",
+        "pattern": "^(?:per-call|per-request|per-session|static|ttl:[0-9]+(?:\\.[0-9]+)?) invalidated-on [a-z0-9]+(?:[.-][a-z0-9]+)*(?:,[a-z0-9]+(?:[.-][a-z0-9]+)*)*$",
+        "description": "The effect form \"cached at a freshness, evicted on these events\":\n`<freshness> invalidated-on <event>,<event>`, the events sorted, each once."
+      },
+      "MFP.InvariantEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "invariant"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.Text"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Free text, compared only by a model."
+      },
+      "MFP.InvariantPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "invariant"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.Text"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Free text, compared only by a model."
+      },
+      "MFP.LiteralShape": {
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "literal"
+            ]
           },
           "value": {
             "anyOf": [
@@ -17791,35 +17969,210 @@
               {
                 "type": "boolean"
               }
-            ],
-            "description": "The value, read on the predicate's lattice:\n\n- `freshness`: `per-call`, `per-request`, `per-session`, `static`, or `ttl:<seconds>`;\n- `consistency`: `eventual`, `read-your-writes`, `linearizable`, or `bounded:<seconds>`;\n- `authority`: the writer set, comma-separated (`a,b`);\n- `shape`: a JSON-encoded structural type;\n- `ordering`: with `before` or `after`, the subject is the first event and the value the second;\n- `bound`: a number, in `unit`;\n- `purity`, `idempotent`, `presence`: a boolean.\n\n`is` means exactly the value; `not` means its complement."
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.Message": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MFP.Intent"
           },
-          "unit": {
+          {
+            "$ref": "#/components/schemas/MFP.Premise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.Decision"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.Observation"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.Stance"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.Verdict"
+          }
+        ],
+        "description": "Any MFP 0.2 message."
+      },
+      "MFP.MessageCitation": {
+        "type": "object",
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "properties": {
+          "kind": {
             "type": "string",
-            "description": "The unit of a `bound` value, e.g. `ms`, `bytes`, `requests/s`."
+            "enum": [
+              "message"
+            ]
+          },
+          "ref": {
+            "$ref": "#/components/schemas/MFP.Ref"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A message in the conversation, by the identifier the driver gave it."
+      },
+      "MFP.ObjectShape": {
+        "type": "object",
+        "required": [
+          "type",
+          "fields"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "object"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.ShapeField"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.Observation": {
+        "type": "object",
+        "required": [
+          "mfp",
+          "kind",
+          "category",
+          "importance",
+          "summary",
+          "cites"
+        ],
+        "properties": {
+          "mfp": {
+            "type": "string",
+            "enum": [
+              "0.2"
+            ],
+            "description": "The wire version."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "observation"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.Token"
+              }
+            ],
+            "description": "What kind of thing was noticed. Open in the core; a profile may close it."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MFP.Text"
+          },
+          "cites": {
+            "$ref": "#/components/schemas/MFP.Citations"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Something the model noticed, and what it rests on."
+      },
+      "MFP.OpaqueShape": {
+        "type": "object",
+        "required": [
+          "type",
+          "name"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "opaque"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.OrderingEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "ordering"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
           },
           "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
             "type": "string",
-            "description": "Where the proposition holds, as `;`-separated `key:value` pairs, e.g.\n`env:prod|staging;tenant:t1`. Absent means everywhere."
+            "description": "A one-line human gloss."
           },
           "anchors": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MFP.Anchor"
             }
-          },
-          "gloss": {
-            "type": "string",
-            "description": "A one-line human gloss."
-          },
-          "strength": {
-            "type": "string",
-            "enum": [
-              "must",
-              "should"
-            ],
-            "description": "The holder's declared kind of reliance, not a confidence. `must`: the\nholder breaks if the proposition is false. `should`: it degrades. A\ncontradiction of a `should` premise is reported as suspect rather than as\na conflict. Comparison never reads it.",
-            "default": "must"
           },
           "cites": {
             "type": "array",
@@ -17831,13 +18184,449 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "A typed statement about a subject. Premises (what a change relies on) and\neffects (what a change alters) share this shape; two propositions with the\nsame subject and predicate can be compared."
+        "description": "The subject is the first event of the pair and the value the second."
+      },
+      "MFP.OrderingPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "ordering"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "before",
+              "after"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The subject is the first event of the pair and the value the second."
+      },
+      "MFP.Predicate": {
+        "type": "string",
+        "enum": [
+          "freshness",
+          "consistency",
+          "cardinality",
+          "bound",
+          "presence",
+          "purity",
+          "idempotent",
+          "authority",
+          "shape",
+          "ordering",
+          "invariant"
+        ],
+        "description": "The dimension a proposition talks about. Each predicate orders its values; see lattices.md."
+      },
+      "MFP.Premise": {
+        "type": "object",
+        "required": [
+          "mfp",
+          "kind",
+          "premise"
+        ],
+        "properties": {
+          "mfp": {
+            "type": "string",
+            "enum": [
+              "0.2"
+            ],
+            "description": "The wire version."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "premise"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
+          },
+          "premise": {
+            "$ref": "#/components/schemas/MFP.PremiseProposition"
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One more thing the model relies on, after its intent."
+      },
+      "MFP.PremiseProposition": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MFP.FreshnessPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ConsistencyPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.CardinalityPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.BoundPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.PresencePremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.PurityPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.IdempotentPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.AuthorityPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ShapePremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.OrderingPremise"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.InvariantPremise"
+          }
+        ],
+        "description": "What a model relies on about code it does not own."
+      },
+      "MFP.PresenceEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "presence"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.PresencePremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "presence"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.PrimitiveShape": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "never",
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "`unknown` admits every value and `never` none."
+      },
+      "MFP.PurityEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "purity"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.PurityPremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "purity"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "not"
+            ]
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.Reason": {
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/MFP.Text"
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "MFP.RecordCitation": {
         "type": "object",
         "required": [
           "kind",
-          "id"
+          "ref"
         ],
         "properties": {
           "kind": {
@@ -17846,33 +18635,19 @@
               "record"
             ]
           },
-          "id": {
-            "type": "string"
+          "ref": {
+            "$ref": "#/components/schemas/MFP.Ref"
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "Another MFP record, by id."
+        "description": "An earlier MFP message, by the identifier its receiver gave it."
       },
-      "MFP.Redaction": {
-        "type": "object",
-        "required": [
-          "pointer",
-          "reason"
-        ],
-        "properties": {
-          "pointer": {
-            "type": "string",
-            "description": "A JSON Pointer into the record."
-          },
-          "reason": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
+      "MFP.Ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "An identifier the driver gave the model: a message, a tool call, an earlier\nMFP message or a decision. A model never invents one."
       },
       "MFP.Relation": {
         "type": "string",
@@ -17884,19 +18659,210 @@
           "before",
           "after"
         ],
-        "description": "How a proposition's value relates to the predicate's lattice."
+        "description": "How a proposition's value sits on its predicate's order. Each predicate takes some of these."
+      },
+      "MFP.Scope": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*(?:\\|[a-z0-9][a-z0-9._-]*)*(?:;[a-z0-9][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*(?:\\|[a-z0-9][a-z0-9._-]*)*)*$",
+        "description": "Where a proposition holds, as `;`-separated `dimension:atom|atom` parts, e.g.\n`env:prod|staging;tenant:t1`. A dimension appears at most once. Absent means\neverywhere."
+      },
+      "MFP.Shape": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/MFP.PrimitiveShape"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.LiteralShape"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ArrayShape"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.ObjectShape"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.UnionShape"
+          },
+          {
+            "$ref": "#/components/schemas/MFP.OpaqueShape"
+          }
+        ],
+        "description": "A structural type, the value of a `shape` proposition. Objects list their\nfields; `opaque` names a type the writer could not see into."
+      },
+      "MFP.ShapeEffect": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "shape"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.Shape"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.ShapeField": {
+        "type": "object",
+        "required": [
+          "name",
+          "shape",
+          "optional"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shape": {
+            "$ref": "#/components/schemas/MFP.Shape"
+          },
+          "optional": {
+            "type": "boolean",
+            "description": "Whether the field may be absent."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "MFP.ShapePremise": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/MFP.SubjectKey"
+          },
+          "predicate": {
+            "type": "string",
+            "enum": [
+              "shape"
+            ]
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "is",
+              "at-most",
+              "at-least"
+            ]
+          },
+          "value": {
+            "$ref": "#/components/schemas/MFP.Shape"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's kind of reliance, not a confidence. `must`: the holder breaks\nif the proposition is false. `should`: it degrades. Comparison never reads it.",
+            "default": "must"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MFP.Scope"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "A one-line human gloss."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Anchor"
+            }
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "MFP.Stance": {
         "type": "object",
         "required": [
+          "mfp",
+          "kind",
           "decision",
-          "stance"
+          "stance",
+          "argument"
         ],
         "properties": {
-          "decision": {
+          "mfp": {
             "type": "string",
-            "minLength": 1,
-            "description": "The id of the decision record."
+            "enum": [
+              "0.2"
+            ],
+            "description": "The wire version."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stance"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
+          },
+          "decision": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.Ref"
+              }
+            ],
+            "description": "The decision, by the identifier the driver gave it."
           },
           "stance": {
             "type": "string",
@@ -17907,72 +18873,12 @@
             ]
           },
           "argument": {
-            "type": "string",
-            "description": "Required in practice for `distinguished` and `overrule-requested`."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "How a change relates to an earlier decision it encountered as precedent."
-      },
-      "MFP.StanceRecord": {
-        "type": "object",
-        "required": [
-          "mfp",
-          "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
-        ],
-        "properties": {
-          "mfp": {
-            "type": "string",
-            "enum": [
-              "0.1"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.Text"
+              }
             ],
-            "description": "The protocol version."
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "stance"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
-          },
-          "change": {
-            "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
+            "description": "Why the decision applies, does not apply, or should be overruled."
           },
           "cites": {
             "type": "array",
@@ -17980,85 +18886,102 @@
               "$ref": "#/components/schemas/MFP.Citation"
             }
           },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
+          "confidence": {
             "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Stance"
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "The fields every record carries."
+        "description": "How the model's work relates to an earlier decision it met as precedent."
       },
-      "MFP.Verdict": {
+      "MFP.SubjectKey": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+        "description": "A named concept in the codebase, as dot-separated segments of lowercase\nletters, digits and inner hyphens, e.g. `authz.permission-evaluation`. Keys\nare hierarchical: `authz` is an ancestor of `authz.permission-evaluation`."
+      },
+      "MFP.Text": {
+        "type": "string",
+        "pattern": "\\S",
+        "description": "Text a reader is meant to read: at least one non-space character."
+      },
+      "MFP.Token": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+        "description": "A lowercase token: letters, digits and inner hyphens, e.g. `request-changes`."
+      },
+      "MFP.ToolResultCitation": {
         "type": "object",
         "required": [
-          "outcome",
-          "reasons"
+          "kind",
+          "ref"
         ],
         "properties": {
-          "outcome": {
+          "kind": {
             "type": "string",
             "enum": [
-              "land",
-              "bounce",
-              "park",
-              "hold",
-              "supersede"
+              "tool-result"
             ]
           },
-          "reasons": {
+          "ref": {
+            "$ref": "#/components/schemas/MFP.Ref"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The result of a tool call, by the call's identifier."
+      },
+      "MFP.UnionShape": {
+        "type": "object",
+        "required": [
+          "type",
+          "of"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "union"
+            ]
+          },
+          "of": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Evidence"
-            },
-            "minItems": 1
-          },
-          "residualRisk": {
-            "type": "string"
-          },
-          "cost": {
-            "$ref": "#/components/schemas/MFP.Cost"
+              "$ref": "#/components/schemas/MFP.Shape"
+            }
           }
         },
         "additionalProperties": {
           "not": {}
         }
       },
-      "MFP.VerdictRecord": {
+      "MFP.Unit": {
+        "type": "string",
+        "pattern": "^\\S+$",
+        "description": "A unit of measure, e.g. `ms`, `bytes`, `requests/s`."
+      },
+      "MFP.Verdict": {
         "type": "object",
         "required": [
           "mfp",
           "kind",
-          "id",
-          "author",
-          "at",
-          "cites",
-          "payload"
+          "outcome",
+          "reasons"
         ],
         "properties": {
           "mfp": {
             "type": "string",
             "enum": [
-              "0.1"
+              "0.2"
             ],
-            "description": "The protocol version."
+            "description": "The wire version."
           },
           "kind": {
             "type": "string",
@@ -18066,67 +18989,55 @@
               "verdict"
             ]
           },
-          "id": {
+          "profile": {
             "type": "string",
-            "minLength": 1,
-            "description": "Globally unique, e.g. a ULID."
+            "format": "uri",
+            "description": "The profile the message conforms to, by URI. Absent means the core profile."
           },
-          "change": {
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MFP.Token"
+              }
+            ],
+            "description": "The outcome, as a token. The core profile's vocabulary is `accept`,\n`revise`, `reject` and `defer`; a profile may replace it."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Reason"
+            },
+            "minItems": 1
+          },
+          "residualRisk": {
             "type": "string",
-            "description": "The change this claim is about: a Change-Id that survives rebases."
-          },
-          "session": {
-            "type": "string",
-            "description": "The session the claim was made in."
-          },
-          "author": {
-            "$ref": "#/components/schemas/MFP.Author"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/MFP.Actor"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "base": {
-            "type": "string",
-            "description": "The base commit the claim was made against."
-          },
-          "seq": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Position within the session, when the record came from one."
+            "description": "What could still go wrong if the outcome is taken."
           },
           "cites": {
-            "$ref": "#/components/schemas/MFP.NonEmptyCitations"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Citation"
+            }
           },
-          "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "supersedes": {
+          "confidence": {
             "type": "string",
-            "description": "The id of a record this one replaces."
-          },
-          "privacy": {
-            "$ref": "#/components/schemas/MFP.Privacy"
-          },
-          "countersig": {
-            "type": "string",
-            "description": "The platform's Ed25519 signature over the RFC 8785 canonical record, added when the change lands."
-          },
-          "payload": {
-            "$ref": "#/components/schemas/MFP.Verdict"
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The model's own confidence in this report. An opinion about an opinion: it never carries weight."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "The fields every record carries."
+        "description": "The outcome the model thinks a piece of work should have. An opinion, never a ruling."
+      },
+      "MFP.Writer": {
+        "type": "string",
+        "pattern": "^[^\\s,]+$",
+        "description": "A writer of a subject: a name with no spaces or commas."
       },
       "MatrixCheck": {
         "type": "object",
@@ -20514,6 +21425,30 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "RecordAuthor": {
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "human",
+              "agent",
+              "platform"
+            ]
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Who stated a message: a person, an agent, or Keel itself."
+      },
       "RecordedScope": {
         "type": "string",
         "enum": [
@@ -20701,7 +21636,7 @@
         ],
         "properties": {
           "premise": {
-            "$ref": "#/components/schemas/MFP.Proposition"
+            "$ref": "#/components/schemas/MFP.PremiseProposition"
           }
         },
         "additionalProperties": {
@@ -21152,19 +22087,19 @@
           "premisesAdded": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.PremiseProposition"
             }
           },
           "premisesRetracted": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.PremiseProposition"
             }
           },
           "declaredEffects": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Proposition"
+              "$ref": "#/components/schemas/MFP.EffectProposition"
             },
             "description": "Replaces the declared effects. Advisory only."
           }
@@ -22554,16 +23489,6 @@
           "not": {}
         }
       },
-      "VerdictEvidenceClass": {
-        "type": "string",
-        "enum": [
-          "proof",
-          "ruling",
-          "testimony",
-          "opinion"
-        ],
-        "description": "How strongly a piece of evidence bears on a verdict (ADR 0005): only proof\nand rulings may fail one. Keel's own record-layer fact, never an MFP field."
-      },
       "VerdictId": {
         "type": "string",
         "pattern": "^vrd_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -22701,7 +23626,7 @@
           "evidenceCeiling": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/VerdictEvidenceClass"
+                "$ref": "#/components/schemas/EvidenceClass"
               }
             ],
             "description": "The strongest evidence the step can give."
@@ -22742,7 +23667,7 @@
           "class": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/VerdictEvidenceClass"
+                "$ref": "#/components/schemas/EvidenceClass"
               }
             ],
             "description": "The class of the step it names; proof when it names none, since a verifier reports only what ran."
@@ -23096,13 +24021,13 @@
             "type": "string"
           },
           "record": {
-            "$ref": "#/components/schemas/MFP.MfpRecord"
+            "$ref": "#/components/schemas/KeelRecord"
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "One link in a chain of reasons, with the MFP record behind it."
+        "description": "One link in a chain of reasons, with Keel's record of the MFP message behind it."
       },
       "Workspace": {
         "type": "object",

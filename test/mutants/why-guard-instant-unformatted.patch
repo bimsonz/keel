@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts
 # kills: why.mfp
-# why: a guard's evidence is stamped with epoch milliseconds where MFP asks for a date-time
+# why: a guard's record is stamped with epoch milliseconds where the spec asks for a date-time
 diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
-index 423d31a..5085f41 100644
+index 8a300180..5f14a987 100644
 --- a/packages/core/src/application/memory/why.ts
 +++ b/packages/core/src/application/memory/why.ts
-@@ -170,7 +170,7 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
-           category: "guard",
-           importance: "high",
-           summary: `Guard ${guard.id} asserts the premise ${label} upheld, from probe ${guard.probeId}`,
--          evidence: [{ class: "proof", ref: guard.probeId, at: admittedAt }],
-+          evidence: [{ class: "proof", ref: guard.probeId, at: String(guard.admittedAt) }],
-         },
-       },
-     });
+@@ -126,7 +126,7 @@ export function whyChain({
+       record: {
+         id: guard.id,
+         author: KEEL_AUTHOR,
+-        at: iso(guard.admittedAt),
++        at: String(guard.admittedAt),
+         evidenceClass: "proof",
+         message: {
+           ...stated("observation"),

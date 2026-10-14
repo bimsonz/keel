@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: a message citation is held one message on from the one its ref names
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 21a9e85f..d28b6f1c 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -231,7 +231,7 @@ export const citationOfMfp = (
+       const n = Number(seq);
+       return session === undefined || !Number.isSafeInteger(n)
+         ? untellable("citation", "message-ref", `message ref "${c.ref}" is not <session>/<seq>`)
+-        : Result.succeed({ _tag: "message", session: SessionId.make(session), seq: n });
++        : Result.succeed({ _tag: "message", session: SessionId.make(session), seq: n + 1 });
+     }
+     case "anchor":
+       return Result.map(anchorOfMfp(c, ctx), (anchor) => ({ _tag: "anchor", anchor }));

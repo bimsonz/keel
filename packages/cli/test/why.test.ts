@@ -5,49 +5,50 @@ const D1 = "dec_01HZY8D1D1D1D1D1D1D1D1D1D1";
 const G1 = "grd_01HZY8G1G1G1G1G1G1G1G1G1G1";
 const AT = "2026-10-14T00:57:21.555Z";
 
-/** One decision's chain as `why` answers it: the ruling, then the guard holding it. */
+/** One decision's chain as `why` answers it: the ruling, then the guard holding it, each an MFP 0.2 message in Keel's record. */
 const chain = [
   {
     summary:
       "D-1 ruled premise-holds: The premise holds: authz.permission-evaluation freshness at-most per-request",
     record: {
-      mfp: "0.1",
-      kind: "decision",
       id: D1,
       author: { kind: "human", id: "user:usr_01HZY8R1R1R1R1R1R1R1R1R1R1" },
       at: AT,
-      cites: [{ kind: "record", id: G1 }],
       evidenceClass: "ruling",
-      payload: {
+      message: {
+        mfp: "0.2",
+        kind: "decision",
+        profile: "https://keel.town/mfp/profile/1",
         chosen: "premise-holds",
         rationale: "The premise holds",
         alternatives: [],
         reversible: true,
+        cites: [{ kind: "record", ref: G1 }],
       },
     },
   },
   {
     summary: "G-1 holds D-1: probe prb_01HZY8P1P1P1P1P1P1P1P1P1P1 told the worlds apart in 3 runs",
     record: {
-      mfp: "0.1",
-      kind: "observation",
       id: G1,
       author: { kind: "platform", id: "keel" },
       at: AT,
-      cites: [],
       evidenceClass: "proof",
-      payload: {
+      message: {
+        mfp: "0.2",
+        kind: "observation",
+        profile: "https://keel.town/mfp/profile/1",
         category: "guard",
         importance: "high",
         summary: `Guard ${G1} upholds D-1`,
-        evidence: [],
+        cites: [{ kind: "record", ref: "prb_01HZY8P1P1P1P1P1P1P1P1P1P1" }],
       },
     },
   },
 ];
 
 describe("keeltown why", () => {
-  it("[why.cli] prints each decision's chain Keel answers, the next action to read it, and its records", async () => {
+  it("[why.cli] prints each decision's chain Keel answers, the next action to read it, and Keel's record of each MFP message", async () => {
     const asked: URL[] = [];
     const out: string[] = [];
     const io: Io = {

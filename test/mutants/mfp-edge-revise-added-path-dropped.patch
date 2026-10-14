@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-input"
+# kills: mfp.edge-input
+# why: a premise a revision adds is refused with no path, so the agent cannot tell which
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..cf160d8d 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1040,7 +1040,7 @@ export function revising(
+   request: ReviseRequest,
+ ): Result.Result<ReviseInput, Issues> {
+   const ctx = working(base);
+-  const added = holding(request.added, ["premisesAdded"], premiseOfMfp, ctx, NO_BASE);
++  const added = holding(request.added, [], premiseOfMfp, ctx, NO_BASE);
+   const effects = holding(request.effects ?? [], ["declaredEffects"], effectOfMfp, ctx, NO_BASE);
+   if (Result.isFailure(added) || Result.isFailure(effects))
+     return Result.fail(failures(added, effects));

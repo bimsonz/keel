@@ -1,13 +1,17 @@
-import { Effect, Schema } from "effect";
-import type { Change, Proposition } from "../../domain/coordination/index.ts";
-import { type Anchor, ChangeId, type Citation, type ProjectId } from "../../domain/kernel/index.ts";
+import { Effect, Result, Schema } from "effect";
 import {
-  type MfpAnchor,
-  type MfpAuthor,
+  type Change,
   type MfpCitation,
-  type MfpProposition,
-  type MfpRecord,
+  type Proposition,
+  effectToMfp,
+  premiseToMfp,
+} from "../../domain/coordination/index.ts";
+import { ChangeId, type ProjectId } from "../../domain/kernel/index.ts";
+import {
+  KEEL_MFP_PROFILE,
+  type KeelRecord,
   NothingToExplain,
+  type RecordAuthor,
   type WhyLink,
 } from "../../domain/memory/index.ts";
 import {
@@ -23,7 +27,11 @@ import { conflictRecordOf } from "./conflict-views.ts";
 import { pathDecisionsOf, subjectDecisionsOf } from "./decision-index.ts";
 
 /** Keel, as the author of what it observed and concluded. */
-export const KEEL_AUTHOR: MfpAuthor = { kind: "platform", id: "keel" };
+export const KEEL_AUTHOR: RecordAuthor = { kind: "platform", id: "keel" };
+
+/** The members every message Keel states carries: MFP 0.2, under Keel's profile. */
+const stated = <K extends string>(kind: K) =>
+  ({ mfp: "0.2", kind, profile: KEEL_MFP_PROFILE }) as const;
 
 type Store = (typeof EntityStore)["Service"];
 
@@ -34,46 +42,14 @@ const isChangeId = Schema.is(ChangeId);
 const said = (p: Proposition): string =>
   `${p.subject} ${p.predicate} ${p.relation} ${String(p.value)}${p.unit === undefined ? "" : ` ${p.unit}`}`;
 
-const anchorOf = (anchor: Anchor): MfpAnchor => ({
-  path: anchor.path,
-  ...(anchor.symbol === undefined ? {} : { symbol: anchor.symbol }),
-  commit: anchor.commit,
-});
+/** What told in MFP 0.2: a stored proposition with no 0.2 form is left out, never repaired. */
+const told = <A, E>(result: Result.Result<A, E>): A[] =>
+  Result.isSuccess(result) ? [result.success] : [];
 
-/** The domain tags a citation by `_tag`; MFP by `kind`. */
-function citationOf(citation: Citation): MfpCitation {
-  switch (citation._tag) {
-    case "message":
-      return { kind: "message", session: citation.session, seq: citation.seq };
-    case "anchor":
-      return { kind: "anchor", anchor: anchorOf(citation.anchor) };
-    case "record":
-      return { kind: "record", id: citation.id };
-    default: {
-      const unmapped: never = citation;
-      return unmapped;
-    }
-  }
-}
-
-/** A proposition as MFP writes it: `strength` always, `must` where the holder gave none. */
-export const mfpProposition = (p: Proposition): MfpProposition => ({
-  subject: p.subject,
-  predicate: p.predicate,
-  relation: p.relation,
-  value: p.value,
-  ...(p.unit === undefined ? {} : { unit: p.unit }),
-  ...(p.scope === undefined ? {} : { scope: p.scope }),
-  ...(p.anchors === undefined ? {} : { anchors: p.anchors.map(anchorOf) }),
-  ...(p.gloss === undefined ? {} : { gloss: p.gloss }),
-  strength: p.strength ?? "must",
-  ...(p.cites === undefined ? {} : { cites: p.cites.map(citationOf) }),
-});
-
-const cite = (record: MfpRecord): MfpCitation => ({ kind: "record", id: record.id });
+const cite = (record: KeelRecord): MfpCitation => ({ kind: "record", ref: record.id });
 
 /** An agent's change is its agent's claim; one an auditor or an operator opened is Keel's. */
-const authorOf = (change: Change): MfpAuthor =>
+const authorOf = (change: Change): RecordAuthor =>
   change.origin === "agent" ? { kind: "agent", id: change.agentId } : KEEL_AUTHOR;
 
 /** The intent a change holds now, as its agent declared it. */
@@ -82,39 +58,36 @@ function intentLink(change: Change, proposition: Proposition): WhyLink {
   return {
     summary: `${change.id} intends "${intent.goal}", which makes ${said(proposition)}`,
     record: {
-      mfp: "0.1",
-      kind: "intent",
       id: `${change.id}.intent.${intent.revision}`,
       change: change.id,
       author: authorOf(change),
       // The view keeps no time per revision: the change's own is when it was declared.
       at: iso(change.createdAt),
-      cites: [],
-      payload: {
-        revision: intent.revision,
+      message: {
+        ...stated("intent"),
         goal: intent.goal,
         footprint: intent.footprint.map((entry) => ({
           path: entry.path,
           ...(entry.symbol === undefined ? {} : { symbol: entry.symbol }),
           op: entry.op,
         })),
-        premises: intent.premises.map(mfpProposition),
+        premises: intent.premises.flatMap((p) => told(premiseToMfp(p))),
         ...(intent.declaredEffects === undefined
           ? {}
-          : { declaredEffects: intent.declaredEffects.map(mfpProposition) }),
+          : { declaredEffects: intent.declaredEffects.flatMap((p) => told(effectToMfp(p))) }),
       },
     },
   };
 }
 
 /**
- * One active decision's chain, each link an MFP 0.1 record: the decision,
- * the premise its conflict was about, the intent of the change whose effect
- * met it, each guard that holds it, then, once its resolution is heard, each
- * party the ruling did not go against that landed at or after the ruling.
- * The decision cites the records after it but the landings, which cite the
- * decision. A decision with nothing to cite cannot be stated as MFP has a
- * decision, so it explains nothing.
+ * One active decision's chain, each link Keel's record of an MFP 0.2 message:
+ * the decision, the premise its conflict was about, the intent of the change
+ * whose effect met it, each guard that holds it, then, once its resolution is
+ * heard, each party the ruling did not go against that landed at or after the
+ * ruling. The decision cites the records after it but the landings, which cite
+ * the decision. A decision with nothing to cite cannot be stated as MFP has a
+ * decision, so it explains nothing; a premise with no 0.2 form is not stated.
  */
 export function whyChain({
   decision: indexed,
@@ -126,20 +99,18 @@ export function whyChain({
   const conflict = record?.conflict;
   const grounds: WhyLink[] = [];
   const premise = conflict?.premise;
-  if (conflict !== undefined && premise !== undefined) {
+  const premiseTold = premise === undefined ? [] : told(premiseToMfp(premise.proposition));
+  if (conflict !== undefined && premise !== undefined && premiseTold[0] !== undefined) {
     const holder = changes.get(premise.holder)?.change;
     grounds.push({
       summary: `${premise.holder} relies on ${said(premise.proposition)}`,
       record: {
-        mfp: "0.1",
-        kind: "premise",
         id: `${conflict.id}.premise`,
-        change: premise.holder,
+        ...(isChangeId(premise.holder) ? { change: premise.holder } : {}),
         author: holder === undefined ? KEEL_AUTHOR : authorOf(holder),
         // The premise as its conflict put it at stake.
         at: iso(conflict.openedAt),
-        cites: [],
-        payload: { proposition: mfpProposition(premise.proposition) },
+        message: { ...stated("premise"), premise: premiseTold[0] },
       },
     });
   }
@@ -149,23 +120,24 @@ export function whyChain({
     grounds.push(intentLink(maker, effect.proposition));
   const guard = record?.guard;
   if (guard !== undefined && indexed.guards.includes(guard.id)) {
-    const premiseRecord = grounds.find((link) => link.record.kind === "premise")?.record;
-    const admittedAt = iso(guard.admittedAt);
+    const premiseRecord = grounds.find((link) => link.record.message.kind === "premise")?.record;
     grounds.push({
       summary: `${record?.labels.guard ?? guard.id} holds ${label}: probe ${guard.probeId} told the worlds apart in ${guard.runs} runs`,
       record: {
-        mfp: "0.1",
-        kind: "observation",
         id: guard.id,
         author: KEEL_AUTHOR,
-        at: admittedAt,
+        at: iso(guard.admittedAt),
         evidenceClass: "proof",
-        cites: premiseRecord === undefined ? [] : [cite(premiseRecord)],
-        payload: {
+        message: {
+          ...stated("observation"),
           category: "guard",
           importance: "high",
           summary: `Guard ${guard.id} asserts the premise ${label} upheld, from probe ${guard.probeId}`,
-          evidence: [{ class: "proof", ref: guard.probeId, at: admittedAt }],
+          // What it rests on: the premise it asserts, and the probe that proved it.
+          cites: [
+            ...(premiseRecord === undefined ? [] : [cite(premiseRecord)]),
+            { kind: "record", ref: guard.probeId },
+          ],
         },
       },
     });
@@ -177,15 +149,13 @@ export function whyChain({
   const decided: WhyLink = {
     summary: `${label} ruled ${decision.option}: ${decision.summary}`,
     record: {
-      mfp: "0.1",
-      kind: "decision",
       id: decision.id,
       author: ruler === undefined || ruler === "" ? KEEL_AUTHOR : { kind: "human", id: ruler },
       at: iso(decision.decidedAt),
       evidenceClass: "ruling",
       ...(decision.scope === undefined ? {} : { scope: decision.scope }),
-      cites: grounds.map((link) => cite(link.record)),
-      payload: {
+      message: {
+        ...stated("decision"),
         ...(escalation === undefined ? {} : { question: escalation.question }),
         chosen: decision.option,
         rationale: decision.summary === "" ? decision.option : decision.summary,
@@ -199,6 +169,7 @@ export function whyChain({
                 : alternative.reasonRejected,
           })),
         reversible: true,
+        cites: grounds.map((link) => cite(link.record)),
       },
     },
   };
@@ -210,21 +181,25 @@ export function whyChain({
     const commit = view?.change.landedCommit;
     const landedAt = view?.landedAt;
     // A party that landed before the ruling did not land under it.
-    if (commit === undefined || landedAt === undefined || landedAt < decision.decidedAt) return [];
-    const at = iso(landedAt);
+    if (view === undefined || commit === undefined || landedAt === undefined) return [];
+    if (landedAt < decision.decidedAt) return [];
     return [
       {
         summary: `${party} landed as ${commit} under ${label}`,
         record: {
-          mfp: "0.1",
-          kind: "verdict",
           // A party favoured by two decisions landed under each: one record apiece.
           id: `${party}.landed.${decision.id}`,
-          change: party,
+          change: view.change.id,
           author: KEEL_AUTHOR,
-          at,
-          cites: [cite(decided.record)],
-          payload: { outcome: "land", reasons: [{ class: "proof", ref: commit, at }] },
+          at: iso(landedAt),
+          evidenceClass: "proof",
+          message: {
+            ...stated("verdict"),
+            outcome: "land",
+            reasons: [
+              { summary: `Landed as ${commit} under ${label}`, cites: [cite(decided.record)] },
+            ],
+          },
         },
       },
     ];

@@ -14,7 +14,7 @@ import {
   UserId,
 } from "../kernel/index.ts";
 import { Predicate, Relation } from "../coordination/index.ts";
-import { MfpRecord } from "./mfp.ts";
+import { KeelRecord } from "./mfp.ts";
 
 export const DecisionState = Schema.Literals(["active", "superseded", "overruled"]);
 export type DecisionState = typeof DecisionState.Type;
@@ -79,6 +79,6 @@ export const Session = Schema.Struct({
 });
 export type Session = typeof Session.Type;
 
-/** One link in a `why` chain: a one-line summary and the MFP record behind it. */
-export const WhyLink = Schema.Struct({ summary: Schema.String, record: MfpRecord });
+/** One link in a `why` chain: a one-line summary and Keel's record of the MFP message behind it. */
+export const WhyLink = Schema.Struct({ summary: Schema.String, record: KeelRecord });
 export type WhyLink = typeof WhyLink.Type;

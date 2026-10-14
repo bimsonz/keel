@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/mfp.test.ts
+# kills: mfp.record-refuses
+# why: A verdict's outcome is any MFP token, as the core leaves it open, so Keel holds an accept that its own profile closes out
+diff --git a/packages/core/src/domain/memory/mfp.ts b/packages/core/src/domain/memory/mfp.ts
+index e8633033..b80ef3a1 100644
+--- a/packages/core/src/domain/memory/mfp.ts
++++ b/packages/core/src/domain/memory/mfp.ts
+@@ -95,7 +95,7 @@ export type MfpStance = typeof MfpStance.Type;
+ /** The outcome work should have, as an opinion. Keel's profile closes the outcome to Keel's five. */
+ export const MfpVerdict = Schema.Struct({
+   ...header("verdict"),
+-  outcome: Schema.Literals(["land", "bounce", "park", "hold", "supersede"]),
++  outcome: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/)),
+   reasons: Schema.Array(
+     Schema.Struct({ summary: Text, cites: Schema.optionalKey(Citations) }),
+   ).check(Schema.isMinLength(1)),

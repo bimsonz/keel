@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts -t "why.mfp"
+# kills: why.mfp
+# why: a landing is stated with an outcome Keel's profile does not have
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 8a300180..857385e8 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -195,7 +195,7 @@ export function whyChain({
+           evidenceClass: "proof",
+           message: {
+             ...stated("verdict"),
+-            outcome: "land",
++            outcome: "accept",
+             reasons: [
+               { summary: `Landed as ${commit} under ${label}`, cites: [cite(decided.record)] },
+             ],

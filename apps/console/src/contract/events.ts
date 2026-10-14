@@ -73,8 +73,4 @@ type Assert<Holds extends true> = Holds;
  * Compiles only while everything in `Ahead` is still ahead of Keel. When Keel builds one of these, its line
  * fails: take it out of `Ahead`, and make the console read the shape Keel built.
  */
-export type StillAhead = [
-  Assert<Of<"PlanCompiled">["steps"] extends number ? true : false>,
-  // A3: one sentence from whoever produced a piece of evidence.
-  Assert<"summary" extends keyof Keel.Evidence ? false : true>,
-];
+export type StillAhead = [Assert<Of<"PlanCompiled">["steps"] extends number ? true : false>];

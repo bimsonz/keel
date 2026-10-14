@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-view"
+# kills: mfp.edge-view
+# why: a stored proposition with no 0.2 form is served as stored, with no notice
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 80640429..e239bb00 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -182,6 +182,7 @@ function teller() {
+   const notices: NoticeView[] = [];
+   const told = <A>(ref: string, p: Proposition, result: Result.Result<A, Untellable>): A[] => {
+     if (Result.isSuccess(result)) return [result.success];
++    if (result.failure.reason === "writer") return [p as unknown as A];
+     notices.push({
+       id: `untellable:${ref}:${notices.length}`,
+       at: new Date().toISOString(),

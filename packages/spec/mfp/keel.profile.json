@@ -1,0 +1,9 @@
+{
+  "id": "https://keel.town/mfp/profile/1",
+  "mfp": "0.2",
+  "title": "Keel",
+  "vocabularies": {
+    "verdict.outcome": ["land", "bounce", "park", "hold", "supersede"],
+    "observation.category": ["guard"]
+  }
+}

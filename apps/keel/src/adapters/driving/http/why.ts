@@ -1,6 +1,6 @@
 import { why, whyAsked } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import type { WhyLink } from "@keeltown/core/domain/memory";
+import type { KeelRecord, WhyLink } from "@keeltown/core/domain/memory";
 import type { WhyTarget } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations, WhyResult } from "../../../generated/http/app.gen.ts";
@@ -8,7 +8,7 @@ import type { Caller } from "./caller.ts";
 import { projectIn } from "./decisions.ts";
 import { type ProblemBody, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
-import { invalid } from "./work-loop.ts";
+import { invalid, served } from "./work-loop.ts";
 
 type Input<A extends keyof Operations<Caller>> = Parameters<Operations<Caller>[A]>[1];
 type Issues = NonNullable<ProblemBody["issues"]>;
@@ -61,10 +61,23 @@ export function askedIn(input: unknown): string {
   return Result.isSuccess(target) ? whyAsked(target.success) : "what was asked";
 }
 
+/** Keel's record as the API serves it: each premise its message states with its strength written out. */
+function recordView(record: KeelRecord) {
+  const { message } = record;
+  switch (message.kind) {
+    case "intent":
+      return { ...record, message: { ...message, premises: message.premises.map(served) } };
+    case "premise":
+      return { ...record, message: { ...message, premise: served(message.premise) } };
+    default:
+      return { ...record, message };
+  }
+}
+
 /** The chain, with a summary naming the decisions behind it and a way to read each of the first three. */
 function whyOk(target: WhyTarget, chain: readonly WhyLink[]): WhyResult {
   const decisions = chain.flatMap((link) =>
-    link.record.kind === "decision" ? [link.record.id] : [],
+    link.record.message.kind === "decision" ? [link.record.id] : [],
   );
   const one = decisions.length === 1;
   return {
@@ -72,7 +85,9 @@ function whyOk(target: WhyTarget, chain: readonly WhyLink[]): WhyResult {
     body: {
       ok: true,
       summary: `${decisions.length} active decision${one ? "" : "s"} explain${one ? "s" : ""} ${whyAsked(target)}, newest first: ${chain.length} records.`,
-      result: { chain: chain.map((link) => ({ summary: link.summary, record: link.record })) },
+      result: {
+        chain: chain.map((link) => ({ summary: link.summary, record: recordView(link.record) })),
+      },
       findings: [],
       next: decisions.slice(0, 3).map((decisionId) => ({
         kind: "read",

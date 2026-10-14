@@ -127,7 +127,7 @@ describe("the Projector's re-fold", () => {
     const at = new Date(landing.at).toISOString();
     expect(
       Result.getOrThrow(read.chain).map((link) => [
-        link.record.kind,
+        link.record.message.kind,
         link.record.id,
         link.record.at,
       ]),

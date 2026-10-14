@@ -203,16 +203,16 @@ function propositionOf(text: string): Proposition {
   return parsed;
 }
 
+/** A value of any JSON type: MFP 0.2 types it by the predicate (an authority's writers are a list, a shape is a type), and Keel checks it. */
 function isProposition(value: unknown): value is Proposition {
   const field = (name: string) => Reflect.get(Object(value), name);
-  const scalar = field("value");
   return (
     typeof value === "object" &&
     value !== null &&
     typeof field("subject") === "string" &&
     typeof field("predicate") === "string" &&
     typeof field("relation") === "string" &&
-    (typeof scalar === "string" || typeof scalar === "number" || typeof scalar === "boolean")
+    field("value") !== undefined
   );
 }
 

@@ -1,4 +1,6 @@
-import { checkMessages, loadCore, loadWire } from "@bimsonz/mfp/profile";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { checkMessages, loadWire, type Profile } from "@bimsonz/mfp/profile";
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
@@ -17,10 +19,19 @@ import {
   type Untellable,
 } from "../../../src/domain/coordination/index.ts";
 import { CommitSha, makeId } from "../../../src/domain/kernel/index.ts";
+import { KEEL_MFP_PROFILE } from "../../../src/domain/memory/index.ts";
 import { citationArb, wirePropositionArb } from "../../arbitraries/coordination.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const PROPERTY_TIMEOUT = 60_000;
+
+/** Keel's MFP profile, as the spec publishes it. */
+const PROFILE: Profile = JSON.parse(
+  readFileSync(
+    join(import.meta.dirname, "../../../../../packages/spec/mfp/keel.profile.json"),
+    "utf8",
+  ),
+);
 
 const SESSION = makeId("ses", "0".repeat(26));
 const COMMIT = CommitSha.make("a".repeat(40));
@@ -323,7 +334,7 @@ describe("the MFP 0.2 wire", { timeout: PROPERTY_TIMEOUT }, () => {
     );
   });
 
-  it("[mfp.spec-agrees] every premise and effect Keel tells passes MFP 0.2's own schema in a premise and an intent message", () => {
+  it("[mfp.spec-agrees] every premise and effect Keel tells passes MFP 0.2's own schema in a premise and an intent message under Keel's profile", () => {
     // Every run's messages are checked in one call: MFP's checker compiles its schemas each time it is called.
     const messages: [string, unknown][] = [];
     fc.assert(
@@ -332,11 +343,12 @@ describe("the MFP 0.2 wire", { timeout: PROPERTY_TIMEOUT }, () => {
         const effect = told(effectToMfp(e));
         const run = String(messages.length / 2).padStart(4, "0");
         messages.push(
-          [`premise ${run}`, { mfp: "0.2", kind: "premise", premise }],
+          [`premise ${run}`, { mfp: "0.2", profile: KEEL_MFP_PROFILE, kind: "premise", premise }],
           [
             `intent ${run}`,
             {
               mfp: "0.2",
+              profile: KEEL_MFP_PROFILE,
               kind: "intent",
               goal: "keep grants fresh",
               premises: [premise],
@@ -346,7 +358,7 @@ describe("the MFP 0.2 wire", { timeout: PROPERTY_TIMEOUT }, () => {
         );
       }),
     );
-    const problems = checkMessages(loadWire(), loadCore(), messages);
+    const problems = checkMessages(loadWire(), PROFILE, messages);
     expect(
       problems.map((problem) => ({
         problem,

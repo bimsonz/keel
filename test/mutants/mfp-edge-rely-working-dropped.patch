@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: rely holds its premise with no working commit, so an anchor with no commit is refused though the change has a base
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..9415f6cc 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1192,7 +1192,7 @@ export function relying(
+   request: RelyRequest,
+ ): Result.Result<RelyInput, Issues> {
+   return Result.map(
+-    holdAt(premiseOfMfp(request.premise, working(base)), ["premise"], NO_BASE),
++    holdAt(premiseOfMfp(request.premise, {}), ["premise"], NO_BASE),
+     (premise) => ({ ...request.rely, premise }),
+   );
+ }

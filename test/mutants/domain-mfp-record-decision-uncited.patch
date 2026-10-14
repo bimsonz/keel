@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/mfp.test.ts
+# kills: mfp.record-refuses
+# why: A decision may cite nothing, so Keel holds a ruling resting on nothing, which 0.2's minItems on a decision's cites refuses
+diff --git a/packages/core/src/domain/memory/mfp.ts b/packages/core/src/domain/memory/mfp.ts
+index e8633033..35e669b1 100644
+--- a/packages/core/src/domain/memory/mfp.ts
++++ b/packages/core/src/domain/memory/mfp.ts
+@@ -65,7 +65,7 @@ export const MfpDecision = Schema.Struct({
+   rationale: Text,
+   alternatives: Schema.Array(Schema.Struct({ option: Text, reasonRejected: Text })),
+   reversible: Schema.Boolean,
+-  cites: NonEmptyCitations,
++  cites: Citations,
+   confidence,
+ });
+ export type MfpDecision = typeof MfpDecision.Type;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts -t "cli.rely-mfp"
+# kills: cli.rely-mfp
+# why: the CLI takes only a scalar value, so it refuses an authority's writers and a shape before Keel sees them
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index e5251b08..c7e55c03 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -212,7 +212,7 @@ function isProposition(value: unknown): value is Proposition {
+     typeof field("subject") === "string" &&
+     typeof field("predicate") === "string" &&
+     typeof field("relation") === "string" &&
+-    field("value") !== undefined
++    ["string", "number", "boolean"].includes(typeof field("value"))
+   );
+ }
+ 

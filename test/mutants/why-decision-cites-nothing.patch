@@ -2,15 +2,15 @@
 # kills: why.mfp
 # why: the decision record cites nothing, which MFP refuses of a decision
 diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
-index 423d31a..3b7e822 100644
+index 8a300180..ab9ded3a 100644
 --- a/packages/core/src/application/memory/why.ts
 +++ b/packages/core/src/application/memory/why.ts
-@@ -189,7 +189,7 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
-       at: iso(decision.decidedAt),
-       evidenceClass: "ruling",
-       ...(decision.scope === undefined ? {} : { scope: decision.scope }),
--      cites: grounds.map((link) => cite(link.record)),
-+      cites: [],
-       payload: {
-         ...(escalation === undefined ? {} : { question: escalation.question }),
-         chosen: decision.option,
+@@ -169,7 +169,7 @@ export function whyChain({
+                 : alternative.reasonRejected,
+           })),
+         reversible: true,
+-        cites: grounds.map((link) => cite(link.record)),
++        cites: [],
+       },
+     },
+   };

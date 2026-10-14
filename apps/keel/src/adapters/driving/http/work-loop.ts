@@ -31,18 +31,25 @@ import {
   type LeaseStale,
   type PoolExhausted,
   type Preflight,
+  MfpEffectProposition,
+  MfpPremiseProposition,
   Move,
-  Proposition,
+  type Proposition,
   type RevisionMismatch,
+  type Untellable,
+  type WireContext,
+  effectOfMfp,
+  effectToMfp,
+  premiseOfMfp,
+  premiseToMfp,
+  retractedBy,
   type WorkspaceNotFound,
 } from "@keeltown/core/domain/coordination";
 import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import type { ConflictNotFound, MoveRefused } from "@keeltown/core/domain/verification";
 import {
-  type Anchor,
   ChangeId,
   type NextAction as DomainNextAction,
-  type Citation,
   CommitSha,
   ConflictId,
   LeaseId,
@@ -77,7 +84,7 @@ import type {
   StatusResult,
   SubmitResult,
 } from "../../../generated/http/app.gen.ts";
-import { noticeView } from "../notices.ts";
+import { type NoticeView, noticeView } from "../notices.ts";
 import type { Caller } from "./caller.ts";
 import { runView } from "./mappers.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
@@ -117,67 +124,101 @@ export function invalid(caller: Caller, issues: Issues) {
   };
 }
 
-type WireProposition = Input<"declare">["premises"][number];
-type WireCitation = NonNullable<WireProposition["cites"]>[number];
+type Path = readonly (string | number)[];
 
-/** The wire tags citations by `kind`; the domain by `_tag`. Decoding checks everything else. */
-function citationInput(citation: WireCitation) {
-  switch (citation.kind) {
-    case "message":
-      return { _tag: "message", session: citation.session, seq: citation.seq };
-    case "anchor":
-      return { _tag: "anchor", anchor: citation.anchor };
-    case "record":
-      return { _tag: "record", id: citation.id };
-    default: {
-      const unmapped: never = citation;
-      return unmapped;
-    }
-  }
+/**
+ * An MFP 0.2 proposition held in Keel's form, or the issue that refuses it at
+ * its field: one that does not read on its lattice, or holds what Keel cannot,
+ * is refused with the reason, never repaired. An anchor with no commit means
+ * the driver's working commit; where Keel knows none, `unpinned` says what to do.
+ */
+function holdAt(
+  held: Result.Result<Proposition, Untellable>,
+  path: Path,
+  unpinned: string,
+): Result.Result<Proposition, Issues> {
+  return Result.mapError(held, (untellable) => [
+    {
+      path: [...path],
+      message:
+        untellable.reason === "anchor-commit"
+          ? `${untellable.detail}: ${unpinned}`
+          : `${untellable.detail} (${untellable.reason})`,
+    },
+  ]);
 }
 
-function propositionInput(proposition: WireProposition) {
-  const { cites, ...rest } = proposition;
-  return { ...rest, ...(cites === undefined ? {} : { cites: cites.map(citationInput) }) };
+/** Each of a list held against what the edge knows, or every issue among them. */
+const holding = <M>(
+  values: readonly M[],
+  path: Path,
+  hold: (m: M, ctx: WireContext) => Result.Result<Proposition, Untellable>,
+  ctx: WireContext,
+  unpinned: string,
+) => collect(values.map((m, i) => holdAt(hold(m, ctx), [...path, i], unpinned)));
+
+/** Declare knows no working commit: the workspace is granted behind the edge. */
+const ON_DECLARE =
+  "an anchor on declare names its commit, as Keel has no working commit until the workspace is granted; name it, or add the premise with rely once declared, where an anchor with none means the change's base";
+
+/** A change with no base has no working commit either. */
+const NO_BASE =
+  "the change has no base yet, so an anchor with no commit means nothing; name the commit";
+
+/** Whether a 0.2 proposition anchors or cites code with no commit, which means the driver's working commit. */
+const unpinned = (m: MfpPremiseProposition | MfpEffectProposition): boolean =>
+  (m.anchors ?? []).some((a) => a.commit === undefined) ||
+  (m.cites ?? []).some((c) => c.kind === "anchor" && c.commit === undefined);
+
+const working = (base: CommitSha | undefined): WireContext =>
+  base === undefined ? {} : { working: base };
+
+/** Every issue among the results, in order. */
+const failures = (...results: readonly (Result.Result<unknown, Issues> | undefined)[]): Issues =>
+  results.flatMap((r) => (r !== undefined && Result.isFailure(r) ? r.failure : []));
+
+/** Every result's value in order, or every issue among them. */
+function collect<A>(results: readonly Result.Result<A, Issues>[]): Result.Result<A[], Issues> {
+  const issues = results.flatMap((r) => (Result.isFailure(r) ? r.failure : []));
+  return issues.length > 0
+    ? Result.fail(issues)
+    : Result.succeed(results.flatMap((r) => (Result.isSuccess(r) ? [r.success] : [])));
 }
 
-function anchorView(anchor: Anchor) {
+/** A premise as the API serves it: its strength written out, 0.2's default `must` where it gave none. */
+export const served = (m: MfpPremiseProposition) => ({
+  ...m,
+  strength: m.strength ?? ("must" as const),
+});
+
+/**
+ * Keel's stored propositions told in MFP 0.2, for one response. A stored one
+ * with no 0.2 form (it does not read on its lattice, or holds what 0.2 cannot)
+ * is left out of the view and shown in the response's notices instead, never
+ * repaired.
+ */
+function teller() {
+  const notices: NoticeView[] = [];
+  const told = <A>(ref: string, p: Proposition, result: Result.Result<A, Untellable>): A[] => {
+    if (Result.isSuccess(result)) return [result.success];
+    notices.push({
+      id: `untellable:${ref}:${notices.length}`,
+      at: new Date().toISOString(),
+      kind: "PropositionUntellable",
+      title: `Proposition untellable in MFP 0.2: ${ref}`,
+      detail: `Left out: ${p.subject} ${p.predicate} ${p.relation} ${String(p.value)}. ${result.failure.detail} (${result.failure.reason}).`,
+      ref,
+    });
+    return [];
+  };
   return {
-    path: anchor.path,
-    commit: anchor.commit,
-    ...(anchor.symbol === undefined ? {} : { symbol: anchor.symbol }),
+    premise: (ref: string, p: Proposition) => told(ref, p, Result.map(premiseToMfp(p), served)),
+    effect: (ref: string, p: Proposition) => told(ref, p, effectToMfp(p)),
+    notices,
   };
 }
 
-function citationView(citation: Citation) {
-  switch (citation._tag) {
-    case "message":
-      return { kind: "message" as const, session: citation.session, seq: citation.seq };
-    case "anchor":
-      return { kind: "anchor" as const, anchor: anchorView(citation.anchor) };
-    case "record":
-      return { kind: "record" as const, id: citation.id };
-    default: {
-      const unmapped: never = citation;
-      return unmapped;
-    }
-  }
-}
-
-function propositionView(proposition: Proposition) {
-  return {
-    subject: proposition.subject,
-    predicate: proposition.predicate,
-    relation: proposition.relation,
-    value: proposition.value,
-    strength: proposition.strength ?? "must",
-    ...(proposition.unit === undefined ? {} : { unit: proposition.unit }),
-    ...(proposition.scope === undefined ? {} : { scope: proposition.scope }),
-    ...(proposition.gloss === undefined ? {} : { gloss: proposition.gloss }),
-    ...(proposition.anchors === undefined ? {} : { anchors: proposition.anchors.map(anchorView) }),
-    ...(proposition.cites === undefined ? {} : { cites: proposition.cites.map(citationView) }),
-  };
-}
+type Teller = ReturnType<typeof teller>;
 
 function footprintView(entry: FootprintEntry) {
   return {
@@ -190,26 +231,33 @@ function footprintView(entry: FootprintEntry) {
 const DeclareFields = Schema.Struct({
   goal: Schema.NonEmptyString,
   footprint: Schema.Array(FootprintEntry),
-  premises: Schema.Array(Proposition),
-  declaredEffects: Schema.optional(Schema.Array(Proposition)),
+  premises: Schema.Array(MfpPremiseProposition),
+  declaredEffects: Schema.optional(Schema.Array(MfpEffectProposition)),
 });
 
 export function declareInput(input: Input<"declare">): Result.Result<DeclareInput, Issues> {
-  const wire = {
+  const fields = decodeWith(DeclareFields, {
     goal: input.goal,
     footprint: input.footprint ?? [],
-    premises: input.premises.map(propositionInput),
-    ...(input.declaredEffects === undefined
-      ? {}
-      : { declaredEffects: input.declaredEffects.map(propositionInput) }),
-  };
-  return Result.map(decodeWith(DeclareFields, wire), (fields) => ({
-    goal: fields.goal,
-    footprint: fields.footprint,
-    premises: fields.premises,
-    ...(fields.declaredEffects === undefined ? {} : { declaredEffects: fields.declaredEffects }),
+    premises: input.premises,
+    ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
+  });
+  const premises = Result.flatMap(fields, (f) =>
+    holding(f.premises, ["premises"], premiseOfMfp, {}, ON_DECLARE),
+  );
+  const effects = Result.flatMap(fields, (f) =>
+    holding(f.declaredEffects ?? [], ["declaredEffects"], effectOfMfp, {}, ON_DECLARE),
+  );
+  if (Result.isFailure(fields)) return Result.fail(fields.failure);
+  if (Result.isFailure(premises) || Result.isFailure(effects))
+    return Result.fail(failures(premises, effects));
+  return Result.succeed({
+    goal: fields.success.goal,
+    footprint: fields.success.footprint,
+    premises: premises.success,
+    ...(fields.success.declaredEffects === undefined ? {} : { declaredEffects: effects.success }),
     idempotencyKey: input["idempotency-key"],
-  }));
+  });
 }
 
 const SubmitFields = Schema.Struct({ changeId: ChangeId, lease: LeaseId, commitSha: CommitSha });
@@ -231,11 +279,25 @@ export function changeIdInput(changeId: string): Result.Result<ChangeId, Issues>
   );
 }
 
-function envelope<R>(summary: string, result: R, next: readonly NextAction[] = []) {
-  return { ok: true, summary, result, findings: [], next: [...next], notices: [], cost: {} };
+function envelope<R>(
+  summary: string,
+  result: R,
+  next: readonly NextAction[] = [],
+  notices: readonly NoticeView[] = [],
+) {
+  return {
+    ok: true,
+    summary,
+    result,
+    findings: [],
+    next: [...next],
+    notices: [...notices],
+    cost: {},
+  };
 }
 
-function changeView(change: Change) {
+function changeView(change: Change, tell: Teller) {
+  const ref = `change:${change.id}`;
   return {
     id: change.id,
     agentId: change.agentId,
@@ -243,10 +305,10 @@ function changeView(change: Change) {
     revision: change.intent.revision,
     goal: change.intent.goal,
     footprint: change.intent.footprint.map(footprintView),
-    premises: change.intent.premises.map(propositionView),
+    premises: change.intent.premises.flatMap((p) => tell.premise(ref, p)),
     ...(change.intent.declaredEffects === undefined
       ? {}
-      : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
+      : { declaredEffects: change.intent.declaredEffects.flatMap((p) => tell.effect(ref, p)) }),
     ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
     ...(change.run === undefined ? {} : { run: runView(change.run) }),
     createdAt: iso(change.createdAt),
@@ -272,15 +334,40 @@ function leaseView(lease: Lease) {
   };
 }
 
-function preflightView(preflight: Preflight) {
+/**
+ * A change's preflight as the API declares it. A contradiction whose side has
+ * no 0.2 form is left out with a notice, and a move resting on one by its index
+ * is told with the index it has in the list as served, or with no basis when
+ * the one it rests on is left out.
+ */
+function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+  const position = new Map<number, number>();
+  const contradictions = preflight.contradictions.flatMap((c, i) => {
+    const premise = tell.premise(`change:${changeId}`, c.premise);
+    const other =
+      c.withRole === "premise" ? tell.premise(c.holder, c.with) : tell.effect(c.holder, c.with);
+    if (premise[0] === undefined || other[0] === undefined) return [];
+    position.set(i, position.size);
+    return [
+      {
+        premise: premise[0],
+        with: other[0],
+        holder: c.holder,
+        ...(c.withRole === undefined ? {} : { withRole: c.withRole }),
+      },
+    ];
+  });
+  const rests = preflight.basis?._tag === "contradiction" ? preflight.basis.index : undefined;
+  const index = rests === undefined ? undefined : position.get(rests);
+  const basis =
+    rests === undefined
+      ? preflight.basis
+      : index === undefined
+        ? undefined
+        : { _tag: "contradiction" as const, index };
   return {
     neighbours: preflight.neighbours.map((n) => ({ ...n, subjects: [...n.subjects] })),
-    contradictions: preflight.contradictions.map((c) => ({
-      premise: propositionView(c.premise),
-      with: propositionView(c.with),
-      holder: c.holder,
-      ...(c.withRole === undefined ? {} : { withRole: c.withRole }),
-    })),
+    contradictions,
     precedents: preflight.precedents.map((p) => ({
       decisionId: p.decisionId,
       summary: p.summary,
@@ -288,7 +375,7 @@ function preflightView(preflight: Preflight) {
       ...(p.scope === undefined ? {} : { scope: p.scope }),
     })),
     suggestedMove: preflight.suggestedMove,
-    ...(preflight.basis === undefined ? {} : { basis: preflight.basis }),
+    ...(basis === undefined ? {} : { basis }),
     ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
   };
 }
@@ -329,13 +416,14 @@ const MAX_NEXT = 3;
 
 export function declareOk(declared: Declared): DeclareResult {
   const { change, preflight, workspace } = declared;
+  const tell = teller();
   return {
     status: 201,
     body: envelope(
       `Declared ${change.id} (${change.state}). Push your commits to the workspace remote with its token, then submit.`,
       {
-        change: changeView(change),
-        preflight: preflightView(preflight),
+        change: changeView(change, tell),
+        preflight: preflightView(change.id, preflight, tell),
         workspace: workspaceView(workspace),
         lease: leaseView(change.lease),
       },
@@ -347,6 +435,7 @@ export function declareOk(declared: Declared): DeclareResult {
           args: { changeId: change.id },
         },
       ],
+      tell.notices,
     ),
   };
 }
@@ -487,11 +576,12 @@ export function rebaseInput(input: Input<"rebase">): Result.Result<RebaseInput, 
 
 export function rebaseOk(rebased: RebasedChange): RebaseResult {
   const { change, ref, base } = rebased;
+  const tell = teller();
   return {
     status: 200,
     body: envelope(
       `Rebased ${change.id} onto trunk ${base.slice(0, 12)}, now on your workspace's keel/trunk. Merge it, resolve, push, then submit.`,
-      { change: changeView(change), ref, base },
+      { change: changeView(change, tell), ref, base },
       [
         {
           kind: "call",
@@ -501,6 +591,7 @@ export function rebaseOk(rebased: RebasedChange): RebaseResult {
           args: { changeId: change.id },
         },
       ],
+      tell.notices,
     ),
   };
 }
@@ -647,12 +738,13 @@ export function commitInput(input: Input<"commit">): Result.Result<CommitInput, 
 
 export function committedOk(committed: CommittedChange): CommitResult {
   const { change, commit, parent } = committed;
+  const tell = teller();
   return {
     status: 200,
     body: envelope(
       `Committed ${commit.changed} path(s) to ${change.id}'s workspace as ${commit.commitSha.slice(0, 12)}. Submit it when the change is ready.`,
       {
-        change: changeView(change),
+        change: changeView(change, tell),
         commitSha: commit.commitSha,
         parent,
         tree: commit.tree,
@@ -666,6 +758,7 @@ export function committedOk(committed: CommittedChange): CommitResult {
           args: { changeId: change.id, commitSha: commit.commitSha },
         },
       ],
+      tell.notices,
     ),
   };
 }
@@ -874,50 +967,102 @@ const ReviseFields = Schema.Struct({
   lease: LeaseId,
   goal: Schema.optional(Schema.NonEmptyString),
   footprint: Schema.optional(Schema.Array(FootprintEntry)),
-  premisesAdded: Schema.Array(Proposition),
-  premisesRetracted: Schema.Array(Proposition),
-  declaredEffects: Schema.optional(Schema.Array(Proposition)),
+  premisesAdded: Schema.Array(MfpPremiseProposition),
+  premisesRetracted: Schema.Array(MfpPremiseProposition),
+  declaredEffects: Schema.optional(Schema.Array(MfpEffectProposition)),
 });
 
-export function reviseInput(input: Input<"revise">): Result.Result<ReviseInput, Issues> {
+/**
+ * A revision as asked, its propositions as MFP 0.2 told them. They are held
+ * against the change it revises (`revising`): an anchor with no commit means
+ * the change's base, and a retraction names a premise the change stores.
+ */
+export interface ReviseRequest {
+  readonly revise: Omit<ReviseInput, "premisesAdded" | "premisesRetracted" | "declaredEffects">;
+  readonly added: readonly MfpPremiseProposition[];
+  readonly retracted: readonly MfpPremiseProposition[];
+  readonly effects?: readonly MfpEffectProposition[];
+}
+
+export function reviseInput(input: Input<"revise">): Result.Result<ReviseRequest, Issues> {
   const fields = decodeWith(ReviseFields, {
     changeId: input.changeId,
     lease: input["keel-lease"],
     ...(input.goal === undefined ? {} : { goal: input.goal }),
     ...(input.footprint === undefined ? {} : { footprint: input.footprint }),
-    premisesAdded: (input.premisesAdded ?? []).map(propositionInput),
-    premisesRetracted: (input.premisesRetracted ?? []).map(propositionInput),
-    ...(input.declaredEffects === undefined
-      ? {}
-      : { declaredEffects: input.declaredEffects.map(propositionInput) }),
+    premisesAdded: input.premisesAdded ?? [],
+    premisesRetracted: input.premisesRetracted ?? [],
+    ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
   });
   const revision = ifMatchInput(input["if-match"]);
   if (Result.isFailure(fields) || Result.isFailure(revision))
-    return Result.fail([
-      ...(Result.isFailure(fields) ? fields.failure : []),
-      ...(Result.isFailure(revision) ? revision.failure : []),
-    ]);
-  const { goal, footprint, declaredEffects, ...rest } = fields.success;
+    return Result.fail(failures(fields, revision));
+  const { goal, footprint, premisesAdded, premisesRetracted, declaredEffects, ...rest } =
+    fields.success;
   return Result.succeed({
-    ...rest,
-    ifMatchRevision: revision.success,
-    ...(goal === undefined ? {} : { goal }),
-    ...(footprint === undefined ? {} : { footprint }),
-    ...(declaredEffects === undefined ? {} : { declaredEffects }),
-    idempotencyKey: input["idempotency-key"],
+    revise: {
+      ...rest,
+      ifMatchRevision: revision.success,
+      ...(goal === undefined ? {} : { goal }),
+      ...(footprint === undefined ? {} : { footprint }),
+      idempotencyKey: input["idempotency-key"],
+    },
+    added: premisesAdded,
+    retracted: premisesRetracted,
+    ...(declaredEffects === undefined ? {} : { effects: declaredEffects }),
+  });
+}
+
+/** Whether a revision is held against the change itself: to retract, or to hold an anchor with no commit at its base. */
+export const revisesAgainstChange = (request: ReviseRequest): boolean =>
+  request.retracted.length > 0 || [...request.added, ...(request.effects ?? [])].some(unpinned);
+
+/**
+ * Each retracted premise as the change stores it: the one whose 0.2 form is
+ * the one retracted, so a premise stored in an older spelling is retracted by
+ * echoing what Keel told. One that matches no stored premise retracts nothing,
+ * as a retraction never did.
+ */
+export const retractions = (
+  stored: readonly Proposition[],
+  retracted: readonly MfpPremiseProposition[],
+  ctx: WireContext = {},
+): Proposition[] =>
+  retracted.flatMap((m) => {
+    const premise = retractedBy(stored, m, ctx);
+    return premise === undefined ? [] : [premise];
+  });
+
+/** The revision held against the change it revises: its base, and the premises it stores. */
+export function revising(
+  base: CommitSha | undefined,
+  stored: readonly Proposition[],
+  request: ReviseRequest,
+): Result.Result<ReviseInput, Issues> {
+  const ctx = working(base);
+  const added = holding(request.added, ["premisesAdded"], premiseOfMfp, ctx, NO_BASE);
+  const effects = holding(request.effects ?? [], ["declaredEffects"], effectOfMfp, ctx, NO_BASE);
+  if (Result.isFailure(added) || Result.isFailure(effects))
+    return Result.fail(failures(added, effects));
+  return Result.succeed({
+    ...request.revise,
+    premisesAdded: added.success,
+    premisesRetracted: retractions(stored, request.retracted, ctx),
+    ...(request.effects === undefined ? {} : { declaredEffects: effects.success }),
   });
 }
 
 /** What a revision or a rely leaves: the change at its new revision, and the preflight of its intent now. */
 function revisedBody(verb: string, revised: Revised) {
   const { change, preflight } = revised;
+  const tell = teller();
   const found = preflight.contradictions.length;
   return envelope(
     `${verb} ${change.id}, now at revision ${change.intent.revision}.` +
       (found === 0
         ? ""
         : ` Preflight found ${found} contradiction${found === 1 ? "" : "s"} with another change: refine before you build on it.`),
-    { change: changeView(change), preflight: preflightView(preflight) },
+    { change: changeView(change, tell), preflight: preflightView(change.id, preflight, tell) },
     [
       {
         kind: "call",
@@ -926,6 +1071,7 @@ function revisedBody(verb: string, revised: Revised) {
         args: { changeId: change.id },
       },
     ],
+    tell.notices,
   );
 }
 
@@ -1011,16 +1157,43 @@ export function reviseError(
   }
 }
 
-const RelyFields = Schema.Struct({ changeId: ChangeId, lease: LeaseId, premise: Proposition });
+const RelyFields = Schema.Struct({
+  changeId: ChangeId,
+  lease: LeaseId,
+  premise: MfpPremiseProposition,
+});
 
-export function relyInput(input: Input<"rely">): Result.Result<RelyInput, Issues> {
+/** A rely as asked, its premise as MFP 0.2 told it, held against the change (`relying`). */
+export interface RelyRequest {
+  readonly rely: Omit<RelyInput, "premise">;
+  readonly premise: MfpPremiseProposition;
+}
+
+export function relyInput(input: Input<"rely">): Result.Result<RelyRequest, Issues> {
   return Result.map(
     decodeWith(RelyFields, {
       changeId: input.changeId,
       lease: input["keel-lease"],
-      premise: propositionInput(input.premise),
+      premise: input.premise,
     }),
-    (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
+    ({ premise, ...fields }) => ({
+      rely: { ...fields, idempotencyKey: input["idempotency-key"] },
+      premise,
+    }),
+  );
+}
+
+/** Whether a rely is held against the change itself: to hold an anchor with no commit at its base. */
+export const reliesAgainstChange = (request: RelyRequest): boolean => unpinned(request.premise);
+
+/** The rely held against the change's base: an anchor with no commit means it. */
+export function relying(
+  base: CommitSha | undefined,
+  request: RelyRequest,
+): Result.Result<RelyInput, Issues> {
+  return Result.map(
+    holdAt(premiseOfMfp(request.premise, working(base)), ["premise"], NO_BASE),
+    (premise) => ({ ...request.rely, premise }),
   );
 }
 
@@ -1050,7 +1223,7 @@ export function relyError(
 
 /** A change read by id: the change itself, bare, as the spec's `Change`. */
 export function changeOk(change: Change): ChangeResult {
-  return { status: 200, body: changeView(change) };
+  return { status: 200, body: changeView(change, teller()) };
 }
 
 export function changeReadError(caller: Caller, error: ChangeNotFound): ChangeResult {
@@ -1059,11 +1232,14 @@ export function changeReadError(caller: Caller, error: ChangeNotFound): ChangeRe
 
 export function nearbyOk(changeId: ChangeId, preflight: Preflight): NearbyResult {
   const found = preflight.contradictions.length;
+  const tell = teller();
   return {
     status: 200,
     body: envelope(
       `${preflight.neighbours.length} change${preflight.neighbours.length === 1 ? "" : "s"} near ${changeId}, ${found} contradiction${found === 1 ? "" : "s"}.`,
-      { preflight: preflightView(preflight) },
+      { preflight: preflightView(changeId, preflight, tell) },
+      [],
+      tell.notices,
     ),
   };
 }
@@ -1098,16 +1274,18 @@ export function adoptInput(input: Input<"adopt">): Result.Result<AdoptInput, Iss
 
 export function adoptOk(adopted: Adopted): AdoptResult {
   const { change, workspace } = adopted;
+  const tell = teller();
   return {
     status: 200,
     body: envelope(
       `Adopted ${change.id} (${change.state}) under a new lease. Pull its workspace, carry on, then submit.`,
       {
-        change: changeView(change),
+        change: changeView(change, tell),
         lease: leaseView(change.lease),
         ...(workspace === undefined ? {} : { workspace: workspaceView(workspace) }),
       },
       [statusOf(change.id)],
+      tell.notices,
     ),
   };
 }
@@ -1209,11 +1387,15 @@ export function abandonInput(input: Input<"abandon">): Result.Result<AbandonCall
 }
 
 export function abandonOk(change: Change): AbandonResult {
+  const tell = teller();
   return {
     status: 200,
-    body: envelope(`Withdrew ${change.id}; its workspace is released.`, {
-      change: changeView(change),
-    }),
+    body: envelope(
+      `Withdrew ${change.id}; its workspace is released.`,
+      { change: changeView(change, tell) },
+      [],
+      tell.notices,
+    ),
   };
 }
 

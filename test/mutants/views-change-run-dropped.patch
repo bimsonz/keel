@@ -2,12 +2,12 @@
 # kills: run.pool-views
 # why: a change's body drops the run that holds it
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index dbab9d13..c1459de2 100644
+index 80640429..6a8297a7 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -235,7 +235,6 @@ function changeView(change: Change) {
+@@ -286,7 +286,6 @@ function changeView(change: Change, tell: Teller) {
        ? {}
-       : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
+       : { declaredEffects: change.intent.declaredEffects.flatMap((p) => tell.effect(ref, p)) }),
      ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
 -    ...(change.run === undefined ? {} : { run: runView(change.run) }),
      createdAt: iso(change.createdAt),

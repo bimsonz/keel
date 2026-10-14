@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-retract"
+# kills: mfp.edge-retract
+# why: a retraction is held as written rather than matched to the stored premise, so one stored in an older spelling is never retracted
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..1055b3d9 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1029,7 +1029,8 @@ export const retractions = (
+   ctx: WireContext = {},
+ ): Proposition[] =>
+   retracted.flatMap((m) => {
+-    const premise = retractedBy(stored, m, ctx);
++    const told = premiseOfMfp(m, ctx);
++    const premise = Result.isSuccess(told) ? told.success : undefined;
+     return premise === undefined ? [] : [premise];
+   });
+ 

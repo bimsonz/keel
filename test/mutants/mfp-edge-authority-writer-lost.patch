@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: an authority declared in 0.2 loses its first writer on the way in, so Keel tells back a smaller set
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 21a9e85f..e90e6870 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -405,7 +405,7 @@ const hold = (
+       unit = m.unit === UNITLESS ? undefined : m.unit;
+       break;
+     case "authority":
+-      value = m.value.join(",");
++      value = m.value.slice(1).join(",");
+       break;
+     case "shape": {
+       const held = shapeOfMfp(m.value);

@@ -9,10 +9,31 @@ using OpenAPI;
 
 namespace Keel;
 
-/** One link in a chain of reasons, with the MFP record behind it. */
+/** Who stated a message: a person, an agent, or Keel itself. */
+model RecordAuthor {
+  kind: "human" | "agent" | "platform";
+  id: string;
+}
+
+/**
+ * Keel's own record of an MFP message: who stated it, when, for which change,
+ * the class of evidence it rests on and where it holds, which MFP 0.2 leaves to
+ * the receiver. The message itself is MFP 0.2.
+ */
+model KeelRecord {
+  id: string;
+  author: RecordAuthor;
+  at: utcDateTime;
+  change?: ChangeId;
+  evidenceClass?: EvidenceClass;
+  scope?: string;
+  message: MFP.Message;
+}
+
+/** One link in a chain of reasons, with Keel's record of the MFP message behind it. */
 model WhyLink {
   summary: string;
-  record: MFP.MfpRecord;
+  record: KeelRecord;
 }
 
 model WhyChain {
@@ -32,14 +53,14 @@ interface Memory {
    * anchored in the file, answers with its chain, newest decision first: the
    * decision, the premise its conflict was about, the intent of the change
    * whose effect met it, each guard that holds it, and each change that landed
-   * under it, every link an MFP 0.1 record. A subject's anchors name a file and
-   * no lines, so `line` does not narrow: a path with a line answers every
-   * subject anchored in that file. An agent reads its own project unless it
-   * names another; anyone else names one. Nothing to explain in the project
-   * read is 404 `why.nothing_to_explain`. Without a token only a public project
-   * is read, and a private or unknown one, like any the caller may not see, is
-   * the same 404. A refusal about the caller itself (a token's scope, a
-   * suspension, a paused agent) is 403 with its next action.
+   * under it, every link an MFP 0.2 message in Keel's record. A subject's
+   * anchors name a file and no lines, so `line` does not narrow: a path with a
+   * line answers every subject anchored in that file. An agent reads its own
+   * project unless it names another; anyone else names one. Nothing to explain
+   * in the project read is 404 `why.nothing_to_explain`. Without a token only a
+   * public project is read, and a private or unknown one, like any the caller
+   * may not see, is the same 404. A refusal about the caller itself (a token's
+   * scope, a suspension, a paused agent) is 403 with its next action.
    */
   @summary("Why is it like this?")
   @tag("mcp")

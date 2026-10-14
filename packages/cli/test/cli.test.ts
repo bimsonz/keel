@@ -450,6 +450,33 @@ describe("keeltown", () => {
     expect(sent.body).toEqual({ premise: PREMISE });
   });
 
+  it("[cli.rely-mfp] sends a premise whose value MFP 0.2 types as a list or a type as it is given: an authority's writers, a shape", async () => {
+    const authority = {
+      subject: "deploy.prod",
+      predicate: "authority",
+      relation: "at-most",
+      value: ["release-team", "alice"],
+    };
+    const shape = {
+      subject: "deploy.manifest",
+      predicate: "shape",
+      relation: "is",
+      value: {
+        type: "object",
+        fields: [{ name: "service", shape: { type: "string" }, optional: false }],
+      },
+    };
+    for (const premise of [authority, shape]) {
+      const keel = fakeKeel(() => Response.json(envelope));
+      const code = await run(
+        ["rely", "chg_1", "--lease", "lse_1", "--premise", JSON.stringify(premise)],
+        keel.io,
+      );
+      expect(code).toBe(0);
+      expect(only(keel.requests).body).toEqual({ premise });
+    }
+  });
+
   it("[cli.nearby] reads what is near a change", async () => {
     const keel = fakeKeel(() => Response.json(envelope));
     expect(await run(["nearby", "chg_1"], keel.io)).toBe(0);

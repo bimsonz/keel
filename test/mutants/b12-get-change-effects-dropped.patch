@@ -2,14 +2,14 @@
 # kills: b12.get-change
 # why: the change answers without its declared effects, so comparing two attempts cannot see what each claims to cause
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index dbab9d13..e247ae89 100644
+index 80640429..4769a651 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -233,7 +233,7 @@ function changeView(change: Change) {
-     premises: change.intent.premises.map(propositionView),
+@@ -284,7 +284,7 @@ function changeView(change: Change, tell: Teller) {
+     premises: change.intent.premises.flatMap((p) => tell.premise(ref, p)),
      ...(change.intent.declaredEffects === undefined
        ? {}
--      : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
+-      : { declaredEffects: change.intent.declaredEffects.flatMap((p) => tell.effect(ref, p)) }),
 +      : {}),
      ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
      ...(change.run === undefined ? {} : { run: runView(change.run) }),

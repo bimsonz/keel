@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-input"
+# kills: mfp.edge-input
+# why: rely takes its premise without 0.2's schema and trusts the doorway's validator, so a bound with no unit gets in behind it
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..b5a1c31e 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1160,7 +1160,7 @@ export function reviseError(
+ const RelyFields = Schema.Struct({
+   changeId: ChangeId,
+   lease: LeaseId,
+-  premise: MfpPremiseProposition,
++  premise: Schema.Unknown,
+ });
+ 
+ /** A rely as asked, its premise as MFP 0.2 told it, held against the change (`relying`). */
