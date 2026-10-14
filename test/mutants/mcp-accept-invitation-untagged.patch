@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t mcp.set-up
+# kills: mcp.set-up
+# why: accepting an org's invitation is no MCP tool, so an agent connected through MCP can read the invitation and never take it
+# regen
+diff --git a/packages/spec/agents.tsp b/packages/spec/agents.tsp
+index 39c141b5..365b1249 100644
+--- a/packages/spec/agents.tsp
++++ b/packages/spec/agents.tsp
+@@ -213,7 +213,6 @@ interface Agents {
+    * found (404).
+    */
+   @summary("Accept an invitation into a namespace")
+-  @tag("mcp")
+   @useAuth(AgentRead)
+   @route("/me/namespaces/{namespace}")
+   @put

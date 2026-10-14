@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.placement-next
+# kills: whoami.placement-next
+# why: the agent is told to give a member its id, which no invitation takes, rather than its handle
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index d5fb419f..24006943 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -134,7 +134,7 @@ function placement({ agent, invitations, joined }: Identity) {
+   const standing =
+     invitations.namespaces + invitations.projects + joined.namespaces + joined.projects;
+   if (agent.projectId !== undefined || standing > 0) return { clause: "", next: [] };
+-  const handle = agent.handle ?? agent.id;
++  const handle = agent.id;
+   return {
+     clause: ` You work only in your own namespace, ${handle}: a member of an org invites you into theirs.`,
+     next: [

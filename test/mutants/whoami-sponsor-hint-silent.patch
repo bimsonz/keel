@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.sponsor-next
+# kills: whoami.sponsor-next
+# why: whoami says nothing to an agent nobody stands behind, so it never learns that a person must, nor that askSponsor asks one
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index d5fb419f..2058d1a2 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -110,7 +110,7 @@ function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
+ 
+ /** What `whoami` tells an agent nobody stands behind: that a person must, and the call that asks one. */
+ function sponsorship(agent: Agent) {
+-  return agent.sponsor !== undefined
++  return agent.sponsor !== undefined || agent.state === "active"
+     ? { clause: "", next: [] }
+     : {
+         clause: " Nobody stands behind you yet: ask a person to sponsor you.",

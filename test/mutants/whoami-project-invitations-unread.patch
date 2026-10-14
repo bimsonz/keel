@@ -2,15 +2,15 @@
 # kills: whoami.invited
 # why: a project's invitation is never counted, so an agent invited to one project is told nothing waits
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index 70ad04a3..6dedd4ad 100644
+index 217aba03..22bac7d0 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
-@@ -57,7 +57,7 @@ export const whoami: (
+@@ -61,7 +61,7 @@ export const whoami: (
      agent,
      ...(principal.run === undefined ? {} : { run: principal.run }),
      session: current === null ? null : { id: current.id },
 -    invitations: { namespaces: waiting(namespaces), projects: waiting(projects) },
 +    invitations: { namespaces: waiting(namespaces), projects: 0 },
+     joined: { namespaces: joined(namespaces), projects: joined(projects) },
    };
  });
- 

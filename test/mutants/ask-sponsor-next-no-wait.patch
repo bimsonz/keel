@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts -t link.sponsor-http
+# kills: link.sponsor-http
+# why: an agent that asked for a sponsor is not told it can wait for the approval, so it reads whoami again and again
+diff --git a/apps/keel/src/adapters/driving/http/sponsorship.ts b/apps/keel/src/adapters/driving/http/sponsorship.ts
+index 39f7d402..12ab9b43 100644
+--- a/apps/keel/src/adapters/driving/http/sponsorship.ts
++++ b/apps/keel/src/adapters/driving/http/sponsorship.ts
+@@ -55,7 +55,7 @@ export function askOk(origin: string, agentId: AgentId, request: SponsorRequest)
+         {
+           kind: "call",
+           title: "Wait in your inbox: Keel tells you the moment they approve",
+-          operationId: "inbox",
++          operationId: "whoami",
+           args: { cursor: "end", wait: 600 },
+         },
+         {

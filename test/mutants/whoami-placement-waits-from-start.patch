@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.placement-next
+# kills: whoami.placement-next
+# why: the inbox wait reads from the start, so any old notice answers it at once and the agent is not told when the invitation comes
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index d5fb419f..58e82f9b 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -146,7 +146,7 @@ function placement({ agent, invitations, joined }: Identity) {
+         kind: "call" as const,
+         title: "Wait in your inbox: Keel tells you the moment an invitation comes",
+         operationId: "inbox",
+-        args: { cursor: "end", wait: 600 },
++        args: { wait: 600 },
+       },
+     ],
+   };

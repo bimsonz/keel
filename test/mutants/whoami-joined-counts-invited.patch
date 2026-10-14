@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t mcp.set-up
+# kills: mcp.set-up
+# why: an accepted invitation is not counted as a place the agent stands, so once in an org it is still told to ask for an invitation
+diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
+index 217aba03..30dbc97d 100644
+--- a/packages/core/src/application/identity/index.ts
++++ b/packages/core/src/application/identity/index.ts
+@@ -43,7 +43,7 @@ const waiting = (invitations: readonly Invitation[]): number =>
+ 
+ /** How many invitations the agent has accepted: the places it stands. */
+ const joined = (invitations: readonly Invitation[]): number =>
+-  invitations.filter((invitation) => invitation.state === "joined").length;
++  invitations.filter((invitation) => invitation.state === "invited").length;
+ 
+ /** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, that run's current session, how many invitations wait for its word and how many it has accepted. */
+ export const whoami: (
