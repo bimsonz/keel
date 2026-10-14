@@ -2,19 +2,19 @@
 # kills: d21.requeue-keeps-hash
 # why: A requeued change re-enters the queue without the plan its ChangeRequeued names, so a change bounced out of a batch by infra comes back planless and is refused
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 1562ba3..4e88e5c 100644
+index 8b5fe912..84793b61 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -277,11 +277,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+@@ -382,11 +382,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+       case "ChangeRequeued": {
          const requeued = decodeRequeued(event.payload);
-         return holds(tx.store, lane, requeued.changeId)
-           ? undefined
--          : withPlan(
--              { ...lane, queue: [requeued.changeId, ...lane.queue] },
--              requeued.changeId,
--              requeued.planHash,
--            );
-+          : { ...lane, queue: [requeued.changeId, ...lane.queue] };
+         if (holds(tx.store, lane, requeued.changeId)) return undefined;
+-        const back = withPlan(
+-          { ...lane, queue: [requeued.changeId, ...lane.queue] },
+-          requeued.changeId,
+-          requeued.planHash,
+-        );
++        const back = { ...lane, queue: [requeued.changeId, ...lane.queue] };
+         // Its members clashed: it runs alone next, so the clash ends in one landing and one failure of its own.
+         return runsAlone(requeued.reason) ? withAlone(back, [requeued.changeId]) : back;
        }
-       case "ChangeParked": {
-         // Held for a person's ruling: out of the queue, its plan kept for when it resumes.

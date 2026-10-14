@@ -2,15 +2,15 @@
 # kills: trunk.promote-as-is
 # why: The WAL records the batch's base as the group's commit, so trunk is pushed back to where it was and the candidate never lands
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index a2b3860..3530e01 100644
+index 757595b7..74acde76 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -313,7 +313,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -655,7 +655,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
      const tip = yield* candidateTip(projectId, batch.candidateId);
      yield* promote(
        projectId,
--      { _tag: "Composed", sha: tip, commits: [{ changeId: member, commitSha: tip }] },
-+      { _tag: "Composed", sha: batch.base, commits: [{ changeId: member, commitSha: batch.base }] },
+-      { _tag: "Composed", sha: tip, commits: yield* memberCommits(projectId, batch, tip) },
++      { _tag: "Composed", sha: batch.base, commits: yield* memberCommits(projectId, batch, batch.base) },
        `composed:${wal.groupId}`,
      ).pipe(Effect.orDie);
    }

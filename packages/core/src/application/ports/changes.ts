@@ -68,6 +68,8 @@ export interface SubmissionStatus {
 export interface ChangeRead {
   readonly change: Change;
   readonly projectId: ProjectId;
+  /** The other changes it shares a conflict with that is neither dismissed nor resolved: the Lane batches it apart from them. */
+  readonly unsettled?: readonly ChangeId[] | undefined;
 }
 
 /**

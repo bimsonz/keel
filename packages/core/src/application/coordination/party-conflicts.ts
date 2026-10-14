@@ -41,6 +41,8 @@ const PartyConflict = Schema.Struct({
   /** The change relying on the premise at stake, and the change making the effect against it: the two a ruling is between. */
   holder: Schema.optional(ChangeId),
   author: Schema.optional(ChangeId),
+  /** Every change among its parties; absent on a row kept before they were, which falls back to holder and author. */
+  parties: Schema.optional(Schema.Array(ChangeId)),
   state: Schema.Literals(["open", "proven", "dismissed", "escalated", "resolved"]),
 });
 export type PartyConflict = typeof PartyConflict.Type;
@@ -98,7 +100,7 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
   if (event.type === "ConflictSuspected") {
     const suspected = decodeSuspected(event.payload);
     if (Option.isNone(suspected)) return false;
-    const { conflictId, subjectId, predicate, premise, effect } = suspected.value;
+    const { conflictId, subjectId, predicate, premise, effect, parties } = suspected.value;
     if (store.get(PARTY_CONFLICT, conflictId) !== undefined) return true;
     store.put(
       PARTY_CONFLICT,
@@ -110,6 +112,7 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
           ...(predicate === undefined ? {} : { predicate }),
           ...(premise === undefined ? {} : { holder: premise.holder }),
           ...(effect === undefined ? {} : { author: effect.changeId }),
+          parties: changeParties(parties),
           state: "open",
         }),
       ),
@@ -175,6 +178,24 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
   unresolvedHighDrift: [],
   awaitingRuling: awaitedEscalations(store),
 });
+
+/** The states in which a conflict is not settled: suspected or probing (`open`), proven, or with a person. */
+const UNSETTLED: ReadonlySet<PartyConflict["state"]> = new Set(["open", "proven", "escalated"]);
+
+/**
+ * The other changes `self` shares a conflict with that is not yet settled
+ * (neither dismissed nor resolved), from the rows its own DO keeps: the Lane
+ * never puts two of them in one batch. Sorted, each once.
+ */
+export function unsettledWith(store: Store, self: ChangeId): readonly ChangeId[] {
+  const others = store
+    .list(PARTY_CONFLICT)
+    .map((row) => decodeRow(row.value))
+    .filter((row) => UNSETTLED.has(row.state))
+    .flatMap((row) => row.parties ?? [row.holder, row.author].filter(isChange))
+    .filter((id) => id !== self);
+  return [...new Set(others)].toSorted();
+}
 
 /** The escalations the change's conflicts wait on: each conflict with a person and not yet ruled on, by conflict id. */
 export function awaitedEscalations(store: Store): readonly EscalationId[] {

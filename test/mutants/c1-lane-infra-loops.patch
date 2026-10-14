@@ -2,11 +2,11 @@
 # kills: lane.infra-limit
 # why: A change failing on the infrastructure every time is requeued forever instead of bouncing on the third
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..45f4d55 100644
+index 8b5fe912..64998469 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -344,7 +344,7 @@ const infraBlame = (
-   if (sole === undefined) return { attribution: "infra", lane };
+@@ -581,7 +581,7 @@ const infraBlame = (
+   }
    const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
    const others = withoutInfra(lane, [sole]);
 -  if (reasons.length >= INFRA_FAILURE_LIMIT)

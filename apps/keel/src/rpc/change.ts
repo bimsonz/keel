@@ -373,7 +373,14 @@ const AwaitedChange = Schema.Union([
 ]);
 
 export const ChangeCodecs = {
-  get: exitCodec(Schema.Struct({ change: Change, projectId: ProjectId }), ChangeNotFound),
+  get: exitCodec(
+    Schema.Struct({
+      change: Change,
+      projectId: ProjectId,
+      unsettled: Schema.optional(Schema.Array(ChangeId)),
+    }),
+    ChangeNotFound,
+  ),
   awaitSubmission: exitCodec(AwaitedChange, ChangeNotFound),
   awaitPlan: exitCodec(AwaitedChange, ChangeNotFound),
   declare: exitCodec(

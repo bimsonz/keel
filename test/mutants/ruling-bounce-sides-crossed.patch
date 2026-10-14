@@ -2,10 +2,10 @@
 # kills: t35.park-resume
 # why: a party keeps its conflict's two sides crossed, so through the real Worker the change ruled against is bounced with the other option's consequence
 diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
-index 33ba6564..54170fe9 100644
+index 925a79fe..9d3e2439 100644
 --- a/packages/core/src/application/coordination/party-conflicts.ts
 +++ b/packages/core/src/application/coordination/party-conflicts.ts
-@@ -108,8 +108,8 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
+@@ -110,8 +110,8 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
            conflictId,
            ...(subjectId === undefined ? {} : { subjectId }),
            ...(predicate === undefined ? {} : { predicate }),
@@ -13,6 +13,6 @@ index 33ba6564..54170fe9 100644
 -          ...(effect === undefined ? {} : { author: effect.changeId }),
 +          ...(premise === undefined ? {} : { author: premise.holder }),
 +          ...(effect === undefined ? {} : { holder: effect.changeId }),
+           parties: changeParties(parties),
            state: "open",
          }),
-       ),

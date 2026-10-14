@@ -589,15 +589,45 @@ export type PushOutcome =
   /** No group is open. */
   | "idle";
 
+/**
+ * Each member's commit in a batch's candidate: the composer chains one commit
+ * a member onto the batch's base, in batch order, so the chain read back from
+ * the tip, oldest first, is the members'. A batch of one is its tip. A chain
+ * that does not end at the base is a defect: trunk would land commits no
+ * member made.
+ */
+const memberCommits = (projectId: ProjectId, batch: QueuedBatch, tip: CommitSha) =>
+  Effect.gen(function* () {
+    const [sole, ...others] = batch.members;
+    if (sole !== undefined && others.length === 0) return [{ changeId: sole, commitSha: tip }];
+    const n = batch.members.length;
+    const chain = yield* (yield* CodeHost)
+      .log(projectRepos(projectId).staging, tip, n + 1)
+      .pipe(Effect.orDie);
+    const below = chain[n];
+    if (below?.sha !== batch.base || chain.slice(0, n).some((c) => c.parents.length !== 1))
+      return yield* Effect.die(
+        new Error(
+          `candidate ${batch.candidateId} is not ${n} commits on ${batch.base}: its chain reads ${chain.map((c) => c.sha).join(" < ")}`,
+        ),
+      );
+    const oldestFirst = chain.slice(0, n).toReversed();
+    return batch.members.flatMap((changeId, i) => {
+      const own = oldestFirst[i];
+      return own === undefined ? [] : [{ changeId, commitSha: own.sha }];
+    });
+  });
+
 /** What a trunk with no group to push answers: a frozen one says so, every time it is asked. */
 const restingAs = (trunk: Trunk | undefined): PushOutcome =>
   trunk?.phase === "frozen" ? "frozen" : "idle";
 
 /**
- * Pushes the open group and reads trunk back (ADR 0003). A group is one
- * batch of one change, pushed as its candidate was composed: the WAL records
- * the candidate's commit once, before the first push, and every retry pushes
- * that SHA with the WAL's old value. The read-back decides: the recorded SHA
+ * Pushes the open group and reads trunk back (ADR 0003). A group is one batch,
+ * of one change or several (a group commit), pushed as its candidate was
+ * composed: the WAL records the candidate's commit and each member's commit
+ * in its chain once, before the first push, and every retry pushes that SHA
+ * with the WAL's old value. The read-back decides: the recorded SHA
  * advances trunk, the old head means push again, anything else freezes.
  *
  * Every push admits its own pack against its namespace's repo-bytes quota before
@@ -618,17 +648,14 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   if (opened?.phase !== "promoting" || wal === undefined) return restingAs(opened);
   if (wal.composed === undefined) {
     const [batch, ...more] = wal.batches;
-    const [member, ...others] = batch?.members ?? [];
-    if (batch === undefined || member === undefined || more.length > 0 || others.length > 0)
+    if (batch === undefined || more.length > 0)
       return yield* Effect.die(
-        new Error(
-          `group ${wal.groupId} is not one batch of one: multi-member promotion is not built`,
-        ),
+        new Error(`group ${wal.groupId} is not one batch: Keel promotes one batch a group`),
       );
     const tip = yield* candidateTip(projectId, batch.candidateId);
     yield* promote(
       projectId,
-      { _tag: "Composed", sha: tip, commits: [{ changeId: member, commitSha: tip }] },
+      { _tag: "Composed", sha: tip, commits: yield* memberCommits(projectId, batch, tip) },
       `composed:${wal.groupId}`,
     ).pipe(Effect.orDie);
   }

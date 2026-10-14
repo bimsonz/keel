@@ -2,13 +2,13 @@
 # kills: lane.verdict-order
 # why: A parked verdict is blamed on the batch's change, so an infrastructure fault bounces an agent's work
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..8e3b9e1 100644
+index 8b5fe912..6fb57b22 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -817,6 +817,13 @@ const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
-       attribution: blameOf(batch, verdict.failingTests),
-       lane: cleared,
+@@ -1600,6 +1600,13 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
+         : cleared,
      };
+   }
 +  if (verdict.outcome === "park")
 +    return {
 +      outcome: "park",

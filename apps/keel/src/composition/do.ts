@@ -15,6 +15,7 @@ import {
   type NamespaceAgents,
   type Namespaces,
   type ProjectAgents,
+  type PlanStore,
   ProjectNamespaces,
   type Projects,
   type StagingWriter,
@@ -53,6 +54,7 @@ import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-re
 import { WorkspaceWriterGitCore } from "../adapters/driven/gitcore/workspace-writer.ts";
 import { WorkspaceRefresherGitCore } from "../adapters/driven/gitcore/workspace-refresher.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
+import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
 import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
@@ -242,11 +244,13 @@ export type LaneServices =
   | BatchVerification
   | StagingWriter
   | Projects
-  | ProjectNamespaces;
+  | ProjectNamespaces
+  | PlanStore;
 
 /**
  * The Lane DO reads its members from their Change DOs and its project's
- * settings from the Project DO (verification may be off), composes and bundles
+ * settings from the Project DO (verification may be off), reads each queued
+ * change's plan and stores a batch's union of them in R2, composes and bundles
  * candidates through GitCore over the Artifacts bindings (one handle per repo
  * per compose), names each member's agent by the handle D1's directory holds, stores bundles in R2 for the namespace D1's `projects` table
  * places its project in, starts KeelVerify, and moves staging's
@@ -285,6 +289,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       StagingWriterGitCore({ trunk: repos.trunk, staging: repos.staging }).pipe(
         Layer.provide(host),
       ),
+      PlanStoreR2(env.ARCHIVE),
     );
   });
 }

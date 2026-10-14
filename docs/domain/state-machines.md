@@ -327,15 +327,15 @@ stateDiagram-v2
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Forming | The lane forms a batch | N = clamp(ln 0.8 / ln(1−p), 1, 16); no two members with an open suspected conflict or opposite effects on one subject; risky changes alone; speculation ≤ 4 deep | `BatchFormed` |
+| — | Forming | The lane forms a batch | N = min(the project's `maxBatchSize`, clamp(ln 0.8 / ln(1−p), 1, 16)), p the share of failures among the lane's last 20 member outcomes; the queue's head first, then members in queue order; no two members that share a conflict neither dismissed nor resolved, or with opposite effects on one subject; risky changes alone (a person's plan, or requeued `textual` or `interaction`); members whose plans union, and the union stored as the batch's plan; no speculation yet | `BatchFormed` |
 | Forming | Assembled | GitCore composes the tree (Tier 0), or MergeBox when GitCore refuses (Tier 2) | — | `CandidateAssembled` (with tier and reason) |
 | Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed`: for a batch of one, attributed to its member, so the change bounces with next actions; for a larger batch, `textual`: every member requeues and runs alone next, and the Lane opens no Conflict for it (a proven one would bounce the innocent member too) |
-| Forming | Red | MergeBox cannot compose for its own sake: BoxGate has no room, the box could not fetch, push or answer, or its check of the box did not pass | — | `BatchFailed` attributed to `infra`, and the verdict holds: every member requeues. A batch of one refused that way the third time in a row is attributed to its member instead, and bounces with the reasons and a next action to submit again unchanged |
+| Forming | Red | MergeBox cannot compose for its own sake: BoxGate has no room, the box could not fetch, push or answer, or its check of the box did not pass | — | `BatchFailed` attributed to `infra`, and the verdict holds: every member requeues. A batch of one refused that way the third time in a row is attributed to its member instead, and bounces with the reasons and a next action to submit again unchanged. In a batch of several every member counts the failure, and one that reaches the third runs alone next |
 | Assembled | Verifying | KeelVerify instance created | — | `VerificationStarted` |
 | Assembled | Red | The candidate cannot be bundled (a symlink, a gitlink, an unsafe path) | The blame is a member (the one whose restacked commit introduces the entry) or `infra` (the base already holds it) | `BatchFailed` with that attribution; never bisected |
 | Verifying | Green | The union of the members' plans passes | Results fenced on `(batchId, attempt, chainEpoch)`: a result for another attempt or epoch is refused and never retried | `BatchVerified` (with the members, base and predecessors the Trunk DO needs) |
 | Verifying | Red | A step fails after a flake rerun | Fenced as above; a blamed change is a member; `interaction` and `unattributed` need several members (a batch of one's failure is its member's) | `BatchFailed` (attribution: a change, `interaction`, `infra`, or `unattributed` when several members could be to blame) |
-| Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches) |
+| Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches): today one a member, and each member forms its next batch alone under the id that named it |
 | Green | Promoted | Caused by `TrunkAdvanced` | — | `CandidatePromoted` |
 | Green | Invalidated | Caused by `PromotionDeclined`: trunk moved and the commutation rule fails | — | `CandidateInvalidated` |
 

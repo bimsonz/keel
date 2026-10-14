@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t b12.settings
 # kills: b12.settings-audit
-# why: the default batch size is 16, a setting the L1 lane, which forms batches of one, does not honour
+# why: the default batch size is 16, not the 8 a project starts with
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index 2416824..01f14f2 100644
+index 89493ac6..432d0157 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
-@@ -33,7 +33,7 @@ export const PROJECT_SETTINGS = "project-settings";
+@@ -36,7 +36,7 @@ export const PROJECT_SETTINGS = "project-settings";
   */
  export const DEFAULT_SETTINGS: ProjectSettings = {
    protectedPaths: [],
--  maxBatchSize: 1,
+-  maxBatchSize: 8,
 +  maxBatchSize: 16,
    verification: "required",
    visibility: "private",

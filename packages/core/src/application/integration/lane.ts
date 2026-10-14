@@ -12,6 +12,7 @@ import {
   attribute,
   Batch,
   type BatchAttribution,
+  batchSize,
   CandidateEvent,
   type CandidateCommand,
   CandidateNotFound,
@@ -20,8 +21,11 @@ import {
   decideCandidate,
   evolveCandidate,
   isCandidateTerminal,
+  planBatches,
   PromotionDeclined,
+  type QueuedChange,
   ResultFenced,
+  runsAlone,
   TrunkAdvanced,
   VerificationStarted,
 } from "../../domain/integration/index.ts";
@@ -34,10 +38,16 @@ import {
   type EntityRef,
   type EventEnvelope,
   type Instant,
+  type NamespaceId,
   type NextAction,
   ProjectId,
 } from "../../domain/kernel/index.ts";
-import { type VerdictOutcome, VerdictIssued } from "../../domain/verification/index.ts";
+import {
+  type FlowPlan,
+  unionPlans,
+  type VerdictOutcome,
+  VerdictIssued,
+} from "../../domain/verification/index.ts";
 import {
   AgentDirectory,
   type BatchVerdict,
@@ -54,6 +64,7 @@ import {
   EventOutbox,
   Ids,
   Lanes,
+  PlanStore,
   Projects,
   REDELIVERY_CAP_MS,
   type RepoRef,
@@ -162,6 +173,17 @@ export const Lane = Schema.Struct({
   trunkHead: Schema.optional(CommitSha),
   /** The last candidate bundle this lane stored: the next takes from it what did not change. */
   lastBundle: Schema.optional(ContentHash),
+  /** The outcome of each member verified lately, oldest first, at most OUTCOME_WINDOW: the batch size is read from it. */
+  outcomes: Schema.optional(Schema.Array(Schema.Literals(["pass", "fail"]))),
+  /**
+   * The changes that run alone in their next batch: each requeued after its
+   * members clashed (`runsAlone`), spent on the infrastructure in a batch of
+   * several, or split out of a failed batch by its bisection, which named the
+   * batch it forms under.
+   */
+  alone: Schema.optional(
+    Schema.Array(Schema.Struct({ changeId: ChangeId, batchId: Schema.optional(BatchId) })),
+  ),
 });
 export type Lane = typeof Lane.Type;
 
@@ -226,6 +248,45 @@ const withPlan = (lane: Lane, changeId: ChangeId, planHash: ContentHash | undefi
     ...(planHash === undefined ? [] : [{ changeId, planHash }]),
   ],
 });
+
+/** Whether `changeId` runs alone in its next batch, and under which batch id when a bisection named one. */
+const aloneOf = (lane: Lane, changeId: ChangeId) =>
+  lane.alone?.find((entry) => entry.changeId === changeId);
+
+/** The lane with `changeIds` to run alone next (kept as they are when already so). */
+const withAlone = (lane: Lane, changeIds: readonly ChangeId[]): Lane => {
+  const added = changeIds.filter((id) => aloneOf(lane, id) === undefined);
+  return added.length === 0
+    ? lane
+    : { ...lane, alone: [...(lane.alone ?? []), ...added.map((changeId) => ({ changeId }))] };
+};
+
+/** The lane with `changeIds` no longer marked to run alone. */
+const withoutAlone = (lane: Lane, changeIds: readonly ChangeId[]): Lane =>
+  lane.alone === undefined
+    ? lane
+    : { ...lane, alone: lane.alone.filter((entry) => !changeIds.includes(entry.changeId)) };
+
+/** How many of its members' latest outcomes a lane reads its failure rate from. */
+export const OUTCOME_WINDOW = 20;
+
+/**
+ * The lane's recent failure rate: failures among its last OUTCOME_WINDOW
+ * member outcomes, an outcome not yet seen counting as a pass, so a new lane
+ * starts at the project's largest batch.
+ */
+export const failureRate = (lane: Lane): number =>
+  (lane.outcomes ?? []).filter((outcome) => outcome === "fail").length / OUTCOME_WINDOW;
+
+/** The largest batch the lane forms next: the project's `maxBatchSize`, shrunk by its recent failure rate (`batchSize`). */
+export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
+  Math.max(1, Math.min(maxBatchSize, batchSize(failureRate(lane))));
+
+/** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>
+  added.length === 0
+    ? lane
+    : { ...lane, outcomes: [...(lane.outcomes ?? []), ...added].slice(-OUTCOME_WINDOW) };
 
 /** The batch as its events left it. */
 export const batchOf = (store: Store, batchId: BatchId): Batch | undefined => {
@@ -320,13 +381,14 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
       }
       case "ChangeRequeued": {
         const requeued = decodeRequeued(event.payload);
-        return holds(tx.store, lane, requeued.changeId)
-          ? undefined
-          : withPlan(
-              { ...lane, queue: [requeued.changeId, ...lane.queue] },
-              requeued.changeId,
-              requeued.planHash,
-            );
+        if (holds(tx.store, lane, requeued.changeId)) return undefined;
+        const back = withPlan(
+          { ...lane, queue: [requeued.changeId, ...lane.queue] },
+          requeued.changeId,
+          requeued.planHash,
+        );
+        // Its members clashed: it runs alone next, so the clash ends in one landing and one failure of its own.
+        return runsAlone(requeued.reason) ? withAlone(back, [requeued.changeId]) : back;
       }
       case "ChangeParked": {
         // Held for a person's ruling: out of the queue, its plan kept for when it resumes.
@@ -351,10 +413,13 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
         return lane.queue.includes(ended.changeId) ||
           (kept && !holds(tx.store, lane, ended.changeId))
-          ? withPlan(
-              { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
-              ended.changeId,
-              undefined,
+          ? withoutAlone(
+              withPlan(
+                { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
+                ended.changeId,
+                undefined,
+              ),
+              [ended.changeId],
             )
           : undefined;
       }
@@ -480,7 +545,10 @@ const remedy = (batch: Batch, operationId: "submit" | "rebase", title: string): 
  * An infrastructure failure of the batch, blamed on `infra` (the Change DO
  * requeues its members) until a batch of one fails that way the
  * INFRA_FAILURE_LIMIT-th time in a row: then on the change, so it bounces
- * visibly, with every reason, instead of looping.
+ * visibly, with every reason, instead of looping. In a batch of several every
+ * member counts the failure, and one that reaches the limit runs alone next,
+ * where its next such failure bounces it: a forming batch of several can
+ * only be failed as `infra` or `textual`, never on one member.
  */
 const infraBlame = (
   lane: Lane,
@@ -493,7 +561,24 @@ const infraBlame = (
 } => {
   const [only] = batch.members;
   const sole = batch.members.length === 1 ? only : undefined;
-  if (sole === undefined) return { attribution: "infra", lane };
+  if (sole === undefined) {
+    const counted = batch.members.map((changeId) => ({
+      changeId,
+      reasons: [
+        ...(lane.infra.find((entry) => entry.changeId === changeId)?.reasons ?? []),
+        reason,
+      ],
+    }));
+    const others = withoutInfra(lane, batch.members);
+    const spent = counted.filter((entry) => entry.reasons.length >= INFRA_FAILURE_LIMIT);
+    return {
+      attribution: "infra",
+      lane: withAlone(
+        { ...others, infra: [...others.infra, ...counted] },
+        spent.map((entry) => entry.changeId),
+      ),
+    };
+  }
   const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
   const others = withoutInfra(lane, [sole]);
   if (reasons.length >= INFRA_FAILURE_LIMIT)
@@ -536,20 +621,117 @@ const stagingOnTrunk = (lane: Lane) =>
     return trunk;
   });
 
-/** Forms a batch of one from the queue's head, on staging main's head, which is trunk's. */
+/** What the lane reads of a queued change before batching it: its declared effects, its unsettled conflicts and its plan. */
+interface QueuedRead {
+  readonly changeId: ChangeId;
+  readonly effects: QueuedChange["effects"];
+  readonly unsettled: readonly ChangeId[];
+  /** Undefined when the change was queued with none, or its plan or its change could not be read: it then joins no one. */
+  readonly plan: FlowPlan | undefined;
+}
+
+const readQueued = (lane: Lane, namespace: NamespaceId, changeId: ChangeId) =>
+  Effect.gen(function* () {
+    const read = Option.getOrUndefined(yield* Effect.option((yield* Changes).get(changeId)));
+    const planHash = planOf(lane, changeId);
+    const plan =
+      read === undefined || planHash === undefined
+        ? undefined
+        : Option.getOrUndefined(yield* Effect.option((yield* PlanStore).get(namespace, planHash)));
+    return {
+      changeId,
+      effects: read?.change.intent.declaredEffects ?? [],
+      unsettled: read?.unsettled ?? [],
+      plan,
+    } satisfies QueuedRead;
+  });
+
+/** The members a batch forms with, in queue order, and the plan it runs. */
+interface Chosen {
+  readonly members: readonly [ChangeId, ...ChangeId[]];
+  readonly planHash: ContentHash | undefined;
+}
+
+/**
+ * Chooses a batch of up to `size` from the queue's front, the head first:
+ * belief-aware (`planBatches`: no two changes with an unsettled conflict or
+ * opposite effects, and a risky change alone, where risky is a change with no
+ * readable plan, one whose plan is a person's (`humanClass`), or one marked to
+ * run alone). Members join in queue order while their plans still union, and
+ * the union is stored as the batch's plan; a batch of one runs its member's
+ * plan unchanged.
+ */
+const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+  lane: Lane,
+  head: ChangeId,
+  size: number,
+) {
+  const alone: Chosen = { members: [head], planHash: planOf(lane, head) };
+  const namespace = yield* projectNamespace(lane.projectId).pipe(Effect.orDie);
+  const reads = yield* Effect.forEach(
+    lane.queue.slice(0, size),
+    (changeId) => readQueued(lane, namespace, changeId),
+    { concurrency: "unbounded" },
+  );
+  const queued = reads.map((read): QueuedChange => ({
+    id: read.changeId,
+    effects: read.effects,
+    risky:
+      read.plan === undefined || read.plan.humanClass || aloneOf(lane, read.changeId) !== undefined,
+  }));
+  const pairs = reads.flatMap((read) =>
+    read.unsettled.map((other) => [read.changeId, other] as const),
+  );
+  const [planned = []] = planBatches(queued, failureRate(lane), pairs, 1, size);
+  const plans = new Map(reads.map((read) => [read.changeId, read.plan]));
+  const joined: { readonly changeId: ChangeId; readonly plan: FlowPlan }[] = [];
+  let union: FlowPlan | undefined;
+  for (const changeId of planned) {
+    const plan = plans.get(changeId);
+    if (plan === undefined) continue;
+    const tried = unionPlans([plan, ...joined.map((each) => each.plan)]);
+    if (Result.isFailure(tried)) continue;
+    joined.push({ changeId, plan });
+    union = tried.success;
+  }
+  const [first, ...rest] = joined.map((each) => each.changeId);
+  if (first !== head || rest.length === 0 || union === undefined) return alone;
+  const planHash = yield* (yield* PlanStore).put(namespace, union);
+  return { members: [first, ...rest], planHash } satisfies Chosen;
+});
+
+/**
+ * Forms the next batch on staging main's head, which is trunk's: the queue's
+ * head, alone when it is marked so (under the batch id its bisection named),
+ * else with what `chooseMembers` adds, up to `laneBatchSize`. The members are
+ * read first; one no longer queued, or a new head, forms nothing, and the
+ * step tries again.
+ */
 const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+  const [head] = lane.queue;
+  if (head === undefined) return;
   const base = yield* stagingOnTrunk(lane);
+  const named = aloneOf(lane, head);
+  const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
+  const size = named === undefined ? laneBatchSize(lane, settings.maxBatchSize) : 1;
+  const chosen: Chosen =
+    size === 1
+      ? { members: [head], planHash: planOf(lane, head) }
+      : yield* chooseMembers(lane, head, size);
   const ids = yield* Ids;
-  const batchId = yield* ids.next("bat");
+  const batchId = named?.batchId ?? (yield* ids.next("bat"));
   const candidateId = yield* ids.next("cnd");
+  const members = chosen.members;
   yield* commit(
     { entity: batchRef(batchId), cause: `form:${batchId}`, project: lane.projectId },
     (tx): Result.Result<Transition<undefined>, CandidateRejection> => {
       const now = laneOf(tx.store, lane.laneId) ?? lane;
-      const [first] = now.queue;
-      if (first === undefined || now.active !== undefined)
+      if (
+        now.active !== undefined ||
+        now.queue[0] !== head ||
+        members.some((member) => !now.queue.includes(member))
+      )
         return Result.succeed({ value: undefined, drafts: [] });
-      const members = [first];
       return Result.map(
         decideCandidate(
           undefined,
@@ -571,10 +753,11 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
             tx.outbox.subscribe(`change:${member}`, MEMBER_EVENTS, changeRef(member));
           tx.outbox.subscribe(`trunk:${lane.projectId}`, ["BatchVerified"]);
           tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
-          const planHash = planOf(now, first);
+          const planHash = chosen.planHash;
+          const left = members.reduce((acc, member) => withPlan(acc, member, undefined), now);
           putLane(tx.store, {
-            ...withPlan(now, first, undefined),
-            queue: now.queue.slice(1),
+            ...withoutAlone(left, members),
+            queue: now.queue.filter((id) => !members.includes(id)),
             active: { batchId, candidateId, ...(planHash === undefined ? {} : { planHash }) },
           });
           return { value: undefined, drafts: events.map((e) => batchDraft(e, members)) };
@@ -1047,7 +1230,11 @@ const passUnverified = Effect.fn("integration/passUnverified")(function* (
         ],
       },
     ],
-    lane: () => withoutInfra(now, batch.members),
+    lane: () =>
+      withOutcomes(
+        withoutInfra(now, batch.members),
+        batch.members.map(() => "pass" as const),
+      ),
   })).pipe(Effect.orDie);
 });
 
@@ -1387,20 +1574,32 @@ type Verdict = Pick<
 const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
   const cleared = withoutInfra(lane, batch.members);
   if (verdict.outcome === "land")
-    return { outcome: "land", evidence: verdict.evidence, lane: cleared };
+    return {
+      outcome: "land",
+      evidence: verdict.evidence,
+      lane: withOutcomes(
+        cleared,
+        batch.members.map(() => "pass" as const),
+      ),
+    };
   // KeelVerify's own remedy (what to fix in the failing tests) when it gave one.
   const verifiersRemedy =
     verdict.nextActions === undefined || verdict.nextActions.length === 0
       ? {}
       : { nextActions: verdict.nextActions };
-  if (verdict.outcome === "bounce")
+  if (verdict.outcome === "bounce") {
+    const attribution = blameOf(batch, verdict.failingTests);
     return {
       outcome: "bounce",
       evidence: verdict.evidence,
       ...verifiersRemedy,
-      attribution: blameOf(batch, verdict.failingTests),
-      lane: cleared,
+      attribution,
+      // A member blamed is a failure the batch size reads; one not yet found is counted when it is.
+      lane: batch.members.some((member) => member === attribution)
+        ? withOutcomes(cleared, ["fail"])
+        : cleared,
     };
+  }
   // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row.
   const infra = infraBlame(
     lane,
@@ -1440,9 +1639,14 @@ const issue = Effect.fn("integration/issue")(function* (
 ) {
   // Set inside the transaction when this verdict is the change's last infra failure allowed.
   let exhausted: string | undefined;
+  // A failure of several that no one is blamed for splits into batches of one, minted here: each member runs alone.
+  const ids = yield* Ids;
+  const into =
+    batch.members.length > 1 ? yield* Effect.forEach(batch.members, () => ids.next("bat")) : [];
   const committed = yield* onBatch(laneId, batch.id, cause, (now, lane) => {
     const issued = issuedFor(verdict, now, lane);
     exhausted = issued.exhausted;
+    const bisected = issued.attribution === "unattributed";
     return {
       moves: [
         {
@@ -1469,9 +1673,20 @@ const issue = Effect.fn("integration/issue")(function* (
             ),
           ],
         },
+        ...(bisected ? [{ command: { _tag: "Bisect", into } } satisfies Move] : []),
       ],
-      lane: (after) =>
-        after.state === "red" ? { ...issued.lane, active: undefined } : issued.lane,
+      lane: (after) => {
+        if (after.state !== "red" && after.state !== "bisected") return issued.lane;
+        const settled: Lane = { ...issued.lane, active: undefined };
+        if (!bisected) return settled;
+        // Each member forms its next batch alone, under the id CandidateBisected named for it.
+        const split = withoutAlone(settled, now.members);
+        const named = now.members.flatMap((changeId, i) => {
+          const batchId = into[i];
+          return batchId === undefined ? [] : [{ changeId, batchId }];
+        });
+        return { ...split, alone: [...(split.alone ?? []), ...named] };
+      },
     };
   });
   if (!committed.duplicate && exhausted !== undefined)

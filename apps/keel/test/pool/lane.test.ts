@@ -19,6 +19,7 @@ import {
   EntityStore,
   EventOutbox,
   Lanes,
+  PlanStore,
   type VerificationJob,
 } from "@keeltown/core/ports";
 import {
@@ -29,6 +30,8 @@ import {
   makeCodeHostMemory,
   makeNamespaceUsageMemory,
   makePlacedProject,
+  makePlanStoreMemory,
+  sampleNamespace,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
@@ -62,6 +65,8 @@ async function lane(
     readonly noStaging?: boolean;
     /** The candidate bundler, in place of one in memory that always bundles. */
     readonly bundles?: Layer.Layer<CandidateBundles>;
+    /** The project's largest batch: 1 unless given. */
+    readonly maxBatchSize?: number;
   } = {},
 ) {
   const projectId: ProjectId = makeId("prj", ulid());
@@ -102,10 +107,17 @@ async function lane(
   const projects = makeProjectsMemory();
   projects.setSettings(projectId, {
     protectedPaths: [],
-    maxBatchSize: 1,
+    maxBatchSize: options.maxBatchSize ?? 1,
     verification: "required",
     visibility: "private",
   });
+  // The plan Precheck stored for every change this lane queues.
+  const plans = makePlanStoreMemory();
+  await Effect.runPromise(
+    Effect.flatMap(PlanStore, (store) => store.put(sampleNamespace, PLAN)).pipe(
+      Effect.provide(plans.layer),
+    ),
+  );
   const agentId = makeId("agt", ulid());
   const changes = Layer.succeed(
     Changes,
@@ -150,6 +162,7 @@ async function lane(
   );
   const driven: Layer.Layer<LaneServices> = Layer.mergeAll(
     code.layer,
+    plans.layer,
     changes,
     makeCandidateComposerMemory().layer,
     makeAgentDirectoryMemory().layer,
@@ -172,15 +185,29 @@ async function lane(
       );
     });
   await install();
-  /** The candidate the composer pushed for `candidateId`: a commit on staging's base at its ref. */
-  const pushCandidate = (candidateId: string) => {
+  /** The candidate the composer pushed for `candidateId`: one commit a member, chained on staging's base at its ref. */
+  const pushCandidate = async (candidateId: string, members = 1) => {
     const ref = `refs/heads/cand/${candidateId}`;
     if (base !== undefined) stagingRefs()?.set(ref, base);
-    return Effect.runPromise(
-      code.fixture.commit(staging, ref, { "README.md": "keel\n", "src/retry.ts": "export {};\n" }),
-    );
+    let tip: CommitSha | undefined;
+    for (let n = 0; n < members; n++)
+      tip = await Effect.runPromise(
+        code.fixture.commit(staging, ref, {
+          "README.md": "keel\n",
+          [`src/member-${n}.ts`]: "export {};\n",
+        }),
+      );
+    if (tip === undefined) throw new Error("a candidate has at least one member");
+    return tip;
   };
-  return { stub, projectId, laneId, verification, writer, pushCandidate, install };
+  /** Every event the project's Trunk committed, in commit order. */
+  const trunkEvents = () =>
+    runInDurableObject(trunk, (_instance: TrunkDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "trunk", id: projectId })),
+      ),
+    );
+  return { stub, projectId, laneId, verification, writer, pushCandidate, install, trunkEvents };
 }
 
 /** The plan each queued change was compiled with, as its ChangeQueued names it. */
@@ -276,6 +303,45 @@ describe("the Lane DO", () => {
       { timeout: 20_000, interval: 50 },
     );
     // The step and the verdicts committed real events; their flush must not outlive the file.
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.group-commit] four queued changes form one batch, verified once on their plan, and one trunk advance lands all four, each at its own commit of the candidate's chain", async () => {
+    const { stub, laneId, verification, writer, pushCandidate, trunkEvents } = await lane({
+      maxBatchSize: 4,
+    });
+    await stub.receive([1, 2, 3, 4].map((n) => queued(laneId, n)));
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    expect(job.members).toHaveLength(4);
+    expect(job.planHash).toBe(PLAN.planHash);
+    const tip = await pushCandidate(job.candidateId, 4);
+    const landed = decodeExit(
+      LaneCodecs.recordVerdict,
+      await stub.recordVerdict(landing(job, instanceId)),
+    );
+    expect(landed).toEqual(Exit.void);
+    await vi.waitFor(
+      async () => {
+        expect(writer.head()).toBe(tip);
+        expect(await batchState(stub, job.fence.batchId)).toBe("promoted");
+      },
+      { timeout: 20_000, interval: 50 },
+    );
+    const advanced = (await trunkEvents()).filter((event) => event.type === "TrunkAdvanced");
+    expect(advanced).toHaveLength(1);
+    const landings = Reflect.get(Object(advanced[0]?.payload), "landings");
+    const commits = Array.isArray(landings)
+      ? landings.map((l) => [
+          Reflect.get(Object(l), "changeId"),
+          Reflect.get(Object(l), "commitSha"),
+        ])
+      : [];
+    expect(commits.map(([changeId]) => changeId)).toEqual(job.members);
+    expect(new Set(commits.map(([, commitSha]) => commitSha)).size).toBe(4);
+    expect(commits.at(-1)?.[1]).toBe(tip);
     await drainOutbox(stub);
   });
 

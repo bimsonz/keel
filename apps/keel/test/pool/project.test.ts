@@ -315,26 +315,26 @@ describe("a project's settings over real RPC", () => {
     ok(await p.create());
     const defaults = ok(await p.settings());
     const off = ok(
-      await p.putSettings({ protectedPaths: [], maxBatchSize: 1, verification: "off" }, "req-1"),
+      await p.putSettings({ protectedPaths: [], maxBatchSize: 8, verification: "off" }, "req-1"),
     );
     const unchanged = ok(
-      await p.putSettings({ protectedPaths: [], maxBatchSize: 1, verification: "off" }, "req-2"),
+      await p.putSettings({ protectedPaths: [], maxBatchSize: 8, verification: "off" }, "req-2"),
     );
     const retried = ok(
-      await p.putSettings({ protectedPaths: [], maxBatchSize: 1, verification: "off" }, "req-1"),
+      await p.putSettings({ protectedPaths: [], maxBatchSize: 8, verification: "off" }, "req-1"),
     );
     const changes = await settingsChanges(p);
 
     expect(refusal(beforeCreate)).toContain("ProjectNotFound");
     expect(defaults).toEqual({
       protectedPaths: [],
-      maxBatchSize: 1,
+      maxBatchSize: 8,
       verification: "required",
       visibility: "private",
     });
     expect(off).toEqual({
       protectedPaths: [],
-      maxBatchSize: 1,
+      maxBatchSize: 8,
       verification: "off",
       visibility: "private",
     });
@@ -353,7 +353,7 @@ describe("a project's settings over real RPC", () => {
   it("[b12.settings-audit] audits every field a PUT changes, and an absent verification turns it back on", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
-    ok(await p.putSettings({ protectedPaths: [], maxBatchSize: 1, verification: "off" }, "req-1"));
+    ok(await p.putSettings({ protectedPaths: [], maxBatchSize: 8, verification: "off" }, "req-1"));
     const replaced = ok(
       await p.putSettings({ protectedPaths: ["infra/**"], maxBatchSize: 4 }, "req-2"),
     );
@@ -370,7 +370,7 @@ describe("a project's settings over real RPC", () => {
       {
         changes: [
           { field: "protectedPaths", from: [], to: ["infra/**"] },
-          { field: "maxBatchSize", from: 1, to: 4 },
+          { field: "maxBatchSize", from: 8, to: 4 },
           { field: "verification", from: "off", to: "required" },
         ],
       },
@@ -468,7 +468,7 @@ describe("a project's settings through the operator routes", () => {
     ok(await p.create());
     await placeProject(p.projectId);
     const user = (await maintainer()).token;
-    const put = { protectedPaths: [], maxBatchSize: 1 };
+    const put = { protectedPaths: [], maxBatchSize: 8 };
 
     const published = await settingsCall(user, p.projectId, { ...put, visibility: "public" });
     const readPublic = await settingsCall(user, p.projectId);

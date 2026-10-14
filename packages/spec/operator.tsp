@@ -100,7 +100,7 @@ model ProjectSettings {
   /** Paths only Keel may change; a change touching them is refused at precheck. */
   protectedPaths: string[];
 
-  /** The largest batch a lane may form. */
+  /** The largest batch a lane may form; 8 until a PUT sets it. The lane forms fewer as its recent failure rate rises. */
   @minValue(1)
   @maxValue(16)
   maxBatchSize: int32;

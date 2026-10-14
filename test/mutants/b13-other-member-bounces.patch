@@ -2,15 +2,15 @@
 # kills: b13.reacts
 # why: any failure that is not infra bounces this change, even one attributed to another member or to no one yet
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bfaf830..8addb0a 100644
+index 1f18ae50..6c87bcbd 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -893,7 +893,7 @@ const commandFor = (
-     case "BatchFailed": {
+@@ -2152,7 +2152,7 @@ const commandFor = (
        const failed = decodeFailed(event.payload);
        if (Option.isNone(failed) || !ours(failed.value.batchId)) return undefined;
--      if (failed.value.attribution === change.id) return bounceFor(store, failed.value);
-+      if (failed.value.attribution !== "infra") return bounceFor(store, failed.value);
-       if (failed.value.attribution === "infra")
-         return {
-           command: { _tag: "Requeue", batchId: failed.value.batchId, reason: "infra-failure" },
+       // The domain reads the member's way out from the blame: its own bounces it, any other requeues it with that cause.
+-      const exit = redExit(failed.value.attribution, change.id);
++      const exit = redExit(failed.value.attribution === "infra" ? "infra" : change.id, change.id);
+       switch (exit._tag) {
+         case "Bounce":
+           return bounceFor(store, failed.value);

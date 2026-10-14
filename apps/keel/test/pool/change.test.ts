@@ -14,6 +14,7 @@ import {
   makeCodeHostMemory,
   makeNamespaceUsageMemory,
   makePlacedProject,
+  makePlanStoreMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
@@ -523,6 +524,7 @@ async function realLane(projectId: ProjectId) {
   });
   const driven: Layer.Layer<LaneServices> = Layer.mergeAll(
     code.layer,
+    makePlanStoreMemory().layer,
     changes,
     makeAgentDirectoryMemory().layer,
     makeCandidateComposerMemory().layer,

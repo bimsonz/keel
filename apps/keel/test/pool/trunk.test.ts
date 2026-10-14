@@ -36,6 +36,7 @@ import {
   makeCodeHostMemory,
   makeNamespaceUsageMemory,
   makePlacedProject,
+  makePlanStoreMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
@@ -330,6 +331,7 @@ async function promoting(placed?: { readonly namespace: NamespaceId; readonly hi
   const stagingRefs = () => code.repos.get(`${staging.namespace}/${staging.name}`)?.refs;
   const laneServices: Layer.Layer<LaneServices> = Layer.mergeAll(
     code.layer,
+    makePlanStoreMemory().layer,
     makeAgentDirectoryMemory().layer,
     Layer.succeed(
       Changes,

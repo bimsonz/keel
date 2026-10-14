@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   abandon,
   adopt,
+  changeRead,
   changeWorkspace,
   declare,
   getChange,
@@ -703,7 +704,7 @@ describe("the change's batch, delivered", () => {
   );
 
   it.effect(
-    "[b13.reacts] requeues the change on an infra failure, a bisection or an invalidation of its batch",
+    "[b13.reacts] [c41.red-exit] requeues the change with its cause on an infra failure, another member's failure, a clash of its members, a bisection or an invalidation of its batch",
     () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
@@ -711,6 +712,9 @@ describe("the change's batch, delivered", () => {
         const reasons: unknown[] = [];
         for (const requeueing of [
           (batchId: string) => failed(batchId, "infra"),
+          (batchId: string) => failed(batchId, otherChange),
+          (batchId: string) => failed(batchId, "textual"),
+          (batchId: string) => failed(batchId, "interaction"),
           bisected,
           invalidated,
         ]) {
@@ -722,13 +726,20 @@ describe("the change's batch, delivered", () => {
           expect(change.batchId).toBeUndefined();
           reasons.push(Reflect.get(Object((yield* lastEvent)?.payload), "reason"));
         }
-        expect(reasons).toEqual(["infra-failure", "bisection", "invalidated"]);
+        expect(reasons).toEqual([
+          "infra-failure",
+          "co-member-failed",
+          "textual",
+          "interaction",
+          "bisection",
+          "invalidated",
+        ]);
       }).pipe(Effect.provide(layer));
     },
   );
 
   it.effect(
-    "[b13.reacts] does nothing for another member's failure, an unattributed one, or another batch's events",
+    "[b13.reacts] [c41.red-exit] waits for the bisection on a failure no one is blamed for, and does nothing for another batch's events",
     () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
@@ -736,9 +747,7 @@ describe("the change's batch, delivered", () => {
         const before = (yield* EventOutbox).log(changeRef).length;
         const elsewhere = freshBatch();
         for (const event of [
-          failed(batchId, otherChange),
           failed(batchId, "unattributed"),
-          failed(batchId, "textual"),
           verdictOn(elsewhere, ["not ours"]),
           failed(elsewhere, changeId),
           bisected(elsewhere),
@@ -1403,6 +1412,36 @@ describe("the run an agent's command names", () => {
         const adoption = events.filter((event) => event.type === "ChangeAdopted");
         expect(adoption).toMatchObject([{ actor: `agent:${adopterId}`, run: OTHER }]);
         expect((yield* getChange(changeId)).run).toEqual(OTHER);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+describe("the conflicts a change's batch keeps apart (C4.1)", () => {
+  it.effect(
+    "[c41.unsettled] a change's read names each other change it shares a conflict with, on either side, until that conflict is dismissed or resolved",
+    () => {
+      const { layer } = changeObject();
+      const third = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8VA");
+      const unsettled = Effect.map(changeRead(changeId), (read) => read.unsettled);
+      return Effect.gen(function* () {
+        yield* queued;
+        expect(yield* unsettled).toEqual([]);
+        yield* receive(suspected(CONFLICT, { holder: changeId, author: otherChange }));
+        yield* receive(suspected(OTHER_CONFLICT, { holder: third, author: changeId }));
+        expect(yield* unsettled).toEqual([otherChange, third].toSorted());
+        // With a person, a conflict is still unsettled.
+        yield* receive(escalated(CONFLICT));
+        expect(yield* unsettled).toEqual([otherChange, third].toSorted());
+        yield* receive(resolved(CONFLICT));
+        expect(yield* unsettled).toEqual([third]);
+        yield* receive(
+          arriving(
+            { kind: "conflict", id: OTHER_CONFLICT },
+            { _tag: "ConflictDismissed", conflictId: OTHER_CONFLICT, reason: "probe-refuted" },
+          ),
+        );
+        expect(yield* unsettled).toEqual([]);
       }).pipe(Effect.provide(layer));
     },
   );

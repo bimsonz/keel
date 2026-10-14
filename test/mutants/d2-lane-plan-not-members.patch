@@ -2,15 +2,15 @@
 # kills: d21.member-hash
 # why: A batch takes the newest queued change's plan rather than its own member's, so a change is verified under a plan compiled for another
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e7935d8..1b64c26 100644
+index 8b5fe912..5a83e175 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -478,7 +478,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
-             tx.outbox.subscribe(`change:${member}`, MEMBER_EVENTS, changeRef(member));
-           tx.outbox.subscribe(`trunk:${lane.projectId}`, ["BatchVerified"]);
-           tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
--          const planHash = planOf(now, first);
-+          const planHash = now.plans?.at(-1)?.planHash;
-           putLane(tx.store, {
-             ...withPlan(now, first, undefined),
-             queue: now.queue.slice(1),
+@@ -716,7 +716,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+   const size = named === undefined ? laneBatchSize(lane, settings.maxBatchSize) : 1;
+   const chosen: Chosen =
+     size === 1
+-      ? { members: [head], planHash: planOf(lane, head) }
++      ? { members: [head], planHash: lane.plans?.at(-1)?.planHash }
+       : yield* chooseMembers(lane, head, size);
+   const ids = yield* Ids;
+   const batchId = named?.batchId ?? (yield* ids.next("bat"));

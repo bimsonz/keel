@@ -46,6 +46,7 @@ import {
   CandidateBisected,
   CandidateInvalidated,
   type PushRejected,
+  redExit,
   TrunkAdvanced,
 } from "../../domain/integration/index.ts";
 import {
@@ -120,6 +121,7 @@ import {
   awaitedEscalations,
   blockersOf,
   hearConflict,
+  unsettledWith,
   partyConflictOf,
   policyFor,
 } from "./party-conflicts.ts";
@@ -703,9 +705,10 @@ export const changeRead: (
 ) => Effect.Effect<ChangeRead, ChangeNotFound, EntityStore> = Effect.fn("coordination/changeRead")(
   function* (changeId: ChangeId) {
     const change = yield* getChange(changeId);
-    const projectId = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+    const store = yield* EntityStore;
+    const projectId = heldWorkspace(store, changeId)?.projectId;
     if (projectId === undefined) return yield* Effect.die(`${changeId} has no project recorded`);
-    return { change, projectId };
+    return { change, projectId, unsettled: unsettledWith(store, changeId) };
   },
 );
 
@@ -2148,13 +2151,19 @@ const commandFor = (
     case "BatchFailed": {
       const failed = decodeFailed(event.payload);
       if (Option.isNone(failed) || !ours(failed.value.batchId)) return undefined;
-      if (failed.value.attribution === change.id) return bounceFor(store, failed.value);
-      if (failed.value.attribution === "infra")
-        return {
-          command: { _tag: "Requeue", batchId: failed.value.batchId, reason: "infra-failure" },
-        };
-      // Another member, or not yet attributed: bisection or the lane moves the change next.
-      return undefined;
+      // The domain reads the member's way out from the blame: its own bounces it, any other requeues it with that cause.
+      const exit = redExit(failed.value.attribution, change.id);
+      switch (exit._tag) {
+        case "Bounce":
+          return bounceFor(store, failed.value);
+        case "Requeue":
+          return {
+            command: { _tag: "Requeue", batchId: failed.value.batchId, reason: exit.reason },
+          };
+        case "Bisection":
+          // Nobody is blamed yet: the batch's CandidateBisected requeues the change.
+          return undefined;
+      }
     }
     case "CandidateBisected": {
       const bisected = decodeBisected(event.payload);
@@ -2214,8 +2223,9 @@ export interface BatchReaction {
  * The Change DO's reaction to its batch's events, inside the
  * transaction that records the delivery: BatchFormed naming it → ChangeBatched;
  * BatchFailed attributed to it → ChangeBounced with the verdict's reasons and
- * next actions; BatchFailed `infra`, CandidateBisected or CandidateInvalidated
- * → ChangeRequeued. A conflict it is a party to, put to a person →
+ * next actions; BatchFailed blaming another member, `infra`, `textual` or
+ * `interaction` (the domain's `redExit`), CandidateBisected or
+ * CandidateInvalidated → ChangeRequeued with that cause. A conflict it is a party to, put to a person →
  * ChangeParked where the machine parks a change, and that escalation's ruling
  * → ChangeResumed, or ChangeBounced by the ruling's decision when the ruling
  * goes against the change; a ruling against a change that is past the wait

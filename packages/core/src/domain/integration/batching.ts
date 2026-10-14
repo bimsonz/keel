@@ -1,6 +1,6 @@
 import { compare, type Proposition } from "../coordination/index.ts";
 import type { ChangeId } from "../kernel/index.ts";
-import { batchSize } from "./batch.ts";
+import { batchSize, MAX_BATCH } from "./batch.ts";
 
 /** A change waiting in a lane, with what Keel derived it alters. */
 export type QueuedChange = {
@@ -26,19 +26,21 @@ const suspected = (
 ): boolean => pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 
 /**
- * Belief-aware batching. Batches hold at most N = batchSize(p) changes, never
- * two with an open suspected conflict or opposite effects on one subject; a
- * risky change runs alone. Changes are placed first-fit in queue order, at
- * most `maxDepth` batches deep; the rest wait. The queue's head always rides
- * in the first batch.
+ * Belief-aware batching. Batches hold at most N = batchSize(p) changes (and
+ * no more than `maxSize`, the project's own bound), never two with an open
+ * suspected conflict or opposite effects on one subject; a risky change runs
+ * alone. Changes are placed first-fit in queue order, at most `maxDepth`
+ * batches deep; the rest wait. The queue's head always rides in the first
+ * batch.
  */
 export const planBatches = (
   queue: readonly QueuedChange[],
   failureRate: number,
   openSuspected: readonly (readonly [ChangeId, ChangeId])[],
   maxDepth: number = MAX_SPECULATION,
+  maxSize: number = MAX_BATCH,
 ): readonly (readonly ChangeId[])[] => {
-  const n = batchSize(failureRate);
+  const n = Math.max(1, Math.min(maxSize, batchSize(failureRate)));
   const batches: QueuedChange[][] = [];
   const alone = new Set<number>();
   for (const change of queue) {

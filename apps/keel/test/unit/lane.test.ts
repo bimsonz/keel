@@ -8,15 +8,18 @@ import {
   bundleBlame,
   checkVerification,
   destroyLane,
+  failureRate,
   instanceEnded,
   instanceOf,
   laneDestroyed,
   laneHeard,
+  laneBatchSize,
   laneOf,
   laneStanding,
   laneOfInstance,
   laneStep,
   laneStepFailed,
+  OUTCOME_WINDOW,
   projectRepos,
   recordVerdict,
   reofferDue,
@@ -27,7 +30,7 @@ import {
 } from "@keeltown/core/application/integration";
 import type { Change } from "@keeltown/core/domain/coordination";
 import type { Agent } from "@keeltown/core/domain/identity";
-import type { VerdictOutcome } from "@keeltown/core/domain/verification";
+import { unionPlans, type VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
   type AgentId,
   BatchId,
@@ -50,6 +53,7 @@ import {
   CodeHost,
   EntityStore,
   EventOutbox,
+  PlanStore,
   StagingWriter,
 } from "@keeltown/core/ports";
 import { PushRejected } from "@keeltown/core/domain/integration";
@@ -64,12 +68,15 @@ import {
   makeLanesMemory,
   makeManualClock,
   makePlacedProject,
+  makePlanStoreMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  sampleNamespace,
   suitePlan,
   workerAppPlan,
 } from "@keeltown/testing";
-import { Cause, Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Result, Schema } from "effect";
+import * as fc from "fast-check";
 import { ulid } from "ulid";
 
 const PROJECT = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
@@ -95,6 +102,8 @@ const change = (n: number): ChangeId => makeId("chg", `01J9C${String(n).padStart
 
 /** The plan Precheck compiled for a queued change, as its ChangeQueued names it. */
 const PLAN = suitePlan();
+/** Another plan, so a batch of the two runs their union. */
+const WORKER_PLAN = workerAppPlan();
 const changeRef = (id: ChangeId): EntityRef => ({ kind: "change", id });
 
 interface WorldOptions {
@@ -108,6 +117,8 @@ interface WorldOptions {
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
   /** Staging's main refuses every move, as a staging some other writer holds would. */
   readonly stagingStuck?: boolean;
+  /** The project's largest batch: 1 unless given, so a case batches only when it says so. */
+  readonly maxBatchSize?: number;
 }
 
 /** The Lane's ports in memory, staging's main shared by the code host and the StagingWriter. */
@@ -125,11 +136,14 @@ function world(options: WorldOptions = {}) {
   const projects = makeProjectsMemory();
   projects.setSettings(PROJECT, {
     protectedPaths: [],
-    maxBatchSize: 1,
+    maxBatchSize: options.maxBatchSize ?? 1,
     verification: options.verification ?? "required",
     visibility: "private",
   });
   const changes = new Map<ChangeId, Change>();
+  /** The changes each change's own DO says it shares an unsettled conflict with. */
+  const unsettled = new Map<ChangeId, readonly ChangeId[]>();
+  const plans = makePlanStoreMemory();
   const changesLayer = Layer.succeed(
     Changes,
     Changes.of({
@@ -145,9 +159,14 @@ function world(options: WorldOptions = {}) {
       get: (id) =>
         Effect.suspend(() => {
           const found = changes.get(id);
+          const others = unsettled.get(id);
           return found === undefined
             ? Effect.die(new Error(`no ${id}`))
-            : Effect.succeed({ change: found, projectId: PROJECT });
+            : Effect.succeed({
+                change: found,
+                projectId: PROJECT,
+                ...(others === undefined ? {} : { unsettled: others }),
+              });
         }),
       workspace: (id) =>
         Effect.succeed({
@@ -218,9 +237,12 @@ function world(options: WorldOptions = {}) {
     makePlacedProject(PROJECT).layer,
     directory.layer,
     changesLayer,
+    plans.layer,
   );
   const seeded = Effect.gen(function* () {
     (yield* EventOutbox).subscribe("projector", "*");
+    // The plans Precheck stored for the changes it queued.
+    for (const plan of [PLAN, WORKER_PLAN]) yield* (yield* PlanStore).put(sampleNamespace, plan);
     yield* (yield* CodeHost).create(STAGING);
     return yield* code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
   });
@@ -231,6 +253,8 @@ function world(options: WorldOptions = {}) {
     bundles,
     staging,
     changes,
+    unsettled,
+    plans,
     /** The agent directory the Lane reads handles from: empty until a test writes an agent. */
     agents: directory.agents,
     startedIn,
@@ -1946,6 +1970,300 @@ describe("the Lane's verification that sends no verdict", () => {
         expect(yield* instanceEnded(`keel-verify-${event}`)).toBe("dropped");
         expect(lanes.ended).toEqual([{ laneId: LANE, instanceId }]);
       }).pipe(Effect.provide(lanes.layer));
+    },
+  );
+});
+
+// prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
+const fcSeed = process.env["FC_SEED"];
+const fcRuns = { numRuns: 60, ...(fcSeed === undefined ? {} : { seed: Number(fcSeed) }) };
+
+/** Trunk heads the cases advance to, one a landing. */
+const head = (round: number) => sha("123456789abcdef"[round % 15] ?? "e");
+
+/** The members of the batch in flight, as the lane formed it. */
+const membersInFlight = Effect.gen(function* () {
+  const active = yield* inFlight;
+  return batchOf(yield* EntityStore, active.batchId)?.members ?? [];
+});
+
+/**
+ * Lands every queued change the way trunk would, batch by batch: verify the
+ * batch in flight, land it, and advance trunk naming its members, which the
+ * lane follows into its next batch. Answers each batch's members in order.
+ */
+const landAll = (w: World, base: string, count: number) =>
+  Effect.gen(function* () {
+    const batches: (readonly ChangeId[])[] = [];
+    let from = base;
+    for (let landed = 0; landed < count;) {
+      const v = yield* toVerifying(w);
+      const members = yield* membersInFlight;
+      batches.push(members);
+      yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "land"));
+      const to = head(batches.length);
+      yield* advance(from, to, members);
+      from = to;
+      landed += members.length;
+    }
+    return batches;
+  });
+
+/** A change requeued by its own DO for `reason`, as it reacts to its batch's failure. */
+const requeuedFor = (id: ChangeId, batchId: BatchId, reason: string) =>
+  deliver(
+    envelope(changeRef(id), {
+      _tag: "ChangeRequeued",
+      changeId: id,
+      batchId,
+      reason,
+      planHash: PLAN.planHash,
+    }),
+  );
+
+/** A lane whose latest member outcomes are `passes` passes, then `fails` failures. */
+const laneWithOutcomes = (fails: number, passes = 0) => ({
+  laneId: LANE,
+  projectId: PROJECT,
+  queue: [],
+  advances: [],
+  infra: [],
+  outcomes: [
+    ...Array.from({ length: passes }, () => "pass" as const),
+    ...Array.from({ length: fails }, () => "fail" as const),
+  ],
+});
+
+describe("the Lane batches (C4.1)", () => {
+  it("[c41.size] a lane forms up to the project's maxBatchSize, fewer as its members' recent failure rate rises", () => {
+    const lane = laneWithOutcomes;
+    expect([0, 1, 2, 3].map((fails) => laneBatchSize(lane(fails), 16))).toEqual([16, 4, 2, 1]);
+    expect([1, 8, 16].map((max) => laneBatchSize(lane(0), max))).toEqual([1, 8, 16]);
+    expect(laneBatchSize(lane(1), 2)).toBe(2);
+    // Only the latest twenty outcomes count: a failure twenty passes ago no longer shrinks the batch.
+    expect(failureRate(lane(1, 0))).toBe(1 / OUTCOME_WINDOW);
+  });
+
+  it.effect(
+    "[c41.group-commit] a lane batches the queue's head and up to N - 1 behind it in queue order, composes them as one candidate, verifies it once, and one trunk advance promotes them all",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        for (const n of [1, 2, 3, 4, 5, 6]) yield* queue(w, change(n));
+        const v = yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual([1, 2, 3, 4].map(change));
+        expect(w.composed.map((request) => request.members.map((m) => m.changeId))).toEqual([
+          [1, 2, 3, 4].map(change),
+        ]);
+        const job = w.verification.started.get(v.instanceId);
+        expect(job?.members).toEqual([1, 2, 3, 4].map(change));
+        expect(job?.planHash).toBe(PLAN.planHash);
+        yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "land"));
+        expect((yield* payloads("BatchVerified")).at(-1)?.["members"]).toEqual(
+          [1, 2, 3, 4].map(change),
+        );
+        yield* advance(base, head(1), [1, 2, 3, 4].map(change));
+        yield* toVerifying(w);
+        expect((yield* payloads("CandidatePromoted")).map((p) => p["batchId"])).toEqual([
+          v.batchId,
+        ]);
+        expect(yield* membersInFlight).toEqual([5, 6].map(change));
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[c41.union-plan] a batch of changes compiled under different plans runs the union of their plans, which the lane stores; a batch of one runs its member's plan unchanged",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1), PLAN.planHash);
+        yield* queue(w, change(2), WORKER_PLAN.planHash);
+        const v = yield* toVerifying(w);
+        const union = Result.getOrThrow(unionPlans([PLAN, WORKER_PLAN]));
+        expect(union.planHash).not.toBe(PLAN.planHash);
+        expect((yield* inFlight).planHash).toBe(union.planHash);
+        expect(w.verification.started.get(v.instanceId)?.planHash).toBe(union.planHash);
+        const stored = yield* (yield* PlanStore).get(sampleNamespace, union.planHash);
+        expect(stored.members).toEqual([PLAN.planHash, WORKER_PLAN.planHash].toSorted());
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it("[c41.no-unsettled-pair] no batch the lane forms holds two changes that share an unsettled conflict, whichever of the two says so; every change is batched once, the head first", async () => {
+    const cases = fc.integer({ min: 2, max: 8 }).chain((n) =>
+      fc.record({
+        n: fc.constant(n),
+        size: fc.integer({ min: 1, max: 8 }),
+        pairs: fc.uniqueArray(
+          fc
+            .tuple(fc.integer({ min: 1, max: n }), fc.integer({ min: 1, max: n }))
+            .filter(([a, b]) => a !== b),
+          { maxLength: 2 * n, selector: ([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}` },
+        ),
+        bothSides: fc.boolean(),
+      }),
+    );
+    await fc.assert(
+      fc.asyncProperty(cases, async ({ n, size, pairs, bothSides }) => {
+        const w = world({ maxBatchSize: size });
+        const say = (a: number, b: number) =>
+          w.unsettled.set(change(a), [...(w.unsettled.get(change(a)) ?? []), change(b)]);
+        for (const [a, b] of pairs) {
+          say(a, b);
+          if (bothSides) say(b, a);
+        }
+        const batches = await Effect.runPromise(
+          Effect.gen(function* () {
+            const base = yield* w.seeded;
+            for (let i = 1; i <= n; i++) yield* queue(w, change(i));
+            return yield* landAll(w, base, n);
+          }).pipe(Effect.provide(w.layer)),
+        );
+        const apart = pairs.every(([a, b]) =>
+          batches.every((batch) => !(batch.includes(change(a)) && batch.includes(change(b)))),
+        );
+        const once =
+          batches.flat().toSorted().join() ===
+          Array.from({ length: n }, (_, i) => change(i + 1)).join();
+        const bounded = batches.every((batch) => batch.length >= 1 && batch.length <= size);
+        // Each batch leads with the earliest change not yet batched: the queue's head.
+        const headFirst = batches.every(
+          (batch, i) => batch[0] === batches.slice(i).flat().toSorted()[0],
+        );
+        expect({ apart, once, bounded, headFirst }).toEqual({
+          apart: true,
+          once: true,
+          bounded: true,
+          headFirst: true,
+        });
+      }),
+      fcRuns,
+    );
+    // By hand: 1 and 2 share a conflict, so 1 and 3 go together and 2 waits for the next batch.
+    const w = world({ maxBatchSize: 3 });
+    w.unsettled.set(change(2), [change(1)]);
+    const batches = await Effect.runPromise(
+      Effect.gen(function* () {
+        const base = yield* w.seeded;
+        for (const n of [1, 2, 3]) yield* queue(w, change(n));
+        return yield* landAll(w, base, 3);
+      }).pipe(Effect.provide(w.layer)),
+    );
+    expect(batches).toEqual([[change(1), change(3)], [change(2)]]);
+  });
+
+  it.effect(
+    "[c41.unattributed-alone] a batch of four that fails with no one blamed is split into four batches of one, each formed alone under the id its bisection named: the culprit bounces on its own verdict and the other three land",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const four = [1, 2, 3, 4].map(change);
+        for (const id of four) yield* queue(w, id);
+        const v = yield* toVerifying(w);
+        yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "bounce"));
+        expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("unattributed");
+        const into = (yield* payloads("CandidateBisected")).at(-1)?.["into"];
+        expect(Array.isArray(into) && into.length).toBe(4);
+        expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
+        // Each member's DO requeues it for the bisection, to the queue's front, in whatever order they arrive.
+        for (const id of four.toReversed()) yield* requeuedFor(id, v.batchId, "bisection");
+        const outcomes: (readonly [readonly ChangeId[], BatchId])[] = [];
+        const blamed: unknown[] = [];
+        let from = base;
+        for (let round = 1; round <= four.length; round++) {
+          const each = yield* toVerifying(w);
+          const members = yield* membersInFlight;
+          outcomes.push([members, each.batchId]);
+          const culprit = members.includes(change(3));
+          yield* recordVerdict(
+            LANE,
+            verdict(each.batchId, each.candidateId, each.instanceId, culprit ? "bounce" : "land"),
+          );
+          if (culprit) blamed.push((yield* payloads("BatchFailed")).at(-1)?.["attribution"]);
+          else {
+            yield* advance(from, head(round), members);
+            from = head(round);
+          }
+        }
+        expect(outcomes.map(([members]) => members)).toEqual(four.map((id) => [id]));
+        expect(outcomes.map(([, batchId]) => batchId)).toEqual(
+          Array.isArray(into) ? four.map((_, i) => into[i]) : [],
+        );
+        expect(blamed).toEqual([change(3)]);
+        // The lane follows the last advance in its next step.
+        yield* laneStep(LANE);
+        expect((yield* payloads("CandidatePromoted")).length).toBe(3);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[c41.infra-several] a batch of two failing on the infrastructure counts it for both; at the limit each runs alone next, and its next such failure bounces it with every reason",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const two = [1, 2].map(change);
+        for (const id of two) yield* queue(w, id);
+        for (let round = 0; round < INFRA_ROUNDS; round++) {
+          const v = yield* toVerifying(w);
+          expect(yield* membersInFlight).toEqual(two);
+          yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "park"));
+          expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("infra");
+          for (const id of two.toReversed()) yield* requeuedFor(id, v.batchId, "infra-failure");
+        }
+        const alone = yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual([change(1)]);
+        yield* recordVerdict(
+          LANE,
+          verdict(alone.batchId, alone.candidateId, alone.instanceId, "park"),
+        );
+        expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe(change(1));
+        expect(String((yield* payloads("VerdictIssued")).at(-1)?.["evidence"])).toContain(
+          `infra-failure x${INFRA_ROUNDS + 1}`,
+        );
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[c41.runs-alone] a change requeued after its members clashed runs alone, and the batch formed behind another head leaves it out",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        for (const n of [1, 2, 3, 4]) yield* queue(w, change(n));
+        const v = yield* toVerifying(w);
+        yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "park"));
+        // Their DOs requeue them to the front: 2 after a clash of its members, the rest after the infra failure.
+        for (const n of [4, 3]) yield* requeuedFor(change(n), v.batchId, "infra-failure");
+        yield* requeuedFor(change(2), v.batchId, "textual");
+        yield* requeuedFor(change(1), v.batchId, "infra-failure");
+        yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual([1, 3, 4].map(change));
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[c41.outcomes] a bounce of a sole member is a failure the lane's next batch size reads, and a landing passes every member",
+    () => {
+      const w = world({ maxBatchSize: 8 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const v = yield* toVerifying(w);
+        yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "bounce"));
+        expect(laneOf(yield* EntityStore, LANE)?.outcomes).toEqual(["fail"]);
+        for (const n of [2, 3, 4, 5, 6, 7]) yield* queue(w, change(n));
+        yield* toVerifying(w);
+        // One failure in twenty: batchSize(0.05) is 4.
+        expect(yield* membersInFlight).toEqual([2, 3, 4, 5].map(change));
+      }).pipe(Effect.provide(w.layer));
     },
   );
 });
