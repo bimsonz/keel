@@ -22,6 +22,7 @@ import { type Route, TRUNK, href } from "../route.ts";
 import { Link, carriedParams, useWhere } from "../router.tsx";
 import { Footer } from "./Footer.tsx";
 import { HomeLink } from "./HomeLink.tsx";
+import { TabBar, TabFace } from "./TabBar.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
 
 export type { Sibling } from "./Switch.tsx";
@@ -285,7 +286,7 @@ export function Frame({
           </span>
         </div>
         {counts !== undefined && (
-          <nav aria-label="Project" className="a-tabs a-tabs-frame px-4">
+          <TabBar label="Project">
             {TABS.filter(
               (tab) => (tab.id !== "settings" || settings) && (tab.id !== "decisions" || decisions),
             ).map((tab) => (
@@ -297,12 +298,15 @@ export function Frame({
                   tab.id !== active ? undefined : route.at === tab.to.at ? "page" : "true"
                 }
               >
-                <tab.Icon size={17} weight={tab.id === active ? "fill" : "regular"} />
-                {tab.label}
-                <Count tab={tab.id} counts={counts} />
+                <TabFace
+                  Icon={tab.Icon}
+                  label={tab.label}
+                  open={tab.id === active}
+                  count={<Count tab={tab.id} counts={counts} />}
+                />
               </Link>
             ))}
-          </nav>
+          </TabBar>
         )}
       </header>
       <main className="relative min-h-0 flex-1">{children}</main>

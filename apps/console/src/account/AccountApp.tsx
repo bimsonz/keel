@@ -24,6 +24,7 @@ import type { KeelCredentials, KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { HomeLink } from "../views/HomeLink.tsx";
 import { Switch } from "../views/Switch.tsx";
+import { TabSlot } from "../views/TabBar.tsx";
 import {
   type Account,
   type Methods,
@@ -783,6 +784,8 @@ function Shell({
   children: ReactNode;
 }) {
   const namesHandle = handle !== undefined && (reader.is === "user" || reader.is === "visitor");
+  // A namespace's page puts its tabs here, under the row, where a project's are in its frame.
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   return (
     <div className="a-root flex min-h-screen w-screen flex-col bg-kumo-canvas text-base text-kumo-default">
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
@@ -827,8 +830,11 @@ function Shell({
             </a>
           )}
         </div>
+        <div ref={setSlot} className="contents" />
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <TabSlot.Provider value={slot}>{children}</TabSlot.Provider>
+      </main>
       <Footer />
     </div>
   );

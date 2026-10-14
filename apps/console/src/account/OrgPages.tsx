@@ -6,7 +6,25 @@
 import { AgentAbout } from "./AgentAbout.tsx";
 import { isOwn } from "./accounts.ts";
 import { Button, Input, buttonVariants } from "@cloudflare/kumo";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  BookBookmarkIcon,
+  BookOpenIcon,
+  GearIcon,
+  type Icon,
+  KeyIcon,
+  UsersIcon,
+  UsersThreeIcon,
+} from "@phosphor-icons/react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { TabBar, TabFace, TabSlot } from "../views/TabBar.tsx";
 import { hrefOf } from "../places.ts";
 import { TRUNK, href } from "../route.ts";
 import type {
@@ -49,7 +67,20 @@ function none(namespace: NamespaceRef): string {
 /** What a page calls a namespace's tab bar, by its kind. */
 const TABS_OF: Record<NamespaceKind, string> = { user: "Account", agent: "Agent", org: "Org" };
 
-/** A namespace's own sections under its name, as a code host lists an owner's: each a link, the one open marked. */
+/** Each tab's icon, as a code host marks an owner's sections. */
+const TAB_ICON: Record<NamespaceTab, Icon> = {
+  overview: BookOpenIcon,
+  projects: BookBookmarkIcon,
+  orgs: UsersThreeIcon,
+  people: UsersIcon,
+  credentials: KeyIcon,
+  settings: GearIcon,
+};
+
+/**
+ * A namespace's own sections, in the bar under the header that a project's places are in: the same bar, drawn in
+ * the header's place for it. Each is a link, the one open marked.
+ */
 function NamespaceTabs({
   handle,
   kind,
@@ -64,19 +95,30 @@ function NamespaceTabs({
   /** How many each tab holds, where Keel has said. */
   counts: Partial<Record<NamespaceTab, number>>;
 }) {
-  return (
-    <nav aria-label={TABS_OF[kind]} className="a-tabs">
+  const slot = useContext(TabSlot);
+  if (slot === null) return null;
+  return createPortal(
+    <TabBar label={TABS_OF[kind]}>
       {tabs.map((tab) => (
         <a
           key={tab}
           href={tabHref(handle, kind, tab)}
           aria-current={tab === open ? "page" : undefined}
         >
-          {TAB_LABEL[tab]}
-          {counts[tab] !== undefined && <span className="a-count">{counts[tab]}</span>}
+          <TabFace
+            Icon={TAB_ICON[tab]}
+            label={TAB_LABEL[tab]}
+            open={tab === open}
+            count={
+              counts[tab] === undefined ? undefined : (
+                <span className="a-count">{counts[tab].toLocaleString("en-US")}</span>
+              )
+            }
+          />
         </a>
       ))}
-    </nav>
+    </TabBar>,
+    slot,
   );
 }
 

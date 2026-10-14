@@ -2516,11 +2516,34 @@ expectEqual(
 // A handle's own page. Whose a handle is, Keel says to anyone who asks, and the page is worded from that: a
 // person's is their handle and the projects of theirs this reader may see, with no word of an org; an org's
 // says it is one; and a handle nobody has is said to be nobody's.
+/**
+ * The tab bar under a page's header, as it is drawn: where it is, its class, its size and colours, and its first
+ * tab's. Two pages with the same bar read the same.
+ */
+const barOf = async (shown: Page): Promise<string> =>
+  shown
+    .locator("header nav.a-tabs")
+    .first()
+    .evaluate(
+      (nav) => {
+        // oxlint-disable-next-line unicorn/consistent-function-scoping -- runs in the page, where nothing outside this callback is
+        const look = (part: Element | null, keys: string[]): string =>
+          part === null
+            ? "none"
+            : keys.map((key) => getComputedStyle(part).getPropertyValue(key)).join(" ");
+        const header = nav.closest("header");
+        const tab = nav.querySelector("a");
+        return `in ${header === null ? "nothing" : "HEADER"} | foot ${header === null ? "none" : Math.round(header.getBoundingClientRect().bottom - nav.getBoundingClientRect().bottom)} | ${nav.className} | ${look(nav, ["display", "padding-left", "border-bottom-width", "background-color"])} | ${look(tab, ["font-size", "font-weight", "padding-top", "padding-bottom", "column-gap", "color"])} | ${tab?.querySelector("svg") === null ? "no icon" : "icon"}`;
+      },
+      undefined,
+      { timeout: 10_000 },
+    )
+    .catch(() => "no bar in the header");
 /** A namespace page's tabs, in order, as `name count → address`, the open one marked `*`. */
 const namespaceTabsOf = async (shown: Page): Promise<string> =>
   (
     await shown
-      .locator("main nav.a-tabs a")
+      .locator("header nav.a-tabs a")
       .evaluateAll((links) =>
         links.map(
           (a) =>
@@ -3133,7 +3156,7 @@ expectEqual(
     .getByRole("main")
     .getByText(/\borg\b/i)
     .count()} mentions of an org`,
-  "ada ada | ada Your account | 0 org tabs | 0 mentions of an org",
+  "ada ada Overview Projects 1 Organizations Settings | ada Your account | 0 org tabs | 0 mentions of an org",
 );
 expectEqual(
   "account: a namespace's header is Keel's mark home and the namespace's name, a link to its own page",
@@ -3476,6 +3499,29 @@ expectEqual(
   await headerOf(person),
   "Keel (mark) → / | ada → /ada | demo → /ada/demo | Fork → /ada/demo/fork | ada → /settings || ada / demo private",
 );
+// A namespace's own page has the bar a project's page has, as a code host's owner and repository pages share one.
+const projectBar = await barOf(person);
+await shot(person, "bar-project");
+// Her namespace's page, in another tab of the same browser, so this one stays on the project.
+const beside = await person.context().newPage();
+await beside.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
+await beside
+  .locator("header nav.a-tabs a")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "member: a namespace's page draws the project page's own tab bar, in the header, the same to the pixel",
+  await barOf(beside),
+  projectBar,
+);
+expectEqual(
+  "member: and that bar is the header's, with icons",
+  `${projectBar.split(" | ")[0] ?? ""} ${projectBar.split(" | ")[1] ?? ""} ${projectBar.split(" | ").at(-1) ?? ""}`,
+  "in HEADER foot 1 icon",
+);
+await shot(beside, "bar-namespace");
+await beside.close();
 expectEqual(
   "member: the frame names the org, the project and who is reading",
   squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "",
@@ -4738,7 +4784,7 @@ await newcomer
 expectEqual(
   "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
   squash(await newcomer.getByRole("main").innerText()),
-  "turing Your account Overview Projects 0 Organizations 0 Settings Projects No projects yet New project Import a repository Read the quickstart",
+  "turing Your account Projects No projects yet New project Import a repository Read the quickstart",
 );
 expectEqual(
   "namespace: a person's own page has their tabs, and with no project yet the two ways to start one and the quickstart",
