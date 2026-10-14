@@ -2,16 +2,16 @@
 # kills: artifacts.import
 # why: The import answers the branch the binding calls the default, which is main whatever came, so a trunk imported from a master upstream is said to hold a branch it lacks
 diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-index 033b5d8e..643896e7 100644
+index 39246f53..0d121489 100644
 --- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-@@ -275,7 +275,8 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
-             await revoke(binding(target), target.name, made.token);
+@@ -381,7 +381,8 @@ export function CodeHostArtifacts(
+             }
              const handle = await binding(target).get(target.name);
              try {
 -              return await advertisedBranches(handle);
 +              const came = await advertisedBranches(handle);
-+              return came.map((b) => ({ ...b, ref: `${BRANCH}${made.defaultBranch}` }));
++              return came.map((b) => ({ ...b, ref: `${BRANCH}main` }));
              } finally {
                handle[Symbol.dispose]();
              }

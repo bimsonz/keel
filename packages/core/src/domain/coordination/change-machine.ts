@@ -8,6 +8,7 @@ import {
   type Committed,
   type ConflictId,
   type ContentHash,
+  type Counterpart,
   type DecisionId,
   type EscalationId,
   type GuardId,
@@ -204,6 +205,8 @@ export type ChangeCommand =
       readonly nextActions: readonly NextAction[];
       /** The failed batch, when the bounce comes from Integrating. */
       readonly batchId?: BatchId;
+      /** What the change conflicts with on trunk, as its verdict named it. */
+      readonly counterparts?: readonly Counterpart[];
     } & BounceCause)
   | {
       /** A conflict proven against the change under `advise` or `annotate`: recorded, nothing moves. */
@@ -786,7 +789,13 @@ export const decideChange = (
       return intoAgentOwned(
         change,
         now,
-        ChangeBounced.make({ changeId: id, ...cause, reasons: command.reasons, nextActions }),
+        ChangeBounced.make({
+          changeId: id,
+          ...cause,
+          reasons: command.reasons,
+          nextActions,
+          ...(command.counterparts === undefined ? {} : { counterparts: command.counterparts }),
+        }),
       );
     }
 

@@ -1,10 +1,17 @@
-import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import {
+  DerivedEffect,
+  Intent,
+  PreflightCompared,
+  SubjectKey,
+} from "@keeltown/core/domain/coordination";
+import {
+  ConnectStateRefused,
   DeliveryRefused,
   Deployment,
   DeployTarget,
   DeployTargetName,
   DeployTargetRefused,
+  PendingConnect,
 } from "@keeltown/core/domain/delivery";
 import {
   IdempotencyConflict,
@@ -136,6 +143,18 @@ export const LiveChangeView = Schema.Struct({
   derived: Schema.Array(DerivedEffect),
 });
 
+/** Read the live changes near a change's intent (the port's `near`): `self` is left out. */
+export const LiveNearRead = Schema.Struct({
+  self: ChangeId,
+  intent: Intent,
+});
+
+/** The live changes near an intent, in change id order, and what finding them compared: the port's `LiveNear`. */
+export const LiveNearView = Schema.Struct({
+  changes: Schema.Array(LiveChangeView),
+  compared: PreflightCompared,
+});
+
 /** A live subject and the code it is anchored to: the domain's `SubjectAnchors`, as it crosses RPC. */
 export const SubjectAnchorsView = Schema.Struct({
   subject: SubjectKey,
@@ -210,6 +229,22 @@ export const ClearDeployTargetCommand = Schema.Struct({
   requestId: Schema.NonEmptyString,
 });
 
+/** Hold a Connect its owner begins (core's `HoldProjectConnect`), in place of one they began before. */
+export const HoldConnectCommand = Schema.Struct({
+  projectId: ProjectId,
+  by: UserId,
+  target: DeployTargetName,
+  nonce: Schema.NonEmptyString,
+  verifier: Schema.NonEmptyString,
+});
+
+/** Take the Connect its owner began (core's `TakeProjectConnect`), by the nonce its callback carried. */
+export const TakeConnectCommand = Schema.Struct({
+  projectId: ProjectId,
+  by: UserId,
+  nonce: Schema.String,
+});
+
 /**
  * Keep a candidate's deployment (core's `recordDeployment`), in place of any
  * kept for it before. It commits no event; a replay of the same deployment
@@ -258,7 +293,7 @@ export const ProjectCodecs = {
   inviteAgent: invitationMove,
   acceptInvitation: invitationMove,
   endInvitation: invitationMove,
-  liveChanges: exitCodec(Schema.Array(LiveChangeView), Schema.Never),
+  liveNear: exitCodec(LiveNearView, Schema.Never),
   liveAnchors: exitCodec(Schema.Array(SubjectAnchorsView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
   putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
@@ -268,6 +303,8 @@ export const ProjectCodecs = {
     Schema.Union([ProjectNotFound, DeployTargetRefused, IdempotencyConflict]),
   ),
   clearDeployTarget: exitCodec(Schema.Void, Schema.Union([ProjectNotFound, DeployTargetRefused])),
+  holdConnect: exitCodec(Schema.Void, ProjectNotFound),
+  takeConnect: exitCodec(PendingConnect, Schema.Union([ProjectNotFound, ConnectStateRefused])),
   recordDeployment: exitCodec(Schema.Void, ProjectNotFound),
   deploymentOf: exitCodec(Schema.UndefinedOr(Deployment), ProjectNotFound),
   deploymentPromoted: exitCodec(Schema.Void, ProjectNotFound),
@@ -280,8 +317,9 @@ export const ProjectCodecs = {
 
 /** The Project DO (`project:<id>`): settings and the subject registry. */
 export interface ProjectRpc extends EventReceiverRpc {
-  /** The project's live changes, from each one's declare until it ends, for preflight. */
-  liveChanges(): Promise<ExitJson>;
+  /** The project's live changes, all of them, from each one's declare until it ends. */
+  /** The project's live changes near a change's intent, read by key, for its preflight. */
+  liveNear(read: typeof LiveNearRead.Encoded): Promise<ExitJson>;
   /** Where the project's live changes anchor their subjects in code, for Precheck's derivation. */
   liveAnchors(): Promise<ExitJson>;
   settings(): Promise<ExitJson>;
@@ -292,6 +330,10 @@ export interface ProjectRpc extends EventReceiverRpc {
   setDeployTarget(command: typeof SetDeployTargetCommand.Encoded): Promise<ExitJson>;
   /** Clears one of the project's deploy targets, committing DeployTargetCleared. */
   clearDeployTarget(command: typeof ClearDeployTargetCommand.Encoded): Promise<ExitJson>;
+  /** Holds a Connect its owner begins, in place of one they began before; commits nothing. */
+  holdConnect(command: typeof HoldConnectCommand.Encoded): Promise<ExitJson>;
+  /** Takes the Connect its owner began, if the nonce is its own and its window open; it is gone after. */
+  takeConnect(command: typeof TakeConnectCommand.Encoded): Promise<ExitJson>;
   /** Keeps a candidate's deployment, in place of any kept for it before; commits nothing. */
   recordDeployment(command: typeof RecordDeploymentCommand.Encoded): Promise<ExitJson>;
   /** The deployment the project keeps for a candidate, or undefined. */

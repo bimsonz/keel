@@ -37,6 +37,12 @@ const TITLES: Record<ProblemCode, string> = {
   "service.unavailable": "Keel cannot serve this right now",
   "service.not_implemented": "This operation is part of the contract but not implemented yet",
   "internal.defect": "Keel hit a defect while serving this request",
+  "project.not_imported": "The project was not imported, so it has no upstream to sync from",
+  "project.upstream_unreachable":
+    "The project's upstream did not answer, or no longer holds its branch",
+  "trunk.not_fast_forward":
+    "Trunk holds commits its upstream lacks, so it cannot move forward to upstream's head",
+  "trunk.busy": "Trunk is promoting, frozen or already syncing",
   "change.not_found": "No such change",
   "conflict.not_found": "No such conflict",
   "conflict.move_refused": "Keel cannot make that move on the conflict",
@@ -72,6 +78,7 @@ const TITLES: Record<ProblemCode, string> = {
   "deploy_target.refused": "The project's deploy target was not set",
   "deploy_target.unreachable": "The credential does not reach the account's Workers",
   "deploy_target.no_workers_dev": "The account has no workers.dev subdomain",
+  "cloudflare.not_configured": "This Keel has no OAuth client registered with Cloudflare",
 };
 
 export interface ProblemExtras {

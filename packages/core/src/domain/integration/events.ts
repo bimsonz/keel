@@ -247,6 +247,40 @@ export const PromotionComposed = Schema.TaggedStruct("PromotionComposed", {
   /** Each member's commit in the composed chain, in group order: the commits the members land as. */
   commits: Schema.Array(MemberCommit),
 });
+/** The upstream an imported trunk syncs from: the URL and branch its import took, as its origin names them. */
+export const SyncUpstream = Schema.Struct({
+  url: Schema.NonEmptyString,
+  /** The upstream branch, by its full ref name. */
+  ref: Schema.NonEmptyString,
+});
+export type SyncUpstream = typeof SyncUpstream.Type;
+
+/**
+ * The write-ahead entry of a sync from upstream: an owner asked for trunk's
+ * main to move from `from` to `to`, the upstream branch's head, which
+ * descends from it. Written before the move, and resolved by exactly one
+ * `TrunkSynced` or `PromotionFrozen`.
+ */
+export const TrunkSyncStarted = Schema.TaggedStruct("TrunkSyncStarted", {
+  projectId: ProjectId,
+  from: CommitSha,
+  to: CommitSha,
+  by: Schema.String,
+  upstream: SyncUpstream,
+});
+/**
+ * Trunk's main moved forward to its upstream branch's head, each upstream
+ * commit kept as upstream made it: no change landed, so no change is named.
+ */
+export const TrunkSynced = Schema.TaggedStruct("TrunkSynced", {
+  projectId: ProjectId,
+  from: CommitSha,
+  to: CommitSha,
+  by: Schema.String,
+  upstream: SyncUpstream,
+  /** Trunk's height after the sync, counted as an advance is. */
+  height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+});
 export const AuditCompleted = Schema.TaggedStruct("AuditCompleted", {
   projectId: ProjectId,
   head: CommitSha,
@@ -275,5 +309,7 @@ export const IntegrationEvent = Schema.Union([
   PromotionStarted,
   PromotionComposed,
   AuditCompleted,
+  TrunkSyncStarted,
+  TrunkSynced,
 ]);
 export type IntegrationEvent = typeof IntegrationEvent.Type;

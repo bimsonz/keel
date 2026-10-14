@@ -1,13 +1,13 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/bindings.test.ts -t Workflow
 # why: Precheck completes on a payload it cannot read, instead of failing permanently
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 61ba5d2..5b65c9f 100644
+index 947eacd7..73d4afab 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -76,7 +76,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
-     step: WorkflowStep,
-   ): Promise<PrecheckOutcome> {
-     const params = Schema.decodeUnknownOption(PrecheckParams)(event.payload);
+@@ -104,7 +104,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+     const input = await claimedInput(event, step);
+     if (input._tag === "Retired") return { outcome: "retired" };
+     const params = Schema.decodeUnknownOption(PrecheckParams)(input.payload);
 -    if (Option.isNone(params)) throw new NonRetryableError("not a ChangeSubmitted payload");
 +    if (Option.isNone(params)) return { outcome: "stale", step: "start", reason: "no payload" };
      const submission: PrecheckSubmission = {

@@ -33,12 +33,20 @@ export function* readPkts(buf: Uint8Array): Generator<Uint8Array | null> {
   }
 }
 
-/** Where to push. `url` is the repo's git remote; it embeds the account id, so it is never put in an error or a log. */
+/**
+ * Where to push. `url` is the repo's git remote; it embeds the account id, so
+ * it is never put in an error or a log. A public remote read with no
+ * credential has no `token`, and its requests carry no Authorization.
+ */
 export interface GitRemote {
   readonly url: string;
-  readonly token: string;
+  readonly token?: string;
   readonly fetch?: typeof fetch;
 }
+
+/** The credential each request to `remote` carries: none for a public remote. */
+export const authorizationOf = (remote: GitRemote): Readonly<Record<string, string>> =>
+  remote.token === undefined ? {} : { Authorization: `Bearer ${remote.token}` };
 
 /** One ref update: `old` is what the ref must hold now (`ZERO_OID`: must not exist), `new` what it becomes (`ZERO_OID`: delete). */
 export interface RefUpdate {
@@ -104,18 +112,25 @@ export function parseReport(buf: Uint8Array): Report {
   return { unpack, refs, errors };
 }
 
-/**
- * The refs a remote advertises (`GET info/refs?service=git-upload-pack`), by
- * full name. A read token is enough.
- */
-export async function advertisedRefs(remote: GitRemote): Promise<ReadonlyMap<string, string>> {
+/** What a remote advertises: its refs by full name, and the branch its HEAD names, when it names one. */
+export interface Advertisement {
+  readonly refs: ReadonlyMap<string, string>;
+  /** The full ref HEAD's `symref=HEAD:<ref>` capability names. */
+  readonly head: string | undefined;
+}
+
+const SYMREF_HEAD = "symref=HEAD:";
+
+/** What a remote advertises (`GET info/refs?service=git-upload-pack`). A read token is enough. */
+export async function advertisement(remote: GitRemote): Promise<Advertisement> {
   const f = remote.fetch ?? fetch;
   const res = await f(`${remote.url}/info/refs?service=git-upload-pack`, {
-    headers: { Authorization: `Bearer ${remote.token}` },
+    headers: authorizationOf(remote),
   });
   const body = new Uint8Array(await res.arrayBuffer());
   if (!res.ok) throw new Error(`ref advertisement answered HTTP ${res.status}`);
   const refs = new Map<string, string>();
+  let head: string | undefined;
   for (const payload of readPkts(body)) {
     if (payload === null) continue;
     const line = dec.decode(payload).replace(/\n$/, "");
@@ -123,8 +138,21 @@ export async function advertisedRefs(remote: GitRemote): Promise<ReadonlyMap<str
     const nul = line.indexOf("\0");
     const [oid, name] = (nul < 0 ? line : line.slice(0, nul)).split(" ");
     if (oid !== undefined && name !== undefined && name !== "capabilities^{}") refs.set(name, oid);
+    const symref =
+      nul < 0
+        ? undefined
+        : line
+            .slice(nul + 1)
+            .split(" ")
+            .find((capability) => capability.startsWith(SYMREF_HEAD));
+    if (symref !== undefined) head = symref.slice(SYMREF_HEAD.length);
   }
-  return refs;
+  return { refs, head };
+}
+
+/** The refs a remote advertises, by full name. A read token is enough. */
+export async function advertisedRefs(remote: GitRemote): Promise<ReadonlyMap<string, string>> {
+  return (await advertisement(remote)).refs;
 }
 
 /** Applied only when the pack unpacked and every update's ref reports ok. */
@@ -173,7 +201,7 @@ export async function receivePack(
   const res = await f(`${remote.url}/git-receive-pack`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${remote.token}`,
+      ...authorizationOf(remote),
       "Content-Type": "application/x-git-receive-pack-request",
       Accept: "application/x-git-receive-pack-result",
     },

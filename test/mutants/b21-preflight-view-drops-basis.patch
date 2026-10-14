@@ -2,14 +2,14 @@
 # kills: b21.preflight-view
 # why: the agent is told the move but not the contradiction or precedent it rests on
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index 80640429..a72e2b97 100644
+index f2f1f65a..e75fed88 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -351,7 +351,6 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+@@ -375,7 +375,6 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
        ...(p.scope === undefined ? {} : { scope: p.scope }),
      })),
      suggestedMove: preflight.suggestedMove,
 -    ...(basis === undefined ? {} : { basis }),
      ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
+     ...(preflight.compared === undefined ? {} : { compared: { ...preflight.compared } }),
    };
- }

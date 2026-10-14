@@ -1,4 +1,4 @@
-import { hearLiveChange, liveAnchors, liveChanges } from "@keeltown/core/application/coordination";
+import { hearLiveChange, liveAnchors, liveNear } from "@keeltown/core/application/coordination";
 import {
   acceptProjectInvitation,
   endProjectInvitation,
@@ -9,6 +9,8 @@ import {
   commitDeployTargetClear,
   deploymentOf,
   deployTargetsOf,
+  holdConnect,
+  takeConnect,
   promoteDeployment,
   recordDeployment,
   refuseDelivery,
@@ -32,12 +34,15 @@ import {
 import {
   AcceptProjectInvitationCommand,
   ClearDeployTargetCommand,
+  HoldConnectCommand,
+  TakeConnectCommand,
   CreateProjectCommand,
   DeliveryRefusedCommand,
   DeploymentOfCommand,
   DeploymentPromotedCommand,
   EndProjectInvitationCommand,
   InviteToProjectCommand,
+  LiveNearRead,
   ProjectCodecs,
   type ProjectRpc,
   PutSettingsCommand,
@@ -71,11 +76,13 @@ export class ProjectDO
       | "deployTargets"
       | "setDeployTarget"
       | "clearDeployTarget"
+      | "holdConnect"
+      | "takeConnect"
       | "recordDeployment"
       | "deploymentOf"
       | "deploymentPromoted"
       | "deliveryRefused"
-      | "liveChanges"
+      | "liveNear"
       | "liveAnchors"
       | "inviteAgent"
       | "acceptInvitation"
@@ -185,11 +192,22 @@ export class ProjectDO
       : { entity: { kind: "project", id: projectId }, drafts, project: projectId };
   }
 
-  /** The project's live changes, read once by each preflight. */
-  async liveChanges() {
+  /**
+   * The live changes near a change's intent, read once by each preflight: by
+   * key, in a transaction, since an index from before the key rows builds
+   * them on its first read.
+   */
+  async liveNear(read: typeof LiveNearRead.Encoded) {
     return this.answer(
-      ProjectCodecs.liveChanges,
-      EntityStore.use((store) => Effect.succeed(liveChanges(store))),
+      ProjectCodecs.liveNear,
+      Schema.decodeUnknownEffect(LiveNearRead)(read).pipe(
+        Effect.orDie,
+        Effect.flatMap(({ self, intent }) =>
+          EntityStore.use((store) =>
+            Effect.sync(() => store.transaction(() => liveNear(store, self, intent))),
+          ),
+        ),
+      ),
     );
   }
 
@@ -251,6 +269,34 @@ export class ProjectDO
       ),
     );
     return this.answer(ProjectCodecs.clearDeployTarget, program);
+  }
+
+  /** Holds a Connect its owner begins on the project, lapsing by this object's clock. */
+  async holdConnect(command: typeof HoldConnectCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(HoldConnectCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((holding) =>
+        holding.projectId === projectId
+          ? holdConnect(holding)
+          : Effect.die(`a holdConnect for ${holding.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.holdConnect, program);
+  }
+
+  /** Takes the Connect its owner began, once: it is gone whatever the answer. */
+  async takeConnect(command: typeof TakeConnectCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(TakeConnectCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((taking) =>
+        taking.projectId === projectId
+          ? takeConnect(taking)
+          : Effect.die(`a takeConnect for ${taking.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.takeConnect, program);
   }
 
   /** Keeps a candidate's deployment, in place of any kept for it before; ProjectNotFound before createProject. */

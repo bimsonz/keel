@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.composition-counterparts
+# kills: lane.composition-counterparts
+# why: A textual bounce names no why on the conflicting path, so an agent merges over what was decided there without reading it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f70ce198..536e0298 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -980,9 +980,6 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+                   "rebase",
+                   `Rebase the change onto trunk's head (it was ${batch.base} at this bounce): Keel puts it on your workspace's keel/trunk branch`,
+                 ),
+-                ...(counterparts === undefined
+-                  ? []
+-                  : whyActions(lane.projectId, refused.paths, counterparts)),
+                 remedy(
+                   batch,
+                   "submit",

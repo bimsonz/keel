@@ -7,8 +7,10 @@ import {
   type SyncOutcome,
   type TakenTrunk,
   TrunkWriter,
+  UpstreamUnreachable,
 } from "@keeltown/core/ports";
 import {
+  advertisement,
   type GitObject,
   type GitRemote,
   PackTooLarge as GitPackTooLarge,
@@ -27,6 +29,13 @@ import { Effect, Layer, Schema } from "effect";
 import { type CommitSigningConfig, commitSigner, keelCommitter } from "./commit-signing.ts";
 
 export const MAIN = "refs/heads/main";
+
+/**
+ * Where a sync from upstream holds upstream's history in trunk until main is
+ * moved to it: a branch, as staging's candidates are, so the code host takes
+ * it as it takes any push. It is deleted once the sync is resolved.
+ */
+export const UPSTREAM_REF = "refs/heads/keel/upstream-sync";
 
 /** Every trunk-side token lives a minute, minted for the one operation that needs it. */
 export const TOKEN_TTL_SECONDS = 60;
@@ -94,6 +103,12 @@ export const TrunkWriterGitCore = (
         );
 
       const trunkHead = host.head(trunk, MAIN).pipe(Effect.catchTag("RefNotFound", Effect.die));
+
+      /** Trunk's side ref of a sync from upstream, or null when none is open. */
+      const sideHead = host.head(trunk, UPSTREAM_REF).pipe(
+        Effect.map((sha): CommitSha | null => sha),
+        Effect.catchTags({ RefNotFound: () => Effect.succeed(null), RepoNotFound: Effect.die }),
+      );
 
       /** Trunk's main, or null before it has one. Trunk's own repo missing is a defect, never a source's. */
       const ownHead = headOf(trunk).pipe(Effect.catchTag("RepoNotFound", Effect.die));
@@ -239,6 +254,78 @@ export const TrunkWriterGitCore = (
             for (const target of targets) outcomes.push(yield* syncOne(source, head, target));
             return { head, outcomes };
           }),
+        // An upstream is someone else's public repository: it is read with no credential, as the import's relay reads it.
+        upstreamHead: (upstream) =>
+          Effect.tryPromise({
+            try: () => advertisement({ url: upstream.url }),
+            catch: () => new UpstreamUnreachable({ ...upstream, reason: "unreachable" }),
+          }).pipe(
+            Effect.map((advertised) => {
+              const head = advertised.refs.get(upstream.ref);
+              return head === undefined ? undefined : toCommitSha(head);
+            }),
+          ),
+        fetchUpstream: (upstream, to, haves) =>
+          Effect.gen(function* () {
+            const move: RelayMove = { ref: UPSTREAM_REF, from: null, to, haves };
+            const pack = yield* Effect.tryPromise({
+              try: () => relayPack({ url: upstream.url }, move),
+              catch: (cause) => cause,
+            }).pipe(
+              Effect.catch((cause): Effect.Effect<never, PackTooLarge | UpstreamUnreachable> =>
+                cause instanceof GitPackTooLarge
+                  ? tooLarge(trunk)(cause)
+                  : Effect.fail(new UpstreamUnreachable({ ...upstream, reason: "unreachable" })),
+              ),
+            );
+            const target = yield* remoteOf(trunk, "write").pipe(
+              Effect.catchTag("RepoNotFound", Effect.die),
+            );
+            // The side ref may hold an earlier sync's fetch: it is moved from whatever it holds, read again if it moved.
+            for (let attempt = 0; attempt <= STALE_RETRIES; attempt += 1) {
+              const held = yield* sideHead;
+              const outcome = yield* Effect.tryPromise({
+                try: () => relaySend(target, { ...move, from: held }, pack),
+                catch: (cause) => cause,
+              }).pipe(Effect.orDie);
+              if (outcome.kind !== "rejected") return pack.length;
+            }
+            return yield* Effect.die(new Error("trunk's upstream ref kept moving during a sync"));
+          }),
+        descends: (from, to, stopAt) => host.isAncestor(trunk, from, to, stopAt).pipe(Effect.orDie),
+        fastForward: (from, to) =>
+          Effect.gen(function* () {
+            const target = yield* remoteOf(trunk, "write").pipe(
+              Effect.catchTag("RepoNotFound", Effect.die),
+            );
+            // `to` is in trunk already, under the side ref: the push sends no object.
+            const pack = yield* Effect.promise(() => writePack([]));
+            for (let attempt = 0; attempt <= BUSY_RETRIES; attempt += 1) {
+              const outcome = yield* Effect.promise(() =>
+                receivePack(target, [{ ref: MAIN, old: from, new: to }], pack),
+              );
+              if (outcome.kind === "applied") return "moved" as const;
+              if (outcome.kind === "rejected")
+                return yield* Effect.fail(new PushRejected({ reason: "stale" }));
+              if (outcome.kind === "failed")
+                return yield* Effect.die(
+                  new Error(`moving trunk's main was refused: ${outcome.message}`),
+                );
+              yield* Effect.sleep(50 * 2 ** attempt);
+            }
+            return yield* Effect.fail(new PushRejected({ reason: "busy" }));
+          }).pipe(Effect.asVoid),
+        dropUpstream: Effect.gen(function* () {
+          const held = yield* sideHead;
+          if (held === null) return;
+          const target = yield* remoteOf(trunk, "write").pipe(
+            Effect.catchTag("RepoNotFound", Effect.die),
+          );
+          // A side ref left behind holds nothing main needs: the next sync moves it from what it holds.
+          yield* Effect.promise(() =>
+            receivePack(target, [{ ref: UPSTREAM_REF, old: held, new: ZERO_OID }], null),
+          );
+        }),
       });
     }),
   );

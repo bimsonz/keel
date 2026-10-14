@@ -27,6 +27,13 @@ const claimsOf = (intent: Intent): ReadonlySet<string> =>
   new Set((intent.declaredEffects ?? []).map(claimKey));
 
 /**
+ * The claims an intent's declared effects make, each once and sorted: equal
+ * for two intents exactly when they make the same claims, so its alternatives
+ * are found by it. Empty when the intent declares no effects.
+ */
+export const claimSetOf = (intent: Intent): readonly string[] => [...claimsOf(intent)].toSorted();
+
+/**
  * Whether two intents attempt the same thing: their declared effects make the
  * same claims, as non-empty sets. Order and repeats do not matter. A partial
  * overlap is not an alternative (the two are neighbours, and may contradict),

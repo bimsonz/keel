@@ -2,12 +2,12 @@
 # kills: d22.pool.probe-deadline
 # why: A wait that runs out errors the instance, so a party that never submits leaves its conflict suspected with no failed draft
 diff --git a/apps/keel/src/adapters/driving/workflow/steps.ts b/apps/keel/src/adapters/driving/workflow/steps.ts
-index 576638e..9de56fb 100644
+index 3edd757f..3db9b1fe 100644
 --- a/apps/keel/src/adapters/driving/workflow/steps.ts
 +++ b/apps/keel/src/adapters/driving/workflow/steps.ts
-@@ -14,7 +14,7 @@ const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
+@@ -72,7 +72,7 @@ export async function placedStep(
  /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */
- const timedOut = (error: unknown) =>
+ export const timedOut = (error: unknown) =>
    error instanceof Error &&
 -  (error.name === "WorkflowTimeoutError" || /timed? ?out/i.test(error.message));
 +  error.name === "NoSuchError";

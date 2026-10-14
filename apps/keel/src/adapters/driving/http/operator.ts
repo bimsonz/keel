@@ -19,6 +19,7 @@ import type {
   ProjectNameTaken,
 } from "@keeltown/core/domain/identity";
 import type { ProjectNotFound } from "@keeltown/core/domain/integration";
+import type { SyncRefused, UpstreamSynced } from "@keeltown/core/ports";
 import { AgentId, Glob, ProjectId } from "@keeltown/core/kernel";
 import { Result, Schema } from "effect";
 import type {
@@ -29,6 +30,7 @@ import type {
   Operator_reinstateAgentResult,
   Operator_revokeAgentResult,
   Operator_suspendAgentResult,
+  Operator_syncUpstreamResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { agentProfile } from "./mappers.ts";
@@ -120,6 +122,110 @@ export function settingsError(
       ],
     }),
   };
+}
+
+/** What a sync from upstream did, as it answered. */
+export function syncUpstreamOk(
+  synced: UpstreamSynced,
+): Extract<Operator_syncUpstreamResult, { readonly status: 200 }> {
+  return { status: 200, body: { from: synced.from, to: synced.to, synced: synced.synced } };
+}
+
+const syncAgain = (title: string) => ({
+  kind: "call" as const,
+  title,
+  operationId: "Operator_syncUpstream",
+});
+
+/** A sync's refusals, each with nothing moved. */
+export function syncUpstreamError(caller: Caller, error: SyncRefused): Operator_syncUpstreamResult {
+  switch (error._tag) {
+    case "TrunkNotInitialized":
+      return {
+        status: 404,
+        body: problem(404, "resource.not_found", caller.requestId, {
+          detail: `Project ${error.projectId} has no trunk yet.`,
+          nextActions: [],
+        }),
+      };
+    case "NotImported":
+      return {
+        status: 409,
+        body: problem(409, "project.not_imported", caller.requestId, {
+          detail:
+            "Only a project imported from a Git URL has an upstream to sync from. Nothing was moved.",
+          nextActions: [],
+        }),
+      };
+    case "NotFastForward":
+      return {
+        status: 409,
+        body: problem(409, "trunk.not_fast_forward", caller.requestId, {
+          detail: `Trunk is at ${error.trunk}, and upstream's head ${error.upstream} does not descend from it: trunk holds commits upstream lacks, or upstream's history was rewritten. Nothing was moved.`,
+          nextActions: [],
+        }),
+      };
+    case "PromotionStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "trunk.busy", caller.requestId, {
+          detail:
+            error.phase === "frozen"
+              ? "Trunk's promotion is frozen: an operator resumes it first. Nothing was moved."
+              : `Trunk is ${error.phase}: a sync starts between promotions. Nothing was moved.`,
+          nextActions:
+            error.phase === "frozen"
+              ? []
+              : [{ kind: "wait" as const, title: "Sync again once trunk's promotion has landed" }],
+          ...(error.phase === "frozen" ? {} : { retryAfterMs: 5_000 }),
+        }),
+      };
+    case "UpstreamUnreachable":
+      return error.reason === "branch-gone"
+        ? {
+            status: 404,
+            body: problem(404, "project.upstream_unreachable", caller.requestId, {
+              detail: `${error.url} no longer holds ${error.ref}. Nothing was moved.`,
+              nextActions: [],
+            }),
+          }
+        : {
+            status: 503,
+            body: problem(503, "project.upstream_unreachable", caller.requestId, {
+              detail: `${error.url} did not answer. Nothing was moved.`,
+              nextActions: [{ kind: "wait" as const, title: "Sync again shortly" }],
+              retryAfterMs: 5_000,
+            }),
+          };
+    case "ImportTooLarge":
+      return {
+        status: 403,
+        body: problem(403, "project.import_too_large", caller.requestId, {
+          detail: `Upstream's new history is ${error.bytes} bytes, and Keel takes at most ${error.limit} in one piece. Nothing was moved.`,
+          nextActions: [],
+        }),
+      };
+    case "QuotaExceeded":
+      return {
+        status: 403,
+        body: problem(403, "quota.exceeded", caller.requestId, {
+          detail: `Upstream's new history is ${error.requested} bytes, and the namespace has ${Math.max(0, error.limit - error.used)} of its ${error.limit} left (${error.kind}). Nothing was moved.`,
+          nextActions: [
+            ...error.nextActions.map(({ kind, title, operationId, args }) => ({
+              kind,
+              title,
+              ...(operationId === undefined ? {} : { operationId }),
+              ...(args === undefined ? {} : { args }),
+            })),
+            syncAgain("Sync again once the namespace has room"),
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
 }
 
 /** A PUT's refusals: the project does not exist, or its request id already carried other settings. */

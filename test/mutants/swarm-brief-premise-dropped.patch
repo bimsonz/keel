@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.tasks-brief
+# why: A premise task's brief never says what its test relies on: no premise reaches Keel, and the premise pairs measure nothing
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index ce469ec5..aa64719b 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -303,7 +303,6 @@ export function brief(task: Task): string {
+       : `Create the file with one describe block named "${task.target.fn}".`,
+     `Write one it() per case, asserting exactly this:`,
+     ...task.cases.map((c) => `- ${describeCase(task.target, c)}`),
+-    ...task.premises.map((p) => `Your test relies on this premise: ${JSON.stringify(p)}`),
+   ];
+   return lines.join("\n");
+ }

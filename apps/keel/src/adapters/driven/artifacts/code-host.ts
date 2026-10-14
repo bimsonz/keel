@@ -14,17 +14,22 @@ import {
 } from "@keeltown/core/ports";
 import {
   advertisedRefs,
+  advertisement,
   compareTreeEntries,
   diffTrees,
   isAncestor,
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
+  PackTooLarge,
+  relayPack,
+  relaySend,
   type TreeEntry as GitTreeEntry,
   type TreeReader,
 } from "@keeltown/gitcore";
 import { Effect, Layer, Result, Schema } from "effect";
 import { objectsOf } from "./objects.ts";
+import { type HandleReads, refreshingReads } from "./refreshing-handle.ts";
 
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
 const plain = (repo: RepoRef) => ({ namespace: repo.namespace, name: repo.name });
@@ -80,7 +85,9 @@ const importRefusal = (e: unknown): ImportRefused["reason"] | undefined => {
 };
 
 /** The repo's branches from its own advertisement, in name order, read with a minute-long token that is revoked once read. */
-async function advertisedBranches(handle: ArtifactsRepo): Promise<Imported[]> {
+async function advertisedBranches(
+  handle: Pick<ArtifactsRepo, "info" | "createToken" | "revokeToken">,
+): Promise<Imported[]> {
   const [info, token] = await Promise.all([handle.info(), handle.createToken("read", 60)]);
   try {
     const refs = await advertisedRefs({ url: info.remote, token: token.plaintext });
@@ -93,11 +100,54 @@ async function advertisedBranches(handle: ArtifactsRepo): Promise<Imported[]> {
   }
 }
 
+/**
+ * An import by relay, for one Artifacts answered as unavailable: its own
+ * import gives up after about 65 s, which a repository of about 20 MB already
+ * takes (live, 14 Oct). The branch named, else the one the upstream's HEAD
+ * names, is read from the upstream's own advertisement with no credential,
+ * and its whole history is relayed into a new, empty repo under the target's
+ * name, after whatever the failed import left there is deleted. An upstream
+ * that does not answer is `unreachable` still; a relay that does not land
+ * deletes the repo it made, so a refused import leaves none.
+ */
+async function relayImport(
+  namespace: Artifacts,
+  name: string,
+  source: { readonly url: string; readonly ref?: string | undefined },
+): Promise<void> {
+  const upstream = { url: source.url };
+  const advertised = await advertisement(upstream).catch(() => {
+    throw new ImportRefused({ reason: "unreachable" });
+  });
+  const ref = source.ref === undefined ? advertised.head : `${BRANCH}${source.ref}`;
+  const to = ref === undefined ? undefined : advertised.refs.get(ref);
+  if (ref === undefined || to === undefined) throw new ImportRefused({ reason: "no-branch" });
+  const move = { ref, from: null, to };
+  const pack = await relayPack(upstream, move).catch((e: unknown) => {
+    throw new ImportRefused({ reason: e instanceof PackTooLarge ? "too-large" : "unreachable" });
+  });
+  await namespace.delete(name);
+  const made = await namespace.create(name);
+  try {
+    const sent = await relaySend({ url: made.remote, token: made.token }, move, pack);
+    if (sent.kind !== "advanced") throw new Error(`an import's relay was ${sent.kind}`);
+  } catch (e) {
+    // Its tokens go with it.
+    await namespace.delete(name);
+    throw e;
+  }
+  await revoke(namespace, name, made.token);
+}
+
+/** What a body run on a repo calls on its handle. */
+type RepoHandle = HandleReads &
+  Pick<ArtifactsRepo, "info" | "log" | "createToken" | "revokeToken" | "fork">;
+
 /** A fork whose target name was taken, carried out of the binding call to become RepoAlreadyExists. */
 const TAKEN = Symbol("taken");
 
 /** A ref's commit. The binding's `log` resolves branch names (`main`) but not full ref names, so other refs are read from the advertisement with a minute-long read token. */
-async function resolveRef(handle: ArtifactsRepo, ref: string): Promise<string | undefined> {
+async function resolveRef(handle: RepoHandle, ref: string): Promise<string | undefined> {
   if (ref.startsWith(BRANCH))
     return (await handle.log({ ref: ref.slice(BRANCH.length), limit: 1 }))[0]?.hash;
   const [info, token] = await Promise.all([handle.info(), handle.createToken("read", 60)]);
@@ -114,7 +164,7 @@ async function revoke(namespace: Artifacts, name: string, token: string): Promis
   }
 }
 
-async function rootTree(handle: ArtifactsRepo, commit: string): Promise<string> {
+async function rootTree(handle: HandleReads, commit: string): Promise<string> {
   const read = await handle.readCommit(commit);
   if (read === null) throw new MissingObject(commit);
   return read.treeHash;
@@ -241,15 +291,31 @@ export function CodeHostArtifacts(
     return found;
   };
 
-  /** Opens the repo, runs `body`, and releases the handle. Fails with whatever was thrown. */
-  const run = <A>(repo: RepoRef, body: (handle: ArtifactsRepo) => Promise<A>) =>
+  /**
+   * Opens the repo, runs `body`, and releases the handle. Its reads go on
+   * through a fresh handle past one handle's reads (`refreshingReads`), and
+   * every other call goes to the handle read through now. Fails with
+   * whatever was thrown.
+   */
+  const run = <A>(repo: RepoRef, body: (handle: RepoHandle) => Promise<A>) =>
     Effect.tryPromise({
       try: async () => {
-        const handle = await binding(repo).get(repo.name);
+        const reads = refreshingReads(await binding(repo).get(repo.name), () =>
+          binding(repo).get(repo.name),
+        );
         try {
-          return await body(handle);
+          return await body({
+            readTree: reads.readTree,
+            readBlob: reads.readBlob,
+            readCommit: reads.readCommit,
+            info: () => reads.use((handle) => handle.info()),
+            log: (...args) => reads.use((handle) => handle.log(...args)),
+            createToken: (...args) => reads.use((handle) => handle.createToken(...args)),
+            revokeToken: (...args) => reads.use((handle) => handle.revokeToken(...args)),
+            fork: (...args) => reads.use((handle) => handle.fork(...args)),
+          });
         } finally {
-          handle[Symbol.dispose]();
+          reads[Symbol.dispose]();
         }
       },
       catch: (e) => e,
@@ -258,7 +324,7 @@ export function CodeHostArtifacts(
   /** A missing repo is `RepoNotFound`; anything else is a defect. */
   const onRepo = <A>(
     repo: RepoRef,
-    body: (handle: ArtifactsRepo) => Promise<A>,
+    body: (handle: RepoHandle) => Promise<A>,
   ): Effect.Effect<A, RepoNotFound> =>
     run(repo, body).pipe(
       Effect.catch((e): Effect.Effect<never, RepoNotFound> => {
@@ -270,7 +336,7 @@ export function CodeHostArtifacts(
   /** Also maps an object the repo lacks (`MissingObject`) to `ObjectNotFound`. */
   const onObjects = <A>(
     repo: RepoRef,
-    body: (handle: ArtifactsRepo) => Promise<A>,
+    body: (handle: RepoHandle) => Promise<A>,
   ): Effect.Effect<A, RepoNotFound | ObjectNotFound> =>
     run(repo, body).pipe(
       Effect.catch((e): Effect.Effect<never, RepoNotFound | ObjectNotFound> => {
@@ -285,7 +351,7 @@ export function CodeHostArtifacts(
   return Layer.sync(CodeHost, () => {
     const kept = options.trees === undefined ? undefined : treeCache(options.trees);
     /** The handle's tree reads, through this layer's cache when it keeps one. */
-    const treesOf = (repo: RepoRef, handle: ArtifactsRepo): TreeReader =>
+    const treesOf = (repo: RepoRef, handle: HandleReads): TreeReader =>
       kept === undefined ? objectsOf(handle) : kept(repo, objectsOf(handle));
     return CodeHost.of({
       // create() and fork() each return a day-long write token Keel never uses: revoke it at once, so no pooled repo carries a standing credential.
@@ -323,14 +389,19 @@ export function CodeHostArtifacts(
       import: (source, target) =>
         Effect.tryPromise({
           try: async () => {
-            const made = await binding(target).import({
-              source: {
-                url: source.url,
-                ...(source.ref === undefined ? {} : { branch: source.ref }),
-              },
-              target: { name: target.name },
-            });
-            await revoke(binding(target), target.name, made.token);
+            try {
+              const made = await binding(target).import({
+                source: {
+                  url: source.url,
+                  ...(source.ref === undefined ? {} : { branch: source.ref }),
+                },
+                target: { name: target.name },
+              });
+              await revoke(binding(target), target.name, made.token);
+            } catch (e) {
+              if (importRefusal(e) !== "unreachable") throw e;
+              await relayImport(binding(target), target.name, source);
+            }
             const handle = await binding(target).get(target.name);
             try {
               return await advertisedBranches(handle);
@@ -341,6 +412,7 @@ export function CodeHostArtifacts(
           catch: (e) => e,
         }).pipe(
           Effect.catch((e): Effect.Effect<never, RepoAlreadyExists | ImportRefused> => {
+            if (e instanceof ImportRefused) return Effect.fail(e);
             const reason = importRefusal(e);
             return reason === undefined
               ? unlessTaken(target)(e)

@@ -35,9 +35,24 @@ import { Effect, Layer, Result, Schema } from "effect";
 
 /**
  * A Durable Object's storage, in a Map. `transaction` snapshots the map and
- * restores it if the body throws, so a failed decision commits nothing.
+ * restores it if the body throws, so a failed decision commits nothing. A
+ * list answers in id order, as SQLite's `ORDER BY id` does, and a prefix keeps
+ * the ids that start with it.
  */
 const key = (kind: string, id: string) => `${kind}\u0000${id}`;
+
+/** A UTF-16 unit, moved so that comparing units compares code points: surrogates sort above U+E000–U+FFFF. */
+const unitRank = (unit: number): number =>
+  unit >= 0xd800 && unit < 0xe000 ? unit + 0x2000 : unit >= 0xe000 ? unit - 0x800 : unit;
+
+/** Two ids in code point order, SQLite's order for text. */
+const byCodePoint = (a: string, b: string): number => {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const [x, y] = [a.charCodeAt(i), b.charCodeAt(i)];
+    if (x !== y) return unitRank(x) - unitRank(y);
+  }
+  return a.length - b.length;
+};
 
 export function makeEntityStoreMemory() {
   let rows = new Map<string, Stored>();
@@ -52,10 +67,11 @@ export function makeEntityStoreMemory() {
     remove: (kind, id) => {
       rows.delete(key(kind, id));
     },
-    list: (kind) =>
+    list: (kind, idPrefix = "") =>
       [...rows.entries()]
-        .filter(([k]) => k.startsWith(`${kind}\u0000`))
-        .map(([k, value]) => ({ id: k.slice(kind.length + 1), value: structuredClone(value) })),
+        .filter(([k]) => k.startsWith(key(kind, idPrefix)))
+        .map(([k, value]) => ({ id: k.slice(kind.length + 1), value: structuredClone(value) }))
+        .toSorted((a, b) => byCodePoint(a.id, b.id)),
     transaction: (body) => {
       const snapshot = new Map(rows);
       try {

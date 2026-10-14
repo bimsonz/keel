@@ -26,11 +26,18 @@
     "ARTIFACTS_LOCATION_HINT": "wnam",
     // How many ready workspaces a new project's pool keeps forked ahead of declares.
     "POOL_TARGET": "4",
+    // How many Precheck instances the warm pool keeps started, each waiting for a submission's
+    // claim; 0 keeps none, and every submission's Precheck starts cold.
+    "PRECHECK_WARM_TARGET": "4",
     // Every key Keel signs or has signed commits with, as JSON: [{ publicKey, validAfter?, validBefore? }],
     // each key as `ssh-ed25519 <base64>` and each time ISO 8601. Served as the allowed-signers file at
     // /.well-known/keel/allowed-signers. scripts/deploy.ts fills it from Terraform; a compose is a defect
     // while it does not hold KEEL_COMMIT_SIGNING_KEY's public half for the commit's time.
     "KEEL_COMMIT_SIGNERS": "[]",
+    // The id of Keel's OAuth client on Cloudflare, which an owner connects a project's deploy target through.
+    // Not a secret: it is in every consent URL. scripts/deploy.ts fills it from Terraform, which registers the
+    // client; empty here, where Connect answers that no client is registered.
+    "CF_OAUTH_CLIENT_ID": "",
     // Each PlatformFunction's model, by exact id: never cloudflare/auto.
     "PLATFORM_FUNCTION_PINS": { "keel.probe.freshness": "@cf/moonshotai/kimi-k2.7-code" },
   },
@@ -86,6 +93,8 @@
       { "name": "NAMESPACE", "class_name": "NamespaceDO" },
       { "name": "MERGEBOX", "class_name": "MergeBox" },
       { "name": "BOXGATE", "class_name": "BoxGate" },
+      // Each pooled Workflow's warm instances (`pool:Precheck`), claimed by the fan-out before it starts one cold.
+      { "name": "WORKFLOW_POOL", "class_name": "WorkflowPoolDO" },
       // Tier 2 runners live in keel-verify, which holds no credentials.
       { "name": "SANDBOX", "class_name": "KeelSandbox", "script_name": "keel-verify" },
     ],
@@ -119,6 +128,7 @@
     { "tag": "v3", "new_sqlite_classes": ["NamespaceDO"] },
     // Each namespace's counts move with the class: the objects and their storage are kept, at the same address.
     { "tag": "v4", "renamed_classes": [{ "from": "OrgUsageDO", "to": "NamespaceUsageDO" }] },
+    { "tag": "v5", "new_sqlite_classes": ["WorkflowPoolDO"] },
   ],
   "workflows": [
     { "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" },
@@ -162,6 +172,13 @@
       "binding": "CREDENTIAL_KEK",
       "store_id": "PLACEHOLDER-secrets-store",
       "secret_name": "keel-staging-credential-kek",
+    },
+    // The OAuth client's secret, read only to exchange a consent's code: Terraform registers the client and keeps
+    // the secret Cloudflare issues in this store, so no person handles it.
+    {
+      "binding": "CF_OAUTH_CLIENT_SECRET",
+      "store_id": "PLACEHOLDER-secrets-store",
+      "secret_name": "keel-staging-cloudflare-oauth-client-secret",
     },
   ],
   "ai": { "binding": "AI" },

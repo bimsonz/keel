@@ -5,10 +5,10 @@
 //   node examples/loadgen/scripts/run.ts --agents 5 [--projects 1] [--seed 42]
 //     [--run r1] [--keel https://keel.town] [--minutes 60] [--seal-only]
 //
-// A project's lane forms batches of one, so its Trunk promotes one change at a
-// time; --projects spreads the agents over that many of the account's own
-// projects (`loadgen`, `loadgen-1`, …), each with its own lane and Trunk, and
-// each with its own share of the overlap.
+// Each project's Trunk promotes one batch at a time; --projects spreads the
+// agents over that many of the account's own projects (`loadgen`,
+// `loadgen-1`, …), each with its own lane and Trunk, and each with its own
+// share of the overlap.
 //
 // --seal-only writes the run's benchmark key and prints its digest, and starts
 // nothing: publish the digest, then run again with the same arguments.
@@ -292,6 +292,8 @@ await Promise.all(
       },
     );
     results.get(s)?.push(result);
+    if (result.outcome !== "landed")
+      log(`${s.name} agent ${task.index} ${result.outcome}: ${result.reason ?? ""}`);
   }),
 );
 clearInterval(progress);
@@ -414,7 +416,7 @@ const written = {
   })),
   verification:
     "off, the owner's setting; no suite, no guards; this measures coordination and the Trunk, not CI",
-  lane: "each project's lane forms batches of one (lane.ts formBatch); maxBatchSize is set but not yet read",
+  lane: `each project's lane forms batches of up to ${BATCH}, the owner's setting; the changes each batch landed are in the report`,
   maxBatchSize: BATCH,
   keySha256: seal.sha256,
   endedAt: new Date().toISOString(),
@@ -459,7 +461,7 @@ const rates = read.map((r) => perMinute(r.events, new Set(r.changeOf.values())))
 const rateRow = `| Landings a minute | ${num(perMinute(events, new Set(globalChange.values())), 1)} |${shards > 1 ? ` ${rates.map((x) => num(x, 1)).join(" | ")} |` : ""}`;
 console.log(`
 verification: off, the owner's setting; no suite, no guards; this measures coordination and the Trunk, not CI
-${count} runs of one agent account (${me.handle}) over ${shards} project(s) of its own; each project's lane forms batches of one
+${count} runs of one agent account (${me.handle}) over ${shards} project(s) of its own; each project's lane forms batches of up to ${BATCH}
 
 | | ${run}${shards > 1 ? ` | ${read.map((r) => r.s.name).join(" | ")}` : ""} |
 |---|---:|${shards > 1 ? read.map(() => "---:|").join("") : ""}

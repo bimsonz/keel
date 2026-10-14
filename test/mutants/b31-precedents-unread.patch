@@ -2,15 +2,15 @@
 # kills: b31.precedent-preflight
 # why: declare's preflight is given no precedents, so an intent against a ruling is told to proceed
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 4e4191d2..c2a05a77 100644
+index e152f56e..45dcb2e3 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -884,7 +884,7 @@ export const declare: (
-           ? {}
-           : { declaredEffects: canonical(command.declaredEffects) }),
-       };
--      const { preflight } = preflightFor(changeId, intent, live, precedentsFor(intent, decided));
-+      const { preflight } = preflightFor(changeId, intent, live, []);
+@@ -935,7 +935,7 @@ export const declare: (
+       project: command.projectId,
+     },
+     (tx) => {
+-      const { preflight } = preflightFor(changeId, intent, near, precedentsFor(intent, decided));
++      const { preflight } = preflightFor(changeId, intent, near, []);
        const declared = transition(
          tx,
          changeId,

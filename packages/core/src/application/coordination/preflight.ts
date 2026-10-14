@@ -1,12 +1,12 @@
 import {
   exposure,
   type Intent,
-  type LiveChange,
   type Preflight,
   preflight,
   type ScopedPrecedent,
 } from "../../domain/coordination/index.ts";
 import type { ChangeId } from "../../domain/kernel/index.ts";
+import type { LiveNear } from "../ports/index.ts";
 
 /** What preflight found, and the propositions exposure could not read. */
 export interface PreflightFinding {
@@ -16,21 +16,22 @@ export interface PreflightFinding {
 }
 
 /**
- * The preflight of `intent` for change `self` against its project's live
- * changes: the domain's `exposure` gives the neighbours and contradictions,
- * and the domain's `preflight` the move and what it rests on, with the
- * precedents in scope (the decisions in force on the subjects the intent
- * names). Advisory: fallout on the Subject DO is what judges.
+ * The preflight of `intent` for change `self` against the live changes near
+ * it, as its project's index answered them: the domain's `exposure` gives the
+ * neighbours and contradictions, and the domain's `preflight` the move and
+ * what it rests on, with the precedents in scope (the decisions in force on
+ * the subjects the intent names). It says what it compared. Advisory: fallout
+ * on the Subject DO is what judges.
  */
 export function preflightFor(
   self: ChangeId,
   intent: Intent,
-  live: readonly LiveChange[],
+  near: LiveNear,
   precedents: readonly ScopedPrecedent[],
 ): PreflightFinding {
-  const found = exposure(self, intent, live);
+  const found = exposure(self, intent, near.changes);
   return {
-    preflight: preflight(self, intent, found, precedents),
+    preflight: { ...preflight(self, intent, found, precedents), compared: near.compared },
     unreadable: found.unreadable.length,
   };
 }

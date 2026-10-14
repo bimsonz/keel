@@ -3,6 +3,7 @@ import {
   type DepsRefused,
   type DepsUnavailable,
   depsStop,
+  judgeTypecheck,
   recordBatchVerdict,
   runJob,
   settleVerdict,
@@ -376,6 +377,43 @@ describe("a worker app's verdict", () => {
         expect(settled.failingTests).toEqual([]);
         expect(settled.evidence.filter((line) => line.includes("refused"))).toEqual([]);
         expect(settled.nextActions).toEqual([]);
+      }),
+  );
+
+  it.effect(
+    "[verify.config-missing-cited] a worker app with no tsconfig.json bounces on the first round, cited once with what to add however many steps found it missing",
+    () =>
+      Effect.gen(function* () {
+        const store = makeEvidenceStoreMemory();
+        const settled = yield* Effect.gen(function* () {
+          const evidence = yield* EvidenceStore;
+          const reports: StepReport[] = [];
+          for (const s of plan.steps) {
+            const judged = judgeTypecheck(s, { _tag: "no-tsconfig" }, { output: undefined });
+            const resultRef = yield* evidence.put(sampleNamespace, {
+              ...judged.evidence,
+              errors: judged.evidence.errors.map((e) => ({ ...e })),
+            });
+            reports.push({ ...judged.report, resultRef });
+          }
+          return yield* settleVerdict(sampleNamespace, plan, reports);
+        }).pipe(Effect.provide(Layer.merge(store.layer, makeIdsMemory().layer)));
+        expect(plan.steps).toHaveLength(2);
+        const cited =
+          "tsconfig.json: the typecheck step runs the project's own tsc --noEmit with the tsconfig.json at the repository's root, and there is none: add one that includes the Worker's sources, and commit it";
+        expect(settled.outcome).toBe("bounce");
+        expect(settled.failingTests).toEqual([cited]);
+        expect(settled.evidence.filter((line) => line.includes("missing"))).toEqual([
+          `configuration missing: ${cited}`,
+        ]);
+        expect(settled.nextActions).toEqual([
+          {
+            kind: "call",
+            title: `Fix the missing configuration, push, then submit again: ${cited}`,
+            operationId: "submit",
+            args: { missingConfig: [cited] },
+          },
+        ]);
       }),
   );
 

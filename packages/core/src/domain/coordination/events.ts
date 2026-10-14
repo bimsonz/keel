@@ -8,6 +8,7 @@ import {
   CommitSha,
   ConflictId,
   ContentHash,
+  Counterpart,
   DecisionId,
   EscalationId,
   InstantSchema,
@@ -21,7 +22,13 @@ import {
 } from "../kernel/index.ts";
 import { ChangeOrigin, ParkReason, PushRefusedReason } from "./change.ts";
 import { DerivedEffect, Drift } from "./derivation.ts";
-import { Contradiction, MoveBasis, Neighbour, PrecedentRef } from "./preflight.ts";
+import {
+  Contradiction,
+  MoveBasis,
+  Neighbour,
+  PrecedentRef,
+  PreflightCompared,
+} from "./preflight.ts";
 import {
   FootprintEntry,
   Predicate,
@@ -57,6 +64,8 @@ export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
   basis: Schema.optional(MoveBasis),
   /** The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none. */
   alternatives: Schema.optional(Schema.Array(ChangeId)),
+  /** How many live changes the preflight read, near the intent, and under how many subject keys. Absent on older events. */
+  compared: Schema.optional(PreflightCompared),
 });
 export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   changeId: ChangeId,
@@ -187,6 +196,8 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   reasons: Schema.Array(Schema.String),
   /** Always set, never empty, by `decideChange`; optional only so events committed before it was added still decode. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
+  /** What the change conflicts with on trunk, from its verdict, when it bounced on a textual conflict. */
+  counterparts: Schema.optional(Schema.Array(Counterpart)),
 }).check(
   Schema.makeFilter(
     (e) =>

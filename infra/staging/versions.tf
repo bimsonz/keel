@@ -22,5 +22,14 @@ terraform {
 }
 
 # Authenticated by CLOUDFLARE_API_TOKEN, which scripts/tf.ts takes from the
-# operator's wrangler login. No credential is ever written to a file.
+# operator's wrangler login.
 provider "cloudflare" {}
+
+# Only keel's OAuth client is made through this one. A wrangler login cannot
+# create OAuth clients, so an account API token holding OAuth Clients Edit alone
+# does, from a file of the operator's that scripts/tf.ts reads.
+provider "cloudflare" {
+  alias = "oauth_clients"
+  # With no token, it is configured as the default one is, and makes nothing.
+  api_token = var.oauth_clients_api_token == "" ? null : var.oauth_clients_api_token
+}

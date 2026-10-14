@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.composition-counterparts
+# kills: lane.composition-counterparts
+# why: The walk reads past the change's base, so a commit the change already had is named as what it conflicts with
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index e770f95b..1b897245 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -864,7 +864,7 @@ const counterpartsOf = Effect.fn("integration/counterpartsOf")(function* (
+   const host = yield* CodeHost;
+   const chain = yield* host.log(staging, head, COUNTERPART_WALK);
+   const reached = chain.findIndex((landed) => landed.sha === base);
+-  const since = reached === -1 ? chain : chain.slice(0, reached);
++  const since = reached === -1 ? chain : chain;
+   const found = yield* Effect.forEach(since, (landed) => {
+     const [parent] = landed.parents;
+     if (parent === undefined) return Effect.succeed([]);

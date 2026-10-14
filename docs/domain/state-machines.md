@@ -354,11 +354,17 @@ Owner: Trunk DO (`trunk:<project>`), the one writer of trunk ([ADR 0003](../adr/
 stateDiagram-v2
   [*] --> Idle: TrunkInitialized
   Idle --> Debouncing: BatchVerified
+  Idle --> Syncing: TrunkSyncStarted
   Debouncing --> Debouncing: BatchVerified
   Debouncing --> Idle: PromotionDeclined [queue-empty]
   Debouncing --> Debouncing: PromotionDeclined [batches-waiting]
   Debouncing --> Promoting: PromotionStarted
   Debouncing --> Frozen: PromotionFrozen
+  Debouncing --> Syncing: TrunkSyncStarted
+  Syncing --> Syncing: BatchVerified
+  Syncing --> Idle: TrunkSynced [queue-empty]
+  Syncing --> Debouncing: TrunkSynced [batches-waiting]
+  Syncing --> Frozen: PromotionFrozen
   Promoting --> Promoting: BatchVerified
   Promoting --> Promoting: PromotionComposed
   Promoting --> Idle: TrunkAdvanced [queue-empty]

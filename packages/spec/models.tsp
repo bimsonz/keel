@@ -148,6 +148,18 @@ model PrecedentRef {
   scope?: string;
 }
 
+/**
+ * What a preflight compared its intent with: the live changes it read, found by key near the
+ * intent rather than every live change of the project, and how many subject keys it looked up.
+ */
+model PreflightCompared {
+  @minValue(0)
+  changes: integer;
+
+  @minValue(0)
+  subjects: integer;
+}
+
 /** What Keel tells an agent as soon as it declares an intent. */
 model Preflight {
   neighbours: Neighbour[];
@@ -163,6 +175,9 @@ model Preflight {
    * order the live index gave them, never ranked. Absent when there are none; the move never reads them.
    */
   alternatives?: ChangeId[];
+
+  /** What the preflight compared. Absent on a preflight made before it was counted. */
+  compared?: PreflightCompared;
 }
 
 union ConflictKind {

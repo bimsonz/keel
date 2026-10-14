@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all, t694.backfill
+# why: A revision writes the change's new key rows without removing the old ones, so the index keeps rows for subjects, globs and claims the change no longer has.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..756c1d67 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -269,7 +269,7 @@ export function hearLiveChange(
+     case "IntentRevised": {
+       if (live === undefined) return [];
+       const revised = Schema.decodeUnknownSync(IntentRevised)(event.payload);
+-      putLive(store, changeId, live, { ...live, intent: reviseIntent(live.intent, revised) });
++      putLive(store, changeId, undefined, { ...live, intent: reviseIntent(live.intent, revised) });
+       return [];
+     }
+     case "EffectsDerived": {

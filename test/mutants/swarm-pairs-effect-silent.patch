@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.pairs-conflict
+# why: The planted effect pair's change adds no side effect: it conflicts with nothing, and the pair scores as a miss Keel never had a chance at
+diff --git a/examples/swarm/src/run/pairs.ts b/examples/swarm/src/run/pairs.ts
+index 50d031ec..6428db74 100644
+--- a/examples/swarm/src/run/pairs.ts
++++ b/examples/swarm/src/run/pairs.ts
+@@ -77,7 +77,7 @@ const change = (target: Target, what: string): Side => ({
+ const logs = (target: Target) =>
+   change(
+     target,
+-    `Make ${target.fn} log each call with console.info(${JSON.stringify(target.fn)}, ...its arguments) before it answers. ${KEEP}`,
++    `Make ${target.fn} check its argument is a string before it answers. ${KEEP}`,
+   );
+ const rewrite = (target: Target, how: string) =>
+   change(target, `Rewrite the body of ${target.fn} ${how}. ${KEEP}`);

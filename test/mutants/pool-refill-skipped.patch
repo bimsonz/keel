@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.refill
+# why: A claim that empties the pool starts no warm instance, so every later submission starts cold
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool.ts b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+index 59ed23c9..34d6bd9c 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+@@ -93,7 +93,6 @@ export class WorkflowPoolDO extends KeelObject implements WorkflowPoolRpc {
+       await this.armForget();
+     }
+     const short = toStart(decided.state, now, "claim", this.target) - this.starting;
+-    if (short > 0) this.ctx.waitUntil(this.refill(short));
+     return decided.answer;
+   }
+ 

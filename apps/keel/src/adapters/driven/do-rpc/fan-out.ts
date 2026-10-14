@@ -4,6 +4,7 @@ import { EventEnvelope } from "@keeltown/core/kernel";
 import { DeliveryFailed, type FanOut, PROJECTOR, type Subscriber } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { DeliverJob, decodeExit, deliverInstanceId, EventCodecs } from "../../../rpc/index.ts";
+import { COLD, POOL_CLAIM_EVENT } from "../../../rpc/workflow-pool.ts";
 
 /** A Durable Object's `receive`, reached by its address, which is also the object's name. */
 type Receive = (envelopes: unknown) => Promise<unknown>;
@@ -106,11 +107,46 @@ async function exists(workflow: Workflow, id: string): Promise<boolean> {
   }
 }
 
+/** A pooled Workflow's claim of one event: a warm instance's id, or COLD. */
+type Claim = (eventId: string) => Promise<unknown>;
+
+/** The claim of the pool a Workflow keeps warm (`pool:<Name>`), if it keeps one: only Precheck does. */
+function poolFor(env: Env, name: string): Claim | undefined {
+  if (name !== "Precheck") return undefined;
+  return (eventId) =>
+    env.WORKFLOW_POOL.get(env.WORKFLOW_POOL.idFromName(`pool:${name}`)).claim(eventId);
+}
+
+/**
+ * Hands an event's params to the warm instance its pool's claim answers.
+ * False when it cannot: the pool answers COLD, cannot be reached or answers
+ * what is no instance id, or the send fails. The caller then starts the
+ * instance cold; a second run of one submission ends at its first step,
+ * refused by the change, having written nothing.
+ */
+async function startWarm(
+  workflow: Workflow,
+  claim: Claim,
+  eventId: string,
+  params: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const answer = await claim(eventId);
+    if (typeof answer !== "string" || answer === COLD) return false;
+    await (await workflow.get(answer)).sendEvent({ type: POOL_CLAIM_EVENT, payload: params });
+    return true;
+  } catch (cause) {
+    console.error(`the warm pool could not take ${eventId}, so it starts cold: ${String(cause)}`);
+    return false;
+  }
+}
+
 function startWorkflow(
   workflow: Workflow,
   name: string,
   subscriber: Subscriber,
   events: readonly EventEnvelope[],
+  claim?: Claim,
 ) {
   return Effect.forEach(
     events,
@@ -122,6 +158,8 @@ function startWorkflow(
       };
       return Effect.tryPromise({
         try: async () => {
+          if (claim !== undefined && (await startWarm(workflow, claim, event.eventId, params)))
+            return;
           try {
             await workflow.create({ id, params });
           } catch (cause) {
@@ -320,7 +358,7 @@ export function FanOutRpc(env: Env): FanOut {
           return Effect.fail(failed(subscriber, `no Workflow named ${name}`));
         if (name === "Probe") return startKeyed(workflow, subscriber, events, probeStart);
         if (name === "Deliver") return startKeyed(workflow, subscriber, events, deliverStart);
-        return startWorkflow(workflow, name, subscriber, events);
+        return startWorkflow(workflow, name, subscriber, events, poolFor(env, name));
       }
       const receive = receiverFor(env, subscriber);
       return receive === undefined

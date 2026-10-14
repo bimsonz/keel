@@ -207,7 +207,12 @@ interface Changes {
     ...PageQuery,
   ): ChangeSummaryPage | NotFound | StandardErrors;
 
-  /** Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. */
+  /**
+   * Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. A retry
+   * with the same Idempotency-Key answers the same change while it is live; once it has ended (landed,
+   * withdrawn or superseded) it holds no workspace, and the retry is 409 `change.state_refused`, naming
+   * the change and its state. The same key with a different body is 409 `request.idempotency_conflict`.
+   */
   @summary("Declare a change")
   @tag("mcp")
   @operationId("declare")

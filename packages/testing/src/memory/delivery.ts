@@ -2,14 +2,18 @@ import {
   commitDeployTarget,
   commitDeployTargetClear,
   deployTargetsOf,
+  holdConnect,
+  takeConnect,
 } from "@keeltown/core/application/delivery";
 import { PROJECT, ProjectRecord } from "@keeltown/core/application/integration";
 import {
+  CloudflareConnectFailed,
   type CredentialMeta,
   CredentialMissing,
   type Deployment,
   type SmokeAnswer,
   type DeployTargetUnreachable,
+  type GrantedAccount,
 } from "@keeltown/core/domain/delivery";
 import {
   type ChangeId,
@@ -22,6 +26,7 @@ import {
   type ProjectId,
 } from "@keeltown/core/kernel";
 import {
+  CloudflareOAuth,
   CredentialStore,
   type DeliveryRefusal,
   type DeployAccount,
@@ -283,6 +288,10 @@ export function makeDeployTargetsMemory() {
           commitDeployTarget(command).pipe(Effect.provide(inObject(command.projectId))),
         clear: (command) =>
           commitDeployTargetClear(command).pipe(Effect.provide(inObject(command.projectId))),
+        holdConnect: (command) =>
+          holdConnect(command).pipe(Effect.provide(inObject(command.projectId))),
+        takeConnect: (command) =>
+          takeConnect(command).pipe(Effect.provide(inObject(command.projectId))),
       }),
     ),
   };
@@ -313,10 +322,77 @@ export function makeDeployTargetCheckMemory(
   };
 }
 
+/** What Cloudflare's OAuth answers, as `makeCloudflareOAuthMemory` plays it: each step may fail. */
+export interface CloudflareOAuthScript {
+  /** The accounts the consent granted: one by default. */
+  readonly accounts?: readonly GrantedAccount[];
+  /** The step Cloudflare refuses, if any. */
+  readonly refuses?: CloudflareConnectFailed["step"];
+}
+
+/**
+ * Cloudflare's OAuth in memory: a consent URL whose state is the project and
+ * a nonce, an exchange that takes only the code `code-<verifier>` (as a code
+ * is bound to its PKCE verifier), and a mint that answers a token naming the
+ * account and the name. It records every exchange and mint, with the access
+ * token each was asked with.
+ */
+export function makeCloudflareOAuthMemory(script: CloudflareOAuthScript = {}) {
+  let made = 0;
+  const exchanged: { readonly code: string; readonly verifier: string }[] = [];
+  const minted: { readonly access: string; readonly accountId: string; readonly name: string }[] =
+    [];
+  const fails = (
+    step: CloudflareConnectFailed["step"],
+  ): Effect.Effect<void, CloudflareConnectFailed> =>
+    script.refuses === step
+      ? Effect.fail(new CloudflareConnectFailed({ step, status: 403 }))
+      : Effect.void;
+  return {
+    exchanged,
+    minted,
+    layer: Layer.succeed(
+      CloudflareOAuth,
+      CloudflareOAuth.of({
+        begin: (projectId) =>
+          fails("unconfigured").pipe(
+            Effect.map(() => {
+              made += 1;
+              const nonce = `n${String(made).padStart(42, "0")}`;
+              const verifier = `verifier-${made}`;
+              return { url: `https://consent.test/?state=${projectId}.${nonce}`, nonce, verifier };
+            }),
+          ),
+        exchange: (code, verifier) =>
+          Effect.suspend(() => {
+            exchanged.push({ code, verifier });
+            return code === `code-${verifier}`
+              ? fails("exchange").pipe(Effect.as(Redacted.make(`access-${verifier}`)))
+              : Effect.fail(new CloudflareConnectFailed({ step: "exchange", status: 400 }));
+          }),
+        accounts: () =>
+          fails("accounts").pipe(
+            Effect.as(
+              script.accounts ?? [{ id: "0123456789abcdef0123456789abcdef", name: "Acme" }],
+            ),
+          ),
+        mint: (access, accountId, name) =>
+          Effect.suspend(() => {
+            minted.push({ access: Redacted.value(access), accountId, name });
+            return fails("mint").pipe(
+              Effect.as(Redacted.make(`minted-${accountId}-${minted.length}`)),
+            );
+          }),
+      }),
+    ),
+  };
+}
+
 /** The delivery ports an isolate's runtime provides, in memory, for a test that composes one. */
 export const deliveryMemoryLayer = () =>
   Layer.mergeAll(
     makeCredentialStoreMemory().layer,
     makeDeployTargetCheckMemory().layer,
     makeDeployTargetsMemory().layer,
+    makeCloudflareOAuthMemory().layer,
   );

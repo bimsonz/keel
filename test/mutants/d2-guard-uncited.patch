@@ -2,11 +2,11 @@
 # kills: d21.guard-step
 # why: A bounce never names the guard whose probe failed, so the agent is told to fix nothing in particular
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index 50d29581..55baba6d 100644
+index 29c39072..efef9018 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -227,7 +227,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
-       failures.push({ kind: "deps", name: depsName });
+@@ -241,7 +241,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+       failures.push({ kind: "config", name: configName });
      if (stored.value.deploy !== undefined)
        failures.push({ kind: "deploy", name: `${r.stepId}: ${stored.value.deploy.failure}` });
 -    if (stored.value.guard !== undefined) {

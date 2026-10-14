@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectView } from "../../../src/contract/keel/index.ts";
-import { agentNamed, agentPageOf, agentsOf } from "../../../src/engine/agents.ts";
+import { heldUnder } from "../../../src/engine/holder.ts";
 import { Player } from "../../../src/engine/player.ts";
 import { type RepoAddress, repositoryOf } from "../../../src/engine/repository.ts";
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
@@ -296,7 +296,7 @@ describe("who the page reads as", () => {
     expect(stranger.player.world.escalations.size).toBe(0);
   });
 
-  it("[http.agents] names a public project's agents to a visitor from Keel's cards, each asked for once, and their runs from the log", async () => {
+  it("[http.agents] names a change's holder to a visitor by Keel's card, each card asked for once, and its run from the log", async () => {
     const visitor = await opened("visitor", "public", 0, { signedUp: { "Agent A": "tidy-otter" } });
     await visitor.player.load();
     visitor.player.seek(visitor.player.end);
@@ -309,37 +309,24 @@ describe("who the page reads as", () => {
             ? [event.payload.agentId]
             : [],
         )[0] ?? "";
-    const shown = (agentId: string) => agentsOf(world, cards).find((row) => row.id === agentId);
+    const held = (agentId: string) => {
+      const change = [...world.changes.values()].find((each) => each.agentId === agentId);
+      return change === undefined ? undefined : heldUnder(cards, change);
+    };
     // The log names each agent by its id alone: a visitor is read no enrolment, and no sign-up is in the log.
     expect(world.agents.size).toBe(0);
-    expect(agentsOf(world, cards).map((row) => row.label)).toEqual([undefined, undefined]);
     // The run Keel wrote on an agent's entries reached the fold; the other agent's token named none.
-    expect([shown(idOf("Agent A"))?.runs, shown(idOf("Agent B"))?.runs]).toEqual([1, 0]);
+    expect([held(idOf("Agent A"))?.run?.label, held(idOf("Agent B"))?.run]).toEqual([
+      "collab-revocation",
+      undefined,
+    ]);
     const ids = [...world.work.keys()];
     visitor.player.wantCards(ids);
     visitor.player.wantCards(ids);
     await settled();
-    // One that signed itself up has its handle, which is what an address calls it. One a member enrolled has
-    // the kind it declared and the namespace it works in.
-    expect(shown(idOf("Agent A"))).toMatchObject({
-      label: "Agent A",
-      handle: "tidy-otter",
-      name: "tidy-otter",
-    });
-    expect(shown(idOf("Agent A"))).not.toHaveProperty("kind");
-    expect(shown(idOf("Agent B"))).toMatchObject({
-      label: "Agent B",
-      kind: "interactive",
-      namespace: "acme",
-      name: idOf("Agent B"),
-    });
-    // The run is on the entries themselves, as Keel publishes them, and not only in what a declaration says:
-    // every entry Agent A's commands committed is counted to the run, and none to work under no run.
-    const otter = agentPageOf(world, cards, "tidy-otter");
-    expect(otter?.runs.map((run) => [run.label, run.entries > 0])).toEqual([
-      ["collab-revocation", true],
-    ]);
-    expect(otter).not.toHaveProperty("unnamed");
+    // One that signed itself up has its handle, where its own page is. One a member enrolled has none.
+    expect(held(idOf("Agent A"))?.handle).toBe("tidy-otter");
+    expect(held(idOf("Agent B"))).not.toHaveProperty("handle");
     // No project's log holds an enrolment of an agent that signed itself up: a member is read Agent B's alone.
     const member = await opened("member", "public", 0, { signedUp: { "Agent A": "tidy-otter" } });
     await member.player.load();
@@ -355,34 +342,6 @@ describe("who the page reads as", () => {
       ids.map((id) => `/v1/agents/${id}`).toSorted(),
     );
     expect(asked.map((request) => request.headers.get("authorization"))).toEqual([null, null]);
-  });
-
-  it("[http.agent-at] asks Keel whose a handle is before it asks for an agent's card, and for no card where the handle is not an agent's", async () => {
-    const visitor = await opened("visitor", "public", 0, { signedUp: { "Agent A": "tidy-otter" } });
-    await visitor.player.load();
-    visitor.player.seek(visitor.player.end);
-    const { world, cards, sought } = visitor.player;
-    const pathsFrom = (mark: number): string[] =>
-      visitor.fromThePage.slice(mark).map((request) => new URL(request.url).pathname);
-    // The log has the agent's id, and nothing that says which agent a handle is.
-    expect(agentNamed(world, cards, "tidy-otter")).toBeUndefined();
-    expect(sought.has("tidy-otter")).toBe(false);
-    const first = visitor.fromThePage.length;
-    visitor.player.wantAgentAt("tidy-otter");
-    visitor.player.wantAgentAt("tidy-otter");
-    await settled();
-    const found = agentNamed(world, cards, "tidy-otter");
-    expect(found).toMatch(/^agt_/);
-    expect(sought.has("tidy-otter")).toBe(true);
-    expect(pathsFrom(first)).toEqual(["/v1/namespaces/tidy-otter", `/v1/agents/${found ?? ""}`]);
-    // An org's handle and a handle nobody has are no agent's: no card is asked for, and the page is told
-    // Keel has answered.
-    const second = visitor.fromThePage.length;
-    visitor.player.wantAgentAt("acme");
-    visitor.player.wantAgentAt("nobody");
-    await settled();
-    expect(pathsFrom(second).toSorted()).toEqual(["/v1/namespaces/acme", "/v1/namespaces/nobody"]);
-    expect([sought.has("acme"), sought.has("nobody"), cards.size]).toEqual([true, true, 1]);
   });
 
   it("[new.call] makes a project by Keel's own operation: the attempt's key in its header, whose, what name and how it starts as the body, and no credential of the page's", async () => {

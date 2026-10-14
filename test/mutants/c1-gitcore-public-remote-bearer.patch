@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay]"
+# kills: artifacts.import-relay
+# why: a public remote with no token is still sent an Authorization header, `Bearer undefined`, which an upstream may refuse
+diff --git a/packages/gitcore/src/push.ts b/packages/gitcore/src/push.ts
+index 13ef6acb..331a6198 100644
+--- a/packages/gitcore/src/push.ts
++++ b/packages/gitcore/src/push.ts
+@@ -46,7 +46,7 @@ export interface GitRemote {
+ 
+ /** The credential each request to `remote` carries: none for a public remote. */
+ export const authorizationOf = (remote: GitRemote): Readonly<Record<string, string>> =>
+-  remote.token === undefined ? {} : { Authorization: `Bearer ${remote.token}` };
++  ({ Authorization: `Bearer ${remote.token}` });
+ 
+ /** One ref update: `old` is what the ref must hold now (`ZERO_OID`: must not exist), `new` what it becomes (`ZERO_OID`: delete). */
+ export interface RefUpdate {

@@ -2,11 +2,11 @@
 # kills: cred.owner-only, authz.deploy-owner-only, authz.org-rows, authz.role-refusal-by-kind
 # why: a maintainer may store a credential in the org's store, which only an owner may
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 79da9fe..ab191ce 100644
+index 900987d6..e12ab8ae 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -175,7 +175,7 @@ export const SPEC_ACTIONS = {
-   Operator_putSettings: rule("Project", "maintain"),
+@@ -178,7 +178,7 @@ export const SPEC_ACTIONS = {
+   Operator_syncUpstream: rule("Project", "own"),
  
    // A namespace's credentials and a project's deploy targets are its owners' alone.
 -  Delivery_createCredential: rule("Namespace", "ownAsUser"),

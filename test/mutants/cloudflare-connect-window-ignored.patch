@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/cloudflare-connect.test.ts apps/keel/test/unit/cloudflare-connect.test.ts
+# kills: connect.finish, connect.window
+# why: a Connect is finished twenty minutes after it began, past the ten its state is good for
+diff --git a/packages/core/src/domain/delivery/cloudflare-connect.ts b/packages/core/src/domain/delivery/cloudflare-connect.ts
+index 7f8ad368..784880be 100644
+--- a/packages/core/src/domain/delivery/cloudflare-connect.ts
++++ b/packages/core/src/domain/delivery/cloudflare-connect.ts
+@@ -58,7 +58,7 @@ export function finishConnect(
+   if (held === undefined) return Result.fail(new ConnectStateRefused({ reason: "none" }));
+   if (!sameSecret(held.nonce, nonce))
+     return Result.fail(new ConnectStateRefused({ reason: "mismatch" }));
+-  if (now >= held.expiresAt) return Result.fail(new ConnectStateRefused({ reason: "expired" }));
++  if (now >= held.expiresAt + CONNECT_WINDOW_MS) return Result.fail(new ConnectStateRefused({ reason: "expired" }));
+   return Result.succeed(held);
+ }
+ 

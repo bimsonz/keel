@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/cloudflare-connect.test.ts
+# kills: connect.same-secret
+# why: a nonce is compared only as far as the shorter of the two, so a prefix of the owner's nonce finishes their Connect
+diff --git a/packages/core/src/domain/delivery/cloudflare-connect.ts b/packages/core/src/domain/delivery/cloudflare-connect.ts
+index 7f8ad368..5f6702c2 100644
+--- a/packages/core/src/domain/delivery/cloudflare-connect.ts
++++ b/packages/core/src/domain/delivery/cloudflare-connect.ts
+@@ -37,8 +37,8 @@ export class ConnectStateRefused extends Schema.TaggedError<ConnectStateRefused>
+ 
+ /** Whether two strings are equal, in a time that depends on their lengths alone and never on where they differ. */
+ export function sameSecret(a: string, b: string): boolean {
+-  let differs = a.length ^ b.length;
+-  const longest = Math.max(a.length, b.length);
++  let differs = 0;
++  const longest = Math.min(a.length, b.length);
+   for (let index = 0; index < longest; index++)
+     differs |= (a.charCodeAt(index) | 0) ^ (b.charCodeAt(index) | 0);
+   return differs === 0;

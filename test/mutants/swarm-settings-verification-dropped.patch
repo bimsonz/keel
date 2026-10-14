@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.settings
+# why: Verification asked for is never sent: the run's candidates land unverified while the report says the suite ran
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index 59148d0b..4e1c19d0 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -99,7 +99,6 @@ export class Keyring extends DurableObject<Env> {
+       ...settings,
+       protectedPaths: [...settings.protectedPaths],
+       ...(change.visibility === undefined ? {} : { visibility: change.visibility }),
+-      ...(change.verification === undefined ? {} : { verification: change.verification }),
+     });
+     return { visibility: set.visibility, verification: set.verification };
+   }

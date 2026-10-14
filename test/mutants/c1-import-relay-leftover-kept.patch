@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay]"
+# kills: artifacts.import-relay
+# why: the relay creates the repo without deleting what the failed import left under its name, so the create is refused as taken
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 39246f53..db20e16a 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -123,7 +123,6 @@ async function relayImport(
+   const pack = await relayPack(upstream, move).catch((e: unknown) => {
+     throw new ImportRefused({ reason: e instanceof PackTooLarge ? "too-large" : "unreachable" });
+   });
+-  await namespace.delete(name);
+   const made = await namespace.create(name);
+   try {
+     const sent = await relaySend({ url: made.remote, token: made.token }, move, pack);

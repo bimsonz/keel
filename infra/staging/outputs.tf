@@ -41,3 +41,10 @@ output "commit_signers" {
 output "keel_host" {
   value = var.host
 }
+
+# The id of keel's OAuth client on Cloudflare, which scripts/deploy.ts sets as
+# keel's CF_OAUTH_CLIENT_ID. Public: it is in every consent URL. Null while no
+# client is made, and then keel deploys without one.
+output "cloudflare_oauth_client_id" {
+  value = one(cloudflare_oauth_client.keel[*].client_id)
+}

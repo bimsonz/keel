@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/abandon.test.ts apps/keel/test/pool/change.test.ts -t a11.declare-replay
+# kills: a11.declare-replay-ended
+# why: a declare retried after its change has ended is taken as a defect, so the agent is answered 500 where its change has simply moved on
+diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+index 2ee69134..58eaa685 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+@@ -110,6 +110,10 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+           // A retry whose change has ended is refused for the change's state: it has no workspace.
+           const declared = yield* callObject(ChangeCodecs.declare, () =>
+             objects.change(changeId).declare(command),
++          ).pipe(
++            Effect.catchTag("ChangeStateRefused", (refused) =>
++              Effect.die(new Error(`Change ${refused.changeId} refused its declare in state ${refused.state}`)),
++            ),
+           );
+           return {
+             change: declared.change,

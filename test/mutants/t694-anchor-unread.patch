@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: My anchor paths are never looked up, so a change sharing only an anchor with mine is missed.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..938ef875 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -347,7 +347,6 @@ export function liveNear(store: Store, self: ChangeId, intent: Intent): LiveNear
+       read(LIVE_FOOTPRINT, `${footprintKey(prefix)}/`, "|");
+     }
+   }
+-  for (const path of lookups.anchors) read(LIVE_ANCHOR, `${escaped(path)}|`, "|");
+   if (lookups.claims.length > 0) read(LIVE_CLAIM, `${claimsKey(lookups.claims)}|`, "|");
+   const changes = liveRows(
+     store,

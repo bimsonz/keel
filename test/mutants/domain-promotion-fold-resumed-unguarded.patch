@@ -2,20 +2,20 @@
 # kills: promotion.fold-table
 # why: the fold takes PromotionResumed with its guard gone: `trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)`.
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5cfb16f7..1be1d2a4 100644
+index a14057d8..379c6634 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -608,8 +608,7 @@ export const evolvePromotion = (
+@@ -695,8 +695,7 @@ export const evolvePromotion = (
      }
  
      case "PromotionResumed":
 -      return trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)
 -        ? {
 +      return {
-             ...without(trunk, "wal", "frozen"),
+             ...without(trunk, "wal", "frozen", "sync"),
              head: event.head ?? trunk.head,
              // A resume at another head changed trunk's head, whoever wrote that commit.
-@@ -617,8 +616,7 @@ export const evolvePromotion = (
+@@ -704,8 +703,7 @@ export const evolvePromotion = (
                ? {}
                : { advancedAt: committed.at }),
              phase: settled(trunk.queue),
@@ -23,5 +23,5 @@ index 5cfb16f7..1be1d2a4 100644
 -        : illegal(trunk, event);
 +          };
  
-     default: {
-       const unreachable: never = event;
+     case "TrunkSyncStarted":
+       return (trunk.phase === "idle" || trunk.phase === "debouncing") &&

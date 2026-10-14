@@ -4,6 +4,8 @@ import {
   BatchVerified,
   type CommutationFacts,
   decidePromotion,
+  NotFastForward,
+  NotImported,
   PromotionStateRefused,
   evolvePromotion,
   type Footprints,
@@ -12,6 +14,7 @@ import {
   type QueuedBatch,
   Trunk,
   TrunkEvent,
+  TrunkNotInitialized,
   type TrunkOrigin,
 } from "../../domain/integration/index.ts";
 import type {
@@ -37,6 +40,8 @@ import {
   type Transaction,
   type TrunkStanding,
   TrunkWriter,
+  type UpstreamSynced,
+  UpstreamUnreachable,
 } from "../ports/index.ts";
 import { projectNamespace } from "../verification/index.ts";
 import { projectRepos } from "./project-repos.ts";
@@ -284,7 +289,13 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
     { _tag: "Initialize", head, by, origin },
     "initialize",
     head,
-  ).pipe(Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }));
+  ).pipe(
+    Effect.catchTags({
+      TrunkNotInitialized: Effect.die,
+      CompositionMismatch: Effect.die,
+      NotImported: Effect.die,
+    }),
+  );
   const trunk = trunkOf(yield* EntityStore, projectId);
   if (trunk === undefined)
     return yield* Effect.die(
@@ -515,7 +526,7 @@ export const trunkHeard = (
   if (after !== undefined) tx.store.put(TRUNK, projectId, encodeTrunk(after));
   for (const member of members)
     tx.outbox.subscribe(`change:${member}`, ["TrunkAdvanced"], changeRef(member));
-  tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined"]);
+  tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined", "TrunkSynced"]);
   tx.outbox.subscribe(DELIVER, ["TrunkAdvanced"]);
   return true;
 };
@@ -731,4 +742,111 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
   if (trunk === undefined)
     return yield* Effect.die(new Error(`trunk ${projectId} is not initialized`));
   return trunk;
+});
+
+/**
+ * Moves an open sync's main by its CAS and reads trunk back: main at the
+ * sync's target commits TrunkSynced, main still at its start leaves the sync
+ * open for the next try (the push was busy), and any other head freezes
+ * promotion; once resolved, the side ref is dropped. A trunk with no open
+ * sync is left as it is. Answers the phase.
+ */
+export const finishUpstreamSync = Effect.fn("integration/finishUpstreamSync")(function* (
+  projectId: ProjectId,
+) {
+  const open = trunkOf(yield* EntityStore, projectId);
+  if (open?.phase !== "syncing" || open.sync === undefined) return open?.phase;
+  const { from, to } = open.sync;
+  const writer = yield* TrunkWriter;
+  // Stale or busy, nothing moved: the read-back tells which.
+  yield* Effect.result(writer.fastForward(from, to));
+  const observed = yield* writer.head;
+  yield* promote(projectId, { _tag: "ReadBack", observed }, `sync-readback:${to}:${observed}`).pipe(
+    Effect.orDie,
+  );
+  const phase = trunkOf(yield* EntityStore, projectId)?.phase;
+  // Resolved either way: the side ref holds nothing main needs from here on.
+  if (phase !== "syncing") yield* writer.dropUpstream;
+  return phase;
+});
+
+/**
+ * An owner's sync of an imported trunk from its upstream, the URL and branch
+ * its import took, kept on its origin. In order, each step before the move
+ * refusing with nothing moved:
+ * 1. trunk is initialized, was imported, and is between groups;
+ * 2. upstream's head is read with no credential; one at trunk's head answers
+ *    `synced: false` and records nothing;
+ * 3. what upstream's head reaches past trunk's head and the import's commit
+ *    is brought into trunk's side ref and weighed: over what one relay
+ *    carries it is ImportTooLarge;
+ * 4. upstream's head must descend from trunk's (NotFastForward otherwise,
+ *    with the side ref dropped). The walk stops at the import's commit:
+ *    trunk's head descends from it, so nothing older can lead there;
+ * 5. the pack is admitted against the namespace's repo bytes once, under
+ *    `sync:<to>` (QuotaExceeded otherwise, with the side ref dropped);
+ * 6. TrunkSyncStarted is committed, the main lane is told of syncs, and main
+ *    is moved by its CAS and read back (`finishUpstreamSync`). A refused start gives
+ *    the admitted bytes back.
+ * Answers `synced` false with `from ≠ to` when the move is still open (the
+ * push stayed busy): the Trunk DO's deadline finishes it.
+ */
+export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(function* (
+  projectId: ProjectId,
+  by: CommandActor,
+) {
+  const trunk = trunkOf(yield* EntityStore, projectId);
+  if (trunk === undefined) return yield* new TrunkNotInitialized({ projectId });
+  const { origin } = trunk;
+  if (origin?.kind !== "imported") return yield* new NotImported({ projectId });
+  if (trunk.phase !== "idle" && trunk.phase !== "debouncing")
+    return yield* new PromotionStateRefused({ projectId, phase: trunk.phase, command: "Sync" });
+  const upstream = { url: origin.url, ref: origin.ref };
+  const writer = yield* TrunkWriter;
+  const to = yield* writer.upstreamHead(upstream);
+  if (to === undefined)
+    return yield* new UpstreamUnreachable({ ...upstream, reason: "branch-gone" });
+  const from = trunk.head;
+  if (to === from) return { from, to, synced: false } satisfies UpstreamSynced;
+  const haves = from === origin.commit ? [from] : [from, origin.commit];
+  const bytes = yield* writer
+    .fetchUpstream(upstream, to, haves)
+    .pipe(
+      Effect.catchTag("PackTooLarge", (tooLarge) =>
+        Effect.fail(
+          new ImportTooLarge({ projectId, bytes: tooLarge.bytes, limit: RELAY_PACK_CAP_BYTES }),
+        ),
+      ),
+    );
+  const forward = yield* writer.descends(from, to, [origin.commit]);
+  if (!forward) {
+    yield* writer.dropUpstream;
+    return yield* new NotFastForward({ projectId, trunk: from, upstream: to });
+  }
+  const namespace = yield* namespaceOf(projectId);
+  const usage = yield* NamespaceUsage;
+  const admitted = bytes - PACK_OVERHEAD_BYTES;
+  yield* usage
+    .admit(namespace, REPO_BYTES, admitted, `sync:${to}`)
+    .pipe(Effect.tapError(() => writer.dropUpstream));
+  // A lane that subscribed before syncs existed hears them too: it follows trunk's head only by its events.
+  yield* commit(
+    { entity: { kind: "trunk", id: projectId }, cause: "sync-subscribe", project: projectId },
+    (tx) => {
+      tx.outbox.subscribe(mainLane(projectId), ["TrunkSynced"]);
+      return Result.succeed({ value: undefined, drafts: [] });
+    },
+  );
+  yield* promote(projectId, { _tag: "Sync", by, from, to }, `sync:${to}`, from).pipe(
+    Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }),
+    Effect.tapError(() =>
+      Effect.andThen(
+        usage.record(namespace, REPO_BYTES, -admitted, `sync-giveback:${to}`),
+        writer.dropUpstream,
+      ),
+    ),
+  );
+  yield* finishUpstreamSync(projectId);
+  const after = trunkOf(yield* EntityStore, projectId);
+  return { from, to, synced: after?.head === to } satisfies UpstreamSynced;
 });

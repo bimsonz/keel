@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.imported-only
+# kills: sync.imported-only
+# why: an empty or template trunk starts a sync from an upstream it does not have
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..5d289d58 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -485,7 +485,7 @@ export const decidePromotion = (
+     case "Sync": {
+       // Only an import has an upstream; its origin names the URL and branch.
+       const { origin } = trunk;
+-      if (origin?.kind !== "imported") return Result.fail(new NotImported({ projectId }));
++      if (origin?.kind === "forked") return Result.fail(new NotImported({ projectId }));
+       // A sync starts only between groups, from the head trunk holds, and never during another sync.
+       if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
+         return refuse(trunk, command);

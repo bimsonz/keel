@@ -2,15 +2,15 @@
 # kills: b31.precedent-preflight
 # why: a rely's preflight drops the precedents its intent is still in the scope of
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 4e4191d2..136f5bed 100644
+index e152f56e..a15340f5 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1053,7 +1053,7 @@ export const rely: (
-             _tag: "Rely",
-             leaseId: command.leaseId,
-             premise: command.premise,
--            preflight,
-+            preflight: preflightOf(changeId, after, live, []),
-           },
-         ],
-         command.leaseId,
+@@ -1121,7 +1121,7 @@ export const rely: (
+                 _tag: "Rely",
+                 leaseId: command.leaseId,
+                 premise: command.premise,
+-                preflight,
++                preflight: preflightOf(changeId, after, near, []),
+               },
+             ],
+             command.leaseId,

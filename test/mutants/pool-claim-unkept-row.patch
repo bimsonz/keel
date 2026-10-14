@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.claims-kept
+# why: The object keeps no row for a new claim, so a redelivered event is claimed again and takes a second instance
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool.ts b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+index 59ed23c9..f5f8890f 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+@@ -82,7 +82,7 @@ export class WorkflowPoolDO extends KeelObject implements WorkflowPoolRpc {
+     const decided = claim(this.state, eventId, prior, now);
+     this.ctx.storage.kv.put(STATE, decided.state);
+     const kept = decided.kept;
+-    if (kept !== undefined) {
++    if (kept === undefined) {
+       this.ctx.storage.sql.exec(
+         `INSERT INTO ${CLAIMS} (event_id, answer, forget_at) VALUES (?, ?, ?)
+          ON CONFLICT (event_id) DO UPDATE SET answer = excluded.answer, forget_at = excluded.forget_at`,

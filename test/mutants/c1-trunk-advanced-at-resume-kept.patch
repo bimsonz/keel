@@ -2,11 +2,11 @@
 # kills: trunk.advanced-at
 # why: a resume at another head changes trunk's head and not its time, so the view shows a head with a time from before that commit was trunk's
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5cfb16f7..91bda36a 100644
+index a14057d8..4d3857d2 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -613,9 +613,6 @@ export const evolvePromotion = (
-             ...without(trunk, "wal", "frozen"),
+@@ -700,9 +700,6 @@ export const evolvePromotion = (
+             ...without(trunk, "wal", "frozen", "sync"),
              head: event.head ?? trunk.head,
              // A resume at another head changed trunk's head, whoever wrote that commit.
 -            ...(event.head === undefined || event.head === trunk.head

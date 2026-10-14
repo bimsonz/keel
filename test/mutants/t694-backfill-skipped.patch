@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.backfill, t694.near-equals-all
+# why: An index holding live-change rows from before the key rows is marked built without building them, so its near read finds nothing.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..74251937 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -146,7 +146,6 @@ function putLive(
+  */
+ function ensureKeys(store: Store): void {
+   if (store.get(LIVE_KEYS, BUILT) !== undefined) return;
+-  for (const { id, value } of store.list(LIVE_CHANGE)) writeKeys(store, id, decodeRow(value));
+   store.put(LIVE_KEYS, BUILT, true);
+ }
+ 

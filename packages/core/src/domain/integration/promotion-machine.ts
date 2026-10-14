@@ -16,7 +16,12 @@ import {
 } from "../kernel/index.ts";
 import { isVerified, type PendingGroup, type QueuedBatch, type Trunk } from "./batch.ts";
 import { commutation, type Footprints } from "./commutation.ts";
-import { CompositionMismatch, PromotionStateRefused, TrunkNotInitialized } from "./errors.ts";
+import {
+  CompositionMismatch,
+  NotImported,
+  PromotionStateRefused,
+  TrunkNotInitialized,
+} from "./errors.ts";
 import {
   BatchVerified,
   type MemberCommit,
@@ -29,6 +34,8 @@ import {
   TrunkAdvanced,
   TrunkInitialized,
   type TrunkOrigin,
+  TrunkSynced,
+  TrunkSyncStarted,
 } from "./events.ts";
 
 /**
@@ -45,6 +52,8 @@ export const TrunkEvent = Schema.Union([
   TrunkAdvanced,
   PromotionFrozen,
   PromotionResumed,
+  TrunkSyncStarted,
+  TrunkSynced,
 ]);
 export type TrunkEvent = typeof TrunkEvent.Type;
 
@@ -104,7 +113,19 @@ export type PromotionCommand =
       readonly reason: PushRefusedReason;
       readonly observed: CommitSha;
     }
-  | { readonly _tag: "Resume"; readonly by: CommandActor; readonly head: CommitSha };
+  | { readonly _tag: "Resume"; readonly by: CommandActor; readonly head: CommitSha }
+  | {
+      /**
+       * An owner asks for trunk's main to move from `from`, its head, to `to`,
+       * the head of the upstream branch its import took. The caller has
+       * already found that `to` descends from `from`; the move itself waits
+       * for the read-back.
+       */
+      readonly _tag: "Sync";
+      readonly by: CommandActor;
+      readonly from: CommitSha;
+      readonly to: CommitSha;
+    };
 
 /** Facts from I/O: the time, and the project whose trunk this is (the Trunk DO's key). */
 export interface PromotionFacts {
@@ -112,7 +133,11 @@ export interface PromotionFacts {
   readonly projectId: ProjectId;
 }
 
-export type PromotionRejection = TrunkNotInitialized | PromotionStateRefused | CompositionMismatch;
+export type PromotionRejection =
+  | TrunkNotInitialized
+  | PromotionStateRefused
+  | CompositionMismatch
+  | NotImported;
 
 type Decision = Result.Result<readonly TrunkEvent[], PromotionRejection>;
 
@@ -188,6 +213,42 @@ const refusedActions = (reason: PushRefusedReason, alone: boolean): readonly Nex
 /** The SHA a push of the open group must carry: recorded once, before the first push, and never recomposed. */
 export const pushTarget = (trunk: Trunk): CommitSha | undefined =>
   trunk.phase === "promoting" ? trunk.wal?.composed : undefined;
+
+/** The group a sync's freeze names: the sync is no group of batches, so its target stands in for one. */
+export const syncGroupId = (to: CommitSha): string => `sync:${to}`;
+
+/**
+ * A sync's read-back: main at the sync's target means trunk synced, main
+ * still at its start means the move has not happened yet, and any other head
+ * is one the write-ahead entry does not explain, so promotion freezes.
+ */
+const readBackSync = (
+  trunk: Trunk,
+  sync: NonNullable<Trunk["sync"]>,
+  observed: CommitSha,
+): Decision => {
+  if (observed === sync.from) return Result.succeed([]);
+  if (observed === sync.to)
+    return Result.succeed([
+      TrunkSynced.make({
+        projectId: trunk.projectId,
+        from: sync.from,
+        to: sync.to,
+        by: sync.by,
+        upstream: sync.upstream,
+        ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),
+      }),
+    ]);
+  return Result.succeed([
+    PromotionFrozen.make({
+      projectId: trunk.projectId,
+      groupId: syncGroupId(sync.to),
+      expected: sync.to,
+      observed,
+      reason: "readback-mismatch",
+    }),
+  ]);
+};
 
 /**
  * The debounce deadline. Queued batches are taken in arrival order: one that
@@ -354,6 +415,8 @@ export const decidePromotion = (
           ]);
 
     case "ReadBack":
+      if (trunk.phase === "syncing" && trunk.sync !== undefined)
+        return readBackSync(trunk, trunk.sync, command.observed);
       if (trunk.phase !== "promoting" || wal?.composed === undefined || wal.commits === undefined)
         return refuse(trunk, command);
       if (command.observed === wal.old) return Result.succeed([]);
@@ -418,6 +481,26 @@ export const decidePromotion = (
             PromotionResumed.make({ projectId, by: command.by, head: command.head }),
           ])
         : refuse(trunk, command);
+
+    case "Sync": {
+      // Only an import has an upstream; its origin names the URL and branch.
+      const { origin } = trunk;
+      if (origin?.kind !== "imported") return Result.fail(new NotImported({ projectId }));
+      // A sync starts only between groups, from the head trunk holds, and never during another sync.
+      if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
+        return refuse(trunk, command);
+      // Upstream at trunk's head: there is nothing to move.
+      if (command.to === command.from) return Result.succeed([]);
+      return Result.succeed([
+        TrunkSyncStarted.make({
+          projectId,
+          from: command.from,
+          to: command.to,
+          by: command.by,
+          upstream: { url: origin.url, ref: origin.ref },
+        }),
+      ]);
+    }
 
     default: {
       const unreachable: never = command;
@@ -594,7 +677,11 @@ export const evolvePromotion = (
       const atFlush = trunk.phase === "debouncing" && event.expected === trunk.head;
       const inGroup =
         trunk.phase === "promoting" && wal !== undefined && wal.groupId === event.groupId;
-      return atFlush || inGroup
+      const inSync =
+        trunk.phase === "syncing" &&
+        trunk.sync !== undefined &&
+        syncGroupId(trunk.sync.to) === event.groupId;
+      return atFlush || inGroup || inSync
         ? {
             ...trunk,
             phase: "frozen",
@@ -610,7 +697,7 @@ export const evolvePromotion = (
     case "PromotionResumed":
       return trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)
         ? {
-            ...without(trunk, "wal", "frozen"),
+            ...without(trunk, "wal", "frozen", "sync"),
             head: event.head ?? trunk.head,
             // A resume at another head changed trunk's head, whoever wrote that commit.
             ...(event.head === undefined || event.head === trunk.head
@@ -619,6 +706,38 @@ export const evolvePromotion = (
             phase: settled(trunk.queue),
           }
         : illegal(trunk, event);
+
+    case "TrunkSyncStarted":
+      return (trunk.phase === "idle" || trunk.phase === "debouncing") &&
+        event.from === trunk.head &&
+        event.to !== trunk.head
+        ? {
+            ...trunk,
+            phase: "syncing",
+            sync: { from: event.from, to: event.to, by: event.by, upstream: event.upstream },
+          }
+        : illegal(trunk, event);
+
+    case "TrunkSynced": {
+      const { sync } = trunk;
+      return trunk.phase === "syncing" &&
+        sync !== undefined &&
+        sync.from === event.from &&
+        sync.to === event.to &&
+        (event.height === undefined ||
+          trunk.height === undefined ||
+          event.height === trunk.height + 1)
+        ? {
+            // A sync without a height (an older Trunk DO's state) leaves the height unknown.
+            ...without(trunk, "sync", "height"),
+            head: event.to,
+            advancedAt: committed.at,
+            // Batches queued during the sync wait for the debounce, as after an advance.
+            phase: settled(trunk.queue),
+            ...(event.height === undefined ? {} : { height: event.height }),
+          }
+        : illegal(trunk, event);
+    }
 
     default: {
       const unreachable: never = event;

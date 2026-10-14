@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: connect.outcomes
+# why: an outcome Keel never gives is shown as connected
+diff --git a/apps/console/src/account/credentials.ts b/apps/console/src/account/credentials.ts
+index 6ecc1834..f5ccf97e 100644
+--- a/apps/console/src/account/credentials.ts
++++ b/apps/console/src/account/credentials.ts
+@@ -52,7 +52,7 @@ export const CONNECT_SAID: Readonly<Record<ConnectOutcome, { readonly ok: boolea
+ /** The outcome an address's query names, if it names one Keel's callback gives. */
+ export function outcomeIn(search: string): ConnectOutcome | undefined {
+   const named = new URLSearchParams(search).get("cloudflare");
+-  return CONNECT_OUTCOMES.find((outcome) => outcome === named);
++  return CONNECT_OUTCOMES.find((outcome) => outcome === named) ?? (named === null ? undefined : "connected");
+ }
+ 
+ /** What a target is called until its owner says otherwise: the name in Keel's own example of a project's deploy file. */

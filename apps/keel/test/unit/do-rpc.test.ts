@@ -273,20 +273,13 @@ describe("Changes over Durable Object RPC", () => {
     });
   });
 
-  it.effect(
-    "turns a declare refused for the change's state into a defect, not a refusal the port lacks",
-    () => {
-      const { fake } = objects({
-        declare: Exit.fail(
-          new ChangeStateRefused({ changeId, state: "submitted", command: "declare" }),
-        ),
-      });
-      return Effect.gen(function* () {
-        const exit = yield* Effect.exit((yield* Changes).declare(principal, input));
-        expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
-      }).pipe(Effect.provide(ChangesRpc(fake)));
-    },
-  );
+  it.effect("brings a declare refused for the change's state back as the same refusal", () => {
+    const refusal = new ChangeStateRefused({ changeId, state: "withdrawn", command: "Declare" });
+    const { fake } = objects({ declare: Exit.fail(refusal) });
+    return Effect.gen(function* () {
+      expect(yield* Effect.flip((yield* Changes).declare(principal, input))).toEqual(refusal);
+    }).pipe(Effect.provide(ChangesRpc(fake)));
+  });
 
   it.effect("rebuilds a NotImplemented defect, so the doorway still answers 503", () => {
     const { fake } = objects({});

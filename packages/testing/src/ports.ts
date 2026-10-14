@@ -4,6 +4,8 @@ import {
   describeEventOutboxContract,
   describeEntityStoreContract,
   describeIdsContract,
+  type EntityStoreHarness,
+  memoryEntityStoreHarness,
   describePendingContract,
   describeTokenIssuerContract,
   memoryOutboxHarness,
@@ -220,6 +222,14 @@ const eventOutbox = {
   contract: (adapter: string, harness: () => OutboxHarness) =>
     describeEventOutboxContract(adapter, harness),
   verifyMemory: () => describeEventOutboxContract("in-memory", memoryOutboxHarness),
+};
+
+/** The store's suite runs inside a Durable Object's context for DO SQLite, so it too registers with a harness factory. */
+const entityStore = {
+  memory: () => storage.makeEntityStoreMemory().layer,
+  contract: (adapter: string, harness: () => EntityStoreHarness) =>
+    describeEntityStoreContract(adapter, harness),
+  verifyMemory: () => describeEntityStoreContract("in-memory", memoryEntityStoreHarness),
 };
 
 /** A port whose suite needs a harness beside its Layer: the Layer is the harness's. */
@@ -458,6 +468,14 @@ function memoryLiveChangesHarness(): LiveChangesHarness {
   return {
     layer: memory.layer,
     hear: (projectId, event) => Effect.sync(() => memory.hear(projectId, event)),
+    live: (projectId) => Effect.sync(() => memory.live(projectId)),
+    rows: (projectId, kind) =>
+      Effect.sync(() =>
+        memory
+          .storeOf(projectId)
+          .list(kind)
+          .map((row) => row.id),
+      ),
   };
 }
 
@@ -644,7 +662,7 @@ export const PORTS = {
     memoryTenancyHarness(tenancy.makeProjectNamespacesMemory),
     describeProjectNamespacesContract,
   ),
-  EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
+  EntityStore: entityStore,
   EventOutbox: eventOutbox,
   EventFeed: harnessed<EventFeed, EventFeedHarness>(
     memoryEventFeedHarness,
@@ -782,6 +800,10 @@ export const PORTS = {
   DeployTargetCheck: port(
     () => delivery.makeDeployTargetCheckMemory().layer,
     pending("DeployTargetCheck", ["reach"]),
+  ),
+  CloudflareOAuth: port(
+    () => delivery.makeCloudflareOAuthMemory().layer,
+    pending("CloudflareOAuth", ["begin", "exchange", "accounts", "mint"]),
   ),
   DeployTargets: harnessed<DeployTargets, DeployTargetsHarness>(
     memoryDeployTargetsHarness,

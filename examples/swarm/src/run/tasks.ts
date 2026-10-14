@@ -11,9 +11,12 @@
  *     re-merges;
  *   - 10% declare a premise on one of two shared subjects, so preflight shows
  *     neighbours by subject as well as by footprint.
+ * A run of twelve or more first plants its pairs (`pairs.ts`): conflicts Keel
+ * should catch before trunk, and decoys it should leave alone.
  */
 
 import type { KeelClient } from "@keeltown/sdk";
+import { pairsFor, type PairKey, type PairKind } from "./pairs.ts";
 
 /** A function of the fixture and where it lives, from the repository root. */
 export interface Target {
@@ -30,7 +33,7 @@ export interface Case {
   readonly expected: boolean;
 }
 
-export type TaskKind = "disjoint" | "shared" | "premise";
+export type TaskKind = "disjoint" | "shared" | "premise" | "pair";
 
 /** A premise as Keel's API takes it (MFP 0.2), declared with the change. */
 export type Premise = Parameters<KeelClient["rely"]>[1]["premise"];
@@ -46,7 +49,20 @@ export interface Task {
   readonly target: Target;
   readonly cases: readonly Case[];
   readonly premises: readonly Premise[];
+  /** For a pair's side that changes the function's module rather than testing it: what to change. */
+  readonly change?: string;
+  /** The planted pair or decoy this task is a side of. */
+  readonly pair?: {
+    readonly pair: number;
+    readonly kind: PairKind;
+    readonly planted: boolean;
+    readonly side: "a" | "b";
+  };
 }
+
+/** A run of this many or more plants its pairs; of `WIDE` or more, the wider set. */
+export const PAIRED = 12;
+export const WIDE = 60;
 
 const NAMES = "src/domain/names.ts";
 const PERMISSIONS = "src/domain/permissions.ts";
@@ -221,19 +237,69 @@ export function planTasks(options: {
   readonly seed: number;
   readonly count: number;
   readonly run: string;
+  /** Trunk's head as the run began, where the pairs' premises are anchored. */
+  readonly base?: string | undefined;
 }): Task[] {
-  const { seed, count, run } = options;
+  const { seed, count, run, base } = options;
+  const dir = `test/swarm/${run}`;
+  const pairs = count >= PAIRED ? pairsFor({ run, base, wide: count >= WIDE }) : [];
+  const planted = pairs.flatMap((pair, k) =>
+    (["a", "b"] as const).map((side, s): Task => {
+      const index = 2 * k + s;
+      const one = pair[side];
+      const of = { pair: k, kind: pair.kind, planted: pair.planted, side };
+      return one.writes === "change"
+        ? {
+            index,
+            kind: "pair",
+            goal: `Change ${one.target.fn} in ${one.target.module}`,
+            path: one.target.module,
+            target: one.target,
+            cases: [],
+            premises: [],
+            change: one.change,
+            pair: of,
+          }
+        : {
+            index,
+            kind: "pair",
+            goal: `Test ${one.target.fn} with worker ${index}'s cases`,
+            path: `${dir}/${String(index).padStart(3, "0")}-${one.target.fn}.test.ts`,
+            target: one.target,
+            cases: one.cases,
+            premises: one.premises,
+            pair: of,
+          };
+    }),
+  );
+  return [...planted, ...unpaired(seed, count - planted.length, dir, planted.length)];
+}
+
+/** The key to a run's pairs: each pair's two sides by worker index. */
+export function keyOf(tasks: readonly Task[]): PairKey[] {
+  const keys = new Map<number, PairKey>();
+  for (const task of tasks) {
+    if (task.pair === undefined) continue;
+    const { pair, kind, planted, side } = task.pair;
+    const held = keys.get(pair) ?? { pair, kind, planted, a: -1, b: -1 };
+    keys.set(pair, { ...held, [side]: task.index });
+  }
+  return [...keys.values()];
+}
+
+/** The run's tasks that are no pair's side, numbered from `first`. */
+function unpaired(seed: number, count: number, dir: string, first: number): Task[] {
   const next = random(seed);
   const split = mix(count);
   const groups = groupsFor(split.shared);
-  const dir = `test/swarm/${run}`;
   const kinds: TaskKind[] = [
     ...Array<TaskKind>(split.disjoint).fill("disjoint"),
     ...Array<TaskKind>(split.shared).fill(groups === 0 ? "disjoint" : "shared"),
     ...Array<TaskKind>(split.premise).fill("premise"),
   ];
   let sharedSeen = 0;
-  return kinds.map((kind, index): Task => {
+  return kinds.map((kind, i): Task => {
+    const index = first + i;
     if (kind === "premise") {
       const entry = PREMISE_BANK[index % PREMISE_BANK.length] ?? PREMISE_BANK[0];
       if (entry === undefined) throw new Error("the premise bank is empty");
@@ -290,17 +356,22 @@ export function importPath(task: Task): string {
   return `${"../".repeat(depth)}${task.target.module}`;
 }
 
-/** The worker's whole brief: what to change, how to declare it, and the cases with their answers. */
+/**
+ * The worker's whole brief: what to build, the cases with their answers, and what its test relies on.
+ * Nothing in it says how Keel works: that the worker learns from Keel's answers.
+ */
 export function brief(task: Task): string {
+  if (task.change !== undefined)
+    return [`Goal: ${task.goal}.`, `File: ${task.path}.`, task.change].join("\n");
   const lines = [
     `Goal: ${task.goal}.`,
     `File: ${task.path}. Import it as: import { ${task.target.fn} } from "${importPath(task)}"; and import { describe, expect, it } from "vitest".`,
     task.kind === "shared"
-      ? `This file is shared with other workers. Read it at your workspace's head first: if it exists, keep every line of it and add one describe block of your own, named "worker ${task.index}: ${task.target.fn}", at the end. If it does not exist, create it with that one describe block.`
+      ? `This file is shared with other agents. If it already exists, keep every line of it and add one describe block of your own, named "worker ${task.index}: ${task.target.fn}", at the end. If it does not exist, create it with that one describe block.`
       : `Create the file with one describe block named "${task.target.fn}".`,
     `Write one it() per case, asserting exactly this:`,
     ...task.cases.map((c) => `- ${describeCase(task.target, c)}`),
-    `Declare with goal ${JSON.stringify(task.goal)}, footprint ${JSON.stringify([{ path: task.path, op: task.kind === "shared" ? "edit" : "create" }])}, premises ${JSON.stringify(task.premises)}.`,
+    ...task.premises.map((p) => `Your test relies on this premise: ${JSON.stringify(p)}`),
   ];
   return lines.join("\n");
 }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.flow
+# why: the client's secret is URI-encoded in the Basic credential, so a secret with ~ ( ) ! authenticates as another string
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+index c592fffb..878eebf7 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+@@ -171,7 +171,7 @@ export function CloudflareOAuthLive(options: CloudflareOAuthOptions): Layer.Laye
+                     {
+                       method: "POST",
+                       headers: {
+-                        authorization: `Basic ${btoa(`${formEncode(options.clientId)}:${formEncode(secret)}`)}`,
++                        authorization: `Basic ${btoa(`${encodeURIComponent(options.clientId)}:${encodeURIComponent(secret)}`)}`,
+                         "content-type": "application/x-www-form-urlencoded",
+                         accept: "application/json",
+                       },

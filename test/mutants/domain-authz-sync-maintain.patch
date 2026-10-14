@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sync-own
+# kills: authz.sync-own
+# why: a maintainer moves trunk to commits Keel never verified, which is an owner's call
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 900987d6..10278f6c 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -175,7 +175,7 @@ export const SPEC_ACTIONS = {
+   Agents_leaveProject: rule("Self", "agent"),
+   Operator_putSettings: rule("Project", "maintain"),
+   // Moving trunk to commits Keel did not verify is its owners' call alone.
+-  Operator_syncUpstream: rule("Project", "own"),
++  Operator_syncUpstream: rule("Project", "maintain"),
+ 
+   // A namespace's credentials and a project's deploy targets are its owners' alone.
+   Delivery_createCredential: rule("Namespace", "ownAsUser"),

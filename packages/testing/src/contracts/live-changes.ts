@@ -1,13 +1,26 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Intent } from "@keeltown/core/domain/coordination";
+import {
+  LIVE_ANCHOR,
+  LIVE_CLAIM,
+  LIVE_FOOTPRINT,
+  LIVE_SUBJECT,
+} from "@keeltown/core/application/coordination";
+import { Intent, type LiveChange } from "@keeltown/core/domain/coordination";
 import { type ChangeId, EventEnvelope, makeId, ProjectId } from "@keeltown/core/kernel";
 import { LiveChanges } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 
-/** The `LiveChanges` suite feeds each adapter's index an event of one of a project's changes, as the fan-out would. */
+/**
+ * The `LiveChanges` suite feeds each adapter's index an event of one of a
+ * project's changes, as the fan-out would, and reads the ids of the index's
+ * rows of a kind, as the Project DO's storage holds them.
+ */
 export interface LiveChangesHarness {
   readonly layer: Layer.Layer<LiveChanges>;
   readonly hear: (projectId: ProjectId, event: EventEnvelope) => Effect.Effect<void>;
+  readonly rows: (projectId: ProjectId, kind: string) => Effect.Effect<readonly string[]>;
+  /** Every live change the index holds, read where it is kept. */
+  readonly live: (projectId: ProjectId) => Effect.Effect<readonly LiveChange[]>;
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -79,6 +92,25 @@ const derivation = (changeId: ChangeId, ref: string, subjects: readonly string[]
   derivationRef: ref,
 });
 
+/** A change declared with this intent, beside the premise `declared` gives. */
+const declaredWith = (changeId: ChangeId, intent: Record<string, unknown>) =>
+  eventOf(changeId, {
+    _tag: "IntentDeclared",
+    changeId,
+    agentId: makeId("agt", ulid()),
+    origin: "agent",
+    revision: 1,
+    goal: "cache the sessions",
+    footprint: [],
+    premises: [],
+    leaseId: makeId("lse", ulid()),
+    ...intent,
+  });
+
+const KEY_KINDS = [LIVE_SUBJECT, LIVE_FOOTPRINT, LIVE_ANCHOR, LIVE_CLAIM];
+/** Change ids in the order the index lists them. */
+const byId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 export function describeLiveChangesContract(adapter: string, make: () => LiveChangesHarness) {
   describe(`LiveChanges contract: ${adapter}`, () => {
     it.live(
@@ -112,7 +144,7 @@ export function describeLiveChangesContract(adapter: string, make: () => LiveCha
               by: "agent",
             }),
           );
-          const live = yield* (yield* LiveChanges).of(projectId);
+          const live = yield* harness.live(projectId);
           const expected: Intent = {
             revision: 2,
             goal: "cache the sessions for longer",
@@ -130,9 +162,8 @@ export function describeLiveChangesContract(adapter: string, make: () => LiveCha
         return Effect.gen(function* () {
           const projectId = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
           const changeId = makeId("chg", ulid());
-          const derivedSubjects = Effect.map(
-            Effect.flatMap(LiveChanges, (index) => index.of(projectId)),
-            (live) => live.map((row) => row.derived.map((effect) => effect.proposition.subject)),
+          const derivedSubjects = Effect.map(harness.live(projectId), (live) =>
+            live.map((row) => row.derived.map((effect) => effect.proposition.subject)),
           );
           yield* harness.hear(projectId, declared(changeId));
           yield* harness.hear(
@@ -152,6 +183,93 @@ export function describeLiveChangesContract(adapter: string, make: () => LiveCha
             [["authz.sessions"]],
             [["billing.invoices"]],
           ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.live(
+      "[t694.near-contract] reads the changes near an intent by key, in change id order, says what it compared, and an end takes every key row of the change",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projectId = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
+          const fresh = () => makeId("chg", ulid());
+          const [relies, caches, elsewhere, edits, self] = [
+            fresh(),
+            fresh(),
+            fresh(),
+            fresh(),
+            fresh(),
+          ];
+          const cache = { ...premise, relation: "is", value: "per-session" };
+          const billing = { ...premise, subject: "billing.invoices" };
+          // One relies on my premise's subject, with a row of every kind; one's cache breaks it;
+          // one works elsewhere; one edits a file under my footprint, on a subject of its own.
+          yield* harness.hear(
+            projectId,
+            declaredWith(relies, {
+              premises: [{ ...premise, anchors: [{ path: "src/a|b.ts", commit: "a".repeat(40) }] }],
+              declaredEffects: [billing],
+              footprint: [{ path: "docs/*.md", op: "edit" }],
+            }),
+          );
+          yield* harness.hear(projectId, declaredWith(caches, { declaredEffects: [cache] }));
+          yield* harness.hear(
+            projectId,
+            declaredWith(elsewhere, {
+              premises: [billing],
+              footprint: [{ path: "docs/**", op: "edit" }],
+            }),
+          );
+          yield* harness.hear(
+            projectId,
+            declaredWith(edits, {
+              premises: [{ ...billing, subject: "search.ranking" }],
+              footprint: [{ path: "src/authz/check.ts", op: "edit" }],
+            }),
+          );
+          const intent = Schema.decodeUnknownSync(Intent)({
+            revision: 1,
+            goal: "revoke on every request",
+            footprint: [{ path: "src/authz/**", op: "edit" }],
+            premises: [premise],
+          });
+          const index = yield* LiveChanges;
+          const rowsOf = (changeId: ChangeId) =>
+            Effect.forEach(KEY_KINDS, (kind) =>
+              Effect.map(harness.rows(projectId, kind), (ids) =>
+                ids.filter((id) => id.endsWith(changeId)),
+              ),
+            );
+
+          const near = yield* index.near(projectId, self, intent);
+          const held = yield* rowsOf(relies);
+          yield* harness.hear(
+            projectId,
+            eventOf(relies, { _tag: "ChangeWithdrawn", changeId: relies, by: "agent" }),
+          );
+          const after = yield* index.near(projectId, self, intent);
+
+          expect(near.changes.map((live) => live.id)).toEqual(
+            [relies, caches, edits].toSorted(byId),
+          );
+          expect(near.compared).toEqual({ changes: 3, subjects: 1 });
+          expect(held).toEqual([
+            [
+              `authz.permission-evaluation/${relies}`,
+              `authz/${relies}`,
+              `billing.invoices/${relies}`,
+              `billing/${relies}`,
+            ],
+            [`docs|${relies}`],
+            [`src%2Fa%7Cb.ts|${relies}`],
+            [
+              expect.stringMatching(
+                new RegExp(`^\\["\\{.*billing\\.invoices.*\\}"\\]\\|${relies}$`),
+              ),
+            ],
+          ]);
+          expect(after.changes.map((live) => live.id)).toEqual([caches, edits].toSorted(byId));
+          expect(yield* rowsOf(relies)).toEqual([[], [], [], []]);
         }).pipe(Effect.provide(harness.layer));
       },
     );

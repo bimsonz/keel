@@ -20,7 +20,15 @@ export class EntityStore extends Context.Service<
     readonly get: (kind: string, id: string) => Stored | undefined;
     readonly put: (kind: string, id: string, value: Stored) => void;
     readonly remove: (kind: string, id: string) => void;
-    readonly list: (kind: string) => readonly { readonly id: string; readonly value: Stored }[];
+    /**
+     * The kind's rows in id order: every one, or with `idPrefix` only those
+     * whose id starts with it, read as a range of the key rather than a scan
+     * of the kind. An empty prefix is the whole kind.
+     */
+    readonly list: (
+      kind: string,
+      idPrefix?: string,
+    ) => readonly { readonly id: string; readonly value: Stored }[];
     /** Runs `body` atomically: every write inside commits together or not at all. */
     readonly transaction: <A>(body: () => A) => A;
   }

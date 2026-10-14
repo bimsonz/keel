@@ -148,8 +148,10 @@ const inHolds = <A, E, R>(
 export const declareChange: (
   principal: AgentToken,
   input: DeclareInput,
-) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict, Changes> = (principal, input) =>
-  Changes.use((changes) => changes.declare(principal, input));
+) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict | ChangeStateRefused, Changes> = (
+  principal,
+  input,
+) => Changes.use((changes) => changes.declare(principal, input));
 
 export const submitChange: (
   principal: AgentToken,

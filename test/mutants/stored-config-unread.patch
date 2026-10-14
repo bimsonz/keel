@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.config-missing-cited
+# why: A step's stored missing configuration is dropped on reading, so the bounce never cites it
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 29c39072..bfee6c57 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -157,7 +157,6 @@ const readDecision = (decision: HeldDecision): NextAction => ({
+ const StoredFailures = Schema.Struct({
+   deploy: Schema.optional(Schema.Struct({ failure: Schema.String })),
+   deps: Schema.optional(Schema.Struct({ refused: Schema.String, remedy: Schema.String })),
+-  config: Schema.optional(Schema.Struct({ missing: Schema.String, remedy: Schema.String })),
+   guard: Schema.optional(Schema.Struct({ predicate: Schema.String, probe: Schema.String })),
+   reason: Schema.optional(Schema.String),
+   failing: Schema.optional(

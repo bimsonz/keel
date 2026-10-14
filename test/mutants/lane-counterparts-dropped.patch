@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.composition-counterparts
+# kills: lane.composition-counterparts
+# why: A textual bounce's verdict carries no counterparts, so an agent and the change's bounce never learn which landed change it conflicts with
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f70ce198..de785d64 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -989,7 +989,6 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+                   `Then run git fetch origin keel/trunk && git merge FETCH_HEAD, resolve ${refused.paths.join(", ") || "the conflict"}, push, and submit again`,
+                 ),
+               ],
+-              ...(counterparts === undefined ? {} : { counterparts: counterparts.found }),
+             }),
+             batch.members,
+           ),

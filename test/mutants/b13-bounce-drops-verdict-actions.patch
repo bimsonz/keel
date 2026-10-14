@@ -2,15 +2,15 @@
 # kills: b13.reacts
 # why: the bounce drops the issuer's remedy, so every bounce says only the generic fix and submit
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bfaf830..99785ae 100644
+index e9b89c32..e4ec6e54 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -843,7 +843,7 @@ const bounceFor = (
+@@ -1970,7 +1970,7 @@ const bounceFor = (
        verdictId: failed.verdictId,
        reasons: verdict?.evidence ?? [`verdict ${failed.verdictId}`],
        // Empty: the machine's own "fix and submit" is the fallback.
 -      nextActions: verdict?.nextActions ?? [],
 +      nextActions: [],
        batchId: failed.batchId,
+       ...(verdict?.counterparts === undefined ? {} : { counterparts: verdict.counterparts }),
      },
-     ...(verdict === undefined

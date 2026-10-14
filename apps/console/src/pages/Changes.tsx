@@ -19,7 +19,7 @@ import {
   ConflictLink,
   EscalationLink,
   HolderLink,
-  RunLink,
+  HeldRun,
   SubjectLink,
 } from "../views/links.tsx";
 import { AgentMark, Unverified, agentLine, dateTime } from "../views/parts.tsx";
@@ -99,7 +99,7 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
                     <AgentMark agentClass={row.agentClass} size={12} />
                     {agentLine(row.agent, row.agentClass)}
                   </HolderLink>
-                  <RunLink held={row.held} className="a-link-quiet" />
+                  <HeldRun held={row.held} className="a-link-quiet" />
                   {row.subject !== undefined && (
                     <SubjectLink subject={row.subject} className="a-mono a-link-quiet">
                       {row.subject}

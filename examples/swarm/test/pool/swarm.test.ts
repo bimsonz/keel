@@ -107,6 +107,36 @@ describe("the swarm's Worker", () => {
     expect(new URLSearchParams(minted[0]).get("resource")).toBe("https://keel.test/mcp");
   });
 
+  it("[swarm.settings] sets the one account's project's visibility and verification by its owner's settings call, every other setting kept", async () => {
+    await SELF.fetch(`${SWARM}/admin/agents`, {
+      method: "POST",
+      headers: { ...ADMIN, "content-type": "application/json" },
+      body: JSON.stringify({ shape: "one" }),
+    });
+    const configure = (change: object) =>
+      SELF.fetch(`${SWARM}/admin/projects/prj_SHOW/settings`, {
+        method: "PATCH",
+        headers: { ...ADMIN, "content-type": "application/json" },
+        body: JSON.stringify(change),
+      });
+    expect((await configure({ visibility: "everyone" })).status).toBe(400);
+    expect((await configure({ maxBatchSize: 16 })).status).toBe(400);
+    expect(await (await configure({ visibility: "public" })).json()).toEqual({
+      visibility: "public",
+      verification: "off",
+    });
+    expect(await (await configure({ verification: "required" })).json()).toEqual({
+      visibility: "private",
+      verification: "required",
+    });
+    const put = (await seen("/v1/projects/prj_SHOW/settings")).filter((body) => body !== "");
+    const kept = { protectedPaths: ["infra/"], maxBatchSize: 4 };
+    expect(put.map((body) => JSON.parse(body))).toEqual([
+      { ...kept, verification: "off", visibility: "public" },
+      { ...kept, verification: "required", visibility: "private" },
+    ]);
+  });
+
   it("[swarm.forget] wipes every key on DELETE /admin/agents", async () => {
     await SELF.fetch(`${SWARM}/admin/agents`, {
       method: "POST",

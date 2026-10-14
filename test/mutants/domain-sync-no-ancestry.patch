@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-sync.test.ts -t sync.ff-only
+# kills: sync.ff-only
+# why: a sync moves trunk to an upstream head that does not descend from it, dropping the commits trunk holds
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index d3bfebf6..7346599d 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -818,7 +818,7 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
+         ),
+       ),
+     );
+-  const forward = yield* writer.descends(from, to, [origin.commit]);
++  const forward = true;
+   if (!forward) {
+     yield* writer.dropUpstream;
+     return yield* new NotFastForward({ projectId, trunk: from, upstream: to });

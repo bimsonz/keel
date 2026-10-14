@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay]"
+# kills: artifacts.import-relay
+# why: an import Artifacts gives up on as unavailable is refused as unreachable, so a repository of about 20 MB cannot be imported at all
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 39246f53..ca70e299 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -377,7 +377,7 @@ export function CodeHostArtifacts(
+               await revoke(binding(target), target.name, made.token);
+             } catch (e) {
+               if (importRefusal(e) !== "unreachable") throw e;
+-              await relayImport(binding(target), target.name, source);
++              throw e;
+             }
+             const handle = await binding(target).get(target.name);
+             try {

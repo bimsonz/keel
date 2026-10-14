@@ -29,6 +29,19 @@ export type Exposure = {
 export const anchorPathsOf = (ps: readonly Proposition[]): ReadonlySet<string> =>
   new Set(ps.flatMap((p) => (p.anchors ?? []).map((a) => a.path)));
 
+/** What exposure compares of an intent: its premises, then its declared effects. */
+export const intentPropositions = (intent: Intent): readonly Proposition[] => [
+  ...intent.premises,
+  ...(intent.declaredEffects ?? []),
+];
+
+/** What exposure reads of a live change: its premises, its declared effects, then what was derived for it. */
+export const livePropositions = (live: LiveChange): readonly Proposition[] => [
+  ...live.intent.premises,
+  ...(live.intent.declaredEffects ?? []),
+  ...live.derived.map((d) => d.proposition),
+];
+
 /**
  * Exposure's never-miss relation between subjects: related (ancestor or
  * self, either way) or siblings. Wider than fallout's, which treats siblings
@@ -44,7 +57,7 @@ export const exposure = (
 ): Exposure => {
   const myPremises = intent.premises;
   const myEffects = intent.declaredEffects ?? [];
-  const mine = [...myPremises, ...myEffects];
+  const mine = intentPropositions(intent);
   const myAnchors = anchorPathsOf(mine);
   const neighbours: Neighbour[] = [];
   const contradictions: Contradiction[] = [];
@@ -55,7 +68,7 @@ export const exposure = (
       ...(live.intent.declaredEffects ?? []),
       ...live.derived.map((d) => d.proposition),
     ];
-    const theirs = [...theirPremises, ...theirEffects];
+    const theirs = livePropositions(live);
 
     const subjects = [
       ...new Set(

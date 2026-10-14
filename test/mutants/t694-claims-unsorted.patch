@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.claim
+# why: The claim set keeps its declared order, so two intents making the same claims in another order are not found as alternatives by the index's notices.
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 27397a51..7b9c1c50 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -31,7 +31,7 @@ const claimsOf = (intent: Intent): ReadonlySet<string> =>
+  * for two intents exactly when they make the same claims, so its alternatives
+  * are found by it. Empty when the intent declares no effects.
+  */
+-export const claimSetOf = (intent: Intent): readonly string[] => [...claimsOf(intent)].toSorted();
++export const claimSetOf = (intent: Intent): readonly string[] => [...claimsOf(intent)];
+ 
+ /**
+  * Whether two intents attempt the same thing: their declared effects make the

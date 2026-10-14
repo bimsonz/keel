@@ -39,6 +39,7 @@ interface Body {
     readonly workspace: { readonly id: string };
   };
   readonly code: string;
+  readonly detail: string;
   readonly nextActions: readonly unknown[];
 }
 
@@ -103,7 +104,7 @@ async function poolStatus(projectId: ProjectId) {
  * the project's finish leaves it, then held at that: it forks no more, so what it
  * collects is all that moves.
  */
-async function stockedPool(projectId: ProjectId) {
+async function stockedPool(projectId: ProjectId, ready = 1) {
   if (env.TEST_ARTIFACTS === undefined) throw new Error("vitest.config.ts binds TEST_ARTIFACTS");
   const mirror = `mirror-${ulid().toLowerCase()}`;
   await env.TEST_ARTIFACTS.create(mirror);
@@ -111,10 +112,10 @@ async function stockedPool(projectId: ProjectId) {
   const pool = poolStub(projectId);
   // A project's trunk is initialized before its finish configures the pool; this project has none.
   await followTrunk(projectId, source);
-  await pool.configure({ source, target: 1 });
+  await pool.configure({ source, target: ready });
   // The refill is a deadline armed for now; the platform may run it before this line does.
   await runDurableObjectAlarm(pool);
-  await vi.waitFor(async () => expect((await poolStatus(projectId)).ready).toBe(1), WAIT);
+  await vi.waitFor(async () => expect((await poolStatus(projectId)).ready).toBe(ready), WAIT);
   await pool.configure({ source, target: 0 });
   return pool;
 }
@@ -171,6 +172,69 @@ describe("abandoning a change through the doorways", () => {
       async () => expect(await poolStatus(projectId)).toMatchObject({ granted: 0 }),
       WAIT,
     );
+  });
+
+  it("[a11.declare-replay-ended] a declare retried while its change is live answers 201 with the same change and workspace; retried after the change was withdrawn it is 409 change.state_refused naming the change, over REST and MCP, and takes no workspace from the pool", async () => {
+    const projectId: ProjectId = makeId("prj", ulid());
+    // Two ready: one for the declare, and one a retry could wrongly take.
+    const pool = await stockedPool(projectId, 2);
+    const agent = await seedAgent({ projectId });
+    const token = await tokenFor(agent);
+    const intent = { goal: "Cache permission lookups per request", premises: [] };
+    const declare = () =>
+      rest(token, "/changes", {
+        method: "POST",
+        headers: { "idempotency-key": "declare-key-0002" },
+        body: JSON.stringify(intent),
+      });
+    const declared = await declare();
+    expect(declared.status).toBe(201);
+    const { change, lease, workspace } = declared.body.result;
+    const live = await declare();
+    expect(live.status).toBe(201);
+    expect(live.body.result).toMatchObject({
+      change: { id: change.id },
+      workspace: { id: workspace.id },
+    });
+    expect(await poolStatus(projectId)).toMatchObject({ granted: 1, ready: 1 });
+    drainAfter(env.CHANGE.get(env.CHANGE.idFromName(`change:${change.id}`)));
+    drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agent.agent.id}`)));
+    drainAfter(pool);
+    drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${projectId}:main`)));
+    const withdrawn = await abandonRest(token, change.id, "abandon-key-0002", { lease: lease.id });
+    expect(withdrawn.status).toBe(200);
+    await vi.waitFor(
+      async () => expect(await poolStatus(projectId)).toMatchObject({ granted: 0, ready: 1 }),
+      WAIT,
+    );
+
+    for (const retry of [await declare(), await declare()]) {
+      expect(retry.status).toBe(409);
+      expect(retry.body).toMatchObject({
+        code: "change.state_refused",
+        nextActions: [
+          { kind: "read", operationId: "change", args: { changeId: change.id } },
+          { kind: "call", operationId: "declare" },
+        ],
+      });
+      expect(retry.body.detail).toContain(`${change.id} is withdrawn`);
+    }
+    // A refusal over MCP is an error result whose text is the same problem.
+    const viaTool = await mcpResult(
+      await mcp(
+        token,
+        "tools/call",
+        { name: "declare", arguments: { "idempotency-key": "declare-key-0002", ...intent } },
+        "declare",
+      ),
+    );
+    const [said] = Array.isArray(viaTool["content"]) ? viaTool["content"] : [];
+    expect(viaTool["isError"]).toBe(true);
+    expect(JSON.parse(String(Reflect.get(Object(said), "text")))).toMatchObject({
+      status: 409,
+      code: "change.state_refused",
+    });
+    expect(await poolStatus(projectId)).toMatchObject({ granted: 0, ready: 1 });
   });
 
   it("[a11.abandon-operator] a maintainer of the project's org withdraws with no lease: 200, ChangeWithdrawn by the maintainer, as user:<id>", async () => {

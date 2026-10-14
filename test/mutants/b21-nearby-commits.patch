@@ -2,19 +2,19 @@
 # kills: b21.nearby
 # why: reading what is near a change commits a PreflightIssued, so a read changes the change's log
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 537a82cc..f76b79f7 100644
+index e152f56e..4365b941 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1094,8 +1094,27 @@ export const nearby: (
+@@ -1164,8 +1164,27 @@ export const nearby: (
    if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
-   const live = yield* liveOf(projectId);
+   const near = yield* nearOf(projectId, changeId, change.intent);
    const decided = yield* decidedOn(projectId, intentSubjects(change.intent));
--  return preflightFor(changeId, change.intent, live, precedentsFor(change.intent, decided))
+-  return preflightFor(changeId, change.intent, near, precedentsFor(change.intent, decided))
 -    .preflight;
 +  const preflight = preflightFor(
 +    changeId,
 +    change.intent,
-+    live,
++    near,
 +    precedentsFor(change.intent, decided),
 +  ).preflight;
 +  const at = yield* (yield* Clock).now;

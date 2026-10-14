@@ -2,15 +2,15 @@
 # kills: b24.alternative-landed
 # why: a withdrawn change is announced to its alternatives as landed
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index a0d9ef2..c501892 100644
+index 50c23c55..698ee6a5 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -183,7 +183,7 @@ export function hearLiveChange(
+@@ -299,7 +299,7 @@ export function hearLiveChange(
      default: {
        if (!(CHANGE_ENDS as readonly string[]).includes(event.type)) return [];
        const told =
 -        event.type === "ChangeLanded" && live !== undefined
 +        live !== undefined
-           ? alternativesOf(changeId, live.intent, liveChanges(store)).map((other) =>
+           ? alternativesOf(changeId, live.intent, claimingAlike(store, live.intent)).map((other) =>
                noticeFor(
                  other,

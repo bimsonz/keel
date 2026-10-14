@@ -2,16 +2,15 @@
 # kills: b24.awareness
 # why: two changes that diverge and converge again are never told again
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index a0d9ef2..9a0456d 100644
+index 50c23c55..ba44925e 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -87,8 +87,7 @@ function aware(
-   for (const { id } of store.list(ALT_SHOWN)) {
-     const [a, b] = id.split("/");
-     const other = a === self.id ? b : b === self.id ? a : undefined;
--    if (other !== undefined && !alternatives.some((alt) => alt === other))
--      store.remove(ALT_SHOWN, id);
-+    if (other !== undefined && other === "") store.remove(ALT_SHOWN, id);
+@@ -189,7 +189,7 @@ function aware(
+   for (const other of listed) store.put(ALT_SHOWN, shownId(self.id, other), true);
+   for (const { id } of store.list(ALT_SHOWN, `${self.id}/`)) {
+     const other = id.slice(self.id.length + 1);
+-    if (alternatives.some((alt) => alt === other)) continue;
++    if (other !== "") continue;
+     store.remove(ALT_SHOWN, id);
+     store.remove(ALT_SHOWN, `${other}/${self.id}`);
    }
-   const drafts: EventDraft[] = [];
-   const tell = (target: ChangeId, about: ChangeId) => {

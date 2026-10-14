@@ -1,13 +1,11 @@
-// A namespace's credentials, as a code host has a repository's secrets: Keel's list by label, a form that stores
-// a provider's API token, and its removal. A person's own are on their settings, an org's on a page of the org.
-// The token is typed into one field, leaves the page in the body of the one call that stores it, and the field
-// is emptied as it is sent: it is in no address, no storage and no later request, and nothing shows it again.
+// A namespace's credentials, as a code host has a repository's secrets: Keel's list by label, and its removal. A
+// person's own are on their settings, an org's on a page of the org. No token is typed here: Keel makes the one it
+// deploys with when an owner connects a project to a Cloudflare account, and nothing shows it again.
 
-import { Button, Input } from "@cloudflare/kumo";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Credential } from "../contract/keel/index.ts";
 import type { KeelCredentials } from "../source/types.ts";
-import { TOKEN_LINK, storedOf } from "./credentials.ts";
+import { TOKENS_PAGE, storedOf } from "./credentials.ts";
 import { Refusal, type Said, saidOf, useAsking } from "./parts.tsx";
 
 /** Keel's answer to a read of a namespace's credentials: its list, or what it said in refusing. */
@@ -70,36 +68,22 @@ export function NamespaceCredentials({
   credentials: KeelCredentials;
   handle: string;
   readerId: string;
-  /** Whether the reader owns the namespace, as the page knows it: the form is offered to an owner alone. */
+  /** Whether the reader owns the namespace, as the page knows it: removal is offered to an owner alone. */
   owner: boolean;
   /** Whose credentials these are, in the section's own words: "yours", or an org's handle. */
   whose: string;
 }) {
   const { listed, unread, read } = useStored(credentials, handle);
-  const [label, setLabel] = useState("");
-  const [token, setToken] = useState("");
   const { busy, refused, ask } = useAsking();
-
-  const store = (event: FormEvent): void => {
-    event.preventDefault();
-    // The token is taken out of the field as it is sent, whatever Keel answers.
-    const secret = token;
-    setToken("");
-    void ask(async () => {
-      await credentials.storeCredential(handle, { label, provider: "cloudflare", secret });
-      setLabel("");
-      await read();
-    });
-  };
 
   return (
     <section className="a-panel flex flex-col gap-3 p-4" aria-label="Credentials">
       <h2 className="a-h">Credentials</h2>
       <p className="text-sm text-kumo-subtle">
-        A credential is a provider's API token kept by Keel for {whose} projects to deploy with.
-        Keel seals it as it is stored, and nothing shows it again, here or anywhere. A project's
-        owner chooses one by its label when connecting the project to an account. Removing one stops
-        every deploy target that names it from reaching its account.
+        A credential is an API token Keel made on a Cloudflare account when an owner connected one
+        of {whose} projects to it, kept for those projects to deploy with. Keel seals it as it is
+        made, and nothing shows it again, here or anywhere. Removing one stops every deploy target
+        that names it from reaching its account; revoke it on Cloudflare too.
       </p>
       {unread !== null && <Refusal said={unread} />}
       {listed !== null && listed.length === 0 && (
@@ -138,44 +122,14 @@ export function NamespaceCredentials({
           ))}
         </ul>
       )}
-      {owner && (
-        <p className="text-sm text-kumo-default">
-          <a className="a-link" href={TOKEN_LINK} target="_blank" rel="noreferrer">
-            Make a token on Cloudflare
+      {owner && listed !== null && listed.length > 0 && (
+        <p className="text-sm text-kumo-subtle">
+          Each token is on{" "}
+          <a className="a-link" href={TOKENS_PAGE} target="_blank" rel="noreferrer">
+            Cloudflare's account API tokens
           </a>{" "}
-          with Workers Scripts: Edit, already chosen there, then paste it here.
+          under its label, where it is revoked.
         </p>
-      )}
-      {owner && (
-        <form
-          className="flex flex-wrap items-end gap-2"
-          onSubmit={store}
-          aria-label="Store a credential"
-        >
-          <Input
-            label="Label"
-            name="label"
-            autoComplete="off"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Input
-            label="Cloudflare API token"
-            name="token"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={busy || label.trim() === "" || token.trim() === ""}
-          >
-            Store credential
-          </Button>
-        </form>
       )}
       <Refusal said={refused} />
     </section>

@@ -1,5 +1,5 @@
 import { TrunkOrigin } from "@keeltown/core/domain/integration";
-import { ImportTooLarge, RepoNotFound, Trunks } from "@keeltown/core/ports";
+import { ImportTooLarge, RepoNotFound, Trunks, UpstreamUnreachable } from "@keeltown/core/ports";
 import { Effect, Layer, Option, Schema } from "effect";
 import { TrunkCodecs } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
@@ -64,6 +64,14 @@ export function TrunksRpc(
         callObject(TrunkCodecs.sync, () => trunk(projectId).sync()).pipe(
           Effect.map(({ head }) => ({ head, staging: head, mirror: head })),
           Effect.orDie,
+        ),
+      syncUpstream: (projectId, by) =>
+        callObject(TrunkCodecs.syncUpstream, () => trunk(projectId).syncUpstream(by)).pipe(
+          // The RPC carries the port's two by shape (rule R15).
+          Effect.catchTags({
+            UpstreamUnreachable: (unreachable) => Effect.fail(new UpstreamUnreachable(unreachable)),
+            ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
+          }),
         ),
       destroy: (projectId, by) =>
         callObject(TrunkCodecs.destroy, () => trunk(projectId).destroy(by)),

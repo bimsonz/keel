@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/events.test.ts
+# kills: swarm.records-label
+# why: Records are numbered in the order changes were declared: a record names another worker than the one whose conversation and key side it is
+diff --git a/examples/swarm/src/run/events.ts b/examples/swarm/src/run/events.ts
+index a230e3f8..3a5701b7 100644
+--- a/examples/swarm/src/run/events.ts
++++ b/examples/swarm/src/run/events.ts
+@@ -87,7 +87,7 @@ export function recordsFrom(
+             ? "shared"
+             : "disjoint";
+       changes.set(changeId, {
+-        index: workerOf(label) ?? changes.size,
++        index: changes.size,
+         kind,
+         changeId,
+         outcome: "unfinished",

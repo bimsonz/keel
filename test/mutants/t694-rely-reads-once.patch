@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t694.rely-race
+# kills: t694.rely-race
+# why: a rely commits on what it read before a revise moved its intent, so its preflight reads the changes near an intent it no longer has
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e152f56e..f608a261 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1108,7 +1108,7 @@ export const rely: (
+           Transition<Change>,
+           IntentMoved | ChangeNotFound | LeaseStale | ChangeStateRefused
+         > => {
+-          if (!lastRead && storedChange(tx.store, changeId)?.intent.revision !== readAt)
++          if (lastRead && storedChange(tx.store, changeId)?.intent.revision !== readAt)
+             return Result.fail(INTENT_MOVED);
+           const after = intentAfter(tx.store, changeId, relying);
+           const preflight = preflightOf(changeId, after, near, decided);

@@ -12,9 +12,11 @@
 // in the built console imports this.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
+import type { ConnectOutcome } from "../../../src/account/credentials.ts";
 import type {
   AgentCard,
   AgentProfile,
+  CloudflareConnect,
   Credential,
   Credentials,
   DecisionPage,
@@ -103,6 +105,16 @@ const CREDENTIAL_LABEL = /^\S(?:.*\S)?$/;
 const ACCOUNT_ID = /^[0-9a-f]{32}$/;
 /** The most deploy targets Keel lets a project hold. */
 export const TARGETS_MOST = 16;
+/** Cloudflare's consent screen, which the stand-in's Connect answers; the test plays the consent. */
+export const CONSENT_URL = "https://dash.cloudflare.com/oauth2/auth";
+/** The account a consent grants, unless a test says another. */
+export const CONSENT_ACCOUNT = "0123456789abcdef0123456789abcdef";
+/** What Keel says next of a token that does not reach its account: connect it again, through Cloudflare. */
+const CONNECT_AGAIN: NextAction = {
+  kind: "call",
+  title: "Connect the account again through Cloudflare, which makes Keel a new token",
+  operationId: "Delivery_beginCloudflareConnect",
+};
 
 /**
  * How long a question waits for the person asked first before Keel lists it to its namespace's maintainers
@@ -419,6 +431,10 @@ export function createFakeKeel(
      * account's subdomain is `keel-previews`.
      */
     cloudflare?: (asked: { secret: string; accountId: string }) => Reached;
+    /** The one account Cloudflare's consent grants a Connect: `CONSENT_ACCOUNT` unless a test says another. */
+    consentAccount?: string;
+    /** Whether the instance has an OAuth client on Cloudflare: yes unless a test says no. */
+    oauthClient?: boolean;
     /**
      * How many entries of other projects the instance's log holds ahead of this project's first. Keel's log is
      * the whole instance's: a page is its next stretch with the project's entries picked out, so a stretch
@@ -620,6 +636,8 @@ export function createFakeKeel(
    * only to say, as Cloudflare would, whether it reaches an account. Nothing it answers holds it.
    */
   const stored = new Map<string, { credential: Credential; secret: string }[]>();
+  /** Each owner's Connect, begun and not finished: one at a time, as Keel holds them. */
+  const connects = new Map<string, { state: string; name: string }>();
   /** Each project's deploy targets, by its id and then by name. */
   const targeted = new Map<string, Map<string, DeployTargetView>>();
   const cloudflare =
@@ -1056,6 +1074,91 @@ export function createFakeKeel(
           return new Response(null, { status: 204 });
         }
       }
+      // Connecting a Cloudflare account, as Keel does it: begin answers Cloudflare's consent screen with a state of
+      // the project and a nonce, held for the owner who began it; the callback, where the consent sends them back,
+      // spends the state, mints a token on the one account the consent granted, keeps it as a credential named for
+      // the project and sets the target with it, asking the account first. The consent itself is the test's to play.
+      const connectOf =
+        /^\/v1\/projects\/([^/]+)\/deploy-targets\/([^/]+)\/cloudflare-connect$/.exec(url.pathname);
+      const placeOfProject = (projectId: string) => {
+        if (projectId === project.id)
+          return visible ? { namespace: project.namespace, name: project.name } : undefined;
+        const mine = [...made.values()].find((one) => one.view.id === projectId);
+        return mine !== undefined && mine.by === reader?.id
+          ? { namespace: mine.view.namespace, name: mine.view.name }
+          : undefined;
+      };
+      if (connectOf !== null && request.method === "POST") {
+        if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+        if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+        if (options.oauthClient === false)
+          return problem(
+            503,
+            "cloudflare.not_configured",
+            [],
+            "This Keel has no OAuth client registered with Cloudflare, so no account can be connected through it yet.",
+          );
+        const projectId = decodeURIComponent(connectOf[1] ?? "");
+        const name = decodeURIComponent(connectOf[2] ?? "");
+        const place = placeOfProject(projectId);
+        if (place === undefined) return gone();
+        if (!(await owns(place.namespace.handle, place.namespace.kind)))
+          return refusedRole(place.namespace.kind);
+        const state = `${projectId}.${crypto.randomUUID().replaceAll("-", "").padEnd(43, "0")}`;
+        connects.set(reader.id, { state, name });
+        const consent = new URL(CONSENT_URL);
+        consent.searchParams.set("state", state);
+        return Response.json({ authorizeUrl: consent.toString() } satisfies CloudflareConnect);
+      }
+      if (url.pathname === "/v1/cloudflare/callback" && request.method === "GET") {
+        if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+        const state = url.searchParams.get("state") ?? "";
+        const place = placeOfProject(state.split(".")[0] ?? "");
+        if (place === undefined) return gone();
+        if (!(await owns(place.namespace.handle, place.namespace.kind)))
+          return refusedRole(place.namespace.kind);
+        const projectId = state.split(".")[0] ?? "";
+        const pending = connects.get(reader.id);
+        if (pending?.state === state) connects.delete(reader.id);
+        const handle = place.namespace.handle.toLowerCase();
+        const finish = (): ConnectOutcome => {
+          if (url.searchParams.has("error"))
+            return url.searchParams.get("error") === "access_denied" ? "denied" : "refused";
+          if (pending?.state !== state || !url.searchParams.has("code")) return "expired";
+          const accountId = options.consentAccount ?? CONSENT_ACCOUNT;
+          const secret = `minted-${crypto.randomUUID()}`;
+          const credential: Credential = {
+            id: `crd_${crypto.randomUUID().replaceAll("-", "").slice(0, 26).toUpperCase()}`,
+            label: `Keel deploys: ${place.namespace.handle}/${place.name}`.slice(0, 64).trimEnd(),
+            provider: "cloudflare",
+            createdAt: new Date(now()).toISOString(),
+            createdBy: reader.id ?? "",
+          };
+          stored.set(handle, [...(stored.get(handle) ?? []), { credential, secret }]);
+          const reached = cloudflare({ secret, accountId });
+          if (!reached.reaches) return "unreachable";
+          if (reached.subdomain === undefined) return "no-workers-dev";
+          const set = targeted.get(projectId) ?? new Map<string, DeployTargetView>();
+          if (!set.has(pending.name) && set.size >= TARGETS_MOST) return "full";
+          set.set(pending.name, {
+            name: pending.name,
+            provider: "cloudflare",
+            accountId,
+            credential: credential.id,
+            workersDev: `${reached.subdomain}.workers.dev`,
+          });
+          targeted.set(projectId, set);
+          return "connected";
+        };
+        const outcome = finish();
+        return new Response(null, {
+          status: 303,
+          headers: {
+            location: `/${place.namespace.handle}/${place.name}/settings?cloudflare=${outcome}`,
+            "keel-cloudflare-outcome": outcome,
+          },
+        });
+      }
       const targetsOf = /^\/v1\/projects\/([^/]+)\/deploy-targets(?:\/([^/]+))?$/.exec(
         url.pathname,
       );
@@ -1125,12 +1228,7 @@ export function createFakeKeel(
                   title: "Read the namespace's credentials",
                   operationId: "Delivery_listCredentials",
                 },
-                {
-                  kind: "call",
-                  title:
-                    "Store a Cloudflare API token that may edit Workers on the account, then set the target with it",
-                  operationId: "Delivery_createCredential",
-                },
+                CONNECT_AGAIN,
               ],
               `Deploy target ${name} names a credential this project's namespace does not hold. A target uses only a credential of its own project's namespace.`,
             );
@@ -1139,17 +1237,11 @@ export function createFakeKeel(
             reached.reaches || reached.code === undefined
               ? ""
               : ` (Cloudflare error ${reached.code})`;
-          const storeAnother: NextAction = {
-            kind: "call",
-            title:
-              "Store a Cloudflare API token that may edit Workers on the account, then set the target with it",
-            operationId: "Delivery_createCredential",
-          };
           if (!reached.reaches)
             return problem(
               422,
               "deploy_target.unreachable",
-              [storeAnother],
+              [CONNECT_AGAIN],
               reached.why === "token-invalid"
                 ? `Cloudflare refused the credential's token${code}: it is invalid, expired or revoked. Nothing was set.`
                 : `The credential's token does not reach the account's Workers${code}: check the account id, and that the token may edit Workers on that account. Nothing was set.`,

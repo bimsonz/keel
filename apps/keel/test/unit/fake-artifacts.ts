@@ -51,6 +51,12 @@ export class FakeArtifacts implements Artifacts {
   readonly reads: FakeRead[] = [];
   /** Blob ids whose reads answer a little after the others, so reads made together finish out of the order asked. */
   readonly slow = new Set<string>();
+  /** Blobs whose reads wait for their gate to open. */
+  readonly gates = new Map<string, Promise<void>>();
+  /** Each handle's reads past this many fail, as a live handle's fail at its 5,004th. */
+  handleReads: number | undefined;
+  /** Every handle `get()` opened: its repo, the reads it served, and how often it was disposed. */
+  readonly handles: { readonly repo: string; reads: number; disposed: number }[] = [];
   private readonly objects = new Map<string, FakeObjects>();
   private minted = 0;
 
@@ -86,7 +92,10 @@ export class FakeArtifacts implements Artifacts {
     };
   }
 
+  /** As the binding does: a name that is taken is refused. */
   create(name: string): Promise<ArtifactsCreateRepoResult> {
+    if (this.repos.has(name))
+      return Promise.reject(new Error(`ArtifactsError: repo already exists: ${name}`));
     return Promise.resolve(this.created(name));
   }
 
@@ -94,10 +103,19 @@ export class FakeArtifacts implements Artifacts {
     if (!this.repos.has(name))
       return Promise.reject(new NotFound(`Repository not found: ${name}.`));
     this.opened.push(name);
+    const handle = { repo: name, reads: 0, disposed: 0 };
+    this.handles.push(handle);
     const tokens = () => this.repos.get(name) ?? [];
     const served = () => this.objects.get(name) ?? {};
-    const read = (kind: FakeRead["kind"], oid: string) =>
+    const read = (kind: FakeRead["kind"], oid: string) => {
+      handle.reads += 1;
+      if (this.handleReads !== undefined && handle.reads > this.handleReads)
+        throw new Error("ArtifactsError: An internal error occurred.");
       this.reads.push({ kind, repo: name, oid });
+    };
+    const live = () => {
+      if (handle.disposed > 0) throw new Error("ArtifactsError: the handle was disposed");
+    };
     const repo: ArtifactsRepo = {
       createToken: (scope = "write") => {
         const t = this.mint(name, scope);
@@ -139,17 +157,22 @@ export class FakeArtifacts implements Artifacts {
           readOnly: false,
         }),
       readBlob: async (hash) => {
+        live();
         read("blob", hash);
         if (this.slow.has(hash)) await new Promise((resolve) => setTimeout(resolve, 5));
+        await this.gates.get(hash);
+        live();
         const text = served().blobs?.[hash];
         return text === undefined ? null : new Blob([text]);
       },
-      readTree: (hash) => {
+      readTree: async (hash) => {
+        live();
         read("tree", hash);
         const entries = served().trees?.[hash];
         return Promise.resolve(entries === undefined ? null : [...entries]);
       },
-      readCommit: (hash) => {
+      readCommit: async (hash) => {
+        live();
         read("commit", hash);
         const tree = served().commits?.[hash];
         return Promise.resolve(
@@ -169,7 +192,9 @@ export class FakeArtifacts implements Artifacts {
       },
       readFile: () => unfaked("readFile"),
       log: () => unfaked("log"),
-      [Symbol.dispose]: () => undefined,
+      [Symbol.dispose]: () => {
+        handle.disposed += 1;
+      },
     };
     return Promise.resolve(repo);
   }

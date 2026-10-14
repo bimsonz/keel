@@ -85,6 +85,52 @@ resource "cloudflare_secrets_store_secret" "credential_kek" {
   scopes     = ["workers"]
 }
 
+# Keel's OAuth client on Cloudflare: what an owner consents to when they
+# connect a project's deploy target to their own account, from the project's
+# settings. Its two scopes let keel mint, on the one account the owner ticks,
+# an API token of its own that may only edit that account's Workers, and read
+# which account that was; keel deploys with that token, never with the
+# consent's own access. The scopes are keel's CLOUDFLARE_SCOPES, which a unit
+# test holds equal to these. Private until made public, which needs a logo and
+# the host's domain verified: until then only this account's members consent.
+resource "cloudflare_oauth_client" "keel" {
+  # Optional configuration: made only once the operator has the token that may
+  # make it. Without it the instance still applies and deploys, with no client.
+  count                      = var.oauth_clients_api_token == "" ? 0 : 1
+  provider                   = cloudflare.oauth_clients
+  account_id                 = var.account_id
+  client_name                = "Keel"
+  grant_types                = ["authorization_code"]
+  response_types             = ["code"]
+  redirect_uris              = ["https://${var.host}/v1/cloudflare/callback"]
+  token_endpoint_auth_method = "client_secret_basic"
+  scopes                     = ["account-api-tokens.write", "account-settings.read"]
+  client_uri                 = "https://${var.host}"
+  policy_uri                 = "https://${var.host}/privacy"
+  tos_uri                    = "https://${var.host}/terms"
+
+  # The provider answers oauth_client_id and visibility after creating the
+  # client where it planned null: the id it reads back is the client's own, and
+  # visibility is Cloudflare's "private", which the provider cannot be told
+  # (it takes only "public"). A later plan must change neither.
+  lifecycle {
+    ignore_changes = [oauth_client_id, visibility]
+  }
+}
+
+# The client's secret, which Cloudflare issues once, as the client is made, and
+# Terraform keeps only in its state: keel reads it through its
+# CF_OAUTH_CLIENT_SECRET binding to exchange a consent's code. No person
+# handles it, and no output carries it.
+resource "cloudflare_secrets_store_secret" "cloudflare_oauth_client_secret" {
+  count      = length(cloudflare_oauth_client.keel)
+  account_id = var.account_id
+  store_id   = local.secrets_store_id
+  name       = "${local.prefix}-cloudflare-oauth-client-secret"
+  value      = cloudflare_oauth_client.keel[0].client_secret
+  scopes     = ["workers"]
+}
+
 # Better Auth's secret: it signs the session cookies and encrypts what Better
 # Auth keeps sealed. scripts/deploy.ts sets it as BETTER_AUTH_SECRET. Replacing
 # it signs every user out.

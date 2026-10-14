@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-connect.test.ts
+# kills: connect.once
+# why: a Connect's state is not spent when its callback comes, so the same consent sets a target twice
+diff --git a/packages/core/src/application/delivery/deploy-targets.ts b/packages/core/src/application/delivery/deploy-targets.ts
+index a60180bb..b59a8385 100644
+--- a/packages/core/src/application/delivery/deploy-targets.ts
++++ b/packages/core/src/application/delivery/deploy-targets.ts
+@@ -306,7 +306,6 @@ export const takeConnect: (
+     const now = yield* Clock.use((clock) => clock.now);
+     const key = pendingKey(projectId, by);
+     const value = store.get(PENDING_CONNECTS, key);
+-    store.remove(PENDING_CONNECTS, key);
+     return yield* Effect.fromResult(
+       finishConnect(value === undefined ? undefined : decodePending(value), nonce, now),
+     );

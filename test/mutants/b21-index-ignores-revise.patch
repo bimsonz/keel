@@ -2,15 +2,15 @@
 # kills: b21.live-index
 # why: the index keeps a change's declared intent through its revisions, so preflight compares stale premises
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index a0d9ef2..73e4148 100644
+index 50c23c55..79b58c5f 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -155,7 +155,7 @@ export function hearLiveChange(
-       store.put(
-         LIVE_CHANGE,
-         changeId,
--        encodeRow({ ...live, intent: reviseIntent(live.intent, revised) }),
-+        encodeRow(live),
-       );
+@@ -269,7 +269,7 @@ export function hearLiveChange(
+     case "IntentRevised": {
+       if (live === undefined) return [];
+       const revised = Schema.decodeUnknownSync(IntentRevised)(event.payload);
+-      putLive(store, changeId, live, { ...live, intent: reviseIntent(live.intent, revised) });
++      putLive(store, changeId, live, live);
        return [];
      }
+     case "EffectsDerived": {

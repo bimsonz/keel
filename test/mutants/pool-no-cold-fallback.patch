@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.cold-fallback
+# why: A warm instance that cannot take its event fails the delivery, where the submission should start cold
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index 2c3690f3..59102256 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -136,8 +136,7 @@ async function startWarm(
+     await (await workflow.get(answer)).sendEvent({ type: POOL_CLAIM_EVENT, payload: params });
+     return true;
+   } catch (cause) {
+-    console.error(`the warm pool could not take ${eventId}, so it starts cold: ${String(cause)}`);
+-    return false;
++    throw cause;
+   }
+ }
+ 

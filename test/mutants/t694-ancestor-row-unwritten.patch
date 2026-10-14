@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: A live change gets no row at its subjects' ancestors, so a read at my subject's parent misses its siblings and deeper descendants.
+diff --git a/packages/core/src/domain/coordination/near.ts b/packages/core/src/domain/coordination/near.ts
+index 2236b160..1d8fc562 100644
+--- a/packages/core/src/domain/coordination/near.ts
++++ b/packages/core/src/domain/coordination/near.ts
+@@ -40,7 +40,7 @@ export const nearKeysOf = (live: LiveChange): NearKeys => {
+   for (const { subject } of stated) subjects.set(subject, true);
+   for (const { subject } of stated)
+     for (const ancestor of subjectAncestors(subject))
+-      if (!subjects.has(ancestor)) subjects.set(ancestor, false);
++      if (!subjects.has(ancestor)) continue;
+   return {
+     subjects,
+     footprints: live.intent.footprint.map((entry) => footprintPrefix(entry.path)),

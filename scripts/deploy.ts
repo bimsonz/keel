@@ -21,6 +21,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
+import { CLIENT_ID_VAR, oauthClientAtDeploy } from "./lib/oauth-client.ts";
 import { examplePinProblems, pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
 import { ApiRefused, verifyStore } from "./lib/cloudflare-api.ts";
@@ -193,6 +194,20 @@ function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string;
       requireOutput(outputs, "bundle_url_public_key", "the bundle URL public key"),
     );
 
+  // Keel's OAuth client on Cloudflare: for the instance's users, never a condition of deploying the instance.
+  const oauthClient = oauthClientAtDeploy(committed, outputs);
+  if (oauthClient.kind === "registered") set(["vars", CLIENT_ID_VAR], oauthClient.clientId);
+  if (oauthClient.kind === "unregistered") {
+    if (oauthClient.dropSecretAt !== undefined)
+      text = applyEdits(
+        text,
+        modify(text, ["secrets_store_secrets", oauthClient.dropSecretAt], undefined, {
+          formattingOptions: { insertSpaces: true, tabSize: 2 },
+        }),
+      );
+    console.log(`${source}: ${oauthClient.said}`);
+  }
+
   // The keys Keel's commits verify against: its signers file, and what its composer checks its own key by.
   if (isObject(vars) && "KEEL_COMMIT_SIGNERS" in vars)
     set(
@@ -347,7 +362,7 @@ function containerBuildEnv(scratch: string): Record<string, string> {
  * The routes and MCP tools are generated from the spec into gitignored files
  * that only `pnpm gen` writes, so a clone whose last gen predates a spec change
  * would deploy the old routes beside the new handlers (12 Oct: getChange still
- * demanded a token after 11adb24 let anyone read it). Every run generates them
+ * demanded a token after e1dece5 let anyone read it). Every run generates them
  * from this tree first.
  */
 function generate(): void {

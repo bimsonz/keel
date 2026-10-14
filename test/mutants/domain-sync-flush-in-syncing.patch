@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.flush-held
+# kills: sync.flush-held
+# why: a group starts on the old head while a sync is moving main
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..536488f3 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -373,7 +373,9 @@ export const decidePromotion = (
+     }
+ 
+     case "Flush":
+-      return trunk.phase === "debouncing" ? flush(trunk, command) : refuse(trunk, command);
++      return trunk.phase === "debouncing" || trunk.phase === "syncing"
++        ? flush(trunk, command)
++        : refuse(trunk, command);
+ 
+     case "Composed":
+       if (trunk.phase !== "promoting" || wal === undefined) return refuse(trunk, command);

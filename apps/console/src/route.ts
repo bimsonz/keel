@@ -13,7 +13,6 @@
 //   P/decisions[?subject=<key>]    what was ruled     P/decisions/<D-n>
 //   P/mission-control              the live graph     P/subjects/<key>      with that subject open
 //   P/insights[/funnel|/benchmark]
-//   P/agents                       the agents at work   P/agents/<handle>   one agent's runs here
 //   P/settings                     who may read the project
 //
 // `ref` is a commit, or `trunk` for wherever trunk's head is. Nothing here
@@ -50,9 +49,6 @@ export type Route =
   | { at: "decision"; name: string }
   | { at: "mission-control"; subject?: string }
   | { at: "insights"; tab: InsightsTab }
-  | { at: "agents"; shown: number }
-  /** One agent in this project, by its handle, or by Keel's id for it where the log gives it none. */
-  | { at: "agent"; name: string }
   | { at: "settings" }
   /** An address that names nothing the console has. */
   | { at: "missing" };
@@ -156,12 +152,6 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       return first === undefined || more.length > 0
         ? MISSING
         : { at: "mission-control", subject: first };
-    case "agents":
-      if (first === undefined) {
-        const shown = Number(query.get("shown"));
-        return { at: "agents", shown: Number.isInteger(shown) && shown > PAGE ? shown : PAGE };
-      }
-      return more.length > 0 ? MISSING : { at: "agent", name: first };
     case "insights": {
       if (first === undefined) return { at: "insights", tab: "trunk" };
       const tab = among(INSIGHTS_TABS.slice(1), first);
@@ -237,10 +227,6 @@ function pathOf(route: Route): string[] {
       return ["decisions", route.name];
     case "insights":
       return ["insights", ...(route.tab === "trunk" ? [] : [route.tab])];
-    case "agents":
-      return ["agents"];
-    case "agent":
-      return ["agents", route.name];
     case "settings":
       return ["settings"];
     default:
@@ -254,16 +240,10 @@ function queryOf(route: Route): string {
     return route.subject === undefined
       ? ""
       : new URLSearchParams({ subject: route.subject }).toString();
-  if (
-    route.at !== "changes" &&
-    route.at !== "conflicts" &&
-    route.at !== "escalations" &&
-    route.at !== "agents"
-  )
-    return "";
+  if (route.at !== "changes" && route.at !== "conflicts" && route.at !== "escalations") return "";
   const first: string = route.at === "changes" ? "in-flight" : "open";
   const query = new URLSearchParams();
-  if (route.at !== "agents" && route.filter !== first) query.set("state", route.filter);
+  if (route.filter !== first) query.set("state", route.filter);
   if (route.shown > PAGE) query.set("shown", String(route.shown));
   return query.toString();
 }

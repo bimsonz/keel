@@ -2,13 +2,13 @@
 # kills: trunk.subscribes
 # why: a declined batch starts a Deliver, as if trunk had moved
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 3f7b0f67..4536799d 100644
+index d3bfebf6..338faff3 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -516,7 +516,7 @@ export const trunkHeard = (
+@@ -527,7 +527,7 @@ export const trunkHeard = (
    for (const member of members)
      tx.outbox.subscribe(`change:${member}`, ["TrunkAdvanced"], changeRef(member));
-   tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined"]);
+   tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined", "TrunkSynced"]);
 -  tx.outbox.subscribe(DELIVER, ["TrunkAdvanced"]);
 +  tx.outbox.subscribe(DELIVER, ["TrunkAdvanced", "PromotionDeclined"]);
    return true;

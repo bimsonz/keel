@@ -11,6 +11,7 @@ export { ProjectDO } from "./adapters/driving/do/project.ts";
 export { ProjectorDO } from "./adapters/driving/do/projector.ts";
 export { SubjectDO } from "./adapters/driving/do/subject.ts";
 export { TrunkDO } from "./adapters/driving/do/trunk.ts";
+export { WorkflowPoolDO } from "./adapters/driving/do/workflow-pool.ts";
 export { WorkspacePoolDO } from "./adapters/driving/do/workspace-pool.ts";
 export { BoxGate } from "./adapters/driving/do/boxgate.ts";
 export { MergeBox, MergeBoxDeny, MergeBoxEgress } from "./adapters/driving/do/mergebox.ts";

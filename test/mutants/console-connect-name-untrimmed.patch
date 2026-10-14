@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.connect
+# why: the target's name is sent as typed, with the space around it, which no target's name has
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 26e31fe8..0f6d2295 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -703,7 +703,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+       async beginConnect(named) {
+         const input: Delivery_beginCloudflareConnectInput = {
+           projectId: project.id,
+-          name: named.trim(),
++          name: named,
+         };
+         const response = await request(
+           `${origin}/v1/projects/${encodeURIComponent(input.projectId)}/deploy-targets/${encodeURIComponent(input.name)}/cloudflare-connect`,

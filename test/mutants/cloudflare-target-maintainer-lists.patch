@@ -2,15 +2,15 @@
 # kills: target.owner-only, authz.deploy-owner-only
 # why: a maintainer may list a project's deploy targets, with their accounts and their credentials' ids, which only an owner may
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 64994aa5..3cb58ad1 100644
+index 37eb593e..302cc7e5 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -179,7 +179,7 @@ export const SPEC_ACTIONS = {
+@@ -180,7 +180,7 @@ export const SPEC_ACTIONS = {
    Delivery_listCredentials: rule("Namespace", "ownAsUser"),
    Delivery_deleteCredential: rule("Namespace", "ownAsUser"),
    Delivery_putDeployTarget: rule("Project", "ownAsUser"),
 -  Delivery_listDeployTargets: rule("Project", "ownAsUser"),
 +  Delivery_listDeployTargets: rule("Project", "maintain"),
    Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
- } as const satisfies Record<string, ActionRule>;
- 
+   Delivery_beginCloudflareConnect: rule("Project", "ownAsUser"),
+   Delivery_completeCloudflareConnect: rule("Project", "ownAsUser"),

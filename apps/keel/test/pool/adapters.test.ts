@@ -15,6 +15,7 @@ import {
 } from "@keeltown/core/ports";
 import { SPONSOR_ASK } from "@keeltown/core/application/identity";
 import {
+  liveChanges,
   namespaceAddress,
   subjectAddress,
   suspectConflict,
@@ -38,7 +39,10 @@ import { ConflictMovesRpc } from "../../src/adapters/driven/do-rpc/conflict-move
 import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
 import { HumanGateRpc } from "../../src/adapters/driven/do-rpc/human-gate.ts";
 import { ProbeLedgerRpc } from "../../src/adapters/driven/do-rpc/probe-ledger.ts";
+import { EntityStoreSql } from "../../src/adapters/driven/do-storage/entity-store.ts";
 import type { NamespaceDO } from "../../src/adapters/driving/do/namespace.ts";
+import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
+import type { ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { SponsorshipsRpc } from "../../src/adapters/driven/do-rpc/sponsorships.ts";
@@ -94,14 +98,45 @@ PORTS.Inbox.contract("AgentSession DO over RPC", () => ({
 const projectObject = (projectId: ProjectId) =>
   drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
 
-// The live-change index on each project's Project DO, fed through its `receive` as the fan-out feeds it.
+// The live-change index on each project's Project DO, fed through its `receive` as the fan-out feeds it,
+// and its rows read inside the object.
 PORTS.LiveChanges.contract("Project DO over RPC", () => ({
   layer: LiveChangesRpc(projectObject),
   hear: (projectId, event) =>
     Effect.promise(async () => {
       await projectObject(projectId).receive([Schema.encodeSync(EventEnvelope)(event)]);
     }),
+  rows: (projectId, kind) =>
+    Effect.promise(() =>
+      runInDurableObject(projectObject(projectId), (instance: ProjectDO) =>
+        instance["runtime"].runPromise(
+          Effect.map(EntityStore, (store) => store.list(kind).map((row) => row.id)),
+        ),
+      ),
+    ),
+  live: (projectId) =>
+    Effect.promise(() =>
+      runInDurableObject(projectObject(projectId), (instance: ProjectDO) =>
+        instance["runtime"].runPromise(Effect.map(EntityStore, liveChanges)),
+      ),
+    ),
 }));
+
+// DO SQLite can only be touched from inside its Durable Object, so each program runs there, on that object's storage.
+PORTS.EntityStore.contract("do-sqlite", () => {
+  const stub = env.PROJECTOR.get(env.PROJECTOR.idFromName(`contract:${ulid()}`));
+  return {
+    run: (program) =>
+      Effect.flatMap(
+        Effect.promise(() =>
+          runInDurableObject(stub, (_instance: ProjectorDO, state) =>
+            Effect.runPromiseExit(Effect.provide(program, EntityStoreSql(state.storage))),
+          ),
+        ),
+        (exit) => exit,
+      ),
+  };
+});
 
 /** A subject's Subject DO, drained after each case. */
 const subjectObject = (address: string) =>

@@ -178,12 +178,21 @@ export const promotionChart: Chart = {
   initial: "idle",
   meta: { createdBy: "TrunkInitialized", section: "Promotion (Trunk DO)" },
   states: {
-    idle: { on: { BatchVerified: p("debouncing") } },
+    idle: { on: { BatchVerified: p("debouncing"), TrunkSyncStarted: p("syncing") } },
     debouncing: {
       on: {
         BatchVerified: p("debouncing"),
         ...settles("PromotionDeclined"),
         PromotionStarted: p("promoting"),
+        PromotionFrozen: p("frozen"),
+        TrunkSyncStarted: p("syncing"),
+      },
+    },
+    // A sync from upstream: its write-ahead entry, then main moved and read back. Batches queue meanwhile.
+    syncing: {
+      on: {
+        BatchVerified: p("syncing"),
+        ...settles("TrunkSynced"),
         PromotionFrozen: p("frozen"),
       },
     },

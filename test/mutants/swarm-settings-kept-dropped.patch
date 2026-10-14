@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.settings
+# why: Changing one setting sends only the paths and that setting: the PUT resets the project's batch size and everything else unnamed
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index 59148d0b..cd91a38b 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -96,7 +96,6 @@ export class Keyring extends DurableObject<Env> {
+     const client = await this.#client({ project, run: "settings" }, "api");
+     const settings = await client.settings(project);
+     const set = await client.putSettings(project, {
+-      ...settings,
+       protectedPaths: [...settings.protectedPaths],
+       ...(change.visibility === undefined ? {} : { visibility: change.visibility }),
+       ...(change.verification === undefined ? {} : { verification: change.verification }),

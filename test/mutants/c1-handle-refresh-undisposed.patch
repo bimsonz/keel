@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refreshing-handle.test.ts -t "artifacts.handle-refresh]"
+# kills: artifacts.handle-refresh
+# why: a handle left behind, and the last one, are never disposed, so a long walk keeps every handle it ever opened
+diff --git a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+index 70338c0e..c92f36c4 100644
+--- a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
++++ b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+@@ -45,7 +45,6 @@ export function refreshingReads(
+   const retire = (each: Held) => {
+     if (each.retired) return;
+     each.retired = true;
+-    settle(each);
+   };
+   const take = async (): Promise<Held> => {
+     while (held.served >= limit) {

@@ -103,6 +103,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Users_me: (c) => c.me(),
   Operator_getSettings: (c) => c.settings("prj_1"),
   Operator_putSettings: (c) => c.putSettings("prj_1", { protectedPaths: [], maxBatchSize: 1 }),
+  Operator_syncUpstream: (c) => c.syncUpstream("prj_1"),
   Operator_enrolAgent: (c) =>
     c.enrolAgent({ name: "a1", projectId: "prj_1", kind: "hosted", scopes: ["agent:work"] }),
   Operator_suspendAgent: (c) => c.suspendAgent("agt_1", { reason: "r" }),
@@ -122,6 +123,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
     }),
   Delivery_listDeployTargets: (c) => c.deployTargets("prj_1"),
   Delivery_deleteDeployTarget: (c) => c.deleteDeployTarget("prj_1", "forge-lite"),
+  Delivery_beginCloudflareConnect: (c) => c.beginCloudflareConnect("prj_1", "forge-lite"),
 };
 
 const isRouted = (operation: string): operation is RoutedOperation => operation in ROUTES;

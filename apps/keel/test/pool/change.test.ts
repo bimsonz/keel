@@ -746,6 +746,31 @@ describe("a change moved by its real lane's delivered events", () => {
     expect(trunk.writer.pushes()).toEqual([{ from: lane.base, to: tip }]);
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
+
+  it("[a11.declare-replay-landed] a declare retried under its key once its change has landed through its real Trunk DO is refused for the landed state, not a defect, and asks the pool for nothing", async () => {
+    await using precheck = await inertPrecheck();
+    const projectId = makeId("prj", ulid());
+    const lane = await realLane(projectId);
+    await realTrunk(projectId, lane);
+    const c = await changeUnderTest(projectId);
+    await queue(c);
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
+    const batchId = (await c.current()).batchId;
+    const [, started] = await lane.job(batchId);
+    await lane.candidate(started.candidateId);
+    await lane.verdict(batchId, "land", ["suite: 12 passed"]);
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("landed"), WAIT);
+    const before = { granted: [...c.pool.granted], released: [...c.pool.released] };
+
+    const retried = refusal(await c.declare());
+
+    expect(retried).toContain('"_tag":"ChangeStateRefused"');
+    expect(retried).toContain('"state":"landed"');
+    expect(retried).toContain('"command":"Declare"');
+    expect(retried).not.toContain("Die");
+    expect({ granted: [...c.pool.granted], released: [...c.pool.released] }).toEqual(before);
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
 });
 
 /** KeelVerify's remedy for a red suite, naming the failing tests it read. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.claim-once
+# why: A warm instance handed out stays in the pool, so the next claim gets the same instance and two submissions share one run
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..f5052fbe 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -88,7 +88,7 @@ export function claim(
+   const answer = first?.id ?? COLD;
+   return {
+     answer,
+-    state: { warm: first === undefined ? pool.warm : rest },
++    state: { warm: pool.warm },
+     kept: { eventId, answer, forgetAt: now + CLAIM_MEMORY_MS },
+   };
+ }

@@ -2,19 +2,20 @@
 # kills: b21.contradiction
 # why: the interim move comes back: refine on any contradiction, else proceed, and the domain's preflight is never asked
 diff --git a/packages/core/src/application/coordination/preflight.ts b/packages/core/src/application/coordination/preflight.ts
-index 78827d7d..4876c7de 100644
+index 25a3f38d..63beb3ac 100644
 --- a/packages/core/src/application/coordination/preflight.ts
 +++ b/packages/core/src/application/coordination/preflight.ts
-@@ -30,7 +30,12 @@ export function preflightFor(
+@@ -31,7 +31,13 @@ export function preflightFor(
  ): PreflightFinding {
-   const found = exposure(self, intent, live);
+   const found = exposure(self, intent, near.changes);
    return {
--    preflight: preflight(self, intent, found, precedents),
+-    preflight: { ...preflight(self, intent, found, precedents), compared: near.compared },
 +    preflight: {
 +      neighbours: found.neighbours,
 +      contradictions: found.contradictions,
 +      precedents: [],
 +      suggestedMove: found.contradictions.length > 0 ? "refine" : "proceed",
++      compared: near.compared,
 +    },
      unreadable: found.unreadable.length,
    };

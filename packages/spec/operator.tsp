@@ -7,6 +7,18 @@ using Http;
 
 namespace Keel;
 
+/** What a sync from upstream did. */
+model UpstreamSync {
+  /** Trunk's head before the sync. */
+  from: CommitSha;
+
+  /** Upstream's head: trunk's head once `synced`. */
+  to: CommitSha;
+
+  /** Whether trunk is at `to` now. False with `from` equal to `to` when trunk was already level with upstream; false with them apart while a move the code host kept busy is finished, which the feed then shows as `TrunkSynced`. */
+  synced: boolean;
+}
+
 /** A project and where it lives: `/<namespace>/<name>`. */
 model ProjectView {
   id: ProjectId;
@@ -215,6 +227,23 @@ interface Operator {
   @route("/projects/{projectId}/settings")
   @get
   getSettings(@path projectId: ProjectId): ProjectSettings | NotFound | StandardErrors;
+
+  /**
+   * Moves an imported project's trunk forward to the head of the upstream branch its import took, as GitHub's
+   * "Sync fork" does: each upstream commit is kept as it is, and trunk moves only when upstream's head descends from
+   * trunk's. Its owners alone may ask. Refused, with nothing moved: a project that was not imported
+   * (`project.not_imported`); a trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both heads); a
+   * promotion in flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch
+   * (`project.upstream_unreachable`); upstream's new history over what Keel takes in one piece
+   * (`project.import_too_large`) or over the namespace's repo bytes (`quota.exceeded`). The feed records the move as
+   * `TrunkSynced`.
+   */
+  @summary("Sync an imported project's trunk from its upstream")
+  @tag("mcp")
+  @useAuth(AgentWork | SessionAuth)
+  @route("/projects/{projectId}/sync")
+  @post
+  syncUpstream(@path projectId: ProjectId): UpstreamSync | NotFound | Conflict | StandardErrors;
 
   @summary("Replace a project's settings")
   @useAuth(SessionAuth)

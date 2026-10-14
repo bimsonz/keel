@@ -83,7 +83,7 @@ Not supported, and they throw: snapshots, fake timers, `vi.mock`, `expect.poll` 
   - one deliberate failure;
   - one un-awaited `.resolves`;
   - one `expect.assertions` failure.
-- `fixtures/forge-lite` as committed at `d0d39d1`: 200 tests in base and 214 in A+B. The fixture was copied into scratch and the patches applied there.
+- `fixtures/forge-lite` as committed at `e7834f9`: 200 tests in base and 214 in A+B. The fixture was copied into scratch and the patches applied there.
 - `memtest/` (22 tests): allocation cases for the memory checks.
 
 **References:**

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.pairs-conflict
+# why: The planted premise pair's two sides rely on the same premise: there is no contradiction to catch
+diff --git a/examples/swarm/src/run/pairs.ts b/examples/swarm/src/run/pairs.ts
+index 50d031ec..04bbd7f7 100644
+--- a/examples/swarm/src/run/pairs.ts
++++ b/examples/swarm/src/run/pairs.ts
+@@ -128,7 +128,7 @@ export function pairsFor(options: {
+       kind: "premise",
+       planted: true,
+       a: test(sha, [yes("0".repeat(40))], true),
+-      b: test(sha, [no("g".repeat(40))], false),
++      b: test(sha, [no("g".repeat(40))], true),
+     },
+     {
+       kind: "premise",

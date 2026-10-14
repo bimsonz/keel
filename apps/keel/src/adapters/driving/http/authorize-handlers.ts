@@ -1,3 +1,4 @@
+import { readConnectState } from "@keeltown/core/domain/delivery";
 import {
   type AgentResource,
   type AuthenticationRequired,
@@ -349,6 +350,12 @@ export const RESOLVERS: Resolvers = {
   Delivery_putDeployTarget: (input) => projectNamed(input.projectId),
   Delivery_listDeployTargets: (input) => projectNamed(input.projectId),
   Delivery_deleteDeployTarget: (input) => projectNamed(input.projectId),
+  Delivery_beginCloudflareConnect: (input) => projectNamed(input.projectId),
+  // The project a Connect's state names: anything else names none, and is refused as a missing one.
+  Delivery_completeCloudflareConnect: (input) =>
+    projectNamed(
+      Option.getOrUndefined(Option.map(readConnectState(input.state), (state) => state.projectId)),
+    ),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),
@@ -377,6 +384,7 @@ export const RESOLVERS: Resolvers = {
 
   Operator_getSettings: (input) => projectNamed(input.projectId),
   Operator_putSettings: (input) => projectNamed(input.projectId),
+  Operator_syncUpstream: (input) => projectNamed(input.projectId),
   Operator_listEscalations: (_input, caller) =>
     caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
   Operator_giveRuling: (input) => escalationProject(input.escalationId),

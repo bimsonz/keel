@@ -12,7 +12,6 @@ import {
   GraphIcon,
   HandPalmIcon,
   type Icon,
-  RobotIcon,
   ScalesIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -34,7 +33,6 @@ export type TabId =
   | "escalations"
   | "decisions"
   | "mission-control"
-  | "agents"
   | "insights"
   | "settings";
 
@@ -67,7 +65,6 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
     Icon: GraphIcon,
     to: { at: "mission-control" },
   },
-  { id: "agents", label: "Agents", Icon: RobotIcon, to: { at: "agents", shown: PAGE } },
   { id: "insights", label: "Insights", Icon: ChartBarIcon, to: { at: "insights", tab: "trunk" } },
   { id: "settings", label: "Settings", Icon: GearIcon, to: { at: "settings" } },
 ];
@@ -93,9 +90,6 @@ export function tabOf(route: Route): TabId | undefined {
       return "decisions";
     case "mission-control":
       return "mission-control";
-    case "agents":
-    case "agent":
-      return "agents";
     case "insights":
       return "insights";
     case "settings":

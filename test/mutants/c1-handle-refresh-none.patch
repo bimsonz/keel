@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refreshing-handle.test.ts -t "artifacts.handle-refresh"
+# kills: artifacts.handle-refresh, artifacts.handle-refresh-settles
+# why: every read goes through the first handle, so a walk of about 5,000 objects or more fails at its 5,004th read and no cold bundle of a large tree completes
+diff --git a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+index 8ba128c3..9a54e36b 100644
+--- a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
++++ b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+@@ -48,7 +48,7 @@ export function refreshingReads(
+     settle(each);
+   };
+   const take = async (): Promise<Held> => {
+-    while (held.served >= limit) {
++    while (held.served >= limit && limit < 0) {
+       opening ??= (async () => {
+         try {
+           const handle = await open();

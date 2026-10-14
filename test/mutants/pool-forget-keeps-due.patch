@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.claims-kept
+# why: The alarm deletes the claims still kept and keeps the one whose memory ended
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool.ts b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+index 59ed23c9..6aa27d11 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+@@ -99,7 +99,7 @@ export class WorkflowPoolDO extends KeelObject implements WorkflowPoolRpc {
+ 
+   protected override async onDeadline(request: StartedAlarm): Promise<void> {
+     if (request.reason === FORGET) {
+-      this.ctx.storage.sql.exec(`DELETE FROM ${CLAIMS} WHERE forget_at <= ?`, Date.now());
++      this.ctx.storage.sql.exec(`DELETE FROM ${CLAIMS} WHERE forget_at > ?`, Date.now());
+       return this.armForget();
+     }
+     if (request.reason !== TOP_UP) return super.onDeadline(request);

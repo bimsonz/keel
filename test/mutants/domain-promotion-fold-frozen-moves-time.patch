@@ -2,11 +2,11 @@
 # kills: promotion.fold-table, trunk.advanced-at
 # why: a freeze moves the time trunk's head last changed, though a freeze is what stops the head moving
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5cfb16f7..c82da27b 100644
+index a14057d8..20849c03 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -597,6 +597,7 @@ export const evolvePromotion = (
-       return atFlush || inGroup
+@@ -684,6 +684,7 @@ export const evolvePromotion = (
+       return atFlush || inGroup || inSync
          ? {
              ...trunk,
 +            advancedAt: committed.at,

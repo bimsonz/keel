@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay-refused"
+# kills: artifacts.import-relay-refused
+# why: a branch the upstream does not advertise is relayed anyway, so the import is not refused as no-branch
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 39246f53..7bff48e5 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -118,8 +118,8 @@ async function relayImport(
+   });
+   const ref = source.ref === undefined ? advertised.head : `${BRANCH}${source.ref}`;
+   const to = ref === undefined ? undefined : advertised.refs.get(ref);
+-  if (ref === undefined || to === undefined) throw new ImportRefused({ reason: "no-branch" });
+-  const move = { ref, from: null, to };
++  if (ref === undefined) throw new ImportRefused({ reason: "no-branch" });
++  const move = { ref, from: null, to: to ?? "" };
+   const pack = await relayPack(upstream, move).catch((e: unknown) => {
+     throw new ImportRefused({ reason: e instanceof PackTooLarge ? "too-large" : "unreachable" });
+   });

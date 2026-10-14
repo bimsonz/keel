@@ -2,15 +2,15 @@
 # kills: promotion.fold-table, trunk.advanced-at
 # why: a resume drops the time trunk's head last changed with the freeze, so a released trunk has none unless the resume moved it
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5cfb16f7..8d617e60 100644
+index a14057d8..ef1138c5 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -610,7 +610,7 @@ export const evolvePromotion = (
+@@ -697,7 +697,7 @@ export const evolvePromotion = (
      case "PromotionResumed":
        return trunk.phase === "frozen" && (wal === undefined || wal.batches.length === 0)
          ? {
--            ...without(trunk, "wal", "frozen"),
-+            ...without(trunk, "wal", "frozen", "advancedAt"),
+-            ...without(trunk, "wal", "frozen", "sync"),
++            ...without(trunk, "wal", "frozen", "sync", "advancedAt"),
              head: event.head ?? trunk.head,
              // A resume at another head changed trunk's head, whoever wrote that commit.
              ...(event.head === undefined || event.head === trunk.head

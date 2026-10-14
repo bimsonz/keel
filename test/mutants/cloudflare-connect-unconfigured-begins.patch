@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-oauth.test.ts
+# kills: oauth.unconfigured
+# why: with no OAuth client registered, Keel still sends an owner to a consent screen that cannot work
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+index c592fffb..859f52cf 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+@@ -122,7 +122,7 @@ export interface CloudflareOAuthOptions {
+ export function CloudflareOAuthLive(options: CloudflareOAuthOptions): Layer.Layer<CloudflareOAuth> {
+   const send: Fetcher = options.fetch ?? ((url, init) => fetch(url, init));
+   const api = options.api ?? CLOUDFLARE_API;
+-  const configured = options.clientId !== "";
++  const configured = true;
+   const ask = async (url: string, init: RequestInit, signal: AbortSignal): Promise<Answer> => {
+     try {
+       const response = await send(url, {

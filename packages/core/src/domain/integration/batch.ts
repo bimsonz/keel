@@ -8,7 +8,13 @@ import {
   ProjectId,
   VerdictId,
 } from "../kernel/index.ts";
-import { BatchAttribution, MemberCommit, PromotionFrozenReason, TrunkOrigin } from "./events.ts";
+import {
+  BatchAttribution,
+  MemberCommit,
+  PromotionFrozenReason,
+  SyncUpstream,
+  TrunkOrigin,
+} from "./events.ts";
 
 export const CandidateState = Schema.Literals([
   "forming",
@@ -56,7 +62,13 @@ export function batchSize(failureRate: number): number {
   return Math.min(MAX_BATCH, Math.max(1, n));
 }
 
-export const PromotionState = Schema.Literals(["idle", "debouncing", "promoting", "frozen"]);
+export const PromotionState = Schema.Literals([
+  "idle",
+  "debouncing",
+  "promoting",
+  "frozen",
+  "syncing",
+]);
 export type PromotionState = typeof PromotionState.Type;
 
 /** A verified batch waiting at the Trunk DO, in arrival order. */
@@ -113,6 +125,10 @@ export const Trunk = Schema.Struct({
    * each group is then one batch, until a push lands.
    */
   solo: Schema.optional(Schema.Literal(true)),
+  /** The open sync from upstream, from its TrunkSyncStarted until TrunkSynced or a freeze resolves it. */
+  sync: Schema.optional(
+    Schema.Struct({ from: CommitSha, to: CommitSha, by: Schema.String, upstream: SyncUpstream }),
+  ),
   frozen: Schema.optional(
     Schema.Struct({
       expected: CommitSha,

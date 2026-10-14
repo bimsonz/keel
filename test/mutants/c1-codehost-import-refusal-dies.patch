@@ -2,13 +2,13 @@
 # kills: artifacts.import-refused
 # why: No refusal of the binding is read as one, so a missing or private upstream is a defect retried for ever and never an answer to the caller
 diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-index 033b5d8e..cc496a7d 100644
+index 39246f53..b48e0700 100644
 --- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-@@ -283,7 +283,7 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
-           catch: (e) => e,
+@@ -390,7 +390,7 @@ export function CodeHostArtifacts(
          }).pipe(
            Effect.catch((e): Effect.Effect<never, RepoAlreadyExists | ImportRefused> => {
+             if (e instanceof ImportRefused) return Effect.fail(e);
 -            const reason = importRefusal(e);
 +            const reason = importRefusal(undefined);
              return reason === undefined

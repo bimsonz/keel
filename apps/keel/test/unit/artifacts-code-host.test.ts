@@ -8,6 +8,7 @@ import {
   type CodeHostOptions,
 } from "../../src/adapters/driven/artifacts/code-host.ts";
 import { FakeArtifacts, type FakeObjects, fakeRemote } from "./fake-artifacts.ts";
+import { gitServer, type Reply } from "./git-server.ts";
 
 const NAMESPACE = "keel-core";
 const UPSTREAM = "https://github.com/octocat/Hello-World";
@@ -28,6 +29,55 @@ function advertise(refs: Readonly<Record<string, readonly (readonly [string, str
     const body = concat([pkt("# service=git-upload-pack\n"), FLUSH, ...lines, FLUSH]);
     return Promise.resolve(new Response(body));
   });
+}
+
+/** A ref advertisement as git's smart HTTP sends one, its first line naming HEAD's branch when `head` is given. */
+const advertising = (refs: readonly (readonly [string, string])[], head?: string) =>
+  concat([
+    pkt("# service=git-upload-pack\n"),
+    FLUSH,
+    ...refs.map(([ref, oid], i) =>
+      pkt(
+        `${oid} ${ref}${i === 0 && head !== undefined ? `\0symref=HEAD:${head} agent=fake` : ""}\n`,
+      ),
+    ),
+    FLUSH,
+  ]);
+
+/**
+ * A public upstream an import is relayed from, and the git side of the repos
+ * it lands in: the upstream's advertisement (its HEAD naming `head`) and
+ * upload-pack, each new repo's receive-pack (answered `replies` in turn) and
+ * then its advertisement of what was pushed. Each request is recorded with
+ * the credential it carried.
+ */
+function relaying(
+  refs: readonly (readonly [string, string])[],
+  head: string | undefined,
+  replies: Reply[] = ["ok", "ok"],
+) {
+  const server = gitServer(replies);
+  const advertised: { readonly url: string; readonly auth: string | null }[] = [];
+  vi.stubGlobal("fetch", (input: string, init?: RequestInit) => {
+    if (input.endsWith("/git-upload-pack") || input.endsWith("/git-receive-pack"))
+      return server.fetch(input, init);
+    advertised.push({ url: input, auth: new Headers(init?.headers).get("Authorization") });
+    if (input === `${UPSTREAM}/info/refs?service=git-upload-pack`)
+      return Promise.resolve(new Response(advertising(refs, head)));
+    // A new repo advertises what its receive-pack took: `<zero> <oid> <ref>`.
+    const push = server.requests.find(
+      (request) =>
+        request.service === "receive-pack" &&
+        input === `https://${request.repo}/info/refs?service=git-upload-pack`,
+    );
+    const [, oid = "", ref = ""] = push?.lines[0]?.split(" ") ?? [];
+    return Promise.resolve(
+      push === undefined
+        ? new Response("no such repo", { status: 404 })
+        : new Response(advertising([[ref, oid]], ref)),
+    );
+  });
+  return { server, advertised };
 }
 
 /** A refusal as the binding throws one on the edge: an error with a code. */
@@ -227,6 +277,106 @@ describe("CodeHost on Artifacts: import", () => {
       ),
     );
     expect(refused).toMatchObject({ _tag: "ImportRefused", reason: "no-branch" });
+    expect([...binding.repos.keys()]).toEqual([]);
+  });
+});
+
+describe("CodeHost on Artifacts: an import by relay", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("[artifacts.import-relay] an import Artifacts gives up on as unavailable comes by relay: the branch the upstream's HEAD names, or the one asked, read with no credential, its whole history pushed into a new repo under the target's name once what the failed import left there is deleted, and no token left active", async () => {
+    const binding = new FakeArtifacts();
+    const upstream = relaying(
+      [
+        ["HEAD", A],
+        ["refs/heads/develop", A],
+        ["refs/heads/test", B],
+      ],
+      "refs/heads/develop",
+    );
+    // What the failed import left under the target's name.
+    await binding.create("trunk");
+    const came = await Effect.runPromise(
+      withHost(
+        binding,
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          binding.refusal = coded("UPSTREAM_UNAVAILABLE");
+          const first = yield* host.import({ url: UPSTREAM }, repo("trunk"));
+          // As wrangler's remote-binding proxy hands it on: the message alone.
+          binding.refusal = new Error(
+            "ArtifactsError: The upstream service is unavailable. Please retry.",
+          );
+          const named = yield* host.import({ url: UPSTREAM, ref: "test" }, repo("named"));
+          return [first, named];
+        }),
+      ),
+    );
+    expect(came).toEqual([
+      { ref: "refs/heads/develop", commit: A },
+      { ref: "refs/heads/test", commit: B },
+    ]);
+    expect(binding.imports).toEqual([
+      { source: { url: UPSTREAM }, target: { name: "trunk" } },
+      { source: { url: UPSTREAM, branch: "test" }, target: { name: "named" } },
+    ]);
+    // The upstream is read with no credential, and each history whole: a want, and no have.
+    const upstreamHost = new URL(UPSTREAM).host;
+    expect(
+      upstream.advertised.filter((asked) => asked.url.startsWith(UPSTREAM)).map((a) => a.auth),
+    ).toEqual([null, null]);
+    expect(
+      upstream.server.requests.map((request) => [
+        request.service,
+        request.repo.startsWith(upstreamHost) ? "upstream" : request.repo,
+        request.service === "upload-pack" ? request.auth : request.auth?.startsWith("Bearer "),
+        request.lines.map((line) => line.split(" ").slice(0, 3).join(" ")),
+      ]),
+    ).toEqual([
+      ["upload-pack", "upstream", null, [`want ${A} side-band-64k`, "done"]],
+      [
+        "receive-pack",
+        new URL(fakeRemote("trunk")).host + new URL(fakeRemote("trunk")).pathname,
+        true,
+        [`${"0".repeat(40)} ${A} refs/heads/develop`],
+      ],
+      ["upload-pack", "upstream", null, [`want ${B} side-band-64k`, "done"]],
+      [
+        "receive-pack",
+        new URL(fakeRemote("named")).host + new URL(fakeRemote("named")).pathname,
+        true,
+        [`${"0".repeat(40)} ${B} refs/heads/test`],
+      ],
+    ]);
+    // The leftover went with its tokens; the relay's write token and each read token are revoked.
+    expect(tokenStates(binding)).toEqual([
+      ["trunk", ["revoked", "revoked"]],
+      ["named", ["revoked", "revoked"]],
+    ]);
+  });
+
+  it("[artifacts.import-relay-refused] a relayed import whose branch the upstream does not have is no-branch, and one whose push into the new repo fails is a defect; neither leaves a repo", async () => {
+    const binding = new FakeArtifacts();
+    relaying([["refs/heads/main", A]], "refs/heads/main", ["stale"]);
+    const exits = await Effect.runPromise(
+      withHost(
+        binding,
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          binding.refusal = coded("UPSTREAM_UNAVAILABLE");
+          const missing = yield* Effect.flip(
+            host.import({ url: UPSTREAM, ref: "gone" }, repo("trunk")),
+          );
+          binding.refusal = coded("UPSTREAM_UNAVAILABLE");
+          return [missing, yield* Effect.exit(host.import({ url: UPSTREAM }, repo("trunk")))];
+        }),
+      ),
+    );
+    expect(exits[0]).toMatchObject({ _tag: "ImportRefused", reason: "no-branch" });
+    const died = exits[1];
+    expect(Exit.isExit(died) && Exit.isFailure(died) && Cause.hasDies(died.cause)).toBe(true);
     expect([...binding.repos.keys()]).toEqual([]);
   });
 });

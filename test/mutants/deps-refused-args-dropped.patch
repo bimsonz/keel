@@ -2,14 +2,14 @@
 # kills: verify.deps-refused-cited
 # why: The bounce's next action carries no depsRefused: an agent reading the args finds nothing to act on
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index 50d29581..7aee5028 100644
+index 29c39072..6801bc1e 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -130,7 +130,6 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
+@@ -133,7 +133,6 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
        ...(tests.length === 0 ? {} : { failingTests: tests }),
        ...(types.length === 0 ? {} : { typeErrors: types }),
        ...(guards.length === 0 ? {} : { failingGuards: guards }),
 -      ...(deps.length === 0 ? {} : { depsRefused: deps }),
+       ...(configs.length === 0 ? {} : { missingConfig: configs }),
        ...(deploys.length === 0 ? {} : { failingDeployChecks: deploys }),
      },
-   };

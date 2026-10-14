@@ -1,4 +1,9 @@
-import { introspectWorkflow, introspectWorkflowInstance } from "cloudflare:test";
+import {
+  introspectWorkflow,
+  introspectWorkflowInstance,
+  runDurableObjectAlarm,
+  runInDurableObject,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { subjectAddress } from "@keeltown/core/application/coordination";
 import {
@@ -18,6 +23,8 @@ import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
 import { EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
+import { POOLED } from "../../src/adapters/driving/do/workflow-pool.ts";
+import { added, COLD, EMPTY_POOL } from "../../src/adapters/driving/do/workflow-pool-rules.ts";
 import { planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { SyntaxSourceTreeSitter } from "../../src/adapters/driven/syntax/syntax-source.ts";
 import { SYNTAX_WASM } from "../../src/adapters/driven/syntax/wasm.ts";
@@ -826,5 +833,229 @@ describe("Precheck", () => {
       },
     });
     await expect(instance.waitForStatus("errored")).resolves.not.toThrow();
+  });
+});
+
+/** Precheck's warm pool, as the fan-out reaches it. */
+const precheckPool = () => env.WORKFLOW_POOL.get(env.WORKFLOW_POOL.idFromName("pool:Precheck"));
+
+/**
+ * Gives the pool these instances as its warm ones, each waiting from now. The
+ * pool keeps none of its own here (`PRECHECK_WARM_TARGET` is 0 in the pool
+ * tests), so a case hands it the ones it means to be claimed.
+ */
+const warmWith = (ids: readonly string[]) =>
+  runInDurableObject(precheckPool(), (_pool, state) => {
+    state.storage.kv.put("pool", added(EMPTY_POOL, ids, Date.now()));
+  });
+
+/** Precheck's Workflow as the pool starts it: with POOLED for params, not a submission's. */
+const pooledPrecheck: Workflow = env.PRECHECK;
+
+/** Starts a Precheck instance as the pool starts a warm one: waiting for its claim. */
+async function startedWarm(): Promise<string> {
+  const id = `precheck-pool-${crypto.randomUUID()}`;
+  await pooledPrecheck.create({ id, params: POOLED });
+  return id;
+}
+
+type KeptClaim = {
+  readonly event_id: string;
+  readonly answer: string;
+  readonly forget_at: number;
+};
+
+/** The pool's kept claims for these events, by event id. */
+const claimsOf = (eventIds: readonly string[]) =>
+  runInDurableObject(precheckPool(), (_pool, state) =>
+    state.storage.sql
+      .exec<KeptClaim>(
+        "SELECT event_id, answer, forget_at FROM workflow_pool_claims ORDER BY event_id",
+      )
+      .toArray()
+      .filter((row) => eventIds.includes(row.event_id)),
+  );
+
+/** The change's ChangeSubmitted's event id and the instance its PrecheckStarted names. */
+async function precheckOf(c: ChangeUnderTest) {
+  const log = await c.log();
+  const started: unknown = log.find((e) => e.type === "PrecheckStarted")?.payload;
+  return {
+    submitted: log.find((e) => e.type === "ChangeSubmitted")?.eventId,
+    instanceId:
+      typeof started === "object" && started !== null
+        ? Reflect.get(started, "instanceId")
+        : undefined,
+    types: log.map((e) => e.type),
+  };
+}
+
+/** Every read of a clean submission, mocked on each Precheck instance started while `workflows` is held. */
+async function cleanReads(
+  workflows: Awaited<ReturnType<typeof introspectWorkflow>>,
+  c: ChangeUnderTest,
+  commitSha: string,
+) {
+  const derive = await kept(c, commitSha);
+  await workflows.modifyAll(async (m) => {
+    await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+    await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
+    await m.mockStepResult({ name: "policy" }, policy(["infra/**"]));
+    await m.mockStepResult({ name: "flow" }, flow());
+    await m.mockStepResult({ name: "guards" }, guards());
+    await m.mockStepResult({ name: "derive" }, derive);
+  });
+}
+
+/**
+ * The warm pool, through the fan-out and the real Workflow: a submission's
+ * Precheck runs on the warm instance its claim hands out, starts cold when
+ * that instance cannot take it, and a warm instance no claim reaches retires
+ * having done nothing. The pool's object keeps each claim as a row, answers
+ * a redelivered event as it first did, and forgets a claim at its alarm.
+ */
+describe("Precheck's warm pool", () => {
+  it("[workflow-pool.pool.warm-run] a submission's Precheck runs on the warm instance its claim hands out, which compiles its plan, and none starts cold", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    await cleanReads(workflows, c, commitSha);
+    const warm = await startedWarm();
+    await warmWith([warm]);
+    await submit();
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("queued"), WAIT);
+    const [instance] = await workflows.get();
+    await instance?.waitForStatus("complete");
+
+    expect(await workflows.get()).toHaveLength(1);
+    const run = await precheckOf(c);
+    expect(run.instanceId).toBe(warm);
+    expect(run.types.slice(-4)).toEqual([
+      "PrecheckStarted",
+      "EffectsDerived",
+      "PlanCompiled",
+      "ChangeQueued",
+    ]);
+    expect(await claimsOf([run.submitted ?? ""])).toEqual([
+      { event_id: run.submitted, answer: warm, forget_at: expect.any(Number) },
+    ]);
+  });
+
+  it("[workflow-pool.pool.cold-fallback] a claim that answers an instance no longer there starts the submission's Precheck cold, which compiles its plan", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    await cleanReads(workflows, c, commitSha);
+    await warmWith([`precheck-pool-${crypto.randomUUID()}`]);
+    await submit();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    const run = await precheckOf(c);
+    expect(run.instanceId).toBe(`precheck-${run.submitted}`);
+    expect(run.types.slice(-2)).toEqual(["PlanCompiled", "ChangeQueued"]);
+    expect((await c.current()).state).toBe("queued");
+  });
+
+  it("[workflow-pool.pool.retired] a warm instance whose claim never comes retires, having run no step", async () => {
+    const id = `precheck-pool-${crypto.randomUUID()}`;
+    await using instance = await introspectWorkflowInstance(env.PRECHECK, id);
+    await instance.modify(async (m) => {
+      await m.forceEventTimeout({ name: "claim" });
+    });
+    await pooledPrecheck.create({ id, params: POOLED });
+    await instance.waitForStatus("complete");
+    const { output } = await (await env.PRECHECK.get(id)).status();
+    expect(output).toEqual({ outcome: "retired" });
+  });
+
+  it("[workflow-pool.pool.refill] a claim that leaves the pool low starts warm instances up to its target, each waiting for its claim, and arms the pool's deadline", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const pool = precheckPool();
+    await warmWith([]);
+    // The pool tests keep none warm; this object keeps two for this case alone.
+    await runInDurableObject(pool, async (instance) => {
+      Object.defineProperty(instance, "target", { value: 2, configurable: true });
+      expect(await instance.claim(makeId("evt", ulid()))).toBe(COLD);
+    });
+    try {
+      const warm = await vi.waitFor(async () => {
+        const held = await runInDurableObject(pool, (_pool, state) =>
+          state.storage.kv.get<{ warm: { id: string; retiresAt: number }[] }>("pool"),
+        );
+        expect(held?.warm).toHaveLength(2);
+        return held?.warm ?? [];
+      }, WAIT);
+      expect(await workflows.get()).toHaveLength(2);
+      for (const { id } of warm) {
+        expect(id).toMatch(/^precheck-pool-/);
+        expect((await (await env.PRECHECK.get(id)).status()).status).not.toBe("complete");
+      }
+      const top = await runInDurableObject(pool, (_pool, state) =>
+        state.storage.sql
+          .exec<{ at: number }>(
+            "SELECT at FROM keel_alarms WHERE reason = ?",
+            "the pool's first warm instance nears its end",
+          )
+          .toArray(),
+      );
+      expect(top).toEqual([{ at: (warm[0]?.retiresAt ?? 0) - 10 * 60_000 }]);
+    } finally {
+      await runInDurableObject(pool, (instance) => void Reflect.deleteProperty(instance, "target"));
+      await warmWith([]);
+    }
+  });
+
+  it("[workflow-pool.pool.claims-kept] keeps each claim as one row, answers a redelivered event as it first did, warm or cold, and forgets a claim at its alarm once its memory ends", async () => {
+    const pool = precheckPool();
+    const [a, b] = [`precheck-pool-${crypto.randomUUID()}`, `precheck-pool-${crypto.randomUUID()}`];
+    await warmWith([a, b]);
+    // In the order the rows are read back, by event id.
+    const run = ulid();
+    const [first, second, third] = [`evt_${run}_1`, `evt_${run}_2`, `evt_${run}_3`];
+    expect(await pool.claim(first)).toBe(a);
+    expect(await pool.claim(first)).toBe(a);
+    expect(await pool.claim(second)).toBe(b);
+    expect(await pool.claim(third)).toBe(COLD);
+    expect(await pool.claim(third)).toBe(COLD);
+    const rows = await claimsOf([first, second, third]);
+    expect(rows.map((row) => [row.event_id, row.answer])).toEqual([
+      [first, a],
+      [second, b],
+      [third, COLD],
+    ]);
+
+    // The first claim's memory ends now: its alarm deletes its row, keeps the others, and is armed for the next.
+    const now = Date.now();
+    await runInDurableObject(pool, (_pool, state) => {
+      state.storage.sql.exec(
+        "UPDATE workflow_pool_claims SET forget_at = ? WHERE event_id = ?",
+        now - 1,
+        first,
+      );
+      state.storage.sql.exec(
+        "UPDATE keel_alarms SET at = ? WHERE reason = ?",
+        now - 1,
+        "the pool's oldest kept claim is forgotten",
+      );
+    });
+    await runDurableObjectAlarm(pool);
+    expect((await claimsOf([first, second, third])).map((row) => row.event_id)).toEqual([
+      second,
+      third,
+    ]);
+    // Earlier cases' claims are kept here too: the alarm is armed for the oldest row left, never the deleted one.
+    const { armed, oldest } = await runInDurableObject(pool, (_pool, state) => ({
+      armed: state.storage.sql
+        .exec<{ at: number }>(
+          "SELECT at FROM keel_alarms WHERE reason = ?",
+          "the pool's oldest kept claim is forgotten",
+        )
+        .toArray(),
+      oldest: state.storage.sql
+        .exec<{ at: number }>("SELECT MIN(forget_at) AS at FROM workflow_pool_claims")
+        .one().at,
+    }));
+    expect(armed).toEqual([{ at: oldest }]);
+    expect(oldest).toBeGreaterThan(now);
+    expect(oldest).toBeLessThanOrEqual(rows[1]?.forget_at ?? 0);
   });
 });

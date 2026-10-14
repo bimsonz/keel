@@ -2,18 +2,18 @@
 # kills: b21.revise-preflight
 # why: a revision's preflight reads the stored intent, not the one the revision leaves, so a contradiction it adds goes unseen
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 4e4191d2..cb7690ee 100644
+index e152f56e..b02e60ef 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -980,7 +980,12 @@ export const revise: (
-           ? {}
-           : { declaredEffects: command.declaredEffects }),
-       });
--      const preflight = preflightOf(changeId, after, live, decided);
+@@ -1026,7 +1026,12 @@ export const revise: (
+     },
+     (tx) => {
+       const after = intentAfter(tx.store, changeId, revision);
+-      const preflight = preflightOf(changeId, after, near, decided);
 +      const preflight = preflightOf(
 +        changeId,
 +        storedChange(tx.store, changeId)?.intent,
-+        live,
++        near,
 +        decided,
 +      );
        const revised = transition(

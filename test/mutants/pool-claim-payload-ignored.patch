@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.warm-run
+# why: A claimed warm instance runs on its own params, not the submission its claim carries
+diff --git a/apps/keel/src/adapters/driving/workflow/pooled.ts b/apps/keel/src/adapters/driving/workflow/pooled.ts
+index 8410da60..99240a8e 100644
+--- a/apps/keel/src/adapters/driving/workflow/pooled.ts
++++ b/apps/keel/src/adapters/driving/workflow/pooled.ts
+@@ -29,7 +29,7 @@ export async function claimedInput(
+         timeout: POOL_WAIT,
+       },
+     );
+-    return { _tag: "Input", payload: claimed.payload };
++    return { _tag: "Input", payload: event.payload };
+   } catch (error) {
+     if (timedOut(error)) return { _tag: "Retired" };
+     throw error;

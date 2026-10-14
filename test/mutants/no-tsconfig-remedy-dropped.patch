@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/typecheck.test.ts
+# kills: typecheck.no-tsconfig
+# why: The failure says nothing of what is missing or what to add
+diff --git a/packages/core/src/application/verification/typecheck.ts b/packages/core/src/application/verification/typecheck.ts
+index 65cbad2f..0e670bc2 100644
+--- a/packages/core/src/application/verification/typecheck.ts
++++ b/packages/core/src/application/verification/typecheck.ts
+@@ -217,7 +217,6 @@ const judgeRun = (
+         why: "no tsconfig.json at the candidate's root",
+         errors: [],
+         tail: "",
+-        config: { missing: "tsconfig.json", remedy: TSCONFIG_REMEDY },
+       },
+     };
+   if (output._tag !== "ran") {

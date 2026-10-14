@@ -4,6 +4,7 @@
  */
 export * from "./predicate-policy.ts";
 export * from "./citation.ts";
+export * from "./counterpart.ts";
 export * from "./entity.ts";
 export * from "./event.ts";
 export * from "./evidence.ts";

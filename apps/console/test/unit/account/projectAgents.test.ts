@@ -6,7 +6,7 @@ import {
   createHttpSource,
   createHttpSponsorship,
 } from "../../../src/source/http.ts";
-import { invitesHere } from "../../../src/pages/ProjectAgents.tsx";
+import { invitesHere } from "../../../src/pages/Collaborators.tsx";
 import { KeelRefused } from "../../../src/source/types.ts";
 import { SESSION_COOKIE, createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
 

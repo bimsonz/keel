@@ -2,15 +2,15 @@
 # kills: swarm.events-fold
 # why: The report counts every change in the project, an earlier run's among them
 diff --git a/examples/swarm/src/run/events.ts b/examples/swarm/src/run/events.ts
-index 6ce62723..1c58e861 100644
+index a230e3f8..29e0e25e 100644
 --- a/examples/swarm/src/run/events.ts
 +++ b/examples/swarm/src/run/events.ts
-@@ -64,7 +64,7 @@ export function recordsFrom(
+@@ -75,7 +75,7 @@ export function recordsFrom(
      if (changeId === undefined) continue;
      if (tag === "IntentDeclared") {
        const paths = list(event, "footprint").map(pathOf);
--      if (!paths.some((p) => p?.startsWith(prefix))) continue;
-+      if (paths.length === 0) continue;
+-      const inDir = paths.some((p) => p?.startsWith(prefix));
++      const inDir = paths.length > 0;
+       const label: unknown = Reflect.get(Object(field(event, "run")), "label");
+       if (!inDir && !ours(label)) continue;
        if (changes.has(changeId)) continue;
-       const kind =
-         list(event, "premises").length > 0

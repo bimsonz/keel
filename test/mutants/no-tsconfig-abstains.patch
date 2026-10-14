@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/typecheck.test.ts
+# kills: typecheck.no-tsconfig
+# why: A worker app with no tsconfig.json abstains as infrastructure and parks, where it should bounce with what to add
+diff --git a/packages/core/src/application/verification/typecheck.ts b/packages/core/src/application/verification/typecheck.ts
+index 65cbad2f..b163880c 100644
+--- a/packages/core/src/application/verification/typecheck.ts
++++ b/packages/core/src/application/verification/typecheck.ts
+@@ -210,7 +210,7 @@ const judgeRun = (
+   });
+   if (output._tag === "no-tsconfig")
+     return {
+-      report: { ...base, outcome: "fail", durationMs: 0 },
++      report: { ...base, outcome: "abstain", failure: "schema", durationMs: 0 },
+       evidence: {
+         stepId: step.id,
+         outcome: "fail",

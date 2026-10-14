@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.pairs-conflict
+# why: The planted textual pair rewrites two functions, not the same lines: it is a decoy scored as a miss
+diff --git a/examples/swarm/src/run/pairs.ts b/examples/swarm/src/run/pairs.ts
+index 50d031ec..fca765d2 100644
+--- a/examples/swarm/src/run/pairs.ts
++++ b/examples/swarm/src/run/pairs.ts
+@@ -142,7 +142,7 @@ export function pairsFor(options: {
+       planted: true,
+       a: rewrite(branch, "as one if statement per rule, each returning its own message"),
+       b: rewrite(
+-        branch,
++        label,
+         "so every rule is checked in a single combined condition before one return",
+       ),
+     },

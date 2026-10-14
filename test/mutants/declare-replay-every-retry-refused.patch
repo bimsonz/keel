@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/abandon.test.ts apps/keel/test/pool/change.test.ts -t a11.declare-replay
+# kills: a11.declare-replay-ended
+# why: every declare retried under its key is refused, so an agent whose first answer was lost cannot get its live change's workspace back
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b392248a..8bc1f621 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -911,7 +911,7 @@ export const declare: (
+   // hand back, and a grant would only be collected again. (The key's reservation has already
+   // refused another body.)
+   const prior = storedChange(yield* EntityStore, changeId);
+-  if (prior !== undefined && TERMINAL.has(prior.state)) return yield* refused(prior, "Declare");
++  if (prior !== undefined) return yield* refused(prior, "Declare");
+   const leaseId = yield* (yield* Ids).next("lse");
+   const intent: Intent = {
+     revision: 1,

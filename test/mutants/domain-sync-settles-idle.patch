@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.settles
+# kills: sync.settles
+# why: batches queued during a sync wait for a debounce nothing arms
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..f86c5c58 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -733,7 +733,7 @@ export const evolvePromotion = (
+             head: event.to,
+             advancedAt: committed.at,
+             // Batches queued during the sync wait for the debounce, as after an advance.
+-            phase: settled(trunk.queue),
++            phase: "idle",
+             ...(event.height === undefined ? {} : { height: event.height }),
+           }
+         : illegal(trunk, event);

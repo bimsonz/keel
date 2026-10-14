@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.flow
+# why: the consent screen asks for a scope beyond the pinned list
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+index c592fffb..edb40ef5 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+@@ -149,7 +149,7 @@ export function CloudflareOAuthLive(options: CloudflareOAuthOptions): Layer.Laye
+                 response_type: "code",
+                 client_id: options.clientId,
+                 redirect_uri: options.redirectUri,
+-                scope: CLOUDFLARE_SCOPES.join(" "),
++                scope: [...CLOUDFLARE_SCOPES, "workers-scripts.write"].join(" "),
+                 state: connectState(projectId, nonce),
+                 code_challenge: await challengeOf(verifier),
+                 code_challenge_method: "S256",

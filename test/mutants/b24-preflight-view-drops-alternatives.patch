@@ -2,14 +2,14 @@
 # kills: b24.preflight-alternatives
 # why: the agent's preflight never names its alternatives, though the core found them
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index 80640429..b719d021 100644
+index f2f1f65a..72cea81b 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -352,7 +352,6 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+@@ -376,7 +376,6 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
      })),
      suggestedMove: preflight.suggestedMove,
      ...(basis === undefined ? {} : { basis }),
 -    ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
+     ...(preflight.compared === undefined ? {} : { compared: { ...preflight.compared } }),
    };
  }
- 

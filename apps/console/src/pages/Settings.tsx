@@ -13,7 +13,7 @@ import { maintains, mayPublish, owns, readBy } from "../engine/settings.ts";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
 import { CloudflareTargets } from "./Cloudflare.tsx";
-import { AgentsOfTheOrg, ProjectAgents, invitesHere } from "./ProjectAgents.tsx";
+import { Collaborators, OrgCollaborators, invitesHere } from "./Collaborators.tsx";
 
 /** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
 function readers(visibility: Visibility, namespace: NamespaceRef): string {
@@ -186,12 +186,12 @@ export function SettingsPage({ project }: { project: ProjectView }) {
         )}
         <Refusal said={refused} />
       </section>
-      {/* A person's own project takes an invitation of its own, from its owner. An org's sends them to the org. */}
+      {/* Who has access: a person's own project lists its owner and the agents they added; an org's is its members'. */}
       {source.invited !== undefined && invitesHere(project) && (
-        <ProjectAgents project={project} invited={source.invited} />
+        <Collaborators project={project} invited={source.invited} />
       )}
       {project.namespace.kind === "org" && maintains(project) && (
-        <AgentsOfTheOrg org={project.namespace.handle} />
+        <OrgCollaborators org={project.namespace.handle} />
       )}
       {/* Where the project deploys is its namespace's owner's to say, and Keel reads it to them alone. */}
       {source.targets !== undefined &&

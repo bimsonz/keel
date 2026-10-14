@@ -2,15 +2,15 @@
 # kills: targets.refused
 # why: Cloudflare's own code is left out of Keel's sentence
 diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
-index 021a66df..4d7e126b 100644
+index b7f92428..6445374a 100644
 --- a/apps/console/test/fixtures/mock/fakeKeel.ts
 +++ b/apps/console/test/fixtures/mock/fakeKeel.ts
-@@ -1133,7 +1133,7 @@ export function createFakeKeel(
+@@ -1228,7 +1228,7 @@ export function createFakeKeel(
            const code =
              reached.reaches || reached.code === undefined
                ? ""
 -              : ` (Cloudflare error ${reached.code})`;
 +              : "";
-           const storeAnother: NextAction = {
-             kind: "call",
-             title:
+           if (!reached.reaches)
+             return problem(
+               422,

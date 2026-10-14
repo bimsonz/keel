@@ -3,12 +3,14 @@ import {
   DEBOUNCE_MS,
   deleteProjectRepos,
   destroyTrunk,
+  finishUpstreamSync,
   flushTrunk,
   initializeTrunk,
   pushPromotion,
   type PushOutcome,
   resumeTrunk,
   seedTrunk,
+  syncFromUpstream,
   syncMirror,
   syncTrunk,
   takeTrunk,
@@ -42,6 +44,8 @@ export const TRUNK_PUSH = "trunk push";
 export const MIRROR_SYNC = "mirror sync";
 /** A destroyed project's repos to delete. */
 export const TRUNK_DESTROY = "trunk destroy";
+/** An open sync from upstream whose move has still to land. */
+export const TRUNK_SYNC = "trunk sync";
 
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
 const decodeInstant = Schema.decodeUnknownEffect(InstantSchema);
@@ -171,6 +175,15 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     return this.answer(TrunkCodecs.sync, syncTrunk(this.projectId));
   }
 
+  async syncUpstream(by: CommandActor) {
+    const answer = await this.answer(
+      TrunkCodecs.syncUpstream,
+      syncFromUpstream(this.projectId, by),
+    );
+    await this.afterSync();
+    return answer;
+  }
+
   async destroy(by: string) {
     const answer = await this.answer(TrunkCodecs.destroy, destroyTrunk(this.projectId, by));
     await scheduleAlarm(this.ctx.storage, {
@@ -214,6 +227,11 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       await this.afterPush(exit.value);
       return;
     }
+    if (reason === TRUNK_SYNC) {
+      const exit = await this.runtime.runPromiseExit(finishUpstreamSync(projectId));
+      if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
+      return this.afterSync();
+    }
     if (reason === MIRROR_SYNC) {
       const exit = await this.runtime.runPromiseExit(syncMirror(projectId));
       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
@@ -238,6 +256,33 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       console.error(`trunk ${projectId} froze promotion: its head is not one the WAL explains`);
     if (outcome === "declined")
       console.warn(`trunk ${projectId} declined its group: the pack is over the receive-pack cap`);
+    await this.debounceIfWaiting();
+  }
+
+  /**
+   * What follows a sync from upstream: its move again later while it is
+   * open, and otherwise the mirror brought to trunk's head (a no-op when
+   * nothing moved) and the debounce for batches that queued meanwhile.
+   * Staging is the Lane's to move: it hears TrunkSynced.
+   */
+  private async afterSync(): Promise<void> {
+    const projectId = this.projectId;
+    const trunk = await this.runtime.runPromise(
+      Effect.map(EntityStore, (store) => trunkOf(store, projectId)),
+    );
+    if (trunk?.phase === "syncing")
+      return this.retry(TRUNK_SYNC, "trunk's main is still at the sync's start");
+    this.failures.delete(TRUNK_SYNC);
+    if (trunk?.phase === "frozen")
+      console.error(
+        `trunk ${projectId} froze promotion: its head is not the one its sync moved to`,
+      );
+    else
+      await scheduleAlarm(this.ctx.storage, {
+        kind: "deadline",
+        reason: MIRROR_SYNC,
+        at: Date.now(),
+      });
     await this.debounceIfWaiting();
   }
 

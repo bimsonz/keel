@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: Nothing beneath my footprint prefix is read, so a change editing a file under my glob is missed.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..91bdbf35 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -344,7 +344,6 @@ export function liveNear(store: Store, self: ChangeId, intent: Intent): LiveNear
+     else {
+       for (let depth = 0; depth <= prefix.length; depth++)
+         read(LIVE_FOOTPRINT, `${footprintKey(prefix.slice(0, depth))}|`, "|");
+-      read(LIVE_FOOTPRINT, `${footprintKey(prefix)}/`, "|");
+     }
+   }
+   for (const path of lookups.anchors) read(LIVE_ANCHOR, `${escaped(path)}|`, "|");

@@ -5,6 +5,7 @@ import {
   ChangeId,
   ConflictId,
   ContentHash,
+  Counterpart,
   DecisionId,
   EntityRef,
   EscalationId,
@@ -199,6 +200,12 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
    * it onto `ChangeBounced`, and falls back to its own default only when absent.
    */
   nextActions: Schema.optional(Schema.Array(NextAction)),
+  /**
+   * The trunk commits since the change's base that changed a path a refused
+   * composition conflicted on, newest first: named by the Lane for a batch of
+   * one. The Change DO copies them onto `ChangeBounced`.
+   */
+  counterparts: Schema.optional(Schema.Array(Counterpart)),
 });
 /**
  * A question for a person: at least two options with unique ids, each with its

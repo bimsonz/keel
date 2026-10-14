@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.claims-expire
+# why: A claim is forgotten while the instance it named may still be waiting, and a late redelivery is claimed again
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..242e0e78 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -37,7 +37,7 @@ export function warmTarget(setting: string | undefined): number {
+  * claimed again: a second run of the same submission ends at its first step,
+  * refused by the change, having written nothing.
+  */
+-export const CLAIM_MEMORY_MS = POOL_WAIT_MS;
++export const CLAIM_MEMORY_MS = 60 * 60_000;
+ 
+ import { COLD } from "../../../rpc/workflow-pool.ts";
+ 

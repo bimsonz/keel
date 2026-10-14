@@ -46,16 +46,27 @@ const pathOf = (entry: unknown): string | undefined =>
 
 /**
  * The run's records, from Keel's own record of the project: every change
- * declared on a file under the run's directory, followed through preflight,
+ * declared on a file under the run's directory, or under one of the run's
+ * labels (a pair's side changes the fixture's own code), followed through preflight,
  * its submissions, its bounces and its end. Workers that never declared are
  * records with no change, up to `workers`. Nothing here is the workers' own
  * account of what they did.
  */
 export function recordsFrom(
   events: readonly KeelEvent[],
-  run: { readonly dir: string; readonly workers: number },
+  run: { readonly dir: string; readonly workers: number; readonly label?: string },
 ): WorkerRecord[] {
   const prefix = `${run.dir}/`;
+  const ours = (label: unknown) =>
+    run.label !== undefined &&
+    typeof label === "string" &&
+    (label === run.label || label.startsWith(`${run.label}-`));
+  /** The worker a label names, `<run>-<index>`, when it names one. */
+  const workerOf = (label: unknown): number | undefined => {
+    if (run.label === undefined || typeof label !== "string") return undefined;
+    const rest = label.startsWith(`${run.label}-`) ? label.slice(run.label.length + 1) : "";
+    return /^\d+$/.test(rest) ? Number(rest) : undefined;
+  };
   type Draft = { -readonly [K in keyof WorkerRecord]: WorkerRecord[K] };
   const changes = new Map<string, Draft>();
   for (const event of events) {
@@ -64,16 +75,19 @@ export function recordsFrom(
     if (changeId === undefined) continue;
     if (tag === "IntentDeclared") {
       const paths = list(event, "footprint").map(pathOf);
-      if (!paths.some((p) => p?.startsWith(prefix))) continue;
+      const inDir = paths.some((p) => p?.startsWith(prefix));
+      const label: unknown = Reflect.get(Object(field(event, "run")), "label");
+      if (!inDir && !ours(label)) continue;
       if (changes.has(changeId)) continue;
-      const kind =
-        list(event, "premises").length > 0
+      const kind = !inDir
+        ? "pair"
+        : list(event, "premises").length > 0
           ? "premise"
           : paths.some((p) => p?.includes("/group-"))
             ? "shared"
             : "disjoint";
       changes.set(changeId, {
-        index: changes.size,
+        index: workerOf(label) ?? changes.size,
         kind,
         changeId,
         outcome: "unfinished",
@@ -97,7 +111,9 @@ export function recordsFrom(
     }
   }
   const records: WorkerRecord[] = [...changes.values()];
-  for (let i = records.length; i < run.workers; i++)
-    records.push({ index: i, kind: "disjoint", outcome: "unfinished", bounces: 0 });
-  return records;
+  const taken = new Set(records.map((r) => r.index));
+  for (let i = 0; records.length < run.workers; i++)
+    if (!taken.has(i))
+      records.push({ index: i, kind: "disjoint", outcome: "unfinished", bounces: 0 });
+  return records.toSorted((x, y) => x.index - y.index);
 }

@@ -44,6 +44,19 @@ export const MoveBasis = Schema.Union([
 ]);
 export type MoveBasis = typeof MoveBasis.Type;
 
+const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+/**
+ * What a preflight compared its intent with: the live changes it read, found
+ * by key near the intent rather than every live one, and how many subject
+ * keys it looked them up under.
+ */
+export const PreflightCompared = Schema.Struct({
+  changes: Count,
+  subjects: Count,
+});
+export type PreflightCompared = typeof PreflightCompared.Type;
+
 export const Preflight = Schema.Struct({
   neighbours: Schema.Array(Neighbour),
   contradictions: Schema.Array(Contradiction),
@@ -53,6 +66,8 @@ export const Preflight = Schema.Struct({
   basis: Schema.optional(MoveBasis),
   /** The live changes with the same intent, as exposure listed them, never ranked. Absent when there are none; the move never reads them. */
   alternatives: Schema.optional(Schema.Array(ChangeId)),
+  /** What the preflight compared, as the live index answered it. Absent on a preflight made before it was counted. */
+  compared: Schema.optional(PreflightCompared),
 });
 export type Preflight = typeof Preflight.Type;
 

@@ -15,6 +15,8 @@ export const UNROUTED = {
     "the client's own token exchange: an RFC 6749 form post it makes before any call, not a JSON call",
   Auth_registerClient:
     "the client's own sign-up: an RFC 7591 registration it signs with its key before it has a token",
+  Delivery_completeCloudflareConnect:
+    "where Cloudflare's consent screen sends a person's browser back: a redirect, never a call",
 } as const;
 
 export type UnroutedOperation = keyof typeof UNROUTED;
@@ -108,6 +110,7 @@ export const ROUTES = {
   Operator_createProject: { method: "POST", path: "/projects", headers: ["idempotency-key"] },
   Operator_getSettings: { method: "GET", path: "/projects/{projectId}/settings" },
   Operator_putSettings: { method: "PUT", path: "/projects/{projectId}/settings" },
+  Operator_syncUpstream: { method: "POST", path: "/projects/{projectId}/sync" },
   Operator_enrolAgent: { method: "POST", path: "/agents", headers: ["idempotency-key"] },
   Repo_getTree: { method: "GET", path: "/projects/{projectId}/repo/tree", query: ["ref", "path"] },
   Repo_getBlob: { method: "GET", path: "/projects/{projectId}/repo/blob", query: ["ref", "path"] },
@@ -222,6 +225,10 @@ export const ROUTES = {
   Delivery_deleteDeployTarget: {
     method: "DELETE",
     path: "/projects/{projectId}/deploy-targets/{name}",
+  },
+  Delivery_beginCloudflareConnect: {
+    method: "POST",
+    path: "/projects/{projectId}/deploy-targets/{name}/cloudflare-connect",
   },
 } as const satisfies Record<Exclude<DocumentedOperation, UnroutedOperation>, Route>;
 

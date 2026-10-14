@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refreshing-handle.test.ts -t "artifacts.handle-refresh]"
+# kills: artifacts.handle-refresh
+# why: the code host's bodies read every blob on the handle they were given, so readBlobs of about 5,000 objects or more fails at its 5,004th read
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index fbf38653..2f0640cd 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -306,7 +306,7 @@ export function CodeHostArtifacts(
+         try {
+           return await body({
+             readTree: reads.readTree,
+-            readBlob: reads.readBlob,
++            readBlob: (hash) => reads.use((handle) => handle.readBlob(hash)),
+             readCommit: reads.readCommit,
+             info: () => reads.use((handle) => handle.info()),
+             log: (...args) => reads.use((handle) => handle.log(...args)),

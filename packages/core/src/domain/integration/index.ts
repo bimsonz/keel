@@ -8,3 +8,4 @@ export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./promotion-machine.ts";
 export * from "./red-exit.ts";
+export * from "./trailers.ts";

@@ -107,18 +107,9 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
             idempotencyKey,
             fingerprint,
           });
+          // A retry whose change has ended is refused for the change's state: it has no workspace.
           const declared = yield* callObject(ChangeCodecs.declare, () =>
             objects.change(changeId).declare(command),
-          ).pipe(
-            // The id is fresh for this key, and a retry replays its first answer by cause, so a
-            // declare refused for the change's state means the reservation and the DO disagree.
-            Effect.catchTag("ChangeStateRefused", (refused) =>
-              Effect.die(
-                new Error(
-                  `Change ${refused.changeId}, reserved for this key, refused its declare in state ${refused.state}`,
-                ),
-              ),
-            ),
           );
           return {
             change: declared.change,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/abandon.test.ts apps/keel/test/pool/change.test.ts -t a11.declare-replay
+# kills: a11.declare-replay-ended, a11.declare-replay-landed
+# why: a declare retried after its change has ended asks the pool for a workspace first, so each retry takes a ready workspace only to collect it again
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b392248a..5adff608 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -911,7 +911,6 @@ export const declare: (
+   // hand back, and a grant would only be collected again. (The key's reservation has already
+   // refused another body.)
+   const prior = storedChange(yield* EntityStore, changeId);
+-  if (prior !== undefined && TERMINAL.has(prior.state)) return yield* refused(prior, "Declare");
+   const leaseId = yield* (yield* Ids).next("lse");
+   const intent: Intent = {
+     revision: 1,

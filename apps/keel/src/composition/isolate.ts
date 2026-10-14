@@ -71,6 +71,7 @@ import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts"
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { DeployTargetsRpc } from "../adapters/driven/do-rpc/deploy-targets.ts";
 import { DeployTargetCheckCloudflare } from "../adapters/driven/deploy/cloudflare-api.ts";
+import { CloudflareOAuthLive } from "../adapters/driven/deploy/cloudflare-oauth.ts";
 import { LanesRpc } from "../adapters/driven/do-rpc/lanes.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
@@ -135,6 +136,12 @@ export function isolateLayer(
     // A project's deploy targets, held by its own object; a target's account is asked before one is set.
     DeployTargetsRpc(project),
     DeployTargetCheckCloudflare(),
+    // An owner connects a target through Keel's OAuth client, which comes back to this host.
+    CloudflareOAuthLive({
+      clientId: env.CF_OAUTH_CLIENT_ID,
+      clientSecret: () => env.CF_OAUTH_CLIENT_SECRET.get(),
+      redirectUri: `https://${env.KEEL_HOST}/v1/cloudflare/callback`,
+    }),
     // A project's view names what it was forked from, which its trunk keeps.
     overrides.trunks ?? TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     // A project's lanes, as their own objects count them.

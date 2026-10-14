@@ -326,13 +326,13 @@ export function makeCodeHostMemory() {
       scratch += 1;
       return { namespace: "memory", name: `scratch-${scratch}` };
     },
-    commit: (repo, ref, files, merged = []) =>
+    commit: (repo, ref, files, merged = [], message) =>
       Effect.gen(function* () {
         const found = yield* find(repo);
         const parent = found.refs.get(ref);
         const { tree, objects } = yield* Effect.promise(() => buildTree(files));
         const { oid, object: commit } = yield* Effect.promise(() =>
-          buildCommit(tree, [...(parent === undefined ? [] : [parent]), ...merged]),
+          buildCommit(tree, [...(parent === undefined ? [] : [parent]), ...merged], message),
         );
         for (const [id, o] of objects) found.objects.set(id, o);
         found.objects.set(oid, commit);

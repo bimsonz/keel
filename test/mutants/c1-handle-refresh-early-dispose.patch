@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refreshing-handle.test.ts -t "artifacts.handle-refresh-settles"
+# kills: artifacts.handle-refresh-settles
+# why: a handle left behind is disposed while reads it took are still in flight, so those reads fail on a closed handle
+diff --git a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+index 70338c0e..23f229d5 100644
+--- a/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
++++ b/apps/keel/src/adapters/driven/artifacts/refreshing-handle.ts
+@@ -40,7 +40,7 @@ export function refreshingReads(
+   let opening: Promise<void> | undefined;
+   let disposed = false;
+   const settle = (each: Held) => {
+-    if (each.retired && each.inFlight === 0) each.handle[Symbol.dispose]();
++    if (each.retired) each.handle[Symbol.dispose]();
+   };
+   const retire = (each: Held) => {
+     if (each.retired) return;

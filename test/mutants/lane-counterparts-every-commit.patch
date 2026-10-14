@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.composition-counterparts
+# kills: lane.composition-counterparts
+# why: Every trunk commit since the base is named as a counterpart, whether or not it changed a conflicting path
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index e770f95b..c485c5b1 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -871,7 +871,7 @@ const counterpartsOf = Effect.fn("integration/counterpartsOf")(function* (
+     return host.diffTrees(staging, parent, landed.sha).pipe(
+       Effect.map((changed): Counterpart[] => {
+         const touched = new Set(changed.map((c) => c.path));
+-        const hit = paths.filter((path) => touched.has(path));
++        const hit = [...paths];
+         if (hit.length === 0) return [];
+         const changeId = changeIdOf(landed.message);
+         return [

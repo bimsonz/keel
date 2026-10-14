@@ -70,6 +70,8 @@ const world = (
         ),
       set: () => Effect.die("not asked"),
       clear: () => Effect.die("not asked"),
+      holdConnect: () => Effect.die("not asked"),
+      takeConnect: () => Effect.die("not asked"),
     }),
   );
   const credentials = Layer.succeed(

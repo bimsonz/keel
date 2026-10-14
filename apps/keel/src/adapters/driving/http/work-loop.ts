@@ -377,6 +377,7 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
     suggestedMove: preflight.suggestedMove,
     ...(basis === undefined ? {} : { basis }),
     ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
+    ...(preflight.compared === undefined ? {} : { compared: { ...preflight.compared } }),
   };
 }
 
@@ -442,9 +443,25 @@ export function declareOk(declared: Declared): DeclareResult {
 
 export function declareError(
   caller: Caller,
-  error: PoolExhausted | IdempotencyConflict,
+  error: PoolExhausted | IdempotencyConflict | ChangeStateRefused,
 ): DeclareResult {
   switch (error._tag) {
+    case "ChangeStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "change.state_refused", caller.requestId, {
+          detail: `This Idempotency-Key's change ${error.changeId} is ${error.state}: it holds no workspace now. Read the change, or declare new work with a fresh Idempotency-Key.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "Read the change for how it ended",
+              operationId: "change",
+              args: { changeId: error.changeId },
+            },
+            { kind: "call", title: "Declare with a fresh Idempotency-Key", operationId: "declare" },
+          ],
+        }),
+      };
     case "PoolExhausted":
       return {
         status: 503,

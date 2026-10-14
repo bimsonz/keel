@@ -5,8 +5,6 @@ import { openCounts } from "./engine/lists.ts";
 import { Player } from "./engine/player.ts";
 import { maintains } from "./engine/settings.ts";
 import { ConsoleProvider, usePlayer, useSelected, useWorldVersion } from "./engine/react.tsx";
-import { AgentPage } from "./pages/Agent.tsx";
-import { AgentsPage } from "./pages/Agents.tsx";
 import { ChangePage } from "./pages/Change.tsx";
 import { ChangesPage } from "./pages/Changes.tsx";
 import { CodePage } from "./pages/Code.tsx";
@@ -173,10 +171,6 @@ function Page({ route, mode, project }: { route: Route; mode: Mode; project: Pro
       );
     case "insights":
       return <InsightsPage tab={route.tab} />;
-    case "agents":
-      return <AgentsPage shown={route.shown} />;
-    case "agent":
-      return <AgentPage name={route.name} />;
     case "settings":
       return <SettingsPage project={project} />;
     default:
@@ -195,8 +189,7 @@ function pageOf(route: Route, address: string): string {
     route.at === "decisions" ||
     route.at === "mission-control" ||
     route.at === "code" ||
-    route.at === "insights" ||
-    route.at === "agents"
+    route.at === "insights"
   )
     return route.at;
   // A thing is one page whichever of its parts is shown, so the tab a reader chose keeps the keyboard's place.

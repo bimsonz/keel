@@ -372,3 +372,6 @@ export const forgetOwed = (stub: DurableObjectStub, subscriber: string) =>
   runInDurableObject(stub, (_instance: unknown, state) => {
     state.storage.sql.exec("DELETE FROM keel_deliveries WHERE subscriber = ?", subscriber);
   });
+
+/** The OAuth client's secret the pool's store holds, with characters a Basic credential must escape. */
+export const CLIENT_SECRET = "test-client-secret~(1)!";

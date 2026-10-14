@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.settings
+# why: The admin route takes fields it does not set and answers 200, as if it had set them
+diff --git a/examples/swarm/src/app.ts b/examples/swarm/src/app.ts
+index df132871..efbfa5da 100644
+--- a/examples/swarm/src/app.ts
++++ b/examples/swarm/src/app.ts
+@@ -81,7 +81,7 @@ app.post("/admin/projects", async (c) => {
+ });
+ app.patch("/admin/projects/:project/settings", async (c) => {
+   const change = await body(
+-    v.strictObject({
++    v.object({
+       visibility: v.optional(v.picklist(["public", "private"])),
+       verification: v.optional(v.picklist(["required", "off"])),
+     }),

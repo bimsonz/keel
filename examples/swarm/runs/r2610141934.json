@@ -1,0 +1,86 @@
+{
+  "shape": "one",
+  "seed": 42,
+  "endedAt": "2026-10-14T19:50:11.732Z",
+  "timedOut": false,
+  "run": {
+    "id": "r2610141934",
+    "workers": 5,
+    "dispatched": 5,
+    "errors": [],
+    "modelCalls": 55,
+    "modelLimited": 0,
+    "shape": "one",
+    "seed": 42,
+    "project": "prj_NX568P6ZHATYS5XT5HS9GSWHYZ",
+    "startedAt": "2026-10-14T19:34:36.414Z",
+    "rampMs": 2500,
+    "stoppedAt": "2026-10-14T19:50:10.533Z"
+  },
+  "report": {
+    "workers": 5,
+    "declared": 5,
+    "landed": 4,
+    "bounces": 0,
+    "notLanded": 1,
+    "contentionDensity": 0.2,
+    "reworkRate": 0,
+    "queueMs": {
+      "p50": 43486,
+      "p95": 60988
+    },
+    "modelCalls": 55,
+    "modelCallsPerLanding": 13.75,
+    "modelLimited": 0
+  },
+  "records": [
+    {
+      "outcome": "landed",
+      "index": 0,
+      "kind": "disjoint",
+      "changeId": "chg_01M4XYJ4GCEHFQY1VKDM99Q105",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792006529416,
+      "landedAt": 1792006590404
+    },
+    {
+      "outcome": "landed",
+      "index": 1,
+      "kind": "shared",
+      "changeId": "chg_01M4XYJ7VZYREKAH8W501ZPT55",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792006626944,
+      "landedAt": 1792006668110
+    },
+    {
+      "outcome": "parked",
+      "index": 2,
+      "kind": "shared",
+      "changeId": "chg_01M4XYJCESAQEX09RFY27EBC5C",
+      "bounces": 0,
+      "neighbours": 1
+    },
+    {
+      "outcome": "landed",
+      "index": 3,
+      "kind": "disjoint",
+      "changeId": "chg_01M4XYJ96CCKMKZ8H3Q780HZRH",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792006568388,
+      "landedAt": 1792006625575
+    },
+    {
+      "outcome": "landed",
+      "index": 4,
+      "kind": "disjoint",
+      "changeId": "chg_01M4XYJ8GS2J2RK41ZD8FX71QA",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792006582022,
+      "landedAt": 1792006625508
+    }
+  ]
+}

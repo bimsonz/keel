@@ -10,4 +10,4 @@ Third-party dependencies are used only under compatible licences:
 
 **A missing licence or missing proof is a reason to *spike* an option, never a reason to reject it.** The licence decides only whether code can be copied.
 
-Why: the competition requires an OSI licence on original work, and code with no licence cannot be relicensed by copying it.
+Why: Keel's own code is published under an OSI licence, and code with no licence cannot be relicensed by copying it.

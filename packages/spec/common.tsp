@@ -225,9 +225,14 @@ union ProblemCode {
   projectImportRefused: "project.import_refused",
   projectImportTooLarge: "project.import_too_large",
   quotaExceeded: "quota.exceeded",
+  projectNotImported: "project.not_imported",
+  projectUpstreamUnreachable: "project.upstream_unreachable",
+  trunkNotFastForward: "trunk.not_fast_forward",
+  trunkBusy: "trunk.busy",
   deployTargetRefused: "deploy_target.refused",
   deployTargetUnreachable: "deploy_target.unreachable",
   deployTargetNoWorkersDev: "deploy_target.no_workers_dev",
+  cloudflareNotConfigured: "cloudflare.not_configured",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

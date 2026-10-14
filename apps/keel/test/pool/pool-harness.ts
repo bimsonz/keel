@@ -115,6 +115,7 @@ export async function followTrunk(
       take: unused,
       view: unused,
       sync: unused,
+      syncUpstream: unused,
       destroy: unused,
     }),
   );

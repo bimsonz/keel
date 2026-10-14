@@ -2,13 +2,13 @@
 # kills: t67.session-list
 # why: the list is decided on the caller's own project for everyone, so a signed-in person has no inbox: they are told 404
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 6eb2d409..ff749f24 100644
+index 1499f83e..3b7c1639 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -271,8 +271,7 @@ export const RESOLVERS: Resolvers = {
- 
+@@ -378,8 +378,7 @@ export const RESOLVERS: Resolvers = {
    Operator_getSettings: (input) => projectNamed(input.projectId),
    Operator_putSettings: (input) => projectNamed(input.projectId),
+   Operator_syncUpstream: (input) => projectNamed(input.projectId),
 -  Operator_listEscalations: (_input, caller) =>
 -    caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
 +  Operator_listEscalations: ownProject,

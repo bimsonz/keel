@@ -47,6 +47,21 @@ export class TrunkNotInitialized extends Schema.TaggedError<TrunkNotInitialized>
   { projectId: ProjectId },
 ) {}
 
+/** Trunk did not start from an import, so it has no upstream to sync from. */
+export class NotImported extends Schema.TaggedError<NotImported>()("NotImported", {
+  projectId: ProjectId,
+}) {}
+
+/**
+ * Upstream's head does not descend from trunk's: trunk holds commits upstream
+ * lacks, or upstream's history was rewritten. Nothing was moved.
+ */
+export class NotFastForward extends Schema.TaggedError<NotFastForward>()("NotFastForward", {
+  projectId: ProjectId,
+  trunk: CommitSha,
+  upstream: CommitSha,
+}) {}
+
 /** The command is not valid in the trunk's current promotion phase. */
 export class PromotionStateRefused extends Schema.TaggedError<PromotionStateRefused>()(
   "PromotionStateRefused",

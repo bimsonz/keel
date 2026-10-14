@@ -99,7 +99,7 @@ export class Changes extends Context.Service<
     readonly declare: (
       principal: AgentToken,
       input: DeclareInput,
-    ) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict>;
+    ) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict | ChangeStateRefused>;
     readonly submit: (
       principal: AgentToken,
       input: SubmitInput,

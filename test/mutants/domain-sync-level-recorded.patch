@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.level
+# kills: sync.level
+# why: an upstream at trunk's head starts a sync to where trunk already is
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..c2b6d799 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -490,7 +490,6 @@ export const decidePromotion = (
+       if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
+         return refuse(trunk, command);
+       // Upstream at trunk's head: there is nothing to move.
+-      if (command.to === command.from) return Result.succeed([]);
+       return Result.succeed([
+         TrunkSyncStarted.make({
+           projectId,

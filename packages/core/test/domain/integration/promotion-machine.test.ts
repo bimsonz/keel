@@ -16,8 +16,10 @@ import {
   type PromotionCommand,
   PromotionFrozen,
   replayPromotion,
+  syncGroupId,
   Trunk,
   TrunkEvent,
+  type TrunkOrigin,
 } from "../../../src/domain/integration/index.ts";
 import {
   type BatchId,
@@ -80,7 +82,14 @@ const PROGRESS: Readonly<Record<Phase, readonly Kind[]>> = {
   debouncing: ["Flush", "Flush", "Enqueue"],
   promoting: ["Composed", "ReadBack", "ReadBack", "PushRefused", "Enqueue"],
   frozen: ["Resume", "Enqueue"],
+  syncing: ["ReadBack", "Enqueue"],
 };
+/**
+ * What each step tries besides the kinds it draws from: a sync from upstream. It is never
+ * drawn, so no plan's walk moves; the tours' trunk was not imported, so each one is refused,
+ * and the sync's own walk is `syncTour`'s.
+ */
+const PROBED: readonly Kind[] = [...KINDS, "Sync"];
 
 interface Step {
   readonly mode: "progress" | "any";
@@ -148,6 +157,8 @@ const build = (
   step: Step,
   world: World,
 ): PromotionCommand => {
+  // A sync counts nothing in the world, so trying one moves no batch's id, shape or flag.
+  if (kind === "Sync") return syncCommand(state, step);
   world.n += 1;
   const n = world.n;
   switch (kind) {
@@ -199,6 +210,13 @@ const build = (
     }
     case "ReadBack": {
       const wal = state?.wal;
+      // An open sync is read back at its start, its target, or a stray head.
+      const sync = state?.phase === "syncing" ? state.sync : undefined;
+      if (sync !== undefined)
+        return {
+          _tag: "ReadBack",
+          observed: !step.honest ? STRAY : step.pick % 3 === 0 ? sync.from : sync.to,
+        };
       const observed = !step.honest
         ? STRAY
         : step.pick % 3 === 0
@@ -231,6 +249,15 @@ const build = (
     }
   }
 };
+
+/** Upstream's head a sync moves to: one of two, so a walk meets a sync again after one landed. */
+const UPSTREAM = [sha(0x3001), sha(0x3002)] as const;
+/** A sync from the head trunk holds, mostly; now and then from a stray one, or to the head itself. */
+function syncCommand(state: Trunk | undefined, step: Step): PromotionCommand {
+  const head = state?.head ?? H0;
+  const to = step.pick % 4 === 3 ? head : (UPSTREAM[step.pick % 2] ?? H0);
+  return { _tag: "Sync", by: RELEASER, from: step.honest ? head : STRAY, to };
+}
 
 interface Probe {
   readonly command: PromotionCommand;
@@ -276,7 +303,7 @@ const play = (steps: readonly Step[]): readonly Played[] => {
   for (const step of steps) {
     const now = Instant(T0 + played.length);
     const before = state;
-    const probes = KINDS.map((k) => attempt(before, build(k, before, step, world), now));
+    const probes = PROBED.map((k) => attempt(before, build(k, before, step, world), now));
     const choices = step.mode === "progress" ? PROGRESS[before?.phase ?? "none"] : KINDS;
     const taken = attempt(
       before,
@@ -367,6 +394,10 @@ const oracle = (
       if (wal.composed === undefined) return "promoting";
       return command.sha === wal.composed ? "noop" : "frozen";
     case "ReadBack":
+      if (before.phase === "syncing" && before.sync !== undefined) {
+        if (command.observed === before.sync.from) return "noop";
+        return command.observed === before.sync.to ? settled(before, 0) : "frozen";
+      }
       if (before.phase !== "promoting" || wal?.composed === undefined) return "refused";
       if (command.observed === wal.old) return "noop";
       return command.observed === wal.composed ? settled(before, 0) : "frozen";
@@ -379,6 +410,12 @@ const oracle = (
         : "refused";
     case "Resume":
       return before.phase === "frozen" ? settled(before, 0) : "refused";
+    case "Sync":
+      // Only an import has an upstream, and a sync starts between groups, from trunk's own head.
+      if (before.origin?.kind !== "imported") return "refused";
+      if (before.phase !== "idle" && before.phase !== "debouncing") return "refused";
+      if (command.from !== before.head) return "refused";
+      return command.to === command.from ? "noop" : "syncing";
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -1181,6 +1218,62 @@ const promotionTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
   return walkedTour;
 };
 
+/** An import's origin: the upstream a sync reads, and trunk's first head. */
+const IMPORTED: TrunkOrigin = {
+  kind: "imported",
+  url: "https://git.example/upstream.git",
+  ref: "refs/heads/main",
+  commit: H0,
+};
+const importedInit: PromotionCommand = {
+  _tag: "Initialize",
+  head: H0,
+  by: "seed",
+  origin: IMPORTED,
+};
+
+/**
+ * The machine walked breadth-first from an imported trunk, with a sync from upstream among its
+ * moves: every edge of a sync, with batches queued around it and a freeze after it. Its own
+ * walk, so the promotion tour and its fold table stay as they were.
+ */
+let walkedSyncTour: readonly Fold<Trunk, TrunkEvent>[] | undefined;
+const syncTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
+  if (walkedSyncTour !== undefined) return walkedSyncTour;
+  const world: World = { touched: new Map(), behind: new Set(), n: 100 };
+  walkedSyncTour = tour(promotionMachine, {
+    start: T0,
+    facts: (now) => ({ now, projectId: PROJECT }),
+    moves: (state) =>
+      state === undefined
+        ? [{ command: importedInit, dt: 1 }]
+        : PROBED.filter((kind) => kind !== "Initialize").flatMap((kind) =>
+            [true, false].flatMap((honest) =>
+              [0, 1, 2, 3].map((pick) => ({
+                command: build(
+                  kind,
+                  state,
+                  { mode: "progress", pick, honest, path: pick % PATHS.length, behind: false },
+                  world,
+                ),
+                dt: 1,
+              })),
+            ),
+          ),
+    signature: (t) =>
+      [
+        phaseOf(t),
+        Math.min(t?.queue.length ?? 0, 2),
+        t?.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
+        t?.sync === undefined ? "-" : "sync",
+        t?.frozen === undefined ? "-" : "frozen",
+        // Whether trunk is at an upstream head: a second sync starts from one.
+        t !== undefined && UPSTREAM.some((u) => u === t.head) ? "upstream" : "-",
+      ].join("|"),
+  });
+  return walkedSyncTour;
+};
+
 /** A verdict's `verified` flag as the Lane DO sets it. */
 type Flag = "absent" | boolean;
 const withFlag = (flag: Flag): { readonly verified?: boolean } =>
@@ -1452,6 +1545,8 @@ interface FoldedTrunk {
   readonly promoted: number;
   /** When its head last changed: the instant of the fold that changed it. */
   readonly advancedAt?: Instant;
+  /** The open sync from upstream: where it moves main from and to. */
+  readonly sync?: { readonly from: CommitSha; readonly to: CommitSha };
 }
 
 const slotOf = (b: Slot): Slot => ({ batchId: b.batchId, members: b.members });
@@ -1579,13 +1674,16 @@ const trunkFolds = (
     }
     case "PromotionFrozen":
       return (from.phase === "debouncing" && event.expected === from.head) ||
-        (from.phase === "promoting" && group !== undefined && group.id === event.groupId)
+        (from.phase === "promoting" && group !== undefined && group.id === event.groupId) ||
+        (from.phase === "syncing" &&
+          from.sync !== undefined &&
+          syncGroupId(from.sync.to) === event.groupId)
         ? { ...from, phase: "frozen", frozen: true }
         : "illegal";
     case "PromotionResumed": {
       if (from.phase !== "frozen" || (group !== undefined && group.batches.length > 0))
         return "illegal";
-      const { group: _dropped, ...resumed } = from;
+      const { group: _dropped, sync: _resolved, ...resumed } = from;
       // Only a resume that names a head trunk is not at moves the time: one that names none (an older event) leaves it.
       const moved = event.head !== undefined && event.head !== from.head;
       return {
@@ -1594,6 +1692,31 @@ const trunkFolds = (
         head: event.head ?? from.head,
         ...(moved ? { advancedAt: at } : {}),
         phase: rests(from.queue),
+      };
+    }
+    case "TrunkSyncStarted":
+      return (from.phase === "idle" || from.phase === "debouncing") &&
+        event.from === from.head &&
+        event.to !== from.head
+        ? { ...from, phase: "syncing", sync: { from: event.from, to: event.to } }
+        : "illegal";
+    case "TrunkSynced": {
+      if (
+        from.phase !== "syncing" ||
+        from.sync?.from !== event.from ||
+        from.sync.to !== event.to ||
+        (event.height !== undefined &&
+          from.height !== undefined &&
+          event.height !== from.height + 1)
+      )
+        return "illegal";
+      const { sync: _resolved, height: _was, ...synced } = from;
+      return {
+        ...synced,
+        head: event.to,
+        advancedAt: at,
+        phase: rests(from.queue),
+        ...(event.height === undefined ? {} : { height: event.height }),
       };
     }
     default: {
@@ -1798,6 +1921,7 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
         frozen: t.frozen !== undefined,
         promoted: t.promoted.length,
         ...(t.advancedAt === undefined ? {} : { advancedAt: t.advancedAt }),
+        ...(t.sync === undefined ? {} : { sync: { from: t.sync.from, to: t.sync.to } }),
       }),
       shown: (f) => canonicalJson(asJson(f)),
       row: shapeOf,
@@ -1830,6 +1954,163 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
   });
 });
 
+/** Every trunk the sync's walk reaches, each command tried on it as a step would build it. */
+const reached = () => {
+  const world: World = { touched: new Map(), behind: new Set(), n: 500 };
+  return syncTour().flatMap(({ after }) =>
+    PROBED.flatMap((kind) =>
+      [true, false].flatMap((honest) =>
+        [0, 1, 2, 3].map((pick) => ({
+          before: after,
+          probe: attempt(
+            after,
+            build(kind, after, { mode: "progress", pick, honest, path: 0, behind: false }, world),
+            T0,
+          ),
+        })),
+      ),
+    ),
+  );
+};
+
+describe("a sync from upstream", { timeout: PROPERTY_TIMEOUT }, () => {
+  const UP = sha(0x3001);
+  const sync = (from: CommitSha = H0, to: CommitSha = UP): PromotionCommand => ({
+    _tag: "Sync",
+    by: RELEASER,
+    from,
+    to,
+  });
+  it("[sync.transitions] in every phase the sync's walk reaches, every command lands where the docs' table says, or is refused", () => {
+    const tried = reached();
+    const off = tried.filter(({ before, probe }) => {
+      const expected = oracle(before, probe.command);
+      if (expected === "refused") return !Result.isFailure(probe.result);
+      if (expected === "noop")
+        return !(Result.isSuccess(probe.result) && probe.result.success.length === 0);
+      return !(
+        Result.isSuccess(probe.result) &&
+        !probe.threw &&
+        (probe.after?.phase ?? "none") === expected
+      );
+    });
+    expect(off.map(({ before, probe }) => `${before.phase} ${probe.command._tag}`)).toEqual([]);
+    expect(new Set(tried.map(({ before }) => before.phase))).toEqual(
+      new Set(["idle", "debouncing", "syncing", "frozen", "promoting"]),
+    );
+  });
+
+  it("[sync.imported-only] only an imported trunk syncs: an empty, forked or template start, or one with no origin, is NotImported", () => {
+    const origins: readonly (TrunkOrigin | undefined)[] = [
+      undefined,
+      { kind: "empty" },
+      { kind: "forked", project: makeId("prj", ulid(2)), commit: H0 },
+      { kind: "template", name: "forge", commit: H0 },
+    ];
+    const refused = origins.map(
+      (origin) =>
+        failureTag(
+          drive([
+            {
+              _tag: "Initialize",
+              head: H0,
+              by: "seed",
+              ...(origin === undefined ? {} : { origin }),
+            },
+            sync(),
+          ]).results[1],
+        ) ?? "taken",
+    );
+    expect(refused).toEqual(["NotImported", "NotImported", "NotImported", "NotImported"]);
+    expect(drive([importedInit, sync()]).tags[1]).toEqual(["TrunkSyncStarted"]);
+  });
+
+  it("[sync.phases] a sync starts from idle or debouncing at trunk's own head, and is refused while a group is in flight, a freeze holds or another sync is open", () => {
+    const idle = drive([importedInit, sync()]);
+    const debouncing = drive([importedInit, enqueue(1, C1), sync()]);
+    expect([idle.tags[1], debouncing.tags[2]]).toEqual([
+      ["TrunkSyncStarted"],
+      ["TrunkSyncStarted"],
+    ]);
+    expect([idle.state?.phase, debouncing.state?.phase]).toEqual(["syncing", "syncing"]);
+    expect(idle.state?.sync).toEqual({
+      from: H0,
+      to: UP,
+      by: RELEASER,
+      upstream: { url: IMPORTED.url, ref: IMPORTED.ref },
+    });
+    const promoting = [importedInit, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")])];
+    const refusals = [
+      drive([...promoting, sync()]).results[3],
+      drive([...promoting, composed, readBack(STRAY), sync(STRAY)]).results[5],
+      drive([importedInit, sync(), sync(H0, sha(0x3002))]).results[2],
+      drive([importedInit, sync(STRAY)]).results[1],
+    ];
+    expect(refusals.map(failureTag)).toEqual([
+      "PromotionStateRefused",
+      "PromotionStateRefused",
+      "PromotionStateRefused",
+      "PromotionStateRefused",
+    ]);
+  });
+
+  it("[sync.flush-held] no group starts while a sync is open: a flush is refused, and a batch only queues", () => {
+    const open = drive([importedInit, sync(), enqueue(1, C1), flush([facts(1, C1, "src/a.ts")])]);
+    expect(open.tags.slice(2)).toEqual([["BatchVerified"], []]);
+    expect(failureTag(open.results[3])).toBe("PromotionStateRefused");
+    expect(open.state).toMatchObject({ phase: "syncing", head: H0 });
+    expect(open.state?.queue.map((b) => b.batchId)).toEqual([makeId("bat", ulid(1))]);
+  });
+
+  it("[sync.readback] main read back at the sync's target syncs trunk one height up, at its start leaves the sync open, and anywhere else freezes it", () => {
+    const synced = drive([importedInit, sync(), readBack(UP)]);
+    expect(synced.tags[2]).toEqual(["TrunkSynced"]);
+    expect(eventsOf(synced.results[2]!)[0]).toMatchObject({
+      from: H0,
+      to: UP,
+      by: RELEASER,
+      height: 1,
+    });
+    expect(synced.state).toMatchObject({ phase: "idle", head: UP, height: 1, advancedAt: T0 });
+    expect(synced.state?.sync).toBeUndefined();
+    const open = drive([importedInit, sync(), readBack(H0)]);
+    expect(open.tags[2]).toEqual([]);
+    expect(open.state).toMatchObject({ phase: "syncing", head: H0 });
+    const stray = drive([importedInit, sync(), readBack(STRAY)]);
+    expect(eventsOf(stray.results[2]!)).toEqual([
+      PromotionFrozen.make({
+        projectId: PROJECT,
+        groupId: syncGroupId(UP),
+        expected: UP,
+        observed: STRAY,
+        reason: "readback-mismatch",
+      }),
+    ]);
+    expect(stray.state).toMatchObject({ phase: "frozen", head: H0 });
+    const resumed = drive([
+      importedInit,
+      sync(),
+      readBack(STRAY),
+      { _tag: "Resume", by: RELEASER, head: STRAY },
+    ]);
+    expect(resumed.state).toMatchObject({ phase: "idle", head: STRAY });
+    expect(resumed.state?.sync).toBeUndefined();
+  });
+
+  it("[sync.settles] a sync that lands leaves trunk debouncing when batches queued during it, and idle when none did", () => {
+    const queued = drive([importedInit, sync(), enqueue(1, C1), readBack(UP)]);
+    const alone = drive([importedInit, sync(), readBack(UP)]);
+    expect([queued.state?.phase, alone.state?.phase]).toEqual(["debouncing", "idle"]);
+    expect(queued.state?.queue.map((b) => b.batchId)).toEqual([makeId("bat", ulid(1))]);
+  });
+
+  it("[sync.level] an upstream at trunk's own head records nothing", () => {
+    const level = drive([importedInit, sync(H0, H0)]);
+    expect(level.tags[1]).toEqual([]);
+    expect(level.state).toMatchObject({ phase: "idle", head: H0 });
+  });
+});
+
 describe("the Promotion chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.chart] every phase change a run makes is an edge of the Promotion chart, and a tour of the machine exercises every edge", () => {
     fc.assert(
@@ -1849,7 +2130,7 @@ describe("the Promotion chart", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    const walked = promotionTour();
+    const walked = [...promotionTour(), ...syncTour()];
     expect(offChart(promotionChart, walked, promotionView)).toEqual([]);
     expect(uncovered(promotionChart, walked, promotionView)).toEqual([]);
   });

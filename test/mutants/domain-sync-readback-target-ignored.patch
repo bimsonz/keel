@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.readback
+# kills: sync.readback
+# why: main read back at the sync's target freezes promotion instead of syncing trunk
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..ad11d634 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -228,7 +228,7 @@ const readBackSync = (
+   observed: CommitSha,
+ ): Decision => {
+   if (observed === sync.from) return Result.succeed([]);
+-  if (observed === sync.to)
++  if (observed === sync.to && observed === sync.from)
+     return Result.succeed([
+       TrunkSynced.make({
+         projectId: trunk.projectId,

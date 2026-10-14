@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: My subject is looked up at itself, never at its parent, so a change on a sibling subject is not read and drops out of the neighbours.
+diff --git a/packages/core/src/domain/coordination/near.ts b/packages/core/src/domain/coordination/near.ts
+index 2236b160..0ac4ba44 100644
+--- a/packages/core/src/domain/coordination/near.ts
++++ b/packages/core/src/domain/coordination/near.ts
+@@ -73,7 +73,7 @@ export type NearLookups = {
+ /** What a preflight of `intent` looks up: of its premises and declared effects, as exposure compares them. */
+ export const nearLookupsOf = (intent: Intent): NearLookups => {
+   const mine = intentPropositions(intent);
+-  const around = new Set(mine.map(({ subject }) => parentSubject(subject) ?? subject));
++  const around = new Set(mine.map(({ subject }) => subject));
+   const holding = new Set(
+     mine.flatMap(({ subject }) => subjectAncestors(subject)).filter((key) => !around.has(key)),
+   );

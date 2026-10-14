@@ -60,6 +60,7 @@ import {
 } from "@keeltown/core/domain/identity";
 import type { Change, ChangeNotFound } from "@keeltown/core/domain/coordination";
 import {
+  agentActor,
   type ChangeId,
   ConflictId,
   type NamespaceId,
@@ -67,6 +68,7 @@ import {
   ProbeId,
   ProjectId as ProjectIdSchema,
   type ProjectId,
+  userActor,
 } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
@@ -111,6 +113,8 @@ import {
   putSettingsInput,
   settingsError,
   settingsOk,
+  syncUpstreamError,
+  syncUpstreamOk,
   settingsProject,
   sourceNotFound,
   sourceRefused,
@@ -1254,6 +1258,22 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               Effect.match({
                 onSuccess: settingsOk,
                 onFailure: (error) => putSettingsError(caller, error),
+              }),
+            ),
+          );
+        },
+        // The policy let an owner of the project's namespace ask: a person, or an agent in a namespace of its own.
+        Operator_syncUpstream: (caller: Caller, input: Input<"Operator_syncUpstream">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          const actor = settingsActorOf(caller);
+          const by = actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
+          return run(
+            caller,
+            Trunks.use((trunks) => trunks.syncUpstream(projectId.success, by)).pipe(
+              Effect.match({
+                onSuccess: syncUpstreamOk,
+                onFailure: (error) => syncUpstreamError(caller, error),
               }),
             ),
           );

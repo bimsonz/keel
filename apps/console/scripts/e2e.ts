@@ -16,6 +16,7 @@ import { build, preview } from "vite";
 import { createAccount } from "../src/account/account.ts";
 import { type Identity, createIdentity } from "../test/fixtures/identity/standIn.ts";
 import {
+  CONSENT_URL,
   type Call,
   type FakeKeel,
   PUBLIC_REPOSITORY,
@@ -157,12 +158,12 @@ expectEqual(
       ),
     )
   ).join(" "),
-  "/acme/demo /acme/demo/changes /acme/demo/conflicts /acme/demo/escalations /acme/demo/mission-control /acme/demo/agents /acme/demo/insights",
+  "/acme/demo /acme/demo/changes /acme/demo/conflicts /acme/demo/escalations /acme/demo/mission-control /acme/demo/insights",
 );
 expectEqual(
   "frame: what is open, counted on the tabs",
   (await tabs.allInnerTexts()).map(squash).join(" | "),
-  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Agents | Insights",
+  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights",
 );
 // A question is a thing in Escalations, not its list: the tab is marked as where the reader is, and not as the page.
 expectEqual(
@@ -272,7 +273,7 @@ expectEqual("trunk red", await stat("Trunk red"), "0");
 expectEqual(
   "frame: nothing is left open",
   (await tabs.allInnerTexts()).map(squash).join(" | "),
-  "Code | Changes | Conflicts | Escalations | Mission Control | Agents | Insights",
+  "Code | Changes | Conflicts | Escalations | Mission Control | Insights",
 );
 
 // The conflict is settled, and is found where settled conflicts are listed. Its matrix is still the probe's record.
@@ -1095,7 +1096,7 @@ expectEqual(
 // An address that names nothing says so, inside the project's frame, with the way back.
 await page.goto(at("/nowhere", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
-expectEqual("missing: the frame is still there", String(await tabs.count()), "7");
+expectEqual("missing: the frame is still there", String(await tabs.count()), "6");
 await page.getByRole("link", { name: "Go to the project's code" }).click();
 await page.locator(".a-prose h2").first().waitFor();
 expectEqual("missing: the way back is the project's code", pathOf(page), "/acme/demo");
@@ -1535,134 +1536,40 @@ expectEqual(
   "100",
 );
 
-// ── Agents: who Keel's log names as having written here, and each one's runs ──
+// ── Agents: members of a project, not a part of it ──
 // Scenario 1 at the question. Agent B declared #1 under a token that named no run, and Agent A declared #2 under
-// the run it called collab-revocation. A fixture has no cards, so each is named as the log enrolled it.
-const AGENTS = "Agents, the one that wrote last first";
-/** Each row of the agents' list: its name, what it says beside Keel's id and the time, and what it holds. */
-const agentRows = (shown: Page): Promise<string> =>
-  shown
-    .getByRole("list", { name: AGENTS })
-    .getByRole("listitem")
-    .evaluateAll((rows) =>
-      rows
-        .map((row) =>
-          [
-            row.querySelector(".a-list-title")?.textContent ?? "",
-            [...row.querySelectorAll(".a-list-title + div > *")]
-              .filter((part) => !part.matches("span.a-mono") && part.querySelector("time") === null)
-              .map((part) => part.textContent ?? "")
-              .join(", "),
-            [...row.querySelectorAll(".a-chip")].map((chip) => chip.textContent ?? "").join(" "),
-          ].join(" | "),
-        )
-        .join(" || "),
-    );
-await page.goto(at("/agents", "scenario=s1&t=470&ruling=live&play=0"), {
-  waitUntil: "networkidle",
-});
-await page.getByRole("heading", { level: 1, name: "Agents" }).waitFor();
-expectEqual(
-  "agents: one row for each agent the log names, with its runs here and the changes it holds",
-  await agentRows(page),
-  "Agent A | 1 run here | #2 1 change || Agent B | no run named | #1 1 change",
-);
-expectEqual(
-  "agents: the tab is where the reader is, and the page says how an agent joins and makes no credential",
-  `${await tabs.filter({ hasText: "Agents" }).getAttribute("aria-current")} | ${await page.getByText("No credential is made here.").count()} | ${await page
-    .getByRole("button")
-    .filter({ hasText: /credential|enrol|mint/i })
-    .count()} buttons`,
-  "page | 1 | 0 buttons",
-);
-// An agent's own page in the project: its runs, each a part of the page with a place of its own.
-await page.getByRole("list", { name: AGENTS }).getByRole("link", { name: "Agent A" }).click();
-await page.getByRole("heading", { level: 1 }).waitFor();
-const runsOn = async (shown: Page): Promise<string> =>
-  (
-    await shown.locator("section.a-panel").evaluateAll((sections) =>
-      sections.map((section) =>
-        [
-          section.id,
-          section.querySelector("h2")?.textContent ?? "",
-          [...section.querySelectorAll("header p > span")]
-            .filter((part) => part.querySelector("time") === null)
-            .map((part) => part.textContent ?? "")
-            .join(", "),
-          [...section.querySelectorAll("li")]
-            .map((held) => (held.textContent ?? "").replaceAll(/\s+/g, " ").trim())
-            .join("; "),
-        ].join(" | "),
-      ),
-    )
-  ).join(" || ");
-expectEqual(
-  "agent: its run is named in its own words and said to be its own, with Keel's id for it and the change it holds",
-  `${squash(await page.getByRole("heading", { level: 1 }).innerText())} | ${await runsOn(page)}`,
-  "Agent A | run-run_0000000000000000000000ACDE | “collab-revocation” | as the agent named it, run_0000000000000000000000ACDE, 2 entries of the log | #2Owners can revoke collaborators, effective immediatelyparked",
-);
-await page.goBack();
-await page.getByRole("list", { name: AGENTS }).getByRole("link", { name: "Agent B" }).click();
-await page.getByRole("heading", { level: 1, name: "Agent B" }).waitFor();
-expectEqual(
-  "agent: work under a token that named no run is listed as that, and under no run",
-  `${await runsOn(page)} | ${await page.getByText("Work under a token that named no run: 2 entries of the log.").count()}`,
-  " | No run named |  | #1Speed up permission checksparked | 1",
-);
-// A change says which run holds it, on its row and on its page, and each is a link to that run's place.
+// the run it called collab-revocation. A fixture has no cards, so no agent has a handle, and so no page.
+const runsSaid = async (shown: Page): Promise<string> =>
+  `${(await shown.getByText(/^in (its run|a run)/).allInnerTexts()).map(squash).join(" || ")} | ${await shown
+    .getByRole("link", { name: /^in (its run|a run)/ })
+    .count()} links`;
 await page.goto(at("/changes?state=parked", "scenario=s1&t=470&ruling=live&play=0"), {
   waitUntil: "networkidle",
 });
 await page.getByRole("list", { name: "Changes, newest first" }).waitFor();
-const runLinks = (shown: Page): Promise<string> =>
-  shown
-    .getByRole("link", { name: /^in (its run|a run)/ })
-    .evaluateAll((links) =>
-      links
-        .map((link) =>
-          link instanceof HTMLAnchorElement
-            ? `${link.textContent ?? ""} -> ${new URL(link.href).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")}${new URL(link.href).hash}`
-            : "not a link",
-        )
-        .join(" || "),
-    );
 expectEqual(
-  "changes: the row of a change held under a run says which, and links to it; one held under none says nothing",
-  await runLinks(page),
-  "in its run “collab-revocation” -> /acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE",
+  "changes: the row of a change held under a run says which; one held under none says nothing",
+  await runsSaid(page),
+  "in its run “collab-revocation” | 0 links",
 );
 await page.goto(at("/changes/2", "scenario=s1&t=470&ruling=live&play=0"), {
   waitUntil: "networkidle",
 });
 await page.getByRole("heading", { level: 1 }).waitFor();
 expectEqual(
-  "change: its page says which run holds it, and its agent's name is a link to the agent's page here",
-  `${await runLinks(page)} | ${await page
-    .getByRole("link", { name: /Agent A/ })
-    .first()
-    .evaluate((link) =>
-      link instanceof HTMLAnchorElement
-        ? new URL(link.href).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")
-        : "not a link",
-    )}`,
-  "in its run “collab-revocation” -> /acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE | /acme/demo/agents/{agent}",
+  "change: its page says which run holds it, and an agent Keel gives no handle is named and leads nowhere",
+  `${await runsSaid(page)} | ${await page.getByRole("main").getByRole("link", { name: "Agent A" }).count()} links to the agent`,
+  "in its run “collab-revocation” | 0 links | 0 links to the agent",
 );
-await page.getByRole("link", { name: /^in its run/ }).click();
-await page.getByRole("heading", { level: 1, name: "Agent A" }).waitFor();
-expectEqual(
-  "change: the link to its run lands on the agent's page with the run's place in the address",
-  `${new URL(page.url()).pathname.replace(/agt_[0-9A-Z]+/, "{agent}")}${new URL(page.url()).hash} | ${await page.locator("#run-run_0000000000000000000000ACDE").count()}`,
-  "/acme/demo/agents/{agent}#run-run_0000000000000000000000ACDE | 1",
-);
-// A name the log gives no agent is said to be that, and nothing is made up for it.
-await page.goto(at("/agents/nobody", "scenario=s1&t=470&ruling=live&play=0"), {
+// Agents are members of a project, as people are: it has no tab of theirs, and no address for them under it.
+await page.goto(at("/agents", "scenario=s1&t=470&ruling=live&play=0"), {
   waitUntil: "networkidle",
 });
 await page.getByRole("heading", { level: 1 }).first().waitFor();
 expectEqual(
-  "agent: a name the log gives no agent is told as that",
-  `${await page.getByText("Keel's log names no agent nobody in this project").count()} | ${await page.locator("section.a-panel").count()} runs`,
-  "1 | 0 runs",
+  "agents: a project has no Agents tab, and no address for its agents",
+  `${await tabs.filter({ hasText: "Agents" }).count()} tabs | ${squash(await page.getByRole("heading", { level: 1 }).first().innerText())}`,
+  "0 tabs | There is nothing at this address",
 );
 // Mission Control's agent node says the run its change is held under, where the agent named one.
 await page.goto(at("/mission-control", "scenario=s1&t=470&ruling=live&play=0"), {
@@ -1835,7 +1742,7 @@ await narrow.goto(at("/escalations/E-1", "scenario=s1&t=472&ruling=live"), {
 await narrow
   .getByRole("heading", { name: "May permission checks be cached within a session?" })
   .waitFor();
-expectEqual("narrow: the same frame, with every tab", String(await tabsOf(narrow).count()), "7");
+expectEqual("narrow: the same frame, with every tab", String(await tabsOf(narrow).count()), "6");
 expectEqual(
   "narrow: a question's page stays within the screen",
   String(await overflowOf(narrow)),
@@ -1999,13 +1906,13 @@ async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<
 }
 
 const OPEN_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Decisions | Mission Control | Agents | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Decisions | Mission Control | Insights";
 /**
  * The tabs as someone who is no member of the project's org is shown them: Keel reads a project's questions to
  * its members alone, so none is counted for anyone else.
  */
 const PUBLIC_ON_TABS =
-  "Code | Changes 2 open | Conflicts 1 open | Escalations | Decisions | Mission Control | Agents | Insights";
+  "Code | Changes 2 open | Conflicts 1 open | Escalations | Decisions | Mission Control | Insights";
 const QUESTION_ASKED = /May permission checks be cached within a session\?/;
 /** The home's first part for someone signed in: the questions Keel has put to them. */
 const waitingOn = (shown: Page) => shown.getByRole("region", { name: "Waiting for you" });
@@ -2706,8 +2613,8 @@ expectEqual(
 
 // ── A visitor, on a project whose agents Keel names to anyone by their cards ──
 // The log names an agent by its id, and a visitor is read no enrolment. What they are shown of each agent is
-// Keel's card of it: Agent A signed itself up, so it has a handle, and Agent B was enrolled, so it has the kind
-// it declared and the namespace it works in.
+// Keel's card of it: Agent A signed itself up, so it has a handle and a page of its own, and Agent B was
+// enrolled, so it has neither.
 const staffed = createFakeKeel({
   namespace: NAMESPACE,
   visibility: "public",
@@ -2716,69 +2623,44 @@ const staffed = createFakeKeel({
   ahead: AHEAD,
   signedUp: { "Agent A": "tidy-otter" },
 });
-const staffSent: Sent[] = [];
-await asDeployed(street, { keel: staffed, sent: staffSent });
-await visitor.goto(`${built}/ada/demo/agents`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { level: 1, name: "Agents" }).waitFor();
-// Each name arrives with its agent's card: both are waited for, or ten seconds, and the check says which.
-for (const carded of ["declared as interactive", "tidy-otter"]) {
-  // oxlint-disable-next-line no-await-in-loop -- one card is waited for after the other, on the one page
-  await visitor
-    .getByRole("list", { name: AGENTS })
-    .getByText(carded)
-    .first()
-    .waitFor({ timeout: 10_000 })
-    .catch(() => undefined);
-}
-expectEqual(
-  "visitor: a project's agents are named from Keel's cards: a handle where one signed itself up, a declared kind where one was enrolled",
-  await agentRows(visitor),
-  "Agent A | tidy-otter, 1 run here | #2 1 change || Agent B | declared as interactive, no run named | #1 1 change",
-);
-expectEqual(
-  "visitor: an agent's handle is a link to its own page, and its name to its page in the project, at its handle",
-  (
-    await visitor
-      .getByRole("list", { name: AGENTS })
-      .getByRole("listitem")
-      .first()
-      .getByRole("link")
-      .evaluateAll((links) =>
-        links.map((link) =>
-          link instanceof HTMLAnchorElement ? new URL(link.href).pathname : "not a link",
-        ),
-      )
-  )
-    .slice(0, 2)
-    .join(" "),
-  "/ada/demo/agents/tidy-otter /tidy-otter",
-);
-// An agent's page opened cold at its handle: the log has only its id, so Keel is asked whose the handle is.
-const beforeTheHandle = staffSent.length;
-await visitor.goto(`${built}/ada/demo/agents/tidy-otter`, { waitUntil: "domcontentloaded" });
+await asDeployed(street, { keel: staffed });
+/** Where each link in a page's main part named `name` leads. */
+const leadsOf = (shown: Page, name: string): Promise<string> =>
+  shown
+    .getByRole("main")
+    .getByRole("link", { name, exact: true })
+    .evaluateAll((links) =>
+      links.map((link) =>
+        link instanceof HTMLAnchorElement ? new URL(link.href).pathname : "not a link",
+      ),
+    )
+    .then((paths) => [...new Set(paths)].join(" ") || "nowhere");
+await visitor.goto(`${built}/ada/demo/changes/2`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { level: 1 }).first().waitFor();
+// The holder's name and handle arrive with Keel's card of it.
 await visitor
-  .getByRole("heading", { level: 1, name: "Agent A" })
+  .getByRole("main")
+  .getByRole("link", { name: "Agent A", exact: true })
+  .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
-  "visitor: an agent's page opened at its handle finds the agent, with its run and the change it holds",
-  `${squash(await visitor.getByRole("heading", { level: 1 }).first().innerText())} | ${await runsOn(visitor)}`,
-  "Agent A | run-run_0000000000000000000000ACDE | “collab-revocation” | as the agent named it, run_0000000000000000000000ACDE, 2 entries of the log | #2Owners can revoke collaborators, effective immediatelyparked",
+  "visitor: a change's holder that signed itself up leads to its own page, at its handle, as an author leads to their profile",
+  await leadsOf(visitor, "Agent A"),
+  "/tidy-otter",
 );
+await visitor.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { level: 1 }).first().waitFor();
+await visitor
+  .getByRole("main")
+  .getByText("Agent B", { exact: true })
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
-  "visitor: for an agent at a handle Keel is asked whose the handle is and for that agent's card, and nothing else of agents",
-  [
-    ...new Set(
-      staffSent
-        .slice(beforeTheHandle)
-        .map((request) => request.path.replace(/\/v1\/agents\/agt_[0-9A-Z]+$/, "/v1/agents/{id}"))
-        .filter((path) => path.startsWith("/v1/agents") || path === "/v1/namespaces/tidy-otter"),
-    ),
-  ]
-    .toSorted()
-    .join(" "),
-  "/v1/agents/{id} /v1/namespaces/tidy-otter",
+  "visitor: a change's holder a member enrolled has no handle, so it is named and leads nowhere",
+  `${(await visitor.getByRole("main").getByText("Agent B", { exact: true }).count()) > 0 ? "named" : "not named"} | ${await leadsOf(visitor, "Agent B")}`,
+  "named | nowhere",
 );
 // The agent's own page, at its handle: Keel's card, and nothing of who stands behind it.
 await visitor.goto(`${built}/tidy-otter`, { waitUntil: "domcontentloaded" });
@@ -3881,7 +3763,7 @@ await countedPublic(passer);
 expectEqual(
   "settings: a visitor now reads the project, and is offered no settings",
   `${await filesOn(passer)} | ${await tabsOf(passer).count()} tabs`,
-  "src | package.json | README.md | 8 tabs",
+  "src | package.json | README.md | 7 tabs",
 );
 await passer.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
 await passer.getByRole("heading", { level: 1, name: "Settings" }).waitFor();
@@ -4163,7 +4045,7 @@ await decisionRows
 expectEqual(
   "decisions: the tab stands after Escalations, and is the page the reader is on",
   `${(await tabsOf(recall).allInnerTexts()).map((tab) => squash(tab).replace(/ \d.*$/, "")).join(" | ")} | ${String(await tabsOf(recall).filter({ hasText: "Decisions" }).getAttribute("aria-current"))}`,
-  "Code | Changes | Conflicts | Escalations | Decisions | Mission Control | Agents | Insights | page",
+  "Code | Changes | Conflicts | Escalations | Decisions | Mission Control | Insights | page",
 );
 expectEqual(
   "decisions: a visitor reads a public project's decisions, each as Keel's row has it",
@@ -4551,9 +4433,9 @@ expectEqual(
 await movingOn.close();
 
 // ── A namespace's credentials, and a project's Cloudflare account ──
-// A token is typed once, leaves the page in the body of the one call that stores it, and is shown again nowhere.
-// A project's owner connects an account on its settings, and Keel reaches the account before it sets anything.
-const DEPLOY_TOKEN = "cf-e2e-token-0123456789abcdefghijk";
+// No token is typed anywhere. A project's owner presses Continue with Cloudflare on its settings and is sent to
+// Cloudflare's consent; Keel's callback makes a token of its own on the account ticked, stores it as a credential
+// of the namespace, sets the target with it, and sends the owner back to the settings with how it went.
 const GOOD_ACCOUNT = "0123456789abcdef0123456789abcdef";
 const deploying = createFakeKeel({
   namespace: NAMESPACE,
@@ -4561,41 +4443,190 @@ const deploying = createFakeKeel({
   readerOf,
   whose: whoseHandle,
   roleIn: (userId, org) => identity.roleIn(userId, org),
+  consentAccount: GOOD_ACCOUNT,
   cloudflare: ({ accountId }) =>
     accountId === GOOD_ACCOUNT
       ? { reaches: true, subdomain: "ada-previews" }
       : { reaches: false, why: "account-unreachable", code: 10000 },
 });
 await asDeployed(lobby, { keel: deploying, sent: sentToKeel });
+// Cloudflare's consent screen, played: the one account is ticked, and Allow sends the browser back to Keel's
+// callback, on the console's own origin, with a code and the state Keel sent it with. Allow is a link the owner
+// follows, not a redirect: a request the browser is redirected to from a fulfilled one is not routed again.
+const consentsAsked: string[] = [];
+await lobby.route(
+  (url) => `${url.origin}${url.pathname}` === CONSENT_URL,
+  async (route) => {
+    const asked = new URL(route.request().url());
+    consentsAsked.push(asked.href);
+    const back = new URL("/v1/cloudflare/callback", built);
+    back.searchParams.set("code", "e2e-code");
+    back.searchParams.set("state", asked.searchParams.get("state") ?? "");
+    await route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><title>Allow Keel</title><a href="${back.href.replaceAll("&", "&amp;")}">Allow</a>`,
+    });
+  },
+);
 const credentialsOn = (shown: Page) => shown.getByRole("region", { name: "Credentials" });
 const cloudflareOn = (shown: Page) => shown.getByRole("region", { name: "Cloudflare" });
-const storesOf = (keel: FakeKeel, handle: string) =>
+/** The labels of a section's text fields, in order: what it asks the reader to type. */
+const fieldsOf = async (section: Locator): Promise<string> => {
+  const labels = await section
+    .locator("input:not([type=hidden]), textarea")
+    .evaluateAll((fields) =>
+      fields.map((field) =>
+        field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
+          ? (field.labels?.[0]?.textContent ?? field.getAttribute("aria-label") ?? field.name)
+          : "",
+      ),
+    )
+    .catch(() => ["unread"]);
+  return labels.length === 0 ? "none" : labels.join(", ");
+};
+const connectsOf = (keel: FakeKeel): Call[] =>
+  keel.calls.filter((call) => call.method === "POST" && call.path.endsWith("/cloudflare-connect"));
+const setsOf = (keel: FakeKeel, name: string): Call[] =>
   keel.calls.filter(
-    (call) => call.method === "POST" && call.path === `/v1/namespaces/${handle}/credentials`,
+    (call) => call.method === "PUT" && call.path.endsWith(`/deploy-targets/${name}`),
   );
-/** Everything the page has put in the browser's storage, keys and values. */
-const kept = (shown: Page): Promise<string> =>
-  shown.evaluate(() =>
-    [localStorage, sessionStorage]
-      .flatMap((store) =>
-        Array.from({ length: store.length }, (_, place) => {
-          const key = store.key(place) ?? "";
-          return `${key}=${store.getItem(key) ?? ""}`;
-        }),
-      )
-      .join("\n"),
-  );
-await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
-await credentialsOn(person)
-  .getByText("No credential is stored.")
+/** The credential a target was set with, as the page sent it. */
+const credentialIn = (body: string): string => {
+  const parsed: unknown = JSON.parse(body);
+  return typeof parsed === "object" && parsed !== null && "credential" in parsed
+    ? String(parsed.credential)
+    : "";
+};
+await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await cloudflareOn(person)
+  .getByText("No Cloudflare account is connected.")
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-await credentialsOn(person).getByLabel("Label", { exact: true }).fill("ada deploys");
-await credentialsOn(person).getByLabel("Cloudflare API token", { exact: true }).fill(DEPLOY_TOKEN);
-await credentialsOn(person)
-  .getByRole("button", { name: "Store credential" })
+expectEqual(
+  "cloudflare: a project's owner is offered Continue with Cloudflare for a target, and no field for a token",
+  `${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()} | ${await cloudflareOn(
+    person,
+  )
+    .getByRole("form", { name: "Connect a Cloudflare account" })
+    .getByRole("button", { name: "Continue with Cloudflare" })
+    .count()} button | fields ${await fieldsOf(cloudflareOn(person))} | target "${await cloudflareOn(
+    person,
+  )
+    .getByLabel("Target", { exact: true })
+    .inputValue()
+    .catch(() => "no field")}"`,
+  '1 | 1 button | fields Target | target "production"',
+);
+const revokeLink = cloudflareOn(person).getByRole("link", {
+  name: "Cloudflare's account API tokens",
+});
+expectEqual(
+  "cloudflare: the owner is told where Keel's token is revoked, opened apart with no referrer",
+  `${String(await revokeLink.getAttribute("href").catch(() => "no link"))} | ${String(await revokeLink.getAttribute("target").catch(() => "none"))} | ${String(await revokeLink.getAttribute("rel").catch(() => "none"))}`,
+  "https://dash.cloudflare.com/?to=/:account/api-tokens | _blank | noreferrer",
+);
+// Each address the browser is sent to on the way, by its path and the names of its query's parts.
+const hops: string[] = [];
+const noteHop = (asked: { url(): string; isNavigationRequest(): boolean }): void => {
+  if (!asked.isNavigationRequest()) return;
+  const url = new URL(asked.url());
+  const query = [...url.searchParams.keys()].join("&");
+  hops.push(
+    `${url.origin === built ? "" : url.origin}${url.pathname}${query === "" ? "" : `?${query}`}`,
+  );
+};
+person.on("request", noteHop);
+const howItWent = cloudflareOn(person).getByRole("status", { name: "How connecting went" });
+await cloudflareOn(person)
+  .getByRole("button", { name: "Continue with Cloudflare" })
   .click({ timeout: 15_000 })
   .catch(() => undefined);
+await person
+  .getByRole("link", { name: "Allow" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await howItWent.waitFor({ timeout: 15_000 }).catch(() => undefined);
+await person
+  .waitForURL((url) => !url.searchParams.has("cloudflare"), { timeout: 5_000 })
+  .catch(() => undefined);
+person.off("request", noteHop);
+expectEqual(
+  "cloudflare: Continue with Cloudflare goes to Cloudflare's consent, whose callback brings the owner back to the settings with how it went",
+  `${hops.join(" → ")} | ${squash(await howItWent.innerText().catch(() => "nothing said"))}`,
+  "https://dash.cloudflare.com/oauth2/auth?state → /v1/cloudflare/callback?code&state → /ada/demo/settings?cloudflare | Connected. Keel made its deploy token on the account you ticked.",
+);
+expectEqual(
+  "cloudflare: once it is said, the address is the settings' own again",
+  person.url(),
+  `${built}/ada/demo/settings`,
+);
+const targetRows = cloudflareOn(person)
+  .getByRole("list", { name: "Deploy targets" })
+  .getByRole("listitem");
+await targetRows
+  .first()
+  .getByText(/token/)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "cloudflare: the target is listed as Keel's callback set it, on the account consented to, with its workers.dev subdomain and Keel's own token",
+  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${connectsOf(deploying).length} connect, for ${connectsOf(deploying)[0]?.path.split("/").at(-2) ?? "none"} | ${consentsAsked.length} consent | ${deploying.calls.filter((call) => call.path === "/v1/cloudflare/callback").length} callback | ${setsOf(deploying, "production").length} sets from the page`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove | 1 connect, for production | 1 consent | 1 callback | 0 sets from the page`,
+);
+// The token Keel made serves another target on the same account, with no second consent. On an account it does
+// not reach, Keel refuses, and its refusal is shown in its words.
+const reuseOn = (shown: Page) =>
+  cloudflareOn(shown).getByRole("form", { name: "Use a token already stored" });
+await cloudflareOn(person)
+  .getByLabel("Target", { exact: true })
+  .fill("staging", { timeout: 15_000 })
+  .catch(() => undefined);
+await reuseOn(person)
+  .getByLabel("Stored token", { exact: true })
+  .selectOption({ label: "Keel deploys: ada/demo" }, { timeout: 15_000 })
+  .catch(() => undefined);
+await reuseOn(person)
+  .getByLabel("Account id", { exact: true })
+  .fill("f".repeat(32), { timeout: 15_000 })
+  .catch(() => undefined);
+await reuseOn(person)
+  .getByRole("button", { name: "Set the target" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await cloudflareOn(person)
+  .getByRole("alert")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "cloudflare: Keel's refusal of an account its token does not reach is shown in its words, and nothing is set",
+  `${squash(
+    await cloudflareOn(person)
+      .getByRole("alert")
+      .innerText()
+      .catch(() => "no refusal"),
+  )} | ${await targetRows.count()} listed | fields ${await fieldsOf(cloudflareOn(person))}`,
+  "The credential's token does not reach the account's Workers (Cloudflare error 10000): check the account id, and that the token may edit Workers on that account. Nothing was set. Connect the account again through Cloudflare, which makes Keel a new token | 1 listed | fields Target, Account id",
+);
+await reuseOn(person)
+  .getByLabel("Account id", { exact: true })
+  .fill(GOOD_ACCOUNT, { timeout: 15_000 })
+  .catch(() => undefined);
+await reuseOn(person)
+  .getByRole("button", { name: "Set the target" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await targetRows
+  .nth(1)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "cloudflare: on the account it was made for, the stored token sets a second target, with no second consent",
+  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${await cloudflareOn(person).getByRole("alert").count()} refusals | ${connectsOf(deploying).length} connect | ${setsOf(deploying, "staging").length} sets, ${new Set(setsOf(deploying, "staging").map((call) => credentialIn(call.body))).size} credential`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove || staging Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove | 0 refusals | 1 connect | 2 sets, 1 credential`,
+);
+// The token is a credential of the namespace: listed on its owner's settings under the label Keel gave it, and
+// removable there. Nothing on that page takes a token.
+await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 const storedRows = credentialsOn(person)
   .getByRole("list", { name: "Stored credentials" })
   .getByRole("listitem");
@@ -4604,125 +4635,35 @@ await storedRows
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "credentials: a person stores a token on their settings, is shown its label, and the field is emptied as it is sent",
+  "credentials: the token Keel made is listed on its owner's settings by its label, with Remove, and nothing there takes a token",
   `${(await storedRows.allInnerTexts())
     .map(squash)
     .join(" || ")
-    .replace(/\d{4}-\d{2}-\d{2}/, "<day>")} | field "${await credentialsOn(person)
-    .getByLabel("Cloudflare API token", { exact: true })
-    .inputValue()}"`,
-  'ada deploys Cloudflare · stored on <day> by you Remove | field ""',
-);
-expectEqual(
-  "credentials: the token stored is on the page nowhere, and in none of the browser's storage",
-  `on the page ${String((await person.content()).includes(DEPLOY_TOKEN))} | kept ${String((await kept(person)).includes(DEPLOY_TOKEN))}`,
-  "on the page false | kept false",
-);
-expectEqual(
-  "credentials: the token leaves the page in the body of the one call that stores it, and in nothing else",
-  `${storesOf(deploying, "ada").length} | ${String(storesOf(deploying, "ada")[0]?.body.includes(DEPLOY_TOKEN))} | ${
-    deploying.calls.filter(
-      (call) =>
-        `${call.path} ${call.query} ${call.authorization} ${call.idempotencyKey}`.includes(
-          DEPLOY_TOKEN,
-        ) ||
-        (call !== storesOf(deploying, "ada")[0] && call.body.includes(DEPLOY_TOKEN)),
-    ).length
-  } elsewhere`,
-  "1 | true | 0 elsewhere",
-);
-await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
-await cloudflareOn(person)
-  .getByText("No Cloudflare account is connected.")
-  .waitFor({ timeout: 15_000 })
-  .catch(() => undefined);
-const tokenLink = cloudflareOn(person).getByRole("link", { name: "Make a token on Cloudflare" });
-expectEqual(
-  "cloudflare: the project's owner is led to make a token with Workers Scripts: Edit chosen, opened apart with no referrer",
-  `${String(await tokenLink.getAttribute("href").catch(() => "no link"))} | ${String(await tokenLink.getAttribute("target").catch(() => "none"))} | ${String(await tokenLink.getAttribute("rel").catch(() => "none"))}`,
-  "https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%5D&name=Keel%20deploys | _blank | noreferrer",
-);
-// An account the token does not reach: Keel says so, and sets nothing.
-await cloudflareOn(person).getByLabel("Account id", { exact: true }).fill("f".repeat(32));
-await cloudflareOn(person).getByLabel("Cloudflare API token", { exact: true }).fill(DEPLOY_TOKEN);
-await cloudflareOn(person)
-  .getByRole("button", { name: "Connect" })
-  .click({ timeout: 15_000 })
-  .catch(() => undefined);
-await cloudflareOn(person)
-  .getByRole("alert")
-  .waitFor({ timeout: 15_000 })
-  .catch(() => undefined);
-const chosenCredential = (shown: Page): Promise<string> =>
-  cloudflareOn(shown)
-    .getByLabel("Credential", { exact: true })
-    .evaluate((select) =>
-      select instanceof HTMLSelectElement ? (select.selectedOptions[0]?.text ?? "") : "",
-    )
-    .catch(() => "no select");
-expectEqual(
-  "cloudflare: Keel's refusal of an account the token does not reach is shown in its words, and the token just stored stays chosen",
-  `${squash(
-    await cloudflareOn(person)
-      .getByRole("alert")
-      .innerText()
-      .catch(() => "no refusal"),
-  )} | ${await chosenCredential(person)} | ${await cloudflareOn(person).getByLabel("Cloudflare API token", { exact: true }).count()} token fields`,
-  "The credential's token does not reach the account's Workers (Cloudflare error 10000): check the account id, and that the token may edit Workers on that account. Nothing was set. Store a Cloudflare API token that may edit Workers on the account, then set the target with it | demo deploys | 0 token fields",
-);
-await cloudflareOn(person).getByLabel("Account id", { exact: true }).fill(GOOD_ACCOUNT);
-await cloudflareOn(person)
-  .getByRole("button", { name: "Connect" })
-  .click({ timeout: 15_000 })
-  .catch(() => undefined);
-const targetRows = cloudflareOn(person)
-  .getByRole("list", { name: "Deploy targets" })
-  .getByRole("listitem");
-await targetRows
-  .first()
-  .waitFor({ timeout: 15_000 })
-  .catch(() => undefined);
-/** The credential a target was set with, as the page sent it. */
-const credentialIn = (body: string): string => {
-  const parsed: unknown = JSON.parse(body);
-  return typeof parsed === "object" && parsed !== null && "credential" in parsed
-    ? String(parsed.credential)
-    : "";
-};
-const puts = (): Call[] =>
-  deploying.calls.filter(
-    (call) => call.method === "PUT" && call.path.endsWith("/deploy-targets/production"),
-  );
-expectEqual(
-  "cloudflare: tried again, the target is set with the credential kept and no second token, and listed as Keel holds it",
-  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${storesOf(deploying, "ada").length} stored | ${puts().length} sets, ${new Set(puts().map((call) => credentialIn(call.body))).size} credential | ${String(puts().some((call) => call.body.includes(DEPLOY_TOKEN)))}`,
-  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the credential demo deploys Remove | 2 stored | 2 sets, 1 credential | false`,
+    .replace(
+      /\d{4}-\d{2}-\d{2}/,
+      "<day>",
+    )} | ${await credentialsOn(person).locator("form").count()} forms | fields ${await fieldsOf(credentialsOn(person))}`,
+  "Keel deploys: ada/demo Cloudflare · stored on <day> by you Remove | 0 forms | fields none",
 );
 // Keel deletes a credential a target still names, and the target keeps the id: the project says so.
-await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await credentialsOn(person)
-  .getByRole("button", { name: "Remove demo deploys" })
+  .getByRole("button", { name: "Remove Keel deploys: ada/demo" })
   .click({ timeout: 15_000 })
   .catch(() => undefined);
 await credentialsOn(person)
-  .getByRole("button", { name: "Remove demo deploys" })
-  .waitFor({ state: "detached", timeout: 15_000 })
+  .getByText("No credential is stored.")
+  .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
 await targetRows
   .first()
-  .getByText(/credential/)
+  .getByText(/token/)
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "cloudflare: a target whose credential was removed says it cannot reach its account, and is listed as Keel keeps it",
-  squash(
-    await targetRows
-      .first()
-      .innerText()
-      .catch(() => "no target"),
-  ),
-  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its credential is no longer stored, so Keel cannot reach the account: set it again with another. Remove`,
+  "cloudflare: a target whose token was removed says it cannot reach its account, and is listed as Keel keeps it",
+  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${await reuseOn(person).count()} forms to reuse a token`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its token is no longer stored, so Keel cannot reach the account: connect it again. Remove || staging Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its token is no longer stored, so Keel cannot reach the account: connect it again. Remove | 0 forms to reuse a token`,
 );
 // At a phone's width the section's words stay on the screen: each run of text is measured where it is drawn.
 await person.setViewportSize({ width: 390, height: 844 });
@@ -4745,18 +4686,20 @@ expectEqual(
 );
 await shot(person, "cloudflare-phone");
 await person.setViewportSize({ width: 1280, height: 900 });
-await cloudflareOn(person)
-  .getByRole("button", { name: "Remove the target production" })
-  .click({ timeout: 15_000 })
-  .catch(() => undefined);
-await cloudflareOn(person)
-  .getByText("No Cloudflare account is connected.")
-  .waitFor({ timeout: 15_000 })
-  .catch(() => undefined);
+for (const name of ["staging", "production"]) {
+  await cloudflareOn(person)
+    .getByRole("button", { name: `Remove the target ${name}` })
+    .click({ timeout: 15_000 })
+    .catch(() => undefined);
+  await cloudflareOn(person)
+    .getByRole("button", { name: `Remove the target ${name}` })
+    .waitFor({ state: "detached", timeout: 15_000 })
+    .catch(() => undefined);
+}
 expectEqual(
   "cloudflare: removing a target clears it in Keel, and the project has none",
-  `${deploying.calls.filter((call) => call.method === "DELETE" && call.path.endsWith("/deploy-targets/production")).length} cleared | ${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()}`,
-  "1 cleared | 1",
+  `${deploying.calls.filter((call) => call.method === "DELETE" && call.path.includes("/deploy-targets/")).length} cleared | ${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()}`,
+  "2 cleared | 1",
 );
 
 await lobby.close();
@@ -5575,17 +5518,7 @@ const asKeelServes = createFakeKeel({
   verdictViews: false,
 });
 const plainly = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-const sentPlainly: Sent[] = [];
-// Keel's log takes a second to read on a real Keel, and a page is up before it is: this one's can be held too.
-let logIsSlow = false;
-await asDeployed(plainly, {
-  keel: asKeelServes,
-  sent: sentPlainly,
-  hold: async (path) => {
-    if (logIsSlow && path === "/v1/events")
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-  },
-});
+await asDeployed(plainly, { keel: asKeelServes });
 const reader = watch(await plainly.newPage(), "a change's page, as Keel serves a verdict");
 // The change the address names, the agent that declared it and the verdict it bounced on, from the stand-in's
 // own log: nine days on, the careless change bounced on its batch's verdict. The verdict names the batch, and the
@@ -5639,32 +5572,6 @@ expectEqual(
     "nothing listed",
   itsVerdict?.type === "VerdictIssued" ? itsVerdict.payload.evidence.join(" | ") : "no verdict",
 );
-// The agent's page is up before the log has named the agent: until then the page has an id and nothing else.
-const declarer = careless?.agentId ?? "";
-sentPlainly.length = 0;
-logIsSlow = true;
-await reader.goto(`${built}/ada/demo/agents/${declarer}`, { waitUntil: "domcontentloaded" });
-await reader
-  .getByRole("main")
-  .getByRole("heading")
-  .first()
-  .waitFor({ timeout: 15_000 })
-  .catch(() => undefined);
-await reader.waitForTimeout(1500);
-expectEqual(
-  "as Keel serves: at an agent's id the page asks Keel for its card, and nothing of whose a handle is",
-  [
-    ...new Set(
-      sentPlainly
-        .map((request) => request.path.replace(declarer, "{id}"))
-        .filter((path) => path.startsWith("/v1/agents") || path.startsWith("/v1/namespaces/{id}")),
-    ),
-  ]
-    .toSorted()
-    .join(" ") || "nothing asked of agents",
-  "/v1/agents/{id}",
-);
-logIsSlow = false;
 await plainly.close();
 
 // An agent invited into an org, on the org's members page. Two people who signed up by passkey on a Keel that
@@ -5728,9 +5635,9 @@ await credentialsOn(noether)
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "credentials: an org's owner has its credentials as a tab of the org, with the form",
-  `${(await noether.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts()).map(squash).join(" | ")} | ${await credentialsOn(noether).getByRole("form", { name: "Store a credential" }).count()} form`,
-  "Overview | Projects 0 | People 2 | Credentials | Settings | 1 form",
+  "credentials: an org's owner has its credentials as a tab of the org, listed, and nothing there takes a token",
+  `${(await noether.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts()).map(squash).join(" | ")} | ${await credentialsOn(noether).getByText("No credential is stored.").count()} | ${await credentialsOn(noether).locator("form").count()} forms | fields ${await fieldsOf(credentialsOn(noether))}`,
+  "Overview | Projects 0 | People 2 | Credentials | Settings | 1 | 0 forms | fields none",
 );
 await franklin.goto(`${built}/orgs/symmetry/credentials`, { waitUntil: "domcontentloaded" });
 await credentialsOn(franklin)
@@ -5745,14 +5652,14 @@ expectEqual(
   "Overview | Projects 0 | People 2",
 );
 expectEqual(
-  "credentials: at the tab's address, a member who is no owner is told Keel's refusal and given no form",
+  "credentials: at the tab's address, a member who is no owner is told Keel's refusal and offered nothing to remove",
   `${squash(
     await credentialsOn(franklin)
       .getByRole("alert")
       .innerText()
       .catch(() => "no refusal"),
-  )} | ${await credentialsOn(franklin).getByRole("form").count()} forms`,
-  "Refused: role. Ask an owner: this needs that role | 0 forms",
+  )} | ${await credentialsOn(franklin).getByRole("button").count()} buttons`,
+  "Refused: role. Ask an owner: this needs that role | 0 buttons",
 );
 
 const orgAgentsOn = (shown: Page): Locator => shown.locator('main section[aria-label="Agents"]');
@@ -5767,10 +5674,15 @@ const answeredOn = async (shown: Page, row: string): Promise<void> => {
     orgAgentsOn(shown).getByRole("alert").first().waitFor({ timeout: 10_000 }),
   ]).catch(() => undefined);
 };
-const refusalOn = async (shown: Page): Promise<string> =>
-  (await orgAgentsOn(shown).getByRole("alert").count()) === 0
+/** Keel's refusal where agents are added: an org's members page, or a project's Collaborators. */
+const refusalOn = async (shown: Page): Promise<string> => {
+  const where = shown.locator(
+    'main section[aria-label="Agents"], main section[aria-label="Collaborators"]',
+  );
+  return (await where.getByRole("alert").count()) === 0
     ? "no refusal"
-    : squash(await orgAgentsOn(shown).getByRole("alert").first().innerText());
+    : squash(await where.getByRole("alert").first().innerText());
+};
 const inviteAgent = async (shown: Page, handle: string, grant?: string): Promise<void> => {
   await orgAgentsOn(shown).getByLabel("The agent's handle").fill(handle);
   if (grant !== undefined)
@@ -5989,62 +5901,60 @@ const personal = createFakeKeel({
 });
 // The route put on last is the one that answers: from here Noether's Keel is the one with her own project.
 await asDeployed(noether.context(), { keel: personal, identity: inviting });
+/** A project's settings list who has access to it, as a code host's Collaborators: people and agents in one list. */
+const accessOn = (shown: Page): Locator =>
+  shown.locator('main section[aria-label="Collaborators"]');
 const invitedOn = (shown: Page): Locator =>
-  orgAgentsOn(shown).getByRole("list", { name: "Agents invited to this project" });
-const invitedRows = async (shown: Page): Promise<string[]> =>
+  accessOn(shown).getByRole("list", { name: "Who has access to this project" });
+const accessRows = async (shown: Page): Promise<string[]> =>
   (await invitedOn(shown).getByRole("listitem").allInnerTexts()).map(squash);
+/** The rows of the agents added, which are all but the owner's. */
+const invitedRows = async (shown: Page): Promise<string[]> =>
+  (await accessRows(shown)).filter((row) => !row.endsWith(" owner"));
 const lastProjectInvitation = (): string =>
   personal.calls.findLast(
     (call) => call.method === "POST" && call.path === `/v1/projects/${personal.project.id}/agents`,
   )?.body ?? "nothing asked";
 await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
-await orgAgentsOn(noether)
+await accessOn(noether)
   .getByText("No agent has been invited to this project.")
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-if ((await orgAgentsOn(noether).getByLabel("The agent's handle").count()) > 0) {
-  await orgAgentsOn(noether).getByLabel("The agent's handle").fill("tidy-otter");
-  await orgAgentsOn(noether)
+if ((await accessOn(noether).getByLabel("The agent's handle").count()) > 0) {
+  await accessOn(noether).getByLabel("The agent's handle").fill("tidy-otter");
+  await accessOn(noether)
     .getByLabel("What the agent may do on this project")
     .selectOption({ label: "Read only" });
-  await orgAgentsOn(noether).getByRole("button", { name: "Invite agent" }).click();
+  await accessOn(noether).getByRole("button", { name: "Add agent" }).click();
 }
 await Promise.race([
   invitedOn(noether).getByText("Tidy Otter").first().waitFor({ timeout: 10_000 }),
-  orgAgentsOn(noether).getByRole("alert").first().waitFor({ timeout: 10_000 }),
+  accessOn(noether).getByRole("alert").first().waitFor({ timeout: 10_000 }),
 ]).catch(() => undefined);
 await shot(noether, "project-agents");
 expectEqual(
   "project agents: the owner invites an agent to her own project by its handle, to read alone, and the row says what Keel answered and nothing of who invited",
   `${(await invitedRows(noether)).join(" | ") || "nothing listed"} | ${lastProjectInvitation()}`,
-  'Tidy Otter reads · invited, not yet accepted Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+  'Tidy Otter agent reads · invited, not yet accepted Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
 );
-// The agent accepts, which is its own call. Anyone who reads the project is then listed it, on the Agents tab.
+// The agent accepts, which is its own call. The project's settings then list who has access: its owner and the
+// agent, each in the same row, the agent marked as one.
 personal.joins(personal.project.id, OTTER.id);
-const bystanding = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await asDeployed(bystanding, { keel: personal, identity: inviting });
-const bystander = watch(await bystanding.newPage(), "a project's agents, a visitor");
-await bystander.goto(`${built}/noether/demo/agents`, { waitUntil: "domcontentloaded" });
-const invitedSection = bystander.locator('main section[aria-label="Invited to this project"]');
-await bystander
-  .getByRole("main")
-  .getByRole("heading")
+await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
+await invitedOn(noether)
+  .getByText(/joined/)
   .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-await invitedSection
-  .getByRole("listitem")
-  .first()
-  .waitFor({ timeout: 6000 })
-  .catch(() => undefined);
+await shot(noether, "project-collaborators");
 expectEqual(
-  "project agents: a visitor is listed the invited agents that have joined, on the project's Agents tab, each linked to its page",
-  (await invitedSection.count()) === 0
-    ? "no section"
-    : `${(await invitedSection.getByRole("listitem").allInnerTexts()).map(squash).join(" | ")} | ${String(await invitedSection.getByRole("link").first().getAttribute("href"))}`,
-  `Tidy Otter joined ${today} | /tidy-otter`,
+  "project access: the settings list who has access in one list, the owner and the agent alike, the agent marked as one and linked to its page",
+  `${(await accessRows(noether)).join(" | ") || "nothing listed"} | ${await invitedOn(noether)
+    .getByRole("link")
+    .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href") ?? "").join(" "))
+    .catch(() => "no links")}`,
+  `noether owner | Tidy Otter agent reads · joined ${today} Remove | /noether /tidy-otter`,
 );
-await bystanding.close();
 // Ten minutes on, Keel takes no removal from this sign-in, and the page offers the passkey touch that answers it.
 await inviting.age();
 await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
@@ -6055,19 +5965,19 @@ await invitedOn(noether)
   .catch(() => undefined);
 const takeOff = invitedOn(noether).getByRole("button", { name: /^(Remove|Withdraw) Tidy Otter$/ });
 if ((await takeOff.count()) > 0) await takeOff.click();
-await orgAgentsOn(noether)
+await accessOn(noether)
   .getByRole("alert")
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
-const touchForProject = orgAgentsOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
+const touchForProject = accessOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
 expectEqual(
   "project agents: a removal from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and the agent is still on the project",
   `${await refusalOn(noether)} | ${await touchForProject.count()} offered | ${(await invitedRows(noether)).length} listed`,
   "This needs a fresh sign-in: a passkey sign-in from the last ten minutes. Sign in again with your passkey, then retry | 1 offered | 1 listed",
 );
 if ((await touchForProject.count()) > 0) await touchForProject.click();
-await orgAgentsOn(noether)
+await accessOn(noether)
   .getByText("No agent has been invited to this project.")
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
@@ -6097,11 +6007,11 @@ await noether
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "project agents: an org's project offers no invitation of its own, and sends its maintainer to the org's members page",
-  (await orgAgentsOn(noether).count()) === 0
+  "project access: an org's project is its members', people and agents alike, and sends its maintainer to the org's members page to see who and add one",
+  (await accessOn(noether).count()) === 0
     ? "no section"
-    : `${await orgAgentsOn(noether).getByRole("button").count()} buttons | ${String(await orgAgentsOn(noether).getByRole("link").first().getAttribute("href"))} | ${String(squash(await orgAgentsOn(noether).innerText()).startsWith("Agents An org's project takes no invitation of its own"))}`,
-  "0 buttons | /orgs/symmetry/members | true",
+    : `${await accessOn(noether).getByRole("button").count()} buttons | ${String(await accessOn(noether).getByRole("link").first().getAttribute("href"))} | ${squash(await accessOn(noether).innerText())}`,
+  "0 buttons | /orgs/symmetry/members | Collaborators Everyone in symmetry has access to this project, its people and its agents alike. See who, and add an agent, on symmetry's members page",
 );
 await noether.context().close();
 await franklin.context().close();

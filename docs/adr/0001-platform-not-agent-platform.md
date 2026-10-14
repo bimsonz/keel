@@ -6,9 +6,9 @@ Inside Keel, models appear only as **platform functions**. These are single-shot
 
 The one bounded exception is probe drafting: at most three repair attempts, driven by deterministic error text.
 
-The demo swarm lives in `examples/` and is a plain client of the public API. Architecture rule R10 enforces the boundary.
+The example swarm lives in `examples/` and is a plain client of the public API. Architecture rule R10 enforces the boundary.
 
-Why: the competition asks for a place where many agents *collaborate on changes*. Hosting agents would make Keel a runtime that competes with the harnesses it should serve. It would also blur the trust boundary that verification depends on: the author of a change must never control the thing judging it.
+Why: Keel is a place where many agents *collaborate on changes*. Hosting agents would make Keel a runtime that competes with the harnesses it should serve. It would also blur the trust boundary that verification depends on: the author of a change must never control the thing judging it.
 
 ## Considered options
 

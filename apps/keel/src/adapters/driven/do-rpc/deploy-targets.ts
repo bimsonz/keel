@@ -3,8 +3,10 @@ import { DeployTargets } from "@keeltown/core/ports";
 import { Layer, Schema } from "effect";
 import {
   ClearDeployTargetCommand,
+  HoldConnectCommand,
   ProjectCodecs,
   SetDeployTargetCommand,
+  TakeConnectCommand,
 } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
 
@@ -13,10 +15,14 @@ export interface DeployTargetsStub {
   deployTargets(): Promise<unknown>;
   setDeployTarget(command: typeof SetDeployTargetCommand.Encoded): Promise<unknown>;
   clearDeployTarget(command: typeof ClearDeployTargetCommand.Encoded): Promise<unknown>;
+  holdConnect(command: typeof HoldConnectCommand.Encoded): Promise<unknown>;
+  takeConnect(command: typeof TakeConnectCommand.Encoded): Promise<unknown>;
 }
 
 const encodeSet = Schema.encodeSync(SetDeployTargetCommand);
 const encodeClear = Schema.encodeSync(ClearDeployTargetCommand);
+const encodeHold = Schema.encodeSync(HoldConnectCommand);
+const encodeTake = Schema.encodeSync(TakeConnectCommand);
 
 /**
  * `DeployTargets` over Durable Object RPC: each project's targets are its own
@@ -47,6 +53,14 @@ export function DeployTargetsRpc(
       clear: (command) =>
         callObject(ProjectCodecs.clearDeployTarget, () =>
           project(command.projectId).clearDeployTarget(encodeClear(command)),
+        ),
+      holdConnect: (command) =>
+        callObject(ProjectCodecs.holdConnect, () =>
+          project(command.projectId).holdConnect(encodeHold(command)),
+        ),
+      takeConnect: (command) =>
+        callObject(ProjectCodecs.takeConnect, () =>
+          project(command.projectId).takeConnect(encodeTake(command)),
         ),
     }),
   );

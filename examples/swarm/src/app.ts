@@ -79,6 +79,16 @@ app.post("/admin/projects", async (c) => {
   );
   return c.json(await director().ownProject(name), 201);
 });
+app.patch("/admin/projects/:project/settings", async (c) => {
+  const change = await body(
+    v.strictObject({
+      visibility: v.optional(v.picklist(["public", "private"])),
+      verification: v.optional(v.picklist(["required", "off"])),
+    }),
+    c.req.raw,
+  );
+  return c.json(await director().configure(c.req.param("project"), change));
+});
 app.post("/admin/runs", async (c) => {
   const { rampMs, ...start } = await body(Start, c.req.raw);
   return c.json(

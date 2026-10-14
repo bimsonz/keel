@@ -1,11 +1,14 @@
 import { Context, type Effect, type Option, Schema } from "effect";
 import type { QuotaExceeded } from "../../domain/identity/index.ts";
 import type {
+  NotFastForward,
+  NotImported,
   PromotionState,
   PromotionStateRefused,
+  TrunkNotInitialized,
   TrunkOrigin,
 } from "../../domain/integration/index.ts";
-import type { CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
+import type { CommandActor, CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
 import type { RepoNotFound } from "./code-host.ts";
 
 /**
@@ -22,11 +25,38 @@ export class ImportTooLarge extends Schema.TaggedError<ImportTooLarge>()("Import
 }) {}
 
 /** Where a sync left the project's repos: trunk's head, and staging and the mirror brought to it. */
-export interface TrunkSynced {
+export interface ReposSynced {
   readonly head: CommitSha;
   readonly staging: CommitSha;
   readonly mirror: CommitSha;
 }
+
+/** Upstream could not be read: its URL answered nothing Keel could use, or the branch the import took is gone. */
+export class UpstreamUnreachable extends Schema.TaggedError<UpstreamUnreachable>()(
+  "UpstreamUnreachable",
+  {
+    url: Schema.String,
+    ref: Schema.String,
+    reason: Schema.Literals(["unreachable", "branch-gone"]),
+  },
+) {}
+
+/** What a sync from upstream did: trunk moved `from → to`, or was already at upstream's head (`synced` false, `from` and `to` the same). */
+export interface UpstreamSynced {
+  readonly from: CommitSha;
+  readonly to: CommitSha;
+  readonly synced: boolean;
+}
+
+/** Why a sync from upstream moved nothing. */
+export type SyncRefused =
+  | TrunkNotInitialized
+  | NotImported
+  | NotFastForward
+  | PromotionStateRefused
+  | UpstreamUnreachable
+  | ImportTooLarge
+  | QuotaExceeded;
 
 /** A trunk as a reader of its project is shown it: its head, when that last changed, and what its promotion is doing. */
 export interface TrunkStanding {
@@ -103,8 +133,24 @@ export class Trunks extends Context.Service<
      * another head), and no other event of the trunk's changes it.
      */
     readonly view: (projectId: ProjectId) => Effect.Effect<Option.Option<TrunkStanding>>;
+    /**
+     * Moves trunk's main forward to the head of the upstream branch its import
+     * took, as its owner asked, keeping each upstream commit as it is. Only
+     * an imported trunk has an upstream (NotImported otherwise), and only one
+     * whose head upstream's descends from moves (NotFastForward otherwise,
+     * naming both). It starts between groups only (PromotionStateRefused
+     * while a group is in flight, a freeze holds or another sync is open).
+     * Upstream's new history is weighed and admitted against the namespace's
+     * repo bytes first: over what one relay carries it is ImportTooLarge, over
+     * what is left QuotaExceeded. Each refusal moves nothing. Upstream already
+     * at trunk's head answers `synced: false` and records nothing.
+     */
+    readonly syncUpstream: (
+      projectId: ProjectId,
+      by: CommandActor,
+    ) => Effect.Effect<UpstreamSynced, SyncRefused>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
-    readonly sync: (projectId: ProjectId) => Effect.Effect<TrunkSynced>;
+    readonly sync: (projectId: ProjectId) => Effect.Effect<ReposSynced>;
     /**
      * Destroys the project's trunk, for good (its project was deleted): it
      * promotes nothing from here on, and its trunk, staging, mirror and guards

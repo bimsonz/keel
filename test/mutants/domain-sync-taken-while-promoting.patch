@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t sync.phases
+# kills: sync.phases
+# why: a sync starts while a group is in flight or another sync is open
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a14057d8..2aabcf0a 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -487,7 +487,7 @@ export const decidePromotion = (
+       const { origin } = trunk;
+       if (origin?.kind !== "imported") return Result.fail(new NotImported({ projectId }));
+       // A sync starts only between groups, from the head trunk holds, and never during another sync.
+-      if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
++      if (trunk.phase === "frozen" || command.from !== trunk.head)
+         return refuse(trunk, command);
+       // Upstream at trunk's head: there is nothing to move.
+       if (command.to === command.from) return Result.succeed([]);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.target
+# why: A setting that is no whole number is taken as the pool's size
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..508ba162 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -24,7 +24,7 @@ export const POOL_LOW_WATER = 2;
+  */
+ export function warmTarget(setting: string | undefined): number {
+   const target = Number(setting);
+-  return Number.isSafeInteger(target) && target > 0 ? target : 0;
++  return target > 0 ? target : 0;
+ }
+ 
+ /**

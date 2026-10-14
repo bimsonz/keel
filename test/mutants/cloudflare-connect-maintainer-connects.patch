@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.owner
+# why: a maintainer may connect a project's deploys to an account, which only an owner may
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 37eb593e..61fff0c1 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -182,8 +182,8 @@ export const SPEC_ACTIONS = {
+   Delivery_putDeployTarget: rule("Project", "ownAsUser"),
+   Delivery_listDeployTargets: rule("Project", "ownAsUser"),
+   Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
+-  Delivery_beginCloudflareConnect: rule("Project", "ownAsUser"),
+-  Delivery_completeCloudflareConnect: rule("Project", "ownAsUser"),
++  Delivery_beginCloudflareConnect: rule("Project", "maintain"),
++  Delivery_completeCloudflareConnect: rule("Project", "maintain"),
+ } as const satisfies Record<string, ActionRule>;
+ 
+ /**

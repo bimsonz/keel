@@ -1,4 +1,4 @@
-/** A path only the current routes answer one way: getChange admits anonymous reads (11adb24). */
+/** A path only the current routes answer one way: getChange admits anonymous reads (e1dece5). */
 export const FRESH_ROUTE_PATH = "/v1/changes/not-a-change";
 
 export interface RoutesCheck {

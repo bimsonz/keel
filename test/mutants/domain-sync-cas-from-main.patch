@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-sync.test.ts -t sync.cas
+# kills: sync.cas
+# why: the sync's push names whatever main holds as its old value, so a main moved under it is overwritten
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index d3bfebf6..3eb6c57f 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -759,7 +759,7 @@ export const finishUpstreamSync = Effect.fn("integration/finishUpstreamSync")(fu
+   const { from, to } = open.sync;
+   const writer = yield* TrunkWriter;
+   // Stale or busy, nothing moved: the read-back tells which.
+-  yield* Effect.result(writer.fastForward(from, to));
++  yield* Effect.result(writer.fastForward(yield* writer.head, to));
+   const observed = yield* writer.head;
+   yield* promote(projectId, { _tag: "ReadBack", observed }, `sync-readback:${to}:${observed}`).pipe(
+     Effect.orDie,

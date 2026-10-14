@@ -202,10 +202,13 @@ const RULES: Record<EventType, Rule[]> = {
   TrunkAdvanced: [{ kind: "trunk", idField: "projectId", from: ["promoting"], to: "idle" }],
   PromotionDeclined: [{ kind: "trunk", idField: "projectId", from: ["idle", "frozen"] }],
   PromotionFrozen: [
-    { kind: "trunk", idField: "projectId", from: ["idle", "promoting"], to: "frozen" },
+    { kind: "trunk", idField: "projectId", from: ["idle", "promoting", "syncing"], to: "frozen" },
   ],
   PromotionResumed: [{ kind: "trunk", idField: "projectId", from: ["frozen"], to: "idle" }],
   AuditCompleted: [{ kind: "trunk", idField: "projectId", from: ["idle", "promoting", "frozen"] }],
+  // A sync from upstream: its write-ahead entry between promotions, then main moved.
+  TrunkSyncStarted: [{ kind: "trunk", idField: "projectId", from: ["idle"], to: "syncing" }],
+  TrunkSynced: [{ kind: "trunk", idField: "projectId", from: ["syncing"], to: "idle" }],
 
   RulingGiven: [{ kind: "escalation", idField: "escalationId", from: ["open"], to: "ruled" }],
   DecisionRecorded: [{ kind: "decision", idField: "decisionId", from: null, to: "active" }],

@@ -2,14 +2,14 @@
 # kills: events.verdict-next-actions
 # why: a verdict loses the issuer's next actions at decode, so the bounce falls back to a generic remedy
 diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
-index 0bc661c..4566b44 100644
+index c15df7bd..8f1e9a6b 100644
 --- a/packages/core/src/domain/verification/events.ts
 +++ b/packages/core/src/domain/verification/events.ts
-@@ -148,7 +148,6 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
+@@ -199,7 +199,6 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
     * composition or bundle, KeelVerify for a failing test). The Change DO copies
     * it onto `ChangeBounced`, and falls back to its own default only when absent.
     */
 -  nextActions: Schema.optional(Schema.Array(NextAction)),
- });
- /**
-  * A question for a person: at least two options with unique ids, each with its
+   /**
+    * The trunk commits since the change's base that changed a path a refused
+    * composition conflicted on, newest first: named by the Lane for a batch of

@@ -19,7 +19,7 @@ import {
   makeId,
 } from "@keeltown/core/kernel";
 import { noticeOf } from "@keeltown/core/domain/identity";
-import { type EventDraft, EventOutbox, LiveChanges } from "@keeltown/core/ports";
+import { type EventDraft, EventOutbox } from "@keeltown/core/ports";
 import {
   makeCodeHostMemory,
   makeEntityStoreMemory,
@@ -183,8 +183,7 @@ function world() {
     });
   };
 
-  const indexed = () =>
-    LiveChanges.use((live) => live.of(sampleProjectId)).pipe(Effect.provide(index.layer));
+  const indexed = () => Effect.sync(() => index.live(sampleProjectId));
 
   /** Delivers the change's next queued event to the index, answering what the index told. */
   const deliver = (changeId: ChangeId) => {

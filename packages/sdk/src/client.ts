@@ -929,6 +929,20 @@ export class KeelClient {
   }
 
   /**
+   * Operator: moves an imported project's trunk forward to its upstream
+   * branch's head, as GitHub's "Sync fork" does; an owner's alone. Trunk
+   * moves only when upstream's head descends from its own, and a retry is
+   * safe: a trunk level with upstream answers `synced: false` and moves
+   * nothing.
+   */
+  syncUpstream(
+    projectId: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Operator_syncUpstream"]> {
+    return this.call("Operator_syncUpstream", { projectId }, options);
+  }
+
+  /**
    * Stores a provider's API token in a namespace, under a label: an owner's alone. The answer
    * names it by a minted id; the secret is never answered again, here or anywhere.
    */
@@ -977,6 +991,18 @@ export class KeelClient {
   /** Clears a project's deploy target. */
   deleteDeployTarget(projectId: string, name: string, options?: CallOptions): Promise<void> {
     return this.call("Delivery_deleteDeployTarget", { projectId, name }, options);
+  }
+
+  /**
+   * Begins connecting a Cloudflare account to a project's deploy target: answers Cloudflare's
+   * consent screen, for a person to open in a browser that is signed in to Keel as them.
+   */
+  beginCloudflareConnect(
+    projectId: string,
+    name: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Delivery_beginCloudflareConnect"]> {
+    return this.call("Delivery_beginCloudflareConnect", { projectId, name }, options);
   }
 
   /** A directory of a project's trunk at `ref` (trunk's head when absent); the root without `path`. */

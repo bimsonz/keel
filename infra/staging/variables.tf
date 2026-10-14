@@ -15,3 +15,10 @@ variable "host" {
   type        = string
   default     = "keel.town"
 }
+
+variable "oauth_clients_api_token" {
+  description = "An account API token holding only Account > OAuth Clients > Edit, which makes keel's OAuth client: a wrangler login cannot. scripts/tf.ts reads it from ~/.keel/cloudflare-oauth-clients-token; never committed. Empty, no client is made."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

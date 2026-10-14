@@ -293,10 +293,10 @@ export interface AlternativeRow extends IntentRow {
 
 /** The agent a change is held by and the run it is held under, as a page links to them. */
 export interface HeldUnder {
-  /** What an address calls the agent that holds the change. */
-  agent: string;
+  /** The holder's handle, where Keel's card of it gives one: its own page is there. */
+  handle?: string;
   /** Absent where the holder's token named no run. `label` is the agent's own word for the run. */
-  run?: { id: string; label?: string; anchor: string };
+  run?: { id: string; label?: string };
 }
 
 /** The ruling a change bounced on, as far as the log names it. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay-refused"
+# kills: artifacts.import-relay-refused
+# why: a relay whose push into the new repo fails leaves that repo behind, so a refused import leaves a trunk with no history
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 39246f53..33617dcd 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -129,8 +129,6 @@ async function relayImport(
+     const sent = await relaySend({ url: made.remote, token: made.token }, move, pack);
+     if (sent.kind !== "advanced") throw new Error(`an import's relay was ${sent.kind}`);
+   } catch (e) {
+-    // Its tokens go with it.
+-    await namespace.delete(name);
+     throw e;
+   }
+   await revoke(namespace, name, made.token);

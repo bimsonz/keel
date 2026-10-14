@@ -70,7 +70,7 @@ export async function placedStep(
 }
 
 /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */
-const timedOut = (error: unknown) =>
+export const timedOut = (error: unknown) =>
   error instanceof Error &&
   (error.name === "WorkflowTimeoutError" || /timed? ?out/i.test(error.message));
 

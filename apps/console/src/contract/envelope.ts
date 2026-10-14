@@ -104,6 +104,8 @@ export const EVENT_TYPES = [
   "PromotionFrozen",
   "PromotionResumed",
   "AuditCompleted",
+  "TrunkSyncStarted",
+  "TrunkSynced",
   // memory
   "RulingGiven",
   "DecisionRecorded",

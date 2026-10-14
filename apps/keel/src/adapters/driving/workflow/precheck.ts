@@ -19,6 +19,7 @@ import {
 import { ChangeId, CommitSha } from "@keeltown/core/kernel";
 import { Cause, type Effect, Exit, type ManagedRuntime, Option, Schema } from "effect";
 import { precheckRuntime } from "../../../composition/workflow.ts";
+import { claimedInput } from "./pooled.ts";
 import { placedStep } from "./steps.ts";
 
 /**
@@ -40,7 +41,9 @@ export type PrecheckOutcome =
   | { readonly outcome: "refused"; readonly verdictId: string; readonly reasons: readonly string[] }
   | { readonly outcome: "compiled"; readonly planHash: string }
   /** The change moved on (resubmitted, withdrawn) while this instance ran: nothing to do. */
-  | { readonly outcome: "stale"; readonly step: string; readonly reason: string };
+  | { readonly outcome: "stale"; readonly step: string; readonly reason: string }
+  /** A warm instance whose claim never came: it ran nothing and wrote nothing. */
+  | { readonly outcome: "retired" };
 
 type Settled<A> =
   | { readonly _tag: "Done"; readonly value: A }
@@ -89,14 +92,18 @@ const settledValue = <A>(settled: Settled<A>): A => {
  * then `refuse` or `compile` (which stores the plan before recording it).
  * Nothing derives for a commit off its base, or one whose diff could not be
  * read. Each write is idempotent by this instance's id, so a replayed step
- * commits nothing new.
+ * commits nothing new. A warm instance (`precheck-pool-…`, started by its
+ * pool) first waits for its claim, whose payload is the event's params, and
+ * retires having written nothing when no claim comes.
  */
 export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
   override async run(
     event: WorkflowEvent<PrecheckParams>,
     step: WorkflowStep,
   ): Promise<PrecheckOutcome> {
-    const params = Schema.decodeUnknownOption(PrecheckParams)(event.payload);
+    const input = await claimedInput(event, step);
+    if (input._tag === "Retired") return { outcome: "retired" };
+    const params = Schema.decodeUnknownOption(PrecheckParams)(input.payload);
     if (Option.isNone(params)) throw new NonRetryableError("not a ChangeSubmitted payload");
     const submission: PrecheckSubmission = {
       changeId: params.value.changeId,

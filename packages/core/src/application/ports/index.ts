@@ -17,6 +17,7 @@ export * from "./changes.ts";
 export * from "./clock.ts";
 export * from "./commit.ts";
 export * from "./conflict-moves.ts";
+export * from "./cloudflare-oauth.ts";
 export * from "./code-host.ts";
 export * from "./credential-store.ts";
 export * from "./decision-model.ts";

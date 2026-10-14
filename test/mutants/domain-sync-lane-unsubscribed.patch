@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-sync.test.ts -t sync.moves
+# kills: sync.moves
+# why: a lane that subscribed before syncs existed never hears one, and forms every batch on the old head
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index d3bfebf6..a6c7b044 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -833,7 +833,6 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
+   yield* commit(
+     { entity: { kind: "trunk", id: projectId }, cause: "sync-subscribe", project: projectId },
+     (tx) => {
+-      tx.outbox.subscribe(mainLane(projectId), ["TrunkSynced"]);
+       return Result.succeed({ value: undefined, drafts: [] });
+     },
+   );

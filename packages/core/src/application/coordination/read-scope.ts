@@ -110,6 +110,8 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   PromotionStarted: "public",
   PromotionComposed: "public",
   AuditCompleted: "public",
+  TrunkSyncStarted: "public",
+  TrunkSynced: "public",
 
   ConflictSuspected: "public",
   ProbeDrafted: "public",

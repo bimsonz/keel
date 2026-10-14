@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/trailers.test.ts
+# kills: trailer.change-id
+# why: The first Change-Id trailer wins where git reads the last, so a commit carrying two names the wrong change
+diff --git a/packages/core/src/domain/integration/trailers.ts b/packages/core/src/domain/integration/trailers.ts
+index 368bff15..a420a468 100644
+--- a/packages/core/src/domain/integration/trailers.ts
++++ b/packages/core/src/domain/integration/trailers.ts
+@@ -14,5 +14,5 @@ const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
+  */
+ export const changeIdOf = (message: string): ChangeId | undefined => {
+   const ids = [...message.matchAll(/^Change-Id: (\S+)$/gm)].map((m) => m[1]);
+-  return Option.getOrUndefined(decodeChangeId(ids.at(-1)));
++  return Option.getOrUndefined(decodeChangeId(ids.at(0)));
+ };

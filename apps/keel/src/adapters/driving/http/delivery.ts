@@ -1,22 +1,35 @@
 import {
+  beginCloudflareConnect,
+  type CloudflareConnectError,
+  completeCloudflareConnect,
   listDeployTargets,
   putDeployTarget,
   removeDeployTarget,
 } from "@keeltown/core/application/delivery";
 import {
+  type CloudflareConnectFailed,
   CredentialLabel,
   type CredentialMeta,
   DeployTarget,
   DeployTargetName,
   type DeployTargetRefused,
   type DeployTargetUnreachable,
+  readConnectState,
 } from "@keeltown/core/domain/delivery";
 import type { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import type { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { CredentialId, type NamespaceId, type UserId } from "@keeltown/core/kernel";
-import { CredentialStore, type HeldDeployTarget } from "@keeltown/core/ports";
+import { CredentialId, type NamespaceId, type ProjectId, type UserId } from "@keeltown/core/kernel";
+import {
+  CredentialStore,
+  DeployTargets,
+  type HeldDeployTarget,
+  Namespaces,
+  ProjectNamespaces,
+} from "@keeltown/core/ports";
 import { Effect, Option, Redacted, Result, Schema, SchemaIssue } from "effect";
 import type {
+  Delivery_beginCloudflareConnectResult,
+  Delivery_completeCloudflareConnectResult,
   Delivery_createCredentialResult,
   Delivery_deleteDeployTargetResult,
   Delivery_listCredentialsResult,
@@ -104,11 +117,10 @@ const LIST_CREDENTIALS = {
   title: "Read the namespace's credentials",
   operationId: "Delivery_listCredentials",
 };
-const STORE_CREDENTIAL = {
+const CONNECT_AGAIN = {
   kind: "call" as const,
-  title:
-    "Store a Cloudflare API token that may edit Workers on the account, then set the target with it",
-  operationId: "Delivery_createCredential",
+  title: "Connect the account again through Cloudflare, which makes Keel a new token",
+  operationId: "Delivery_beginCloudflareConnect",
 };
 const LIST_TARGETS = {
   kind: "read" as const,
@@ -124,7 +136,7 @@ function refused(caller: Caller, error: DeployTargetRefused) {
         status: 409 as const,
         body: problem(409, "deploy_target.refused", caller.requestId, {
           detail: `Deploy target ${error.name} names a credential this project's namespace does not hold. A target uses only a credential of its own project's namespace.`,
-          nextActions: [LIST_CREDENTIALS, STORE_CREDENTIAL],
+          nextActions: [LIST_CREDENTIALS, CONNECT_AGAIN],
         }),
       };
     case "too-many-targets":
@@ -156,7 +168,7 @@ function unreachable(caller: Caller, error: DeployTargetUnreachable) {
         status: 422 as const,
         body: problem(422, "deploy_target.unreachable", caller.requestId, {
           detail: `Cloudflare refused the credential's token${codeOf(error)}: it is invalid, expired or revoked. Nothing was set.`,
-          nextActions: [STORE_CREDENTIAL],
+          nextActions: [CONNECT_AGAIN],
         }),
       };
     case "account-unreachable":
@@ -164,7 +176,7 @@ function unreachable(caller: Caller, error: DeployTargetUnreachable) {
         status: 422 as const,
         body: problem(422, "deploy_target.unreachable", caller.requestId, {
           detail: `The credential's token does not reach the account's Workers${codeOf(error)}: check the account id, and that the token may edit Workers on that account. Nothing was set.`,
-          nextActions: [STORE_CREDENTIAL],
+          nextActions: [CONNECT_AGAIN],
         }),
       };
     case "no-workers-dev":
@@ -235,6 +247,79 @@ export function clearTargetError(
   }
 }
 
+/** Begin refused: a project gone, or no OAuth client registered with Cloudflare (503, nothing to retry). */
+function beginError(
+  caller: Caller,
+  error: CloudflareConnectFailed | ProjectNotFound,
+): Exclude<Delivery_beginCloudflareConnectResult, { readonly status: 200 }> {
+  switch (error._tag) {
+    case "ProjectNotFound":
+      return notFound(caller);
+    case "CloudflareConnectFailed":
+      return {
+        status: 503 as const,
+        body: problem(503, "cloudflare.not_configured", caller.requestId, {
+          detail:
+            "This Keel has no OAuth client registered with Cloudflare, so no account can be connected through it yet.",
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+type Outcome = Extract<
+  Delivery_completeCloudflareConnectResult,
+  { readonly status: 303 }
+>["headers"]["keel-cloudflare-outcome"];
+
+/** What a Connect that did not finish comes to, for the owner's settings to say. */
+export function outcomeOf(error: Exclude<CloudflareConnectError, ProjectNotFound>): Outcome {
+  switch (error._tag) {
+    case "ConnectStateRefused":
+      return "expired";
+    case "ConnectAccountsRefused":
+      return "accounts";
+    case "CloudflareConnectFailed":
+      return "refused";
+    case "DeployTargetUnreachable":
+      return error.reason === "no-workers-dev" ? "no-workers-dev" : "unreachable";
+    case "DeployTargetRefused":
+      return error.reason === "too-many-targets" ? "full" : "refused";
+    case "IdempotencyConflict":
+      return "refused";
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+/** The project's namespace's handle and its own name: its address, and what a minted token is named by. */
+const addressOf = (projectId: ProjectId) =>
+  Effect.gen(function* () {
+    const place = yield* ProjectNamespaces.use((places) => places.byId(projectId));
+    if (Option.isNone(place))
+      return Option.none<{ readonly handle: string; readonly name: string }>();
+    const record = yield* Namespaces.use((namespaces) => namespaces.byId(place.value.namespace));
+    return Option.map(record, (found) => ({ handle: found.handle, name: place.value.name }));
+  });
+
+/** How a Connect ended, and for one Cloudflare refused, the step it refused. */
+interface Ended {
+  readonly outcome: Outcome;
+  readonly step?: CloudflareConnectFailed["step"];
+}
+
+const ended = (outcome: Outcome, step?: CloudflareConnectFailed["step"]): Ended =>
+  step === undefined ? { outcome } : { outcome, step };
+
+/** The project's settings, where its owner is sent back with how the Connect ended. */
+const settingsAt = (address: { readonly handle: string; readonly name: string }, end: Ended) =>
+  `/${encodeURIComponent(address.handle)}/${encodeURIComponent(address.name)}/settings?cloudflare=${end.outcome}${end.step === undefined ? "" : `&step=${end.step}`}`;
+
 /** The person the policy granted: credentials and deploy targets are recorded as a user's. */
 function userOf(caller: Caller): Effect.Effect<UserId> {
   return caller.principal._tag === "User"
@@ -258,7 +343,7 @@ function projectOf(caller: Caller) {
   return caller.resource;
 }
 
-/** The six operations on a namespace's credentials and a project's deploy targets. */
+/** The operations on a namespace's credentials and a project's deploy targets, and connecting a Cloudflare account to one. */
 export function deliveryHandlers(run: Runner) {
   return {
     Delivery_createCredential: (caller: Caller, input: Input<"Delivery_createCredential">) => {
@@ -358,6 +443,90 @@ export function deliveryHandlers(run: Runner) {
           }),
         ),
       ),
+    Delivery_beginCloudflareConnect: (
+      caller: Caller,
+      input: Input<"Delivery_beginCloudflareConnect">,
+    ) => {
+      const name = decodeTargetName(input.name);
+      if (Option.isNone(name))
+        return invalid(caller, [{ path: ["path", "name"], message: "Not a deploy target's name" }]);
+      const project = projectOf(caller);
+      return run(
+        caller,
+        userOf(caller).pipe(
+          Effect.flatMap((by) =>
+            beginCloudflareConnect({ projectId: project.projectId, target: name.value, by }),
+          ),
+          Effect.match({
+            onSuccess: (url) =>
+              ({
+                status: 200 as const,
+                body: { authorizeUrl: url },
+              }) satisfies Delivery_beginCloudflareConnectResult,
+            onFailure: (error) => beginError(caller, error),
+          }),
+        ),
+      );
+    },
+    Delivery_completeCloudflareConnect: (
+      caller: Caller,
+      input: Input<"Delivery_completeCloudflareConnect">,
+    ) => {
+      const project = projectOf(caller);
+      const state = readConnectState(input.state);
+      // The policy decided on the project this state names, so it reads as one.
+      if (Option.isNone(state)) return notFound(caller);
+      const { nonce } = state.value;
+      const { code } = input;
+      return run(
+        caller,
+        Effect.gen(function* () {
+          const by = yield* userOf(caller);
+          const address = yield* addressOf(project.projectId);
+          if (Option.isNone(address)) return notFound(caller);
+          const finished =
+            input.error !== undefined || code === undefined
+              ? // Cloudflare's own refusal, or the owner's: the state is spent all the same.
+                DeployTargets.use((targets) =>
+                  targets.takeConnect({ projectId: project.projectId, by, nonce }),
+                ).pipe(
+                  Effect.catchTag("ConnectStateRefused", () => Effect.void),
+                  Effect.as(ended(input.error === "access_denied" ? "denied" : "refused")),
+                )
+              : completeCloudflareConnect({
+                  projectId: project.projectId,
+                  namespaceId: project.namespace,
+                  handle: address.value.handle,
+                  project: address.value.name,
+                  by,
+                  nonce,
+                  code,
+                  requestId: caller.requestId,
+                }).pipe(
+                  Effect.as(ended("connected")),
+                  Effect.catch((error) =>
+                    error._tag === "ProjectNotFound"
+                      ? Effect.fail(error)
+                      : Effect.succeed(
+                          ended(
+                            outcomeOf(error),
+                            error._tag === "CloudflareConnectFailed" ? error.step : undefined,
+                          ),
+                        ),
+                  ),
+                );
+          const outcome = yield* Effect.option(finished);
+          if (Option.isNone(outcome)) return notFound(caller);
+          return {
+            status: 303 as const,
+            headers: {
+              location: settingsAt(address.value, outcome.value),
+              "keel-cloudflare-outcome": outcome.value.outcome,
+            },
+          } satisfies Delivery_completeCloudflareConnectResult;
+        }),
+      );
+    },
     Delivery_deleteDeployTarget: (caller: Caller, input: Input<"Delivery_deleteDeployTarget">) => {
       const name = decodeTargetName(input.name);
       if (Option.isNone(name))

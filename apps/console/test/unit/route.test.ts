@@ -56,10 +56,6 @@ const ADDRESSES: [string, Route][] = [
   ["/acme/demo/insights", { at: "insights", tab: "trunk" }],
   ["/acme/demo/insights/funnel", { at: "insights", tab: "funnel" }],
   ["/acme/demo/insights/benchmark", { at: "insights", tab: "benchmark" }],
-  ["/acme/demo/agents", { at: "agents", shown: 50 }],
-  ["/acme/demo/agents?shown=100", { at: "agents", shown: 100 }],
-  ["/acme/demo/agents/tidy-otter", { at: "agent", name: "tidy-otter" }],
-  ["/acme/demo/agents/agt_01JABC", { at: "agent", name: "agt_01JABC" }],
 ];
 
 function read(address: string): ReturnType<typeof parse> {
@@ -123,22 +119,9 @@ describe("the console's addresses", () => {
     expect(parse("/settings", "")).toMatchObject({ namespace: null, project: null });
   });
 
-  it("[route.agents] gives the project's agents a list, and each agent an address with nothing under it", () => {
-    expect(parse("/acme/demo/agents", "").route).toEqual({ at: "agents", shown: 50 });
-    expect(parse("/acme/demo/agents", "shown=150").route).toEqual({ at: "agents", shown: 150 });
-    expect(href("acme", "demo", { at: "agents", shown: 50 })).toBe("/acme/demo/agents");
-    expect(href("acme", "demo", { at: "agents", shown: 150 })).toBe("/acme/demo/agents?shown=150");
-    // An agent is called by its handle, or by Keel's id for it: one segment either way.
-    expect(parse("/acme/demo/agents/tidy-otter", "").route).toEqual({
-      at: "agent",
-      name: "tidy-otter",
-    });
-    expect(href("acme", "demo", { at: "agent", name: "tidy-otter" })).toBe(
-      "/acme/demo/agents/tidy-otter",
-    );
-    // A run is a part of its agent's page, and has no address of its own.
-    expect(parse("/acme/demo/agents/tidy-otter/runs", "").route).toEqual({ at: "missing" });
-    expect(parse("/acme/demo/agents/tidy-otter/run_1", "").route).toEqual({ at: "missing" });
+  it("[route.agents] gives agents no place in a project: they are members, and an agent's page is its own account's", () => {
+    expect(parse("/acme/demo/agents", "").route).toEqual({ at: "missing" });
+    expect(parse("/acme/demo/agents/tidy-otter", "").route).toEqual({ at: "missing" });
   });
 
   it("[route.decisions] gives the project's decisions a list, narrowed by a subject where one is named, and each decision an address", () => {

@@ -59,12 +59,14 @@ export class CodeHostFixture extends Context.Service<
      * `refs/heads/main`), parented on the ref's current commit if it has one,
      * then on each of `merged` in order (commits the repo already holds, as
      * `git merge` would add them), and moves the ref. The repo must exist.
+     * The message is `message`, `fixture` unless given.
      */
     readonly commit: (
       repo: RepoRef,
       ref: string,
       files: FixtureFiles,
       merged?: readonly CommitSha[],
+      message?: string,
     ) => Effect.Effect<CommitSha, RepoNotFound>;
     /** The upstreams this host's import cases run against. */
     readonly upstreams: Effect.Effect<Upstreams>;
@@ -113,12 +115,13 @@ export async function buildTree(
   return { tree, objects };
 }
 
-/** A fixture commit: fixed identity and time, so the same tree on the same parent is the same commit. */
+/** A fixture commit: fixed identity and time, so the same tree on the same parent with the same message is the same commit. */
 export async function buildCommit(
   tree: string,
   parents: readonly string[],
+  message = "fixture",
 ): Promise<{ readonly oid: string; readonly object: GitObject }> {
   const who = { name: "keel fixture", email: "fixture@keel.invalid", time: 1_760_000_000 };
-  const body = encodeCommit({ tree, parents, author: who, committer: who, message: "fixture" });
+  const body = encodeCommit({ tree, parents, author: who, committer: who, message });
   return { oid: await hashObject("commit", body), object: { type: "commit", body } };
 }

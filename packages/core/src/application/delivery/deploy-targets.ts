@@ -1,12 +1,16 @@
 import { Effect, Result, Schema } from "effect";
 import {
   clearDeployTarget,
+  CONNECT_WINDOW_MS,
+  type ConnectStateRefused,
   DeployTarget,
   DeployTargetCleared,
   type DeployTargetRefused,
   DeployTargetSet,
   type DeployTargetUnreachable,
   evolveDeployTargets,
+  finishConnect,
+  PendingConnect,
   setDeployTarget,
 } from "../../domain/delivery/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
@@ -23,7 +27,7 @@ import {
 import { PROJECT } from "../integration/index.ts";
 import {
   type ClearProjectDeployTarget,
-  type Clock,
+  Clock,
   commit,
   CredentialStore,
   DeployTargetCheck,
@@ -32,8 +36,10 @@ import {
   type EventDraft,
   type EventOutbox,
   type HeldDeployTarget,
+  type HoldProjectConnect,
   type SetProjectDeployTarget,
   type Stored,
+  type TakeProjectConnect,
   type Transaction,
 } from "../ports/index.ts";
 
@@ -256,3 +262,52 @@ export const removeDeployTarget: (
   command: ClearProjectDeployTarget,
 ) => Effect.Effect<void, DeployTargetRefused | ProjectNotFound, DeployTargets> = (command) =>
   DeployTargets.use((targets) => targets.clear(command));
+
+/**
+ * Where the Project DO keeps the Connects its owners have begun, one per
+ * owner, keyed `<projectId>:<userId>`: never an event, since each lasts ten
+ * minutes at most and is gone once its callback comes.
+ */
+export const PENDING_CONNECTS = "cloudflare-connects";
+
+const encodePending = Schema.encodeSync(PendingConnect);
+const decodePending = Schema.decodeUnknownSync(PendingConnect);
+const pendingKey = (projectId: ProjectId, by: UserId) => `${projectId}:${by}`;
+
+/** Holds a Connect its owner begins on the project, in place of one they began before, lapsing by this object's clock. */
+export const holdConnect: (
+  command: HoldProjectConnect,
+) => Effect.Effect<void, ProjectNotFound, Clock | EntityStore> = Effect.fn("delivery/holdConnect")(
+  function* (command: HoldProjectConnect) {
+    const { projectId, by, target, nonce, verifier } = command;
+    const store = yield* EntityStore;
+    if (!created(store, projectId)) yield* new ProjectNotFound({ projectId });
+    const now = yield* Clock.use((clock) => clock.now);
+    store.put(
+      PENDING_CONNECTS,
+      pendingKey(projectId, by),
+      asStored(encodePending({ target, nonce, verifier, expiresAt: now + CONNECT_WINDOW_MS })),
+    );
+  },
+);
+
+/**
+ * Takes the Connect its owner began on the project, if the nonce is its own
+ * and its window is open (`finishConnect`). It is removed whatever the answer,
+ * so a state is tried once: a replay, or a guess after a wrong one, finds none.
+ */
+export const takeConnect: (
+  command: TakeProjectConnect,
+) => Effect.Effect<PendingConnect, ProjectNotFound | ConnectStateRefused, Clock | EntityStore> =
+  Effect.fn("delivery/takeConnect")(function* (command: TakeProjectConnect) {
+    const { projectId, by, nonce } = command;
+    const store = yield* EntityStore;
+    if (!created(store, projectId)) return yield* new ProjectNotFound({ projectId });
+    const now = yield* Clock.use((clock) => clock.now);
+    const key = pendingKey(projectId, by);
+    const value = store.get(PENDING_CONNECTS, key);
+    store.remove(PENDING_CONNECTS, key);
+    return yield* Effect.fromResult(
+      finishConnect(value === undefined ? undefined : decodePending(value), nonce, now),
+    );
+  });

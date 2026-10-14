@@ -1,7 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type DeployTarget, DeployTargetName } from "@keeltown/core/domain/delivery";
 import { CredentialId, ProjectId, UserId } from "@keeltown/core/kernel";
-import { DeployTargets, type SetProjectDeployTarget } from "@keeltown/core/ports";
+import {
+  DeployTargets,
+  type HoldProjectConnect,
+  type SetProjectDeployTarget,
+} from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Schema } from "effect";
 
 /** What the `DeployTargets` suite needs beside the port: a way to create a project, as createProject does. */
@@ -39,6 +43,20 @@ const setting = (
   workersDev: "acme.workers.dev",
   requestId: crypto.randomUUID(),
   ...fields,
+});
+
+const other = Schema.decodeUnknownSync(UserId)(`usr_${ulid()}`);
+
+/** A nonce as a state carries one: 43 base64url characters, told apart by `tag`. */
+const nonce = (tag: string) => tag.padEnd(43, "x");
+
+/** The owner beginning a Connect of the target `production` with the nonce `tag` names. */
+const connecting = (projectId: ProjectId, tag: string): HoldProjectConnect => ({
+  projectId,
+  by: owner,
+  target: name("production"),
+  nonce: nonce(tag),
+  verifier: `verifier-${tag}`,
 });
 
 /** The failure's tag and reason, or `succeeded`. */
@@ -129,7 +147,79 @@ export function describeDeployTargetsContract(adapter: string, make: () => Deplo
         expect(
           failure(yield* Effect.exit(targets.set(setting(projectId, target("preview"))))),
         ).toMatchObject({ error: { _tag: "ProjectNotFound", projectId } });
+        expect(
+          failure(yield* Effect.exit(targets.holdConnect(connecting(projectId, "n1")))),
+        ).toMatchObject({ error: { _tag: "ProjectNotFound", projectId } });
+        expect(
+          failure(
+            yield* Effect.exit(targets.takeConnect({ projectId, by: owner, nonce: nonce("n1") })),
+          ),
+        ).toMatchObject({ error: { _tag: "ProjectNotFound", projectId } });
       }).pipe(Effect.provide(harness.layer));
     });
+
+    it.live(
+      "[deploytargets.contract.connect-once] a held Connect is taken once, with its target and verifier, by its own nonce",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const targets = yield* DeployTargets;
+          const projectId = freshProject();
+          yield* harness.establish(projectId);
+          yield* targets.holdConnect(connecting(projectId, "n1"));
+          const taken = yield* targets.takeConnect({ projectId, by: owner, nonce: nonce("n1") });
+          expect(taken).toMatchObject({
+            target: name("production"),
+            nonce: nonce("n1"),
+            verifier: "verifier-n1",
+          });
+          const again = yield* Effect.exit(
+            targets.takeConnect({ projectId, by: owner, nonce: nonce("n1") }),
+          );
+          expect(failure(again)).toMatchObject({
+            error: { _tag: "ConnectStateRefused", reason: "none" },
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[deploytargets.contract.connect-owner] a Connect is its owner's alone, is gone after a wrong nonce, and is replaced by the owner's next",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const targets = yield* DeployTargets;
+          const projectId = freshProject();
+          yield* harness.establish(projectId);
+          yield* targets.holdConnect(connecting(projectId, "n1"));
+          const stranger = yield* Effect.exit(
+            targets.takeConnect({ projectId, by: other, nonce: nonce("n1") }),
+          );
+          expect(failure(stranger)).toMatchObject({
+            error: { _tag: "ConnectStateRefused", reason: "none" },
+          });
+          const wrong = yield* Effect.exit(
+            targets.takeConnect({ projectId, by: owner, nonce: nonce("n2") }),
+          );
+          expect(failure(wrong)).toMatchObject({
+            error: { _tag: "ConnectStateRefused", reason: "mismatch" },
+          });
+          const after = yield* Effect.exit(
+            targets.takeConnect({ projectId, by: owner, nonce: nonce("n1") }),
+          );
+          expect(failure(after)).toMatchObject({
+            error: { _tag: "ConnectStateRefused", reason: "none" },
+          });
+          yield* targets.holdConnect(connecting(projectId, "n3"));
+          yield* targets.holdConnect(connecting(projectId, "n4"));
+          const replaced = yield* Effect.exit(
+            targets.takeConnect({ projectId, by: owner, nonce: nonce("n3") }),
+          );
+          expect(failure(replaced)).toMatchObject({
+            error: { _tag: "ConnectStateRefused", reason: "mismatch" },
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
   });
 }

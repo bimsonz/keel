@@ -4,6 +4,7 @@ import type {
   AgentSignUps,
   Changes,
   Clock,
+  CloudflareOAuth,
   CodeHost,
   ConflictMoves,
   CredentialStore,
@@ -92,6 +93,7 @@ export type IsolateServices =
   | RepoServer
   | WorkspacePool
   | CredentialStore
+  | CloudflareOAuth
   | DeployTargetCheck
   | DeployTargets;
 

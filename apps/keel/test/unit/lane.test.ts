@@ -7,6 +7,7 @@ import {
   batchOf,
   bundleBlame,
   checkVerification,
+  COUNTERPART_WALK,
   destroyLane,
   failureRate,
   instanceEnded,
@@ -112,6 +113,8 @@ interface WorldOptions {
   readonly refuseReason?: string;
   /** What failed where the composer saw it, with `refuseReason`. */
   readonly refuseDetail?: string;
+  /** The paths the composer's refusal names: none unless given. */
+  readonly refusePaths?: readonly string[];
   readonly bundles?: Layer.Layer<CandidateBundles>;
   readonly verification?: "required" | "off";
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
@@ -145,6 +148,8 @@ function world(options: WorldOptions = {}) {
   const reads = { inFlight: 0, most: 0 };
   /** The changes each change's own DO says it shares an unsettled conflict with. */
   const unsettled = new Map<ChangeId, readonly ChangeId[]>();
+  /** Each change's workspace base, where a case sets one: `sha("0")` otherwise. */
+  const bases = new Map<ChangeId, CommitSha>();
   const plans = makePlanStoreMemory();
   const changesLayer = Layer.succeed(
     Changes,
@@ -181,7 +186,7 @@ function world(options: WorldOptions = {}) {
               return Effect.succeed({
                 workspaceId: makeId("wsp", ulid()),
                 repo: { namespace: "memory", name: `ws-${id}` },
-                baseSha: sha("0"),
+                baseSha: bases.get(id) ?? sha("0"),
                 grantedSha: sha("0"),
                 projectId: PROJECT,
               });
@@ -226,6 +231,7 @@ function world(options: WorldOptions = {}) {
     refuse: options.refuseCompose ?? [],
     ...(options.refuseReason === undefined ? {} : { reason: options.refuseReason }),
     ...(options.refuseDetail === undefined ? {} : { detail: options.refuseDetail }),
+    ...(options.refusePaths === undefined ? {} : { paths: options.refusePaths }),
   });
   const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
@@ -266,6 +272,7 @@ function world(options: WorldOptions = {}) {
     staging,
     changes,
     unsettled,
+    bases,
     plans,
     reads,
     /** The agent directory the Lane reads handles from: empty until a test writes an agent. */
@@ -374,6 +381,23 @@ const advance = (from: string, to: string, members: readonly ChangeId[]) =>
           candidateId: makeId("cnd", "01J9KKKKKKKKKKKKKKKKKKKKKK"),
           proofId: `proof-${changeId}`,
         })),
+      },
+    ),
+  );
+
+/** Trunk synced from upstream `from → to`: an advance no change made. */
+const synced = (from: string, to: string) =>
+  deliver(
+    envelope(
+      { kind: "trunk", id: PROJECT },
+      {
+        _tag: "TrunkSynced",
+        projectId: PROJECT,
+        from,
+        to,
+        by: "user:usr_01J9ZZZZZZZZZZZZZZZZZZZZZZ",
+        upstream: { url: "https://git.example/team/app", ref: "refs/heads/main" },
+        height: 1,
       },
     ),
   );
@@ -953,6 +977,25 @@ describe("the Lane", () => {
   );
 
   it.effect(
+    "[lane.hears-sync] a trunk synced from upstream is followed as an advance no change made: the lane's next batch forms on the synced head",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* synced(base, sha("e"));
+        expect(laneOf(yield* EntityStore, LANE)).toMatchObject({
+          trunkHead: sha("e"),
+          advances: [{ from: base, to: sha("e"), members: [] }],
+        });
+        yield* queue(w, change(1));
+        yield* toVerifying(w);
+        const [formed] = yield* payloads("BatchFormed");
+        expect(formed).toMatchObject({ base: sha("e") });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[lane.composition-refused] a refused composition bounces its change with the reason and the rebase-then-merge remedy, and never bundles or verifies",
     () => {
       const w = world({ refuseCompose: [change(1)] });
@@ -987,6 +1030,98 @@ describe("the Lane", () => {
         expect((yield* payloads("BatchFailed"))[0]).toMatchObject({ attribution: change(1) });
         expect(w.bundles.bundled).toEqual([]);
         expect(w.verification.started.size).toBe(0);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.composition-counterparts] a textual bounce names the trunk commits since the change's base that changed a conflicting path, newest first, with the change each landed, and asks why of the path between rebase and submit",
+    () => {
+      const w = world({
+        refuseCompose: [change(1)],
+        refuseReason: "conflict",
+        refusePaths: ["src/a.ts"],
+      });
+      const landedX = change(91);
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const commit = (files: Record<string, string>, message?: string) =>
+          w.code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n", ...files }, [], message);
+        // Before the base: it changed the path too, and is not what the change conflicts with.
+        yield* commit({ "src/a.ts": "a1\n" });
+        const base = yield* commit({ "src/a.ts": "a1\n", "docs/notes.md": "base\n" });
+        const x = yield* commit(
+          { "src/a.ts": "a2\n", "docs/notes.md": "base\n" },
+          `Rewrite a\n\nChange-Id: ${landedX}\nKeel-Agent: agt_x`,
+        );
+        yield* commit(
+          { "src/a.ts": "a2\n", "src/b.ts": "b\n", "docs/notes.md": "base\n" },
+          `Add b\n\nChange-Id: ${change(92)}`,
+        );
+        const z = yield* commit(
+          { "src/a.ts": "a3\n", "src/b.ts": "b\n", "docs/notes.md": "base\n" },
+          "An import Keel did not land",
+        );
+        w.bases.set(change(1), base);
+        yield* queue(w, change(1));
+        expect(yield* laneStep(LANE)).toBe("idle");
+        const [issued] = yield* payloads("VerdictIssued");
+        expect(issued?.["counterparts"]).toEqual([
+          { commitSha: z, paths: ["src/a.ts"] },
+          { changeId: landedX, commitSha: x, paths: ["src/a.ts"] },
+        ]);
+        expect(issued?.["evidence"]).toEqual([
+          "composition-refused: conflict src/a.ts",
+          `conflicts with trunk commit ${z.slice(0, 12)}, which Keel did not land, on src/a.ts`,
+          `conflicts with ${landedX}, landed as ${x.slice(0, 12)}, on src/a.ts`,
+        ]);
+        expect(issued?.["nextActions"]).toEqual([
+          expect.objectContaining({ kind: "call", operationId: "rebase" }),
+          {
+            kind: "read",
+            title: `Ask why src/a.ts is as it is: ${landedX} changed it since your base`,
+            operationId: "why",
+            args: { project: PROJECT, path: "src/a.ts" },
+          },
+          expect.objectContaining({ kind: "call", operationId: "submit" }),
+        ]);
+        expect((yield* payloads("BatchFailed"))[0]).toMatchObject({ attribution: change(1) });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.composition-counterparts.cut] a walk that reads COUNTERPART_WALK trunk commits without reaching the change's base names what it read and says more may conflict",
+    () => {
+      const w = world({
+        refuseCompose: [change(1)],
+        refuseReason: "conflict",
+        refusePaths: ["src/a.ts"],
+      });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const landed: CommitSha[] = [];
+        for (let n = 0; n <= COUNTERPART_WALK; n += 1)
+          landed.push(
+            yield* w.code.fixture.commit(STAGING, MAIN, {
+              "README.md": "keel\n",
+              "src/a.ts": `a${n % 2}\n`,
+            }),
+          );
+        w.bases.set(change(1), base);
+        yield* queue(w, change(1));
+        expect(yield* laneStep(LANE)).toBe("idle");
+        const [issued] = yield* payloads("VerdictIssued");
+        // The oldest commit after the base is past the walk: every one read changed the path.
+        const read = landed.slice(1).toReversed();
+        expect(issued?.["counterparts"]).toEqual(
+          read.map((commitSha) => ({ commitSha, paths: ["src/a.ts"] })),
+        );
+        const evidence: unknown = issued?.["evidence"];
+        expect(evidence).toHaveLength(COUNTERPART_WALK + 2);
+        expect(Array.isArray(evidence) ? evidence.at(-1) : evidence).toBe(
+          `and more may conflict: Keel read ${COUNTERPART_WALK} trunk commits back without reaching the change's base ${base.slice(0, 12)}`,
+        );
       }).pipe(Effect.provide(w.layer));
     },
   );

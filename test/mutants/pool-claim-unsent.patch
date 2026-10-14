@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.warm-run
+# why: The warm instance is never sent its event: the submission's Precheck never runs
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index 2c3690f3..c1e6d30a 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -133,7 +133,6 @@ async function startWarm(
+   try {
+     const answer = await claim(eventId);
+     if (typeof answer !== "string" || answer === COLD) return false;
+-    await (await workflow.get(answer)).sendEvent({ type: POOL_CLAIM_EVENT, payload: params });
+     return true;
+   } catch (cause) {
+     console.error(`the warm pool could not take ${eventId}, so it starts cold: ${String(cause)}`);

@@ -76,6 +76,7 @@ const CONTRACT_PORTS = [
   "Deployer",
   "CredentialStore",
   "DeployTargetCheck",
+  "CloudflareOAuth",
   "DeployTargets",
   "Deployments",
   "PreviewNotices",

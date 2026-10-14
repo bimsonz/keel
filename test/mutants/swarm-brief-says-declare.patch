@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.tasks-brief
+# why: The brief spells out how to declare: the agents follow our script, not Keel's answers, and the run says nothing about Keel's guidance
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index ce469ec5..69a81903 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -304,6 +304,7 @@ export function brief(task: Task): string {
+     `Write one it() per case, asserting exactly this:`,
+     ...task.cases.map((c) => `- ${describeCase(task.target, c)}`),
+     ...task.premises.map((p) => `Your test relies on this premise: ${JSON.stringify(p)}`),
++    `Declare with goal ${JSON.stringify(task.goal)}, footprint ${JSON.stringify([{ path: task.path, op: "create" }])}.`,
+   ];
+   return lines.join("\n");
+ }

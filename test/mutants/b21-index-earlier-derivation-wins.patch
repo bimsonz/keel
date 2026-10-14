@@ -2,14 +2,14 @@
 # kills: b21.index-derivation-order
 # why: the project's live index lets an earlier derivation arriving late replace the later one
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index 6beef97..14010bc 100644
+index 50c23c55..e0a995c9 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -172,7 +172,6 @@ export function hearLiveChange(
+@@ -275,7 +275,6 @@ export function hearLiveChange(
      case "EffectsDerived": {
        if (live === undefined) return [];
        const held = store.get(LIVE_DERIVED_AT, changeId);
 -      if (typeof held === "number" && held >= event.seq) return [];
        const derived = Schema.decodeUnknownSync(EffectsDerived)(event.payload);
-       store.put(LIVE_CHANGE, changeId, encodeRow({ ...live, derived: derived.effects }));
+       putLive(store, changeId, live, { ...live, derived: derived.effects });
        store.put(LIVE_DERIVED_AT, changeId, event.seq);

@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.denied
+# why: a declined consent leaves its state good, so a later callback with a code finishes it
+diff --git a/apps/keel/src/adapters/driving/http/delivery.ts b/apps/keel/src/adapters/driving/http/delivery.ts
+index ad548ce2..21cd9896 100644
+--- a/apps/keel/src/adapters/driving/http/delivery.ts
++++ b/apps/keel/src/adapters/driving/http/delivery.ts
+@@ -487,10 +487,7 @@ export function deliveryHandlers(run: Runner) {
+           const finished =
+             input.error !== undefined || code === undefined
+               ? // Cloudflare's own refusal, or the owner's: the state is spent all the same.
+-                DeployTargets.use((targets) =>
+-                  targets.takeConnect({ projectId: project.projectId, by, nonce }),
+-                ).pipe(
+-                  Effect.catchTag("ConnectStateRefused", () => Effect.void),
++                Effect.void.pipe(
+                   Effect.as(ended(input.error === "access_denied" ? "denied" : "refused")),
+                 )
+               : completeCloudflareConnect({

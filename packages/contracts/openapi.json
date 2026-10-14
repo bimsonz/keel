@@ -2489,7 +2489,7 @@
       "post": {
         "operationId": "declare",
         "summary": "Declare a change",
-        "description": "Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease.",
+        "description": "Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. A retry\nwith the same Idempotency-Key answers the same change while it is live; once it has ended (landed,\nwithdrawn or superseded) it holds no workspace, and the retry is 409 `change.state_refused`, naming\nthe change and its state. The same key with a different body is 409 `request.idempotency_conflict`.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -3904,6 +3904,157 @@
               "agent:read"
             ]
           },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/cloudflare/callback": {
+      "get": {
+        "operationId": "Delivery_completeCloudflareConnect",
+        "summary": "Finish connecting a Cloudflare account",
+        "description": "Where Cloudflare's consent screen sends the owner back, with a code or an error and the state Keel gave. It\nfinishes the Connect the state names, if it is the caller's, and answers 303 to the project's settings with\n`?cloudflare=<outcome>`; the outcome is also in `keel-cloudflare-outcome`. A state names its project, which only\nits owners may finish a Connect on.",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirection",
+            "headers": {
+              "location": {
+                "required": true,
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "keel-cloudflare-outcome": {
+                "required": true,
+                "schema": {
+                  "$ref": "#/components/schemas/CloudflareConnectOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "security": [
           {
             "BearerAuth": []
           }
@@ -7975,6 +8126,139 @@
         ]
       }
     },
+    "/projects/{projectId}/deploy-targets/{name}/cloudflare-connect": {
+      "post": {
+        "operationId": "Delivery_beginCloudflareConnect",
+        "summary": "Begin connecting a Cloudflare account",
+        "description": "Begin connecting a Cloudflare account to a project's deploy target: answers Cloudflare's consent screen, where\nthe owner ticks exactly one account. Coming back, Keel mints on that account an API token of its own, named\n`Keel deploys: <namespace>/<project>`, that may only edit its Workers; stores it sealed in the project's\nnamespace; and sets the target with it. The consent's own access is used for that alone and kept nowhere.\nBeginning again replaces the owner's Connect before. A 503 `cloudflare.not_configured` while this Keel has no\nOAuth client registered with Cloudflare.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DeployTargetName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudflareConnect"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Delivery"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects/{projectId}/lanes": {
       "get": {
         "operationId": "Views_listLanes",
@@ -9108,6 +9392,147 @@
           }
         },
         "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/sync": {
+      "post": {
+        "operationId": "Operator_syncUpstream",
+        "summary": "Sync an imported project's trunk from its upstream",
+        "description": "Moves an imported project's trunk forward to the head of the upstream branch its import took, as GitHub's\n\"Sync fork\" does: each upstream commit is kept as it is, and trunk moves only when upstream's head descends from\ntrunk's. Its owners alone may ask. Refused, with nothing moved: a project that was not imported\n(`project.not_imported`); a trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both heads); a\npromotion in flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch\n(`project.upstream_unreachable`); upstream's new history over what Keel takes in one piece\n(`project.import_too_large`) or over the namespace's repo bytes (`quota.exceeded`). The feed records the move as\n`TrunkSynced`.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpstreamSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Operator",
+          "mcp"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          },
           {
             "BearerAuth": []
           }
@@ -11835,6 +12260,13 @@
               "$ref": "#/components/schemas/EventNextAction"
             },
             "description": "Always set, never empty; optional only so events committed before it was added still decode."
+          },
+          "counterparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventCounterpart"
+            },
+            "description": "What the change conflicts with on trunk, from its verdict, when it bounced on a textual conflict."
           }
         },
         "additionalProperties": {
@@ -12431,6 +12863,37 @@
         "type": "string",
         "pattern": "^[0-9a-f]{32}$",
         "description": "A Cloudflare account's id."
+      },
+      "CloudflareConnect": {
+        "type": "object",
+        "required": [
+          "authorizeUrl"
+        ],
+        "properties": {
+          "authorizeUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Cloudflare's consent screen, asking for Keel's client's scopes. Its state is good once, for this owner, project\nand target, for ten minutes."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Where to send an owner to connect a Cloudflare account to a project's deploy target."
+      },
+      "CloudflareConnectOutcome": {
+        "type": "string",
+        "enum": [
+          "connected",
+          "denied",
+          "expired",
+          "accounts",
+          "refused",
+          "unreachable",
+          "no-workers-dev",
+          "full"
+        ],
+        "description": "How a Connect ended, as the callback names it in its redirect's `?cloudflare=`: `connected`; `denied` at\nCloudflare's consent screen; `expired` (a state that is not the owner's current one, used, or over ten minutes\nold); `accounts` (the consent granted no account, or more than one: tick exactly one); `refused` (Cloudflare\nrefused the code's exchange, the read of the account, or the token's minting); `unreachable` (the minted token\ndoes not reach the account's Workers); `no-workers-dev` (the account has no workers.dev subdomain); `full` (the\nproject holds all the deploy targets it may)."
       },
       "CommitEdit": {
         "type": "object",
@@ -15151,6 +15614,37 @@
         },
         "description": "A move resting on one of the preflight's contradictions, by its index in that list."
       },
+      "EventCounterpart": {
+        "type": "object",
+        "required": [
+          "commitSha",
+          "paths"
+        ],
+        "properties": {
+          "changeId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              }
+            ],
+            "description": "The change Keel landed as the commit, from its `Change-Id` trailer. Absent for a commit Keel did not land (an import, a seed)."
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The conflicting paths the commit changed."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A trunk commit landed since a bounced change's base that changed a path its composition conflicted on."
+      },
       "EventCredential": {
         "type": "object",
         "required": [
@@ -15523,6 +16017,27 @@
           "not": {}
         },
         "description": "A project's predicate policy as composed for one change. A predicate left out is advise."
+      },
+      "EventPreflightCompared": {
+        "type": "object",
+        "required": [
+          "changes",
+          "subjects"
+        ],
+        "properties": {
+          "changes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "subjects": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What a preflight compared: the live changes it read, near the intent, and the subject keys it looked up."
       },
       "EventProposition": {
         "type": "object",
@@ -16526,6 +17041,12 @@
           },
           {
             "$ref": "#/components/schemas/AuditCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkSyncStarted"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkSynced"
           },
           {
             "$ref": "#/components/schemas/ProjectCreated"
@@ -20287,12 +20808,41 @@
               "$ref": "#/components/schemas/ChangeId"
             },
             "description": "The live changes with the same intent (their declared effects make the same claims), in the\norder the live index gave them, never ranked. Absent when there are none; the move never reads them."
+          },
+          "compared": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PreflightCompared"
+              }
+            ],
+            "description": "What the preflight compared. Absent on a preflight made before it was counted."
           }
         },
         "additionalProperties": {
           "not": {}
         },
         "description": "What Keel tells an agent as soon as it declares an intent."
+      },
+      "PreflightCompared": {
+        "type": "object",
+        "required": [
+          "changes",
+          "subjects"
+        ],
+        "properties": {
+          "changes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "subjects": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What a preflight compared its intent with: the live changes it read, found by key near the\nintent rather than every live change of the project, and how many subject keys it looked up."
       },
       "PreflightIssued": {
         "type": "object",
@@ -20353,6 +20903,14 @@
               "$ref": "#/components/schemas/ChangeId"
             },
             "description": "The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none."
+          },
+          "compared": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventPreflightCompared"
+              }
+            ],
+            "description": "How many live changes the preflight read, near the intent, and under how many subject keys. Absent on older events."
           }
         },
         "additionalProperties": {
@@ -20844,9 +21402,14 @@
           "project.import_refused",
           "project.import_too_large",
           "quota.exceeded",
+          "project.not_imported",
+          "project.upstream_unreachable",
+          "trunk.not_fast_forward",
+          "trunk.busy",
           "deploy_target.refused",
           "deploy_target.unreachable",
-          "deploy_target.no_workers_dev"
+          "deploy_target.no_workers_dev",
+          "cloudflare.not_configured"
         ],
         "description": "Machine-readable reason for a problem. Dotted, area first."
       },
@@ -23071,6 +23634,28 @@
           "not": {}
         }
       },
+      "SyncUpstream": {
+        "type": "object",
+        "required": [
+          "url",
+          "ref"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upstream branch, by its full ref name."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The upstream an imported trunk syncs from: the URL and branch its import took."
+      },
       "TemplateSource": {
         "type": "object",
         "required": [
@@ -23563,6 +24148,87 @@
         },
         "description": "A template. `commit` is trunk's first head."
       },
+      "TrunkSyncStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "from",
+          "to",
+          "by",
+          "upstream"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TrunkSyncStarted"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "to": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "by": {
+            "type": "string"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/SyncUpstream"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An owner asked for trunk's main to move from `from` to `to`, its upstream branch's head, which descends from it: written before the move, resolved by one `TrunkSynced` or `PromotionFrozen`."
+      },
+      "TrunkSynced": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "from",
+          "to",
+          "by",
+          "upstream"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TrunkSynced"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "to": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "by": {
+            "type": "string"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/SyncUpstream"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Trunk's height after the sync, counted as an advance is."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Trunk's main moved forward to its upstream branch's head, each upstream commit kept as upstream made it. No change landed, so none is named."
+      },
       "TrunkView": {
         "type": "object",
         "required": [
@@ -23591,6 +24257,40 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "UpstreamSync": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "synced"
+        ],
+        "properties": {
+          "from": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "Trunk's head before the sync."
+          },
+          "to": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "Upstream's head: trunk's head once `synced`."
+          },
+          "synced": {
+            "type": "boolean",
+            "description": "Whether trunk is at `to` now. False with `from` equal to `to` when trunk was already level with upstream; false with them apart while a move the code host kept busy is finished, which the feed then shows as `TrunkSynced`."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What a sync from upstream did."
       },
       "UserId": {
         "type": "string",
@@ -23806,6 +24506,13 @@
               "$ref": "#/components/schemas/EventNextAction"
             },
             "description": "The remedy, named by the issuer; the Change DO copies it onto ChangeBounced."
+          },
+          "counterparts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventCounterpart"
+            },
+            "description": "The trunk commits since the change's base that changed a path a refused composition conflicted on, newest first; the Change DO copies them onto ChangeBounced."
           }
         },
         "additionalProperties": {

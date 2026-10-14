@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/preflight-near.test.ts
+# kills: t694.reads-near-rows
+# why: REST's preflight leaves out `compared`, so the answer no longer says what the preflight compared.
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index f2f1f65a..c2193f54 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -377,7 +377,6 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
+     suggestedMove: preflight.suggestedMove,
+     ...(basis === undefined ? {} : { basis }),
+     ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
+-    ...(preflight.compared === undefined ? {} : { compared: { ...preflight.compared } }),
+   };
+ }
+ 

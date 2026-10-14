@@ -18,6 +18,7 @@ export * from "./lattice.ts";
 export * from "./lattice-data.ts";
 export * from "./lease.ts";
 export * from "./mfp-wire.ts";
+export * from "./near.ts";
 export * from "./preflight.ts";
 export * from "./proposition.ts";
 export * from "./scope.ts";

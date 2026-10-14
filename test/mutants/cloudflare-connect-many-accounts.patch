@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/cloudflare-connect.test.ts apps/keel/test/unit/cloudflare-connect.test.ts
+# kills: connect.one-account
+# why: a consent that granted several accounts connects the first of them, which the owner never chose
+diff --git a/packages/core/src/domain/delivery/cloudflare-connect.ts b/packages/core/src/domain/delivery/cloudflare-connect.ts
+index 7f8ad368..4f5de6ce 100644
+--- a/packages/core/src/domain/delivery/cloudflare-connect.ts
++++ b/packages/core/src/domain/delivery/cloudflare-connect.ts
+@@ -97,7 +97,7 @@ export function oneAccount(
+   granted: readonly GrantedAccount[],
+ ): Result.Result<GrantedAccount, ConnectAccountsRefused> {
+   const [only, ...more] = granted;
+-  return only !== undefined && more.length === 0
++  return only !== undefined
+     ? Result.succeed(only)
+     : Result.fail(new ConnectAccountsRefused({ granted: granted.length }));
+ }

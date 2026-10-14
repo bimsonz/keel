@@ -1,3 +1,4 @@
+export * from "./cloudflare-connect.ts";
 export * from "./credentials.ts";
 export * from "./deliver.ts";
 export * from "./deploy-steps.ts";

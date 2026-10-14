@@ -1,6 +1,9 @@
 import {
+  NotFastForward,
+  NotImported,
   PromotionState,
   PromotionStateRefused,
+  TrunkNotInitialized,
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
@@ -44,6 +47,20 @@ export const PackTooLarge = Schema.TaggedStruct("PackTooLarge", {
   limit: Schema.Number,
 });
 
+/** What a sync from upstream did: trunk moved `from → to`, or was already level with upstream (`synced` false, `from` and `to` alike). */
+export const UpstreamSyncedAnswer = Schema.Struct({
+  from: CommitSha,
+  to: CommitSha,
+  synced: Schema.Boolean,
+});
+
+/** The Trunks port's UpstreamUnreachable, by shape (rule R15). */
+export const UpstreamUnreachable = Schema.TaggedStruct("UpstreamUnreachable", {
+  url: Schema.String,
+  ref: Schema.String,
+  reason: Schema.Literals(["unreachable", "branch-gone"]),
+});
+
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
   origin: exitCodec(TrunkStart, Schema.Never),
@@ -57,6 +74,18 @@ export const TrunkCodecs = {
   seed: exitCodec(CommitSha, Schema.Never),
   take: exitCodec(CommitSha, Schema.Union([RepoNotFound, ImportTooLarge])),
   sync: exitCodec(TrunkSync, Schema.Union([RepoNotFound, PackTooLarge])),
+  syncUpstream: exitCodec(
+    UpstreamSyncedAnswer,
+    Schema.Union([
+      TrunkNotInitialized,
+      NotImported,
+      NotFastForward,
+      PromotionStateRefused,
+      UpstreamUnreachable,
+      ImportTooLarge,
+      QuotaExceeded,
+    ]),
+  ),
   destroy: exitCodec(Schema.Void, Schema.Never),
 };
 
@@ -114,6 +143,16 @@ export interface TrunkRpc {
    * has one writer, the Lane.
    */
   sync(): Promise<ExitJson>;
+  /**
+   * Moves an imported trunk's main forward to the head of the upstream
+   * branch its import took, as `by`, an owner, asked: refused, with nothing
+   * moved, when trunk was not imported, is not between groups, upstream
+   * cannot be read, its head does not descend from trunk's, or its new
+   * history is over what a relay carries or over the namespace's repo
+   * bytes. A move the code host keeps busy is finished on the Trunk DO's
+   * own deadline, and answers `synced` false until then.
+   */
+  syncUpstream(by: CommandActor): Promise<ExitJson>;
   /**
    * Destroys the trunk for good, when its project is deleted: it takes no
    * batch and promotes nothing from here on, and deletes the project's trunk,

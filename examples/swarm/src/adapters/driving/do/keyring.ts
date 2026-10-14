@@ -15,6 +15,12 @@ export interface Member {
   readonly name: string;
 }
 
+/** The settings the swarm sets on a project it owns: who may read it, and whether its lane verifies. */
+export interface SettingsChange {
+  readonly visibility?: "public" | "private" | undefined;
+  readonly verification?: "required" | "off" | undefined;
+}
+
 /** Keel's two doors: its API, and its MCP endpoint. Each refuses the other's token. */
 export type Door = "api" | "mcp";
 
@@ -83,6 +89,25 @@ export class Keyring extends DurableObject<Env> {
       source: { kind: "template", name: "fixture-forge-lite" },
     });
     return { id: project.id, name: `${member.handle}/${project.name}` };
+  }
+
+  /** Changes a project the account owns, keeping every setting not named: the owner's call, as on any project. */
+  async configure(project: string, change: SettingsChange): Promise<SettingsChange> {
+    const client = await this.#client({ project, run: "settings" }, "api");
+    const settings = await client.settings(project);
+    const set = await client.putSettings(project, {
+      ...settings,
+      protectedPaths: [...settings.protectedPaths],
+      ...(change.visibility === undefined ? {} : { visibility: change.visibility }),
+      ...(change.verification === undefined ? {} : { verification: change.verification }),
+    });
+    return { visibility: set.visibility, verification: set.verification };
+  }
+
+  /** Trunk's head on a project the account may read, or undefined while it has none. */
+  async head(project: string): Promise<string | undefined> {
+    const client = await this.#client({ project, run: "settings" }, "api");
+    return (await client.commits(project, { limit: 1 })).items[0]?.sha;
   }
 
   /** One page of the project's events from `cursor`, oldest first, as JSON: its records hold values RPC can't name. */

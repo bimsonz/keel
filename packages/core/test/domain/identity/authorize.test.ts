@@ -1222,6 +1222,22 @@ describe("authorize", () => {
     }
   });
 
+  it("[authz.sync-own] a sync from upstream is its project's owners' alone, decided as the project's deletion is", () => {
+    fc.assert(
+      fc.property(principalArb, projectArb, (principal, resource) => {
+        return (
+          outcome(decide(principal, "Operator_syncUpstream", resource)) ===
+          outcome(decide(principal, "DeleteProject", resource))
+        );
+      }),
+    );
+    const inOrg = (role: (typeof ROLES)[number]) => user({ memberships: [{ org: ORG_1, role }] });
+    const theirs = project(PRJ_1, "private");
+    expect(
+      ROLES.map((role) => outcome(authorize(inOrg(role), "Operator_syncUpstream", theirs))),
+    ).toEqual(ROLES.map((role) => (role === "owner" ? "ok:" : "403:role")));
+  });
+
   it("[authz.handle-first] a user without a handle may only choose one", () => {
     fc.assert(
       fc.property(userArb, requestArb, (u, { action, resource }) => {

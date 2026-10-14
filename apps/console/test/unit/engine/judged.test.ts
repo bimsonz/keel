@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { couldBeHandle } from "../../../src/engine/agents.ts";
 import { noneDerived, unjudged, verdictSaid } from "../../../src/engine/judged.ts";
 import { changePageOf } from "../../../src/engine/select.ts";
 import { World } from "../../../src/engine/world.ts";
@@ -297,19 +296,5 @@ describe("a change's page, in Keel's own fields", () => {
     expect(unserved?.recorded).toEqual(
       refusing.world.verdicts.get(unserved?.id ?? "")?.evidence ?? ["no such verdict"],
     );
-  });
-
-  it("[judged.handle] asks Keel whose a name is only where it could be a handle: an agent's id is none", () => {
-    expect(["tidy-otter", "a", "c6b-agent", "x9"].map(couldBeHandle)).toEqual([
-      true,
-      true,
-      true,
-      true,
-    ]);
-    expect(
-      ["agt_18DF4CK3Z1R69K8R5MFP7J6GK0", "Tidy-Otter", "-otter", "otter-", "a--b", ""].map(
-        couldBeHandle,
-      ),
-    ).toEqual([false, false, false, false, false, false]);
   });
 });

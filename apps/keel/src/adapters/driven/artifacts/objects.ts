@@ -1,8 +1,9 @@
 import type { RepoRef } from "@keeltown/core/ports";
 import { MissingObject, normaliseMode, type ObjectReader } from "@keeltown/gitcore";
+import { type HandleReads, refreshingReads } from "./refreshing-handle.ts";
 
-/** gitcore's reader over one open repo handle: an object the repo lacks throws `MissingObject`. */
-export const objectsOf = (handle: ArtifactsRepo): ObjectReader => ({
+/** gitcore's reader over a repo handle's reads: an object the repo lacks throws `MissingObject`. */
+export const objectsOf = (handle: HandleReads): ObjectReader => ({
   readTree: async (oid) => {
     const entries = await handle.readTree(oid);
     if (entries === null) throw new MissingObject(oid);
@@ -28,7 +29,8 @@ export const objectsOf = (handle: ArtifactsRepo): ObjectReader => ({
 /**
  * Opens a repo for gitcore's object reads through its namespace's binding.
  * The handle stays open until disposed: `get()` caps at about 150 a second,
- * so one compose holds one handle per repo.
+ * so one compose holds one handle per repo, and a walk past one handle's
+ * reads goes on through a fresh one (`refreshingReads`).
  */
 export const ArtifactsObjects =
   (namespaces: Readonly<Record<string, Artifacts>>) =>
@@ -36,6 +38,6 @@ export const ArtifactsObjects =
     const binding = namespaces[repo.namespace];
     if (binding === undefined)
       throw new Error(`no Artifacts binding serves namespace ${repo.namespace}`);
-    const handle = await binding.get(repo.name);
-    return { ...objectsOf(handle), [Symbol.dispose]: () => handle[Symbol.dispose]() };
+    const reads = refreshingReads(await binding.get(repo.name), () => binding.get(repo.name));
+    return { ...objectsOf(reads), [Symbol.dispose]: () => reads[Symbol.dispose]() };
   };

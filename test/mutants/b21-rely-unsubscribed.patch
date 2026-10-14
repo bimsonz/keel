@@ -2,14 +2,14 @@
 # kills: b21.rely
 # why: rely adds the premise but never subscribes its subject, so the subject never relies it
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 4e4191d2..6b028abe 100644
+index e152f56e..5a30beeb 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1059,7 +1059,6 @@ export const rely: (
-         command.leaseId,
-       );
-       if (Result.isFailure(relied)) return Result.fail(relied.failure);
--      subscribeSubjects(tx, changeId, { premises: canonical([command.premise]) });
-       return Result.succeed(
-         withSurfaced(asTransition(relied.success), surfaced(tx, changeId, preflight)),
-       );
+@@ -1127,7 +1127,6 @@ export const rely: (
+             command.leaseId,
+           );
+           if (Result.isFailure(relied)) return Result.fail(relied.failure);
+-          subscribeSubjects(tx, changeId, { premises: canonical([command.premise]) });
+           return Result.succeed(
+             withSurfaced(asTransition(relied.success), surfaced(tx, changeId, preflight)),
+           );

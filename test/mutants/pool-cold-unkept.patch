@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.claim-once
+# why: A cold answer is not kept, so a redelivery after a refill takes a warm instance and runs the submission twice
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..2e75293d 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -89,7 +89,7 @@ export function claim(
+   return {
+     answer,
+     state: { warm: first === undefined ? pool.warm : rest },
+-    kept: { eventId, answer, forgetAt: now + CLAIM_MEMORY_MS },
++    kept: first === undefined ? undefined : { eventId, answer, forgetAt: now + CLAIM_MEMORY_MS },
+   };
+ }
+ 

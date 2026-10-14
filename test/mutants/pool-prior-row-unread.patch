@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.claims-kept
+# why: The object never reads a kept claim, so a redelivered event takes the next warm instance
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool.ts b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+index 59ed23c9..8eafd35b 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool.ts
+@@ -74,7 +74,7 @@ export class WorkflowPoolDO extends KeelObject implements WorkflowPoolRpc {
+     const now = Date.now();
+     const prior = this.ctx.storage.sql
+       .exec<{ answer: string }>(
+-        `SELECT answer FROM ${CLAIMS} WHERE event_id = ? AND forget_at > ?`,
++        `SELECT answer FROM ${CLAIMS} WHERE event_id = ? AND forget_at < ?`,
+         eventId,
+         now,
+       )

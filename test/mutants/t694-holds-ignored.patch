@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: A read at one of my subject's ancestors takes every change beneath that ancestor, not only those stating it, so the near read holds changes its promise does not name.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..ae227449 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -338,7 +338,7 @@ export function liveNear(store: Store, self: ChangeId, intent: Intent): LiveNear
+   for (const subject of lookups.around) read(LIVE_SUBJECT, `${subject}/`, "/");
+   for (const subject of lookups.holding)
+     for (const row of store.list(LIVE_SUBJECT, `${subject}/`))
+-      if (decodeSubjectRow(row.value).holds) found.push(...changesOf([row], "/"));
++      if (decodeSubjectRow(row.value)) found.push(...changesOf([row], "/"));
+   for (const prefix of lookups.footprints) {
+     if (prefix.length === 0) read(LIVE_FOOTPRINT, "", "|");
+     else {

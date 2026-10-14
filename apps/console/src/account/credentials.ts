@@ -1,30 +1,83 @@
-// A namespace's credentials and a project's Cloudflare account, in words: what the page says of each, and the
-// two things it fills in for an owner before they type. Nothing here reads, keeps or sends a token.
+// A namespace's credentials and a project's Cloudflare account, in words: what the page says of each, and how a
+// Connect through Cloudflare came back. Nothing here reads, keeps or sends a token.
 
 import type { Credential, DeployProvider, DeployTargetView } from "../contract/keel/index.ts";
 
-/** Cloudflare's page for making an API token, with the one permission Keel needs (Workers Scripts: Edit) chosen and the token named. */
-export const TOKEN_LINK =
-  "https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%5D&name=Keel%20deploys";
+/** Cloudflare's page of an account's API tokens, where an owner revokes the one Keel made for a project. */
+export const TOKENS_PAGE = "https://dash.cloudflare.com/?to=/:account/api-tokens";
+
+/** How a Connect through Cloudflare ended, as Keel's callback names it in `?cloudflare=` on the project's settings. */
+export const CONNECT_OUTCOMES = [
+  "connected",
+  "denied",
+  "expired",
+  "accounts",
+  "refused",
+  "unreachable",
+  "no-workers-dev",
+  "full",
+] as const;
+export type ConnectOutcome = (typeof CONNECT_OUTCOMES)[number];
+
+/** What the settings say of each outcome, and whether it is good news. */
+export const CONNECT_SAID: Readonly<
+  Record<ConnectOutcome, { readonly ok: boolean; readonly said: string }>
+> = {
+  connected: { ok: true, said: "Connected. Keel made its deploy token on the account you ticked." },
+  denied: { ok: false, said: "Cloudflare's consent was declined, so nothing was connected." },
+  expired: {
+    ok: false,
+    said: "That consent was for a Connect that has ended: it lasts ten minutes and is used once. Continue with Cloudflare again.",
+  },
+  accounts: {
+    ok: false,
+    said: "Tick exactly one account on Cloudflare's consent screen: a target deploys to one. Nothing was connected.",
+  },
+  refused: {
+    ok: false,
+    said: "Cloudflare refused Keel's request, so nothing was connected. Continue with Cloudflare again; if it is refused again, your role on the account may not let you make API tokens.",
+  },
+  unreachable: {
+    ok: false,
+    said: "Keel made its token, but it does not reach the account's Workers, so no target was set.",
+  },
+  "no-workers-dev": {
+    ok: false,
+    said: "The account has no workers.dev subdomain to serve previews from. Set one in Cloudflare's dashboard (Workers & Pages → your subdomain), then connect again: Keel's token is stored, so choose it below.",
+  },
+  full: {
+    ok: false,
+    said: "The project already has all the deploy targets it may. Remove one, then connect again.",
+  },
+};
+
+/** The step of a Connect Cloudflare refused, as Keel's callback names it in `?step=`, in words. */
+export const REFUSED_AT: Readonly<Record<string, string>> = {
+  exchange: "Cloudflare refused to exchange the consent for access",
+  accounts: "Cloudflare refused to say which account you ticked",
+  mint: "Cloudflare refused to let Keel make its token on the account",
+  unconfigured: "this instance has no OAuth client registered with Cloudflare",
+};
+
+/** Where a refused Connect stopped, in words, if the address names a step Keel's callback gives. */
+export function refusedAtIn(search: string): string | undefined {
+  const step = new URLSearchParams(search).get("step");
+  return step === null ? undefined : REFUSED_AT[step];
+}
+
+/** The outcome an address's query names, if it names one Keel's callback gives. */
+export function outcomeIn(search: string): ConnectOutcome | undefined {
+  const named = new URLSearchParams(search).get("cloudflare");
+  return CONNECT_OUTCOMES.find((outcome) => outcome === named);
+}
 
 /** What a target is called until its owner says otherwise: the name in Keel's own example of a project's deploy file. */
 export const FIRST_TARGET = "production";
-
-/** The longest label Keel keeps. */
-const LABEL_MOST = 64;
 
 /** A provider by its own name. */
 export const PROVIDER: Readonly<Record<DeployProvider, string>> = { cloudflare: "Cloudflare" };
 
 const day = (iso: string): string => iso.slice(0, 10);
-
-/**
- * The label a token pasted on a project's form is stored under until its owner changes it: the project's, for
- * its deploys, cut to the length Keel keeps and with no space at its end.
- */
-export function labelFor(project: string): string {
-  return `${project} deploys`.slice(0, LABEL_MOST).trim();
-}
 
 /** What a credential's row says beside its label: the provider, the day it was stored, and whether the reader did. */
 export function storedOf(credential: Credential, readerId: string): string {

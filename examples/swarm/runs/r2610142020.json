@@ -1,0 +1,193 @@
+{
+  "shape": "one",
+  "seed": 42,
+  "endedAt": "2026-10-14T20:51:02.126Z",
+  "timedOut": true,
+  "run": {
+    "id": "r2610142020",
+    "workers": 20,
+    "dispatched": 20,
+    "errors": [],
+    "modelCalls": 448,
+    "modelLimited": 0,
+    "shape": "one",
+    "seed": 42,
+    "project": "prj_NX568P6ZHATYS5XT5HS9GSWHYZ",
+    "startedAt": "2026-10-14T20:20:32.221Z",
+    "rampMs": 2500,
+    "stoppedAt": "2026-10-14T20:51:00.601Z"
+  },
+  "report": {
+    "workers": 20,
+    "declared": 9,
+    "landed": 8,
+    "bounces": 3,
+    "notLanded": 12,
+    "contentionDensity": 0.1111111111111111,
+    "reworkRate": 0.375,
+    "queueMs": {
+      "p50": 116650,
+      "p95": 379693
+    },
+    "modelCalls": 448,
+    "modelCallsPerLanding": 56,
+    "modelLimited": 0
+  },
+  "records": [
+    {
+      "outcome": "landed",
+      "index": 0,
+      "kind": "disjoint",
+      "changeId": "chg_01M4Y171VJN0EGYHSQJC14BWNR",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009315152,
+      "landedAt": 1792009362833
+    },
+    {
+      "outcome": "landed",
+      "index": 1,
+      "kind": "disjoint",
+      "changeId": "chg_01M4Y17WDFFSHCKHJV19TFDEWK",
+      "bounces": 1,
+      "neighbours": 0,
+      "submittedAt": 1792009488018,
+      "landedAt": 1792009742235
+    },
+    {
+      "outcome": "landed",
+      "index": 2,
+      "kind": "disjoint",
+      "changeId": "chg_01M4Y185XD2PRB7WEVW2KYQZ8B",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009363576,
+      "landedAt": 1792009436858
+    },
+    {
+      "outcome": "landed",
+      "index": 3,
+      "kind": "premise",
+      "changeId": "chg_01M4Y18S5ZEQNHAZQM3RFKEVRD",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009406731,
+      "landedAt": 1792009786424
+    },
+    {
+      "outcome": "landed",
+      "index": 4,
+      "kind": "premise",
+      "changeId": "chg_01M4Y197VTZ27RS3T8AEXFHDQ1",
+      "bounces": 0,
+      "neighbours": 1,
+      "submittedAt": 1792009384010,
+      "landedAt": 1792009500660
+    },
+    {
+      "outcome": "landed",
+      "index": 5,
+      "kind": "disjoint",
+      "changeId": "chg_01M4Y19JWW7DFJEBD1VWKQ2DEH",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009398090,
+      "landedAt": 1792009500795
+    },
+    {
+      "outcome": "landed",
+      "index": 6,
+      "kind": "shared",
+      "changeId": "chg_01M4Y1A0BH74A84EFWSJZ81NJE",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009410449,
+      "landedAt": 1792009617915
+    },
+    {
+      "outcome": "landed",
+      "index": 7,
+      "kind": "premise",
+      "changeId": "chg_01M4Y1AHGNWJXVWJPQN5892AFM",
+      "bounces": 0,
+      "neighbours": 0,
+      "submittedAt": 1792009428435,
+      "landedAt": 1792009680924
+    },
+    {
+      "outcome": "parked",
+      "index": 8,
+      "kind": "premise",
+      "changeId": "chg_01M4Y1BCTBR3K9CX1R6Q4Y4YJE",
+      "bounces": 2,
+      "neighbours": 0,
+      "submittedAt": 1792009943073
+    },
+    {
+      "outcome": "unfinished",
+      "index": 9,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 10,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 11,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 12,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 13,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 14,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 15,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 16,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 17,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 18,
+      "kind": "disjoint",
+      "bounces": 0
+    },
+    {
+      "outcome": "unfinished",
+      "index": 19,
+      "kind": "disjoint",
+      "bounces": 0
+    }
+  ]
+}

@@ -2,15 +2,15 @@
 # kills: b21.canonical
 # why: the Change preflights and subscribes the propositions as written, so an ordering written from its other event is compared, and its subject subscribed, under the wrong key
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index d0a560f..30c5228 100644
+index e152f56e..9192f7be 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -334,7 +334,7 @@ function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
+@@ -515,7 +515,7 @@ function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
   * preflighted, and its subjects subscribed, as it will be stored.
   */
  const canonical = (propositions: readonly Proposition[]): readonly Proposition[] =>
 -  propositions.map(canonicalProposition);
 +  propositions;
  
- /** The project's live changes, read once before a command's commit; none for a change that holds no workspace. */
- const liveOf = (projectId: ProjectId | undefined) =>
+ /** Nothing near, and nothing compared: what a change that holds no workspace reads. */
+ const NOTHING_NEAR: LiveNear = { changes: [], compared: { changes: 0, subjects: 0 } };

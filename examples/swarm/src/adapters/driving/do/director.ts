@@ -5,7 +5,7 @@ import { CEILINGS, NO_SLOTS, give, take, type Slots } from "../../../run/ceiling
 import { eventsIn, recordsFrom, type KeelEvent } from "../../../run/events.ts";
 import { summarise, type Report, type WorkerRecord } from "../../../run/report.ts";
 import { brief, planTasks } from "../../../run/tasks.ts";
-import type { Member } from "./keyring.ts";
+import type { Member, SettingsChange } from "./keyring.ts";
 
 /**
  * The two shapes a swarm takes: (a) "one" agent account running many runs
@@ -37,6 +37,8 @@ interface Run {
   readonly project: string;
   readonly startedAt: string;
   readonly rampMs: number;
+  /** Trunk's head as the run began: where its pairs' premises are anchored. */
+  readonly base?: string | undefined;
   readonly dispatched: number;
   readonly slots: Slots;
   readonly stoppedAt?: string;
@@ -120,6 +122,11 @@ export class Director extends DurableObject<Env> {
     return this.#keyring("one").ownProject(name);
   }
 
+  /** A project the one account owns: public, so a person can watch a run on Mission Control, and verified. */
+  async configure(project: string, change: SettingsChange): Promise<SettingsChange> {
+    return this.#keyring("one").configure(project, change);
+  }
+
   /** Starts a run of `workers` workers; one run at a time. */
   async start(options: {
     readonly shape: Shape;
@@ -138,6 +145,9 @@ export class Director extends DurableObject<Env> {
       throw new Error(
         `Only ${roster.many.length} accounts are signed up; the run needs ${options.workers}.`,
       );
+    const reader = options.shape === "one" ? "one" : roster.many[0]?.keyring;
+    const base =
+      reader === undefined ? undefined : await this.#keyring(reader).head(options.project);
     const now = new Date();
     const run: Run = {
       id: `r${now.toISOString().replace(/\D/g, "").slice(2, 12)}`,
@@ -147,6 +157,7 @@ export class Director extends DurableObject<Env> {
       project: options.project,
       startedAt: now.toISOString(),
       rampMs: options.rampMs ?? DEFAULT_RAMP_MS,
+      base,
       dispatched: 0,
       slots: NO_SLOTS,
       errors: [],
@@ -218,7 +229,11 @@ export class Director extends DurableObject<Env> {
       return [...events, ...(await read(answer.cursor, pages + 1))];
     };
     const events = await read(undefined, 1);
-    const records = recordsFrom(events, { dir: `test/swarm/${run.id}`, workers: run.workers });
+    const records = recordsFrom(events, {
+      dir: `test/swarm/${run.id}`,
+      workers: run.workers,
+      label: run.id,
+    });
     const { slots, ...rest } = run;
     return {
       run: { ...rest, modelCalls: slots.used, modelLimited: slots.limited },
@@ -291,7 +306,12 @@ export class Director extends DurableObject<Env> {
     const run = await this.#run();
     if (run === undefined || run.stoppedAt !== undefined || run.dispatched >= run.workers) return;
     const index = run.dispatched;
-    const task = planTasks({ seed: run.seed, count: run.workers, run: run.id })[index];
+    const task = planTasks({
+      seed: run.seed,
+      count: run.workers,
+      run: run.id,
+      base: run.base,
+    })[index];
     const keyring = run.shape === "one" ? "one" : roster.many[index]?.keyring;
     let errors = run.errors;
     if (task === undefined || keyring === undefined) {

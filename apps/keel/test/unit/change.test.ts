@@ -12,6 +12,7 @@ import {
   precheckStarted,
   escalationIdOf,
   reactToBatch,
+  RELY_READS,
   rely,
   revise,
   submissionStatus,
@@ -26,7 +27,14 @@ import {
   EventEnvelope,
   makeId,
 } from "@keeltown/core/kernel";
-import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
+import {
+  Clock,
+  CodeHost,
+  type Decisions,
+  EntityStore,
+  EventOutbox,
+  LiveChanges,
+} from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
@@ -204,7 +212,7 @@ describe("declare", () => {
   });
 
   it.effect(
-    "[b11.declare-release] releases a refused declare's grant as withdrawn, but never the workspace a live change holds",
+    "[b11.declare-release] releases a refused declare's grant as withdrawn, but never the workspace a live change holds, and an ended change asks for none",
     () => {
       const { layer, pool } = changeObject();
       return Effect.gen(function* () {
@@ -213,6 +221,14 @@ describe("declare", () => {
         expect(failureTag(again)).toContain("ChangeStateRefused");
         expect(pool.released.size).toBe(0);
 
+        // The pool no longer counts the change as the holder (as when the change ends while the
+        // grant is asked), so the refused declare is granted a workspace the change does not hold.
+        pool.granted.delete(declared.grant.workspaceId);
+        const unheld = yield* Effect.exit(declare(declaring({ idempotencyKey: "declare-3" })));
+        expect(failureTag(unheld)).toContain("ChangeStateRefused");
+        expect([...pool.released]).toEqual([[expect.any(String), "withdrawn"]]);
+        expect(pool.released.has(declared.grant.workspaceId)).toBe(false);
+
         yield* abandon(
           changeId,
           Schema.decodeUnknownSync(AbandonCommand)({
@@ -220,13 +236,10 @@ describe("declare", () => {
             idempotencyKey: "abandon-1",
           }),
         );
-        // The pool collects the withdrawn change's workspace by event; the direct release is for a refused declare.
-        pool.granted.delete(declared.grant.workspaceId);
-        const afterEnd = yield* Effect.exit(declare(declaring({ idempotencyKey: "declare-3" })));
-
+        const afterEnd = yield* Effect.exit(declare(declaring({ idempotencyKey: "declare-4" })));
         expect(failureTag(afterEnd)).toContain("ChangeStateRefused");
-        expect([...pool.released]).toEqual([[expect.any(String), "withdrawn"]]);
-        expect(pool.released.has(declared.grant.workspaceId)).toBe(false);
+        expect(pool.granted.size).toBe(0);
+        expect(pool.released.size).toBe(1);
       }).pipe(Effect.provide(layer));
     },
   );
@@ -670,6 +683,35 @@ describe("the change's batch, delivered", () => {
           verdictId: VERDICT,
           reasons: ["composition-refused: conflict src/a.ts"],
           nextActions: [remedy],
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b13.counterparts] bounces the change with what its verdict says it conflicts with on trunk",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const batchId = yield* batched;
+        const counterparts = [
+          { commitSha: "c".repeat(40), paths: ["src/a.ts"] },
+          {
+            changeId: "chg_01J9C000000000000000000091",
+            commitSha: "d".repeat(40),
+            paths: ["src/a.ts"],
+          },
+        ];
+        yield* receive(
+          verdictOn(batchId, ["composition-refused: conflict src/a.ts"], { counterparts }),
+        );
+        yield* receive(failed(batchId, changeId));
+
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+        expect((yield* lastEvent)?.payload).toMatchObject({
+          _tag: "ChangeBounced",
+          verdictId: VERDICT,
+          counterparts,
         });
       }).pipe(Effect.provide(layer));
     },
@@ -1442,6 +1484,79 @@ describe("the conflicts a change's batch keeps apart", () => {
           ),
         );
         expect(yield* unsettled).toEqual([]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+describe("a rely racing a revise", () => {
+  it.effect(
+    "[t694.rely-race] a rely whose change is revised while it reads what is near reads again for the intent it then leaves, and commits on that read",
+    () => {
+      const clock = makeManualClock();
+      const memory = makeLiveChangesMemory();
+      const asked: { readonly goal: string; readonly premises: number }[] = [];
+      /** Runs once, inside the first near read: what another request commits meanwhile. */
+      const meanwhile: { run: (() => void) | undefined } = { run: undefined };
+      const live = Layer.effect(
+        LiveChanges,
+        Effect.map(LiveChanges, (inner) =>
+          LiveChanges.of({
+            near: (projectId, self, intent) =>
+              Effect.suspend(() => {
+                asked.push({ goal: intent.goal, premises: intent.premises.length });
+                const run = meanwhile.run;
+                meanwhile.run = undefined;
+                run?.();
+                return inner.near(projectId, self, intent);
+              }),
+          }),
+        ),
+      ).pipe(Layer.provide(memory.layer));
+      const layer = Layer.mergeAll(
+        makeEventOutboxMemory().layer,
+        makeIdsMemory().layer,
+        clock.layer,
+        makeWorkspacePoolMemory({ baseSha: BASE }).layer,
+        makeCodeHostMemory().layer,
+        live,
+        makeDecisionsMemory().layer,
+      );
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        const leaseId = declared.change.lease.id;
+        const services = yield* Effect.context<
+          Clock | EntityStore | EventOutbox | LiveChanges | Decisions
+        >();
+        meanwhile.run = () =>
+          Effect.runSync(
+            revise(changeId, revising(leaseId, 1, "revise-meanwhile")).pipe(
+              Effect.provide(services),
+            ),
+          );
+        asked.length = 0;
+        const relied = yield* rely(
+          changeId,
+          Schema.decodeUnknownSync(RelyCommand)({
+            agentId,
+            leaseId,
+            premise: {
+              subject: "migrate",
+              predicate: "ordering",
+              relation: "before",
+              value: "deploy",
+            },
+            idempotencyKey: "rely-1",
+          }),
+        );
+        // The rely read first, the revise read for itself, then the rely read again for the revised intent.
+        expect(asked).toEqual([
+          { goal: "Cache permission lookups per request", premises: 1 },
+          { goal: "Revision after 1", premises: 0 },
+          { goal: "Revision after 1", premises: 1 },
+        ]);
+        expect(relied.change.intent).toMatchObject({ revision: 3, goal: "Revision after 1" });
+        expect(RELY_READS).toBeGreaterThan(1);
       }).pipe(Effect.provide(layer));
     },
   );

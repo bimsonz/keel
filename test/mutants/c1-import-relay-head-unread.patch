@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts -t "artifacts.import-relay]"
+# kills: artifacts.import-relay
+# why: an import that names no branch relays main whatever the upstream's HEAD names, so an upstream whose default branch is another is imported from the wrong one or not at all
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 39246f53..b1d6c0c9 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -116,7 +116,7 @@ async function relayImport(
+   const advertised = await advertisement(upstream).catch(() => {
+     throw new ImportRefused({ reason: "unreachable" });
+   });
+-  const ref = source.ref === undefined ? advertised.head : `${BRANCH}${source.ref}`;
++  const ref = `${BRANCH}${source.ref ?? "main"}`;
+   const to = ref === undefined ? undefined : advertised.refs.get(ref);
+   if (ref === undefined || to === undefined) throw new ImportRefused({ reason: "no-branch" });
+   const move = { ref, from: null, to };

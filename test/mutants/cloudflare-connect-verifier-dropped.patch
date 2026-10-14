@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.flow
+# why: the code is exchanged without its PKCE verifier, so a code taken from another consent is exchanged as well
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+index c592fffb..87c44813 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+@@ -179,7 +179,6 @@ export function CloudflareOAuthLive(options: CloudflareOAuthOptions): Layer.Laye
+                         grant_type: "authorization_code",
+                         code,
+                         redirect_uri: options.redirectUri,
+-                        code_verifier: verifier,
+                         client_id: options.clientId,
+                       }).toString(),
+                     },

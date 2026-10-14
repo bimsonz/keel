@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.config-missing-cited
+# why: Missing configuration is cited once for every step that found it, where it should be cited once
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 29c39072..b201f5a1 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -236,7 +236,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+     const configName = config === undefined ? undefined : `${config.missing}: ${config.remedy}`;
+     if (
+       configName !== undefined &&
+-      !failures.some((f) => f.kind === "config" && f.name === configName)
++      true
+     )
+       failures.push({ kind: "config", name: configName });
+     if (stored.value.deploy !== undefined)

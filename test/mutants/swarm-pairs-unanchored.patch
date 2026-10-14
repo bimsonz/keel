@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.pairs-conflict
+# why: A pair's premise is anchored nowhere: Keel cannot tie it to the code a change touches
+diff --git a/examples/swarm/src/run/pairs.ts b/examples/swarm/src/run/pairs.ts
+index 50d031ec..9d3864ac 100644
+--- a/examples/swarm/src/run/pairs.ts
++++ b/examples/swarm/src/run/pairs.ts
+@@ -61,7 +61,6 @@ function purity(run: string, base: string | undefined, target: Target, value: bo
+     relation: "is",
+     value,
+     anchors: [
+-      { path: target.module, symbol: target.fn, ...(base === undefined ? {} : { commit: base }) },
+     ],
+     gloss: value ? `${target.fn}() has no side effects` : `${target.fn}() may have side effects`,
+   };

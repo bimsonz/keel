@@ -1,4 +1,4 @@
-import type { ProjectNotFound } from "@keeltown/core/domain/integration";
+import { changeIdOf, type ProjectNotFound } from "@keeltown/core/domain/integration";
 import type {
   RepoBlobView,
   RepoCommitDiffView,
@@ -7,7 +7,7 @@ import type {
   RepoCommitPage,
   RepoTreeView,
 } from "@keeltown/core/application/integration";
-import { ChangeId, CommitSha } from "@keeltown/core/kernel";
+import { CommitSha } from "@keeltown/core/kernel";
 import type {
   CommitIdentity,
   CommitInfo,
@@ -36,18 +36,8 @@ type Issues = NonNullable<ProblemBody["issues"]>;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const decodeSha = Schema.decodeUnknownOption(CommitSha);
-const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
 const text = (bytes: Uint8Array | undefined) =>
   bytes === undefined ? null : new TextDecoder().decode(bytes);
-
-/**
- * The change a trunk commit landed: the composer writes it as the message's
- * `Change-Id` trailer. The last such line wins, as git's trailer parsing reads it.
- */
-function changeOf(message: string): ChangeId | undefined {
-  const ids = [...message.matchAll(/^Change-Id: (\S+)$/gm)].map((m) => m[1]);
-  return Option.getOrUndefined(decodeChangeId(ids.at(-1)));
-}
 
 /** A page's cursor: the commit the next page starts at, behind a prefix so it reads as opaque. */
 const CURSOR_PREFIX = "c.";
@@ -122,7 +112,7 @@ export function blobOk(view: RepoBlobView): Extract<Repo_getBlobResult, { readon
 const identity = (who: CommitIdentity) => ({ name: who.name, email: who.email, at: iso(who.at) });
 
 const wireCommit = (c: CommitInfo) => {
-  const changeId = changeOf(c.message);
+  const changeId = changeIdOf(c.message);
   return {
     sha: c.sha,
     parents: [...c.parents],

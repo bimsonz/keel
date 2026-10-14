@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.settings
+# why: The owner's settings call carries the project's old visibility: a project asked to be public stays private, and no one can watch the run
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index 59148d0b..3d669914 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -98,7 +98,6 @@ export class Keyring extends DurableObject<Env> {
+     const set = await client.putSettings(project, {
+       ...settings,
+       protectedPaths: [...settings.protectedPaths],
+-      ...(change.visibility === undefined ? {} : { visibility: change.visibility }),
+       ...(change.verification === undefined ? {} : { verification: change.verification }),
+     });
+     return { visibility: set.visibility, verification: set.verification };

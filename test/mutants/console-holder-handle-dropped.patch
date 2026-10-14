@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.agents
+# why: a change's holder is never given its handle, so it never leads to its own page
+diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
+index 17437678..b2b6e70a 100644
+--- a/apps/console/src/engine/holder.ts
++++ b/apps/console/src/engine/holder.ts
+@@ -25,7 +25,6 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
+ export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {
+   const handle = cards.get(change.agentId)?.handle;
+   return {
+-    ...(handle === undefined ? {} : { handle }),
+     ...(change.run === undefined
+       ? {}
+       : {

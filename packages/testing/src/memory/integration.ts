@@ -5,6 +5,8 @@ import {
   PromotionStateRefused,
   PushRejected,
   type TrunkOrigin,
+  NotFastForward,
+  NotImported,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
 import type { QuotaExceeded } from "@keeltown/core/domain/identity";
@@ -33,6 +35,9 @@ import {
   type TakenTrunk,
   TrunkWriter,
   Trunks,
+  type SyncRefused,
+  UpstreamUnreachable,
+  type UpstreamSynced,
   type InstanceStanding,
   type VerificationJob,
 } from "@keeltown/core/ports";
@@ -56,6 +61,8 @@ export function makeCandidateComposerMemory(
     readonly refuse?: readonly string[];
     readonly reason?: string;
     readonly detail?: string;
+    /** The paths the refusal names: none unless given. */
+    readonly paths?: readonly string[];
   } = {},
 ) {
   /** Every request composed or refused, in order: what a lane named for each member. */
@@ -72,7 +79,7 @@ export function makeCandidateComposerMemory(
             if (refused.length > 0)
               return yield* new CompositionRefused({
                 reason: options.reason ?? "overlap",
-                paths: [],
+                paths: [...(options.paths ?? [])],
                 ...(options.detail === undefined ? {} : { detail: options.detail }),
               });
             const commits: { changeId: ChangeId; sha: CommitSha }[] = [];
@@ -117,6 +124,10 @@ const overTheCap = (bytes: number) =>
     limit: RECEIVE_PACK_CAP_BYTES,
   });
 
+/** An upstream branch's key: its URL and its ref. */
+const upstreamKey = (upstream: { readonly url: string; readonly ref: string }) =>
+  `${upstream.url} ${upstream.ref}`;
+
 /** The commit a memory TrunkWriter answers as an empty trunk's first, whatever the name and the time. */
 export const MEMORY_SEED = Schema.decodeUnknownSync(CommitSha)("5eed".repeat(10));
 
@@ -138,6 +149,21 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
   const weighed: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   const targets = new Map<string, CommitSha>();
   const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
+  /** Each commit's parents, as trunk holds them: its first head has none, and what a sync fetched joins it. */
+  const graph = new Map<CommitSha, readonly CommitSha[]>([[initial, []]]);
+  const upstreams = new Map<
+    string,
+    {
+      readonly head: CommitSha | undefined;
+      readonly commits: ReadonlyMap<CommitSha, readonly CommitSha[]>;
+      readonly bytes: number;
+    }
+  >();
+  const unreachable = new Set<string>();
+  let side: CommitSha | undefined;
+  let busyFor = 0;
+  const fetched: { readonly to: CommitSha; readonly haves: readonly CommitSha[] }[] = [];
+  const fastForwards: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   return {
     head: () => current,
     /** Every commit trunk's main was made at with `adopt`, in order. */
@@ -178,6 +204,42 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     },
     /** Every pack weighed apart with `packBytes`, in order: a push weighs its own and is not here. */
     weighed: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...weighed],
+    /**
+     * The upstream at `url` holds branch `ref` at `head` (none: the branch is
+     * gone), with `commits` (each with its parents) past what trunk holds, in
+     * a pack of `bytes` (an empty pack's 32 when not said): what
+     * `upstreamHead` reads and `fetchUpstream` brings into trunk.
+     */
+    offersUpstream: (
+      upstream: { readonly url: string; readonly ref: string },
+      head: CommitSha | undefined,
+      commits: readonly { readonly sha: CommitSha; readonly parents: readonly CommitSha[] }[],
+      bytes: number = EMPTY_PACK_BYTES,
+    ) => {
+      upstreams.set(upstreamKey(upstream), {
+        head,
+        commits: new Map(commits.map((c) => [c.sha, c.parents])),
+        bytes,
+      });
+    },
+    /** The upstream at `url` answers nothing Keel can read. */
+    unreachable: (upstream: { readonly url: string; readonly ref: string }) => {
+      unreachable.add(upstreamKey(upstream));
+    },
+    /** What trunk's side ref holds: what a sync fetched and has not yet moved main to or dropped. */
+    side: () => side,
+    /** Every fetch from upstream, in order. */
+    fetched: (): readonly { readonly to: CommitSha; readonly haves: readonly CommitSha[] }[] => [
+      ...fetched,
+    ],
+    /** Every fast-forward that moved main, in order. */
+    fastForwards: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [
+      ...fastForwards,
+    ],
+    /** The next `n` fast-forwards stay busy and move nothing. */
+    busy: (n: number) => {
+      busyFor = n;
+    },
     /** Every commit whose whole history was weighed with `historyBytes`, in order. */
     historiesWeighed: (): readonly CommitSha[] => [...historiesWeighed],
     /** Trunk's whole history at `at` weighs `bytes`, which is what `historyBytes` answers for it (an empty pack's 32 otherwise). */
@@ -235,6 +297,50 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
               ? Effect.fail(overTheCap(bytes))
               : Effect.succeed(bytes);
           }),
+        upstreamHead: (upstream) =>
+          Effect.suspend(() =>
+            unreachable.has(upstreamKey(upstream))
+              ? Effect.fail(new UpstreamUnreachable({ ...upstream, reason: "unreachable" }))
+              : Effect.succeed(upstreams.get(upstreamKey(upstream))?.head),
+          ),
+        fetchUpstream: (upstream, to, haves) =>
+          Effect.suspend((): Effect.Effect<number, PackTooLarge | UpstreamUnreachable> => {
+            const offered = upstreams.get(upstreamKey(upstream));
+            if (unreachable.has(upstreamKey(upstream)) || offered === undefined)
+              return Effect.fail(new UpstreamUnreachable({ ...upstream, reason: "unreachable" }));
+            if (offered.bytes > RECEIVE_PACK_CAP_BYTES)
+              return Effect.fail(overTheCap(offered.bytes));
+            for (const [commit, parents] of offered.commits) graph.set(commit, parents);
+            fetched.push({ to, haves });
+            side = to;
+            return Effect.succeed(offered.bytes);
+          }),
+        descends: (from, to, stopAt) =>
+          Effect.sync(() => {
+            const seen = new Set<CommitSha>();
+            const frontier = [to];
+            for (let next = frontier.pop(); next !== undefined; next = frontier.pop()) {
+              if (next === from) return true;
+              if (seen.has(next) || stopAt.includes(next)) continue;
+              seen.add(next);
+              frontier.push(...(graph.get(next) ?? []));
+            }
+            return false;
+          }),
+        fastForward: (from, to) =>
+          Effect.suspend((): Effect.Effect<void, PushRejected> => {
+            if (busyFor > 0) {
+              busyFor -= 1;
+              return Effect.fail(new PushRejected({ reason: "busy" }));
+            }
+            if (from !== current) return Effect.fail(new PushRejected({ reason: "stale" }));
+            fastForwards.push({ from, to });
+            current = to;
+            return Effect.void;
+          }),
+        dropUpstream: Effect.sync(() => {
+          side = undefined;
+        }),
         sync: (repos) =>
           Effect.sync(() => {
             const outcomes = repos.map((repo): SyncOutcome => {
@@ -323,6 +429,12 @@ export function makeTrunksMemory(
   const taken = new Map<ProjectId, ProjectId>();
   const overCap = new Set<ProjectId>();
   const syncs = new Map<ProjectId, number>();
+  const upstreamHeads = new Map<
+    ProjectId,
+    { readonly head: CommitSha; readonly forward: boolean }
+  >();
+  const syncedUp: { readonly projectId: ProjectId; readonly by: string; readonly to: CommitSha }[] =
+    [];
   const destroyed = new Map<ProjectId, string>();
   const standings = new Map<
     ProjectId,
@@ -361,6 +473,15 @@ export function makeTrunksMemory(
       overCap.add(source);
     },
     syncs,
+    /**
+     * An imported trunk's upstream is at `head`, which descends from trunk's
+     * head unless `forward` is false: what `syncUpstream` moves trunk to.
+     */
+    offersUpstream: (projectId: ProjectId, head: CommitSha, forward = true) => {
+      upstreamHeads.set(projectId, { head, forward });
+    },
+    /** Every sync from upstream that moved a trunk, in order. */
+    syncedUp: () => [...syncedUp],
     destroyed,
     layer: Layer.succeed(
       Trunks,
@@ -440,6 +561,30 @@ export function makeTrunksMemory(
             return head === undefined || standing === undefined
               ? Option.none()
               : Option.some({ head, ...standing });
+          }),
+        syncUpstream: (projectId, by) =>
+          Effect.suspend((): Effect.Effect<UpstreamSynced, SyncRefused> => {
+            const from = heads.get(projectId);
+            if (from === undefined) return Effect.die(new Error(`trunk ${projectId} has no head`));
+            const origin = origins.get(projectId);
+            if (origin?.kind !== "imported") return Effect.fail(new NotImported({ projectId }));
+            const upstream = upstreamHeads.get(projectId);
+            if (upstream === undefined)
+              return Effect.fail(
+                new UpstreamUnreachable({
+                  url: origin.url,
+                  ref: origin.ref,
+                  reason: "branch-gone",
+                }),
+              );
+            if (upstream.head === from) return Effect.succeed({ from, to: from, synced: false });
+            if (!upstream.forward)
+              return Effect.fail(
+                new NotFastForward({ projectId, trunk: from, upstream: upstream.head }),
+              );
+            heads.set(projectId, upstream.head);
+            syncedUp.push({ projectId, by, to: upstream.head });
+            return Effect.succeed({ from, to: upstream.head, synced: true });
           }),
         sync: (projectId) =>
           Effect.suspend(() => {

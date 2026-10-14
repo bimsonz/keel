@@ -5,7 +5,15 @@
 // from decoded metadata would not.
 
 import { concat, dec, ZERO_OID } from "./bytes.ts";
-import { FLUSH, type GitRemote, type PushOutcome, pkt, readPkts, receivePack } from "./push.ts";
+import {
+  authorizationOf,
+  FLUSH,
+  type GitRemote,
+  type PushOutcome,
+  pkt,
+  readPkts,
+  receivePack,
+} from "./push.ts";
 
 /** The most a relay sends in one receive-pack request: Artifacts caps a request at about 64 MiB (spike S3). */
 export const MAX_RELAY_PACK_BYTES = 60 * 1024 * 1024;
@@ -72,7 +80,7 @@ async function requestPack(
   const res = await f(`${remote.url}/git-upload-pack`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${remote.token}`,
+      ...authorizationOf(remote),
       "Content-Type": "application/x-git-upload-pack-request",
       Accept: "application/x-git-upload-pack-result",
     },

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.refill
+# why: Every claim starts instances up to the target, however many are left, where only a low pool should
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..452326c0 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -113,7 +113,6 @@ export function toStart(
+   target: number,
+ ): number {
+   const left = current(state, now).warm.length;
+-  if (trigger === "claim" && left >= POOL_LOW_WATER) return 0;
+   return Math.max(0, target - left);
+ }
+ 

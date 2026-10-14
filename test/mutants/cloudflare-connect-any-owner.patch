@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-connect.test.ts
+# kills: connect.owner
+# why: a Connect is held for the project, not for the owner who began it, so another person's callback with that state finishes it
+diff --git a/packages/core/src/application/delivery/deploy-targets.ts b/packages/core/src/application/delivery/deploy-targets.ts
+index a60180bb..f0e392b5 100644
+--- a/packages/core/src/application/delivery/deploy-targets.ts
++++ b/packages/core/src/application/delivery/deploy-targets.ts
+@@ -272,7 +272,7 @@ export const PENDING_CONNECTS = "cloudflare-connects";
+ 
+ const encodePending = Schema.encodeSync(PendingConnect);
+ const decodePending = Schema.decodeUnknownSync(PendingConnect);
+-const pendingKey = (projectId: ProjectId, by: UserId) => `${projectId}:${by}`;
++const pendingKey = (projectId: ProjectId, _by: UserId) => `${projectId}`;
+ 
+ /** Holds a Connect its owner begins on the project, in place of one they began before, lapsing by this object's clock. */
+ export const holdConnect: (

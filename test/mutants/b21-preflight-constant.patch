@@ -2,15 +2,15 @@
 # kills: b21.contradiction
 # why: preflight reports no neighbour and no contradiction whatever the project holds, as L1_PREFLIGHT did
 diff --git a/packages/core/src/application/coordination/preflight.ts b/packages/core/src/application/coordination/preflight.ts
-index 78827d7d..cbf4afbe 100644
+index 25a3f38d..6198f966 100644
 --- a/packages/core/src/application/coordination/preflight.ts
 +++ b/packages/core/src/application/coordination/preflight.ts
-@@ -30,7 +30,7 @@ export function preflightFor(
+@@ -31,7 +31,7 @@ export function preflightFor(
  ): PreflightFinding {
-   const found = exposure(self, intent, live);
+   const found = exposure(self, intent, near.changes);
    return {
--    preflight: preflight(self, intent, found, precedents),
-+    preflight: preflight(self, intent, { neighbours: [], contradictions: [] }, precedents),
+-    preflight: { ...preflight(self, intent, found, precedents), compared: near.compared },
++    preflight: { ...preflight(self, intent, { neighbours: [], contradictions: [] }, precedents), compared: near.compared },
      unreadable: found.unreadable.length,
    };
  }

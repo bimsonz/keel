@@ -23,7 +23,7 @@ import {
   DecisionLink,
   EscalationLink,
   HolderLink,
-  RunLink,
+  HeldRun,
   Said,
   SubjectLink,
 } from "./links.tsx";
@@ -457,7 +457,7 @@ export function Change({
                 harness={state.agent.harness}
               />
             </HolderLink>
-            <RunLink held={state.held} className="a-link-quiet" />
+            <HeldRun held={state.held} className="a-link-quiet" />
             <span>
               declared{" "}
               <time className="a-num text-kumo-default">{dateTime(change.declaredAt)}</time>

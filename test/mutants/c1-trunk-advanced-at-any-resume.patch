@@ -2,11 +2,11 @@
 # kills: trunk.advanced-at
 # why: every resume that names a head moves the time, so releasing a freeze at the head trunk already has reads as trunk having moved
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5cfb16f7..0e819970 100644
+index a14057d8..7794763e 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -613,7 +613,7 @@ export const evolvePromotion = (
-             ...without(trunk, "wal", "frozen"),
+@@ -700,7 +700,7 @@ export const evolvePromotion = (
+             ...without(trunk, "wal", "frozen", "sync"),
              head: event.head ?? trunk.head,
              // A resume at another head changed trunk's head, whoever wrote that commit.
 -            ...(event.head === undefined || event.head === trunk.head

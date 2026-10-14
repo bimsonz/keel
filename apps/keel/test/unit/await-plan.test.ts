@@ -37,15 +37,17 @@ const declared = declare({
   fingerprint: "declare-1",
 });
 
-const layers = Layer.mergeAll(
-  makeEventOutboxMemory().layer,
-  makeIdsMemory().layer,
-  makeManualClock().layer,
-  makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
-  makeCodeHostMemory().layer,
-  makeLiveChangesMemory().layer,
-  makeDecisionsMemory().layer,
-);
+/** Fresh in-memory adapters for each case, so no case reads the change another left behind. */
+const layers = () =>
+  Layer.mergeAll(
+    makeEventOutboxMemory().layer,
+    makeIdsMemory().layer,
+    makeManualClock().layer,
+    makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
+    makeCodeHostMemory().layer,
+    makeLiveChangesMemory().layer,
+    makeDecisionsMemory().layer,
+  );
 
 /** Rewrites the stored change as it would stand in `state`, holding `planHash` or none, and answers it as read back. */
 const standing = (state: ChangeState, planHash: ContentHash | undefined) =>
@@ -110,7 +112,7 @@ describe("[b21.await-plan-one-transaction] the read and the subscribe are one tr
         expect(answer).toEqual({ waiting: true });
         expect(seen.read).toBeGreaterThan(0);
         expect(seen.subscribed).toBe(seen.read);
-      }).pipe(Effect.provide(layers)),
+      }).pipe(Effect.provide(layers())),
   );
 });
 
@@ -138,7 +140,7 @@ describe("[b21.await-plan-agrees] the Change DO and KeelWorldCheck read a plan b
         expect(n).toBe(ChangeState.literals.length * 2);
         // A resubmitted change still holds its earlier plan's hash: both states wait with and without one.
         expect(pending).toEqual(["submitted", "submitted", "deriving", "deriving"]);
-      }).pipe(Effect.provide(layers)),
+      }).pipe(Effect.provide(layers())),
   );
 });
 
@@ -175,7 +177,7 @@ describe("[b21.await-plan] a waiter on a change's plan is told by what ends its 
           DriftDetected: false,
           ConflictNoted: false,
         });
-      }).pipe(Effect.provide(layers)),
+      }).pipe(Effect.provide(layers())),
   );
 
   it.effect("[b21.await-plan] an unknown change is ChangeNotFound, and subscribes nothing", () =>
@@ -189,6 +191,6 @@ describe("[b21.await-plan] a waiter on a change's plan is told by what ends its 
         affected: [],
       });
       expect(told).not.toContain(unknown);
-    }).pipe(Effect.provide(layers)),
+    }).pipe(Effect.provide(layers())),
   );
 });

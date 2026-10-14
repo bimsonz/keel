@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/oauth-client.test.ts
+# kills: deploy.oauth-optional
+# why: a deploy refuses again when Terraform has no OAuth client, so an optional integration of the instance blocks deploying it
+diff --git a/scripts/lib/oauth-client.ts b/scripts/lib/oauth-client.ts
+index 940339ce..411b1218 100644
+--- a/scripts/lib/oauth-client.ts
++++ b/scripts/lib/oauth-client.ts
+@@ -37,7 +37,9 @@ export function oauthClientAtDeploy(
+   const vars = isObject(config) ? config["vars"] : undefined;
+   if (!isObject(vars) || !(CLIENT_ID_VAR in vars)) return { kind: "none" };
+   const clientId = outputs.get(CLIENT_ID_OUTPUT);
+-  if (clientId !== undefined && clientId !== "") return { kind: "registered", clientId };
++  if (clientId === undefined || clientId === "")
++    throw new Error(`Terraform output ${CLIENT_ID_OUTPUT} is missing; refusing to deploy`);
++  return { kind: "registered", clientId };
+   const secrets = isObject(config) ? config["secrets_store_secrets"] : undefined;
+   const index = Array.isArray(secrets)
+     ? secrets.findIndex((secret) => isObject(secret) && secret["binding"] === CLIENT_SECRET_BINDING)

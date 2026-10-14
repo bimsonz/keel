@@ -271,10 +271,20 @@ describe("judging a typecheck", () => {
     );
   });
 
-  it("[typecheck.no-tsconfig] abstains with no tsconfig.json, naming why", () => {
+  it("[typecheck.no-tsconfig] fails with no tsconfig.json, as missing configuration with what to add, never as infra", () => {
     const j = judge({ _tag: "no-tsconfig" }, undefined);
-    expect(j.report).toMatchObject({ outcome: "abstain", failure: "schema" });
-    expect(j.evidence.why).toBe("no tsconfig.json at the candidate's root");
+    expect(j.report.outcome).toBe("fail");
+    expect(j.report).not.toHaveProperty("failure");
+    expect(j.evidence).toMatchObject({
+      outcome: "fail",
+      why: "no tsconfig.json at the candidate's root",
+      errors: [],
+      config: {
+        missing: "tsconfig.json",
+        remedy:
+          "the typecheck step runs the project's own tsc --noEmit with the tsconfig.json at the repository's root, and there is none: add one that includes the Worker's sources, and commit it",
+      },
+    });
   });
 
   it("abstains on every infra stop, and on output that did not decode", () => {

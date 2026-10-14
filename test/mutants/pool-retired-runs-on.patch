@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "warm pool"
+# kills: workflow-pool.pool.retired
+# why: A warm instance whose wait ran out goes on as if a claim had come, and fails on no input
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index 947eacd7..a898be69 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -102,7 +102,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+     step: WorkflowStep,
+   ): Promise<PrecheckOutcome> {
+     const input = await claimedInput(event, step);
+-    if (input._tag === "Retired") return { outcome: "retired" };
+     const params = Schema.decodeUnknownOption(PrecheckParams)(input.payload);
+     if (Option.isNone(params)) throw new NonRetryableError("not a ChangeSubmitted payload");
+     const submission: PrecheckSubmission = {

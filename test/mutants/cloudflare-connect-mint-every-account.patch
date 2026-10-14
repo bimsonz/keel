@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/cloudflare-connect.test.ts
+# kills: connect.pool.flow
+# why: the minted token may edit Workers on every account the owner can reach, not just the one they ticked
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+index c592fffb..a84347ee 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-oauth.ts
+@@ -240,7 +240,7 @@ export function CloudflareOAuthLive(options: CloudflareOAuthOptions): Layer.Laye
+                   policies: [
+                     {
+                       effect: "allow",
+-                      resources: { [`com.cloudflare.api.account.${accountId}`]: "*" },
++                      resources: { "com.cloudflare.api.account.*": "*" },
+                       permission_groups: [{ id: group.id }],
+                     },
+                   ],

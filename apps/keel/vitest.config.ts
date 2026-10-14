@@ -76,12 +76,17 @@ export default defineProject({
         miniflare: {
           bindings: {
             KEEL_ENV: "test",
+            // No warm Precheck instances: a submission's Precheck starts cold, one instance per
+            // submission. The warm pool's own cases hand it the instances they start.
+            PRECHECK_WARM_TARGET: "0",
             KEEL_SIGNING_KEY: await testSigningKey(),
             BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
             BUNDLE_URL_SIGNING_KEY: (await makeBundleUrlKeys()).signingKey,
             KEEL_COMMIT_SIGNING_KEY: commitSigning.signingKey,
             KEEL_COMMIT_SIGNERS: commitSigning.signers,
             TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
+            // A registered OAuth client, so an owner can connect a Cloudflare account; Cloudflare is doubled.
+            CF_OAUTH_CLIENT_ID: "keel-test-client",
             // prove:red pins fast-check's seed; workerd sees it only as a binding.
             ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),
           },

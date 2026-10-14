@@ -66,4 +66,31 @@ describe("a run's records from Keel's events", () => {
     expect(idle.every((r) => r.changeId === undefined && r.outcome === "unfinished")).toBe(true);
     expect(records.some((r) => r.changeId === "c-elsewhere")).toBe(false);
   });
+
+  it("[swarm.records-label] counts a change on the fixture's own code as the run's when one of the run's workers declared it", () => {
+    const labelled = (s: number, changeId: string, label: string) =>
+      event(s, "IntentDeclared", {
+        changeId,
+        footprint: [{ path: "src/domain/names.ts", op: "edit" }],
+        premises: [],
+        run: { id: "run_1", label },
+      });
+    const events = [
+      labelled(0, "c-ours", "r1-3"),
+      labelled(1, "c-theirs", "r10-3"),
+      labelled(2, "c-unlabelled", ""),
+      event(5, "ChangeLanded", { changeId: "c-ours" }),
+    ];
+    const records = recordsFrom(events, { dir: "test/swarm/r1", workers: 5, label: "r1" });
+    // Numbered by the worker its label names, the workers that never declared among them.
+    expect(
+      records.map(({ index, changeId, kind, outcome }) => ({ index, changeId, kind, outcome })),
+    ).toEqual([
+      { index: 0, changeId: undefined, kind: "disjoint", outcome: "unfinished" },
+      { index: 1, changeId: undefined, kind: "disjoint", outcome: "unfinished" },
+      { index: 2, changeId: undefined, kind: "disjoint", outcome: "unfinished" },
+      { index: 3, changeId: "c-ours", kind: "pair", outcome: "landed" },
+      { index: 4, changeId: undefined, kind: "disjoint", outcome: "unfinished" },
+    ]);
+  });
 });

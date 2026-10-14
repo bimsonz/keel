@@ -2,14 +2,14 @@
 # kills: b13.delivered
 # why: the change keeps a verdict's evidence but not its remedy, so a delivered bounce carries the machine's generic fix and submit instead of KeelVerify's
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index b876f15..68854d1 100644
+index e9b89c32..ecded41b 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -885,7 +885,6 @@ const commandFor = (
+@@ -2145,7 +2145,6 @@ const commandFor = (
          asStored(
            encodeBatchVerdict({
              evidence,
 -            ...(nextActions === undefined ? {} : { nextActions }),
+             ...(counterparts === undefined ? {} : { counterparts }),
            }),
          ),
-       );

@@ -2,6 +2,7 @@ import { Context, type Effect, Schema } from "effect";
 import type { PushRejected, UnexpectedHead } from "../../domain/integration/index.ts";
 import type { CommitSha, Instant } from "../../domain/kernel/index.ts";
 import type { RepoNotFound, RepoRef } from "./code-host.ts";
+import type { UpstreamUnreachable } from "./trunks.ts";
 
 /**
  * A relayed pack over the code host's receive-pack cap (about 64 MiB per
@@ -113,5 +114,48 @@ export class TrunkWriter extends Context.Service<
       { readonly head: CommitSha; readonly outcomes: readonly SyncOutcome[] },
       RepoNotFound | PackTooLarge
     >;
+    /**
+     * The head of `upstream`'s branch `ref`, as its own advertisement names
+     * it, asked with no credential: none when the branch is gone. An upstream
+     * that answers nothing Keel can read is UpstreamUnreachable.
+     */
+    readonly upstreamHead: (upstream: {
+      readonly url: string;
+      readonly ref: string;
+    }) => Effect.Effect<CommitSha | undefined, UpstreamUnreachable>;
+    /**
+     * Brings into trunk what `to` reaches in `upstream` past `haves`, under
+     * trunk's side ref `refs/keel/upstream` and never its main, so an
+     * ancestry walk can read it there. Answers the pack's length, as `push`
+     * weighs one for `admit`: the repo grows by that less the pack's header
+     * and trailer. A pack over the receive-pack cap is PackTooLarge with
+     * nothing sent. Idempotent: the side ref is set to `to` whatever it held.
+     */
+    readonly fetchUpstream: (
+      upstream: { readonly url: string; readonly ref: string },
+      to: CommitSha,
+      haves: readonly CommitSha[],
+    ) => Effect.Effect<number, PackTooLarge | UpstreamUnreachable>;
+    /**
+     * Moves trunk's main `from → to` in one push, `from` sent as the explicit
+     * old value: `to` must already be in trunk (`fetchUpstream`), so no
+     * object is sent, and the side ref is left for `dropUpstream`. PushRejected:
+     * trunk no longer held `from` (`stale`) or stayed busy (`busy`), and
+     * nothing moved. The caller reads the head back to learn the outcome.
+     */
+    readonly fastForward: (from: CommitSha, to: CommitSha) => Effect.Effect<void, PushRejected>;
+    /**
+     * Whether `to` descends from `from` (or is it) in trunk's repo, as `git
+     * merge-base --is-ancestor` answers, reading what `fetchUpstream` brought
+     * in. The walk does not go past `stopAt`, and it fails closed: one that
+     * would read more commits than a walk may answers false.
+     */
+    readonly descends: (
+      from: CommitSha,
+      to: CommitSha,
+      stopAt: readonly CommitSha[],
+    ) => Effect.Effect<boolean>;
+    /** Deletes trunk's side ref, as a sync that moved nothing leaves it. Idempotent. */
+    readonly dropUpstream: Effect.Effect<void>;
   }
 >()("keel/TrunkWriter") {}

@@ -8,6 +8,7 @@ import { type Names, namesIn } from "../engine/lists.ts";
 import { type Reference, piecesOf, referencesIn } from "../engine/references.ts";
 import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { ChangeTab, ConflictTab } from "../route.ts";
+import { hrefOf } from "../places.ts";
 import { Link } from "../router.tsx";
 
 const NamesContext = createContext<Names | null>(null);
@@ -141,25 +142,29 @@ function Referred({ to }: { to: Reference }) {
   );
 }
 
-/** The agent that holds a change: its page in this project. */
+/**
+ * The agent that holds a change: its own page, at its handle, as a code host links an author to their profile.
+ * The name alone where Keel's card gives it no handle. Its page is above every project: a plain link, which loads it.
+ */
 export function HolderLink({ held, children, ...rest }: { held: HeldUnder } & Anchor) {
+  if (held.handle === undefined) return <span {...rest}>{children}</span>;
   return (
-    <Link to={{ at: "agent", name: held.agent }} {...rest}>
+    <a href={hrefOf({ at: "namespace", handle: held.handle })} {...rest}>
       {children}
-    </Link>
+    </a>
   );
 }
 
 /**
- * The run a change is held under: its place on its agent's page. The label is the agent's own word for the
- * run, so it is quoted. Nothing where the holder's token named no run.
+ * The run a change is held under. The label is the agent's own word for the run, so it is quoted. Nothing where
+ * the holder's token named no run.
  */
-export function RunLink({ held, ...rest }: { held: HeldUnder } & Omit<Anchor, "children">) {
+export function HeldRun({ held, ...rest }: { held: HeldUnder } & Omit<Anchor, "children">) {
   if (held.run === undefined) return null;
   return (
-    <Link to={{ at: "agent", name: held.agent }} section={held.run.anchor} {...rest}>
+    <span {...rest}>
       {held.run.label === undefined ? "in a run it gave no name" : `in its run “${held.run.label}”`}
-    </Link>
+    </span>
   );
 }
 

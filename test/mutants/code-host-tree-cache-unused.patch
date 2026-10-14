@@ -2,13 +2,13 @@
 # kills: code-host.tree-cache-reuses
 # why: A layer built to keep trees reads every tree again on every walk
 diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-index 7b42f7eb..9c3671ab 100644
+index fbf38653..e8fbabe1 100644
 --- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-@@ -286,7 +286,7 @@ export function CodeHostArtifacts(
+@@ -352,7 +352,7 @@ export function CodeHostArtifacts(
      const kept = options.trees === undefined ? undefined : treeCache(options.trees);
      /** The handle's tree reads, through this layer's cache when it keeps one. */
-     const treesOf = (repo: RepoRef, handle: ArtifactsRepo): TreeReader =>
+     const treesOf = (repo: RepoRef, handle: HandleReads): TreeReader =>
 -      kept === undefined ? objectsOf(handle) : kept(repo, objectsOf(handle));
 +      objectsOf(handle);
      return CodeHost.of({

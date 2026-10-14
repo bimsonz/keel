@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.config-missing-cited
+# why: The bounce's remedy does not name the missing configuration for the agent to add
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 29c39072..9beb3dec 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -134,7 +134,6 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
+       ...(types.length === 0 ? {} : { typeErrors: types }),
+       ...(guards.length === 0 ? {} : { failingGuards: guards }),
+       ...(deps.length === 0 ? {} : { depsRefused: deps }),
+-      ...(configs.length === 0 ? {} : { missingConfig: configs }),
+       ...(deploys.length === 0 ? {} : { failingDeployChecks: deploys }),
+     },
+   };

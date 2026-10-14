@@ -203,11 +203,6 @@ export interface KeelCommands {
 export interface KeelAgents {
   /** Null where Keel knows no agent by that id. */
   findAgent(agentId: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
-  /**
-   * The card of the agent whose handle this is. An agent's handle is its own namespace, so Keel is asked whose
-   * the handle is, and then for that agent's card. Null where the handle is nobody's, or is not an agent's.
-   */
-  findAgentAt?(handle: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
 }
 
 /** Keel refused something, and said why. `next` is the ways forward it gave, each by its title. */
@@ -253,11 +248,6 @@ export interface KeelOrgAgents {
 export interface KeelCredentials {
   /** The namespace's credentials, oldest first, by label and id: `GET /v1/namespaces/{handle}/credentials`. */
   listCredentials(handle: string, signal?: AbortSignal): Promise<Keel.Credential[]>;
-  /** Stores a token. The token rides in the body of this one call and in nothing else; Keel answers the record. */
-  storeCredential(
-    handle: string,
-    stored: { label: string; provider: Keel.DeployProvider; secret: string },
-  ): Promise<Keel.Credential>;
   /** Deletes a credential: its token is gone for good, even where a deploy target still names it. */
   removeCredential(handle: string, credentialId: string): Promise<void>;
 }
@@ -271,6 +261,11 @@ export interface KeelDeployTargets {
   listTargets(signal?: AbortSignal): Promise<Keel.DeployTargetView[]>;
   /** Sets the target of that name, new or in place of the one there. Keel reaches the account before it sets it. */
   putTarget(name: string, target: Keel.PutDeployTargetRequest): Promise<Keel.DeployTargetView>;
+  /**
+   * Begins connecting a Cloudflare account to the target of that name: Cloudflare's consent screen, to send the
+   * owner to. Keel finishes it when Cloudflare sends them back, and sets the target.
+   */
+  beginConnect(name: string): Promise<string>;
   /** Clears the target of that name. */
   clearTarget(name: string): Promise<void>;
 }

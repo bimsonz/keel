@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.near-retire
+# why: An instance minutes from its end is handed out, and retires before its claim's event reaches it
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..4b9cfdee 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -63,7 +63,7 @@ export interface PoolState {
+ 
+ export const EMPTY_POOL: PoolState = { warm: [] };
+ 
+-const usable = (instance: WarmInstance, now: number) => instance.retiresAt - RETIRE_MARGIN_MS > now;
++const usable = (instance: WarmInstance, now: number) => instance.retiresAt > now;
+ 
+ /** The pool as it can be handed out at `now`: instances near their end dropped (they retire on their own). */
+ export const current = (state: PoolState, now: number): PoolState => ({

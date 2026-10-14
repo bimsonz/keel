@@ -1,9 +1,18 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { credentialOf, labelFor, storedOf } from "../../../src/account/credentials.ts";
-import type { NamespaceRef } from "../../../src/contract/keel/index.ts";
+import {
+  CONNECT_OUTCOMES,
+  CONNECT_SAID,
+  credentialOf,
+  outcomeIn,
+  storedOf,
+} from "../../../src/account/credentials.ts";
+import type { Credential, NamespaceRef } from "../../../src/contract/keel/index.ts";
 import { createHttpCredentials, createHttpSource } from "../../../src/source/http.ts";
 import { KeelRefused } from "../../../src/source/types.ts";
 import {
+  CONSENT_ACCOUNT,
+  CONSENT_URL,
   type Reached,
   SESSION_COOKIE,
   TARGETS_MOST,
@@ -26,6 +35,7 @@ function keel(
     namespace?: NamespaceRef;
     visibility?: "private" | "public";
     cloudflare?: (asked: { secret: string; accountId: string }) => Reached;
+    oauthClient?: boolean;
   } = {},
 ) {
   const fake = createFakeKeel({
@@ -34,6 +44,7 @@ function keel(
     sessions: { ada: "owner", max: "maintainer", eve: "stranger" },
     now: () => Date.parse("2026-10-14T01:30:00.000Z"),
     ...(over.cloudflare === undefined ? {} : { cloudflare: over.cloudflare }),
+    ...(over.oauthClient === undefined ? {} : { oauthClient: over.oauthClient }),
   });
   const fromThePage: Request[] = [];
   const options = (who?: Person, origin = ORIGIN) => ({
@@ -53,6 +64,44 @@ function keel(
     createHttpSource(fake.project, options(who, origin)).targets;
   return { fake, fromThePage, credentials, targets, handle: fake.project.namespace.handle };
 }
+
+/**
+ * A credential stored as Keel's API stores one, by the namespace's owner: the console has no way to, since Keel
+ * makes the tokens it deploys with when an owner connects an account.
+ */
+async function seeded(
+  k: ReturnType<typeof keel>,
+  handle: string,
+  stored: { label: string; provider: "cloudflare"; secret: string },
+): Promise<Credential> {
+  const response = await k.fake.fetch(
+    new Request(`${ORIGIN}/v1/namespaces/${handle}/credentials`, {
+      method: "POST",
+      headers: {
+        cookie: `${SESSION_COOKIE}=ada`,
+        origin: ORIGIN,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(stored),
+    }),
+  );
+  expect(response.status).toBe(201);
+  const made: Credential = await response.json();
+  return made;
+}
+
+/** Strings in order, for comparing two lists as sets. */
+const order = (a: string, b: string) => a.localeCompare(b);
+
+/** Cloudflare's consent, played: the owner ticks the one account, and the consent sends them to Keel's callback. */
+const consented = async (k: ReturnType<typeof keel>, consent: string, who: Person = "ada") => {
+  const state = new URL(consent).searchParams.get("state") ?? "";
+  return k.fake.fetch(
+    new Request(`${ORIGIN}/v1/cloudflare/callback?code=the-code&state=${state}`, {
+      headers: { cookie: `${SESSION_COOKIE}=${who}` },
+    }),
+  );
+};
 
 /** A refusal in full: Keel's sentence and the ways forward it gave under it, as a page shows them. */
 const worded = (error: unknown): unknown =>
@@ -74,73 +123,44 @@ const NOT_AN_OWNER = {
   said: "Refused: role.",
   next: ["Ask an owner: this needs that role"],
 };
-const STORE_ANOTHER =
-  "Store a Cloudflare API token that may edit Workers on the account, then set the target with it";
+const CONNECT_AGAIN = "Connect the account again through Cloudflare, which makes Keel a new token";
 
 describe("a namespace's credentials", () => {
-  it("[credentials.calls] sends the token in the body of the one call that stores it and in nothing else, and adds nothing of the page's to any call", async () => {
+  it("[credentials.calls] reads and removes by the namespace's handle, sends no token, and adds nothing of the page's to any call", async () => {
     const k = keel();
-    const made = await k.credentials("ada").storeCredential("ada", {
-      label: "  ada deploys ",
-      provider: "cloudflare",
-      secret: ` ${TOKEN}\n`,
-    });
-    await k.credentials("ada").listCredentials("ada");
-    await k.credentials("ada").removeCredential("ada", made.id);
-    const [store, list, remove] = k.fromThePage;
-    expect(store?.method).toBe("POST");
-    expect(new URL(store?.url ?? "").pathname).toBe("/v1/namespaces/ada/credentials");
-    // The token and the label go as pasted, less the space around them, which neither has.
-    expect(await store?.json()).toEqual({
+    const made = await seeded(k, "ada", {
       label: "ada deploys",
       provider: "cloudflare",
       secret: TOKEN,
     });
+    expect(await k.credentials("ada").listCredentials("ada")).toEqual([made]);
+    await k.credentials("ada").removeCredential("ada", made.id);
+    const [list, remove] = k.fromThePage;
     expect(`${list?.method} ${list?.url}`).toBe(`GET ${ORIGIN}/v1/namespaces/ada/credentials`);
     expect(`${remove?.method} ${remove?.url}`).toBe(
       `DELETE ${ORIGIN}/v1/namespaces/ada/credentials/${made.id}`,
     );
     for (const sent of k.fromThePage) {
       expect(sent.url).not.toContain(TOKEN);
-      expect([...sent.headers.keys()].filter((name) => name !== "content-type")).toEqual([]);
+      expect([...sent.headers.keys()]).toEqual([]);
+      expect(await sent.text()).toBe("");
     }
-    for (const sent of [list, remove]) expect(await sent?.text()).not.toContain(TOKEN);
   });
 
-  it("[credentials.no-secret] answers the record of a stored token and never the token, then or after", async () => {
-    const k = keel();
-    const made = await k
-      .credentials("ada")
-      .storeCredential("ada", { label: "ada deploys", provider: "cloudflare", secret: TOKEN });
-    expect(made).toEqual({
-      id: expect.stringMatching(/^crd_[0-9A-HJKMNP-TV-Z]{26}$/),
-      label: "ada deploys",
-      provider: "cloudflare",
-      createdAt: "2026-10-14T01:30:00.000Z",
-      createdBy: "ada",
-    });
-    expect(await k.credentials("ada").listCredentials("ada")).toEqual([made]);
-    expect(JSON.stringify(await k.credentials("ada").listCredentials("ada"))).not.toContain(TOKEN);
-  });
-
-  it("[credentials.owner] are read, stored and removed by the namespace's owner alone, and refused to anyone else in Keel's words", async () => {
+  it("[credentials.owner] are read and removed by the namespace's owner alone, and refused to anyone else in Keel's words", async () => {
     const own = keel();
     const refusedTo = async (who: Person | undefined, handle: string) => [
       await own.credentials(who).listCredentials(handle).catch(worded),
-      await own
-        .credentials(who)
-        .storeCredential(handle, { label: "x", provider: "cloudflare", secret: TOKEN })
-        .catch(worded),
       await own
         .credentials(who)
         .removeCredential(handle, "crd_00000000000000000000000000")
         .catch(worded),
     ];
     // A person's own namespace has nobody else to ask.
-    expect(await refusedTo("eve", "ada")).toEqual([NOT_THE_OWNER, NOT_THE_OWNER, NOT_THE_OWNER]);
+    expect(await refusedTo("eve", "ada")).toEqual([NOT_THE_OWNER, NOT_THE_OWNER]);
     // Someone signed in to nothing is asked to be.
     expect(await refusedTo(undefined, "ada")).toEqual(
-      Array.from({ length: 3 }, () => expect.objectContaining({ code: "auth.required" })),
+      Array.from({ length: 2 }, () => expect.objectContaining({ code: "auth.required" })),
     );
     // A handle that is nobody's is not there.
     expect(await own.credentials("ada").listCredentials("nobody").catch(worded)).toMatchObject({
@@ -155,7 +175,7 @@ describe("a namespace's credentials", () => {
     expect(
       await org
         .credentials("max")
-        .storeCredential("acme", { label: "x", provider: "cloudflare", secret: TOKEN })
+        .removeCredential("acme", "crd_00000000000000000000000000")
         .catch(worded),
     ).toEqual(NOT_AN_OWNER);
     expect(await org.credentials("ada").listCredentials("acme")).toEqual([]);
@@ -163,26 +183,27 @@ describe("a namespace's credentials", () => {
 
   it("[credentials.cross-site] takes no move another site's page sent", async () => {
     const k = keel();
+    const made = await seeded(k, "ada", { label: "x", provider: "cloudflare", secret: TOKEN });
     expect(
       await k
         .credentials("ada", "https://elsewhere.example")
-        .storeCredential("ada", { label: "x", provider: "cloudflare", secret: TOKEN })
+        .removeCredential("ada", made.id)
         .catch(worded),
     ).toMatchObject({ status: 403, code: "auth.cross_site" });
-    expect(await k.credentials("ada").listCredentials("ada")).toEqual([]);
+    expect(await k.credentials("ada").listCredentials("ada")).toEqual([made]);
   });
 
   it("[credentials.removed] deletes a credential a target still names, which keeps its id and names nothing stored", async () => {
     const k = keel();
-    const made = await k
-      .credentials("ada")
-      .storeCredential("ada", { label: "ada deploys", provider: "cloudflare", secret: TOKEN });
+    const made = await seeded(k, "ada", {
+      label: "ada deploys",
+      provider: "cloudflare",
+      secret: TOKEN,
+    });
     const target = await k
       .targets("ada")
       .putTarget("production", { provider: "cloudflare", accountId: ACCOUNT, credential: made.id });
-    const other = await k
-      .credentials("ada")
-      .storeCredential("ada", { label: "spare", provider: "cloudflare", secret: TOKEN });
+    const other = await seeded(k, "ada", { label: "spare", provider: "cloudflare", secret: TOKEN });
     expect(credentialOf(target, [other, made])).toEqual(made);
     await k.credentials("ada").removeCredential("ada", made.id);
     const left = await k.credentials("ada").listCredentials("ada");
@@ -201,9 +222,7 @@ describe("a namespace's credentials", () => {
 
 /** Ada's credential, stored in the namespace of the project. */
 const storedBy = async (k: ReturnType<typeof keel>, secret = TOKEN) =>
-  k
-    .credentials("ada")
-    .storeCredential(k.handle, { label: "ada deploys", provider: "cloudflare", secret });
+  seeded(k, k.handle, { label: "ada deploys", provider: "cloudflare", secret });
 
 describe("a project's deploy targets", () => {
   it("[targets.calls] sets a target with the credential's id and never its token, the name and the account sent less the space around them", async () => {
@@ -287,7 +306,7 @@ describe("a project's deploy targets", () => {
       status: 409,
       code: "deploy_target.refused",
       said: "Deploy target production names a credential this project's namespace does not hold. A target uses only a credential of its own project's namespace.",
-      next: ["Read the namespace's credentials", STORE_ANOTHER],
+      next: ["Read the namespace's credentials", CONNECT_AGAIN],
     });
     expect(asked).toEqual([]);
     const revoked = await storedBy(k, "revoked");
@@ -295,14 +314,14 @@ describe("a project's deploy targets", () => {
       status: 422,
       code: "deploy_target.unreachable",
       said: "Cloudflare refused the credential's token (Cloudflare error 1000): it is invalid, expired or revoked. Nothing was set.",
-      next: [STORE_ANOTHER],
+      next: [CONNECT_AGAIN],
     });
     const good = await storedBy(k);
     expect(await put("production", good.id, "f".repeat(32))).toEqual({
       status: 422,
       code: "deploy_target.unreachable",
       said: "The credential's token does not reach the account's Workers: check the account id, and that the token may edit Workers on that account. Nothing was set.",
-      next: [STORE_ANOTHER],
+      next: [CONNECT_AGAIN],
     });
     const bare = await storedBy(k, "no-subdomain");
     expect(await put("production", bare.id)).toMatchObject({
@@ -356,12 +375,76 @@ describe("a project's deploy targets", () => {
   });
 });
 
+describe("connecting a Cloudflare account", () => {
+  it("[targets.connect] begins with the target's name alone and sends the owner to Cloudflare's consent, whose callback sets the target with a token Keel made", async () => {
+    const k = keel();
+    const consent = await k.targets("ada").beginConnect(" production ");
+    const [begun] = k.fromThePage;
+    expect(`${begun?.method} ${begun?.url}`).toBe(
+      `POST ${ORIGIN}/v1/projects/${k.fake.project.id}/deploy-targets/production/cloudflare-connect`,
+    );
+    expect(await begun?.text()).toBe("");
+    expect(consent.startsWith(`${CONSENT_URL}?`)).toBe(true);
+    const back = await consented(k, consent);
+    expect([back.status, back.headers.get("location")]).toEqual([
+      303,
+      `/${k.handle}/${k.fake.project.name}/settings?cloudflare=connected`,
+    ]);
+    const [made] = await k.credentials("ada").listCredentials(k.handle);
+    expect(made?.label).toBe(`Keel deploys: ${k.handle}/${k.fake.project.name}`);
+    expect(await k.targets("ada").listTargets()).toEqual([
+      {
+        name: "production",
+        provider: "cloudflare",
+        accountId: CONSENT_ACCOUNT,
+        credential: made?.id,
+        workersDev: "keel-previews.workers.dev",
+      },
+    ]);
+    // The same consent again finishes nothing.
+    expect((await consented(k, consent)).headers.get("location")).toMatch(/cloudflare=expired$/);
+  });
+
+  it("[targets.connect-owner] is begun by the namespace's owner alone, from Keel's own page", async () => {
+    const k = keel();
+    expect(await k.targets("eve").beginConnect("production").catch(worded)).toEqual(NOT_THE_OWNER);
+    expect(
+      await k.targets("ada", "https://elsewhere.example").beginConnect("production").catch(worded),
+    ).toMatchObject({ status: 403, code: "auth.cross_site" });
+    const org = keel({ namespace: { handle: "acme", kind: "org" } });
+    expect(await org.targets("max").beginConnect("production").catch(worded)).toEqual(NOT_AN_OWNER);
+  });
+
+  it("[connect.unset] on an instance with no OAuth client, beginning says so in Keel's words, as a refusal the page knows", async () => {
+    const k = keel({ oauthClient: false });
+    expect(await k.targets("ada").beginConnect("production").catch(worded)).toMatchObject({
+      status: 503,
+      code: "cloudflare.not_configured",
+    });
+    expect(await k.targets("ada").listTargets()).toEqual([]);
+  });
+
+  it("[connect.outcomes] reads the outcome Keel's callback names, says each, and knows exactly the ones Keel's API publishes", () => {
+    expect(outcomeIn("?cloudflare=connected")).toBe("connected");
+    expect(outcomeIn("?tab=x&cloudflare=no-workers-dev")).toBe("no-workers-dev");
+    expect(outcomeIn("?cloudflare=whatever")).toBe(undefined);
+    expect(outcomeIn("")).toBe(undefined);
+    expect(CONNECT_OUTCOMES.filter((outcome) => CONNECT_SAID[outcome].ok)).toEqual(["connected"]);
+    const document = JSON.parse(
+      readFileSync(
+        new URL("../../../../../packages/contracts/openapi.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const header = document.paths["/cloudflare/callback"].get.responses["303"].headers;
+    const named = String(header["keel-cloudflare-outcome"].schema.$ref).split("/").at(-1) ?? "";
+    const published: string[] = document.components.schemas[named].enum;
+    expect(published.toSorted(order)).toEqual([...CONNECT_OUTCOMES].toSorted(order));
+  });
+});
+
 describe("what the pages say of a credential", () => {
-  it("[credentials.words] labels a pasted token for its project, cut to Keel's length with no space at its end, and says who stored one", () => {
-    expect(labelFor("forge-lite")).toBe("forge-lite deploys");
-    // Cut at Keel's sixty-four, the label would end in a space.
-    expect(labelFor("a".repeat(63))).toBe("a".repeat(63));
-    expect(labelFor("a".repeat(80))).toBe("a".repeat(64));
+  it("[credentials.words] says who stored a credential, and when", () => {
     const credential = {
       id: "crd_00000000000000000000000000",
       label: "x",

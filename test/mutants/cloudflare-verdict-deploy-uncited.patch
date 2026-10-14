@@ -2,13 +2,13 @@
 # kills: verify.deploy-cited
 # why: a change bounced by its build, preview or smoke check is told nothing about which deploy check failed or why
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index 50d29581..4373cae7 100644
+index 29c39072..871a5350 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -225,8 +225,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
-     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
-     if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
-       failures.push({ kind: "deps", name: depsName });
+@@ -239,8 +239,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+       !failures.some((f) => f.kind === "config" && f.name === configName)
+     )
+       failures.push({ kind: "config", name: configName });
 -    if (stored.value.deploy !== undefined)
 -      failures.push({ kind: "deploy", name: `${r.stepId}: ${stored.value.deploy.failure}` });
      if (stored.value.guard !== undefined) {

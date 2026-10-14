@@ -106,6 +106,17 @@ model EventNextAction {
   args?: Record<unknown>;
 }
 
+/** A trunk commit landed since a bounced change's base that changed a path its composition conflicted on. */
+model EventCounterpart {
+  /** The change Keel landed as the commit, from its `Change-Id` trailer. Absent for a commit Keel did not land (an import, a seed). */
+  changeId?: ChangeId;
+
+  commitSha: CommitSha;
+
+  /** The conflicting paths the commit changed. */
+  paths: string[];
+}
+
 union EntityKind {
   agent: "agent",
   session: "session",
@@ -192,6 +203,15 @@ model EventPrecedentBasis {
 union EventMoveBasis {
   contradiction: EventContradictionBasis,
   precedent: EventPrecedentBasis,
+}
+
+/** What a preflight compared: the live changes it read, near the intent, and the subject keys it looked up. */
+model EventPreflightCompared {
+  @minValue(0)
+  changes: integer;
+
+  @minValue(0)
+  subjects: integer;
 }
 
 model EventPrecedentRef {
@@ -306,6 +326,9 @@ model PreflightIssued {
 
   /** The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none. */
   alternatives?: ChangeId[];
+
+  /** How many live changes the preflight read, near the intent, and under how many subject keys. Absent on older events. */
+  compared?: EventPreflightCompared;
 }
 
 model IntentRevised {
@@ -488,6 +511,9 @@ model ChangeBounced {
 
   /** Always set, never empty; optional only so events committed before it was added still decode. */
   nextActions?: EventNextAction[];
+
+  /** What the change conflicts with on trunk, from its verdict, when it bounced on a textual conflict. */
+  counterparts?: EventCounterpart[];
 }
 
 /** A conflict proven against the change under `advise` or `annotate`: recorded on the change, which stays where it is. Annotate notifies no one. */
@@ -1118,6 +1144,9 @@ model VerdictIssued {
 
   /** The remedy, named by the issuer; the Change DO copies it onto ChangeBounced. */
   nextActions?: EventNextAction[];
+
+  /** The trunk commits since the change's base that changed a path a refused composition conflicted on, newest first; the Change DO copies them onto ChangeBounced. */
+  counterparts?: EventCounterpart[];
 }
 
 /** One answer a person can give, with what choosing it does. A ruling names it by `id`. */
@@ -1458,6 +1487,40 @@ model TrunkInitialized {
 
   /** Where that head came from; absent on a trunk initialized before origins were kept. */
   origin?: TrunkOrigin;
+}
+
+/** The upstream an imported trunk syncs from: the URL and branch its import took. */
+model SyncUpstream {
+  @minLength(1)
+  url: string;
+
+  /** The upstream branch, by its full ref name. */
+  @minLength(1)
+  ref: string;
+}
+
+/** An owner asked for trunk's main to move from `from` to `to`, its upstream branch's head, which descends from it: written before the move, resolved by one `TrunkSynced` or `PromotionFrozen`. */
+model TrunkSyncStarted {
+  _tag: "TrunkSyncStarted";
+  projectId: ProjectId;
+  from: CommitSha;
+  to: CommitSha;
+  by: string;
+  upstream: SyncUpstream;
+}
+
+/** Trunk's main moved forward to its upstream branch's head, each upstream commit kept as upstream made it. No change landed, so none is named. */
+model TrunkSynced {
+  _tag: "TrunkSynced";
+  projectId: ProjectId;
+  from: CommitSha;
+  to: CommitSha;
+  by: string;
+  upstream: SyncUpstream;
+
+  /** Trunk's height after the sync, counted as an advance is. */
+  @minValue(1)
+  height?: integer;
 }
 
 /** The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose. */
@@ -1862,6 +1925,8 @@ union KeelEvent {
   PromotionStarted,
   PromotionComposed,
   AuditCompleted,
+  TrunkSyncStarted,
+  TrunkSynced,
   ProjectCreated,
   ProjectDeleted,
   ProjectSettingsChanged,

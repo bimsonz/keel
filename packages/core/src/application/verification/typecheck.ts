@@ -144,7 +144,13 @@ export interface TypecheckEvidence extends RunnerEvidence {
   readonly errorCount?: number;
   /** tsc printed more than the runner kept, so there may be more errors than `errorCount`. */
   readonly truncated?: boolean;
+  /** The configuration the step needs and the candidate does not have, with what to do about it. */
+  readonly config?: { readonly missing: string; readonly remedy: string };
 }
+
+/** What a worker app with no tsconfig.json at its root is told to do: the bounce cites it. */
+export const TSCONFIG_REMEDY =
+  "the typecheck step runs the project's own tsc --noEmit with the tsconfig.json at the repository's root, and there is none: add one that includes the Worker's sources, and commit it";
 
 export type TypecheckJudgement = RunnerJudgement<TypecheckEvidence>;
 
@@ -152,10 +158,13 @@ export type TypecheckJudgement = RunnerJudgement<TypecheckEvidence>;
  * Judges one typecheck run. Only a run that hydrated, found a tsconfig and
  * agrees with itself decides:
  * - `pass` needs exit 0 and no line of output that reports an error;
- * - `fail` needs a non-zero exit and at least one error read, each cited;
- * - everything else abstains: an infra failure, no tsconfig.json, output that
- *   did not decode, or an exit code the output contradicts (a crash, a usage
- *   error, errors in a shape tsc does not print with `--pretty false`).
+ * - `fail` needs a non-zero exit and at least one error read, each cited, or
+ *   a candidate with no tsconfig.json at its root: that fails as missing
+ *   configuration (`config`, with what to add), never as an infra failure, so
+ *   the change bounces at once rather than parking on every round;
+ * - everything else abstains: an infra failure, output that did not decode,
+ *   or an exit code the output contradicts (a crash, a usage error, errors in
+ *   a shape tsc does not print with `--pretty false`).
  *
  * The doorway decodes what the runner encoded: `output` is tsc's output as
  * text (undefined when it printed none, or it would not decode), `diagnosis`
@@ -200,7 +209,17 @@ const judgeRun = (
     evidence: { stepId: step.id, outcome: "abstain", why, errors: [], tail },
   });
   if (output._tag === "no-tsconfig")
-    return abstain("schema", "no tsconfig.json at the candidate's root");
+    return {
+      report: { ...base, outcome: "fail", durationMs: 0 },
+      evidence: {
+        stepId: step.id,
+        outcome: "fail",
+        why: "no tsconfig.json at the candidate's root",
+        errors: [],
+        tail: "",
+        config: { missing: "tsconfig.json", remedy: TSCONFIG_REMEDY },
+      },
+    };
   if (output._tag !== "ran") {
     const { failure, why } = stopped(output);
     return abstain(failure, why);

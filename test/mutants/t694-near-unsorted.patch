@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: t694.near-equals-all
+# why: The near read answers in lookup order, not change id order, so its neighbours and contradictions come in another order than a read of every live change gives.
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 50c23c55..21d5b5bf 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -152,7 +152,7 @@ function ensureKeys(store: Store): void {
+ 
+ /** The live changes of these ids, in change id order, as the whole index lists them; an id with no row is left out. */
+ function liveRows(store: Store, ids: Iterable<string>): readonly LiveChange[] {
+-  return [...new Set(ids)].toSorted().flatMap((id) => {
++  return [...new Set(ids)].flatMap((id) => {
+     const stored = store.get(LIVE_CHANGE, id);
+     return stored === undefined ? [] : [decodeRow(stored)];
+   });

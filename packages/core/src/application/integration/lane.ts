@@ -17,6 +17,7 @@ import {
   type CandidateCommand,
   CandidateNotFound,
   type CandidateRejection,
+  changeIdOf,
   type CompositionRefused,
   decideCandidate,
   evolveCandidate,
@@ -27,6 +28,7 @@ import {
   ResultFenced,
   runsAlone,
   TrunkAdvanced,
+  TrunkSynced,
   VerificationStarted,
 } from "../../domain/integration/index.ts";
 import {
@@ -35,6 +37,7 @@ import {
   ChangeId,
   CommitSha,
   ContentHash,
+  type Counterpart,
   type EntityRef,
   type EventEnvelope,
   type Instant,
@@ -345,6 +348,7 @@ const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
 const decodeParked = Schema.decodeUnknownSync(ChangeParked);
 const decodeResumed = Schema.decodeUnknownSync(ChangeResumed);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
+const decodeSynced = Schema.decodeUnknownSync(TrunkSynced);
 const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
 const decodeStarted = Schema.decodeUnknownSync(VerificationStarted);
 const decodeEnded = Schema.decodeUnknownSync(
@@ -359,7 +363,8 @@ const decodeEnded = Schema.decodeUnknownSync(
  * rejoins at the front when it is resumed, a change withdrawn,
  * superseded or bounced while queued leaves the queue (one in the batch in
  * flight finishes its batch),
- * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
+ * TrunkAdvanced is noted for staging to follow and names trunk's head (as is
+ * TrunkSynced, an advance no change made), and a
  * PromotionDeclined of the batch in flight marks it to be invalidated. State
  * only: the step commits the events. A destroyed lane hears nothing. True
  * when the lane changed.
@@ -438,6 +443,16 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
                 },
               ],
               trunkHead: advanced.to,
+            };
+      }
+      case "TrunkSynced": {
+        const synced = decodeSynced(event.payload);
+        return synced.projectId !== lane.projectId
+          ? undefined
+          : {
+              ...lane,
+              advances: [...lane.advances, { from: synced.from, to: synced.to, members: [] }],
+              trunkHead: synced.to,
             };
       }
       case "PromotionDeclined": {
@@ -834,6 +849,86 @@ const refusalEvidence = (refused: CompositionRefused) =>
   `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd() +
   (refused.detail === undefined ? "" : `: ${refused.detail}`);
 
+/** How many trunk commits a textual bounce reads back for what it conflicts with, before it says it stopped short. */
+export const COUNTERPART_WALK = 64;
+
+/** The conflicting paths a textual bounce asks `why` about, at most. */
+const WHY_PATHS = 3;
+
+/** What a textual bounce conflicts with on trunk, newest first, and how many commits the walk read when it stopped short of the change's base. */
+interface Counterparts {
+  readonly found: readonly Counterpart[];
+  readonly cut?: number;
+}
+
+/**
+ * The trunk commits in (the change's base, the batch's base] that changed a
+ * conflicting path, newest first: trunk's first-parent chain, each commit
+ * diffed against its parent, read back to the base or COUNTERPART_WALK
+ * commits. Only a batch of one bounces on a textual conflict (a bigger one
+ * runs each member alone next), so the other side is always trunk.
+ */
+const counterpartsOf = Effect.fn("integration/counterpartsOf")(function* (
+  staging: RepoRef,
+  head: CommitSha,
+  base: CommitSha,
+  paths: readonly string[],
+) {
+  const host = yield* CodeHost;
+  const chain = yield* host.log(staging, head, COUNTERPART_WALK);
+  const reached = chain.findIndex((landed) => landed.sha === base);
+  const since = reached === -1 ? chain : chain.slice(0, reached);
+  const found = yield* Effect.forEach(since, (landed) => {
+    const [parent] = landed.parents;
+    if (parent === undefined) return Effect.succeed([]);
+    return host.diffTrees(staging, parent, landed.sha).pipe(
+      Effect.map((changed): Counterpart[] => {
+        const touched = new Set(changed.map((c) => c.path));
+        const hit = paths.filter((path) => touched.has(path));
+        if (hit.length === 0) return [];
+        const changeId = changeIdOf(landed.message);
+        return [
+          { ...(changeId === undefined ? {} : { changeId }), commitSha: landed.sha, paths: hit },
+        ];
+      }),
+    );
+  });
+  return {
+    found: found.flat(),
+    ...(reached === -1 ? { cut: since.length } : {}),
+  } satisfies Counterparts;
+});
+
+/** Each counterpart as evidence, and the walk's cut when it stopped short of the change's base. */
+const counterpartEvidence = ({ found, cut }: Counterparts, base: CommitSha): string[] => [
+  ...found.map(({ changeId, commitSha, paths }) =>
+    changeId === undefined
+      ? `conflicts with trunk commit ${commitSha.slice(0, 12)}, which Keel did not land, on ${paths.join(", ")}`
+      : `conflicts with ${changeId}, landed as ${commitSha.slice(0, 12)}, on ${paths.join(", ")}`,
+  ),
+  ...(cut === undefined
+    ? []
+    : [
+        `and more may conflict: Keel read ${cut} trunk commits back without reaching the change's base ${base.slice(0, 12)}`,
+      ]),
+];
+
+/** A `why` on each conflicting path, up to WHY_PATHS: what was decided there, naming the change that landed on it since the base when Keel knows one. */
+const whyActions = (
+  projectId: ProjectId,
+  paths: readonly string[],
+  { found }: Counterparts,
+): NextAction[] =>
+  paths.slice(0, WHY_PATHS).map((path) => {
+    const landed = found.find((c) => c.changeId !== undefined && c.paths.includes(path))?.changeId;
+    return {
+      kind: "read",
+      title: `Ask why ${path} is as it is: ${landed ?? "trunk"} changed it since your base`,
+      operationId: "why",
+      args: { project: projectId, path },
+    };
+  });
+
 /** A composition MergeBox refused for its own sake: held on the infrastructure, with what failed in the box. */
 const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
   holdOnInfra(
@@ -850,11 +945,30 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
   lane: Lane,
   batch: Batch,
   refused: CompositionRefused,
+  members: readonly CandidateMember[],
 ) {
   if (BOX_INFRA_REASONS.has(refused.reason)) {
     yield* holdForBox(lane, batch, refused);
     return;
   }
+  // A batch of one bounces on the paths: name what landed on them since the change's base.
+  const [sole] = members;
+  const read =
+    sole === undefined || members.length > 1 || refused.paths.length === 0
+      ? undefined
+      : yield* Effect.result(
+          counterpartsOf(
+            projectRepos(lane.projectId).staging,
+            batch.base,
+            sole.base,
+            refused.paths,
+          ),
+        );
+  if (read !== undefined && Result.isFailure(read))
+    yield* Effect.logWarning(
+      `lane ${lane.laneId}: no counterparts for ${batch.id}: ${read.failure._tag}`,
+    );
+  const counterparts = read !== undefined && Result.isSuccess(read) ? read.success : undefined;
   const verdictId = yield* (yield* Ids).next("vrd");
   yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => ({
     moves: [
@@ -866,7 +980,12 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
               verdictId,
               subject: batch.id,
               outcome: "bounce",
-              evidence: [refusalEvidence(refused)],
+              evidence: [
+                refusalEvidence(refused),
+                ...(counterparts === undefined || sole === undefined
+                  ? []
+                  : counterpartEvidence(counterparts, sole.base)),
+              ],
               // Trunk moved under the change: rebase puts trunk's head on the workspace's keel/trunk, and the agent merges it (never a force push).
               nextActions: [
                 remedy(
@@ -874,12 +993,16 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
                   "rebase",
                   `Rebase the change onto trunk's head (it was ${batch.base} at this bounce): Keel puts it on your workspace's keel/trunk branch`,
                 ),
+                ...(counterparts === undefined
+                  ? []
+                  : whyActions(lane.projectId, refused.paths, counterparts)),
                 remedy(
                   batch,
                   "submit",
                   `Then run git fetch origin keel/trunk && git merge FETCH_HEAD, resolve ${refused.paths.join(", ") || "the conflict"}, push, and submit again`,
                 ),
               ],
+              ...(counterparts === undefined ? {} : { counterparts: counterparts.found }),
             }),
             batch.members,
           ),
@@ -988,7 +1111,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
     }),
   );
   if (Result.isFailure(composed)) {
-    yield* refuseComposition(lane, batch, composed.failure);
+    yield* refuseComposition(lane, batch, composed.failure, members);
     return;
   }
   const candidate = composed.success;

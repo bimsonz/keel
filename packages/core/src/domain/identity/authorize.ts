@@ -174,6 +174,8 @@ export const SPEC_ACTIONS = {
   Agents_acceptProjectInvitation: rule("Self", "agent"),
   Agents_leaveProject: rule("Self", "agent"),
   Operator_putSettings: rule("Project", "maintain"),
+  // Moving trunk to commits Keel did not verify is its owners' call alone.
+  Operator_syncUpstream: rule("Project", "own"),
 
   // A namespace's credentials and a project's deploy targets are its owners' alone.
   Delivery_createCredential: rule("Namespace", "ownAsUser"),
@@ -182,6 +184,8 @@ export const SPEC_ACTIONS = {
   Delivery_putDeployTarget: rule("Project", "ownAsUser"),
   Delivery_listDeployTargets: rule("Project", "ownAsUser"),
   Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
+  Delivery_beginCloudflareConnect: rule("Project", "ownAsUser"),
+  Delivery_completeCloudflareConnect: rule("Project", "ownAsUser"),
 } as const satisfies Record<string, ActionRule>;
 
 /**

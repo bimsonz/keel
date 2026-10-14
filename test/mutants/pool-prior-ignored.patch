@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workflow-pool.test.ts
+# kills: workflow-pool.claim-again
+# why: A redelivered event takes a second warm instance instead of its first answer
+diff --git a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+index 0c12bb68..92c64fbd 100644
+--- a/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
++++ b/apps/keel/src/adapters/driving/do/workflow-pool-rules.ts
+@@ -83,7 +83,6 @@ export function claim(
+   now: number,
+ ): { readonly answer: string; readonly state: PoolState; readonly kept?: Claim } {
+   const pool = current(state, now);
+-  if (prior !== undefined) return { answer: prior, state: pool };
+   const [first, ...rest] = pool.warm;
+   const answer = first?.id ?? COLD;
+   return {

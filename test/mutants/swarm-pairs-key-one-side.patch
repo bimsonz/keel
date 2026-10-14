@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.pairs-key
+# why: The key names one worker for both sides of every pair: the scorer looks for a tie of a change with itself and finds none
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index b0da711d..74b3bbfa 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -282,7 +282,7 @@ export function keyOf(tasks: readonly Task[]): PairKey[] {
+     if (task.pair === undefined) continue;
+     const { pair, kind, planted, side } = task.pair;
+     const held = keys.get(pair) ?? { pair, kind, planted, a: -1, b: -1 };
+-    keys.set(pair, { ...held, [side]: task.index });
++    keys.set(pair, { ...held, a: task.index });
+   }
+   return [...keys.values()];
+ }
