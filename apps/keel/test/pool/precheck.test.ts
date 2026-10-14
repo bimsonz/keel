@@ -478,6 +478,8 @@ describe("Precheck", () => {
       revision: 1,
       effects: [effect],
       derivationRef: answer.derivationRef,
+      // The neighbour's anchored function is in the edited file: the subject hears the edit itself too.
+      touched: [{ subject: "authz.sessions", anchor: SESSION_OF }],
     });
     // The change named no subject: the plan holds the guard on `authz.sessions` through the derivation alone.
     const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
@@ -513,6 +515,7 @@ describe("Precheck", () => {
       readings: { base: read, head: read },
       effects: [effect],
       undecided: [],
+      touched: [{ subject: "authz.sessions", anchor: SESSION_OF }],
     });
 
     // The subjects heard the derivation from this change's outbox, and what they tell the neighbour's agent is theirs to flush.

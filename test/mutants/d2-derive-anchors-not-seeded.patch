@@ -2,10 +2,10 @@
 # kills: d21.derive.seeds
 # why: Only the touched paths are parsed, so a cache added in one file is never put on the subject whose anchored code, in another file, reads through it
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index 2a8dfe9..8a66efd 100644
+index 9403d38f..204a55e7 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -126,7 +126,7 @@ export const derivationSeeds = (
+@@ -133,7 +133,7 @@ export const derivationSeeds = (
    const at = anchors.filter((row) => pathsOf(row).some((p) => edited.has(p)));
    const focus = [...declared, ...at.map((row) => row.subject)];
    const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
@@ -13,4 +13,4 @@ index 2a8dfe9..8a66efd 100644
 +  return [...new Set(touched)].toSorted();
  };
  
- /**
+ const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);

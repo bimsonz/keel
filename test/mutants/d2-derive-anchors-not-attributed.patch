@@ -2,10 +2,10 @@
 # kills: d21.pool.derive-real
 # why: The derivation reads the project's live anchors and attributes against none of them, so a cache is never put on the subject whose anchored code reads through it: a session cache added under a neighbour's anchored function derives nothing, and that subject's guard is never compiled
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index 2a8dfe9..c30420d 100644
+index 9403d38f..2ec4c77e 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -187,7 +187,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+@@ -241,7 +241,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
        : deriveEffects({
            base: before.facts,
            head: after.facts,
@@ -13,4 +13,4 @@ index 2a8dfe9..c30420d 100644
 +          subjects: [],
            intent: workspace.intent,
          });
-   const derivationRef = yield* (yield* EvidenceStore).put(
+   const touchedHere = touchedAnchors(touched, workspace.intent.footprint, anchors);

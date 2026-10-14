@@ -821,6 +821,11 @@ describe("a premise anchored to code another change edits", () => {
     // A redelivery, and a later derivation that touches the same code, put nothing in doubt again.
     expect(suspicions(world.deliver([PRICE], touchingEnvelope(3, 2, touched)))).toEqual([]);
     expect(suspicions(world.deliver([PRICE], touchingEnvelope(3, 5, touched)))).toEqual([]);
+    // Nor does the premise retracted and relied on again: the pair was judged once.
+    world.deliver([PRICE], revisedEnvelope(1, 2, { retracted: [pure(PRICE_AT)] }));
+    expect(
+      suspicions(world.deliver([PRICE], revisedEnvelope(1, 3, { added: [pure(PRICE_AT)] }))),
+    ).toEqual([]);
   });
 
   it("[anchor.suspected] a premise relied on after the diff touched its code is put in doubt as it arrives; the touching change's own premise never is", () => {

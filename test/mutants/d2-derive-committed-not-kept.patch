@@ -2,15 +2,15 @@
 # kills: d21.derive.committed
 # why: The derived step commits an empty derivation whatever the kept record holds, so the change's effects never reach the subjects they alter and no conflict opens
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index ae2251d..e81407c 100644
+index 9403d38f..ba206f76 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -211,7 +211,7 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
+@@ -286,7 +286,7 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
    return yield* (yield* ChangePrecheck).derived(submission.changeId, {
      revision: submission.revision,
      instanceId: submission.instanceId,
 -    effects: record.success.effects,
 +    effects: [],
      derivationRef,
+     ...(record.success.touched === undefined ? {} : { touched: record.success.touched }),
    });
- });

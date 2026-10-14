@@ -2,14 +2,14 @@
 # kills: b21.fallout-derived
 # why: the change never subscribes the subjects its derived effects name, so a subject its intent never named does not hear the derivation
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index dbee8ba..8a3c806 100644
+index 7a0c6e31..8d39990e 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1242,7 +1242,6 @@ export const effectsDerived: (
-                 kind: "subject",
+@@ -1817,7 +1817,6 @@ export const effectsDerived: (
                  id: subjectIdOf(project, key),
                })),
--        alongside: (tx) => subscribeSubjects(tx, changeId, named),
-       },
-     );
-     return recorded.change;
+         alongside: (tx) => {
+-          subscribeSubjects(tx, changeId, named);
+           if (project !== undefined)
+             for (const key of touchedKeys)
+               tx.outbox.subscribe(subjectAddress(project, key), SUBJECT_HEARS, changeRef(changeId));
