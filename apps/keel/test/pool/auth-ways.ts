@@ -93,14 +93,21 @@ export async function signInByPasskey(device: Authenticator) {
 }
 
 /** `keeltown login`: a device grant the jar's session approves, then the code's own token. */
-export async function keeltownLogin(jar: Jar) {
+export const keeltownLogin = (jar: Jar) => keeltownLoginBy(byCookie(jar));
+
+/** `keeltown login`, approved by the session `approver` carries, by cookie or as a bearer. */
+export async function keeltownLoginBy(approver: Carried) {
   const code = await site("/device/code", { body: { client_id: "keeltown" } });
   answered(code, 200);
-  const claimed = await site(`/device?user_code=${encodeURIComponent(code.json.user_code)}`, {
-    jar,
-  });
+  const claimed = await site(
+    `/device?user_code=${encodeURIComponent(code.json.user_code)}`,
+    approver,
+  );
   answered(claimed, 200);
-  const approved = await site("/device/approve", { body: { userCode: code.json.user_code }, jar });
+  const approved = await site("/device/approve", {
+    body: { userCode: code.json.user_code },
+    ...approver,
+  });
   answered(approved, 200);
   // RFC 8628: poll no faster than the interval the server named.
   await new Promise((resolve) => setTimeout(resolve, (code.json.interval ?? 5) * 1000 + 250));

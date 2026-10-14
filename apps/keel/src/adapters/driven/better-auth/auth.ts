@@ -16,7 +16,13 @@ import {
   TOKEN_PATH,
 } from "./agents.ts";
 import { forget, onlyOwner, ownedProjects, ownsProjects, soleOwnerOf } from "./closing.ts";
-import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
+import {
+  approvalPasskeyAt,
+  isFresh,
+  mayAddFirstPasskey,
+  signInMethod,
+  type SignedIn,
+} from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
 import { keyUse, usedNow } from "./passkeys.ts";
@@ -121,6 +127,30 @@ const ADDS_PASSKEY = new Set([
 ]);
 
 /** Whether the account holds a passkey. */
+/** What a session's row says of its sign-in, as fresh.ts reads it. */
+function signedInOf(session: Record<string, unknown> & { createdAt: Date | string }): SignedIn {
+  const by: unknown = session["signedInBy"];
+  const passkeyAt: unknown = session["passkeyAt"];
+  return {
+    signedInBy: typeof by === "string" ? by : null,
+    createdAt: new Date(session.createdAt),
+    passkeyAt: typeof passkeyAt === "number" ? new Date(passkeyAt) : null,
+  };
+}
+
+/**
+ * The key under which `/device/token`'s before-hook hands the redeemed code's
+ * passkey time to the session it makes: Better Auth takes the code's row
+ * before it makes the session, so the session's hook can't read it.
+ */
+const DEVICE_PASSKEY_AT = "keelDevicePasskeyAt";
+
+/** The passkey time `/device/token`'s before-hook handed on, if it handed one. */
+function handedPasskeyAt(context: object | undefined): number | undefined {
+  const at: unknown = context === undefined ? undefined : Reflect.get(context, DEVICE_PASSKEY_AT);
+  return typeof at === "number" ? at : undefined;
+}
+
 async function holdsPasskey(db: D1Database, userId: string): Promise<boolean> {
   const held = await db
     .prepare(`SELECT 1 AS one FROM passkey WHERE userId = ?1 LIMIT 1`)
@@ -266,11 +296,7 @@ export function authOptions(config: AuthConfig) {
   const freshSignIn = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
     const carried = await sessionOf(ctx);
     if (carried === null) return;
-    const by: unknown = carried.session["signedInBy"];
-    const signedIn = {
-      signedInBy: typeof by === "string" ? by : null,
-      createdAt: new Date(carried.session.createdAt),
-    };
+    const signedIn = signedInOf(carried.session);
     const now = new Date();
     if (isFresh(signedIn, now)) return;
     const none = !(await holdsPasskey(db, carried.user.id));
@@ -285,6 +311,43 @@ export function authOptions(config: AuthConfig) {
           ? `Add a passkey first, then retry: ${what} needs a passkey sign-in from the last ten minutes`
           : `Sign in again with your passkey, then retry: ${what} needs a passkey sign-in from the last ten minutes`,
     });
+  };
+
+  /**
+   * Gives the device code a person is approving the time of the passkey their
+   * session rests on (approvalPasskeyAt), or none, before Better Auth approves
+   * it. It is written on the row only while that row is pending and claimed by
+   * the approver, the one row their approval can take, so the time redeemed is
+   * always that of the approval that took it.
+   */
+  const passkeyToApproval = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
+    const code: unknown = ctx.body?.userCode;
+    const carried = await sessionOf(ctx);
+    if (carried === null || typeof code !== "string") return;
+    const at = approvalPasskeyAt(signedInOf(carried.session), new Date());
+    // Better Auth finds the row by the code as typed, then by its normalised form.
+    const normalised = code.replaceAll(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    await db
+      .prepare(
+        `UPDATE deviceCode SET passkeyAt = ?1
+         WHERE id = (SELECT id FROM deviceCode WHERE userCode IN (?2, ?3) ORDER BY userCode = ?2 DESC LIMIT 1)
+           AND userId = ?4 AND status = 'pending'`,
+      )
+      .bind(at?.getTime() ?? null, code, normalised, carried.user.id)
+      .run();
+  };
+
+  /** The passkey time of the approved code a terminal redeems, for the session made from it. */
+  const passkeyOfRedeemed = async (ctx: Parameters<SessionOf>[0]) => {
+    const code: unknown = ctx.body?.device_code;
+    if (typeof code !== "string") return undefined;
+    const row = await db
+      .prepare(`SELECT passkeyAt FROM deviceCode WHERE deviceCode = ?1 AND status = 'approved'`)
+      .bind(code)
+      .first<{ passkeyAt: number | null }>();
+    return typeof row?.passkeyAt === "number"
+      ? { context: { context: { [DEVICE_PASSKEY_AT]: row.passkeyAt } } }
+      : undefined;
   };
 
   const options = {
@@ -326,12 +389,13 @@ export function authOptions(config: AuthConfig) {
         },
       },
     },
-    // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
+    // How each session was signed in, and a device sign-in's passkey (fresh.ts), written as the session is made and by nothing else.
     session: {
       // A row is written again once its session is used this long after the last write (sessions.ts).
       updateAge: SESSION_WRITE_SECONDS,
       additionalFields: {
         signedInBy: { type: "string", required: false, input: false },
+        passkeyAt: { type: "number", required: false, input: false },
       },
     },
     advanced: {
@@ -368,6 +432,7 @@ export function authOptions(config: AuthConfig) {
             : undefined;
         if (DISABLED.has(ctx.path))
           throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+        if (ctx.path === "/device/token") return passkeyOfRedeemed(ctx);
         // Better Auth would check a password, or hand a token to the mailed link's handler, past the router.
         if (
           ctx.path === DELETE_PATH &&
@@ -399,6 +464,7 @@ export function authOptions(config: AuthConfig) {
         const slug: unknown = ctx.body?.slug;
         if (ctx.path === "/organization/create" && typeof slug === "string")
           await claimable(db, slug);
+        if (ctx.path === "/device/approve") await passkeyToApproval(ctx);
         return beforeOrg(ctx);
       }),
       after: createAuthMiddleware(async (ctx) => {
@@ -410,9 +476,14 @@ export function authOptions(config: AuthConfig) {
       // The endpoint making a session says how it was signed in; nothing a request sends does.
       session: {
         create: {
-          before: async (session, context) => ({
-            data: { ...session, signedInBy: signInMethod(context?.path ?? "") },
-          }),
+          before: async (session, context) => {
+            const signedInBy = signInMethod(context?.path ?? "");
+            const passkeyAt =
+              signedInBy === "device" ? handedPasskeyAt(context?.context) : undefined;
+            return {
+              data: { ...session, signedInBy, ...(passkeyAt === undefined ? {} : { passkeyAt }) },
+            };
+          },
         },
       },
       // keel.town's privacy notice promises GitHub's token is never kept: Keel reads

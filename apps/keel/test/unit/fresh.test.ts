@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  approvalPasskeyAt,
   FRESH_FOR_MS,
   isFresh,
+  isFreshForApproval,
   mayAddFirstPasskey,
   signInMethod,
 } from "../../src/adapters/driven/better-auth/fresh.ts";
@@ -81,5 +83,48 @@ describe("a fresh sign-in", () => {
       expect([method, mayAddFirstPasskey(made(0, method), NOW)]).toEqual([method, false]);
     expect(mayAddFirstPasskey(made(0, null), NOW)).toBe(false);
     expect(mayAddFirstPasskey(made(0), NOW)).toBe(false);
+  });
+
+  it("[fresh.device-window] a device sign-in may give agents standing for ten minutes from the passkey that approved it, however late it was redeemed", () => {
+    const device = (passkeyMs: number, madeMs = 0) => ({
+      ...made(madeMs, "device"),
+      passkeyAt: new Date(NOW.getTime() - passkeyMs),
+    });
+    const minute = 60_000;
+    expect(isFreshForApproval(device(9 * minute + 59_000), NOW)).toBe(true);
+    expect(isFreshForApproval(device(FRESH_FOR_MS), NOW)).toBe(true);
+    expect(isFreshForApproval(device(10 * minute + 1000), NOW)).toBe(false);
+    expect(isFreshForApproval(device(10 * minute + 1000, 0), NOW)).toBe(false);
+    expect(isFreshForApproval(device(11 * minute, 2 * minute), NOW)).toBe(false);
+    expect(isFreshForApproval(device(24 * 60 * minute), NOW)).toBe(false);
+    expect(isFreshForApproval(device(0), NOW)).toBe(true);
+    expect(isFreshForApproval(device(-1000), NOW)).toBe(false);
+    expect(isFreshForApproval(device(-5 * minute), NOW)).toBe(false);
+    expect(approvalPasskeyAt(device(4 * minute, 1 * minute), NOW)).toEqual(
+      new Date(NOW.getTime() - 4 * minute),
+    );
+    expect(isFreshForApproval({ ...made(0, "device"), passkeyAt: new Date("never") }, NOW)).toBe(
+      false,
+    );
+  });
+
+  it("[fresh.device-unstepped] a device sign-in whose approval had no fresh passkey never may, nor any other way in but a fresh passkey", () => {
+    expect(isFreshForApproval(made(0, "device"), NOW)).toBe(false);
+    expect(isFreshForApproval({ ...made(0, "device"), passkeyAt: null }, NOW)).toBe(false);
+    for (const method of ["email-otp", "github", "other", "", null])
+      expect(
+        isFreshForApproval({ ...made(0, method), passkeyAt: new Date(NOW.getTime()) }, NOW),
+      ).toBe(false);
+    expect(isFreshForApproval(made(0, "passkey"), NOW)).toBe(true);
+    expect(approvalPasskeyAt(made(60_000, "passkey"), NOW)).toEqual(
+      new Date(NOW.getTime() - 60_000),
+    );
+    expect(isFreshForApproval(made(FRESH_FOR_MS + 1, "passkey"), NOW)).toBe(false);
+  });
+
+  it("[fresh.device-not-sign-in] a device sign-in's passkey never lets it change how the account signs in", () => {
+    const device = { ...made(0, "device"), passkeyAt: new Date(NOW.getTime()) };
+    expect(isFreshForApproval(device, NOW)).toBe(true);
+    expect(isFresh(device, NOW)).toBe(false);
   });
 });

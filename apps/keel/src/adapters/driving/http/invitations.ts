@@ -368,7 +368,8 @@ const asAgent = <A>(caller: Caller, move: (agentId: AgentId) => A) =>
 /**
  * The six operations of an agent's invitation into an org. `touched` asks a
  * person's fresh sign-in before a move: the invitation and the removal are a
- * signed-in page's to make. The agent's own answer needs none: it has no
+ * signed-in page's to make, or a terminal's whose sign-in was approved with a
+ * passkey within ten minutes. The agent's own answer needs none: it has no
  * session to make fresh.
  */
 export function invitationHandlers(

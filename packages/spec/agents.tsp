@@ -261,7 +261,8 @@ interface Agents {
 
   /**
    * Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in
-   * from the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,
+   * from the last ten minutes, or a `keeltown login` approved with a passkey in the last ten
+   * minutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,
    * used or run out, and an agent that does not exist, are one answer (404). An agent another
    * person already stands behind is refused (409 `agent.state_refused`).
    */

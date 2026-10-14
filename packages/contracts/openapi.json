@@ -1718,7 +1718,7 @@
       "put": {
         "operationId": "Agents_approveSponsor",
         "summary": "Sponsor an agent",
-        "description": "Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in\nfrom the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,\nused or run out, and an agent that does not exist, are one answer (404). An agent another\nperson already stands behind is refused (409 `agent.state_refused`).",
+        "description": "Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in\nfrom the last ten minutes, or a `keeltown login` approved with a passkey in the last ten\nminutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,\nused or run out, and an agent that does not exist, are one answer (404). An agent another\nperson already stands behind is refused (409 `agent.state_refused`).",
         "parameters": [
           {
             "name": "agentId",
@@ -5592,7 +5592,7 @@
       "post": {
         "operationId": "Namespaces_inviteAgent",
         "summary": "Invite an agent into an org",
-        "description": "Invite an agent into an org, by its handle. Any member may. The agent gets nothing until it accepts; then it\nreads and works in the org's projects and never governs there, and the member who invited it answers for it\nand is asked first when it has a question. It needs a fresh sign-in: a passkey sign-in from the last ten\nminutes (403 `auth.fresh_sign_in_required` otherwise). A person's or an agent's own namespace takes no\ninvitation (404), and no agent has that handle (404). One member answers for an agent in an org: an agent\nanother member has invited is refused (409 `invitation.state_refused`).",
+        "description": "Invite an agent into an org, by its handle. Any member may. The agent gets nothing until it accepts; then it\nreads and works in the org's projects and never governs there, and the member who invited it answers for it\nand is asked first when it has a question. It needs a fresh sign-in: a passkey sign-in from the last ten\nminutes, or a `keeltown login` approved with a passkey in the last ten minutes (403\n`auth.fresh_sign_in_required` otherwise). A person's or an agent's own namespace takes no\ninvitation (404), and no agent has that handle (404). One member answers for an agent in an org: an agent\nanother member has invited is refused (409 `invitation.state_refused`).",
         "parameters": [
           {
             "name": "handle",
@@ -7158,7 +7158,7 @@
       "post": {
         "operationId": "Projects_inviteAgent",
         "summary": "Invite an agent to a project",
-        "description": "Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a\ncollaborator. The agent gets nothing until it accepts; then a token that names this project reads and works\non it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a\nquestion. It needs a fresh sign-in: a passkey sign-in from the last ten minutes (403\n`auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such\ninvitation (404), and no agent has that handle (404). An agent you have already invited on other terms is\nrefused (409 `invitation.state_refused`).",
+        "description": "Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a\ncollaborator. The agent gets nothing until it accepts; then a token that names this project reads and works\non it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a\nquestion. It needs a fresh sign-in: a passkey sign-in from the last ten minutes, or a `keeltown login`\napproved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such\ninvitation (404), and no agent has that handle (404). An agent you have already invited on other terms is\nrefused (409 `invitation.state_refused`).",
         "parameters": [
           {
             "name": "projectId",

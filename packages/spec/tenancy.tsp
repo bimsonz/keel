@@ -141,7 +141,8 @@ interface Namespaces {
    * Invite an agent into an org, by its handle. Any member may. The agent gets nothing until it accepts; then it
    * reads and works in the org's projects and never governs there, and the member who invited it answers for it
    * and is asked first when it has a question. It needs a fresh sign-in: a passkey sign-in from the last ten
-   * minutes (403 `auth.fresh_sign_in_required` otherwise). A person's or an agent's own namespace takes no
+   * minutes, or a `keeltown login` approved with a passkey in the last ten minutes (403
+   * `auth.fresh_sign_in_required` otherwise). A person's or an agent's own namespace takes no
    * invitation (404), and no agent has that handle (404). One member answers for an agent in an org: an agent
    * another member has invited is refused (409 `invitation.state_refused`).
    */
@@ -184,8 +185,8 @@ interface Projects {
    * Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a
    * collaborator. The agent gets nothing until it accepts; then a token that names this project reads and works
    * on it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a
-   * question. It needs a fresh sign-in: a passkey sign-in from the last ten minutes (403
-   * `auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such
+   * question. It needs a fresh sign-in: a passkey sign-in from the last ten minutes, or a `keeltown login`
+   * approved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such
    * invitation (404), and no agent has that handle (404). An agent you have already invited on other terms is
    * refused (409 `invitation.state_refused`).
    */

@@ -82,6 +82,10 @@ const STALE: readonly (readonly [string, SignedIn | null])[] = [
   ["GitHub", signedIn("github", 1)],
   ["no recorded method", signedIn(null, 1)],
   ["a passkey eleven minutes ago", signedIn("passkey", 11)],
+  [
+    "a terminal approved with a passkey eleven minutes ago",
+    { ...signedIn("device", 1), passkeyAt: NOW - 11 * MINUTE },
+  ],
   ["no session's record at all", null],
 ];
 
@@ -573,6 +577,22 @@ describe("the sponsor link at the doorway", () => {
 
     const leaving = await sponsored(w, ANN, "leaving");
     expect((await end(w, agent(leaving), leaving)).status).toBe(200);
+    await w.runtime.dispose();
+  });
+
+  it("[link.touch-device] a terminal whose sign-in was approved with a passkey nine minutes ago approves the link and ends it, and is refused the pause and its end", async () => {
+    const w = world();
+    const bot = w.enrolled("bot");
+    const terminal: SignedIn = { ...signedIn("device", 30), passkeyAt: NOW - 9 * MINUTE };
+    expect((await approve(w, person(ANN, terminal), bot, await asked(w, bot))).status).toBe(200);
+    expect(w.rowOf(bot)).toEqual([ANN, "active"]);
+    expect(refusal(await pause(w, person(ANN, terminal), bot)).slice(0, 2)).toEqual(TOUCH);
+    expect(w.rowOf(bot)).toEqual([ANN, "active"]);
+    await pause(w, person(ANN), bot);
+    expect(refusal(await unpause(w, person(ANN, terminal), bot)).slice(0, 2)).toEqual(TOUCH);
+    expect(w.rowOf(bot)).toEqual([ANN, "suspended"]);
+    expect((await end(w, person(ANN, terminal), bot)).status).toBe(200);
+    expect(w.rowOf(bot)).toEqual([null, "active"]);
     await w.runtime.dispose();
   });
 

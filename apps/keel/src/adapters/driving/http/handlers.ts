@@ -429,8 +429,12 @@ export interface SignInMethods {
 export interface Doorway {
   /** `https://<KEEL_HOST>`: where the console's pages are, and where a request arrived. */
   readonly origin: string;
-  /** Whether the caller's session is a fresh sign-in, by the sign-in adapter's own rule. */
-  readonly fresh: (caller: Caller) => boolean;
+  /**
+   * Whether the caller's session is a fresh sign-in, by the sign-in adapter's
+   * own rule; with `{ device: true }`, by its rule for giving or taking an
+   * agent's standing, which also takes a device sign-in approved with a passkey.
+   */
+  readonly fresh: (caller: Caller, also?: Touch) => boolean;
   /** Sign-up's check that the key a request registers made the proof beside it, by the identity adapter. */
   readonly provenKey: (request: {
     readonly jwk: unknown;
@@ -461,10 +465,22 @@ const placed = (agent: Agent) =>
     }),
   );
 
+/** A move that a device sign-in approved with a passkey within ten minutes may make too. */
+export interface Touch {
+  readonly device: true;
+}
+
 export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorway) {
   /** A person's move that wants a fresh sign-in: refused here, before its port is called. */
-  const touched = <A>(caller: Caller, move: () => A) =>
-    doorway.fresh(caller) ? move() : freshSignInRequired(caller.requestId);
+  const touched = <A>(caller: Caller, move: () => A, also?: Touch) =>
+    doorway.fresh(caller, also) ? move() : freshSignInRequired(caller.requestId);
+  /**
+   * A person's move on an agent's standing (an invitation, a removal, a
+   * sponsorship approved or ended): a fresh sign-in, or a terminal's device
+   * sign-in within ten minutes of the passkey that approved it.
+   */
+  const touchedForStanding = <A>(caller: Caller, move: () => A) =>
+    touched(caller, move, { device: true });
   /** An operator's move on an agent's standing, answered as the agent's profile. */
   const standing = (
     caller: Caller,
@@ -570,7 +586,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           );
         },
         Agents_approveSponsor: (caller: Caller, input: Input<"Agents_approveSponsor">) =>
-          touched(caller, () => {
+          touchedForStanding(caller, () => {
             const agentId = decodeLinkAgent(input.agentId);
             if (Option.isNone(agentId)) return noSuchRequest(caller);
             return run(
@@ -615,7 +631,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               ),
             );
           // An agent has no session to make fresh: the touch is asked of the person.
-          return caller.principal._tag === "Agent" ? end() : touched(caller, end);
+          return caller.principal._tag === "Agent" ? end() : touchedForStanding(caller, end);
         },
         Agents_listSponsored: (caller: Caller) =>
           run(
@@ -647,8 +663,8 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               );
             }),
           ),
-        ...invitationHandlers(run, touched),
-        ...projectInvitationHandlers(run, touched),
+        ...invitationHandlers(run, touchedForStanding),
+        ...projectInvitationHandlers(run, touchedForStanding),
         ...decisionHandlers(run),
         ...deliveryHandlers(run),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>

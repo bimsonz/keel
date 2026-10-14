@@ -229,11 +229,13 @@ function gateDeps(
       const userId = Option.getOrNull(decodeUserId(session.user.id));
       if (userId === null) return null;
       const by: unknown = session.session["signedInBy"];
+      const passkeyAt: unknown = session.session["passkeyAt"];
       return {
         userId,
         signedIn: {
           by: typeof by === "string" ? by : null,
           at: new Date(session.session.createdAt).getTime(),
+          ...(typeof passkeyAt === "number" ? { passkeyAt } : {}),
         },
       };
     },

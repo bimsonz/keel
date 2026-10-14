@@ -23,12 +23,14 @@ import {
 /**
  * How and when a session was signed in: `by` is the method as the sign-in
  * adapter names it (null for a session made before methods were recorded), `at`
- * the time in epoch milliseconds. The gate decides nothing on it; an operation
- * that wants a fresh sign-in asks it of the caller.
+ * the time in epoch milliseconds. A device sign-in approved with a fresh
+ * passkey also has `passkeyAt`, that passkey's time. The gate decides nothing
+ * on it; an operation that wants a fresh sign-in asks it of the caller.
  */
 export interface SignedIn {
   readonly by: string | null;
   readonly at: number;
+  readonly passkeyAt?: number;
 }
 
 /** An agent's own token as a request presents it: the token, how it was presented, and where. */
