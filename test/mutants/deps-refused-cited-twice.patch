@@ -2,15 +2,15 @@
 # kills: verify.deps-refused-cited
 # why: A refusal is cited once for every Tier 2 step that stored it: the same line and the same remedy, twice or more
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index 3be30dfd..f38a598a 100644
+index 50d29581..257f9761 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -218,7 +218,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -223,7 +223,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
      // Every step that needed the refused dependencies stored the same refusal: it is cited once.
      const refusal = stored.value.deps;
      const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
 -    if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
 +    if (depsName !== undefined)
        failures.push({ kind: "deps", name: depsName });
-     if (stored.value.guard !== undefined) {
-       const decision = plan.steps.find((s) => s.id === r.stepId)?.guards?.decision;
+     if (stored.value.deploy !== undefined)
+       failures.push({ kind: "deploy", name: `${r.stepId}: ${stored.value.deploy.failure}` });

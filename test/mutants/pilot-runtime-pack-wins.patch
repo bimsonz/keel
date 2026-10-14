@@ -2,13 +2,13 @@
 # kills: suite-runtime.project-command-wins
 # why: A step that reuses a pack's id runs the pack's command, not its own
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index a4560ee7..3cdf7a7e 100644
+index 8d44297b..ae650da3 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -391,7 +391,7 @@ export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
- export const tier2RunnerFor = (
-   step: PlanStep,
- ): (Tier2Runner & { readonly config: SuiteRunnerOptions["config"] }) | undefined => {
+@@ -481,7 +481,7 @@ export const tier2RunnerFor = (
+ ):
+   | (Tier2Runner & { readonly command: string; readonly config: SuiteRunnerOptions["config"] })
+   | undefined => {
 -  if (step.run !== undefined)
 +  if (step.run !== undefined && TIER2_RUNNERS[step.id] === undefined)
      return {

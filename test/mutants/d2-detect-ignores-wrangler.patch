@@ -2,13 +2,13 @@
 # kills: packs.worker-app-by-config
 # why: A wrangler config does not make a worker app
 diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
-index e36a39c..618e0e8 100644
+index 1126fddd..76522e68 100644
 --- a/packages/core/src/application/verification/packs.ts
 +++ b/packages/core/src/application/verification/packs.ts
-@@ -103,7 +103,7 @@ export const detectPack = (
-   rootPaths: readonly string[],
-   packageJson: string | undefined,
- ): VerifierPack => {
+@@ -215,7 +215,7 @@ export const detectPack = (
+     const pack = detectPack(rootPaths, packageJson);
+     return { ...pack, reason: `${pack.reason}; no deploy steps: ${deploy.failure.detail}` };
+   }
 -  const config = WRANGLER_CONFIGS.find((name) => rootPaths.includes(name));
 +  const config = WRANGLER_CONFIGS.find(() => false);
    if (config !== undefined)

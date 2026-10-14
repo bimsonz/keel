@@ -2,11 +2,11 @@
 # kills: flow-setup.invalid
 # why: A malformed flow is quietly replaced by the pack's defaults
 diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
-index 65b09d4..5f057c4 100644
+index bb68f71f..0fee3931 100644
 --- a/packages/core/src/application/verification/flow-spec.ts
 +++ b/packages/core/src/application/verification/flow-spec.ts
-@@ -107,5 +107,11 @@ export const flowSetup = (
-   const pack = detectPack(sources.rootPaths, sources.packageJson);
+@@ -130,5 +130,11 @@ export const flowSetup = (
+   const pack = detectPack(sources.rootPaths, sources.packageJson, sources.deployJson);
    if (sources.flowJson === undefined)
      return Result.succeed({ definition: undefined, predicatePolicy: {}, pack });
 -  return Result.map(parseFlow(sources.flowJson, base), (read) => ({ ...read, pack }));

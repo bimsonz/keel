@@ -2,12 +2,16 @@
 # kills: packs.executable-run
 # why: A step with a command is executable in any tier
 diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
-index 42bb10b4..6ec7bc82 100644
+index 1126fddd..e99f56cf 100644
 --- a/packages/core/src/application/verification/packs.ts
 +++ b/packages/core/src/application/verification/packs.ts
-@@ -131,4 +131,4 @@ export const TIER2_STEP_IDS: readonly string[] = [JS_TS_SUITE.id, WORKER_APP_TYP
+@@ -250,7 +250,8 @@ export const TIER2_STEP_IDS: readonly string[] = [
   */
  export const executable = (step: PlanStep): boolean =>
    step.guards !== undefined ||
--  (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id)));
-+  step.run !== undefined || (step.tier.tier === 2 && TIER2_STEP_IDS.includes(step.id));
+-  (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id))) ||
++  step.run !== undefined ||
++  (step.tier.tier === 2 && TIER2_STEP_IDS.includes(step.id)) ||
+   (step.tier.tier === 0 &&
+     step.kind === "deploy" &&
+     step.deploy !== undefined &&
