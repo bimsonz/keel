@@ -2,11 +2,11 @@
 # kills: console.git-first
 # why: the clone address's paths are not run through the Worker first, so the assets answer them with the page and the forward never runs
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index f64d95bb..f97d078b 100644
+index 33142cef..2ab187b7 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
-@@ -20,9 +20,6 @@
-     // the path's shape itself. Everything else is a file or the page.
+@@ -22,9 +22,6 @@
+     // else is a file or the page.
      "run_worker_first": [
        "/healthz",
 -      "/*.git/info/refs",

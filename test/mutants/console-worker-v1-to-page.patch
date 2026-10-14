@@ -2,15 +2,15 @@
 # kills: console.keel-paths
 # why: the deployed Worker answers Keel's API with the page, so nobody signs in or reads anything on a site with no routes
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index e7ec738a..58aaa1fd 100644
+index 2dd9da1a..9a0cbcbc 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -45,7 +45,7 @@ const GIT = /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pac
+@@ -48,7 +48,7 @@ const GIT = /^\/[^/]+\/[^/]+\.git\/(?:info\/refs|git-upload-pack|git-receive-pac
   * A handle that only begins with one of those words (`/starter`, `/mcpx`,
   * `/v1`) is a place in the page.
   */
 -const KEELS = /^\/(?:v1\/|mcp\/|\.well-known\/|(?:mcp|start|llms\.txt)$)/;
 +const KEELS = /^\/(?:mcp\/|\.well-known\/|(?:mcp|start|llms\.txt)$)/;
  
- export interface Console {
-   fetch(request: Request, env: Env): Promise<Response>;
+ /**
+  * Who answers each first segment Keel reserves, on this site: a page of the console's, Keel's Worker, this

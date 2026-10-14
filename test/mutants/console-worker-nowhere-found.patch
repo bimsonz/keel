@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.nowhere
+# why: a path nothing here answers is answered 200, as if the page were there
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 2dd9da1a..3e9e3f3d 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -112,7 +112,7 @@ export function createConsole(): Console {
+         // The built page draws its own not-found; the answer says so too, to whoever reads only its status.
+         const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
+         return new Response(page.body, {
+-          status: 404,
++          status: 200,
+           headers: {
+             "content-type": page.headers.get("content-type") ?? "text/html; charset=utf-8",
+           },

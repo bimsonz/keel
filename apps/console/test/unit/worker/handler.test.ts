@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse, type ParseError } from "jsonc-parser";
 import { describe, expect, it } from "vitest";
-import { type Env, createConsole } from "../../../src/worker/handler.ts";
+import { type Env, NOWHERE, createConsole } from "../../../src/worker/handler.ts";
 
 const ORIGIN = "https://keel-console.example";
 
@@ -113,9 +113,10 @@ describe("the console's Worker", () => {
     });
     expect(asked).toEqual([]);
     expect(r.keel).toEqual([]);
+    // Where the proxy was is under a reserved segment nothing here answers: the page at the root, as not found.
     expect(r.assets).toEqual([
-      "GET /api/v1/events",
-      "GET /api/v1/projects/prj_1/repo/tree",
+      "GET /",
+      "GET /",
       "POST /present/capability",
       "POST /rule/a-capability",
     ]);
@@ -238,6 +239,69 @@ describe("the console's Worker", () => {
       "/acme/forge/blob/trunk/src/index.ts",
       "/acme/forge.git/blob/trunk/README.md",
       "/assets/index.js",
+    ])
+      expect([path, firstFor(path)]).toEqual([path, false]);
+  });
+
+  it("[handler.nowhere] answers 404 with the page for a path nothing here answers, and hands every other path on as before", async () => {
+    const r = rig();
+    for (const path of [
+      "/admin",
+      "/admin/users",
+      "/install",
+      "/api/v1/events",
+      "/favicon.ico",
+      "/sitemap.xml",
+    ]) {
+      const response = await r.ask(path);
+      expect([path, response.status, await response.text()]).toEqual([path, 404, "the page"]);
+    }
+    // Each was answered with the page at the root, which draws its own not-found: Keel was asked nothing.
+    expect(r.assets).toEqual(Array.from({ length: 6 }, () => "GET /"));
+    expect(r.keel).toEqual([]);
+    for (const path of [
+      "/adminx",
+      "/admins/keel",
+      "/login",
+      "/terms",
+      "/rule",
+      "/robots.txt",
+      "/keel/install",
+    ]) {
+      const response = await r.ask(path);
+      expect([path, response.status]).toEqual([path, 200]);
+    }
+    expect(r.assets.slice(6)).toEqual([
+      "GET /adminx",
+      "GET /admins/keel",
+      "GET /login",
+      "GET /terms",
+      "GET /rule",
+      "GET /robots.txt",
+      "GET /keel/install",
+    ]);
+  });
+
+  // A path the Worker is not run first for never reaches its code: each that it answers 404 must be listed.
+  it("[console.nowhere-first] the Worker's config runs it first for every path nothing here answers, and for no handle that begins like one", () => {
+    // The reserved first segments with no page, no file and none of Keel's paths here.
+    expect(NOWHERE).toEqual(["api", "auth", "logout", "install", "admin", "favicon.ico"]);
+    const first = runFirst();
+    const firstFor = (path: string) => first.some((glob) => glob.test(path));
+    for (const segment of NOWHERE)
+      for (const path of segment.includes(".")
+        ? [`/${segment}`]
+        : [`/${segment}`, `/${segment}/a/b`])
+        expect([path, firstFor(path)]).toEqual([path, true]);
+    expect(["/sitemap.xml", firstFor("/sitemap.xml")]).toEqual(["/sitemap.xml", true]);
+    for (const path of [
+      "/adminx",
+      "/apis",
+      "/authors",
+      "/robots.txt",
+      "/login",
+      "/terms",
+      "/settings",
     ])
       expect([path, firstFor(path)]).toEqual([path, false]);
   });

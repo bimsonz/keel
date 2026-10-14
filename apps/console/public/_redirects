@@ -1,0 +1,2 @@
+# Where Cloudflare sends a path of the built page's to another. Keel's API description is under its API.
+/openapi.json /v1/openapi.json 301

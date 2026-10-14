@@ -1109,11 +1109,11 @@ expectEqual(
   "0",
 );
 await page.goto(`${dev}/`, { waitUntil: "networkidle" });
-await page.getByRole("heading", { name: "Keel did not list its projects" }).waitFor();
+await page.getByRole("alert").waitFor();
 expectEqual(
   "dev, with no fixture asked for: the home says what answered was not Keel, and lists nothing",
-  `${squash(await page.getByRole("main").innerText())} | ${await page.getByRole("list", { name: "Projects" }).count()}`,
-  "Keel did not list its projects What answered at /v1 was not Keel. | 0",
+  `${squash(await page.getByRole("region", { name: "Public projects" }).innerText())} | ${await page.getByRole("list", { name: "Projects" }).count()}`,
+  "Public projects Keel did not list its projects: What answered at /v1 was not Keel. | 0",
 );
 
 // Mission Control on the swarm, with thirteen conflicts open at once: a proof nobody was asked about stays open, as
@@ -2037,6 +2037,25 @@ expectEqual(
   "none",
 );
 expectEqual(
+  "visitor: the home says what Keel is first, with its source, its quickstart, its API and the way in",
+  await visitor
+    .getByRole("region", { name: "What Keel is" })
+    .evaluate(
+      (section) =>
+        `${section.querySelector("h1")?.textContent ?? ""} | ${section.querySelector("p")?.textContent ?? ""} | ${section.querySelectorAll("li").length} points | ${[
+          ...section.querySelectorAll("nav a"),
+        ]
+          .map((a) => `${a.textContent ?? ""} → ${a.getAttribute("href") ?? ""}`)
+          .join(
+            " | ",
+          )} | first: ${document.querySelector("main section")?.getAttribute("aria-label") ?? ""}`,
+      undefined,
+      { timeout: 10_000 },
+    )
+    .catch(() => "no such section"),
+  "Keel | An agent-first Git platform. Agents declare what each change relies on; Keel derives what it alters, proves disagreements, and keeps trunk coherent. | 3 points | Source on GitHub → https://github.com/bimsonz/keel | Quickstart → /start | API → /v1/openapi.json | Sign up → /signup | first: What Keel is",
+);
+expectEqual(
   "visitor: the home lists the public projects, each under its org",
   squash(await visitor.getByRole("list", { name: "Projects" }).innerText()),
   "ada / demo public",
@@ -2309,6 +2328,32 @@ expectEqual(
 );
 await visitor.goto(`${built}/ada/demo/nowhere`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+const wayBack = async (shown: Page): Promise<string> =>
+  (
+    await shown
+      .getByRole("main")
+      .getByRole("link")
+      .evaluateAll((links) =>
+        links.map((a) => {
+          const href = a.getAttribute("href") ?? "";
+          // An address the page got wrong is said as it was written.
+          return `${a.textContent ?? ""} → ${URL.canParse(href, window.location.href) ? new URL(href, window.location.href).pathname : href}`;
+        }),
+      )
+  ).join(" | ");
+expectEqual(
+  "built: inside a project, the not-found page's way back is the project's code",
+  await wayBack(visitor),
+  "Go to the project's code → /ada/demo",
+);
+// A first segment Keel reserves that names no page here: the not-found page, with no project to go back to.
+await visitor.goto(`${built}/admin`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+expectEqual(
+  "built: above every project, the not-found page's way back is the home page",
+  await wayBack(visitor),
+  "Go to the home page → /",
+);
 
 // Keel reads a project's questions to its members and to nobody else. A visitor is told so where the list and
 // where a question would be, never that there is none; and the frame's way in comes back to the page.
@@ -2632,7 +2677,17 @@ const lane = await browser.newContext({ viewport: { width: 1920, height: 1080 } 
 await asDeployed(lane, { keel: shut });
 const outsider = watch(await lane.newPage(), "built, a visitor to a private project");
 await outsider.goto(`${built}/`, { waitUntil: "domcontentloaded" });
-await outsider.getByRole("heading", { name: "Keel has no project to show you yet" }).waitFor();
+await outsider
+  .getByRole("region", { name: "Public projects" })
+  .locator("p, li")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => {});
+expectEqual(
+  "visitor: with no project public, the home says so under what Keel is",
+  `${await outsider.getByRole("region", { name: "What Keel is" }).count()} | ${squash(await outsider.getByRole("region", { name: "Public projects" }).innerText())}`,
+  "1 | Public projects No project is public yet.",
+);
 const hidden = await toldAt(outsider, "ada", "demo");
 expectEqual(
   "visitor: a private project is told as none is",
@@ -3295,6 +3350,11 @@ await hers
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
+expectEqual(
+  "member: someone signed in is not told what Keel is: their home leads with what waits for them",
+  `${await person.getByRole("region", { name: "What Keel is" }).count()} | ${await person.getByRole("region", { name: "Waiting for you" }).count()}`,
+  "0 | 1",
+);
 expectEqual(
   "member: her home lists first the question Keel has put to her, by Keel's label and under its project, and it leads to the question's own page",
   (await hers.count()) === 1
@@ -5109,7 +5169,7 @@ for (const [which, title] of [
   expectEqual(
     `legal: /${which} has the foot every page has`,
     await footOf(reading),
-    "/terms /privacy",
+    "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
   );
 }
 await reading.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
@@ -5119,7 +5179,11 @@ expectEqual(
   `${squash((await reading.locator("[data-agreement]").allInnerTexts()).join(" "))} | ${(await reading.locator("[data-agreement] a").evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href")))).join(" ")}`,
   "By creating an account you agree to the Terms of Service and the Privacy Notice. | /terms /privacy",
 );
-expectEqual("legal: an account's page has the foot", await footOf(reading), "/terms /privacy");
+expectEqual(
+  "legal: an account's page has the foot",
+  await footOf(reading),
+  "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
+);
 await reading.goto(`${built}/login`, { waitUntil: "domcontentloaded" });
 await reading.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
 expectEqual(
@@ -5134,7 +5198,11 @@ await reading
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => {});
-expectEqual("legal: a project's page has the foot", await footOf(reading), "/terms /privacy");
+expectEqual(
+  "legal: a project's page has the foot",
+  await footOf(reading),
+  "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
+);
 await reading
   .locator("footer a", { hasText: "Privacy Notice" })
   .click({ timeout: 5000 })

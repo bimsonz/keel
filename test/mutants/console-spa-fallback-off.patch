@@ -2,7 +2,7 @@
 # kills: console.spa
 # why: a path that is not a file is a 404, so no address in a project opens
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index f64d95bb..a39d0358 100644
+index 33142cef..93988c75 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
 @@ -14,7 +14,6 @@
@@ -11,5 +11,5 @@ index f64d95bb..a39d0358 100644
      "binding": "ASSETS",
 -    "not_found_handling": "single-page-application",
      // Only these reach the Worker's code: its health check, the three git paths of a clone
-     // address, and Keel's own paths. A `*` here matches across segments, so the Worker checks
-     // the path's shape itself. Everything else is a file or the page.
+     // address, Keel's own paths, and the paths nothing here answers, which it answers 404 (the
+     // first segments Keel reserves that have no page, file or Worker here, and /sitemap.xml). A

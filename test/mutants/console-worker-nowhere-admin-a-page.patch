@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: console.nowhere-first, handler.nowhere
+# why: `/admin` is taken for a page of the console's, which has none
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 2dd9da1a..fad918d6 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -74,7 +74,7 @@ const ANSWERS: Record<ReservedSegment, "page" | "keel" | "worker" | "file" | "no
+     new: "page",
+     orgs: "page",
+     install: "nobody",
+-    admin: "nobody",
++    admin: "page",
+     terms: "page",
+     privacy: "page",
+     rule: "retired",

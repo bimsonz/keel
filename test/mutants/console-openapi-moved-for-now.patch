@@ -1,0 +1,11 @@
+# expect-red: pnpm exec vitest run --project pool:console
+# kills: console.openapi
+# why: /openapi.json is sent on to Keel's API description for now, not for good
+diff --git a/apps/console/public/_redirects b/apps/console/public/_redirects
+index 7bc84f43..2ac83bd3 100644
+--- a/apps/console/public/_redirects
++++ b/apps/console/public/_redirects
+@@ -1,2 +1,2 @@
+ # Where Cloudflare sends a path of the built page's to another. Keel's API description is under its API.
+-/openapi.json /v1/openapi.json 301
++/openapi.json /v1/openapi.json 302

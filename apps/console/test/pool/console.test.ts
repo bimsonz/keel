@@ -119,10 +119,41 @@ describe("the console's Worker", () => {
     },
   );
 
+  it.each(["/admin", "/admin/users", "/install", "/logout", "/favicon.ico", "/sitemap.xml"])(
+    "[console.not-found] nothing here answers %s: 404, with the page, which draws its own not-found",
+    async (path) => {
+      const response = await SELF.fetch(`${CONSOLE}${path}`);
+      expect(response.status).toBe(404);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(response.headers.get("link")).toBeNull();
+      expect(await response.text()).toContain('<div id="root"');
+    },
+  );
+
+  it("[console.robots] tells crawlers they may read every page, and that Keel's API is not for indexing", async () => {
+    const response = await SELF.fetch(`${CONSOLE}/robots.txt`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    const rules = (await response.text())
+      .split("\n")
+      .filter((line) => line !== "" && !line.startsWith("#"));
+    expect(rules).toEqual(["User-agent: *", "Allow: /", "Disallow: /v1/"]);
+  });
+
+  it("[console.openapi] sends /openapi.json on to Keel's API description, for good", async () => {
+    const response = await SELF.fetch(`${CONSOLE}/openapi.json`, { redirect: "manual" });
+    expect(response.status).toBe(301);
+    expect(new URL(response.headers.get("location") ?? "", CONSOLE).pathname).toBe(
+      "/v1/openapi.json",
+    );
+  });
+
   it("[console.no-proxy] reads nothing of Keel for anyone: where its proxy was is the page, whatever key is shown", async () => {
     const response = await SELF.fetch(`${CONSOLE}/api/v1/events?limit=5`, {
       headers: { authorization: "Bearer test-presenter-key" },
     });
+    // A reserved segment nothing here answers: the page, as not found.
+    expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(await response.text()).toContain('<div id="root"');
   });

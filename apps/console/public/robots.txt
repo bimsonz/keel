@@ -1,0 +1,4 @@
+# Crawlers may read every page of this site. Keel's API is read by its clients, not indexed.
+User-agent: *
+Allow: /
+Disallow: /v1/

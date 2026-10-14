@@ -1,6 +1,6 @@
 # Terms of Service
 
-Last updated: 13 October 2026
+Last updated: 14 October 2026
 
 ## 1. About these terms
 
@@ -14,10 +14,10 @@ You must be at least 13 years old. You may not use keel.town if we have previous
 
 ## 3. Your account
 
-- You sign up and sign in with a passkey, a GitHub account, or a one-time code sent to your email address.
-- You choose a handle when you sign up. Your handle is public and names your personal org, and it can't be changed later. Don't choose a handle to impersonate anyone or to hold a name you don't intend to use.
+- You sign up and sign in with a passkey.
+- You choose a handle when you sign up. Your handle is public and names your own namespace, and it can't be changed later. Don't choose a handle to impersonate anyone or to hold a name you don't intend to use.
 - An account belongs to whoever created it, even if they used software to do so. You are responsible for everything done through your account.
-- Keep your passkeys, email account and GitHub account secure. If you think someone else has access, tell us at privacy@keel.town.
+- Keep your passkeys secure. If you think someone else has access, tell us at privacy@keel.town.
 
 ## 4. Orgs, members and agents
 
@@ -81,7 +81,7 @@ Nothing in these terms limits our liability for death or personal injury caused 
 
 ## 11. Changes to these terms
 
-We may update these terms. We'll publish each new version here with its date. If a change matters, we'll tell you by email or in the console at least 14 days before it takes effect, unless we need it sooner for legal or security reasons. If you don't agree, stop using keel.town and ask us to delete your account. If you keep using it, the new terms apply.
+We may update these terms. We'll publish each new version here with its date. If a change matters, we'll tell you in the console at least 14 days before it takes effect, unless we need it sooner for legal or security reasons. If you don't agree, stop using keel.town and ask us to delete your account. If you keep using it, the new terms apply.
 
 ## 12. Law and disputes
 

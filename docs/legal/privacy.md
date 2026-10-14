@@ -1,6 +1,6 @@
 # Privacy Notice
 
-Last updated: 13 October 2026
+Last updated: 14 October 2026
 
 This notice explains what personal data keel.town collects, why, and what your rights are. It covers keel.town only. If you run your own copy of Keel, you are responsible for the data in that copy.
 
@@ -11,11 +11,10 @@ Bison Labs Limited (company number 17417687, registered office Unit 7 Hove Busin
 ## 2. What we collect
 
 **Your account**
-- Your email address, your name and the handle you choose. If you sign up with a passkey alone, we hold no email address for you.
-- If you sign in with GitHub: your GitHub user ID, name, primary email address and a link to your profile picture. We ask GitHub only for your profile and email addresses, never your repositories. We don't keep the access token GitHub issues.
+- Your name and the handle you choose. You sign up with a passkey, so we hold no email address for you.
 - If you use a passkey: its public key, its ID, the name you give it and technical details about the authenticator, such as its model and whether it is backed up. Your fingerprint, face and device PIN never leave your device.
 - For each signed-in session: a random token, when it expires, your IP address, your browser's user agent and the org you're working in.
-- Short-lived sign-in codes, sent by email or used to sign in from the command line.
+- Short-lived codes used to sign in from the command line.
 - Your org memberships and roles, and invitations. An invitation sent to an email address holds that address.
 - If we suspend your account: the reason, and when the suspension ends.
 
@@ -43,7 +42,7 @@ We collect no analytics or advertising data, and the console loads nothing from 
 | Keep keel.town secure and fair: rate limits, quotas, abuse checks, suspensions, logs | IP address, user agent, logs, usage counts, suspension records | Our legitimate interest in keeping the service secure and available to everyone |
 | Comply with the law and deal with legal claims | Whatever is relevant | Legal obligation; legitimate interests |
 
-To have an account, you need an email address, a passkey or a GitHub account. Without one, we can't provide the service. We don't make decisions about you based solely on automated processing that have legal or similarly significant effects. Keel decides automatically whether a code change passes verification and lands, but that is a decision about code, not about you.
+To have an account, you need a passkey. Without one, we can't provide the service. We don't make decisions about you based solely on automated processing that have legal or similarly significant effects. Keel decides automatically whether a code change passes verification and lands, but that is a decision about code, not about you.
 
 ## 4. What other people can see
 
@@ -55,9 +54,8 @@ To have an account, you need an email address, a passkey or a GitHub account. Wi
 
 ## 5. Who we share it with
 
-- **Cloudflare, Inc.** keel.town runs entirely on Cloudflare. Cloudflare provides the hosting, databases, file storage, repositories, sandboxes and logs, delivers sign-in codes by email, and runs the code model. Cloudflare processes your data on our behalf, as our processor.
+- **Cloudflare, Inc.** keel.town runs entirely on Cloudflare. Cloudflare provides the hosting, databases, file storage, repositories, sandboxes and logs, and runs the code model. Cloudflare processes your data on our behalf, as our processor.
 - **The code model.** When two changes disagree about how the code behaves, Keel can ask a code model to draft a test (a "probe") that settles the question. The model receives the project's source code, the changes involved and a description of the disagreement. It runs on Cloudflare's Workers AI, so this data stays with Cloudflare as our processor. We don't use your content to train any model.
-- **GitHub, Inc.** If you sign in with GitHub, GitHub knows that you signed in to keel.town and shares your profile with us. GitHub is a separate controller, and its own privacy statement applies. We share nothing else with GitHub.
 - **Authorities**, when the law requires it.
 
 We don't sell personal data.

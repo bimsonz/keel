@@ -9,6 +9,7 @@ import type { EscalationView, ProjectView } from "../contract/keel/index.ts";
 import { type KeelDirectory, KeelRefused } from "../source/types.ts";
 import { CATEGORY } from "../views/Escalation.tsx";
 import { Notice } from "../views/Frame.tsx";
+import { ABOUT } from "../views/Footer.tsx";
 import { Column, EscalationMark, Row, Rows } from "../views/List.tsx";
 import { dateTime } from "../views/parts.tsx";
 
@@ -49,6 +50,48 @@ function ProjectRows({ label, projects }: { label: string; projects: readonly Pr
         />
       ))}
     </Rows>
+  );
+}
+
+/**
+ * What Keel is, for whoever arrives with no account: in Keel's own words, where its source, its quickstart and
+ * its API are, and the way in.
+ */
+function About() {
+  return (
+    <section aria-label="What Keel is" className="flex flex-col gap-3">
+      <h1 className="text-2xl font-semibold text-kumo-strong">Keel</h1>
+      <p className="max-w-[72ch] text-base text-kumo-default">
+        An agent-first Git platform. Agents declare what each change relies on; Keel derives what it
+        alters, proves disagreements, and keeps trunk coherent.
+      </p>
+      <ul className="flex max-w-[72ch] list-disc flex-col gap-1 pl-5 text-base text-kumo-subtle">
+        <li>
+          An agent says what a change relies on before it writes it, and is told when that moves.
+        </li>
+        <li>
+          Keel works out what each change alters from its diff, so it knows which changes can
+          disagree.
+        </li>
+        <li>
+          A disagreement is settled by a check Keel runs before anyone is asked, and only what
+          passes verification lands.
+        </li>
+      </ul>
+      <nav
+        aria-label="Keel's source and documents"
+        className="flex flex-wrap gap-x-5 gap-y-1 text-base"
+      >
+        {ABOUT.map((link) => (
+          <a key={link.href} href={link.href} className="a-link">
+            {link.label}
+          </a>
+        ))}
+        <a href={hrefOf({ at: "signup" })} className="a-link">
+          Sign up
+        </a>
+      </nav>
+    </section>
   );
 }
 
@@ -183,6 +226,26 @@ export function HomePage({
       stop.abort();
     };
   }, [directory]);
+  // Whoever arrives with no account is told what Keel is at once, and then shown the projects anyone may read.
+  if (handle === undefined && orgs.length === 0) {
+    return (
+      <Column>
+        <About />
+        <section aria-label="Public projects" className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold text-kumo-strong">Public projects</h2>
+          {projects === undefined ? null : "failed" in projects ? (
+            <p role="alert" className="text-base text-kumo-subtle">
+              Keel did not list its projects: {projects.failed}.
+            </p>
+          ) : projects.length === 0 ? (
+            <p className="text-base text-kumo-subtle">No project is public yet.</p>
+          ) : (
+            <ProjectRows label="Public projects" projects={projects} />
+          )}
+        </section>
+      </Column>
+    );
+  }
   // Someone signed in is shown what waits for them whatever becomes of the list of projects under it.
   if (handle !== undefined && (projects === undefined || "failed" in projects)) {
     return (
@@ -203,18 +266,6 @@ export function HomePage({
   const joined = orgs;
   const mine = projects.filter((project) => project.namespace.handle === handle);
   const rest = projects.filter((project) => project.namespace.handle !== handle);
-  if (handle === undefined && projects.length === 0 && orgs.length === 0) {
-    return (
-      <Notice title="Keel has no project to show you yet">
-        A visitor is shown the public projects, and someone signed in their own and their orgs' as
-        well.{" "}
-        <a href="/login" className="a-link">
-          Sign in
-        </a>{" "}
-        to see yours.
-      </Notice>
-    );
-  }
   return (
     <Column>
       {handle !== undefined && <Waiting directory={directory} />}

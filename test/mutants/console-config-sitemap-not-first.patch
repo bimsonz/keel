@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: console.nowhere-first
+# why: the sitemap never reaches the Worker, so the page answers it 200
+diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
+index 33142cef..9dbc2596 100644
+--- a/apps/console/wrangler.jsonc
++++ b/apps/console/wrangler.jsonc
+@@ -42,7 +42,6 @@
+       "/admin",
+       "/admin/*",
+       "/favicon.ico",
+-      "/sitemap.xml",
+     ],
+   },
+   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

@@ -16,8 +16,10 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // Only these reach the Worker's code: its health check, the three git paths of a clone
-    // address, and Keel's own paths. A `*` here matches across segments, so the Worker checks
-    // the path's shape itself. Everything else is a file or the page.
+    // address, Keel's own paths, and the paths nothing here answers, which it answers 404 (the
+    // first segments Keel reserves that have no page, file or Worker here, and /sitemap.xml). A
+    // `*` here matches across segments, so the Worker checks the path's shape itself. Everything
+    // else is a file or the page.
     "run_worker_first": [
       "/healthz",
       "/*.git/info/refs",
@@ -29,6 +31,18 @@
       "/start",
       "/llms.txt",
       "/.well-known/*",
+      "/api",
+      "/api/*",
+      "/auth",
+      "/auth/*",
+      "/logout",
+      "/logout/*",
+      "/install",
+      "/install/*",
+      "/admin",
+      "/admin/*",
+      "/favicon.ico",
+      "/sitemap.xml",
     ],
   },
   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

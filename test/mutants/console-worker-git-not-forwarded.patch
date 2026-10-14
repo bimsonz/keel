@@ -2,15 +2,15 @@
 # kills: handler.git-forward
 # why: a clone address's git paths are the page, so git clone is answered HTML
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index e7ec738a..6f8ccb97 100644
+index 2dd9da1a..6e8c2587 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -56,7 +56,7 @@ export function createConsole(): Console {
+@@ -107,7 +107,7 @@ export function createConsole(): Console {
      async fetch(request, env) {
        const { pathname } = new URL(request.url);
        if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
 -      if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
 +      if (KEELS.test(pathname)) return env.KEEL.fetch(request);
-       return env.ASSETS.fetch(request);
-     },
-   };
+       if (nowhere(pathname)) {
+         // The built page draws its own not-found; the answer says so too, to whoever reads only its status.
+         const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));

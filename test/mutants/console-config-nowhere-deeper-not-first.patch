@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: console.nowhere-first
+# why: the config runs the Worker first for `/admin` but not under it, so the page answers there 200
+diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
+index 33142cef..26635dff 100644
+--- a/apps/console/wrangler.jsonc
++++ b/apps/console/wrangler.jsonc
+@@ -40,7 +40,6 @@
+       "/install",
+       "/install/*",
+       "/admin",
+-      "/admin/*",
+       "/favicon.ico",
+       "/sitemap.xml",
+     ],

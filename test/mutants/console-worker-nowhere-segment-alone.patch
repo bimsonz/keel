@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.nowhere
+# why: a path under a segment nobody has is the page, where only the segment alone is not found
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 2dd9da1a..d906f7cf 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -95,7 +95,7 @@ export const NOWHERE: readonly string[] = Object.entries(ANSWERS)
+  * none of. Keel's own pages are found by its catalogue and `/llms.txt`, and a project's by its namespace's page.
+  */
+ function nowhere(pathname: string): boolean {
+-  return pathname === "/sitemap.xml" || NOWHERE.includes(pathname.split("/")[1] ?? "");
++  return pathname === "/sitemap.xml" || NOWHERE.some((segment) => pathname === `/${segment}`);
+ }
+ 
+ export interface Console {
