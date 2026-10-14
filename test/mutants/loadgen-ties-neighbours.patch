@@ -2,14 +2,14 @@
 # kills: loadgen.ties-contradiction
 # why: Neighbours count as ties: every subject overlap becomes a reported conflict, and decoys score as false positives
 diff --git a/examples/loadgen/src/report.ts b/examples/loadgen/src/report.ts
-index 24fe2502..cfee91c3 100644
+index 24fe2502..e459de88 100644
 --- a/examples/loadgen/src/report.ts
 +++ b/examples/loadgen/src/report.ts
-@@ -187,6 +187,7 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
-     else if (p._tag === "PreflightIssued")
-       for (const c of p.contradictions) {
-         tie(p.changeId, c.holder);
-+        for (const n of p.neighbours) tie(p.changeId, n.changeId);
-         if (c.holder === p.changeId)
-           for (const other of holders.get(said(c.with)) ?? []) tie(p.changeId, other);
-       }
+@@ -173,6 +173,7 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
+   };
+   for (const e of events) {
+     const p = e.payload;
++    if (p._tag === "PreflightIssued") for (const n of p.neighbours) tie(p.changeId, n.changeId);
+     if (p._tag === "PremiseRelied") holds(p.premise, p.changeId);
+     else if (p._tag === "EffectsDerived")
+       for (const effect of p.effects) holds(Reflect.get(Object(effect), "proposition"), p.changeId);

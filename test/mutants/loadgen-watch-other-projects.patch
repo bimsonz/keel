@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/watch.test.ts
+# kills: loadgen.watch-nth
+# why: The reader takes another project's events as its own: a change of the same id elsewhere settles an agent's
+diff --git a/examples/loadgen/src/watch.ts b/examples/loadgen/src/watch.ts
+index 30fb1227..f3d09e52 100644
+--- a/examples/loadgen/src/watch.ts
++++ b/examples/loadgen/src/watch.ts
+@@ -51,7 +51,6 @@ export class Watch {
+   /** Takes in one page of events, settling whoever waits on them. */
+   take(page: readonly KeelEvent[]): void {
+     for (const e of page) {
+-      if (e.project !== this.#project) continue;
+       this.events.push(e);
+       const state = SETTLES[e.payload._tag];
+       const changeId: unknown = Reflect.get(e.payload, "changeId");

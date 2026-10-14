@@ -4,7 +4,7 @@ import { apply, type Task } from "./plan.ts";
 /**
  * One synthetic agent: a run of the loadgen account, scripted, with no model.
  * It declares its task, commits its file through Keel's API (no clone),
- * submits, and waits for the change to settle. When it bounces it rebases,
+ * submits, and waits for the change to settle, as the run's reader sees it. When it bounces it rebases,
  * writes its edit again on the new base and submits again, three times at
  * most, as Keel's own agents are told to.
  */
@@ -20,7 +20,6 @@ export interface AgentResult {
 }
 
 export const MAX_SUBMISSIONS = 3;
-const SETTLED: ReadonlySet<string> = new Set(["landed", "bounced", "withdrawn", "superseded"]);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** How long to wait before asking again, or undefined when the refusal is the answer. */
@@ -70,23 +69,18 @@ async function readAt(
   }
 }
 
-/** Waits on the change's status until it settles or the deadline passes. */
-async function settle(client: KeelClient, changeId: string, deadline: number): Promise<string> {
-  for (;;) {
-    const wait = Math.max(1, Math.min(30, Math.ceil((deadline - Date.now()) / 1000)));
-    // oxlint-disable-next-line no-await-in-loop -- a long poll asks again only once answered
-    const { result } = await patiently(() => client.status(changeId, { wait }), deadline);
-    if (SETTLED.has(result.state) || Date.now() >= deadline) return result.state;
-  }
-}
-
 export async function work(
   client: KeelClient,
   project: string,
   task: Task,
-  options: { readonly key: string; readonly deadline: number },
+  options: {
+    readonly key: string;
+    readonly deadline: number;
+    /** How the change's `nth` submission settled: from the run's one reader, so a waiting agent holds no token. */
+    readonly settled: (changeId: string, nth: number) => Promise<string>;
+  },
 ): Promise<AgentResult> {
-  const { key, deadline } = options;
+  const { key, deadline, settled } = options;
   let changeId: string | undefined;
   let submissions = 0;
   try {
@@ -153,7 +147,10 @@ export async function work(
         deadline,
       );
       // oxlint-disable-next-line no-await-in-loop -- each step waits on the last
-      const state = await settle(client, id, deadline);
+      const state = await Promise.race([
+        settled(id, n),
+        sleep(Math.max(0, deadline - Date.now())).then(() => "unsettled by the deadline"),
+      ]);
       if (state === "landed")
         return { index: task.index, changeId, outcome: "landed", submissions, declareMs };
       if (state !== "bounced" || submissions === MAX_SUBMISSIONS) {

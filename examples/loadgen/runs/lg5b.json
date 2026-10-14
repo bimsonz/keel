@@ -1,0 +1,131 @@
+{
+  "run": "lg5b",
+  "seed": 43,
+  "keel": "https://keel.town",
+  "project": "agent-0m08rafzfr0zbf0j/loadgen",
+  "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+  "verification": "off, the owner's setting; no suite, no guards; this measures coordination and the Trunk, not CI",
+  "maxBatchSize": 16,
+  "keySha256": "e8ec2e51afeca81109c1f3ac37098d774c2af27cf3b1e8da68ee25434d1bb459",
+  "baseCommit": "1dbe18162615bfb4b4679706b2d70b4630f58575",
+  "trunkHead": "628427b363d22a38f5b3f08404d25dc6997bd45f",
+  "endedAt": "2026-10-14T16:34:06.724Z",
+  "timedOut": false,
+  "tokenRefusals": 0,
+  "outcomes": {
+    "landed": 5,
+    "gaveUp": 0,
+    "failed": 0,
+    "reasons": []
+  },
+  "report": {
+    "agents": 5,
+    "declared": 5,
+    "landed": 5,
+    "bounces": 0,
+    "notLanded": 0,
+    "contentionDensity": 0.4,
+    "reworkRate": 0,
+    "queueMs": {
+      "p50": 40539,
+      "p95": 62753
+    },
+    "preflightMs": {
+      "p50": 1250,
+      "p99": 2921
+    },
+    "trunk": {
+      "promotions": 5,
+      "promotionsPerSecond": 0.05663861167435064,
+      "changesPerGroupCommit": {
+        "mean": 1,
+        "max": 1
+      },
+      "promotionMs": {
+        "p50": 11854,
+        "p95": 12340
+      }
+    }
+  },
+  "trunkBreaks": 0,
+  "breaks": [],
+  "bench": {
+    "byKind": {
+      "premise": {
+        "planted": 1,
+        "recalled": 1,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "effect": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "textual": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "interaction": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      }
+    },
+    "unrun": 0,
+    "recall": 1,
+    "falsePositiveRate": null,
+    "passes": {
+      "recall": true,
+      "decoys": false
+    }
+  },
+  "bothLanded": [
+    {
+      "pair": 0,
+      "kind": "premise",
+      "planted": true
+    }
+  ],
+  "agents": [
+    {
+      "index": 0,
+      "changeId": "chg_01M4XM44HR44S77F8WFWAP9EWV",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2699
+    },
+    {
+      "index": 1,
+      "changeId": "chg_01M4XM4508JQR8SZDT758N3YKK",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1025
+    },
+    {
+      "index": 2,
+      "changeId": "chg_01M4XM46PVMEYP9Q9K9JJH0ZNE",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1250
+    },
+    {
+      "index": 3,
+      "changeId": "chg_01M4XM463GB5TME0CYYWZ79V87",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1131
+    },
+    {
+      "index": 4,
+      "changeId": "chg_01M4XM44RXBSF411HYG7H8VVAT",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2921
+    }
+  ]
+}

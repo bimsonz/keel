@@ -26,6 +26,7 @@ import { compare, expectedTrunk } from "../src/integrity.ts";
 import { Pace, TOKENS_PER_MINUTE, paced } from "../src/limits.ts";
 import { anchoredAt, planRun, sealed, type Plan } from "../src/plan.ts";
 import { summarise, ties, type KeelEvent } from "../src/report.ts";
+import { Watch } from "../src/watch.ts";
 
 const { values } = parseArgs({
   options: {
@@ -112,20 +113,23 @@ const client = (runLabel: string, project?: string) =>
 
 // The project, the account's own, with verification off and batches of up to 16.
 const own = client(`lg-${run}-owner`);
+// The account's own private project isn't in the list it can read, so its id is kept beside the key.
 async function projectId(): Promise<string> {
-  for (let cursor: string | undefined; ;) {
-    // oxlint-disable-next-line no-await-in-loop -- page after page
-    const page = await own.projects({ limit: 100, ...(cursor === undefined ? {} : { cursor }) });
-    const found = page.items.find(
-      (p) => p.name === values.project && p.namespace.handle === me.handle,
-    );
-    if (found !== undefined) return found.id;
-    if (page.nextCursor === undefined || page.items.length === 0) break;
-    cursor = page.nextCursor;
-  }
+  const held: unknown = JSON.parse(readFileSync(keep, "utf8"));
+  const projects: unknown = Reflect.get(Object(held), "projects");
+  const known: unknown = Reflect.get(Object(projects), values.project);
+  if (typeof known === "string") return known;
   const made = await own.createProject(
     { namespace: me.handle, name: values.project, source: { kind: "empty" } },
     { idempotencyKey: `lg:project:${values.project}` },
+  );
+  writeFileSync(
+    keep,
+    JSON.stringify({
+      ...Object(held),
+      projects: { ...Object(projects), [values.project]: made.id },
+    }),
+    { mode: 0o600 },
   );
   log(`made ${me.handle}/${values.project} (${made.id}), empty`);
   return made.id;
@@ -217,6 +221,8 @@ const anchored: Plan = anchoredAt(plan, baseCommit);
 
 // The agents: every run at once; the token pace sets how fast they start.
 const results: AgentResult[] = [];
+const watch = new Watch(reader, project, start.cursor);
+const following = watch.follow(() => results.length === count);
 const progress = setInterval(() => {
   const by = (o: AgentResult["outcome"]) => results.filter((r) => r.outcome === o).length;
   log(
@@ -228,14 +234,17 @@ await Promise.all(
     const result = await work(client(`lg-${run}-${task.index}`, project), project, task, {
       key: `lg:${run}:${task.index}`,
       deadline,
+      settled: (changeId, nth) => watch.settled(changeId, nth),
     });
     results.push(result);
   }),
 );
 clearInterval(progress);
+await following;
 
-// Keel's record of the run, read back.
-const { events } = await eventsAfter(reader, start.cursor);
+// Keel's record of the run, read back: the watch's events, and any after its last page.
+const { events: after } = await eventsAfter(reader, watch.cursor);
+const events = [...watch.events, ...after];
 const changeOf = new Map(
   results.flatMap((r) => (r.changeId === undefined ? [] : [[r.index, r.changeId] as const])),
 );

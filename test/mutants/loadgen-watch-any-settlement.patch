@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/watch.test.ts
+# kills: loadgen.watch-nth
+# why: Every waiter on a change settles on its first settlement: a resubmission is told it bounced again before it is even judged
+diff --git a/examples/loadgen/src/watch.ts b/examples/loadgen/src/watch.ts
+index 30fb1227..d71385ca 100644
+--- a/examples/loadgen/src/watch.ts
++++ b/examples/loadgen/src/watch.ts
+@@ -59,7 +59,7 @@ export class Watch {
+       const so = [...(this.#settled.get(changeId) ?? []), state];
+       this.#settled.set(changeId, so);
+       const waiting = this.#waiting.get(changeId) ?? [];
+-      for (const waiter of waiting.filter((w) => w.nth <= so.length))
++      for (const waiter of waiting.filter(() => true))
+         waiter.resolve(so[waiter.nth - 1] ?? state);
+       this.#waiting.set(
+         changeId,
