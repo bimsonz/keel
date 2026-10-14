@@ -162,4 +162,4 @@ The runner's own controls are `node scripts/prove-red.ts --dir test/controls/pro
 
 - `main` is trunk. Keep changes small, rebase on `main` before you push, and keep `main` green: a change that turns it red is fixed or reverted at once.
 - Commit messages are plain and imperative. The subject says what changed; the body, when there is one, says why, in the author's own words. Never `--no-verify`.
-- After the `contracts-v0` tag, contract changes are additive (a new operation, an optional field, a new port method) and each one gets a line in [CHANGELOG.md](CHANGELOG.md). A breaking change is marked as one in its CHANGELOG entry and says what a caller must do.
+- After the `contracts-v0` tag, contract changes are additive (a new operation, an optional field, a new port method) and each one gets an entry: a fragment of its own in `changes/unreleased/` ([changes/README.md](changes/README.md)), never a line in CHANGELOG.md, whose Unreleased section the `changelog-fragments` guard keeps empty. A breaking change is listed under `### Changed (breaking)` and says what a caller must do.

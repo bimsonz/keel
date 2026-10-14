@@ -1,0 +1,3 @@
+### Changed
+
+- **The JS/TS default pack runs the project's typecheck script beside its tests.** When the root `package.json` of a project with no Worker tooling has a `typecheck` script (a non-empty string), the pack adds the step `js-ts.typecheck`, side by side with `js-ts.suite`: it runs `pnpm run typecheck` as a command of the project's own in Tier 2, judged by its exit, so a type error bounces the change even when every test passes. The pack's reason reads `js-ts: package.json, with a typecheck script`. A project's `.keel/flow.json` still replaces the defaults, and may name the step. The worker-app pack is unchanged: it runs `tsc --noEmit` as `worker-app.typecheck`.

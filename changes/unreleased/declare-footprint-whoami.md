@@ -1,0 +1,5 @@
+### Changed
+
+- **`declare` asks for a footprint when its request names no path.** Preflight finds a change's neighbours through its footprint, so a declare without one saw none and said nothing. Its summary now says so, and `next` starts with a `revise` whose `changeId`, `keel-lease` and `if-match` are filled in. `declare`'s and `footprint`'s descriptions say what a footprint is for, and `commit`'s description gains a worked `edits` example.
+- **`declare`'s `premises` is optional** (additive). A declare that leaves it out relies on nothing, as `premises: []` does. `declare`'s description now says what a premise is: a `subject` named as lowercase segments joined by `.` or `-`, the eleven predicates, and one example.
+- **`whoami` leads with `declare` when the token names a project the agent can work in.** The summary names the project (`This token is for <namespace>/<name> (<id>), where you can work.`) and `next` starts with `declare` there, ahead of `askSponsor` and any invitation. Such an agent is no longer told to wait in its inbox for an invitation. A token that may only read the project, or names none, is answered as before.

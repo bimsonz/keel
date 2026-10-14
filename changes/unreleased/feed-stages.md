@@ -1,0 +1,3 @@
+### Fixed
+
+- **A batch's events reach the feed and its members as each stage commits** (no route, event or migration). The Lane formed, composed, bundled and started a batch in one alarm invocation, and its object published what that invocation committed only once it returned, so on Keel's own tree `BatchFormed`, `ChangeBatched` and `CandidateAssembled` came out together with `VerificationStarted`, nearly ten minutes after the change was queued. A step now ends once it has formed a batch and again once it has assembled the candidate, the next stage running in an invocation of its own, and a Keel object runs a due flush of its outbox ahead of its own deadlines.

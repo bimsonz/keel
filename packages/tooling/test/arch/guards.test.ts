@@ -69,6 +69,13 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /builds a key under ns\/ by hand/,
   ],
   "patches-apply": [/does not apply: patch failed: notes\.txt:1/],
+  "changelog-fragments": [
+    /the Unreleased section holds an entry: write it as a fragment/,
+    /### Improved is not a changelog section/,
+    /### Fixed holds no entry/,
+    /text before the first "### <section>" heading/,
+    /is not a fragment: a fragment is a \.md file/,
+  ],
   R1: [
     /outside the domain/,
     /package hono/,

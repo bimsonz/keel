@@ -1,4 +1,5 @@
 import type { GuardOptions, GuardResult } from "./guard.ts";
+import { CHANGELOG_FRAGMENTS, checkChangelogFragments } from "./guards/changelog-fragments.ts";
 import { checkEventNames, EVENT_NAMES } from "./guards/event-names.ts";
 import { checkLintConfig, LINT_CONFIG } from "./guards/lint-config.ts";
 import { checkLoaderSpec, LOADER_SPEC } from "./guards/loader-spec.ts";
@@ -59,6 +60,7 @@ export const guards: readonly RegisteredGuard[] = [
     controlCanary: "apps/keel/src/adapters/driven/r2/bundle-store.ts",
   },
   { name: PATCHES_APPLY, run: checkPatchesApply, controlCanary: "test/mutants/stale.patch" },
+  { name: CHANGELOG_FRAGMENTS, run: checkChangelogFragments, controlCanary: "CHANGELOG.md" },
 ];
 
 /**

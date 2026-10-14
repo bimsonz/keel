@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t changelog-fragments
+# why: an entry written in CHANGELOG.md's Unreleased section passes
+diff --git a/packages/tooling/src/guards/changelog-fragments.ts b/packages/tooling/src/guards/changelog-fragments.ts
+index 8b3ea826..4499825f 100644
+--- a/packages/tooling/src/guards/changelog-fragments.ts
++++ b/packages/tooling/src/guards/changelog-fragments.ts
+@@ -28,7 +28,7 @@ export function checkChangelogFragments(root: string, options: GuardOptions = {}
+         message: 'has no "## Unreleased" heading for a release to fold the fragments under',
+       });
+     const end = lines.findIndex((text, index) => index > at && text.startsWith("## "));
+-    const unreleased = at < 0 ? [] : lines.slice(at + 1, end < 0 ? lines.length : end);
++    const unreleased = at < 0 ? [] : lines.slice(at + 1, at + 1);
+     unreleased.forEach((text, offset) => {
+       if (text.trim() !== "")
+         violations.push({

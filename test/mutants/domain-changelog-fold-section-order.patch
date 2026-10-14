@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/changelog.test.ts
+# kills: changelog.fold
+# why: sections print in the order fragments first name them
+diff --git a/packages/tooling/src/changelog.ts b/packages/tooling/src/changelog.ts
+index c069b6fc..ce8b9f2a 100644
+--- a/packages/tooling/src/changelog.ts
++++ b/packages/tooling/src/changelog.ts
+@@ -117,7 +117,7 @@ export function foldFragments(fragments: readonly Fragment[]): string {
+     for (const [section, body] of parsed.entries)
+       bySection.set(section, [...(bySection.get(section) ?? []), body]);
+   }
+-  return SECTIONS.filter((section) => bySection.has(section))
++  return [...bySection.keys()]
+     .map((section) =>
+       [`### ${section}`, "", (bySection.get(section) ?? []).join("\n\n")].join("\n"),
+     )

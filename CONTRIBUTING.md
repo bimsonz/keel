@@ -41,7 +41,7 @@ Write plain, imperative subjects that say what changed, such as "Refuse a lease 
 
 - Open pull requests against `main`, rebased on its current head.
 - Say what the change does and why, and how you checked it.
-- A change to a contract (the API in `packages/spec`, the ports, the DO RPC contracts or the runner protocol) adds a line to [CHANGELOG.md](CHANGELOG.md). Contract changes are additive; a breaking change says so in its entry and in the pull request.
+- A change to a contract (the API in `packages/spec`, the ports, the DO RPC contracts or the runner protocol) adds a changelog fragment, a file of its own in `changes/unreleased/` ([changes/README.md](changes/README.md)), rather than a line in [CHANGELOG.md](CHANGELOG.md), which a release writes. Contract changes are additive; a breaking change says so in its entry and in the pull request.
 - Read the relevant [ADR](docs/adr) before changing a boundary one fixes.
 
 ## Reporting a vulnerability

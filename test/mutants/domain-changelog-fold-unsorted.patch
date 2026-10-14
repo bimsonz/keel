@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/changelog.test.ts
+# kills: changelog.fold
+# why: fragments are folded in the order they were read, not by name
+diff --git a/packages/tooling/src/changelog.ts b/packages/tooling/src/changelog.ts
+index c069b6fc..aa9f3882 100644
+--- a/packages/tooling/src/changelog.ts
++++ b/packages/tooling/src/changelog.ts
+@@ -109,7 +109,7 @@ export interface Fragment {
+  */
+ export function foldFragments(fragments: readonly Fragment[]): string {
+   const bySection = new Map<Section, string[]>();
+-  for (const fragment of fragments.toSorted((a, b) =>
++  for (const fragment of fragments.slice(0).toSorted(() => 0) ?? fragments.toSorted((a, b) =>
+     a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+   )) {
+     const parsed = parseFragment(fragment.text);

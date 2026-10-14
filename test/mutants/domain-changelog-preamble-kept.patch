@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/changelog.test.ts
+# kills: changelog.parse
+# why: text before a fragment's first heading is let through
+diff --git a/packages/tooling/src/changelog.ts b/packages/tooling/src/changelog.ts
+index c069b6fc..5fa26364 100644
+--- a/packages/tooling/src/changelog.ts
++++ b/packages/tooling/src/changelog.ts
+@@ -87,7 +87,7 @@ export function parseFragment(text: string): ParsedFragment {
+       return;
+     }
+     if (open !== undefined) open.body.push(written);
+-    else if (!headed && written.trim() !== "")
++    else if (!headed && written.trim() === "#")
+       problems.push({ line, message: 'text before the first "### <section>" heading' });
+   });
+   close();

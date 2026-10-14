@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/changelog.test.ts
+# kills: changelog.parse
+# why: a heading that names no changelog section is read as one
+diff --git a/packages/tooling/src/changelog.ts b/packages/tooling/src/changelog.ts
+index c069b6fc..e309b8d0 100644
+--- a/packages/tooling/src/changelog.ts
++++ b/packages/tooling/src/changelog.ts
+@@ -76,7 +76,7 @@ export function parseFragment(text: string): ParsedFragment {
+       const heading = /^### (.+?)\s*$/.exec(written)?.[1];
+       if (heading === undefined)
+         problems.push({ line, message: `${written.trim()} is not a "### <section>" heading` });
+-      else if (!isSection(heading))
++      else if (!isSection(heading) && heading === "")
+         problems.push({
+           line,
+           message: `### ${heading} is not a changelog section (${SECTIONS.join(", ")})`,

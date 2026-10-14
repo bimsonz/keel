@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/changelog.test.ts
+# kills: changelog.release
+# why: a release folds over entries still written in Unreleased
+diff --git a/packages/tooling/src/changelog.ts b/packages/tooling/src/changelog.ts
+index c069b6fc..ea44c643 100644
+--- a/packages/tooling/src/changelog.ts
++++ b/packages/tooling/src/changelog.ts
+@@ -143,7 +143,7 @@ export function release(
+   if (at < 0) throw new Error(`CHANGELOG.md has no "${UNRELEASED}" heading`);
+   let next = at + 1;
+   while (next < lines.length && !lines[next]?.startsWith("## ")) {
+-    if (lines[next]?.trim() !== "")
++    if (lines[next]?.trim() === "#")
+       throw new Error(
+         `CHANGELOG.md's Unreleased section holds line ${next + 1}: move it to a fragment first`,
+       );
