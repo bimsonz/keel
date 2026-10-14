@@ -82,9 +82,9 @@ A person signs in with \`login\`: Keel names a page to open, the sign-in is appr
 is kept in this machine's key store, never in a file (--print-token prints its token once where
 there is no store, for KEEL_SESSION). \`auth setup-git\` has git ask keeltown for it, so a private
 project clones with nothing pasted, and \`logout\` ends it at Keel and here. With no agent's
-credential on the machine, a command runs as the person signed in. \`project invite\` runs only as
-the person (or KEEL_SESSION), never as an agent, and Keel wants a \`login\` approved with a passkey
-in the last ten minutes for it.
+credential on the machine, a command runs as the person signed in, and \`whoami\` says who that is.
+\`project invite\` runs only as the person (or KEEL_SESSION), never as an agent, and Keel wants a
+\`login\` approved with a passkey in the last ten minutes for it.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -527,6 +527,16 @@ async function personCommand(
   return undefined;
 }
 
+/** A client, and whether it acts as an agent or as a person. */
+interface Acting {
+  readonly client: KeelClient;
+  readonly as: "agent" | "person";
+}
+
+const asAgent = (client: KeelClient): Acting => ({ client, as: "agent" });
+const asPerson = (client: KeelClient | undefined): Acting | undefined =>
+  client === undefined ? undefined : { client, as: "person" };
+
 /**
  * The client a work command runs as: an agent's secret or a user's session
  * when set, else the agent this machine holds a key for, else the person
@@ -537,26 +547,28 @@ async function clientFor(
   values: ReturnType<typeof parse>["values"],
   baseUrl: string,
   entry: string,
-): Promise<KeelClient | undefined> {
+): Promise<Acting | undefined> {
   const clientId = io.env["KEEL_CLIENT_ID"];
   const clientSecret = io.env["KEEL_CLIENT_SECRET"];
   const session = io.env["KEEL_SESSION"];
   const fetch = io.fetch === undefined ? {} : { fetch: io.fetch };
   // An agent's credentials win when both are set: work is an agent's.
   if (clientId !== undefined && clientSecret !== undefined)
-    return createKeelClient({ baseUrl, clientId, clientSecret, ...fetch });
-  if (session !== undefined) return createKeelClient({ baseUrl, session, ...fetch });
+    return asAgent(createKeelClient({ baseUrl, clientId, clientSecret, ...fetch }));
+  if (session !== undefined) return asPerson(createKeelClient({ baseUrl, session, ...fetch }));
   const held = await signedUpKey(io, entry);
   if (held !== undefined)
-    return createKeelClient({
-      baseUrl,
-      agentId: held.agentId,
-      key: held.signer,
-      ...target(values, io.env),
-      ...fetch,
-    });
+    return asAgent(
+      createKeelClient({
+        baseUrl,
+        agentId: held.agentId,
+        key: held.signer,
+        ...target(values, io.env),
+        ...fetch,
+      }),
+    );
   // No agent's credential at all: the person signed in on this machine.
-  return personFor(io, baseUrl, entry);
+  return asPerson(await personFor(io, baseUrl, entry));
 }
 
 const PERSON_ONLY =
@@ -606,20 +618,25 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     const about = await keyCommand(io, positionals.join(" "), values, baseUrl, entry);
     if (about !== undefined) return about;
     // An invitation is the person's to make, on a fresh sign-in, whatever agent this machine holds.
-    const asPerson = positionals.join(" ") === "project invite";
-    const client = asPerson
-      ? await personFor(io, baseUrl, entry)
+    const personOnly = positionals.join(" ") === "project invite";
+    const acting = personOnly
+      ? asPerson(await personFor(io, baseUrl, entry))
       : await clientFor(io, values, baseUrl, entry);
-    if (client === undefined) {
+    if (acting === undefined) {
       io.stderr(
-        asPerson
+        personOnly
           ? PERSON_ONLY
           : `${NO_KEY} Or run \`keeltown login\` to sign in as yourself, or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
       );
       return 2;
     }
+    const { client } = acting;
     if (positionals.join(" ") === "why") return await whyCommand(io, client, values);
-    const answer = await dispatch(client, positionals, values);
+    // `whoami` answers for whoever the command runs as: an agent's own record, or the person's.
+    const answer =
+      positionals.join(" ") === "whoami" && acting.as === "person"
+        ? await client.me()
+        : await dispatch(client, positionals, values);
     io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : summaryOf(answer));
     return 0;
   } catch (error) {

@@ -179,6 +179,8 @@ describe("keeltown, for a person signed in on this machine", () => {
     const asked = k.sent.slice(before);
     expect(asked.map(authorization)).toEqual([`Bearer ${TOKEN}`]);
     expect(asked[0]?.url.startsWith(`${ORIGIN}/v1/`)).toBe(true);
+    // `whoami` as a person reads the person's record: an agent's is refused to them.
+    expect(asked[0]?.url).toBe(`${ORIGIN}/v1/users/me`);
 
     const nobody = keel();
     expect(await run(["whoami"], nobody.io)).toBe(2);

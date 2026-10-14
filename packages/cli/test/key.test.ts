@@ -271,6 +271,7 @@ describe("keeltown, for an agent that holds a key", () => {
     await run(["agent", "signup"], session.io);
     expect(await run(["whoami"], session.io)).toBe(0);
     expect(session.sent.at(-1)?.headers.get("authorization")).toBe("Bearer sess-1");
+    expect(session.sent.at(-1)?.url).toBe(`${ORIGIN}/v1/users/me`);
     const nothing = keel();
     expect(await run(["whoami"], nothing.io)).toBe(2);
     expect(nothing.err.join("\n")).toMatch(/keeltown agent signup/);
