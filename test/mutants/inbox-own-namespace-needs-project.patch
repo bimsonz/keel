@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t "inbox.own-namespace"
+# kills: inbox.own-namespace
+# why: the inbox asks for a token that names a project, so an agent in no org, told by whoami to wait in its inbox for an invitation, is answered 500
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 9ea2a907..03ebb69b 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -937,7 +937,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+             ? agentsOnly(caller.requestId)
+             : run(
+                 caller,
+-                claimsOf(caller).pipe(
++                tokenOf(caller).pipe(
+                   Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
+                   Effect.map(inboxOk),
+                 ),
