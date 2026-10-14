@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-killed
+# why: Only a step that threw is counted: an invocation the platform killed mid-bundle is tried again however often it dies
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..cfec07a1 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1229,7 +1229,7 @@ const attempt = Effect.fn("integration/attempt")(function* (
+   stage: StepStage,
+ ) {
+   const failed =
+-    active.attempt?.stage === stage
++    active.attempt?.stage === stage && active.attempt.error !== undefined
+       ? [
+           ...(active.failed ?? []),
+           `${stage}: ${active.attempt.error ?? "the step died before it finished"}`,

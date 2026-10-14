@@ -42,7 +42,6 @@ import {
   AgentDirectory,
   type BatchVerdict,
   BatchVerification,
-  BundleRefused,
   CandidateBundles,
   CandidateComposer,
   type CandidateMember,
@@ -85,11 +84,15 @@ const MEMBER_EVENTS = [
 export const INFRA_FAILURE_LIMIT = 3;
 
 /**
- * A step that died this many times before its candidate was bundled stops
- * trying: the bundle is failed on the infrastructure for this round, which
- * requeues the change and counts towards `INFRA_FAILURE_LIMIT`.
+ * A batch whose compose, bundle or start has failed this many times (each a
+ * step that threw, or whose invocation died) is not tried again: the next
+ * step fails it on the infrastructure where it stands, which requeues its
+ * change and counts towards `INFRA_FAILURE_LIMIT`.
  */
-export const STEP_KILLS_BEFORE_INFRA = 2;
+export const STEP_FAILURES_BEFORE_INFRA = 3;
+
+/** How much of a thrown step's error a batch keeps with its attempt. */
+const STEP_ERROR_MAX = 300;
 
 /** A green batch trunk has not answered is first re-offered this long after its BatchVerified. */
 export const REOFFER_AFTER_MS = 30_000;
@@ -121,6 +124,20 @@ const ActiveBatch = Schema.Struct({
   started: Schema.optional(Schema.Boolean),
   /** Trunk declined to promote the green batch: it is invalidated, and its members go back to the queue. */
   declined: Schema.optional(Schema.Boolean),
+  /**
+   * The compose, bundle or start a step is attempting, marked before it runs:
+   * a step that finds its own stage still marked knows that attempt failed,
+   * whether it threw (`error`, as the Lane DO recorded it) or the invocation
+   * running it died.
+   */
+  attempt: Schema.optional(
+    Schema.Struct({
+      stage: Schema.Literals(["compose", "bundle", "start"]),
+      error: Schema.optional(Schema.String),
+    }),
+  ),
+  /** Why each attempt at the batch's compose, bundle or start that did not get through failed, oldest first. */
+  failed: Schema.optional(Schema.Array(Schema.String)),
   /** The green batch's BatchVerified re-offered to trunk so far, and when the last went (epoch ms). */
   reoffered: Schema.optional(Schema.Struct({ count: Schema.Int, at: Schema.Number })),
 });
@@ -578,27 +595,34 @@ export const BOX_INFRA_REASONS: ReadonlySet<string> = new Set([
   "box-check",
 ]);
 
+/** The id a verdict the Lane issues is minted with. */
+type IssuedId = Extract<CandidateCommand, { readonly _tag: "RefuseBundle" }>["verdictId"];
+
 /**
- * A composition MergeBox refused for its own sake: blamed on infra, so the
- * Change DO requeues the members and the verdict holds them, until a batch
- * of one is refused that way the INFRA_FAILURE_LIMIT-th time in a row: then
- * the change bounces, told to submit again unchanged once the box is back.
+ * A batch failed on the infrastructure before verification, by `refuse`
+ * (its composition or its bundle refused, blamed as `infraBlame` says): the
+ * Change DO requeues the members and the verdict holds them, waiting, until
+ * a batch of one is failed that way the INFRA_FAILURE_LIMIT-th time in a
+ * row: then the change bounces, told to submit again once the
+ * infrastructure is back.
  */
-const holdForBox = Effect.fn("integration/holdForBox")(function* (
+const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
   lane: Lane,
   batch: Batch,
-  refused: CompositionRefused,
+  cause: string,
+  refuse: (verdictId: IssuedId, attribution: ChangeId | "infra") => CandidateCommand,
+  refusal: string,
+  wait: string,
 ) {
   const verdictId = yield* (yield* Ids).next("vrd");
-  const refusal = `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd();
   let exhausted: string | undefined;
-  yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => {
+  yield* onBatch(lane.laneId, batch.id, cause, (_, now) => {
     const infra = infraBlame(now, batch, refusal);
     exhausted = infra.exhausted;
     return {
       moves: [
         {
-          command: { _tag: "RefuseComposition", verdictId, attribution: infra.attribution },
+          command: refuse(verdictId, infra.attribution),
           before: [
             verdictDraft(
               VerdictIssued.make({
@@ -608,13 +632,7 @@ const holdForBox = Effect.fn("integration/holdForBox")(function* (
                 evidence: infra.exhausted === undefined ? [refusal] : [infra.exhausted, refusal],
                 nextActions:
                   infra.exhausted === undefined
-                    ? [
-                        {
-                          kind: "wait",
-                          title:
-                            "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
-                        },
-                      ]
+                    ? [{ kind: "wait", title: wait }]
                     : afterInfra(batch, INFRA_FAILURE_LIMIT),
               }),
               batch.members,
@@ -627,6 +645,17 @@ const holdForBox = Effect.fn("integration/holdForBox")(function* (
   }).pipe(Effect.orDie);
   if (exhausted !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${exhausted}`);
 });
+
+/** A composition MergeBox refused for its own sake: held on the infrastructure. */
+const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
+  holdOnInfra(
+    lane,
+    batch,
+    `compose-refused:${batch.id}`,
+    (verdictId, attribution) => ({ _tag: "RefuseComposition", verdictId, attribution }),
+    `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd(),
+    "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
+  );
 
 /** A composition refused for the batch's sake: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
 const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
@@ -823,31 +852,19 @@ export const bundleBlame = Effect.fn("integration/bundleBlame")(function* (
  * Bundles the composed candidate for KeelVerify. A refused bundle fails the
  * batch through RefuseBundle with the verdict first: on the member whose
  * commit introduced the entry, or `infra` when the base already held it.
- * `kills` is how often this step's invocation died before it got here: at
- * `STEP_KILLS_BEFORE_INFRA` the bundle is not tried again and is refused on
- * `infra`, since a bundle too heavy for one step would otherwise be started
- * until its deadline is given up on, with the lane held behind it.
  */
 const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
   lane: Lane,
   active: ActiveBatch,
   batch: Batch,
   composed: NonNullable<ActiveBatch["composed"]>,
-  kills: number,
 ) {
   const staging = projectRepos(lane.projectId).staging;
   // A project with no place never has a batch: its Precheck ends before it compiles a plan.
   const namespace = yield* projectNamespace(lane.projectId).pipe(Effect.orDie);
-  const bundled =
-    kills >= STEP_KILLS_BEFORE_INFRA
-      ? Result.fail(
-          new BundleRefused({
-            reason: `the lane's step was killed ${kills} times before the candidate was bundled`,
-          }),
-        )
-      : yield* Effect.result(
-          (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha, lane.lastBundle),
-        );
+  const bundled = yield* Effect.result(
+    (yield* CandidateBundles).bundle(namespace, staging, composed.commitSha, lane.lastBundle),
+  );
   if (Result.isSuccess(bundled)) {
     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
       ...now,
@@ -1147,20 +1164,133 @@ export const destroyLane = Effect.fn("integration/destroyLane")(function* (
   );
 });
 
-/** Where a lane stands after a step: nothing to do, or waiting on a verdict, trunk, or the domain. */
-export type LaneStep = "idle" | "waiting";
+type StepStage = NonNullable<ActiveBatch["attempt"]>["stage"];
+
+/**
+ * A batch whose compose, bundle or start failed STEP_FAILURES_BEFORE_INFRA
+ * times, failed on the infrastructure where it stands so the lane moves on.
+ * A forming batch's composition or an assembled one's bundle is refused and
+ * held, as MergeBox's own failures are; a verifying batch whose instance was
+ * never made is parked, as KeelVerify's infra failures are. Either requeues
+ * the change, and a batch of one failed so the INFRA_FAILURE_LIMIT-th time
+ * in a row bounces.
+ */
+const failOnSteps = Effect.fn("integration/failOnSteps")(function* (
+  lane: Lane,
+  active: ActiveBatch,
+  batch: Batch,
+  failed: readonly string[],
+) {
+  const evidence = `step-failed x${failed.length}: ${failed.join("; ")}`;
+  yield* Effect.logError(
+    `lane ${lane.laneId} failed ${batch.id} on the infrastructure: ${evidence}`,
+  );
+  if (batch.state === "verifying") {
+    yield* issue(
+      lane.laneId,
+      batch,
+      `step-failed:${batch.id}`,
+      {
+        verdictId: yield* (yield* Ids).next("vrd"),
+        outcome: "park",
+        planHash: yield* plannedOf(active),
+        evidence: [evidence],
+        failingTests: [],
+      },
+      { attempt: batch.attempt, chainEpoch: batch.chainEpoch },
+    ).pipe(Effect.orDie);
+    return;
+  }
+  yield* holdOnInfra(
+    lane,
+    batch,
+    `step-failed:${batch.id}`,
+    (verdictId, attribution) =>
+      batch.state === "forming"
+        ? { _tag: "RefuseComposition", verdictId, attribution }
+        : { _tag: "RefuseBundle", verdictId, attribution },
+    evidence,
+    "Keel could not compose, bundle or start verifying the batch, through no fault of the change: Keel puts it back in the queue",
+  );
+});
+
+/**
+ * Marks the batch's `stage` as attempted before the step runs it, and
+ * answers the batch as marked. The same stage still marked by a step before
+ * is an attempt that did not get through, failed with the error the Lane DO
+ * recorded or, with none, by an invocation that died: every such attempt of
+ * the batch counts, at any of its stages. At STEP_FAILURES_BEFORE_INFRA the
+ * batch is failed on the infrastructure instead, and the answer is undefined.
+ */
+const attempt = Effect.fn("integration/attempt")(function* (
+  lane: Lane,
+  active: ActiveBatch,
+  batch: Batch,
+  stage: StepStage,
+) {
+  const failed =
+    active.attempt?.stage === stage
+      ? [
+          ...(active.failed ?? []),
+          `${stage}: ${active.attempt.error ?? "the step died before it finished"}`,
+        ]
+      : (active.failed ?? []);
+  if (failed.length >= STEP_FAILURES_BEFORE_INFRA) {
+    yield* failOnSteps(lane, active, batch, failed);
+    return undefined;
+  }
+  const marked: ActiveBatch = {
+    ...active,
+    attempt: { stage },
+    ...(failed.length === 0 ? {} : { failed }),
+  };
+  yield* noteLane(lane, `attempt:${batch.id}:${stage}:${failed.length}`, (now) =>
+    now.active?.batchId === batch.id ? { ...now, active: marked } : now,
+  );
+  return marked;
+});
+
+/**
+ * The Lane DO's record of a step that threw: kept with the batch's marked
+ * attempt, so the step that finds the attempt failed cites what threw.
+ */
+export const laneStepFailed = Effect.fn("integration/laneStepFailed")(function* (
+  laneId: string,
+  error: string,
+) {
+  const lane = laneOf(yield* EntityStore, laneId);
+  const batchId = lane?.active?.batchId;
+  if (lane === undefined || batchId === undefined || lane.active?.attempt === undefined) return;
+  yield* noteLane(lane, `step-failed:${batchId}`, (now) =>
+    now.active?.batchId !== batchId || now.active.attempt === undefined
+      ? now
+      : {
+          ...now,
+          active: {
+            ...now.active,
+            attempt: { ...now.active.attempt, error: error.slice(0, STEP_ERROR_MAX) },
+          },
+        },
+  );
+});
+
+/**
+ * Where a lane stands after a step: nothing to do, waiting on a verdict,
+ * trunk, or the domain, or `again`: it failed a batch on the infrastructure
+ * and goes on in a new invocation, so no one invocation tries two batches
+ * that may kill it.
+ */
+export type LaneStep = "idle" | "waiting" | "again";
 
 /**
  * Drives the lane as far as it can go without a reply from outside: follow
  * trunk, then Form → Compose → Bundle → Verify for the one batch in flight,
  * and one look at a verification that has outrun its budget. Every step
  * reads its I/O first and commits after, so a retry resumes where the last
- * commit left the lane. `starts` is how often this step was started for one
- * deadline: more than once when the invocation that ran it died.
+ * commit left the lane. Each compose, bundle and start is marked before it
+ * runs (`attempt`), so one that throws or dies is counted against its batch.
  */
-export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string, starts = 1) {
-  // The deaths count against the first bundle this run reaches, and against no later one.
-  let kills = starts - 1;
+export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string) {
   for (;;) {
     const store = yield* EntityStore;
     const lane = laneOf(store, laneId);
@@ -1189,25 +1319,28 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
       continue;
     }
     if (batch.state === "forming") {
-      yield* composeBatch(lane, active, batch);
+      const tried = yield* attempt(lane, active, batch, "compose");
+      if (tried === undefined) return "again" satisfies LaneStep;
+      yield* composeBatch(lane, tried, batch);
       continue;
     }
     if (batch.state === "assembled" && active.bundle === undefined) {
       if (active.composed === undefined)
         return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
+      const tried = yield* attempt(lane, active, batch, "bundle");
+      if (tried === undefined) return "again" satisfies LaneStep;
       const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
-      if (settings.verification === "off") yield* passUnverified(lane, active, batch);
-      else {
-        yield* bundleBatch(lane, active, batch, active.composed, kills);
-        kills = 0;
-      }
+      if (settings.verification === "off") yield* passUnverified(lane, tried, batch);
+      else yield* bundleBatch(lane, tried, batch, active.composed);
       continue;
     }
     if (
       active.bundle !== undefined &&
       (batch.state === "assembled" || (batch.state === "verifying" && active.started !== true))
     ) {
-      yield* verifyBatch(lane, active, batch, active.bundle);
+      const tried = yield* attempt(lane, active, batch, "start");
+      if (tried === undefined) return "again" satisfies LaneStep;
+      yield* verifyBatch(lane, tried, batch, active.bundle);
       continue;
     }
     // A verification past its budget gets one look, which settles it: the step then goes on.

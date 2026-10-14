@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.step-failures"
+# kills: lane.do.step-failures
+# why: After failing a batch at its bound the Lane object arms no step, so the change behind it waits for something else to wake the lane
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index b314f22d..62c1cea8 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -135,7 +135,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
+       this.failures = 0;
+       await this.armReoffer();
+       // A batch failed on the infrastructure: the lane goes on at once, in a new invocation.
+-      if (exit.value === "again") await this.step(Date.now());
++      if (exit.value === "again") return;
+       return;
+     }
+     this.failures += 1;

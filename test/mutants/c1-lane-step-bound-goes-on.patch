@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-failures, lane.step-killed
+# why: The step that fails a batch at its bound goes on to the next batch in the same invocation, which a heavy bundle can kill again under the same alarm
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..e97ef5e8 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1328,7 +1328,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       if (active.composed === undefined)
+         return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
+       const tried = yield* attempt(lane, active, batch, "bundle");
+-      if (tried === undefined) return "again" satisfies LaneStep;
++      if (tried === undefined) continue;
+       const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
+       if (settings.verification === "off") yield* passUnverified(lane, tried, batch);
+       else yield* bundleBatch(lane, tried, batch, active.composed);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-failures-compose
+# why: A forming batch at its bound is refused as a bundle, which the Candidate machine refuses before assembly, so the lane stalls on a compose that keeps throwing
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..0fffdd3f 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1206,7 +1206,7 @@ const failOnSteps = Effect.fn("integration/failOnSteps")(function* (
+     batch,
+     `step-failed:${batch.id}`,
+     (verdictId, attribution) =>
+-      batch.state === "forming"
++      batch.state === "assembled"
+         ? { _tag: "RefuseComposition", verdictId, attribution }
+         : { _tag: "RefuseBundle", verdictId, attribution },
+     evidence,

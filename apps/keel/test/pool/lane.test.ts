@@ -2,7 +2,7 @@
 // alarm takes the batch to Verifying, and recordVerdict through the RPC and
 // the Exit envelope lands it or refuses a fenced verdict. The driven adapters
 // are in memory, the backbone is the object's own storage.
-import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
   batchOf,
@@ -13,6 +13,7 @@ import {
 } from "@keeltown/core/application/integration";
 import { CommitSha, EventEnvelope, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
+  CandidateBundles,
   Changes,
   CodeHost,
   EntityStore,
@@ -52,10 +53,17 @@ import { placedIn } from "./pool-harness.ts";
 import { decodeExit, EventCodecs, LaneCodecs } from "../../src/rpc/index.ts";
 
 const MAIN = "refs/heads/main";
+const HOUR = 3_600_000;
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 
 /** A Lane DO for a fresh project, running on in-memory driven adapters (the pool shares the isolate). */
-async function lane(options: { readonly noStaging?: boolean } = {}) {
+async function lane(
+  options: {
+    readonly noStaging?: boolean;
+    /** The candidate bundler, in place of one in memory that always bundles. */
+    readonly bundles?: Layer.Layer<CandidateBundles>;
+  } = {},
+) {
   const projectId: ProjectId = makeId("prj", ulid());
   const laneId = `lane:${projectId}:main`;
   const stub = drainAfter(env.LANE.get(env.LANE.idFromName(laneId)));
@@ -145,7 +153,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
     changes,
     makeCandidateComposerMemory().layer,
     makeAgentDirectoryMemory().layer,
-    makeCandidateBundlesMemory().layer,
+    options.bundles ?? makeCandidateBundlesMemory().layer,
     verification.layer,
     makeStagingWriterMemory({
       get: () => stagingRefs()?.get(MAIN),
@@ -154,13 +162,16 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
     projects.layer,
     makePlacedProject(projectId).layer,
   );
-  await runInDurableObject(stub, (instance: LaneDO, state) => {
-    Reflect.set(
-      instance,
-      "runtime",
-      ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), driven)),
-    );
-  });
+  /** Gives the object its in-memory adapters: again after each eviction, as a fresh instance has its own. */
+  const install = () =>
+    runInDurableObject(stub, (instance: LaneDO, state) => {
+      Reflect.set(
+        instance,
+        "runtime",
+        ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), driven)),
+      );
+    });
+  await install();
   /** The candidate the composer pushed for `candidateId`: a commit on staging's base at its ref. */
   const pushCandidate = (candidateId: string) => {
     const ref = `refs/heads/cand/${candidateId}`;
@@ -169,7 +180,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
       code.fixture.commit(staging, ref, { "README.md": "keel\n", "src/retry.ts": "export {};\n" }),
     );
   };
-  return { stub, projectId, laneId, verification, writer, pushCandidate };
+  return { stub, projectId, laneId, verification, writer, pushCandidate, install };
 }
 
 /** The plan each queued change was compiled with, as its ChangeQueued names it. */
@@ -462,51 +473,100 @@ describe("the Lane DO", () => {
     await drainOutbox(stub);
   });
 
-  it("[lane.do.step-killed] the lane's deadline hands its step how often it was started: started a third time, it fails the batch's bundle on the infrastructure and starts no verification", async () => {
-    const { stub, laneId, verification } = await lane();
-    // The change is queued in the lane's own store, past the object's receive: no step is armed, so only the deadline under test runs one.
-    const event = Schema.decodeUnknownSync(EventEnvelope)(queued(laneId, 1));
+  it("[lane.do.step-failures] a bundle that throws in three steps is counted in the lane's storage past the object's eviction, with what it threw; the fourth step fails the batch on the infrastructure untried, and the step it arms at once bundles the next change", async () => {
+    const calls = { count: 0 };
+    const made = makeCandidateBundlesMemory();
+    const bundles = Layer.effect(
+      CandidateBundles,
+      Effect.gen(function* () {
+        const inner = yield* CandidateBundles;
+        return CandidateBundles.of({
+          bundle: (namespace, staging, commit, from) =>
+            Effect.suspend(() => {
+              calls.count += 1;
+              return calls.count <= 3
+                ? Effect.die(new RangeError("Array buffer allocation failed"))
+                : inner.bundle(namespace, staging, commit, from);
+            }),
+        });
+      }),
+    ).pipe(Layer.provide(made.layer));
+    const { stub, laneId, verification, install } = await lane({ bundles });
+    // The changes are queued in the lane's own store, past the object's receive: no step is armed, so only the steps under test run.
+    const events = [queued(laneId, 1), queued(laneId, 2)].map((e) =>
+      Schema.decodeUnknownSync(EventEnvelope)(e),
+    );
     await runInDurableObject(stub, (_instance: LaneDO, state) =>
       ManagedRuntime.make(backbone(state.storage)).runPromise(
         Effect.gen(function* () {
           const store = yield* EntityStore;
           const outbox = yield* EventOutbox;
           const at = Instant(0);
-          store.transaction(
-            () =>
-              outbox.receive(event.dedupeKey, at) &&
-              laneHeard({ store, outbox, at }, laneId, event),
-          );
+          for (const event of events)
+            store.transaction(
+              () =>
+                outbox.receive(event.dedupeKey, at) &&
+                laneHeard({ store, outbox, at }, laneId, event),
+            );
         }),
       ),
     );
-    // The step's request as two dead invocations leave it: started twice, never finished, and due.
-    await runInDurableObject(stub, async (_instance: LaneDO, state) => {
-      state.storage.sql.exec(
-        "INSERT INTO keel_alarms (reason, kind, at, starts) VALUES (?, 'debounce', ?, 2)",
-        LANE_STEP,
-        Date.now() - 1,
-      );
-      await state.storage.setAlarm(Date.now());
-    });
-    const infra = () =>
+    const read = <A>(f: (store: (typeof EntityStore)["Service"]) => A) =>
       runInDurableObject(stub, (_instance: LaneDO, state) =>
-        ManagedRuntime.make(backbone(state.storage)).runPromise(
-          Effect.map(EntityStore, (store) =>
-            laneOf(store, laneId)?.infra.map((entry) => entry.reasons),
-          ),
-        ),
+        ManagedRuntime.make(backbone(state.storage)).runPromise(Effect.map(EntityStore, f)),
       );
+    /** The lane's step, due now and run by its deadline, as the object's alarm runs it. */
+    const step = async () => {
+      await runInDurableObject(stub, (_instance: LaneDO, state) =>
+        scheduleAlarm(state.storage, { kind: "debounce", reason: LANE_STEP, at: Date.now() - 1 }),
+      );
+      await runDurableObjectAlarm(stub);
+    };
+    const oom = "RangeError: Array buffer allocation failed";
+    for (let n = 1; n <= 3; n += 1) {
+      await step();
+      // The platform may run the step before `step` does: wait for what this one recorded.
+      await vi.waitFor(
+        async () =>
+          expect(await read((store) => laneOf(store, laneId)?.active)).toMatchObject({
+            ...(n === 1 ? {} : { failed: Array.from({ length: n - 1 }, () => `bundle: ${oom}`) }),
+            attempt: { stage: "bundle", error: oom },
+          }),
+        { timeout: 10_000, interval: 25 },
+      );
+      // The retry the failed step armed is moved out of the way: only `step` runs one here.
+      await runInDurableObject(stub, (_instance: LaneDO, state) =>
+        scheduleAlarm(state.storage, {
+          kind: "debounce",
+          reason: LANE_STEP,
+          at: Date.now() + HOUR,
+        }),
+      );
+      // The object is evicted after each failed step: what it counted is in its storage alone.
+      await evictDurableObject(stub);
+      await install();
+    }
+    expect(calls.count).toBe(3);
+    await step();
+    await vi.waitFor(
+      async () =>
+        expect(
+          await read((store) => laneOf(store, laneId)?.infra.map((entry) => entry.reasons)),
+        ).toEqual([[`step-failed x3: bundle: ${oom}; bundle: ${oom}; bundle: ${oom}`]]),
+      { timeout: 10_000, interval: 25 },
+    );
+    expect(calls.count).toBe(3);
+    expect(verification.started.size).toBe(0);
+    // The step the object armed at once forms the next change's batch, bundles it and starts its verification.
     await vi.waitFor(
       async () => {
         await runDurableObjectAlarm(stub);
-        expect(await infra()).toEqual([
-          ["bundle-refused: the lane's step was killed 2 times before the candidate was bundled"],
-        ]);
+        expect(verification.started.size).toBe(1);
       },
       { timeout: 10_000, interval: 25 },
     );
-    expect(verification.started.size).toBe(0);
+    expect(calls.count).toBe(4);
+    await drainOutbox(stub);
   });
 
   it("[lane.do.backoff] a step that keeps failing is retried 1 s·2ⁿ later, not on a fixed loop", async () => {

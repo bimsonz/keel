@@ -16,10 +16,12 @@ import {
   laneStanding,
   laneOfInstance,
   laneStep,
+  laneStepFailed,
   projectRepos,
   recordVerdict,
   reofferDue,
   reofferVerified,
+  STEP_FAILURES_BEFORE_INFRA,
   VERIFY_BUDGET_MS,
   verificationDue,
 } from "@keeltown/core/application/integration";
@@ -67,7 +69,7 @@ import {
   suitePlan,
   workerAppPlan,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 
 const PROJECT = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
@@ -161,7 +163,11 @@ function world(options: WorldOptions = {}) {
   // What the batch's state is when KeelVerify is started: it must already be Verifying.
   const startedIn: string[] = [];
   /** `look` runs as an instance's standing is read, before the answer: what happened to the lane meanwhile. */
-  const hooks: { look?: (store: (typeof EntityStore)["Service"]) => void } = {};
+  const hooks: {
+    look?: (store: (typeof EntityStore)["Service"]) => void;
+    /** Runs as KeelVerify is started, before it is: a start that throws dies as the binding's would. */
+    start?: () => void;
+  } = {};
   const recordingVerification = Layer.effect(
     BatchVerification,
     Effect.gen(function* () {
@@ -171,6 +177,7 @@ function world(options: WorldOptions = {}) {
         start: (instanceId, job) =>
           Effect.suspend(() => {
             startedIn.push(batchOf(store, job.fence.batchId)?.state ?? "none");
+            hooks.start?.();
             return inner.start(instanceId, job);
           }),
         standing: (instanceId) =>
@@ -376,6 +383,75 @@ const verdict = (
 });
 
 /** Runs the batch in flight to Verifying and answers it, its candidate and its KeelVerify instance. */
+/** What a bundle past the object's memory throws. */
+const OOM = "RangeError: Array buffer allocation failed";
+const COMPOSE_DIED = "Error: staging could not be read";
+/** The rounds of infra failures after which the Lane bounces a change. */
+const INFRA_ROUNDS = 3;
+
+/** A bundler that throws on its first `dies` calls, as one past the object's memory does, then bundles. */
+function dyingBundler(dies: number) {
+  const made = makeCandidateBundlesMemory();
+  const calls = { count: 0 };
+  const layer = Layer.effect(
+    CandidateBundles,
+    Effect.gen(function* () {
+      const inner = yield* CandidateBundles;
+      return CandidateBundles.of({
+        bundle: (namespace, staging, commit, from) =>
+          Effect.suspend(() => {
+            calls.count += 1;
+            return calls.count <= dies
+              ? Effect.die(new RangeError("Array buffer allocation failed"))
+              : inner.bundle(namespace, staging, commit, from);
+          }),
+      });
+    }),
+  ).pipe(Layer.provide(made.layer));
+  return { layer, calls };
+}
+
+/** A composer that throws on its first `dies` calls, then composes. */
+function dyingComposer(dies: number) {
+  const calls = { count: 0 };
+  const wrap = (inner: Layer.Layer<CandidateComposer>) =>
+    Layer.effect(
+      CandidateComposer,
+      Effect.gen(function* () {
+        const composer = yield* CandidateComposer;
+        return CandidateComposer.of({
+          compose: (request) =>
+            Effect.suspend(() => {
+              calls.count += 1;
+              return calls.count <= dies
+                ? Effect.die(new Error("staging could not be read"))
+                : composer.compose(request);
+            }),
+        });
+      }),
+    ).pipe(Layer.provide(inner));
+  return { wrap, calls };
+}
+
+/** A step that throws, as the Lane DO runs one: what it threw is recorded with the batch's attempt. */
+const throwingStep = Effect.gen(function* () {
+  const exit = yield* Effect.exit(laneStep(LANE));
+  if (Exit.isSuccess(exit)) yield* Effect.die(new Error("the step was meant to throw"));
+  else {
+    const thrown = Cause.squash(exit.cause);
+    yield* laneStepFailed(
+      LANE,
+      thrown instanceof Error ? `${thrown.name}: ${thrown.message}` : String(thrown),
+    );
+  }
+});
+
+/** A step whose invocation dies: nothing is recorded after it. */
+const dyingStep = Effect.gen(function* () {
+  const exit = yield* Effect.exit(laneStep(LANE));
+  if (Exit.isSuccess(exit)) yield* Effect.die(new Error("the step was meant to die"));
+});
+
 const toVerifying = (w: World) =>
   Effect.gen(function* () {
     expect(yield* laneStep(LANE)).toBe("waiting");
@@ -1214,40 +1290,165 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.step-killed] a step that died twice before its candidate was bundled refuses the bundle on the infrastructure without trying it again, and goes on to bundle the next batch as any step does",
+    "[lane.step-failures] a batch whose bundle threw in three steps is not bundled a fourth time: the fourth step holds it on the infrastructure with each step's error and a wait, starts no verification, and runs again",
     () => {
-      const w = world();
+      const dying = dyingBundler(Number.POSITIVE_INFINITY);
+      const w = world({ bundles: dying.layer });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let step = 1; step <= STEP_FAILURES_BEFORE_INFRA; step += 1) yield* throwingStep;
+        // Counted with the batch in the lane's own store: the throws before, and the attempt that threw last.
+        expect(yield* inFlight).toMatchObject({
+          failed: [`bundle: ${OOM}`, `bundle: ${OOM}`],
+          attempt: { stage: "bundle", error: OOM },
+        });
+        expect(yield* laneStep(LANE)).toBe("again");
+        expect(dying.calls.count).toBe(STEP_FAILURES_BEFORE_INFRA);
+        expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
+          outcome: "hold",
+          evidence: [`step-failed x3: bundle: ${OOM}; bundle: ${OOM}; bundle: ${OOM}`],
+          nextActions: [{ kind: "wait" }],
+        });
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
+        expect(w.verification.started.size).toBe(0);
+        expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.step-killed] a step that dies mid-bundle counts as one that threw: two deaths and a throw fail the batch on the infrastructure, each cited, and the next batch is bundled untouched by them",
+    () => {
+      const dying = dyingBundler(3);
+      const w = world({ bundles: dying.layer });
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1));
         yield* queue(w, change(2));
-        // The third start of one deadline: two invocations died under it.
-        expect(yield* laneStep(LANE, 3)).toBe("waiting");
+        yield* dyingStep;
+        yield* dyingStep;
+        yield* throwingStep;
+        expect(yield* laneStep(LANE)).toBe("again");
+        const died = "bundle: the step died before it finished";
         expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
-          outcome: "bounce",
-          evidence: [
-            "bundle-refused: the lane's step was killed 2 times before the candidate was bundled",
-          ],
+          outcome: "hold",
+          evidence: [`step-failed x3: ${died}; ${died}; bundle: ${OOM}`],
         });
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
-        // The deaths counted against the first bundle alone: the second change's was made, and is verifying.
-        expect(w.bundles.bundled).toHaveLength(1);
+        // The next step forms the second change's batch: its first bundle is made, and it is verifying.
+        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(dying.calls.count).toBe(4);
+        expect(w.verification.started.size).toBe(1);
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.step-failed-once] a bundle that threw once is tried again, and its batch verifies with nothing failed",
+    () => {
+      const dying = dyingBundler(1);
+      const w = world({ bundles: dying.layer });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* throwingStep;
+        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(dying.calls.count).toBe(2);
+        expect(yield* payloads("BatchFailed")).toEqual([]);
         expect(w.verification.started.size).toBe(1);
       }).pipe(Effect.provide(w.layer));
     },
   );
 
-  it.effect("[lane.step-killed-once] a step that died once bundles its candidate again", () => {
-    const w = world();
-    return Effect.gen(function* () {
-      yield* w.seeded;
-      yield* queue(w, change(1));
-      expect(yield* laneStep(LANE, 2)).toBe("waiting");
-      expect(w.bundles.bundled).toHaveLength(1);
-      expect(yield* payloads("BatchFailed")).toEqual([]);
-      expect(w.verification.started.size).toBe(1);
-    }).pipe(Effect.provide(w.layer));
-  });
+  it.effect(
+    "[lane.step-failures-compose] a batch whose compose threw in three steps is held on the infrastructure as a refused composition, and never bundled",
+    () => {
+      const w = world({ composer: dyingComposer(Number.POSITIVE_INFINITY).wrap });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let step = 1; step <= STEP_FAILURES_BEFORE_INFRA; step += 1) yield* throwingStep;
+        expect(yield* laneStep(LANE)).toBe("again");
+        expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
+          outcome: "hold",
+          evidence: [
+            `step-failed x3: compose: ${COMPOSE_DIED}; compose: ${COMPOSE_DIED}; compose: ${COMPOSE_DIED}`,
+          ],
+        });
+        expect(
+          (yield* committed)
+            .filter((e) => e.type === "BatchFailed" || e.type === "CandidateAssembled")
+            .map((e) => e.type),
+        ).toEqual(["BatchFailed"]);
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
+        expect(w.bundles.bundled).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.step-failures-stages] a batch's failed attempts add up over its compose, bundle and start: the third, at its start, parks it on the infrastructure as KeelVerify's own failures are",
+    () => {
+      const dying = dyingBundler(1);
+      const w = world({ composer: dyingComposer(1).wrap, bundles: dying.layer });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        w.hooks.start = () => {
+          throw new Error("the Workflow binding is gone");
+        };
+        yield* throwingStep;
+        yield* throwingStep;
+        yield* throwingStep;
+        expect(yield* laneStep(LANE)).toBe("again");
+        const issued = yield* payloads("VerdictIssued");
+        expect(issued).toHaveLength(1);
+        expect(issued[0]?.["evidence"]).toEqual([
+          expect.stringContaining(
+            `step-failed x3: compose: ${COMPOSE_DIED}; bundle: ${OOM}; start: Error: the Workflow binding is gone`,
+          ),
+        ]);
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
+        expect(w.verification.started.size).toBe(0);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.step-failures-bounce] a change whose batch is failed on its steps a third time in a row bounces, told to submit again once the infrastructure is back",
+    () => {
+      const w = world({ bundles: dyingBundler(Number.POSITIVE_INFINITY).layer });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let round = 1; round <= INFRA_ROUNDS; round += 1) {
+          for (let step = 1; step <= STEP_FAILURES_BEFORE_INFRA; step += 1) yield* throwingStep;
+          expect(yield* laneStep(LANE)).toBe("again");
+          const failed = (yield* payloads("BatchFailed")).at(-1);
+          if (round < INFRA_ROUNDS)
+            yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+        }
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
+          "infra",
+          "infra",
+          change(1),
+        ]);
+        expect((yield* payloads("VerdictIssued")).at(-1)).toMatchObject({
+          outcome: "bounce",
+          evidence: [
+            expect.stringMatching(/^infra-failure x3: step-failed x3: /),
+            expect.any(String),
+          ],
+          nextActions: [
+            { kind: "call", operationId: "submit", args: { changeId: change(1) } },
+            { kind: "wait" },
+          ],
+        });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
 
   it.effect(
     "[lane.bundle-from-last] a bundle is told to take from the lane's last one, and a step retried after it died names the same",

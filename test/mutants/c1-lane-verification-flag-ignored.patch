@@ -2,15 +2,15 @@
 # kills: lane.unverified
 # why: The project's verification setting is ignored, so the negative control is verified like any other project
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8cb9cee8..a1c13446 100644
+index 23e9b6c6..4d36cfba 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1115,7 +1115,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
-       if (active.composed === undefined)
-         return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
+@@ -1330,7 +1330,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       const tried = yield* attempt(lane, active, batch, "bundle");
+       if (tried === undefined) return "again" satisfies LaneStep;
        const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
--      if (settings.verification === "off") yield* passUnverified(lane, active, batch);
-+      if (settings.verification === ("never" as string)) yield* passUnverified(lane, active, batch);
-       else {
-         yield* bundleBatch(lane, active, batch, active.composed, kills);
-         kills = 0;
+-      if (settings.verification === "off") yield* passUnverified(lane, tried, batch);
++      if (settings.verification === ("never" as string)) yield* passUnverified(lane, tried, batch);
+       else yield* bundleBatch(lane, tried, batch, active.composed);
+       continue;
+     }

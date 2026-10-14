@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-failures
+# why: What a step threw is never kept with its attempt, so the verdict cites a death for every failure and hides the error
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..9f44c6c9 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1260,7 +1260,7 @@ export const laneStepFailed = Effect.fn("integration/laneStepFailed")(function*
+ ) {
+   const lane = laneOf(yield* EntityStore, laneId);
+   const batchId = lane?.active?.batchId;
+-  if (lane === undefined || batchId === undefined || lane.active?.attempt === undefined) return;
++  if (lane === undefined || batchId === undefined || lane.active?.attempt !== undefined) return;
+   yield* noteLane(lane, `step-failed:${batchId}`, (now) =>
+     now.active?.batchId !== batchId || now.active.attempt === undefined
+       ? now

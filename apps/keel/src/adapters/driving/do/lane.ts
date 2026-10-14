@@ -5,6 +5,7 @@ import {
   laneProject,
   laneStanding,
   laneStep,
+  laneStepFailed,
   recordVerdict,
   reofferDue,
   reofferVerified,
@@ -47,7 +48,10 @@ const laneIdOf = (name: string | undefined): string => {
  * changes and TrunkAdvanced and PromotionDeclined from the Trunk; each
  * delivery only records state, and the debounced `lane step` commits what
  * follows. A step that fails (a defect: a binding or a member's DO was
- * unreachable) is retried 1 s·2ⁿ up to 60 s, as deliveries are (ADR 0009).
+ * unreachable) is retried 1 s·2ⁿ up to 60 s, as deliveries are (ADR 0009),
+ * and what it threw is kept with the batch's attempt: the step counts a
+ * batch's failed attempts in the object's storage, past a reset, and fails
+ * the batch on the infrastructure at its bound.
  * While a green batch has no answer from trunk, `lane reoffer` hands trunk
  * its BatchVerified again (30 s after it, then every 60 s). A verifying
  * batch whose KeelVerify instance will send no verdict is failed on the
@@ -124,13 +128,14 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     if (request.reason === LANE_REOFFER) return this.reoffer();
     if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
       return super.onDeadline(request);
-    // The step is told how often this request was started: one the platform killed runs again.
-    const exit = await this.runtime.runPromiseExit(laneStep(this.laneId, request.starts));
+    const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
     // Whether or not the step got through: a batch may be Verifying with its instance never made.
     await this.armVerification();
     if (Exit.isSuccess(exit)) {
       this.failures = 0;
       await this.armReoffer();
+      // A batch failed on the infrastructure: the lane goes on at once, in a new invocation.
+      if (exit.value === "again") await this.step(Date.now());
       return;
     }
     this.failures += 1;
@@ -139,6 +144,18 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     // Below the cap a failure is expected to clear (a binding mid-deploy); at the cap a person should look.
     if (delay >= REDELIVERY_CAP_MS) console.error(line, Cause.pretty(exit.cause));
     else console.warn(line, Cause.pretty(exit.cause));
+    const thrown = Cause.squash(exit.cause);
+    const recorded = await this.runtime.runPromiseExit(
+      laneStepFailed(
+        this.laneId,
+        thrown instanceof Error ? `${thrown.name}: ${thrown.message}` : String(thrown),
+      ),
+    );
+    if (Exit.isFailure(recorded))
+      console.error(
+        `lane ${this.laneId} could not record its failed step`,
+        Cause.pretty(recorded.cause),
+      );
     await this.step(Date.now() + delay);
   }
 

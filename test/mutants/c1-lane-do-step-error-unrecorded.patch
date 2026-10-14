@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.step-failures"
+# kills: lane.do.step-failures
+# why: The Lane object records its failed step's error on no lane, so the batch's failures read as deaths
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index b314f22d..e7bd6753 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -147,7 +147,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
+     const thrown = Cause.squash(exit.cause);
+     const recorded = await this.runtime.runPromiseExit(
+       laneStepFailed(
+-        this.laneId,
++        `${this.laneId}-not`,
+         thrown instanceof Error ? `${thrown.name}: ${thrown.message}` : String(thrown),
+       ),
+     );

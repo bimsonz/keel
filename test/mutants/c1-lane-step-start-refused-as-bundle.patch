@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-failures-stages
+# why: A verifying batch whose instance was never made is refused as a bundle, which the Candidate machine refuses, so the step dies at its bound every time
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..de211e41 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1185,7 +1185,7 @@ const failOnSteps = Effect.fn("integration/failOnSteps")(function* (
+   yield* Effect.logError(
+     `lane ${lane.laneId} failed ${batch.id} on the infrastructure: ${evidence}`,
+   );
+-  if (batch.state === "verifying") {
++  if (batch.state === "verifying" && batch.members.length === 0) {
+     yield* issue(
+       lane.laneId,
+       batch,

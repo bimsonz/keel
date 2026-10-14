@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.step-failures
+# why: The bound is one past three: a batch whose bundle threw three times is bundled a fourth time
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 23e9b6c6..3c210f00 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1235,7 +1235,7 @@ const attempt = Effect.fn("integration/attempt")(function* (
+           `${stage}: ${active.attempt.error ?? "the step died before it finished"}`,
+         ]
+       : (active.failed ?? []);
+-  if (failed.length >= STEP_FAILURES_BEFORE_INFRA) {
++  if (failed.length > STEP_FAILURES_BEFORE_INFRA) {
+     yield* failOnSteps(lane, active, batch, failed);
+     return undefined;
+   }
