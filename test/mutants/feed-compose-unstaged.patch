@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.step-staged"
+# kills: lane.step-staged
+# why: a step that assembled a candidate goes on to bundle it in the same invocation, so CandidateAssembled is not published before the bundle
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 493d1fa4..d5731cfb 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1651,8 +1651,6 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       const tried = yield* attempt(lane, active, batch, "compose");
+       if (tried === undefined) return "again" satisfies LaneStep;
+       yield* composeBatch(lane, tried, batch);
+-      if (batchOf(yield* EntityStore, batch.id)?.state === "assembled")
+-        return "staged" satisfies LaneStep;
+       continue;
+     }
+     if (batch.state === "assembled" && active.bundle === undefined) {

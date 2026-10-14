@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.stage-published"
+# kills: lane.do.stage-published
+# why: the lane's next step, armed before the flush, runs ahead of it, so BatchFormed is still owed while the compose is held
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 238ab6f2..1432d20b 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -187,7 +187,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+     // The outbox goes first, so what an earlier invocation committed is published before any of the
+     // object's own deadlines runs, however long that takes.
+     const outboxFirst = [...due.filter(isOutbox), ...due.filter((request) => !isOutbox(request))];
+-    for (const found of outboxFirst) {
++    for (const found of due) {
+       // Counted as started only now, so a request waiting behind one that dies is not counted with it.
+       const request = await startAlarm(this.ctx.storage, found, now);
+       if (request === undefined) continue;

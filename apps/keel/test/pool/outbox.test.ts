@@ -22,7 +22,7 @@ import {
   startAlarm,
   type StartedAlarm,
 } from "../../src/adapters/driving/do/alarm.ts";
-import { OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
+import { OUTBOX_FLUSH, OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
 import type { DurableObjectServices } from "../../src/composition/do.ts";
@@ -225,6 +225,32 @@ describe("the event backbone across real Durable Objects", () => {
       }));
       expect(after).toEqual({ owed: [], alarms: [] });
     }, WAIT);
+  });
+
+  it("[b1.flush-first] runs a flush due with one of the object's own deadlines first, so what it committed is published before that deadline runs", async () => {
+    const changeId = makeId("chg", ulid());
+    const agentId = makeId("agt", ulid());
+    const entity: EntityRef = { kind: "change", id: changeId };
+    const emitter = changeStub(changeId);
+    agentStub(agentId);
+    // How many deliveries the outbox owed each time the object's own deadline ran.
+    const owed: number[] = [];
+    await runInDurableObject(emitter, async (instance: ChangeDO, state) => {
+      Reflect.set(instance, "onDeadline", async () => {
+        owed.push(tables(state).deliveries.length);
+      });
+      // Committed without the flush an answer arms: that is armed below, due with the deadline.
+      await Reflect.get(instance, "runtime").runPromise(
+        emit(entity, "declare", [`agent:${agentId}`]),
+      );
+      // The deadline's reason sorts before the flush's, and both are due at the same instant.
+      const at = Date.now();
+      await scheduleAlarm(state.storage, { kind: "deadline", reason: "a deadline", at });
+      await scheduleAlarm(state.storage, { kind: "debounce", reason: OUTBOX_FLUSH, at });
+    });
+    await runDurableObjectAlarm(emitter);
+    await vi.waitFor(() => expect(owed).toEqual([0]), WAIT);
+    expect(await inbox(agentId)).toHaveLength(1);
   });
 
   it("[b1.duplicate-noop] treats a duplicate delivery as a no-op: the receiver's state and event log are unchanged", async () => {

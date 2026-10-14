@@ -134,8 +134,9 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     if (Exit.isSuccess(exit)) {
       this.failures = 0;
       await this.armReoffer();
-      // A batch failed on the infrastructure: the lane goes on at once, in a new invocation.
-      if (exit.value === "again") await this.step(Date.now());
+      // A batch formed, a candidate assembled or a batch failed on the infrastructure: the lane goes on
+      // at once, in a new invocation, which publishes what this one committed before it steps again.
+      if (exit.value === "staged" || exit.value === "again") await this.step(Date.now());
       return;
     }
     this.failures += 1;

@@ -14,6 +14,7 @@ import {
 import { CommitSha, EventEnvelope, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   CandidateBundles,
+  type CandidateComposer,
   Changes,
   CodeHost,
   EntityStore,
@@ -65,6 +66,8 @@ async function lane(
     readonly noStaging?: boolean;
     /** The candidate bundler, in place of one in memory that always bundles. */
     readonly bundles?: Layer.Layer<CandidateBundles>;
+    /** The candidate composer, in place of one in memory that always composes at once. */
+    readonly composer?: Layer.Layer<CandidateComposer>;
     /** The project's largest batch: 1 unless given. */
     readonly maxBatchSize?: number;
   } = {},
@@ -164,7 +167,7 @@ async function lane(
     code.layer,
     plans.layer,
     changes,
-    makeCandidateComposerMemory().layer,
+    options.composer ?? makeCandidateComposerMemory().layer,
     makeAgentDirectoryMemory().layer,
     options.bundles ?? makeCandidateBundlesMemory().layer,
     verification.layer,
@@ -212,6 +215,15 @@ async function lane(
 
 /** The plan each queued change was compiled with, as its ChangeQueued names it. */
 const PLAN = suitePlan();
+
+/** A promise that holds until `release` is called. */
+function gate() {
+  const releases: (() => void)[] = [];
+  const held = new Promise<void>((resolve) => {
+    releases.push(resolve);
+  });
+  return { held, release: () => releases.forEach((resolve) => resolve()) };
+}
 
 const queued = (laneId: string, n: number) => {
   const changeId = makeId("chg", ulid());
@@ -303,6 +315,29 @@ describe("the Lane DO", () => {
       { timeout: 20_000, interval: 50 },
     );
     // The step and the verdicts committed real events; their flush must not outlive the file.
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.stage-published] a batch the lane forms is published before its compose runs: while the compose is held, everything the lane committed has been delivered", async () => {
+    const { held, release } = gate();
+    const composer = makeCandidateComposerMemory({ held });
+    const { stub, laneId, verification } = await lane({ composer: composer.layer });
+    try {
+      await stub.receive([queued(laneId, 1)]);
+      // The platform runs the step, and then the flush and the next step: the compose is entered, and held there.
+      await vi.waitFor(() => expect(composer.requests).toHaveLength(1), { timeout: 10_000 });
+      const outbox = await runInDurableObject(stub, (_instance: LaneDO, state) => ({
+        owed: state.storage.sql.exec("SELECT event_id FROM keel_deliveries").toArray().length,
+        committed: state.storage.sql
+          .exec("SELECT json_extract(envelope, '$.type') AS type FROM keel_events ORDER BY seq")
+          .toArray()
+          .map((row) => row["type"]),
+      }));
+      expect(outbox).toEqual({ owed: 0, committed: ["BatchFormed"] });
+    } finally {
+      release();
+    }
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
     await drainOutbox(stub);
   });
 

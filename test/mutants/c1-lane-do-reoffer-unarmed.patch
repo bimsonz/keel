@@ -2,7 +2,7 @@
 # kills: lane.do.reoffer
 # why: The re-offer is never armed, so a BatchVerified the Trunk spent leaves the lane waiting for good
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index b314f22d..0f91b324 100644
+index e35620de..75565e1d 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
 @@ -133,7 +133,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
@@ -10,6 +10,6 @@ index b314f22d..0f91b324 100644
      if (Exit.isSuccess(exit)) {
        this.failures = 0;
 -      await this.armReoffer();
-       // A batch failed on the infrastructure: the lane goes on at once, in a new invocation.
-       if (exit.value === "again") await this.step(Date.now());
-       return;
+       // A batch formed, a candidate assembled or a batch failed on the infrastructure: the lane goes on
+       // at once, in a new invocation, which publishes what this one committed before it steps again.
+       if (exit.value === "staged" || exit.value === "again") await this.step(Date.now());

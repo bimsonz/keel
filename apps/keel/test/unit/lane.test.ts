@@ -1,7 +1,8 @@
 // The Lane's use-cases over in-memory ports: one batch of one in flight, in
 // FIFO order, decided by the domain's Candidate machine. Deliveries are
 // handed to `laneHeard` as the Lane DO's receive would; each step runs
-// `laneStep` as the `lane step` alarm would.
+// `laneStep` as the `lane step` alarm would, on through each stage it ends
+// `staged`, as the invocations that alarm arms would (`stepped`).
 import { describe, expect, it } from "@effect/vitest";
 import {
   batchOf,
@@ -318,6 +319,15 @@ const deliver = (event: EventEnvelope) =>
     );
   });
 
+/** The lane's step on through each stage, as the Lane DO runs it in invocation after invocation, to where it stops. */
+const stepped = (laneId: string) =>
+  Effect.gen(function* () {
+    for (;;) {
+      const at = yield* laneStep(laneId);
+      if (at !== "staged") return at;
+    }
+  });
+
 /** Queues the change with the plan its ChangeQueued names (`null`: an event from before plans were named). */
 const queue = (w: World, id: ChangeId, planHash: ContentHash | null = PLAN.planHash) =>
   Effect.gen(function* () {
@@ -499,7 +509,7 @@ function dyingComposer(dies: number) {
 
 /** A step that throws, as the Lane DO runs one: what it threw is recorded with the batch's attempt. */
 const throwingStep = Effect.gen(function* () {
-  const exit = yield* Effect.exit(laneStep(LANE));
+  const exit = yield* Effect.exit(stepped(LANE));
   if (Exit.isSuccess(exit)) yield* Effect.die(new Error("the step was meant to throw"));
   else {
     const thrown = Cause.squash(exit.cause);
@@ -512,13 +522,13 @@ const throwingStep = Effect.gen(function* () {
 
 /** A step whose invocation dies: nothing is recorded after it. */
 const dyingStep = Effect.gen(function* () {
-  const exit = yield* Effect.exit(laneStep(LANE));
+  const exit = yield* Effect.exit(stepped(LANE));
   if (Exit.isSuccess(exit)) yield* Effect.die(new Error("the step was meant to die"));
 });
 
 const toVerifying = (w: World) =>
   Effect.gen(function* () {
-    expect(yield* laneStep(LANE)).toBe("waiting");
+    expect(yield* stepped(LANE)).toBe("waiting");
     const active = yield* inFlight;
     const instanceId = [...w.verification.started.keys()].at(-1);
     if (instanceId === undefined) return yield* Effect.die(new Error("KeelVerify never started"));
@@ -557,7 +567,7 @@ describe("the Lane", () => {
           LANE,
           verdict(first.batchId, first.candidateId, first.instanceId, "land"),
         );
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         yield* look("green, waiting on trunk");
         yield* advance(base, sha("d"), [change(1)]);
         // The lane lets the landed batch go in its next step, which forms the next one.
@@ -599,10 +609,10 @@ describe("the Lane", () => {
           LANE,
           verdict(first.batchId, first.candidateId, first.instanceId, "land"),
         );
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(1)]]);
         yield* advance(base, sha("d"), [change(1)]);
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([
           [change(1)],
           [change(2)],
@@ -634,7 +644,7 @@ describe("the Lane", () => {
             by: change(3),
           }),
         );
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(3)]]);
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([]);
       }).pipe(Effect.provide(w.layer));
@@ -669,7 +679,7 @@ describe("the Lane", () => {
         );
         yield* resumed(change(1));
         const gone = laneOf(yield* EntityStore, LANE);
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
 
         expect(held?.queue).toEqual([change(2), change(3)]);
         expect(held?.plans?.map((plan) => plan.changeId)).toContain(change(1));
@@ -731,7 +741,7 @@ describe("the Lane", () => {
           }),
         );
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(2)]);
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(2)]]);
       }).pipe(Effect.provide(w.layer));
     },
@@ -760,7 +770,7 @@ describe("the Lane", () => {
           verdict(first.batchId, first.candidateId, first.instanceId, "park"),
         );
         expect(yield* payloads("BatchFailed")).toHaveLength(1);
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([]);
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(1)]]);
       }).pipe(Effect.provide(w.layer));
@@ -814,7 +824,7 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         const base = yield* w.seeded;
         yield* queue(w, change(1));
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         const [formed] = yield* payloads("BatchFormed");
         expect(formed).toMatchObject({
           base,
@@ -851,9 +861,9 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1));
-        expect(Exit.isFailure(yield* Effect.exit(laneStep(LANE)))).toBe(true);
+        expect(Exit.isFailure(yield* Effect.exit(stepped(LANE)))).toBe(true);
         w.clock.advance(5_000);
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         const formed = (yield* committed).find((e) => e.type === "BatchFormed");
         expect(requests.map((r) => r.at)).toEqual([formed?.at, formed?.at]);
         expect(w.clock.now()).not.toBe(formed?.at);
@@ -889,8 +899,33 @@ describe("the Lane", () => {
         // The candidate was bundled for the project's namespace, the one the job names.
         expect(w.bundles.namespaces).toEqual(["org_01JZ8PT2C4E6G8J0M2N4Q6S8V0"]);
         expect(w.startedIn).toEqual(["verifying"]);
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect(w.verification.started.size).toBe(1);
+        expect((yield* committed).map((e) => e.type)).toEqual([
+          "BatchFormed",
+          "CandidateAssembled",
+          "VerificationStarted",
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.step-staged] a step ends once it has formed a batch, and again once it has assembled the batch's candidate, so each is published before the next stage runs",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        expect(yield* laneStep(LANE)).toBe("staged");
+        expect((yield* committed).map((e) => e.type)).toEqual(["BatchFormed"]);
+        expect(yield* laneStep(LANE)).toBe("staged");
+        expect((yield* committed).map((e) => e.type)).toEqual([
+          "BatchFormed",
+          "CandidateAssembled",
+        ]);
+        expect(w.bundles.namespaces).toEqual([]);
+        expect(yield* laneStep(LANE)).toBe("waiting");
         expect((yield* committed).map((e) => e.type)).toEqual([
           "BatchFormed",
           "CandidateAssembled",
@@ -1002,7 +1037,7 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         const base = yield* w.seeded;
         yield* queue(w, change(1));
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect((yield* heardBy(`change:${change(1)}`)).map((e) => e.type)).toEqual([
           "BatchFormed",
           "VerdictIssued",
@@ -1064,7 +1099,7 @@ describe("the Lane", () => {
         );
         w.bases.set(change(1), base);
         yield* queue(w, change(1));
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         const [issued] = yield* payloads("VerdictIssued");
         expect(issued?.["counterparts"]).toEqual([
           { commitSha: z, paths: ["src/a.ts"] },
@@ -1110,7 +1145,7 @@ describe("the Lane", () => {
           );
         w.bases.set(change(1), base);
         yield* queue(w, change(1));
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         const [issued] = yield* payloads("VerdictIssued");
         // The oldest commit after the base is past the walk: every one read changed the path.
         const read = landed.slice(1).toReversed();
@@ -1134,7 +1169,7 @@ describe("the Lane", () => {
         yield* w.seeded;
         yield* queue(w, change(1));
         for (let round = 1; round <= 3; round += 1) {
-          expect(yield* laneStep(LANE)).toBe("idle");
+          expect(yield* stepped(LANE)).toBe("idle");
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < 3)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
@@ -1177,7 +1212,7 @@ describe("the Lane", () => {
         yield* w.seeded;
         yield* queue(w, change(1));
         for (let round = 1; round <= 3; round += 1) {
-          expect(yield* laneStep(LANE)).toBe("idle");
+          expect(yield* stepped(LANE)).toBe("idle");
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < 3)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
@@ -1275,7 +1310,7 @@ describe("the Lane", () => {
             },
           ),
         );
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         const invalidated = (yield* committed).filter((e) => e.type === "CandidateInvalidated");
         expect(invalidated.map((e) => [e.payload, e.affected])).toEqual([
           [
@@ -1308,7 +1343,7 @@ describe("the Lane", () => {
         const landed = sha("e");
         yield* advance(base, landed, []);
         yield* queue(w, change(1));
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect(w.staging.moved).toEqual([{ from: elsewhere, to: landed }]);
         expect(yield* payloads("BatchFormed")).toEqual([
           expect.objectContaining({ members: [change(1)], base: landed }),
@@ -1325,7 +1360,7 @@ describe("the Lane", () => {
         const base = yield* w.seeded;
         yield* advance(base, sha("e"), []);
         yield* queue(w, change(1));
-        expect(Exit.isFailure(yield* Effect.exit(laneStep(LANE)))).toBe(true);
+        expect(Exit.isFailure(yield* Effect.exit(stepped(LANE)))).toBe(true);
         expect(yield* payloads("BatchFormed")).toEqual([]);
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(1)]);
       }).pipe(Effect.provide(w.layer));
@@ -1347,7 +1382,7 @@ describe("the Lane", () => {
         );
         const landed = sha("e");
         yield* advance(base, landed, [change(1)]);
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect(yield* payloads("CandidatePromoted")).toEqual([
           {
             _tag: "CandidatePromoted",
@@ -1393,7 +1428,7 @@ describe("the Lane", () => {
           `${verified.dedupeKey}#reoffer-2`,
         );
         yield* advance(base, sha("e"), [change(1)]);
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect(yield* reofferDue(LANE)).toBeUndefined();
         expect(yield* reofferVerified(LANE)).toBeUndefined();
       }).pipe(Effect.provide(w.layer));
@@ -1422,7 +1457,7 @@ describe("the Lane", () => {
         expect(laneDestroyed(yield* EntityStore, LANE)).toBe(true);
         expect(yield* reofferDue(LANE)).toBeUndefined();
         expect(yield* reofferVerified(LANE)).toBeUndefined();
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         const lane = laneOf(yield* EntityStore, LANE);
         expect(lane?.queue).toEqual([]);
         expect(lane?.active).toBeUndefined();
@@ -1441,7 +1476,7 @@ describe("the Lane", () => {
         yield* destroyLane(LANE, "operator");
         expect(yield* queue(w, change(1))).toBe(false);
         expect(yield* advance(base, sha("e"), [])).toBe(false);
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect(laneOf(yield* EntityStore, LANE)?.queue ?? []).toEqual([]);
         expect(yield* payloads("BatchFormed")).toEqual([]);
       }).pipe(Effect.provide(w.layer));
@@ -1483,7 +1518,7 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1));
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect((yield* heardBy(`change:${change(1)}`)).map((e) => e.type)).toEqual([
           "BatchFormed",
           "VerdictIssued",
@@ -1513,7 +1548,7 @@ describe("the Lane", () => {
           failed: [`bundle: ${OOM}`, `bundle: ${OOM}`],
           attempt: { stage: "bundle", error: OOM },
         });
-        expect(yield* laneStep(LANE)).toBe("again");
+        expect(yield* stepped(LANE)).toBe("again");
         expect(dying.calls.count).toBe(STEP_FAILURES_BEFORE_INFRA);
         expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
           outcome: "hold",
@@ -1539,7 +1574,7 @@ describe("the Lane", () => {
         yield* dyingStep;
         yield* dyingStep;
         yield* throwingStep;
-        expect(yield* laneStep(LANE)).toBe("again");
+        expect(yield* stepped(LANE)).toBe("again");
         const died = "bundle: the step died before it finished";
         expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
           outcome: "hold",
@@ -1547,7 +1582,7 @@ describe("the Lane", () => {
         });
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
         // The next step forms the second change's batch: its first bundle is made, and it is verifying.
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect(dying.calls.count).toBe(4);
         expect(w.verification.started.size).toBe(1);
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["infra"]);
@@ -1564,7 +1599,7 @@ describe("the Lane", () => {
         yield* w.seeded;
         yield* queue(w, change(1));
         yield* throwingStep;
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect(dying.calls.count).toBe(2);
         expect(yield* payloads("BatchFailed")).toEqual([]);
         expect(w.verification.started.size).toBe(1);
@@ -1580,7 +1615,7 @@ describe("the Lane", () => {
         yield* w.seeded;
         yield* queue(w, change(1));
         for (let step = 1; step <= STEP_FAILURES_BEFORE_INFRA; step += 1) yield* throwingStep;
-        expect(yield* laneStep(LANE)).toBe("again");
+        expect(yield* stepped(LANE)).toBe("again");
         expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
           outcome: "hold",
           evidence: [
@@ -1612,7 +1647,7 @@ describe("the Lane", () => {
         yield* throwingStep;
         yield* throwingStep;
         yield* throwingStep;
-        expect(yield* laneStep(LANE)).toBe("again");
+        expect(yield* stepped(LANE)).toBe("again");
         const issued = yield* payloads("VerdictIssued");
         expect(issued).toHaveLength(1);
         expect(issued[0]?.["evidence"]).toEqual([
@@ -1635,7 +1670,7 @@ describe("the Lane", () => {
         yield* queue(w, change(1));
         for (let round = 1; round <= INFRA_ROUNDS; round += 1) {
           for (let step = 1; step <= STEP_FAILURES_BEFORE_INFRA; step += 1) yield* throwingStep;
-          expect(yield* laneStep(LANE)).toBe("again");
+          expect(yield* stepped(LANE)).toBe("again");
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < INFRA_ROUNDS)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
@@ -1698,7 +1733,7 @@ describe("the Lane", () => {
         yield* advance(base, base, []);
         yield* queue(w, change(2));
         step.dies = true;
-        expect(Exit.isFailure(yield* Effect.exit(laneStep(LANE)))).toBe(true);
+        expect(Exit.isFailure(yield* Effect.exit(stepped(LANE)))).toBe(true);
         step.dies = false;
         yield* toVerifying(w);
         expect(last).toBeDefined();
@@ -1794,7 +1829,7 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1), null);
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect((yield* committed).map((e) => e.type)).toEqual([
           "BatchFormed",
           "VerdictIssued",
@@ -1819,7 +1854,7 @@ describe("the Lane", () => {
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1));
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect((yield* committed).map((e) => e.type)).toEqual([
           "BatchFormed",
           "CandidateAssembled",
@@ -1931,7 +1966,7 @@ describe("the Lane's verification that sends no verdict", () => {
         expect(yield* last("BatchFailed")).toMatchObject({ batchId, attribution: "infra" });
         expect(w.verification.stopped).toEqual([]);
         expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect((yield* inFlight).batchId).not.toBe(batchId);
       }).pipe(Effect.provide(w.layer));
     },
@@ -2003,11 +2038,11 @@ describe("the Lane's verification that sends no verdict", () => {
         yield* queue(w, change(1));
         const first = yield* toVerifying(w);
         w.clock.advance(VERIFY_BUDGET_MS - 1);
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect(w.verification.looked).toEqual([]);
         w.clock.advance(1);
         expect(w.clock.now()).toBe(yield* verificationDue(LANE));
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect(w.verification.stopped).toEqual([first.instanceId]);
         expect(yield* last("VerdictIssued")).toMatchObject({
           outcome: "park",
@@ -2023,10 +2058,10 @@ describe("the Lane's verification that sends no verdict", () => {
         const second = yield* toVerifying(w);
         w.verification.end(second.instanceId, { _tag: "Completed" });
         w.clock.advance(VERIFY_BUDGET_MS - 1);
-        expect(yield* laneStep(LANE)).toBe("waiting");
+        expect(yield* stepped(LANE)).toBe("waiting");
         expect(batchOf(yield* EntityStore, second.batchId)?.state).toBe("verifying");
         w.clock.advance(1);
-        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(yield* stepped(LANE)).toBe("idle");
         expect(w.verification.stopped).toEqual([first.instanceId]);
         expect(yield* last("VerdictIssued")).toMatchObject({
           evidence: [
@@ -2359,7 +2394,7 @@ describe("the Lane's batches", () => {
         );
         expect(blamed).toEqual([change(3)]);
         // The lane follows the last advance in its next step.
-        yield* laneStep(LANE);
+        yield* stepped(LANE);
         expect((yield* payloads("CandidatePromoted")).length).toBe(3);
       }).pipe(Effect.provide(w.layer));
     },

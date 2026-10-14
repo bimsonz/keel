@@ -1600,16 +1600,19 @@ export const laneStepFailed = Effect.fn("integration/laneStepFailed")(function* 
 
 /**
  * Where a lane stands after a step: nothing to do, waiting on a verdict,
- * trunk, or the domain, or `again`: it failed a batch on the infrastructure
- * and goes on in a new invocation, so no one invocation tries two batches
- * that may kill it.
+ * trunk, or the domain, or going on in a new invocation: `staged` after it
+ * formed a batch or assembled its candidate, so what that stage committed is
+ * published before the next one, which may take minutes, and each stage has
+ * an invocation of its own; `again` after it failed a batch on the
+ * infrastructure, so no one invocation tries two batches that may kill it.
  */
-export type LaneStep = "idle" | "waiting" | "again";
+export type LaneStep = "idle" | "waiting" | "staged" | "again";
 
 /**
  * Drives the lane as far as it can go without a reply from outside: follow
  * trunk, then Form → Compose → Bundle → Verify for the one batch in flight,
- * and one look at a verification that has outrun its budget. Every step
+ * and one look at a verification that has outrun its budget. A batch formed
+ * and a candidate assembled end the step (`staged`). Every step
  * reads its I/O first and commits after, so a retry resumes where the last
  * commit left the lane. Each compose, bundle and start is marked before it
  * runs (`attempt`), so one that throws or dies is counted against its batch.
@@ -1632,6 +1635,8 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
     if (active === undefined) {
       if (lane.queue.length === 0) return "idle" satisfies LaneStep;
       yield* formBatch(lane);
+      if (laneOf(yield* EntityStore, laneId)?.active !== undefined)
+        return "staged" satisfies LaneStep;
       continue;
     }
     const batch = batchOf(store, active.batchId);
@@ -1646,6 +1651,8 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
       const tried = yield* attempt(lane, active, batch, "compose");
       if (tried === undefined) return "again" satisfies LaneStep;
       yield* composeBatch(lane, tried, batch);
+      if (batchOf(yield* EntityStore, batch.id)?.state === "assembled")
+        return "staged" satisfies LaneStep;
       continue;
     }
     if (batch.state === "assembled" && active.bundle === undefined) {

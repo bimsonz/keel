@@ -63,6 +63,8 @@ export function makeCandidateComposerMemory(
     readonly detail?: string;
     /** The paths the refusal names: none unless given. */
     readonly paths?: readonly string[];
+    /** Each composition waits for it once its request is recorded: a compose that takes as long as a test wants. */
+    readonly held?: Promise<void>;
   } = {},
 ) {
   /** Every request composed or refused, in order: what a lane named for each member. */
@@ -75,6 +77,8 @@ export function makeCandidateComposerMemory(
         compose: (request) =>
           Effect.gen(function* () {
             requests.push(request);
+            const held = options.held;
+            if (held !== undefined) yield* Effect.promise(() => held);
             const refused = request.members.filter((m) => options.refuse?.includes(m.changeId));
             if (refused.length > 0)
               return yield* new CompositionRefused({

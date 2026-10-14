@@ -2,11 +2,11 @@
 # kills: b11.lapse
 # why: the alarm handler runs only the backbone's own reasons, so a due lease deadline is dropped and the change never parks
 diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
-index 960e3dac..2e6fc1d9 100644
+index 238ab6f2..7939fb08 100644
 --- a/apps/keel/src/adapters/driving/do/keel-object.ts
 +++ b/apps/keel/src/adapters/driving/do/keel-object.ts
-@@ -187,8 +187,6 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
-       if (request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY) {
+@@ -194,8 +194,6 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+       if (isOutbox(request)) {
          if (!flushed) await this.flush();
          flushed = true;
 -      } else {

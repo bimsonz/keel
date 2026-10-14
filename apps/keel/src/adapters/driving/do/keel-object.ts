@@ -40,6 +40,10 @@ import { Waiters } from "./waiters.ts";
 export const OUTBOX_FLUSH = "outbox flush";
 export const OUTBOX_REDELIVERY = "outbox redelivery";
 
+/** Whether a request is the outbox's: a flush, or a redelivery after a failed one. */
+const isOutbox = (request: { readonly reason: string }) =>
+  request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY;
+
 /**
  * What a reaction to a received event commits: events of one of this object's
  * entities, or nothing (the event is recorded and taken all the same).
@@ -180,11 +184,14 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
       console.error(
         `${this.constructor.name} ${this.ctx.id.name ?? this.ctx.id.toString()} gave up on "${request.reason}": started ${request.starts} times and never finished`,
       );
-    for (const found of due) {
+    // The outbox goes first, so what an earlier invocation committed is published before any of the
+    // object's own deadlines runs, however long that takes.
+    const outboxFirst = [...due.filter(isOutbox), ...due.filter((request) => !isOutbox(request))];
+    for (const found of outboxFirst) {
       // Counted as started only now, so a request waiting behind one that dies is not counted with it.
       const request = await startAlarm(this.ctx.storage, found, now);
       if (request === undefined) continue;
-      if (request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY) {
+      if (isOutbox(request)) {
         if (!flushed) await this.flush();
         flushed = true;
       } else {
