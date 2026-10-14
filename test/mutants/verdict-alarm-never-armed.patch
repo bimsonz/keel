@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.index-alarm
+# kills: verdict.index-alarm
+# why: a Projector woken over a feed its verdict index has not walked arms nothing, so verdicts issued before the index are found only by a read that misses, four steps at a time
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index cfd95f8a..94b52763 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -92,7 +92,7 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+       Effect.map(EntityStore, (store) =>
+         store.transaction(() => {
+           const { refolded, until } = refoldUntil(store);
+-          return refolded < until || !verdictsIndexed(store);
++          return refolded < until;
+         }),
+       ),
+     );

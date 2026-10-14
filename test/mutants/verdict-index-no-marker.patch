@@ -2,11 +2,11 @@
 # kills: verdict.index-catch-up
 # why: the index keeps no marker, so every step walks the feed again from its start and never reaches its head
 diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
-index 033e8495..f819cc48 100644
+index 29b0c8fc..34c715db 100644
 --- a/packages/core/src/application/verification/verdict-index.ts
 +++ b/packages/core/src/application/verification/verdict-index.ts
 @@ -57,7 +57,6 @@ export function indexVerdicts(
-     const verdictId = verdictOf(store.get(FEED.kind, feedPosition(at)));
+     const verdictId = verdictOf(storedAt(store, at));
      if (verdictId !== undefined) store.put(VERDICT_INDEX.at, verdictId, at);
    }
 -  if (to > from) store.put(VERDICT_INDEX.indexed.kind, VERDICT_INDEX.indexed.id, to);
