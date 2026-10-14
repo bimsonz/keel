@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.git, image.no-deps
+# why: The built git never reaches the runtime stage, which then has no git
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..c423a8cb 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -36,7 +36,6 @@ ARG DEBIAN_FRONTEND=noninteractive
+ RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl procps xz-utils squashfs-tools squashfuse fuse3 libcurl3t64-gnutls libexpat1 libpcre2-8-0 zlib1g openssh-client \
+  && rm -rf /var/lib/apt/lists/*
+-COPY --from=git /out/usr/local/ /usr/local/
+ 
+ # Node as CI runs it (.node-version), from nodejs.org's tarball checked by the
+ # sha256 its SHASUMS256.txt gives; pnpm as the repository names it

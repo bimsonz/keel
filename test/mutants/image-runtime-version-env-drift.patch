@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.runtime
+# why: The server states another version than it is, and the SDK's version check reads a false one
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..425639f9 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -58,7 +58,7 @@ COPY --from=docker.io/cloudflare/sandbox:0.12.10 /usr/bin/fuse-overlayfs /usr/bi
+ RUN sed -i 's/^#user_allow_other/user_allow_other/' /etc/fuse.conf \
+  && ln -sf /proc/mounts /etc/mtab \
+  && mkdir -p /workspace
+-ENV SANDBOX_VERSION=0.12.10 PYTHON_POOL_MIN_SIZE=0 JAVASCRIPT_POOL_MIN_SIZE=0 TYPESCRIPT_POOL_MIN_SIZE=0
++ENV SANDBOX_VERSION=0.12.1 PYTHON_POOL_MIN_SIZE=0 JAVASCRIPT_POOL_MIN_SIZE=0 TYPESCRIPT_POOL_MIN_SIZE=0
+ 
+ # The toolchain a deps build is made with, in one line: node, pnpm and the
+ # base, since a native module built against another libc is another bundle.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.runtime, image.no-deps
+# why: The image runs another release's server than the SDK talking to it
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..27484566 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -53,7 +53,7 @@ RUN npm install -g pnpm@11.18.0 && npm cache clean --force
+ # fuse-overlayfs its backups restore through (noble's 1.13 has the EEXIST
+ # fault the runtime's image pins 1.18 to avoid). The server reads its version
+ # from SANDBOX_VERSION. No code interpreter is used, so its pools stay empty.
+-COPY --from=docker.io/cloudflare/sandbox:0.12.10 /container-server /container-server
++COPY --from=docker.io/cloudflare/sandbox:0.12.1 /container-server /container-server
+ COPY --from=docker.io/cloudflare/sandbox:0.12.10 /usr/bin/fuse-overlayfs /usr/bin/fuse-overlayfs
+ RUN sed -i 's/^#user_allow_other/user_allow_other/' /etc/fuse.conf \
+  && ln -sf /proc/mounts /etc/mtab \

@@ -1,0 +1,12 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.runtime
+# why: The box starts no sandbox server: every exec fails
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..eedc556c 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -69,4 +69,3 @@ RUN echo "node $(node --version) pnpm $(pnpm --version) ubuntu $(. /etc/os-relea
+ 
+ WORKDIR /container-server
+ EXPOSE 3000
+-ENTRYPOINT ["/container-server/sandbox"]

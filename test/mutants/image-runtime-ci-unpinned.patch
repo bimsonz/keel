@@ -1,0 +1,15 @@
+# expect-red: pnpm_config_verify_deps_before_run=false pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.runtime
+# why: @cloudflare/ci keeps its own sandbox 0.12.1, which does not match the image's server
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index 8217fb04..01a560fc 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -102,7 +102,6 @@ catalog:
+ 
+ # One sandbox SDK in the workspace: the one the image's server matches.
+ overrides:
+-  "@cloudflare/ci>@cloudflare/sandbox": "catalog:"
+ 
+ minimumReleaseAgeExclude:
+   - "@oxlint-tsgolint/darwin-arm64@7.0.2004"

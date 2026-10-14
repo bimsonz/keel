@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.git
+# why: The box builds a git the oracle takes but CI does not run: 2.50 diffs histogram as through 2.53
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..3e29a055 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -16,7 +16,7 @@
+ # through curl and gnutls).
+ FROM docker.io/library/ubuntu:24.04 AS git
+ ARG DEBIAN_FRONTEND=noninteractive
+-ARG GIT_VERSION=2.55.0
++ARG GIT_VERSION=2.50.1
+ ARG GIT_SHA256=457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
+ RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential cargo libcurl4-gnutls-dev libexpat1-dev libpcre2-dev zlib1g-dev \

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.git
+# why: The box has no ssh-keygen, so GitCore's SSH signatures cannot be checked there
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..cb8a9a2d 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -34,7 +34,7 @@ ARG DEBIAN_FRONTEND=noninteractive
+ # @cloudflare/ci restores; the libraries the built git links; openssh-client
+ # for ssh-keygen, which GitCore's SSH signatures are checked with.
+ RUN apt-get update \
+- && apt-get install -y --no-install-recommends ca-certificates curl procps xz-utils squashfs-tools squashfuse fuse3 libcurl3t64-gnutls libexpat1 libpcre2-8-0 zlib1g openssh-client \
++ && apt-get install -y --no-install-recommends ca-certificates curl procps xz-utils squashfs-tools squashfuse fuse3 libcurl3t64-gnutls libexpat1 libpcre2-8-0 zlib1g \
+  && rm -rf /var/lib/apt/lists/*
+ COPY --from=git /out/usr/local/ /usr/local/
+ 

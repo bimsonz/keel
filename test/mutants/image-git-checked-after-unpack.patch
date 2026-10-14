@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.git
+# why: Git's tarball is unpacked before its sha256 is checked
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..1c9f7b24 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -22,8 +22,8 @@ RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential cargo libcurl4-gnutls-dev libexpat1-dev libpcre2-dev zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
+ RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
+- && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
+  && tar -xJf /tmp/git.tar.xz -C /tmp \
++ && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
+  && make -C "/tmp/git-${GIT_VERSION}" -j"$(nproc)" prefix=/usr/local USE_LIBPCRE2=YesPlease NO_OPENSSL=YesPlease NO_PERL=YesPlease NO_PYTHON=YesPlease NO_GETTEXT=YesPlease NO_TCLTK=YesPlease DESTDIR=/out install
+ 
+ FROM docker.io/library/ubuntu:24.04

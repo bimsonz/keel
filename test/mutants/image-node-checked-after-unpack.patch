@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.node
+# why: Node's tarball is unpacked before its sha256 is checked
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..865ae6bd 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -44,8 +44,8 @@ COPY --from=git /out/usr/local/ /usr/local/
+ ARG NODE_VERSION=22.22.3
+ ARG NODE_SHA256=2e5d13569282d016861fae7c8f935e741693c269101a5bebcf761a5376d1f99f
+ RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
+- && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
++ && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+  && rm /tmp/node.tar.xz
+ RUN npm install -g pnpm@11.18.0 && npm cache clean --force
+ 

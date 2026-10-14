@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.toolchain
+# why: The box states node and pnpm but not its base, so a bundle built on another libc reads as the same toolchain
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..eff8266f 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -65,7 +65,7 @@ ENV SANDBOX_VERSION=0.12.10 PYTHON_POOL_MIN_SIZE=0 JAVASCRIPT_POOL_MIN_SIZE=0 TY
+ # The deps box reports it and the pointer records it: a build from a box that
+ # says another toolchain is never kept. A unit test holds this line, the node
+ # and pnpm above and the base to core's DEPS_TOOLCHAIN ([image.toolchain]).
+-RUN echo "node $(node --version) pnpm $(pnpm --version) ubuntu $(. /etc/os-release && echo "$VERSION_ID")" > /etc/keel-toolchain
++RUN echo "node $(node --version) pnpm $(pnpm --version)" > /etc/keel-toolchain
+ 
+ WORKDIR /container-server
+ EXPOSE 3000

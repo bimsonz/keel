@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.runtime, image.toolchain
+# why: The boxes run on another base than CI's, so Keel's suite passes in CI and not in a box
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..2a41ecd8 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -26,7 +26,7 @@ RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_V
+  && tar -xJf /tmp/git.tar.xz -C /tmp \
+  && make -C "/tmp/git-${GIT_VERSION}" -j"$(nproc)" prefix=/usr/local USE_LIBPCRE2=YesPlease NO_OPENSSL=YesPlease NO_PERL=YesPlease NO_PYTHON=YesPlease NO_GETTEXT=YesPlease NO_TCLTK=YesPlease DESTDIR=/out install
+ 
+-FROM docker.io/library/ubuntu:24.04
++FROM docker.io/library/ubuntu:22.04
+ ARG DEBIAN_FRONTEND=noninteractive
+ 
+ # ca-certificates and curl for every fetch; procps; xz-utils for node's

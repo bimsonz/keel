@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.node, image.toolchain
+# why: The box installs another pnpm than packageManager names
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..bb08f633 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -47,7 +47,7 @@ RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-l
+  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
+  && rm /tmp/node.tar.xz
+-RUN npm install -g pnpm@11.18.0 && npm cache clean --force
++RUN npm install -g pnpm@11.17.0 && npm cache clean --force
+ 
+ # The sandbox runtime, as its own image lays it out: the server, and the
+ # fuse-overlayfs its backups restore through (noble's 1.13 has the EEXIST

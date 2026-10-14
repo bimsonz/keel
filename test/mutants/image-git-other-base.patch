@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts
+# kills: image.git
+# why: Git is built on another base than the runtime's, linking libraries it may not have
+diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
+index 288dd910..b6f18f2d 100644
+--- a/apps/keel-verify/containers/sandbox/Dockerfile
++++ b/apps/keel-verify/containers/sandbox/Dockerfile
+@@ -14,7 +14,7 @@
+ # its sha256 matches; with its Rust parts, as the git-core PPA builds CI's; and
+ # without OpenSSL, Perl or Python, as nothing here needs them (its https goes
+ # through curl and gnutls).
+-FROM docker.io/library/ubuntu:24.04 AS git
++FROM docker.io/library/ubuntu:22.04 AS git
+ ARG DEBIAN_FRONTEND=noninteractive
+ ARG GIT_VERSION=2.55.0
+ ARG GIT_SHA256=457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
