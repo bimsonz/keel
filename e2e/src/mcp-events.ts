@@ -117,18 +117,20 @@ async function listenLive(): Promise<void> {
 
   // (d) A conflict on the listening run's change, caused by its other run.
   const declared: string[] = [];
+  const leases = new Map<string, string>();
   const base = (await listener.commits(project.id, { limit: 1 })).items[0]?.sha;
   if (base === undefined) throw new Error("the project's trunk has no commit");
   try {
     const before = updates.length;
     const caused = Date.now();
-    await declareS1(
+    const { a, b } = await declareS1(
       { a: listener, b: other },
       base,
       (party) => key(`declare-${party}`),
       SETTLE_MS,
       (changeId) => declared.push(changeId),
     );
+    for (const { result } of [a, b]) leases.set(result.change.id, result.lease.id);
     const told = await waitFor(
       () => updates.slice(before).find((update) => update.uri === INBOX),
       TOLD_MS + 20_000,
@@ -139,8 +141,16 @@ async function listenLive(): Promise<void> {
     const page: { result?: { notices?: Notice[] } } =
       contents !== undefined && "text" in contents ? JSON.parse(contents.text) : {};
     const notices = page.result?.notices ?? [];
-    const notice = notices.find((n) => declared[0] !== undefined && n.ref?.includes(declared[0]));
     for (const n of notices) console.log(`     notice ${n.kind} ${n.ref ?? ""} ${n.title ?? ""}`);
+    // A suspicion's notice names the conflict: the conflict names the changes it is between.
+    let notice: Notice | undefined;
+    for (const n of notices) {
+      const conflictId =
+        n.kind === "ConflictSuspected" ? n.ref?.replace(/^conflict:/, "") : undefined;
+      if (conflictId === undefined || declared[0] === undefined) continue;
+      const conflict = await listener.conflict(conflictId, { project: project.id });
+      if (conflict.parties.includes(declared[0])) notice = n;
+    }
     check(notice !== undefined, "(d) keel://inbox holds a notice about the listening run's change");
     if (told !== undefined && notice?.at !== undefined) {
       const fromCommit = told.at - Date.parse(notice.at);
@@ -172,10 +182,11 @@ async function listenLive(): Promise<void> {
     await client.close();
     for (const changeId of declared) {
       try {
+        const lease = leases.get(changeId);
         await runOf(changeId === declared[0] ? "listener" : "other").abandon(
           changeId,
           { reason: `mcp-events ${run} finished` },
-          { idempotencyKey: key(`abandon:${changeId}`) },
+          { ...(lease === undefined ? {} : { lease }), idempotencyKey: key(`abandon:${changeId}`) },
         );
         console.log(`     withdrawn ${changeId}`);
       } catch (error) {
