@@ -2,15 +2,15 @@
 # kills: bundles.candidate
 # why: A candidate's bundle is stored outside the namespace it was bundled for
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-index 1a5581c9..c4fa0bef 100644
+index fd488215..95a8e334 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -65,7 +65,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
-                       ? Effect.fail(new BundleRefused({ reason: cause.message }))
+@@ -221,7 +221,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
                        : Effect.die(cause),
                  ),
--                Effect.flatMap((bytes) => store.put(namespace, bytes)),
-+                Effect.flatMap((bytes) => store.put("org_00000000000000000000000000", bytes)),
-               ),
-             (reader) => Effect.sync(() => reader[Symbol.dispose]()),
-           ),
+                 Effect.flatMap((bytes) =>
+-                  store.put(namespace, bytes).pipe(
++                  store.put("org_00000000000000000000000000", bytes).pipe(
+                     // Said as the put's, so a step that fails here is not taken for a read.
+                     Effect.catchCause((cause) =>
+                       Effect.die(

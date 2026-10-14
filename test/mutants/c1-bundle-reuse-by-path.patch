@@ -2,9 +2,10 @@
 # kills: bundles.reuse-same-bytes
 # why: a file is taken from the last bundle by its path, without comparing ids: a file rewritten where it is keeps its old bytes
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index fd488215..900cffc4 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -38,9 +38,10 @@
+@@ -38,9 +38,10 @@ class Unbundlable extends Error {
  interface Held {
    readonly blobs: ReadonlyMap<string, Uint8Array>;
    readonly trees: ReadonlyMap<string, readonly BundleFile[]>;
@@ -14,9 +15,9 @@ diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/k
 -const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map() };
 +const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map(), paths: new Map() };
  
- /**
-  * Hashes a bundle's files as git blobs, and derives each directory's tree id
-@@ -77,7 +78,8 @@
+ /** How much of a path a failed read names, from its end. */
+ const PATH_TAIL = 80;
+@@ -128,7 +129,8 @@ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
      return oid;
    };
    await treeOf(files);
@@ -26,13 +27,13 @@ diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/k
  }
  
  /** `path`, refused when it is where the bundle keeps its own manifest. */
-@@ -113,7 +115,8 @@
+@@ -164,7 +166,8 @@ async function filesOf(
        return [
          {
            path: unreserved(path),
--          bytes: held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
+-          bytes: held.blobs.get(e.oid) ?? (await reads.blob(e.oid, path)),
 +          bytes:
-+            held.paths.get(path) ?? held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
++            held.paths.get(path) ?? held.blobs.get(e.oid) ?? (await reads.blob(e.oid, path)),
            executable: e.mode === MODE_EXEC,
          },
        ];

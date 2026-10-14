@@ -2,13 +2,13 @@
 # kills: bundles.refuses
 # why: an entry whose id the last bundle holds is taken before its mode is looked at, so a symlink or a submodule is bundled as a file
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-index 162592fb..bb669185 100644
+index fd488215..0953cab9 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -99,7 +99,7 @@ async function filesOf(
-     (await reader.readTree(tree)).map(async (e): Promise<BundleFile[]> => {
+@@ -156,7 +156,7 @@ async function filesOf(
+     (await reads.tree(tree, prefix)).map(async (e): Promise<BundleFile[]> => {
        const path = under(e.name);
-       if (e.mode === MODE_TREE) return filesOf(reader, held, e.oid, path);
+       if (e.mode === MODE_TREE) return filesOf(reads, held, e.oid, path);
 -      if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC)
 +      if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC && !held.blobs.has(e.oid))
          throw new Unbundlable(

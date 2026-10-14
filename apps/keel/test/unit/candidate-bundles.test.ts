@@ -21,7 +21,7 @@ import {
   otherNamespace,
   sampleNamespace,
 } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
 import { CandidateBundlesGitCore } from "../../src/adapters/driven/gitcore/candidate-bundles.ts";
 
@@ -389,4 +389,38 @@ describe("CandidateBundles over gitcore", () => {
         }
       }),
   );
+
+  it.effect(
+    "[bundles.read-failed-named] a read the code host fails says which read it was, of which path and object, and how far the walk had got",
+    () =>
+      Effect.gen(function* () {
+        const { commit, reader } = yield* Effect.promise(() =>
+          repoOf({ "README.md": "keel\n", "src/a/b.ts": "export const b = 1;\n" }),
+        );
+        const oid = yield* Effect.promise(() => hashObject("blob", text("export const b = 1;\n")));
+        const failing: ObjectReader & Disposable = {
+          ...reader,
+          readBlob: async (asked) => {
+            if (asked === oid) throw new HostFault("An internal error occurred.");
+            return reader.readBlob(asked);
+          },
+        };
+        const exit = yield* Effect.exit(
+          Effect.flatMap(CandidateBundles, (b) => b.bundle(sampleNamespace, STAGING, commit)).pipe(
+            Effect.provide(bundling(failing)),
+          ),
+        );
+        const said = Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "";
+        expect(said).toMatch(
+          new RegExp(
+            `BundleReadFailed: readBlob src/a/b\\.ts ${oid} failed as read \\d+ of \\d+, \\d+ in flight: ArtifactsError: An internal error occurred\\.`,
+          ),
+        );
+      }),
+  );
 });
+
+/** What the binding throws when Artifacts fails a read. */
+class HostFault extends Error {
+  override readonly name = "ArtifactsError";
+}

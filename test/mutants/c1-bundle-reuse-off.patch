@@ -2,10 +2,10 @@
 # kills: bundles.reuse-reads
 # why: the last bundle is never looked at, so every candidate of a large tree reads the whole tree again
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-index 162592fb..ee39a081 100644
+index fd488215..5f59c96f 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -144,7 +144,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
+@@ -201,7 +201,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
            Effect.acquireUseRelease(
              Effect.promise(() => open(staging)),
              (reader) =>
@@ -13,4 +13,4 @@ index 162592fb..ee39a081 100644
 +              heldIn(namespace, undefined).pipe(
                  Effect.flatMap((held) =>
                    Effect.tryPromise({
-                     try: async () =>
+                     try: async () => {

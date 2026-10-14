@@ -2,13 +2,13 @@
 # kills: bundles.candidate
 # why: Executables are bundled as plain files, so a candidate's scripts lose their mode in the sandbox
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-index 162592fb..3284c9a9 100644
+index fd488215..22b47495 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
-@@ -108,7 +108,7 @@ async function filesOf(
+@@ -165,7 +165,7 @@ async function filesOf(
          {
            path: unreserved(path),
-           bytes: held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
+           bytes: held.blobs.get(e.oid) ?? (await reads.blob(e.oid, path)),
 -          executable: e.mode === MODE_EXEC,
 +          executable: false,
          },

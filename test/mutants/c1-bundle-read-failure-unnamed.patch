@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.read-failed-named"
+# kills: bundles.read-failed-named
+# why: a read the code host fails is rethrown as the binding threw it, so a bundle step that fails live says only "ArtifactsError: An internal error occurred." and never which read, path or object
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index fd488215..8626394e 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -78,10 +78,7 @@ function counted(reader: ObjectReader): CountedReads {
+     try {
+       return await call();
+     } catch (error) {
+-      throw new BundleReadFailed(
+-        `${what} failed as read ${nth} of ${asked}, ${inFlight} in flight: ${messageOf(error)}`,
+-        { cause: error },
+-      );
++      throw error;
+     } finally {
+       inFlight -= 1;
+     }

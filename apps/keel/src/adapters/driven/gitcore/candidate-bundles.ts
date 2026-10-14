@@ -16,7 +16,7 @@ import {
   readBundle,
   writeBundle,
 } from "@keeltown/runner-protocol";
-import { Effect, Layer } from "effect";
+import { Cause, Effect, Layer } from "effect";
 import type { OpenObjects } from "./candidate-composer.ts";
 
 /** Refused while walking the tree, at `path`: the bundle carries regular files only, and never its own manifest. */
@@ -41,6 +41,57 @@ interface Held {
 }
 
 const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map() };
+
+/** How much of a path a failed read names, from its end. */
+const PATH_TAIL = 80;
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+
+/**
+ * A read of the walk that the code host failed: which read, of which object
+ * at which path, and how far the walk had got (the reads asked so far and
+ * those in flight with it), so a bundle step that fails says what it was
+ * doing. Led by what is read, since the Lane keeps a step's error short.
+ */
+class BundleReadFailed extends Error {
+  override readonly name = "BundleReadFailed";
+}
+
+/** A path as a failed read names it: its end, and the root as `/`. */
+const at = (path: string) => (path === "" ? "/" : path.slice(-PATH_TAIL));
+
+/** The walk's reads of `reader`, counted, each failure a BundleReadFailed. */
+interface CountedReads {
+  readonly commit: (oid: string) => ReturnType<ObjectReader["readCommit"]>;
+  readonly tree: (oid: string, path: string) => ReturnType<ObjectReader["readTree"]>;
+  readonly blob: (oid: string, path: string) => ReturnType<ObjectReader["readBlob"]>;
+}
+
+function counted(reader: ObjectReader): CountedReads {
+  let asked = 0;
+  let inFlight = 0;
+  const read = async <A>(what: string, call: () => Promise<A>): Promise<A> => {
+    asked += 1;
+    const nth = asked;
+    inFlight += 1;
+    try {
+      return await call();
+    } catch (error) {
+      throw new BundleReadFailed(
+        `${what} failed as read ${nth} of ${asked}, ${inFlight} in flight: ${messageOf(error)}`,
+        { cause: error },
+      );
+    } finally {
+      inFlight -= 1;
+    }
+  };
+  return {
+    commit: (oid) => read(`readCommit ${oid}`, () => reader.readCommit(oid)),
+    tree: (oid, path) => read(`readTree ${at(path)} ${oid}`, () => reader.readTree(oid)),
+    blob: (oid, path) => read(`readBlob ${at(path)} ${oid}`, () => reader.readBlob(oid)),
+  };
+}
 
 /**
  * Hashes a bundle's files as git blobs, and derives each directory's tree id
@@ -93,7 +144,7 @@ const unreserved = (path: string): string => {
  * reader is asked only for what the past bundle does not have.
  */
 async function filesOf(
-  reader: ObjectReader,
+  reads: CountedReads,
   held: Held,
   tree: string,
   prefix: string,
@@ -102,9 +153,9 @@ async function filesOf(
   const whole = held.trees.get(tree);
   if (whole !== undefined) return whole.map((f) => ({ ...f, path: unreserved(under(f.path)) }));
   const nested = await Promise.all(
-    (await reader.readTree(tree)).map(async (e): Promise<BundleFile[]> => {
+    (await reads.tree(tree, prefix)).map(async (e): Promise<BundleFile[]> => {
       const path = under(e.name);
-      if (e.mode === MODE_TREE) return filesOf(reader, held, e.oid, path);
+      if (e.mode === MODE_TREE) return filesOf(reads, held, e.oid, path);
       if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC)
         throw new Unbundlable(
           path,
@@ -113,7 +164,7 @@ async function filesOf(
       return [
         {
           path: unreserved(path),
-          bytes: held.blobs.get(e.oid) ?? (await reader.readBlob(e.oid)),
+          bytes: held.blobs.get(e.oid) ?? (await reads.blob(e.oid, path)),
           executable: e.mode === MODE_EXEC,
         },
       ];
@@ -153,10 +204,12 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
               heldIn(namespace, from).pipe(
                 Effect.flatMap((held) =>
                   Effect.tryPromise({
-                    try: async () =>
-                      writeBundle(
-                        await filesOf(reader, held, (await reader.readCommit(commit)).tree, ""),
-                      ),
+                    try: async () => {
+                      const reads = counted(reader);
+                      return writeBundle(
+                        await filesOf(reads, held, (await reads.commit(commit)).tree, ""),
+                      );
+                    },
                     catch: (cause) => cause,
                   }),
                 ),
@@ -167,7 +220,18 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
                       ? Effect.fail(new BundleRefused({ reason: cause.message }))
                       : Effect.die(cause),
                 ),
-                Effect.flatMap((bytes) => store.put(namespace, bytes)),
+                Effect.flatMap((bytes) =>
+                  store.put(namespace, bytes).pipe(
+                    // Said as the put's, so a step that fails here is not taken for a read.
+                    Effect.catchCause((cause) =>
+                      Effect.die(
+                        new Error(
+                          `BundleStore.put of ${bytes.length} B failed: ${messageOf(Cause.squash(cause))}`,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             (reader) => Effect.sync(() => reader[Symbol.dispose]()),
           ),
