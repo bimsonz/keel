@@ -2,11 +2,11 @@
 # kills: loadgen.pace-refused
 # why: A refused token request is sent again as it was: its one-time assertion and proof are replayed
 diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
-index d645488d..c31232f4 100644
+index cb7d8952..03f6e8da 100644
 --- a/examples/loadgen/src/limits.ts
 +++ b/examples/loadgen/src/limits.ts
-@@ -76,6 +76,6 @@ export function paced(fetch: Fetch, pace: Pace, tokenEndpoint: string): Fetch {
-     await pace.take();
+@@ -101,6 +101,6 @@ export function paced(fetch: Fetch, pace: Pace, tokenEndpoint: string): Fetch {
+     }
      const answer = await fetch(input, init);
      if (answer.status === 429) pace.refusedFor(answer.headers.get("retry-after"));
 -    return answer;

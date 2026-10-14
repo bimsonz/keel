@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/limits.test.ts
+# kills: loadgen.pace-fresh
+# why: A token request the pace held past its signature's life is sent all the same: Keel refuses it as unverifiable and the agent fails, as 138 of lg200a's did
+diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
+index cb7d8952..9776842d 100644
+--- a/examples/loadgen/src/limits.ts
++++ b/examples/loadgen/src/limits.ts
+@@ -88,7 +88,7 @@ export function paced(fetch: Fetch, pace: Pace, tokenEndpoint: string): Fetch {
+   return async (input, init) => {
+     if (input !== tokenEndpoint) return fetch(input, init);
+     if (kept > 0) kept -= 1;
+-    else if ((await pace.take()) > FRESH_MS) {
++    else if ((await pace.take()) > Number.POSITIVE_INFINITY) {
+       kept += 1;
+       pace.signedAgain += 1;
+       return new Response(
