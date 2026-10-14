@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/token-limit.test.ts
 # kills: oauth.rate-limit-wait
 # why: a limited exchange's body does not say how long to wait
-diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
-index c26336f..8877acc 100644
---- a/apps/keel/src/adapters/driving/http/app.ts
-+++ b/apps/keel/src/adapters/driving/http/app.ts
-@@ -64,7 +64,6 @@ export function makeApp(options: AppOptions) {
-     if (await options.tokens.admit(`token:${ip}`)) return next();
-     const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
-       detail: "Too many token requests from this address; wait a minute.",
--      retryAfterMs: TOKEN_WINDOW_SECONDS * 1000,
-     });
-     refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
-     return refused;
+diff --git a/apps/keel/src/adapters/driving/http/token-limits.ts b/apps/keel/src/adapters/driving/http/token-limits.ts
+index df4262b8..6c46f271 100644
+--- a/apps/keel/src/adapters/driving/http/token-limits.ts
++++ b/apps/keel/src/adapters/driving/http/token-limits.ts
+@@ -53,7 +53,6 @@ async function accessTokenOf(answer: Response): Promise<string | undefined> {
+ const refused = (requestId: string, detail: string): Response => {
+   const answer = problemResponse(429, "rate.limited", requestId, {
+     detail,
+-    retryAfterMs: TOKEN_WINDOW_SECONDS * 1000,
+   });
+   answer.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
+   return answer;

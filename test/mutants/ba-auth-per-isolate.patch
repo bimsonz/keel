@@ -2,10 +2,10 @@
 # kills: ba.per-request
 # why: one Better Auth per isolate, made in its first request: when that request ends first, the init and schema check it started never settle, and every later /v1/auth request on the isolate hangs
 diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index 6344f9c..a569229 100644
+index 2d13e375..f36cb02b 100644
 --- a/apps/keel/src/composition/isolate.ts
 +++ b/apps/keel/src/composition/isolate.ts
-@@ -217,10 +217,9 @@ export function makeIsolate(
+@@ -406,10 +406,9 @@ export function makeIsolate(
     * pending, and every later /v1/auth request on the isolate waited for ever.
     * Each request makes its own, so what it awaits is its own.
     */
@@ -17,5 +17,5 @@ index 6344f9c..a569229 100644
 +  const once = makeAuth(authConfig);
 +  const auth = () => once;
    const deps = gateDeps(runtime, env.KEEL_HOST, auth);
-   const boundGate: BoundGate = (request, requestId) => gate(request, requestId, deps);
-   const app = makeApp({
+   // One limiter, two counts under their own keys: tokens issued to an agent, and failed exchanges from an address.
+   const tokenLimits: TokenLimits = {

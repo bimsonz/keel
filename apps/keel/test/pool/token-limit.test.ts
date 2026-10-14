@@ -54,15 +54,15 @@ describe("the token endpoint's rate limit", () => {
     );
     const limited: Fetch = async (url, init) =>
       isolate.app.fetch(new Request(url, init), env, createExecutionContext());
-    const refused = await exchangeFrom(limited, "192.0.2.9", {
-      clientId: "nobody",
-      clientSecret: "not-a-secret",
-    });
+    const stranger = { clientId: "nobody", clientSecret: "not-a-secret" };
+    // The refusal that passes the address's failure limit is answered as it came, and blocks the address.
+    expect((await exchangeFrom(limited, "192.0.2.19", stranger)).status).toBe(401);
+    const refused = await exchangeFrom(limited, "192.0.2.19", stranger);
     expect([refused.status, refused.headers.get("retry-after")]).toEqual([429, "60"]);
     expect(await refused.json()).toMatchObject({ code: "rate.limited", retryAfterMs: 60_000 });
   });
 
-  it("[oauth.rate-limit] asks the limiter about each exchange, keyed by address alone, and refuses what it refuses ahead of the exchange", async () => {
+  it("[oauth.rate-limit] counts an exchange against the agent it issued a token to and a refused one against its address, each refused past sixty", async () => {
     // A fixed allowance stands in for the binding's window, which a slow run could straddle.
     const asked: string[] = [];
     const limiter = {
@@ -75,18 +75,21 @@ describe("the token endpoint's rate limit", () => {
     const limited: Fetch = async (url, init) =>
       isolate.app.fetch(new Request(url, init), env, createExecutionContext());
     const seeded = await seedAgent();
+    const other = await seedAgent();
     const stranger = { clientId: "nobody", clientSecret: "not-a-secret" };
 
-    // The first of the allowance shows the credentials are good; another client's bad ones spend the rest.
-    const statuses = [(await exchangeFrom(limited, "192.0.2.7", seeded)).status];
-    for (let i = 1; i < 60; i++)
-      statuses.push((await exchangeFrom(limited, "192.0.2.7", stranger)).status);
-    expect(statuses[0]).toBe(200);
-    expect(statuses.filter((status) => status === 429)).toEqual([]);
+    // Sixty tokens for one agent, and sixty for another, from one address: all issued.
+    const statuses: number[] = [];
+    for (let i = 0; i < 60; i++) {
+      statuses.push((await exchangeFrom(limited, "192.0.2.7", seeded)).status);
+      statuses.push((await exchangeFrom(limited, "192.0.2.7", other)).status);
+    }
+    expect(statuses.filter((status) => status !== 200)).toEqual([]);
 
-    // Past it, the same good credentials are refused: the limiter answers, not the exchange.
+    // The agent's sixty-first is refused, from any address: the limiter answers after the exchange.
     const refused: Response[] = [];
-    for (let i = 0; i < 3; i++) refused.push(await exchangeFrom(limited, "192.0.2.7", seeded));
+    for (const address of ["192.0.2.7", "192.0.2.8", null])
+      refused.push(await exchangeFrom(limited, address, seeded));
     expect(refused.map((response) => response.status)).toEqual([429, 429, 429]);
     for (const response of refused) {
       expect(response.headers.get("content-type")).toBe("application/problem+json");
@@ -102,18 +105,28 @@ describe("the token endpoint's rate limit", () => {
       expect(body).toMatchObject({
         status: 429,
         code: "rate.limited",
-        detail: expect.stringMatching(/wait a minute/),
+        detail: expect.stringMatching(/for this agent; wait a minute/),
       });
     }
 
-    // Another address, and a request the edge named no address for, have allowances of their own.
-    expect((await exchangeFrom(limited, "192.0.2.8", seeded)).status).toBe(200);
-    expect((await exchangeFrom(limited, null, seeded)).status).toBe(200);
-    expect([...new Set(asked)]).toEqual(["token:192.0.2.7", "token:192.0.2.8", "token:unknown"]);
-    expect(asked.filter((key) => key === "token:192.0.2.7")).toHaveLength(63);
+    // Bad credentials count against the address they came from, not the client they named:
+    // past sixty, that address is refused even a good agent's first token, and another isn't.
+    const fresh = await seedAgent();
+    for (let i = 0; i < 61; i++)
+      expect((await exchangeFrom(limited, "192.0.2.17", stranger)).status).toBe(401);
+    expect((await exchangeFrom(limited, "192.0.2.17", fresh)).status).toBe(429);
+    expect((await exchangeFrom(limited, "192.0.2.18", fresh)).status).toBe(200);
+    expect([...new Set(asked)].toSorted()).toEqual(
+      [
+        `token:agent:${seeded.agent.id}`,
+        `token:agent:${other.agent.id}`,
+        `token:agent:${fresh.agent.id}`,
+        "token-failed:192.0.2.17",
+      ].toSorted(),
+    );
   });
 
-  it("[oauth.limit-binding] the Worker's own limiter refuses an address past 60 exchanges in a minute", async () => {
+  it("[oauth.limit-binding] the Worker's own limiter blocks an address past 60 refused exchanges in a minute", async () => {
     const stranger = { clientId: "nobody", clientSecret: "not-a-secret" };
     // The binding's windows follow the wall clock, so 121 exchanges put 61 in one window however they fall.
     const statuses: number[] = [];

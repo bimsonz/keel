@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/token-limits.test.ts
+# kills: token-limits.failures
+# why: a good exchange is counted against its address as a failure is, so honest traffic from one address is blocked
+diff --git a/apps/keel/src/adapters/driving/http/token-limits.ts b/apps/keel/src/adapters/driving/http/token-limits.ts
+index df4262b8..b03964de 100644
+--- a/apps/keel/src/adapters/driving/http/token-limits.ts
++++ b/apps/keel/src/adapters/driving/http/token-limits.ts
+@@ -77,7 +77,7 @@ export async function limitedExchange(
+   if (await limits.blocks.has(address))
+     return refused(requestId, "Too many failed token requests from this address; wait a minute.");
+   const answer = await exchange();
+-  if (answer.status === 200) {
++  if (answer.status === 200 && (await limits.failed(`token-failed:${address}`))) {
+     const token = await accessTokenOf(answer);
+     const agent = token === undefined ? undefined : issuedTo(token);
+     if (agent !== undefined && !(await limits.issued(`token:agent:${agent}`)))

@@ -2,15 +2,15 @@
 # kills: ba.rate-limit
 # why: the mount never asks the limiter, so one address can send codes and attempts without end
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index cb536a8b..84c3c676 100644
+index 0bca8936..77e1a3dd 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
-@@ -98,7 +98,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
-           refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
-           return refused;
-         }
--      } else if (!(await mount.admit(`auth:${ip}`)))
-+      } else if (ip === "never")
-         return problemResponse(429, "rate.limited", c.get("requestId"), {
-           detail: "Too many sign-in requests from this address; wait a minute.",
-         });
+@@ -101,7 +101,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+     const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+     if (path === mount.tokenPath)
+       return limitedExchange(ip, c.get("requestId"), mount.tokenLimits, answer);
+-    if (!(await mount.admit(`auth:${ip}`)))
++    if (ip === "never")
+       return problemResponse(429, "rate.limited", c.get("requestId"), {
+         detail: "Too many sign-in requests from this address; wait a minute.",
+       });

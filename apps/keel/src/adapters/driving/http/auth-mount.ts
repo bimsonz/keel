@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
 import { SESSION_COOKIE } from "./gate.ts";
 import { DATABASE_AWAY, problemResponse, unavailable } from "./problems.ts";
+import { limitedExchange, type TokenLimits } from "./token-limits.ts";
 
 /** Better Auth's mount: outside the TypeSpec document and problem+json, like the token endpoint. */
 export interface AuthMount {
@@ -11,15 +12,12 @@ export interface AuthMount {
   readonly admit: (key: string) => Promise<boolean>;
   /**
    * Where an agent asks for a token, under the base path. Those requests are
-   * counted with the token endpoint's limiter, not this one: an agent's runs ask
-   * every few minutes, and must not spend what a person's sign-in is allowed.
+   * held to the token limits, not this one: an agent's runs ask every few
+   * minutes, and must not spend what a person's sign-in is allowed.
    */
   readonly tokenPath: string;
-  readonly admitToken: (key: string) => Promise<boolean>;
+  readonly tokenLimits: TokenLimits;
 }
-
-/** How long an address waits once the token limit refuses it: the limiter's own window (`TOKEN_LIMIT`'s period in wrangler.jsonc). */
-export const TOKEN_WINDOW_SECONDS = 60;
 
 /**
  * The one answer that hands a session's token to its holder: the device grant's
@@ -83,33 +81,30 @@ export function oneCredential(request: Request): Request {
 }
 
 /**
- * Mounts Better Auth under its base path, each IP limited on everything but
- * reads. A 503 of Better Auth's is answered as Keel's own, as its 429 is: a
- * problem that says when to send the request again.
+ * Mounts Better Auth under its base path. Every write but the token exchange
+ * is limited by IP; the exchange is held to the token limits, which count an
+ * agent by the token it was issued and an address by its failures. A 503 of
+ * Better Auth's is answered as Keel's own, as its 429 is: a problem that says
+ * when to send the request again.
  */
 export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
   app.all(`${mount.basePath}/*`, async (c) => {
     const request = c.req.raw;
     const path = new URL(request.url).pathname.slice(mount.basePath.length);
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-      if (path === mount.tokenPath) {
-        // By address alone, as the token endpoint is limited: an agent's id is public.
-        if (!(await mount.admitToken(`token:${ip}`))) {
-          const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
-            detail: "Too many token requests from this address; wait a minute.",
-          });
-          refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
-          return refused;
-        }
-      } else if (!(await mount.admit(`auth:${ip}`)))
-        return problemResponse(429, "rate.limited", c.get("requestId"), {
-          detail: "Too many sign-in requests from this address; wait a minute.",
-        });
-    }
-    const answer = await mount.handler(oneCredential(request));
-    // Of what Keel mounts, Better Auth answers 503 for one thing: its database was away.
-    if (answer.status === 503) return unavailable(c.get("requestId"), DATABASE_AWAY);
-    return withoutSessionTokens(path, answer);
+    const answer = async () => {
+      const answered = await mount.handler(oneCredential(request));
+      // Of what Keel mounts, Better Auth answers 503 for one thing: its database was away.
+      if (answered.status === 503) return unavailable(c.get("requestId"), DATABASE_AWAY);
+      return withoutSessionTokens(path, answered);
+    };
+    if (request.method === "GET" || request.method === "HEAD") return answer();
+    const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+    if (path === mount.tokenPath)
+      return limitedExchange(ip, c.get("requestId"), mount.tokenLimits, answer);
+    if (!(await mount.admit(`auth:${ip}`)))
+      return problemResponse(429, "rate.limited", c.get("requestId"), {
+        detail: "Too many sign-in requests from this address; wait a minute.",
+      });
+    return answer();
   });
 }

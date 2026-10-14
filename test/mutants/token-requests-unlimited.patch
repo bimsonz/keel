@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-limits.test.ts
-# kills: token.rate-limit
-# why: a token request is admitted whatever its limiter answers, so one address guesses at signed requests without end
+# kills: token.rate-limit-agent
+# why: an agent's token request is issued whatever the token limits say, so one agent mints without end and one address guesses at signed requests without end
 diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
-index cb536a8b..21847bc1 100644
+index 0bca8936..ae2c2884 100644
 --- a/apps/keel/src/adapters/driving/http/auth-mount.ts
 +++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
-@@ -91,7 +91,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
-       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-       if (path === mount.tokenPath) {
-         // By address alone, as the token endpoint is limited: an agent's id is public.
--        if (!(await mount.admitToken(`token:${ip}`))) {
-+        if (!(await mount.admitToken(`token:${ip}`)) && request.method === "PUT") {
-           const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
-             detail: "Too many token requests from this address; wait a minute.",
-           });
+@@ -100,7 +100,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+     if (request.method === "GET" || request.method === "HEAD") return answer();
+     const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+     if (path === mount.tokenPath)
+-      return limitedExchange(ip, c.get("requestId"), mount.tokenLimits, answer);
++      return answer();
+     if (!(await mount.admit(`auth:${ip}`)))
+       return problemResponse(429, "rate.limited", c.get("requestId"), {
+         detail: "Too many sign-in requests from this address; wait a minute.",

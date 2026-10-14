@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-limits.test.ts
+# kills: token.rate-limit-agent
+# why: tokens are counted by the address that asked, so every agent on one machine or CI runner shares one allowance
+diff --git a/apps/keel/src/adapters/driving/http/token-limits.ts b/apps/keel/src/adapters/driving/http/token-limits.ts
+index df4262b8..77b8db95 100644
+--- a/apps/keel/src/adapters/driving/http/token-limits.ts
++++ b/apps/keel/src/adapters/driving/http/token-limits.ts
+@@ -80,7 +80,7 @@ export async function limitedExchange(
+   if (answer.status === 200) {
+     const token = await accessTokenOf(answer);
+     const agent = token === undefined ? undefined : issuedTo(token);
+-    if (agent !== undefined && !(await limits.issued(`token:agent:${agent}`)))
++    if (agent !== undefined && !(await limits.issued(`token:agent:${address}`)))
+       return refused(requestId, "Too many token requests for this agent; wait a minute.");
+     return answer;
+   }

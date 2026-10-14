@@ -5,7 +5,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { registerRoutes } from "../../../generated/http/app.gen.ts";
 import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
-import { type AuthMount, registerAuth, TOKEN_WINDOW_SECONDS } from "./auth-mount.ts";
+import { type AuthMount, registerAuth } from "./auth-mount.ts";
 import { type GitClone, registerGitClone } from "./git-clone.ts";
 import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
@@ -15,6 +15,7 @@ import { answerUnhandled, type DatabaseAway } from "./run.ts";
 import { registerSigners } from "./signers.ts";
 import { registerWellKnown, type WellKnown } from "./well-known.ts";
 import { registerFrontDoor } from "./front-door.ts";
+import { limitedExchange, type TokenLimits } from "./token-limits.ts";
 
 export interface AppOptions {
   readonly handlers: Handlers;
@@ -23,8 +24,8 @@ export interface AppOptions {
   readonly mcp: (request: Request) => Promise<Response>;
   /** Users, sessions, orgs and the device grant (Better Auth), at `/v1/auth/*`. */
   readonly auth: AuthMount;
-  /** The token endpoint's limiter: whether this key may exchange again now (the Workers Rate Limiting binding). */
-  readonly tokens: { readonly admit: (key: string) => Promise<boolean> };
+  /** The token limits, on the token endpoint as on the agents' exchange under `/v1/auth`. */
+  readonly tokens: TokenLimits;
   /** The discovery documents at the origin's root (RFC 8414, RFC 9728). */
   readonly wellKnown: WellKnown;
   /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
@@ -63,16 +64,21 @@ export function makeApp(options: AppOptions) {
         }),
     }),
   );
-  // By address alone: a key that named the client would let anyone lock an agent out with its public client id.
+  // An agent is counted by the token it was issued, an address by its failures (token-limits.ts).
   app.use(TOKEN_PATH, async (c, next) => {
     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
-    if (await options.tokens.admit(`token:${ip}`)) return next();
-    const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
-      detail: "Too many token requests from this address; wait a minute.",
-      retryAfterMs: TOKEN_WINDOW_SECONDS * 1000,
+    let handled = false;
+    const answer = await limitedExchange(ip, c.get("requestId"), options.tokens, async () => {
+      await next();
+      handled = true;
+      return c.res;
     });
-    refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
-    return refused;
+    if (!handled) return answer;
+    if (answer === c.res) return undefined;
+    // Cleared first, so the answer replacing it keeps none of the dropped answer's headers.
+    c.res = undefined;
+    c.res = answer;
+    return undefined;
   });
 
   // An agent's sign-up is counted as a person's is: by address, under the sign-in limit.

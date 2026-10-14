@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/token-limit.test.ts
 # kills: oauth.rate-limit
-# why: the token endpoint admits an exchange whatever its limiter answers, so one address guesses at client secrets without end
-diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
-index c26336f..234f275 100644
---- a/apps/keel/src/adapters/driving/http/app.ts
-+++ b/apps/keel/src/adapters/driving/http/app.ts
-@@ -61,7 +61,7 @@ export function makeApp(options: AppOptions) {
-   // By address alone: a key that named the client would let anyone lock an agent out with its public client id.
-   app.use(TOKEN_PATH, async (c, next) => {
-     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
--    if (await options.tokens.admit(`token:${ip}`)) return next();
-+    if ((await options.tokens.admit(`token:${ip}`)) || true) return next();
-     const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
-       detail: "Too many token requests from this address; wait a minute.",
-       retryAfterMs: TOKEN_WINDOW_SECONDS * 1000,
+# why: a token is issued whatever its agent's count says, so one agent mints without end
+diff --git a/apps/keel/src/adapters/driving/http/token-limits.ts b/apps/keel/src/adapters/driving/http/token-limits.ts
+index df4262b8..d24ce79e 100644
+--- a/apps/keel/src/adapters/driving/http/token-limits.ts
++++ b/apps/keel/src/adapters/driving/http/token-limits.ts
+@@ -80,7 +80,7 @@ export async function limitedExchange(
+   if (answer.status === 200) {
+     const token = await accessTokenOf(answer);
+     const agent = token === undefined ? undefined : issuedTo(token);
+-    if (agent !== undefined && !(await limits.issued(`token:agent:${agent}`)))
++    if (agent !== undefined && false && !(await limits.issued(`token:agent:${agent}`)))
+       return refused(requestId, "Too many token requests for this agent; wait a minute.");
+     return answer;
+   }

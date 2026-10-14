@@ -58,23 +58,68 @@ const signUpFrom = async (via: Fetch, address: string, key: TestKey) =>
   });
 
 describe("the limits on an agent's two ways in", () => {
-  it("[token.rate-limit] a token request is counted against its address under the token limit, never the sign-in one, and refused past it before the provider is asked", async () => {
+  it("[token.rate-limit-agent] a token is counted against the agent it was issued to, never its address or the sign-in limit, and dropped past the agent's allowance", async () => {
     const tokens = allowing(2);
     const auth = allowing(1000);
     const via = limited(tokens, auth);
-    const account = await newKey();
-    const agent = await seedKeyAgent(account);
+    const keyA = await newKey();
+    const keyB = await newKey();
+    const a = await seedKeyAgent(keyA);
+    const b = await seedKeyAgent(keyB);
+    // Two agents from one address: four tokens between them, past either's allowance of two, all issued.
     const statuses: number[] = [];
-    for (let i = 0; i < 3; i++)
-      statuses.push((await tokenFrom(via, "192.0.2.21", agent.id, account)).status);
-    expect(statuses).toEqual([200, 200, 429]);
-    expect(tokens.asked).toEqual(Array.from({ length: 3 }, () => "token:192.0.2.21"));
-    expect(auth.asked).toEqual([]);
-    const refused = await tokenFrom(via, "192.0.2.21", agent.id, account);
-    expect(refused.headers.get("retry-after")).toBe("60");
+    for (const [agent, key] of [
+      [a, keyA],
+      [b, keyB],
+      [a, keyA],
+      [b, keyB],
+    ] as const)
+      statuses.push((await tokenFrom(via, "192.0.2.21", agent.id, key)).status);
+    expect(statuses).toEqual([200, 200, 200, 200]);
+    // An assertion naming B, signed by a key that is not B's, is refused and spends nothing of B's.
+    expect((await tokenFrom(via, "192.0.2.21", b.id, keyA)).status).toBe(401);
+    // A's third is past its own allowance: dropped, wherever it is asked from.
+    const refused = await tokenFrom(via, "192.0.2.22", a.id, keyA);
+    expect([refused.status, refused.headers.get("retry-after")]).toEqual([429, "60"]);
     expect(refused.headers.get("content-type")).toBe("application/problem+json");
-    // Another address is not held to this one's count.
-    expect((await tokenFrom(via, "192.0.2.22", agent.id, account)).status).toBe(200);
+    expect(await refused.text()).not.toContain("access_token");
+    expect(tokens.asked).toEqual([
+      `token:agent:${a.id}`,
+      `token:agent:${b.id}`,
+      `token:agent:${a.id}`,
+      `token:agent:${b.id}`,
+      "token-failed:192.0.2.21",
+      `token:agent:${a.id}`,
+    ]);
+    expect(auth.asked).toEqual([]);
+  });
+
+  it("[token.flood] an address past sixty refused exchanges is refused before the provider for the window, and good exchanges never count against it", async () => {
+    const tokens = allowing(60);
+    const via = limited(tokens, allowing(1000));
+    const key = await newKey();
+    const agent = await seedKeyAgent(key);
+    const other = await newKey();
+    // Good exchanges from one address, past the failure limit in number, are all issued.
+    const many = allowing(1000);
+    const roomy = limited(many, allowing(1000));
+    const good: number[] = [];
+    for (let i = 0; i < 70; i++)
+      good.push((await tokenFrom(roomy, "192.0.2.41", agent.id, key)).status);
+    expect(good.filter((s) => s !== 200)).toEqual([]);
+    expect(many.asked.filter((k) => k.startsWith("token-failed:"))).toEqual([]);
+    // Sixty-one forged assertions from another address: each refused by the provider, the last blocking it.
+    const forged: number[] = [];
+    for (let i = 0; i < 61; i++)
+      forged.push((await tokenFrom(via, "192.0.2.42", agent.id, other)).status);
+    expect(forged.filter((s) => s !== 401)).toEqual([]);
+    // Now even the agent's own good assertion from that address is refused, before the provider is asked.
+    const before = tokens.asked.length;
+    const refused = await tokenFrom(via, "192.0.2.42", agent.id, key);
+    expect([refused.status, refused.headers.get("retry-after")]).toEqual([429, "60"]);
+    expect(tokens.asked).toHaveLength(before);
+    // Another address is not held to it.
+    expect((await tokenFrom(via, "192.0.2.43", agent.id, key)).status).toBe(200);
   });
 
   it("[signup.rate-limit] a sign-up is counted against its address as a person's is, and refused past it with nothing made", async () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-limits.test.ts
+# kills: token.flood
+# why: a blocked address is never refused, so forged assertions keep costing Keel a lookup and a signature check each
+diff --git a/apps/keel/src/adapters/driving/http/token-limits.ts b/apps/keel/src/adapters/driving/http/token-limits.ts
+index df4262b8..e8f90b13 100644
+--- a/apps/keel/src/adapters/driving/http/token-limits.ts
++++ b/apps/keel/src/adapters/driving/http/token-limits.ts
+@@ -74,7 +74,7 @@ export async function limitedExchange(
+   limits: TokenLimits,
+   exchange: () => Promise<Response>,
+ ): Promise<Response> {
+-  if (await limits.blocks.has(address))
++  if (address === "never" && (await limits.blocks.has(address)))
+     return refused(requestId, "Too many failed token requests from this address; wait a minute.");
+   const answer = await exchange();
+   if (answer.status === 200) {

@@ -1,0 +1,5 @@
+### Changed
+
+- **A token exchange is limited by the agent it issues a token to, not by its address.** At `/v1/auth/oauth2/token` and `/v1/oauth/token`, each agent may be issued 60 tokens a minute, counted from the token Keel issues (its `sub`), never from the client a request names, so a public client id cannot spend another agent's allowance. A token past an agent's limit is dropped and answered 429 `rate.limited` with `retry-after: 60`; the only grant served there issues an access token and rotates nothing. Many agents on one machine or CI runner no longer share one address's 60.
+  - An address is counted only for the exchanges that are refused (400, 401, 403): past 60 a minute it is refused every exchange, before the provider is asked, for the rest of the window (marked in the colo's cache). Good exchanges from one address are never counted against it.
+  - Sign-up (`/v1/oauth/register`) and every other `/v1/auth/*` write stay limited by address under `AUTH_LIMIT`, so a flood of new keys stays bounded.

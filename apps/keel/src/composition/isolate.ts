@@ -85,6 +85,8 @@ import { makeApp } from "../adapters/driving/http/app.ts";
 import { cloneAccess } from "../adapters/driving/http/clone-access.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
 import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
+import type { TokenLimits } from "../adapters/driving/http/token-limits.ts";
+import { cachedTokenBlocks } from "../adapters/driven/edge-cache/token-blocks.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
 import { RUN_HEADER } from "../rpc/index.ts";
 import { START_PATH } from "../adapters/driving/http/front-door.ts";
@@ -409,6 +411,12 @@ export function makeIsolate(
     return makeAuth(authConfig);
   };
   const deps = gateDeps(runtime, env.KEEL_HOST, auth);
+  // One limiter, two counts under their own keys: tokens issued to an agent, and failed exchanges from an address.
+  const tokenLimits: TokenLimits = {
+    issued: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success,
+    failed: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success,
+    blocks: cachedTokenBlocks(caches.default),
+  };
   const boundGate: BoundGate = (request, requestId) => gate(request, requestId, deps);
   const app = makeApp({
     handlers,
@@ -419,9 +427,9 @@ export function makeIsolate(
       handler: (request) => auth().handler(request),
       admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
       tokenPath: TOKEN_PATH,
-      admitToken: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success,
+      tokenLimits,
     },
-    tokens: { admit: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success },
+    tokens: tokenLimits,
     wellKnown: {
       origin,
       issuerPath: AUTH_BASE_PATH,
