@@ -103,16 +103,13 @@ export interface VerdictReason {
 
 /**
  * The plan step a line of a verdict's evidence names: a result's line opens
- * with its step's id, and a guard's citation names its step after its
- * heading. The longest id wins, so a step whose id begins another's is never
- * taken for it.
+ * with its step's id and a colon, and a guard's citation names its step after
+ * its heading, before the predicate. No line can name two steps.
  */
 const namedStep = (line: string, steps: readonly PlanStep[]): PlanStep | undefined =>
-  steps
-    .filter(
-      (s) => line.startsWith(`${s.id}: `) || line.startsWith(`${CITED_AS.guard.line}: ${s.id} (`),
-    )
-    .toSorted((a, b) => b.id.length - a.id.length)[0];
+  steps.find(
+    (s) => line.startsWith(`${s.id}: `) || line.startsWith(`${CITED_AS.guard.line}: ${s.id} (`),
+  );
 
 /**
  * A verdict's evidence, line by line, as it was issued: each classed by the

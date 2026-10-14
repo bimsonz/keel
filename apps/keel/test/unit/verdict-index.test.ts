@@ -115,7 +115,7 @@ const step = (id: string, extra: Partial<PlanStep> = {}): PlanStep => ({
 });
 
 describe("a verdict's reasons", () => {
-  it("[verdict.reasons] classes each line by the plan step it names, the longest id first, and a line naming none as proof", () => {
+  it("[verdict.reasons] classes each line by the plan step it names, and a line naming none as proof", () => {
     const steps = [
       step("keel"),
       step("keel.test", { evidenceCeiling: "testimony" }),
