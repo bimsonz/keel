@@ -4,7 +4,7 @@
 // the ruling asked for is bounced by that guard, citing the decision, while
 // the same change in a fork of the same code, which holds no decision, lands.
 //
-//   KEEL_URL=<keel> CLOUDFLARE_ACCOUNT_ID=<account> node e2e/src/s2.ts <run>
+//   KEEL_URL=<keel> CLOUDFLARE_ACCOUNT_ID=<account> node e2e/src/s2.ts <run> [--public]
 //
 // It takes no Keel credential. A person, `s2-<run>-p`, signs up by passkey and
 // works in their own namespace: they create the project `s2` (from the fixture
@@ -65,7 +65,9 @@ import {
   tagOf,
 } from "./lib/s1.ts";
 
-const [run] = process.argv.slice(2);
+const [run, ...flags] = process.argv.slice(2);
+/** With `--public` the person makes both projects public at the end, and a visitor reads D-1 and both feeds. */
+const PUBLIC = flags.includes("--public");
 if (run === undefined || !/^[a-z0-9]{1,12}$/.test(run))
   throw new Error("usage: s2.ts <run>, the run up to twelve lower-case letters and digits");
 const keelUrl = process.env.KEEL_URL ?? "";
@@ -825,6 +827,35 @@ async function walk(): Promise<void> {
     feed.faults.length === 0 && controlFeed.faults.length === 0,
     `no read of either feed failed (${feed.faults.length + controlFeed.faults.length} did)`,
   );
+
+  if (!PUBLIC) return;
+  console.log("\n[h] the person makes both projects public, and a visitor reads what memory did");
+  for (const id of [project.id, control.id])
+    await me.putSettings(id, {
+      protectedPaths: [],
+      maxBatchSize: 1,
+      verification: "required",
+      visibility: "public",
+    });
+  const visit = async (path: string) => {
+    const response = await fetch(`${keelUrl}${path}`);
+    return { status: response.status, body: await response.json().catch(() => ({})) };
+  };
+  const decided = await visit(`/v1/decisions/${decisionId}`);
+  check(
+    decided.status === 200 &&
+      prop(decided.body, "label") === "D-1" &&
+      strings(prop(decided.body, "guards")).includes(guardId),
+    `a visitor reads D-1, held by G-1: ${decided.status} ${String(prop(decided.body, "label"))}`,
+  );
+  for (const [name, id] of [
+    [PROJECT, project.id],
+    [`${PROJECT}-control`, control.id],
+  ] as const) {
+    const events = await visit(`/v1/events?project=${id}`);
+    check(events.status === 200, `a visitor reads ${name}'s feed: ${events.status}`);
+    console.log(`     ${name}: ${handle}/${name} (${id})`);
+  }
 }
 
 try {
