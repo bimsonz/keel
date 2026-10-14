@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.cleared
+# why: the targets are listed in the order they were set, not Keel's name order
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..575357af 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1092,7 +1092,7 @@ export function createFakeKeel(
+           const set = targeted.get(projectId) ?? new Map<string, DeployTargetView>();
+           if (listing)
+             return Response.json({
+-              targets: [...set.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
++              targets: [...set.values()],
+             } satisfies DeployTargets);
+           if (clearing) {
+             if (!set.has(name))

@@ -15,7 +15,12 @@ import type {
   NamespaceView,
   ProjectView,
 } from "../contract/keel/index.ts";
-import type { KeelDirectory, KeelOrgAgents, KeelSponsorship } from "../source/types.ts";
+import type {
+  KeelCredentials,
+  KeelDirectory,
+  KeelOrgAgents,
+  KeelSponsorship,
+} from "../source/types.ts";
 import {
   type Account,
   type Closed,
@@ -27,6 +32,7 @@ import {
   type Who,
   nameOf,
 } from "./account.ts";
+import { NamespaceCredentials } from "./Credentials.tsx";
 import { JoinedAgents, OrgAgents } from "./OrgAgents.tsx";
 import { Card, HANDLE, Refusal, SELECT, go, useAsking } from "./parts.tsx";
 import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
@@ -125,6 +131,8 @@ function OrgFrame({ page, tab, children }: { page: OrgPage; tab: OrgTab; childre
   const tabs: { id: OrgTab; label: string; count?: number }[] = [
     { id: "home", label: "Overview" },
     { id: "members", label: "Members", count: page.members.length },
+    // An org's credentials are its owners' alone: Keel reads them to nobody else.
+    ...(page.role === "owner" ? [{ id: "credentials" as const, label: "Credentials" }] : []),
     { id: "settings", label: "Settings" },
   ];
   return (
@@ -721,6 +729,7 @@ export function NamespacePages({
   directory,
   sponsorship,
   agents,
+  credentials,
   who,
   handle,
   tab,
@@ -729,6 +738,7 @@ export function NamespacePages({
   directory: KeelDirectory;
   sponsorship: KeelSponsorship;
   agents: KeelOrgAgents;
+  credentials: KeelCredentials;
   who: Who;
   handle: string;
   tab: OrgTab;
@@ -763,6 +773,15 @@ export function NamespacePages({
       {tab === "home" && <Home page={held} directory={directory} agents={agents} />}
       {tab === "members" && (
         <Members account={account} agents={agents} page={held} who={who} read={read} />
+      )}
+      {tab === "credentials" && (
+        <NamespaceCredentials
+          credentials={credentials}
+          handle={held.org.handle}
+          readerId={who.id}
+          owner={held.role === "owner"}
+          whose={`${held.org.handle}'s`}
+        />
       )}
       {tab === "settings" && (
         // The name typed starts from the org's own, whichever org the address goes on to name.

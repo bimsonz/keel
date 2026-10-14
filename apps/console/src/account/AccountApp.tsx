@@ -13,8 +13,13 @@ import {
   useState,
 } from "react";
 import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
-import { createHttpDirectory, createHttpOrgAgents, createHttpSponsorship } from "../source/http.ts";
-import type { KeelSponsorship } from "../source/types.ts";
+import {
+  createHttpCredentials,
+  createHttpDirectory,
+  createHttpOrgAgents,
+  createHttpSponsorship,
+} from "../source/http.ts";
+import type { KeelCredentials, KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
 import {
@@ -30,6 +35,7 @@ import {
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
 import { Closing } from "./Closing.tsx";
+import { NamespaceCredentials } from "./Credentials.tsx";
 import { wayToFresh } from "./fresh.ts";
 import { Fork, NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
@@ -523,10 +529,12 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
 function Settings({
   account,
   sponsorship,
+  credentials,
   who,
 }: {
   account: Account;
   sponsorship: KeelSponsorship;
+  credentials: KeelCredentials;
   who: Who;
 }) {
   return (
@@ -539,6 +547,16 @@ function Settings({
       </header>
       <Passkeys account={account} who={who} />
       <Sponsored account={account} sponsorship={sponsorship} who={who} />
+      {/* A person's own namespace is theirs alone, so its credentials are theirs to keep. */}
+      {who.handle !== undefined && (
+        <NamespaceCredentials
+          credentials={credentials}
+          handle={who.handle}
+          readerId={who.id}
+          owner
+          whose="your"
+        />
+      )}
       <Sessions account={account} onSignedOut={() => go("/")} />
       <Closing account={account} who={who} />
     </div>
@@ -761,6 +779,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   const directory = useMemo(() => createHttpDirectory(), []);
   const sponsorship = useMemo(() => createHttpSponsorship(), []);
   const orgAgents = useMemo(() => createHttpOrgAgents(), []);
+  const credentials = useMemo(() => createHttpCredentials(), []);
   // An agent's link opened while this page is up changes the fragment and loads nothing: it is taken out of the
   // address as the first was, and the page begins again with what it carried.
   const [held, setHeld] = useState({ link, taken: 0 });
@@ -822,7 +841,14 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   else if (reader.is === "user" && place.at === "signup")
     page = <ChooseHandle account={account} who={reader.who} />;
   else if (reader.is === "user" && place.at === "settings")
-    page = <Settings account={account} sponsorship={sponsorship} who={reader.who} />;
+    page = (
+      <Settings
+        account={account}
+        sponsorship={sponsorship}
+        credentials={credentials}
+        who={reader.who}
+      />
+    );
   else if (reader.is === "user" && place.at === "device")
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
@@ -855,6 +881,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
         directory={directory}
         sponsorship={sponsorship}
         agents={orgAgents}
+        credentials={credentials}
         who={reader.who}
         handle={handle}
         tab={tab}

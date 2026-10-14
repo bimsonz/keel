@@ -5,7 +5,7 @@
 
 import { RESERVED_SEGMENTS } from "./contract/keel/index.ts";
 
-export type OrgTab = "home" | "members" | "settings";
+export type OrgTab = "home" | "members" | "credentials" | "settings";
 
 /** A page above every project. */
 export type Place =
@@ -21,14 +21,14 @@ export type Place =
   | { at: "fork"; namespace: string; project: string }
   /** A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. */
   | { at: "namespace"; handle: string }
-  /** An org's members and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
+  /** An org's members, its credentials and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
   | { at: "org"; org: string; tab: Exclude<OrgTab, "home"> }
   /** An invitation to an org, as the person it was made to opens it. */
   | { at: "invite"; id: string }
   /** Where an agent sends the person it asks to stand behind it. What it asks is in the fragment, never here. */
   | { at: "sponsor" };
 
-const UNDER_ORGS: readonly Exclude<OrgTab, "home">[] = ["members", "settings"];
+const UNDER_ORGS: readonly Exclude<OrgTab, "home">[] = ["members", "credentials", "settings"];
 
 /** The place an address names, or null where it names none of them. */
 export function placeOf(pathname: string, search = ""): Place | null {

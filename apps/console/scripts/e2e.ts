@@ -4146,6 +4146,215 @@ expectEqual(
 );
 await recollecting.close();
 
+// ── A namespace's credentials, and a project's Cloudflare account ──
+// A token is typed once, leaves the page in the body of the one call that stores it, and is shown again nowhere.
+// A project's owner connects an account on its settings, and Keel reaches the account before it sets anything.
+const DEPLOY_TOKEN = "cf-e2e-token-0123456789abcdefghijk";
+const GOOD_ACCOUNT = "0123456789abcdef0123456789abcdef";
+const deploying = createFakeKeel({
+  namespace: NAMESPACE,
+  visibility: "private",
+  readerOf,
+  whose: whoseHandle,
+  roleIn: (userId, org) => identity.roleIn(userId, org),
+  cloudflare: ({ accountId }) =>
+    accountId === GOOD_ACCOUNT
+      ? { reaches: true, subdomain: "ada-previews" }
+      : { reaches: false, why: "account-unreachable", code: 10000 },
+});
+await asDeployed(lobby, { keel: deploying, sent: sentToKeel });
+const credentialsOn = (shown: Page) => shown.getByRole("region", { name: "Credentials" });
+const cloudflareOn = (shown: Page) => shown.getByRole("region", { name: "Cloudflare" });
+const storesOf = (keel: FakeKeel, handle: string) =>
+  keel.calls.filter(
+    (call) => call.method === "POST" && call.path === `/v1/namespaces/${handle}/credentials`,
+  );
+/** Everything the page has put in the browser's storage, keys and values. */
+const kept = (shown: Page): Promise<string> =>
+  shown.evaluate(() =>
+    [localStorage, sessionStorage]
+      .flatMap((store) =>
+        Array.from({ length: store.length }, (_, place) => {
+          const key = store.key(place) ?? "";
+          return `${key}=${store.getItem(key) ?? ""}`;
+        }),
+      )
+      .join("\n"),
+  );
+await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await credentialsOn(person)
+  .getByText("No credential is stored.")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await credentialsOn(person).getByLabel("Label", { exact: true }).fill("ada deploys");
+await credentialsOn(person).getByLabel("Cloudflare API token", { exact: true }).fill(DEPLOY_TOKEN);
+await credentialsOn(person)
+  .getByRole("button", { name: "Store credential" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+const storedRows = credentialsOn(person)
+  .getByRole("list", { name: "Stored credentials" })
+  .getByRole("listitem");
+await storedRows
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "credentials: a person stores a token on their settings, is shown its label, and the field is emptied as it is sent",
+  `${(await storedRows.allInnerTexts())
+    .map(squash)
+    .join(" || ")
+    .replace(/\d{4}-\d{2}-\d{2}/, "<day>")} | field "${await credentialsOn(person)
+    .getByLabel("Cloudflare API token", { exact: true })
+    .inputValue()}"`,
+  'ada deploys Cloudflare · stored on <day> by you Remove | field ""',
+);
+expectEqual(
+  "credentials: the token stored is on the page nowhere, and in none of the browser's storage",
+  `on the page ${String((await person.content()).includes(DEPLOY_TOKEN))} | kept ${String((await kept(person)).includes(DEPLOY_TOKEN))}`,
+  "on the page false | kept false",
+);
+expectEqual(
+  "credentials: the token leaves the page in the body of the one call that stores it, and in nothing else",
+  `${storesOf(deploying, "ada").length} | ${String(storesOf(deploying, "ada")[0]?.body.includes(DEPLOY_TOKEN))} | ${
+    deploying.calls.filter(
+      (call) =>
+        `${call.path} ${call.query} ${call.authorization} ${call.idempotencyKey}`.includes(
+          DEPLOY_TOKEN,
+        ) ||
+        (call !== storesOf(deploying, "ada")[0] && call.body.includes(DEPLOY_TOKEN)),
+    ).length
+  } elsewhere`,
+  "1 | true | 0 elsewhere",
+);
+await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await cloudflareOn(person)
+  .getByText("No Cloudflare account is connected.")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+const tokenLink = cloudflareOn(person).getByRole("link", { name: "Make a token on Cloudflare" });
+expectEqual(
+  "cloudflare: the project's owner is led to make a token with Workers Scripts: Edit chosen, opened apart with no referrer",
+  `${String(await tokenLink.getAttribute("href").catch(() => "no link"))} | ${String(await tokenLink.getAttribute("target").catch(() => "none"))} | ${String(await tokenLink.getAttribute("rel").catch(() => "none"))}`,
+  "https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%5D&name=Keel%20deploys | _blank | noreferrer",
+);
+// An account the token does not reach: Keel says so, and sets nothing.
+await cloudflareOn(person).getByLabel("Account id", { exact: true }).fill("f".repeat(32));
+await cloudflareOn(person).getByLabel("Cloudflare API token", { exact: true }).fill(DEPLOY_TOKEN);
+await cloudflareOn(person)
+  .getByRole("button", { name: "Connect" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await cloudflareOn(person)
+  .getByRole("alert")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+const chosenCredential = (shown: Page): Promise<string> =>
+  cloudflareOn(shown)
+    .getByLabel("Credential", { exact: true })
+    .evaluate((select) =>
+      select instanceof HTMLSelectElement ? (select.selectedOptions[0]?.text ?? "") : "",
+    )
+    .catch(() => "no select");
+expectEqual(
+  "cloudflare: Keel's refusal of an account the token does not reach is shown in its words, and the token just stored stays chosen",
+  `${squash(
+    await cloudflareOn(person)
+      .getByRole("alert")
+      .innerText()
+      .catch(() => "no refusal"),
+  )} | ${await chosenCredential(person)} | ${await cloudflareOn(person).getByLabel("Cloudflare API token", { exact: true }).count()} token fields`,
+  "The credential's token does not reach the account's Workers (Cloudflare error 10000): check the account id, and that the token may edit Workers on that account. Nothing was set. Store a Cloudflare API token that may edit Workers on the account, then set the target with it | demo deploys | 0 token fields",
+);
+await cloudflareOn(person).getByLabel("Account id", { exact: true }).fill(GOOD_ACCOUNT);
+await cloudflareOn(person)
+  .getByRole("button", { name: "Connect" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+const targetRows = cloudflareOn(person)
+  .getByRole("list", { name: "Deploy targets" })
+  .getByRole("listitem");
+await targetRows
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+/** The credential a target was set with, as the page sent it. */
+const credentialIn = (body: string): string => {
+  const parsed: unknown = JSON.parse(body);
+  return typeof parsed === "object" && parsed !== null && "credential" in parsed
+    ? String(parsed.credential)
+    : "";
+};
+const puts = (): Call[] =>
+  deploying.calls.filter(
+    (call) => call.method === "PUT" && call.path.endsWith("/deploy-targets/production"),
+  );
+expectEqual(
+  "cloudflare: tried again, the target is set with the credential kept and no second token, and listed as Keel holds it",
+  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${storesOf(deploying, "ada").length} stored | ${puts().length} sets, ${new Set(puts().map((call) => credentialIn(call.body))).size} credential | ${String(puts().some((call) => call.body.includes(DEPLOY_TOKEN)))}`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the credential demo deploys Remove | 2 stored | 2 sets, 1 credential | false`,
+);
+// Keel deletes a credential a target still names, and the target keeps the id: the project says so.
+await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await credentialsOn(person)
+  .getByRole("button", { name: "Remove demo deploys" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await credentialsOn(person)
+  .getByRole("button", { name: "Remove demo deploys" })
+  .waitFor({ state: "detached", timeout: 15_000 })
+  .catch(() => undefined);
+await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await targetRows
+  .first()
+  .getByText(/credential/)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "cloudflare: a target whose credential was removed says it cannot reach its account, and is listed as Keel keeps it",
+  squash(
+    await targetRows
+      .first()
+      .innerText()
+      .catch(() => "no target"),
+  ),
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its credential is no longer stored, so Keel cannot reach the account: set it again with another. Remove`,
+);
+// At a phone's width the section's words stay on the screen: each run of text is measured where it is drawn.
+await person.setViewportSize({ width: 390, height: 844 });
+expectEqual(
+  "cloudflare: at a phone's width none of the section's words runs past the screen",
+  String(
+    await cloudflareOn(person).evaluate((section) => {
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      const edges: number[] = [];
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if ((node.textContent ?? "").trim() === "") continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        edges.push(range.getBoundingClientRect().right);
+      }
+      return edges.length > 3 && Math.max(...edges) <= window.innerWidth;
+    }),
+  ),
+  "true",
+);
+await shot(person, "cloudflare-phone");
+await person.setViewportSize({ width: 1280, height: 900 });
+await cloudflareOn(person)
+  .getByRole("button", { name: "Remove the target production" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await cloudflareOn(person)
+  .getByText("No Cloudflare account is connected.")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "cloudflare: removing a target clears it in Keel, and the project has none",
+  `${deploying.calls.filter((call) => call.method === "DELETE" && call.path.endsWith("/deploy-targets/production")).length} cleared | ${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()}`,
+  "1 cleared | 1",
+);
+
 await lobby.close();
 
 // A Keel that cannot send email yet offers a passkey and nothing else: keel.town as it first served identity. A
@@ -5072,6 +5281,39 @@ await joining.waitFor();
 await franklin.goto(new URL(await joining.innerText()).href, { waitUntil: "domcontentloaded" });
 await franklin.getByRole("button", { name: "Join" }).click();
 await franklin.getByRole("heading", { level: 1, name: /^Symmetry/ }).waitFor();
+// An org's credentials are a tab of the org, offered to its owners alone; Keel reads them to nobody else.
+await noether.goto(`${built}/orgs/symmetry/credentials`, { waitUntil: "domcontentloaded" });
+await credentialsOn(noether)
+  .getByText("No credential is stored.")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "credentials: an org's owner has its credentials as a tab of the org, with the form",
+  `${(await noether.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts()).map(squash).join(" | ")} | ${await credentialsOn(noether).getByRole("form", { name: "Store a credential" }).count()} form`,
+  "Overview | Members 2 | Credentials | Settings | 1 form",
+);
+await franklin.goto(`${built}/orgs/symmetry/credentials`, { waitUntil: "domcontentloaded" });
+await credentialsOn(franklin)
+  .getByRole("alert")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "credentials: a member who is no owner is offered no tab of the org's credentials",
+  (await franklin.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts())
+    .map(squash)
+    .join(" | "),
+  "Overview | Members 2 | Settings",
+);
+expectEqual(
+  "credentials: at the tab's address, a member who is no owner is told Keel's refusal and given no form",
+  `${squash(
+    await credentialsOn(franklin)
+      .getByRole("alert")
+      .innerText()
+      .catch(() => "no refusal"),
+  )} | ${await credentialsOn(franklin).getByRole("form").count()} forms`,
+  "Refused: role. Ask an owner: this needs that role | 0 forms",
+);
 
 const orgAgentsOn = (shown: Page): Locator => shown.locator('main section[aria-label="Agents"]');
 const orgAgentList = (shown: Page): Locator =>

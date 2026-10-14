@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: credentials.owner, targets.read
+# why: the stand-in lets a maintainer at an org's credentials and targets, which Keel keeps for its owners
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..6e6f051a 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -985,7 +985,7 @@ export function createFakeKeel(
+       /** Whether the reader owns the namespace of that handle: a person's own is theirs, an org's is its owners'. */
+       const owns = async (handle: string, kind: NamespaceRef["kind"]): Promise<boolean> => {
+         if (reader?.id === undefined) return false;
+-        if (handle === project.namespace.handle && reader.role === "owner") return true;
++        if (handle === project.namespace.handle && (reader.role === "owner" || reader.role === "maintainer")) return true;
+         if (kind === "org") return (await options.roleIn?.(reader.id, handle)) === "owner";
+         return (await options.whose?.(handle))?.id === reader.id;
+       };

@@ -251,6 +251,41 @@ export interface KeelOrgAgents {
   removeAgent(org: string, agentId: string): Promise<Keel.NamespaceAgent>;
 }
 
+/**
+ * A namespace's credentials: a provider's API token stored under a label, sealed by Keel and never answered again.
+ * Keel reads them, and takes one, only from the namespace's owner, and never from an agent.
+ */
+export interface KeelCredentials {
+  /** The namespace's credentials, oldest first, by label and id: `GET /v1/namespaces/{handle}/credentials`. */
+  listCredentials(handle: string, signal?: AbortSignal): Promise<Keel.Credential[]>;
+  /** Stores a token. The token rides in the body of this one call and in nothing else; Keel answers the record. */
+  storeCredential(
+    handle: string,
+    stored: { label: string; provider: Keel.DeployProvider; secret: string },
+  ): Promise<Keel.Credential>;
+  /** Deletes a credential: its token is gone for good, even where a deploy target still names it. */
+  removeCredential(handle: string, credentialId: string): Promise<void>;
+}
+
+/**
+ * A project's deploy targets: where it deploys, each by its name, an account and a credential of the project's
+ * own namespace by its id. Keel reads them, and takes a change of them, only from that namespace's owner.
+ */
+export interface KeelDeployTargets {
+  /** The project's targets, in name order: `GET /v1/projects/{projectId}/deploy-targets`. */
+  listTargets(signal?: AbortSignal): Promise<Keel.DeployTargetView[]>;
+  /** Sets the target of that name, new or in place of the one there. Keel reaches the account before it sets it. */
+  putTarget(name: string, target: Keel.PutDeployTargetRequest): Promise<Keel.DeployTargetView>;
+  /** Clears the target of that name. */
+  clearTarget(name: string): Promise<void>;
+}
+
+/** A project's source that has Keel's deploy targets, and its namespace's credentials: a test fixture's has neither. */
+export interface KeelTargeted {
+  targets: KeelDeployTargets;
+  credentials: KeelCredentials;
+}
+
 export class KeelRefused extends Error {
   readonly code: string;
   readonly status: number;

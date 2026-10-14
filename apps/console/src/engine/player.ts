@@ -12,6 +12,7 @@ import type {
   KeelInvited,
   KeelRemembered,
   KeelSettings,
+  KeelTargeted,
   KeelEventSource,
   KeelResources,
   ChangeDiff,
@@ -26,9 +27,11 @@ export type ConsoleSource = KeelEventSource &
   KeelResources &
   KeelRepository &
   KeelCommands &
-  // A fixture's source holds no settings, no memory of decisions and no agent's card: only Keel does.
+  // A fixture's source holds no settings, no deploy targets, no memory of decisions and no agent's card: only
+  // Keel does.
   Partial<KeelSettings> &
   Partial<KeelInvited> &
+  Partial<KeelTargeted> &
   Partial<KeelRemembered> &
   Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.cleared
+# why: clearing a name with no target answers that it was cleared
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..429ab9ba 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1095,7 +1095,7 @@ export function createFakeKeel(
+               targets: [...set.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
+             } satisfies DeployTargets);
+           if (clearing) {
+-            if (!set.has(name))
++            if (set.size < 0)
+               return problem(
+                 404,
+                 "resource.not_found",

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.refused
+# why: Cloudflare is asked before the credential is found in the namespace, which Keel never does
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..15f921cb 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1107,6 +1107,7 @@ export function createFakeKeel(
+           }
+           if (name === undefined || typeof accountId !== "string" || typeof credential !== "string")
+             return problem(400, "request.invalid");
++          cloudflare({ secret: "", accountId });
+           const using = (stored.get(here.handle.toLowerCase()) ?? []).find(
+             (one) => one.credential.id === credential,
+           );

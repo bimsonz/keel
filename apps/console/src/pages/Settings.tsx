@@ -9,9 +9,10 @@ import { Refusal, type Said, saidOf, useAsking } from "../account/parts.tsx";
 import type { NamespaceRef, ProjectSettings, ProjectView } from "../contract/keel/index.ts";
 import { usePlayer } from "../engine/react.tsx";
 import type { Visibility } from "../engine/projects.ts";
-import { maintains, mayPublish, readBy } from "../engine/settings.ts";
+import { maintains, mayPublish, owns, readBy } from "../engine/settings.ts";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
+import { CloudflareTargets } from "./Cloudflare.tsx";
 import { AgentsOfTheOrg, ProjectAgents, invitesHere } from "./ProjectAgents.tsx";
 
 /** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
@@ -192,6 +193,23 @@ export function SettingsPage({ project }: { project: ProjectView }) {
       {project.namespace.kind === "org" && maintains(project) && (
         <AgentsOfTheOrg org={project.namespace.handle} />
       )}
+      {/* Where the project deploys is its namespace's owner's to say, and Keel reads it to them alone. */}
+      {source.targets !== undefined &&
+        source.credentials !== undefined &&
+        (owns(project) ? (
+          <CloudflareTargets
+            project={project}
+            targets={source.targets}
+            credentials={source.credentials}
+          />
+        ) : (
+          <section className="a-panel flex flex-col gap-2 p-4" aria-label="Cloudflare">
+            <h2 className="a-h">Cloudflare</h2>
+            <p className="text-sm text-kumo-default">
+              An owner of {project.namespace.handle} connects this project to a Cloudflare account.
+            </p>
+          </section>
+        ))}
       <Held settings={held} />
     </Column>
   );

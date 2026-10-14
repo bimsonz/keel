@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.refused
+# why: a target is set on an account with no workers.dev subdomain to preview on
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..8adf4ee7 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1149,7 +1149,7 @@ export function createFakeKeel(
+                 ? `Cloudflare refused the credential's token${code}: it is invalid, expired or revoked. Nothing was set.`
+                 : `The credential's token does not reach the account's Workers${code}: check the account id, and that the token may edit Workers on that account. Nothing was set.`,
+             );
+-          if (reached.subdomain === undefined)
++          if (reached.subdomain === "")
+             return problem(
+               422,
+               "deploy_target.no_workers_dev",

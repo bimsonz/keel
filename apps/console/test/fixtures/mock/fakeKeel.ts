@@ -16,6 +16,8 @@ import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
   AgentCard,
   AgentProfile,
+  Credential,
+  Credentials,
   DecisionPage,
   DecisionView,
   EscalationPage,
@@ -23,6 +25,8 @@ import type {
   EventPage,
   EventProposition,
   EventRecord,
+  DeployTargetView,
+  DeployTargets,
   LatticeSet,
   NamespaceAgent,
   NamespaceAgents,
@@ -84,6 +88,22 @@ export type Role = NonNullable<ProjectView["viewer"]>["role"];
  * question's agent names: the one Keel asks first.
  */
 export type Reader = { role?: Role; sponsor?: boolean; id?: string; fresh?: boolean } | null;
+
+/**
+ * What Cloudflare answers Keel's check of a deploy target: the token reaches the account's Workers, with the
+ * account's workers.dev subdomain where it has one; or it does not, and why, with Cloudflare's code where it gave
+ * one. Keel's `deploy-target.ts` asks it after the credential is found and before the cap is counted.
+ */
+export type Reached =
+  | { reaches: true; subdomain?: string }
+  | { reaches: false; why: "token-invalid" | "account-unreachable"; code?: number };
+
+/** A deploy target's name and a credential's label, as Keel's contract has them. */
+const TARGET_NAME = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
+const CREDENTIAL_LABEL = /^\S(?:.*\S)?$/;
+const ACCOUNT_ID = /^[0-9a-f]{32}$/;
+/** The most deploy targets Keel lets a project hold. */
+export const TARGETS_MOST = 16;
 
 /**
  * How long a question waits for the person asked first before Keel lists it to its namespace's maintainers
@@ -393,6 +413,11 @@ export function createFakeKeel(
     /** Keel's clock, for what it lists to whom and when. The wall clock unless a test says otherwise. */
     now?: () => number;
     /**
+     * What Cloudflare answers for a token and an account. Left out, every token reaches every account, and the
+     * account's subdomain is `keel-previews`.
+     */
+    cloudflare?: (asked: { secret: string; accountId: string }) => Reached;
+    /**
      * How many entries of other projects the instance's log holds ahead of this project's first. Keel's log is
      * the whole instance's: a page is its next stretch with the project's entries picked out, so a stretch
      * that holds none is an empty page whose cursor has moved on.
@@ -585,6 +610,15 @@ export function createFakeKeel(
     [...made.values()].find(
       (one) => one.view.namespace.handle === handle && one.view.name === name.toLowerCase(),
     );
+  /**
+   * Each namespace's credentials by its handle, oldest first, with the token Keel seals: the stand-in keeps it
+   * only to say, as Cloudflare would, whether it reaches an account. Nothing it answers holds it.
+   */
+  const stored = new Map<string, { credential: Credential; secret: string }[]>();
+  /** Each project's deploy targets, by its id and then by name. */
+  const targeted = new Map<string, Map<string, DeployTargetView>>();
+  const cloudflare =
+    options.cloudflare ?? ((): Reached => ({ reaches: true, subdomain: "keel-previews" }));
   /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
@@ -923,6 +957,236 @@ export function createFakeKeel(
         }
       }
 
+      // A namespace's credentials and a project's deploy targets: Keel's six delivery operations, decided
+      // as Keel's policy and its handlers decide them and in their order (`authorize.ts`, `delivery.ts`,
+      // `deploy-targets.ts`). Each is its namespace's owner's alone: Keel reads a namespace to anyone, so anyone
+      // else is refused by role; a project it does not read them is not there.
+      const refusedRole = (kind: NamespaceRef["kind"] | undefined): Response =>
+        kind === "org"
+          ? lacksIn("an owner")
+          : problem(
+              403,
+              "auth.forbidden",
+              [
+                {
+                  kind: "escalate",
+                  title: `This is ${kind === "agent" ? "an agent's own" : "a person's own"} namespace and has no members: only its owner does this. Use your own namespace, or an org you are a member of`,
+                },
+              ],
+              "Refused: role.",
+            );
+      const kindOf = async (handle: string): Promise<NamespaceRef["kind"] | undefined> =>
+        (await options.whose?.(handle))?.kind ??
+        ([...keyed.values()].includes(handle)
+          ? "agent"
+          : handle === project.namespace.handle
+            ? project.namespace.kind
+            : undefined);
+      /** Whether the reader owns the namespace of that handle: a person's own is theirs, an org's is its owners'. */
+      const owns = async (handle: string, kind: NamespaceRef["kind"]): Promise<boolean> => {
+        if (reader?.id === undefined) return false;
+        if (handle === project.namespace.handle && reader.role === "owner") return true;
+        if (kind === "org") return (await options.roleIn?.(reader.id, handle)) === "owner";
+        return (await options.whose?.(handle))?.id === reader.id;
+      };
+      const credentialsOf = /^\/v1\/namespaces\/([^/]+)\/credentials(?:\/([^/]+))?$/.exec(
+        url.pathname,
+      );
+      if (credentialsOf !== null) {
+        const handle = decodeURIComponent(credentialsOf[1] ?? "").toLowerCase();
+        const credentialId =
+          credentialsOf[2] === undefined ? undefined : decodeURIComponent(credentialsOf[2]);
+        const listing = credentialId === undefined && request.method === "GET";
+        const storing = credentialId === undefined && request.method === "POST";
+        const removing = credentialId !== undefined && request.method === "DELETE";
+        if (listing || storing || removing) {
+          if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+          if (!listing && request.headers.get("origin") !== url.origin)
+            return problem(403, "auth.cross_site");
+          const body = fields(sent);
+          const label = body.get("label");
+          const secret = body.get("secret");
+          if (
+            storing &&
+            (typeof label !== "string" ||
+              label.length > 64 ||
+              !CREDENTIAL_LABEL.test(label) ||
+              body.get("provider") !== "cloudflare" ||
+              typeof secret !== "string" ||
+              secret.length < 1 ||
+              secret.length > 4096)
+          )
+            return problem(400, "request.invalid");
+          const kind = await kindOf(handle);
+          if (kind === undefined) return gone();
+          if (!(await owns(handle, kind))) return refusedRole(kind);
+          const held = stored.get(handle) ?? [];
+          if (listing)
+            return Response.json({
+              credentials: held.map((one) => one.credential),
+            } satisfies Credentials);
+          if (storing && typeof label === "string" && typeof secret === "string") {
+            const credential: Credential = {
+              id: `crd_${crypto.randomUUID().replaceAll("-", "").slice(0, 26).toUpperCase()}`,
+              label,
+              provider: "cloudflare",
+              createdAt: new Date(now()).toISOString(),
+              createdBy: reader.id,
+            };
+            stored.set(handle, [...held, { credential, secret }]);
+            return Response.json(credential satisfies Credential, { status: 201 });
+          }
+          // A credential is deleted whatever target still names it: the target keeps the id.
+          if (!held.some((one) => one.credential.id === credentialId))
+            return problem(
+              404,
+              "resource.not_found",
+              [],
+              `The namespace holds no credential ${String(credentialId)}.`,
+            );
+          stored.set(
+            handle,
+            held.filter((one) => one.credential.id !== credentialId),
+          );
+          return new Response(null, { status: 204 });
+        }
+      }
+      const targetsOf = /^\/v1\/projects\/([^/]+)\/deploy-targets(?:\/([^/]+))?$/.exec(
+        url.pathname,
+      );
+      if (targetsOf !== null) {
+        const projectId = decodeURIComponent(targetsOf[1] ?? "");
+        const name = targetsOf[2] === undefined ? undefined : decodeURIComponent(targetsOf[2]);
+        const listing = name === undefined && request.method === "GET";
+        const setting = name !== undefined && request.method === "PUT";
+        const clearing = name !== undefined && request.method === "DELETE";
+        if (listing || setting || clearing) {
+          if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+          if (!listing && request.headers.get("origin") !== url.origin)
+            return problem(403, "auth.cross_site");
+          const body = fields(sent);
+          const accountId = body.get("accountId");
+          const credential = body.get("credential");
+          if (
+            setting &&
+            (!TARGET_NAME.test(name ?? "") ||
+              body.get("provider") !== "cloudflare" ||
+              typeof accountId !== "string" ||
+              !ACCOUNT_ID.test(accountId) ||
+              typeof credential !== "string" ||
+              credential === "")
+          )
+            return problem(400, "request.invalid");
+          const mine = [...made.values()].find((one) => one.view.id === projectId);
+          // The project as this caller is read it, and its namespace.
+          const here =
+            projectId === project.id
+              ? visible
+                ? project.namespace
+                : undefined
+              : mine !== undefined && mine.by === reader.id
+                ? mine.view.namespace
+                : undefined;
+          if (here === undefined) return gone();
+          if (!(await owns(here.handle, here.kind))) return refusedRole(here.kind);
+          const set = targeted.get(projectId) ?? new Map<string, DeployTargetView>();
+          if (listing)
+            return Response.json({
+              targets: [...set.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
+            } satisfies DeployTargets);
+          if (clearing) {
+            if (!set.has(name))
+              return problem(
+                404,
+                "resource.not_found",
+                [],
+                `The project has no deploy target named ${name}.`,
+              );
+            set.delete(name);
+            return new Response(null, { status: 204 });
+          }
+          if (name === undefined || typeof accountId !== "string" || typeof credential !== "string")
+            return problem(400, "request.invalid");
+          const using = (stored.get(here.handle.toLowerCase()) ?? []).find(
+            (one) => one.credential.id === credential,
+          );
+          if (using === undefined)
+            return problem(
+              409,
+              "deploy_target.refused",
+              [
+                {
+                  kind: "read",
+                  title: "Read the namespace's credentials",
+                  operationId: "Delivery_listCredentials",
+                },
+                {
+                  kind: "call",
+                  title:
+                    "Store a Cloudflare API token that may edit Workers on the account, then set the target with it",
+                  operationId: "Delivery_createCredential",
+                },
+              ],
+              `Deploy target ${name} names a credential this project's namespace does not hold. A target uses only a credential of its own project's namespace.`,
+            );
+          const reached = cloudflare({ secret: using.secret, accountId });
+          const code =
+            reached.reaches || reached.code === undefined
+              ? ""
+              : ` (Cloudflare error ${reached.code})`;
+          const storeAnother: NextAction = {
+            kind: "call",
+            title:
+              "Store a Cloudflare API token that may edit Workers on the account, then set the target with it",
+            operationId: "Delivery_createCredential",
+          };
+          if (!reached.reaches)
+            return problem(
+              422,
+              "deploy_target.unreachable",
+              [storeAnother],
+              reached.why === "token-invalid"
+                ? `Cloudflare refused the credential's token${code}: it is invalid, expired or revoked. Nothing was set.`
+                : `The credential's token does not reach the account's Workers${code}: check the account id, and that the token may edit Workers on that account. Nothing was set.`,
+            );
+          if (reached.subdomain === undefined)
+            return problem(
+              422,
+              "deploy_target.no_workers_dev",
+              [
+                {
+                  kind: "call",
+                  title: "Set the target again once the account has a workers.dev subdomain",
+                  operationId: "Delivery_putDeployTarget",
+                },
+              ],
+              "The account has no workers.dev subdomain to serve previews from. Keel never makes one: set a workers.dev subdomain in the Cloudflare dashboard (Workers & Pages → your subdomain), then set the target again. Nothing was set.",
+            );
+          const target: DeployTargetView = {
+            name,
+            provider: "cloudflare",
+            accountId,
+            credential,
+            workersDev: `${reached.subdomain}.workers.dev`,
+          };
+          if (!set.has(name) && set.size >= TARGETS_MOST)
+            return problem(
+              409,
+              "deploy_target.refused",
+              [
+                {
+                  kind: "read",
+                  title: "Read the project's deploy targets",
+                  operationId: "Delivery_listDeployTargets",
+                },
+              ],
+              `The project already has all the deploy targets it may, so ${name} was not set. Clear one first, or set one already there again.`,
+            );
+          set.set(name, target);
+          targeted.set(projectId, set);
+          return Response.json(target satisfies DeployTargetView);
+        }
+      }
       // The agents invited to one project: Keel's three operations on a project of a person's own namespace,
       // decided as its policy and its handlers decide them and in their order. Keel reads the owner the
       // invitations not yet answered and what each gives; anyone else who reads the project, the agents that

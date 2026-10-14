@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.refused
+# why: setting a target already there again is refused at the count, as a new one would be
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..aabab95f 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1169,7 +1169,7 @@ export function createFakeKeel(
+             credential,
+             workersDev: `${reached.subdomain}.workers.dev`,
+           };
+-          if (!set.has(name) && set.size >= TARGETS_MOST)
++          if (set.size >= TARGETS_MOST)
+             return problem(
+               409,
+               "deploy_target.refused",

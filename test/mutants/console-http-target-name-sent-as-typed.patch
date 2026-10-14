@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.calls
+# why: a target's name typed with a space around it is sent so, and Keel refuses it
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index e6250beb..083029e9 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -702,7 +702,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+       async putTarget(named, target) {
+         const { projectId, name, ...body }: Delivery_putDeployTargetInput = {
+           projectId: project.id,
+-          name: named.trim(),
++          name: named,
+           provider: target.provider,
+           accountId: target.accountId.trim(),
+           credential: target.credential,

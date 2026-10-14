@@ -21,6 +21,16 @@ import type {
   AgentCard,
   AgentProfile,
   Agents_approveSponsorInput,
+  Credential,
+  Credentials,
+  Delivery_createCredentialInput,
+  Delivery_deleteCredentialInput,
+  Delivery_deleteDeployTargetInput,
+  Delivery_listCredentialsInput,
+  Delivery_listDeployTargetsInput,
+  Delivery_putDeployTargetInput,
+  DeployTargetView,
+  DeployTargets,
   Operator_createProjectInput,
   Agents_endSponsorshipInput,
   EscalationPage,
@@ -69,6 +79,7 @@ import {
   type ChangeDiff,
   type KeelAgents,
   type KeelCommands,
+  type KeelCredentials,
   type KeelDirectory,
   type KeelInvited,
   type KeelOrgAgents,
@@ -78,6 +89,7 @@ import {
   KeelRefused,
   type KeelResources,
   type KeelSettings,
+  type KeelTargeted,
   type Page,
   type ReadRequest,
   type RulingCommand,
@@ -98,6 +110,7 @@ export type HttpSource = KeelEventSource &
   KeelSettings &
   KeelInvited &
   KeelRemembered &
+  KeelTargeted &
   KeelAgents;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
@@ -311,6 +324,52 @@ export function createHttpOrgAgents(options: HttpOptions = {}): KeelOrgAgents {
       });
       if (!response.ok) throw await refusalOf(response);
       return answered<NamespaceAgent>(response);
+    },
+  };
+}
+
+/** Where a namespace keeps its credentials, by its handle. */
+const credentialsAt = (handle: string): string =>
+  `/v1/namespaces/${encodeURIComponent(handle)}/credentials`;
+
+/**
+ * A namespace's credentials: Keel's own three operations, by the namespace's handle. The token is in the body of
+ * the one call that stores it and in nothing else, and is sent as pasted less the space around it, which no
+ * token has; the label likewise, since Keel's has none at either end.
+ */
+export function createHttpCredentials(options: HttpOptions = {}): KeelCredentials {
+  const read = reader(options);
+  const request = options.fetch ?? fetch;
+  const origin = options.origin ?? "";
+  return {
+    async listCredentials(namespace, signal) {
+      const input: Delivery_listCredentialsInput = { handle: namespace };
+      const response = await read(credentialsAt(input.handle), signal);
+      if (!response.ok) throw await refusalOf(response);
+      return (await answered<Credentials>(response)).credentials;
+    },
+    async storeCredential(namespace, stored) {
+      const { handle, ...body }: Delivery_createCredentialInput = {
+        handle: namespace,
+        label: stored.label.trim(),
+        provider: stored.provider,
+        secret: stored.secret.trim(),
+      };
+      const response = await request(`${origin}${credentialsAt(handle)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw await refusalOf(response);
+      return answered<Credential>(response);
+    },
+    async removeCredential(namespace, credentialId) {
+      const input: Delivery_deleteCredentialInput = { handle: namespace, credentialId };
+      const response = await request(
+        `${origin}${credentialsAt(input.handle)}/${encodeURIComponent(input.credentialId)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw await refusalOf(response);
     },
   };
 }
@@ -623,6 +682,49 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         );
         if (!response.ok) throw await refusalOf(response);
         return answered<ProjectAgent>(response);
+      },
+    },
+    // The credentials of the project's namespace, which a deploy target names one of.
+    credentials: createHttpCredentials(options),
+    // The project's deploy targets: Keel's own three operations at the project's own address. A target names
+    // its credential by Keel's id for it, never by anything the token could be read from; its name and its
+    // account are sent as typed less the space around them, which neither has.
+    targets: {
+      async listTargets(signal) {
+        const input: Delivery_listDeployTargetsInput = { projectId: project.id };
+        const response = await read(
+          `/v1/projects/${encodeURIComponent(input.projectId)}/deploy-targets`,
+          signal,
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return (await answered<DeployTargets>(response)).targets;
+      },
+      async putTarget(named, target) {
+        const { projectId, name, ...body }: Delivery_putDeployTargetInput = {
+          projectId: project.id,
+          name: named.trim(),
+          provider: target.provider,
+          accountId: target.accountId.trim(),
+          credential: target.credential,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/deploy-targets/${encodeURIComponent(name)}`,
+          {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<DeployTargetView>(response);
+      },
+      async clearTarget(named) {
+        const input: Delivery_deleteDeployTargetInput = { projectId: project.id, name: named };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(input.projectId)}/deploy-targets/${encodeURIComponent(input.name)}`,
+          { method: "DELETE" },
+        );
+        if (!response.ok) throw await refusalOf(response);
       },
     },
     async getSettings(signal?: AbortSignal): Promise<ProjectSettings> {

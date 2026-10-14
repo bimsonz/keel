@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.calls
+# why: an account id pasted with a space around it is sent so, and Keel refuses it
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index e6250beb..ba07b1af 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -704,7 +704,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           projectId: project.id,
+           name: named.trim(),
+           provider: target.provider,
+-          accountId: target.accountId.trim(),
++          accountId: target.accountId,
+           credential: target.credential,
+         };
+         const response = await request(

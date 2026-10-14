@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/credentials.test.ts
+# kills: targets.read
+# why: a project the reader is not read is refused by role, which says it is there
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 021a66df..6c1ce151 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1087,7 +1087,7 @@ export function createFakeKeel(
+               : mine !== undefined && mine.by === reader.id
+                 ? mine.view.namespace
+                 : undefined;
+-          if (here === undefined) return gone();
++          if (here === undefined) return refusedRole(project.namespace.kind);
+           if (!(await owns(here.handle, here.kind))) return refusedRole(here.kind);
+           const set = targeted.get(projectId) ?? new Map<string, DeployTargetView>();
+           if (listing)
