@@ -1,0 +1,29 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t agents.reach
+# kills: agents.reach
+# why: an org that took the agent out still lists its projects (its ended row is read and taken as joined), so the agent keeps asking for tokens it can no longer have
+diff --git a/apps/keel/src/adapters/driven/d1/namespace-agents.ts b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+index 3b324a4d..06d2fd6b 100644
+--- a/apps/keel/src/adapters/driven/d1/namespace-agents.ts
++++ b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+@@ -142,7 +142,7 @@ export function NamespaceAgentsD1(db: D1Database) {
+           db
+             .prepare(
+               `SELECT ${COLUMNS} FROM namespace_agents
+-               WHERE agent_id = ? AND state <> 'ended' ORDER BY invited_at, namespace_id`,
++               WHERE agent_id = ? ORDER BY invited_at, namespace_id`,
+             )
+             .bind(agentId)
+             .all(),
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 37976d20..98509306 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -152,7 +152,7 @@ export const reachableProjects = (agentId: AgentId) =>
+     const orgs = NamespaceAgents.use((agents) => agents.ofAgent(agentId)).pipe(
+       Effect.flatMap((rows) =>
+         Effect.forEach(
+-          rows.filter((row) => row.state === "joined"),
++          rows.filter((row) => row.state !== "invited"),
+           (row) =>
+             Effect.flatMap(answered(row), (stands) =>
+               stands

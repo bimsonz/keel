@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t agents.reach
+# kills: agents.reach
+# why: a person's project the agent joined is left out, so an agent invited to one project is told it can work nowhere
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 37976d20..839f3369 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -197,7 +197,7 @@ export const reachableProjects = (agentId: AgentId) =>
+       ),
+       Effect.map((lists) => lists.flat()),
+     );
+-    const reached = [...(yield* own), ...(yield* orgs), ...(yield* projects)];
++    const reached = [...(yield* own), ...(yield* orgs)];
+     const named = yield* Effect.forEach(reached, (item) =>
+       namespaces.byId(item.place.namespace).pipe(
+         Effect.map(

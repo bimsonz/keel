@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t agents.reach
+# kills: agents.reach
+# why: whether whoever invited the agent still answers for it is not read, so an org whose inviter has left still lists its projects though the gate refuses every token for them
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 37976d20..b476d8e2 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -127,7 +127,7 @@ export const joinedOrgs = (agentId: AgentId) =>
+ /** Whether whoever made an invitation still answers for the agent it invited, as the gate reads it. */
+ const answered = (invitation: Invitation) =>
+   Memberships.use((memberships) => memberships.standing(invitation.by, invitation.namespace)).pipe(
+-    Effect.map(answers),
++    Effect.map(() => true),
+   );
+ 
+ /**

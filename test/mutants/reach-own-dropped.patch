@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t agents.reach
+# kills: agents.reach
+# why: the projects of the agent's own namespace are left out, so an agent that made a project for itself is told it can work nowhere
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 37976d20..7755227b 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -197,7 +197,7 @@ export const reachableProjects = (agentId: AgentId) =>
+       ),
+       Effect.map((lists) => lists.flat()),
+     );
+-    const reached = [...(yield* own), ...(yield* orgs), ...(yield* projects)];
++    const reached = [...(yield* orgs), ...(yield* projects)];
+     const named = yield* Effect.forEach(reached, (item) =>
+       namespaces.byId(item.place.namespace).pipe(
+         Effect.map(

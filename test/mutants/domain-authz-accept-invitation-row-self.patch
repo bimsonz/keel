@@ -2,10 +2,10 @@
 # kills: authz.invitation-rows
 # why: a person accepts an invitation into a namespace as though it were their own record: the row asks `self`, which any account meets
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..7deeaea3 100644
+index 12bab933..be4cd1d2 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -163,7 +163,7 @@ export const SPEC_ACTIONS = {
+@@ -167,7 +167,7 @@ export const SPEC_ACTIONS = {
    Operator_reinstateAgent: rule("Agent", "sponsor"),
    Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
    Agents_listNamespaces: rule("Self", "agent"),
@@ -13,4 +13,4 @@ index e161bdfa..7deeaea3 100644
 +  Agents_acceptInvitation: rule("Self", "self"),
    Agents_leaveNamespace: rule("Self", "agent"),
    Agents_listProjects: rule("Self", "agent"),
-   Agents_acceptProjectInvitation: rule("Self", "agent"),
+   Agents_listReachableProjects: rule("Self", "agent"),

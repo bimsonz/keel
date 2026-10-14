@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t agents.reach
+# kills: agents.reach
+# why: the read is not a tool of Keel's MCP, so an agent connected only through MCP cannot find the id of the project it may work on
+# regen
+diff --git a/packages/spec/agents.tsp b/packages/spec/agents.tsp
+index e43442d3..1e589939 100644
+--- a/packages/spec/agents.tsp
++++ b/packages/spec/agents.tsp
+@@ -270,7 +270,6 @@ interface Agents {
+    * `listNamespaces` and `listProjects` read those.
+    */
+   @summary("List the projects you can work in")
+-  @tag("mcp")
+   @useAuth(AgentRead)
+   @route("/me/reachable-projects")
+   @get

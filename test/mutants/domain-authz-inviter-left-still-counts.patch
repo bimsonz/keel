@@ -2,15 +2,15 @@
 # kills: authz.agent-invited-read-work
 # why: an invitation still counts after the member who gave it left the org, so the agent keeps reading and working there
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index a673edda..84a64986 100644
+index 12bab933..57c60fcb 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -249,7 +249,7 @@ const isTokenProject = (agent: AgentPrincipal, resource: Resource): boolean =>
+@@ -328,7 +328,7 @@ const isTokenProject = (agent: AgentPrincipal, resource: Resource): boolean =>
    resource.projectId === agent.projectId;
  
  /** Whether whoever invited an agent still answers for it: holding a role in the namespace, not suspended. */
--const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
-+const answers = (by: MemberStanding): boolean => !by.suspended;
+-export const answers = (by: MemberStanding): boolean => by.role !== undefined && !by.suspended;
++export const answers = (by: MemberStanding): boolean => !by.suspended;
  
  /**
   * The standing an agent brings to a resource. A token is for at most one
