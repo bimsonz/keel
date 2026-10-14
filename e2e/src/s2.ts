@@ -66,7 +66,11 @@ import {
 } from "./lib/s1.ts";
 
 const [run, ...flags] = process.argv.slice(2);
-/** With `--public` the person makes both projects public at the end, and a visitor reads D-1 and both feeds. */
+/**
+ * With `--public` the person makes both projects public at the end, a visitor
+ * reads D-1 and both feeds, and the person makes them private again, which a
+ * visitor then reads as absent: no test project stays public.
+ */
 const PUBLIC = flags.includes("--public");
 if (run === undefined || !/^[a-z0-9]{1,12}$/.test(run))
   throw new Error("usage: s2.ts <run>, the run up to twelve lower-case letters and digits");
@@ -829,32 +833,54 @@ async function walk(): Promise<void> {
   );
 
   if (!PUBLIC) return;
-  console.log("\n[h] the person makes both projects public, and a visitor reads what memory did");
-  for (const id of [project.id, control.id])
-    await me.putSettings(id, {
-      protectedPaths: [],
-      maxBatchSize: 1,
-      verification: "required",
-      visibility: "public",
-    });
+  console.log(
+    "\n[h] the person makes both projects public, a visitor reads what memory did, and the person makes them private again",
+  );
+  const shown = [project.id, control.id];
+  const showing = (visibility: "public" | "private") =>
+    Promise.all(
+      shown.map((id) =>
+        me.putSettings(id, {
+          protectedPaths: [],
+          maxBatchSize: 1,
+          verification: "required",
+          visibility,
+        }),
+      ),
+    );
   const visit = async (path: string) => {
     const response = await fetch(`${keelUrl}${path}`);
     return { status: response.status, body: await response.json().catch(() => ({})) };
   };
-  const decided = await visit(`/v1/decisions/${decisionId}`);
-  check(
-    decided.status === 200 &&
-      prop(decided.body, "label") === "D-1" &&
-      strings(prop(decided.body, "guards")).includes(guardId),
-    `a visitor reads D-1, held by G-1: ${decided.status} ${String(prop(decided.body, "label"))}`,
-  );
-  for (const [name, id] of [
-    [PROJECT, project.id],
-    [`${PROJECT}-control`, control.id],
-  ] as const) {
+  await showing("public");
+  try {
+    const decided = await visit(`/v1/decisions/${decisionId}`);
+    check(
+      decided.status === 200 &&
+        prop(decided.body, "label") === "D-1" &&
+        strings(prop(decided.body, "guards")).includes(guardId),
+      `a visitor reads D-1, held by G-1: ${decided.status} ${String(prop(decided.body, "label"))}`,
+    );
+    for (const [name, id] of [
+      [PROJECT, project.id],
+      [`${PROJECT}-control`, control.id],
+    ] as const) {
+      const events = await visit(`/v1/events?project=${id}`);
+      check(events.status === 200, `a visitor reads ${name}'s feed: ${events.status}`);
+      console.log(`     ${name}: ${handle}/${name} (${id})`);
+    }
+  } finally {
+    // However the reads went, a test project does not stay public.
+    await showing("private");
+  }
+  const hidden = await visit(`/v1/decisions/${decisionId}`);
+  check(hidden.status === 404, `private again, a visitor reads D-1 as absent: ${hidden.status}`);
+  for (const id of shown) {
     const events = await visit(`/v1/events?project=${id}`);
-    check(events.status === 200, `a visitor reads ${name}'s feed: ${events.status}`);
-    console.log(`     ${name}: ${handle}/${name} (${id})`);
+    check(
+      events.status === 404,
+      `private again, a visitor reads ${id}'s feed as absent: ${events.status}`,
+    );
   }
 }
 
