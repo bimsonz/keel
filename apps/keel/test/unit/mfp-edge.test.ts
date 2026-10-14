@@ -198,7 +198,7 @@ describe("MFP 0.2 at the edge, mapped", () => {
     }
   });
 
-  it("[mfp.edge-retract] a retraction names the stored premise whose 0.2 form it echoes, an older spelling included; one that matches none retracts nothing", () => {
+  it("[mfp.edge-retract] a retraction names the stored premise whose 0.2 form it echoes, an older spelling included; each one echoed is retracted, and one that matches none retracts nothing", () => {
     const stored = [proposition({ ...spacedWriter, value: "release-team, alice" }), perRequest];
     const retracted = [
       {
@@ -214,8 +214,15 @@ describe("MFP 0.2 at the edge, mapped", () => {
         relation: "is" as const,
         value: "static",
       },
+      {
+        subject: SubjectKey.make("authz.permission-evaluation"),
+        predicate: "freshness" as const,
+        relation: "at-most" as const,
+        value: "per-request",
+        strength: "must" as const,
+      },
     ];
-    expect(retractions(stored, retracted)).toEqual([stored[0]]);
+    expect(retractions(stored, retracted)).toEqual([stored[0], stored[1]]);
   });
 
   it("[mfp.edge-input] rely holds its premise through 0.2 itself, without the doorway's validator in front: a bound with no unit is refused at the premise, and an anchor with no commit is held at the change's base or refused where it has none", () => {

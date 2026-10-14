@@ -168,7 +168,7 @@ describe("MFP 0.2 at the work loop's edge", () => {
     ).toContainEqual(["premises", 0]);
   });
 
-  it("[mfp.edge-worker] an anchor with no commit means the driver's working commit: on rely and revise the change's base, and on declare, where Keel has none yet, it is refused with what to do", async () => {
+  it("[mfp.edge-worker] an anchor with no commit means the driver's working commit: on rely and revise the change's base, on a premise added or echoed to retract it and on a declared effect, and on declare, where Keel has none yet, it is refused with what to do", async () => {
     const via = loop();
     const token = await tokenFor(await seedAgent());
     const unpinned = { path: "src/deploy/gate.ts", symbol: "gate" };
@@ -205,5 +205,29 @@ describe("MFP 0.2 at the work loop's edge", () => {
     expect(revised.body.result.change.premises).toContainEqual(
       served({ ...premises[3], cites: [{ kind: "anchor", ...pinned }] }),
     );
+
+    // The same input echoed retracts it: its anchor with no commit is read at the base again.
+    const echoed = await rest(via, token, `/changes/${change.id}/revisions`, {
+      method: "POST",
+      headers: { "idempotency-key": "mfp-edge-0105", "keel-lease": lease.id, "if-match": '"3"' },
+      body: JSON.stringify({
+        premisesRetracted: [{ ...premises[3], cites: [{ kind: "anchor", ...unpinned }] }],
+      }),
+    });
+    expect(echoed.status).toBe(200);
+    expect(echoed.body.result.change.premises).toEqual([
+      served({ ...premises[0], anchors: [pinned] }),
+    ]);
+
+    // A revision whose one anchor with no commit is on a declared effect reads the change too.
+    const effected = await rest(via, token, `/changes/${change.id}/revisions`, {
+      method: "POST",
+      headers: { "idempotency-key": "mfp-edge-0106", "keel-lease": lease.id, "if-match": '"4"' },
+      body: JSON.stringify({ declaredEffects: [{ ...effects[0], anchors: [unpinned] }] }),
+    });
+    expect(effected.status).toBe(200);
+    expect(effected.body.result.change.declaredEffects).toEqual([
+      { ...effects[0], anchors: [pinned] },
+    ]);
   });
 });

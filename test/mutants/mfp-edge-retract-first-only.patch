@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mfp-edge.test.ts -t "mfp.edge-retract"
+# kills: mfp.edge-retract
+# why: only the first premise echoed is retracted, and the rest are kept
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..a10cc6ca 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1028,7 +1028,7 @@ export const retractions = (
+   retracted: readonly MfpPremiseProposition[],
+   ctx: WireContext = {},
+ ): Proposition[] =>
+-  retracted.flatMap((m) => {
++  retracted.slice(0, 1).flatMap((m) => {
+     const premise = retractedBy(stored, m, ctx);
+     return premise === undefined ? [] : [premise];
+   });

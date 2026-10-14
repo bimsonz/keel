@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: a retraction is matched with no working commit, so echoing the input a premise was added with, its anchor with no commit, retracts nothing
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..c09a85aa 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1029,7 +1029,7 @@ export const retractions = (
+   ctx: WireContext = {},
+ ): Proposition[] =>
+   retracted.flatMap((m) => {
+-    const premise = retractedBy(stored, m, ctx);
++    const premise = retractedBy(stored, m);
+     return premise === undefined ? [] : [premise];
+   });
+ 

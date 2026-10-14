@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mfp-edge.test.ts -t "mfp.edge-worker"
+# kills: mfp.edge-worker
+# why: a revision reads the change only for an added premise's anchor with no commit, so one on a declared effect alone is refused for want of a base the change has
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c2193f54..22bf9093 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1015,7 +1015,7 @@ export function reviseInput(input: Input<"revise">): Result.Result<ReviseRequest
+ 
+ /** Whether a revision is held against the change itself: to retract, or to hold an anchor with no commit at its base. */
+ export const revisesAgainstChange = (request: ReviseRequest): boolean =>
+-  request.retracted.length > 0 || [...request.added, ...(request.effects ?? [])].some(unpinned);
++  request.retracted.length > 0 || request.added.some(unpinned);
+ 
+ /**
+  * Each retracted premise as the change stores it: the one whose 0.2 form is
