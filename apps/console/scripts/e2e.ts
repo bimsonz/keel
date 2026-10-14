@@ -4503,19 +4503,14 @@ await cloudflareOn(person)
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "cloudflare: a project's owner is offered Continue with Cloudflare for a target, and no field for a token",
+  "cloudflare: a project's owner is offered Continue with Cloudflare, and no field to type into: not a token, not a target's name",
   `${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()} | ${await cloudflareOn(
     person,
   )
     .getByRole("form", { name: "Connect a Cloudflare account" })
     .getByRole("button", { name: "Continue with Cloudflare" })
-    .count()} button | fields ${await fieldsOf(cloudflareOn(person))} | target "${await cloudflareOn(
-    person,
-  )
-    .getByLabel("Target", { exact: true })
-    .inputValue()
-    .catch(() => "no field")}"`,
-  '1 | 1 button | fields Target | target "production"',
+    .count()} button | fields ${await fieldsOf(cloudflareOn(person))}`,
+  "1 | 1 button | fields none",
 );
 const revokeLink = cloudflareOn(person).getByRole("link", {
   name: "Cloudflare's account API tokens",
@@ -4573,13 +4568,17 @@ expectEqual(
   `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${connectsOf(deploying).length} connect, for ${connectsOf(deploying)[0]?.path.split("/").at(-2) ?? "none"} | ${consentsAsked.length} consent | ${deploying.calls.filter((call) => call.path === "/v1/cloudflare/callback").length} callback | ${setsOf(deploying, "production").length} sets from the page`,
   `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove | 1 connect, for production | 1 consent | 1 callback | 0 sets from the page`,
 );
-// The token Keel made serves another target on the same account, with no second consent. On an account it does
-// not reach, Keel refuses, and its refusal is shown in its words.
+// The token Keel made sets the target again once it is removed, with no second consent. On an account it does not
+// reach, Keel refuses, and its refusal is shown in its words.
 const reuseOn = (shown: Page) =>
   cloudflareOn(shown).getByRole("form", { name: "Use a token already stored" });
 await cloudflareOn(person)
-  .getByLabel("Target", { exact: true })
-  .fill("staging", { timeout: 15_000 })
+  .getByRole("button", { name: "Remove the target production" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await cloudflareOn(person)
+  .getByText("No Cloudflare account is connected.")
+  .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 await reuseOn(person)
   .getByLabel("Stored token", { exact: true })
@@ -4605,7 +4604,7 @@ expectEqual(
       .innerText()
       .catch(() => "no refusal"),
   )} | ${await targetRows.count()} listed | fields ${await fieldsOf(cloudflareOn(person))}`,
-  "The credential's token does not reach the account's Workers (Cloudflare error 10000): check the account id, and that the token may edit Workers on that account. Nothing was set. Connect the account again through Cloudflare, which makes Keel a new token | 1 listed | fields Target, Account id",
+  "The credential's token does not reach the account's Workers (Cloudflare error 10000): check the account id, and that the token may edit Workers on that account. Nothing was set. Connect the account again through Cloudflare, which makes Keel a new token | 0 listed | fields Account id",
 );
 await reuseOn(person)
   .getByLabel("Account id", { exact: true })
@@ -4616,13 +4615,13 @@ await reuseOn(person)
   .click({ timeout: 15_000 })
   .catch(() => undefined);
 await targetRows
-  .nth(1)
+  .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "cloudflare: on the account it was made for, the stored token sets a second target, with no second consent",
-  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${await cloudflareOn(person).getByRole("alert").count()} refusals | ${connectsOf(deploying).length} connect | ${setsOf(deploying, "staging").length} sets, ${new Set(setsOf(deploying, "staging").map((call) => credentialIn(call.body))).size} credential`,
-  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove || staging Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove | 0 refusals | 1 connect | 2 sets, 1 credential`,
+  "cloudflare: on the account it was made for, the stored token sets the target again, with no second consent",
+  `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${await cloudflareOn(person).getByRole("alert").count()} refusals | ${connectsOf(deploying).length} connect | ${setsOf(deploying, "production").length} sets, ${new Set(setsOf(deploying, "production").map((call) => credentialIn(call.body))).size} credential`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev With the token Keel deploys: ada/demo Remove | 0 refusals | 1 connect | 2 sets, 1 credential`,
 );
 // The token is a credential of the namespace: listed on its owner's settings under the label Keel gave it, and
 // removable there. Nothing on that page takes a token.
@@ -4663,7 +4662,7 @@ await targetRows
 expectEqual(
   "cloudflare: a target whose token was removed says it cannot reach its account, and is listed as Keel keeps it",
   `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${await reuseOn(person).count()} forms to reuse a token`,
-  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its token is no longer stored, so Keel cannot reach the account: connect it again. Remove || staging Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its token is no longer stored, so Keel cannot reach the account: connect it again. Remove | 0 forms to reuse a token`,
+  `production Cloudflare account ${GOOD_ACCOUNT} · previews at ada-previews.workers.dev Its token is no longer stored, so Keel cannot reach the account: connect it again. Remove | 0 forms to reuse a token`,
 );
 // At a phone's width the section's words stay on the screen: each run of text is measured where it is drawn.
 await person.setViewportSize({ width: 390, height: 844 });
@@ -4686,16 +4685,14 @@ expectEqual(
 );
 await shot(person, "cloudflare-phone");
 await person.setViewportSize({ width: 1280, height: 900 });
-for (const name of ["staging", "production"]) {
-  await cloudflareOn(person)
-    .getByRole("button", { name: `Remove the target ${name}` })
-    .click({ timeout: 15_000 })
-    .catch(() => undefined);
-  await cloudflareOn(person)
-    .getByRole("button", { name: `Remove the target ${name}` })
-    .waitFor({ state: "detached", timeout: 15_000 })
-    .catch(() => undefined);
-}
+await cloudflareOn(person)
+  .getByRole("button", { name: "Remove the target production" })
+  .click({ timeout: 15_000 })
+  .catch(() => undefined);
+await cloudflareOn(person)
+  .getByRole("button", { name: "Remove the target production" })
+  .waitFor({ state: "detached", timeout: 15_000 })
+  .catch(() => undefined);
 expectEqual(
   "cloudflare: removing a target clears it in Keel, and the project has none",
   `${deploying.calls.filter((call) => call.method === "DELETE" && call.path.includes("/deploy-targets/")).length} cleared | ${await cloudflareOn(person).getByText("No Cloudflare account is connected.").count()}`,

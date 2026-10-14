@@ -15,11 +15,17 @@ export const TOKEN_URL = "https://dash.cloudflare.com/oauth2/token";
 
 /**
  * The scopes Keel's client asks for, which are all its registration holds: to
- * mint the token it deploys with on the account the owner ticks, and to read
- * which account that was. Neither deploys anything: the minted token does,
- * and it may only edit that account's Workers.
+ * mint the token it deploys with on the account the owner ticks, to read which
+ * account that was, and Workers Scripts Write itself, since a token may only be
+ * given permissions its maker holds. Keel deploys with the minted token alone,
+ * which may only edit that account's Workers; the consent's own access is used
+ * for the mint and dropped.
  */
-export const CLOUDFLARE_SCOPES = ["account-api-tokens.write", "account-settings.read"] as const;
+export const CLOUDFLARE_SCOPES = [
+  "account-api-tokens.write",
+  "account-settings.read",
+  "workers-scripts.write",
+] as const;
 
 /** The one permission the minted token holds, found by this name among the account's permission groups. */
 export const WORKERS_SCRIPTS_WRITE = "Workers Scripts Write";

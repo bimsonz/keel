@@ -64,6 +64,7 @@ function useOutcome() {
     const address = new URL(window.location.href);
     address.searchParams.delete("cloudflare");
     address.searchParams.delete("step");
+    address.searchParams.delete("code");
     window.history.replaceState(window.history.state, "", address);
   }, [outcome]);
   return { outcome, refusedAt };

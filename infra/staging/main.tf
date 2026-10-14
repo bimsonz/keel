@@ -87,9 +87,10 @@ resource "cloudflare_secrets_store_secret" "credential_kek" {
 
 # Keel's OAuth client on Cloudflare: what an owner consents to when they
 # connect a project's deploy target to their own account, from the project's
-# settings. Its two scopes let keel mint, on the one account the owner ticks,
-# an API token of its own that may only edit that account's Workers, and read
-# which account that was; keel deploys with that token, never with the
+# settings. Its scopes let keel mint, on the one account the owner ticks, an
+# API token of its own that may only edit that account's Workers (which takes
+# Workers Scripts Write itself: a token holds only what its maker may), and
+# read which account that was; keel deploys with that token, never with the
 # consent's own access. The scopes are keel's CLOUDFLARE_SCOPES, which a unit
 # test holds equal to these. Private until made public, which needs a logo and
 # the host's domain verified: until then only this account's members consent.
@@ -104,7 +105,7 @@ resource "cloudflare_oauth_client" "keel" {
   response_types             = ["code"]
   redirect_uris              = ["https://${var.host}/v1/cloudflare/callback"]
   token_endpoint_auth_method = "client_secret_basic"
-  scopes                     = ["account-api-tokens.write", "account-settings.read"]
+  scopes                     = ["account-api-tokens.write", "account-settings.read", "workers-scripts.write"]
   client_uri                 = "https://${var.host}"
   policy_uri                 = "https://${var.host}/privacy"
   tos_uri                    = "https://${var.host}/terms"

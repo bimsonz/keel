@@ -310,15 +310,24 @@ const addressOf = (projectId: ProjectId) =>
 /** How a Connect ended, and for one Cloudflare refused, the step it refused. */
 interface Ended {
   readonly outcome: Outcome;
-  readonly step?: CloudflareConnectFailed["step"];
+  /** The step Cloudflare refused, and its own error code where it gave one. */
+  readonly refused?: Pick<CloudflareConnectFailed, "step" | "code">;
 }
 
-const ended = (outcome: Outcome, step?: CloudflareConnectFailed["step"]): Ended =>
-  step === undefined ? { outcome } : { outcome, step };
+const ended = (outcome: Outcome, refusal?: CloudflareConnectFailed): Ended =>
+  refusal === undefined
+    ? { outcome }
+    : {
+        outcome,
+        refused:
+          refusal.code === undefined
+            ? { step: refusal.step }
+            : { step: refusal.step, code: refusal.code },
+      };
 
 /** The project's settings, where its owner is sent back with how the Connect ended. */
 const settingsAt = (address: { readonly handle: string; readonly name: string }, end: Ended) =>
-  `/${encodeURIComponent(address.handle)}/${encodeURIComponent(address.name)}/settings?cloudflare=${end.outcome}${end.step === undefined ? "" : `&step=${end.step}`}`;
+  `/${encodeURIComponent(address.handle)}/${encodeURIComponent(address.name)}/settings?cloudflare=${end.outcome}${end.refused === undefined ? "" : `&step=${end.refused.step}${end.refused.code === undefined ? "" : `&code=${end.refused.code}`}`}`;
 
 /** The person the policy granted: credentials and deploy targets are recorded as a user's. */
 function userOf(caller: Caller): Effect.Effect<UserId> {
@@ -510,7 +519,7 @@ export function deliveryHandlers(run: Runner) {
                       : Effect.succeed(
                           ended(
                             outcomeOf(error),
-                            error._tag === "CloudflareConnectFailed" ? error.step : undefined,
+                            error._tag === "CloudflareConnectFailed" ? error : undefined,
                           ),
                         ),
                   ),

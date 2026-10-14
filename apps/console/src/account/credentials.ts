@@ -59,10 +59,15 @@ export const REFUSED_AT: Readonly<Record<string, string>> = {
   unconfigured: "this instance has no OAuth client registered with Cloudflare",
 };
 
-/** Where a refused Connect stopped, in words, if the address names a step Keel's callback gives. */
+/** Where a refused Connect stopped, in words, with Cloudflare's own error code, if the address names a step. */
 export function refusedAtIn(search: string): string | undefined {
-  const step = new URLSearchParams(search).get("step");
-  return step === null ? undefined : REFUSED_AT[step];
+  const query = new URLSearchParams(search);
+  const step = query.get("step");
+  const at = step === null ? undefined : REFUSED_AT[step];
+  const code = query.get("code");
+  return at === undefined || code === null || !/^\d+$/.test(code)
+    ? at
+    : `${at}, Cloudflare error ${code}`;
 }
 
 /** The outcome an address's query names, if it names one Keel's callback gives. */
