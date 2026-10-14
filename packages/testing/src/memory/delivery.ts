@@ -18,51 +18,71 @@ import {
 } from "@keeltown/core/kernel";
 import {
   CredentialStore,
+  type DeployAccount,
   Deployer,
-  type DeployPlan,
   DeployTargetCheck,
   DeployTargets,
   type TargetReach,
+  type WorkerUpload,
 } from "@keeltown/core/ports";
 import { Clock, Effect, Layer, Redacted, Result, Schema } from "effect";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { makeClockMemory } from "./identity.ts";
 
-/** Every lifecycle step succeeds and is recorded, so tests can assert the order. */
+/** A call the memory Deployer was asked, with what it was handed but the token. */
+export type DeployerCall =
+  | { readonly op: "preview"; readonly account: DeployAccount; readonly upload: WorkerUpload }
+  | {
+      readonly op: "promote";
+      readonly account: DeployAccount;
+      readonly deploy: {
+        readonly worker: string;
+        readonly versionId: string;
+        readonly message: string;
+      };
+    }
+  | {
+      readonly op: "delete-version";
+      readonly account: DeployAccount;
+      readonly version: { readonly worker: string; readonly versionId: string };
+    };
+
+/**
+ * A provider whose every call succeeds, as Cloudflare answers for a Worker
+ * that starts: each is recorded (never its token), so tests can assert what
+ * was sent and in what order. Version ids count up from one; their addresses
+ * are formed as Cloudflare forms them.
+ */
 export function makeDeployerMemory() {
-  const steps: { readonly operation: string; readonly plan: DeployPlan }[] = [];
+  const calls: DeployerCall[] = [];
   let counter = 0;
-  const step =
-    (operation: "preview" | "verify" | "promote" | "rollback" | "teardown") => (plan: DeployPlan) =>
-      Effect.sync(() => {
-        steps.push({ operation, plan });
-        return {
-          deploymentId: plan.deploymentId,
-          operation,
-          ok: true,
-          detail: `${operation} recorded in memory`,
-        };
-      });
   return {
-    steps,
+    calls,
     layer: Layer.succeed(
       Deployer,
       Deployer.of({
-        plan: (target, bundle, world) =>
+        preview: (account, _token, upload) =>
           Effect.sync(() => {
             counter += 1;
+            calls.push({ op: "preview", account, upload });
+            const versionId = `${counter.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`;
             return {
-              deploymentId: makeId("dpl", counter.toString().padStart(26, "0")),
-              target,
-              bundle,
-              world,
+              versionId,
+              url: `https://${versionId.slice(0, 8)}-${upload.worker}.${account.workersDev}`,
+              ...(upload.alias === undefined
+                ? {}
+                : { aliasUrl: `https://${upload.alias}-${upload.worker}.${account.workersDev}` }),
             };
           }),
-        preview: step("preview"),
-        verify: step("verify"),
-        promote: (plan) => step("promote")(plan),
-        rollback: step("rollback"),
-        teardown: step("teardown"),
+        promote: (account, _token, deploy) =>
+          Effect.sync(() => {
+            calls.push({ op: "promote", account, deploy });
+            return { deploymentId: `deployment-of-${deploy.versionId}` };
+          }),
+        deleteVersion: (account, _token, version) =>
+          Effect.sync(() => {
+            calls.push({ op: "delete-version", account, version });
+          }),
       }),
     ),
   };

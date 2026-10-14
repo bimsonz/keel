@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { CredentialId, DeploymentId } from "../kernel/index.ts";
+import { CandidateId, ChangeId, CommitSha, CredentialId, DeploymentId } from "../kernel/index.ts";
 
 /**
  * Who hosts a deploy target. Cloudflare is the only one so far, so this is one
@@ -41,22 +41,30 @@ export const DeploymentState = Schema.Literals([
 ]);
 export type DeploymentState = typeof DeploymentState.Type;
 
+/**
+ * A Worker version Keel uploaded to a project's deploy target for one
+ * candidate, and what became of it: `previewing` once it answers at its
+ * address, `promoted` once trunk was deployed as it, `torn-down` once its
+ * version was deleted. The project's object keeps one per candidate.
+ */
 export const Deployment = Schema.Struct({
   id: DeploymentId,
   /** The project's deploy target it went to, by name. */
   target: DeployTargetName,
-  world: Schema.String,
-  url: Schema.optional(Schema.String),
+  worker: Schema.String,
+  candidateId: CandidateId,
+  /** The candidate's own commit (`ComposedCandidate.commitSha`), which trunk must reach for it to be deployed. */
+  candidateCommit: Schema.optional(CommitSha),
+  /** The changes the candidate holds, each told the address. */
+  changes: Schema.Array(ChangeId),
+  versionId: Schema.String,
+  /** The version's own address. */
+  url: Schema.String,
+  /** The change's stable address, when the candidate is one change's. */
+  aliasUrl: Schema.optional(Schema.String),
   state: DeploymentState,
+  previewedAt: Schema.Number,
+  /** Trunk's commit it was deployed as, once it was. */
+  promotedTo: Schema.optional(CommitSha),
 });
 export type Deployment = typeof Deployment.Type;
-
-/** What every Deployer operation returns: what happened, as evidence. */
-export const DeployEvidence = Schema.Struct({
-  deploymentId: DeploymentId,
-  operation: Schema.Literals(["plan", "preview", "verify", "promote", "rollback", "teardown"]),
-  ok: Schema.Boolean,
-  detail: Schema.String,
-  ref: Schema.optional(Schema.String),
-});
-export type DeployEvidence = typeof DeployEvidence.Type;

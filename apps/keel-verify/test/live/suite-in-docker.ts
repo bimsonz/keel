@@ -14,7 +14,7 @@ import { WORKER_APP_PACK } from "@keeltown/core/application/verification";
 import { compile } from "@keeltown/core/domain/verification";
 import { CommitSha } from "@keeltown/core/kernel";
 import { Effect, Result } from "effect";
-import { TIER2_RUNNERS } from "../../../keel/src/adapters/driven/ci/suite-runtime.ts";
+import { tier2RunnerFor } from "../../../keel/src/adapters/driven/ci/suite-runtime.ts";
 import { buildBundle, type Variant } from "./bundles.ts";
 
 const IMAGE = process.env["KEEL_EXECBOX_IMAGE"] ?? "keel-execbox:local";
@@ -29,7 +29,7 @@ if (Result.isFailure(plan)) throw new Error("the worker-app pack does not compil
 const step = plan.success.steps.find(
   (s) => s.id === (typecheck ? "worker-app.typecheck" : "js-ts.suite"),
 );
-const runner = step === undefined ? undefined : TIER2_RUNNERS[step.id];
+const runner = step === undefined ? undefined : tier2RunnerFor(step);
 if (step === undefined || runner === undefined) throw new Error("no runner for the step");
 
 type Case = Variant | "truncated" | "truncated-twice" | "empty";

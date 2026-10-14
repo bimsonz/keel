@@ -766,7 +766,7 @@ export const PORTS = {
   ),
   Deployer: port(
     () => delivery.makeDeployerMemory().layer,
-    pending("Deployer", ["plan", "preview", "verify", "promote", "rollback", "teardown"]),
+    pending("Deployer", ["preview", "promote", "deleteVersion"]),
   ),
   // The real check asks Cloudflare's API, so no suite runs it: its mapping is unit-tested against a fetch double.
   DeployTargetCheck: port(
