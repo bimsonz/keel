@@ -1,6 +1,7 @@
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { readStoredPlan, storedPlanText } from "../../../src/application/verification/index.ts";
+import { DeploySpec } from "../../../src/domain/delivery/index.ts";
 import { compile, type FlowPlan, unionPlans } from "../../../src/domain/verification/index.ts";
 import {
   emptyDefaults,
@@ -94,5 +95,30 @@ describe("a plan as the plan store keeps it", () => {
       }),
     );
     expect(ruled).toBeGreaterThan(0);
+  });
+
+  it("[plan-codec.deploy] reads back a plan whose steps carry the base's deploy spec with it, so a stored plan deploys the Worker it was compiled for", () => {
+    const deploy = Schema.decodeUnknownSync(DeploySpec)({
+      target: "production",
+      worker: "worker-lite",
+      path: "apps/worker-lite",
+      smoke: [{ path: "/health", status: 200, contains: "ok" }],
+    });
+    let deploying = 0;
+    assertReaching(
+      fc.property(guardedCaseArb(), (c) => {
+        const plan = planOf({
+          ...c,
+          spec: { ...c.spec, steps: c.spec.steps.map((s) => ({ ...s, deploy })) },
+        });
+        if (plan.steps.some((s) => s.deploy !== undefined)) deploying++;
+        const read = Result.getOrThrow(
+          readStoredPlan(plan.planHash, Result.getOrThrow(storedPlanText(plan))),
+        );
+        expect(read.steps.map((s) => s.deploy)).toEqual(plan.steps.map((s) => s.deploy));
+        expect(read).toEqual(plan);
+      }),
+    );
+    expect(deploying).toBeGreaterThan(0);
   });
 });

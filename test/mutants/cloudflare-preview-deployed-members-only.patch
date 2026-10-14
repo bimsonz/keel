@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/read-feed.test.ts apps/keel/test/unit/event-audience.test.ts
+# kills: feed.preview-public, b12.event-audience
+# why: a public project's preview addresses are kept to its members, so a visitor reviewing a change cannot open the preview a code host would show
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 5bafd48e..37e5729f 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -150,7 +150,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   CredentialRemoved: "members",
+   DeployTargetSet: "members",
+   DeployTargetCleared: "members",
+-  PreviewDeployed: "public",
++  PreviewDeployed: "members",
+   PreviewTornDown: "public",
+   DeploymentPromoted: "public",
+   DeploymentRolledBack: "public",

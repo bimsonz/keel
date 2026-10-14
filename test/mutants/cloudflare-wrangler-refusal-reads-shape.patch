@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.carries-only-known
+# why: an unknown key is refused only when its value is a list or a table, so minify: true or keep_vars: true is taken and the preview is not the Worker its config describes
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..1f040644 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -199,7 +199,9 @@ export const wranglerFacts = (
+     return Result.fail(
+       new WranglerConfigRefused({ reason: "unreadable", detail: `${fileName} is not an object` }),
+     );
+-  const uncarried = Object.keys(config).filter((key) => !TAKEN_KEYS.includes(key));
++  const uncarried = Object.keys(config).filter(
++    (key) => !TAKEN_KEYS.includes(key) && typeof Reflect.get(config, key) === "object",
++  );
+   if (uncarried.length > 0)
+     return Result.fail(
+       new WranglerConfigRefused({

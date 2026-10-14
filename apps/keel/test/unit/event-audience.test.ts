@@ -86,6 +86,23 @@ describe("[b12.event-audience] who an event on a public project's feed is for", 
     expect(sponsored.every((event) => audienceOf(event.type) === "members")).toBe(true);
   });
 
+  it("[b12.preview-fields] a preview's notice, which a public project's visitor reads, carries its addresses and nothing else naming the account it went to: no account id, target settings or credential", () => {
+    expect(events.find((event) => event.type === "PreviewDeployed")?.fields.toSorted()).toEqual(
+      [
+        "_tag",
+        "deploymentId",
+        "changeId",
+        "candidateId",
+        "world",
+        // The target's name and its host, never its record: the account and the credential stay with members.
+        "target",
+        "provider",
+        "url",
+        "aliasUrl",
+      ].toSorted(),
+    );
+  });
+
   it("[b12.event-audience] keeps an event type this build does not know to members", () => {
     expect(audienceOf("SomethingNewHappened")).toBe("members");
     expect(audienceOf("IntentDeclared")).toBe("public");

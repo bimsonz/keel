@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: smoke.preview-origin
+# why: a preview address holding a ? is taken, so each smoke path joined to it lands in the query and every check fetches /
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..23c7aac4 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -281,7 +281,7 @@ export class SmokePathOffHost extends Schema.TaggedError<SmokePathOffHost>()("Sm
+  */
+ export const PreviewOrigin = Schema.String.check(
+   Schema.isPattern(
+-    /^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/,
++    /^https:\/\/[a-z0-9](?:[a-z0-9?-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9?-]*[a-z0-9])?)+$/,
+   ),
+ ).pipe(Schema.brand("PreviewOrigin"));
+ export type PreviewOrigin = typeof PreviewOrigin.Type;

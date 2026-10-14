@@ -584,6 +584,9 @@ const perturbations = (plan: FlowPlan): readonly PlanPreimage[] => {
 };
 
 /** The plan with its first guard step pinning another probe, or undefined when it has none. */
+/** A deploy spec's JSON with its build directory left out. */
+const pathless = (deploy: DeploySpec): string => JSON.stringify({ ...deploy, path: undefined });
+
 const repinned = (plan: FlowPlan): PlanPreimage | undefined => {
   const i = plan.steps.findIndex((s) => s.guards !== undefined);
   if (i === -1) return undefined;
@@ -671,10 +674,11 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     expect(ok(single([suiteStep("check")])).steps[0]).not.toHaveProperty("run");
   });
 
-  it("[flow.step-deploy] a step's deploy spec rides on its plan step, and the plan's hash covers it", () => {
+  it("[flow.step-deploy] a step's deploy spec rides on its plan step, its build directory too, and the plan's hash covers it", () => {
     const deploy = Schema.decodeUnknownSync(DeploySpec)({
       target: "production",
       worker: "worker-lite",
+      path: "apps/worker-lite",
       smoke: [{ path: "/health", status: 200 }],
     });
     const preview = suiteStep("deploy.preview", { suite: false, kind: "deploy", tier: 0, deploy });
@@ -682,50 +686,76 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     expect(plan.steps.map((s) => [s.id, s.deploy, s.tier.tier])).toEqual([
       ["deploy.preview", deploy, 0],
     ]);
-    expect(
-      ok(single([{ ...preview, deploy: { ...deploy, worker: deploy.worker } }])).planHash,
-    ).toBe(plan.planHash);
-    const renamed = Schema.decodeUnknownSync(DeploySpec)({ ...deploy, worker: "billing-api" });
-    expect(ok(single([{ ...preview, deploy: renamed }])).planHash).not.toBe(plan.planHash);
+    const hashWith = (spec: object) =>
+      ok(single([{ ...preview, deploy: Schema.decodeUnknownSync(DeploySpec)(spec) }])).planHash;
+    expect(hashWith({ ...deploy, worker: "billing-api" })).not.toBe(plan.planHash);
+    // The build runs from the spec's path, so the same plan building in another directory, or at
+    // the repo's root, is another plan.
+    expect(hashWith({ ...deploy, path: "apps/console" })).not.toBe(plan.planHash);
+    const { path: _built, ...atRoot } = deploy;
+    expect(hashWith(atRoot)).not.toBe(plan.planHash);
+    const elsewhere = plan.steps.map((s) => ({
+      ...s,
+      deploy: { ...deploy, path: "apps/console" },
+    }));
+    expect(planHashOf({ ...plan, steps: elsewhere })).not.toBe(plan.planHash);
     expect(ok(single([suiteStep("check")])).steps[0]).not.toHaveProperty("deploy");
   });
 
   const deployArb = fc
-    .record({
-      target: fc.constantFrom("production", "staging"),
-      worker: fc.constantFrom("worker-lite", "billing-api"),
-      smoke: fc.constantFrom(
-        [{ path: "/health", status: 200 }],
-        [{ path: "/", status: 200, contains: "hello" }],
-      ),
-    })
+    .record(
+      {
+        target: fc.constantFrom("production", "staging"),
+        worker: fc.constantFrom("worker-lite", "billing-api"),
+        // The directory the build runs from, the repo's root when absent.
+        path: fc.constantFrom("apps/worker-lite", "apps/console"),
+        smoke: fc.constantFrom(
+          [{ path: "/health", status: 200 }],
+          [{ path: "/", status: 200, contains: "hello" }],
+        ),
+      },
+      { requiredKeys: ["target", "worker", "smoke"] },
+    )
     .map((spec) => Schema.decodeUnknownSync(DeploySpec)(spec));
 
   it("[flow.step-deploy-only-carried] a plan step carries a deploy spec exactly when its step does, unchanged", () => {
-    fc.assert(
+    let carried = 0;
+    let inDirectory = 0;
+    assertReaching(
       fc.property(flowCaseArb(), fc.nat(), deployArb, (c, i, deploy) => {
         const id = c.spec.steps[i % c.spec.steps.length]?.id;
         const plan = ok(withStep(c, i, (s) => ({ ...s, deploy })));
+        const planned = plan.steps.some((s) => s.id === id);
+        if (planned) carried++;
+        if (planned && deploy.path !== undefined) inDirectory++;
         expect(
           plan.steps.filter((s) => s.deploy !== undefined).map((s) => [s.id, s.deploy]),
-        ).toEqual(plan.steps.some((s) => s.id === id) ? [[id, deploy]] : []);
+        ).toEqual(planned ? [[id, deploy]] : []);
         expect(ok(c).steps.filter((s) => s.deploy !== undefined)).toEqual([]);
       }),
     );
+    expect(carried).toBeGreaterThan(0);
+    expect(inDirectory).toBeGreaterThan(0);
   });
 
   it("[flow.step-deploy-hash] two plans that differ only in a step's deploy spec have different hashes", () => {
-    fc.assert(
+    let differ = 0;
+    let byPath = 0;
+    assertReaching(
       fc.property(flowCaseArb(), fc.nat(), deployArb, deployArb, (c, i, a, b) => {
         const id = c.spec.steps[i % c.spec.steps.length]?.id;
         const withA = ok(withStep(c, i, (s) => ({ ...s, deploy: a })));
         const withB = ok(withStep(c, i, (s) => ({ ...s, deploy: b })));
         const planned = withA.steps.some((s) => s.id === id);
-        expect(withA.planHash === withB.planHash).toBe(
-          !planned || JSON.stringify(a) === JSON.stringify(b),
-        );
+        const same = JSON.stringify(a) === JSON.stringify(b);
+        if (planned && !same) differ++;
+        if (planned && !same && pathless(a) === pathless(b)) byPath++;
+        expect(withA.planHash === withB.planHash).toBe(!planned || same);
       }),
     );
+    expect(differ).toBeGreaterThan(0);
+    // Two specs alike but for the directory the build runs from.
+    expect(byPath).toBeGreaterThan(0);
   });
 
   it("[flow.guard-policy] a guard step carries its predicate's policy, and a predicate the change's policy leaves out is advise", () => {

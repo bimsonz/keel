@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: smoke.same-host
+# why: a smoke path may hold a carriage return, which URL parsing strips, so /<CR>/evil.example/x resolves to that host
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..ce99e930 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -17,7 +17,7 @@ export type WorkerName = typeof WorkerName.Type;
+  * `/` or any `\` would let a URL resolve it to another host, so neither is taken.
+  */
+ export const SmokeCheck = Schema.Struct({
+-  path: Schema.String.check(Schema.isPattern(/^\/(?!\/)[\x21-\x5b\x5d-\x7e]{0,255}$/)),
++  path: Schema.String.check(Schema.isPattern(/^\/(?!\/)[\r\x21-\x5b\x5d-\x7e]{0,255}$/)),
+   status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
+   contains: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+ });

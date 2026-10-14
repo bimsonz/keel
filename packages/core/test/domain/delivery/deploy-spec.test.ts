@@ -62,87 +62,89 @@ const TAKEN = [
   "workers_dev",
 ];
 
-// wrangler 4.149's other top-level keys: each declares a binding or resource, is carried by a version, or changes the bundle.
-const WRANGLER_REFUSED = [
+// wrangler 4.149's other top-level keys, each with a value of the kind its schema takes (a flag, a
+// name, a table or a list), so a refusal that read the value's shape is caught: each declares a
+// binding or resource, is carried by a version, or changes the bundle.
+const WRANGLER_REFUSED: Readonly<Record<string, unknown>> = {
   // Settings a version carries that Keel's upload does not yet, and one that changes the bundle.
-  "keep_vars",
-  "limits",
-  "minify",
-  "placement",
-  "access",
-  "addresses",
-  "agent_memory",
-  "ai",
-  "ai_search",
-  "ai_search_namespaces",
-  "alias",
-  "analytics",
-  "analytics_engine_datasets",
-  "artifacts",
-  "assets",
-  "base_dir",
-  "browser",
-  "build",
-  "cache",
-  "cloudchamber",
-  "connect",
-  "containers",
-  "d1_databases",
-  "data_blobs",
-  "define",
-  "dependencies_instrumentation",
-  "dispatch_namespaces",
-  "durable_objects",
-  "exports",
-  "find_additional_modules",
-  "first_party_worker",
-  "flagship",
-  "hyperdrive",
-  "images",
-  "jsx_factory",
-  "jsx_fragment",
-  "k2",
-  "keep_names",
-  "kv_namespaces",
-  "logfwdr",
-  "media",
-  "migrations",
-  "mtls_certificates",
-  "no_bundle",
-  "pages_build_output_dir",
-  "pipelines",
-  "preserve_file_names",
-  "previews",
-  "python_modules",
-  "queues",
-  "r2_buckets",
-  "ratelimits",
-  "rules",
-  "secrets",
-  "secrets_store_secrets",
-  "send_email",
-  "services",
-  "site",
-  "stream",
-  "streaming_tail_consumers",
-  "tail_consumers",
-  "text_blobs",
-  "tsconfig",
-  "unsafe",
-  "unsafe_hello_world",
-  "vectorize",
-  "version_metadata",
-  "vpc_networks",
-  "vpc_services",
-  "wasm_modules",
-  "worker_loaders",
-  "workflows",
-];
+  keep_vars: true,
+  limits: { cpu_ms: 50 },
+  minify: true,
+  placement: { mode: "smart" },
+  access: { dev: { aud: "aud" } },
+  addresses: ["10.0.0.1"],
+  agent_memory: [{ binding: "MEMORY", namespace: "agents" }],
+  ai: { binding: "AI" },
+  ai_search: [{ binding: "SEARCH", instance_name: "docs" }],
+  ai_search_namespaces: [{ binding: "SEARCHES", namespace: "docs" }],
+  alias: { "node:fs": "./fs.js" },
+  analytics: { binding: "ANALYTICS" },
+  analytics_engine_datasets: [{ binding: "EVENTS", dataset: "events" }],
+  artifacts: [{ binding: "ARTIFACTS", namespace: "builds" }],
+  assets: { directory: "./public" },
+  base_dir: "./src",
+  browser: { binding: "BROWSER" },
+  build: { command: "pnpm build" },
+  cache: { enabled: true },
+  cloudchamber: { image: "./Dockerfile" },
+  connect: [{ protocol: "tcp", port: 5432 }],
+  containers: [{ class_name: "Box", image: "./Dockerfile" }],
+  d1_databases: [{ binding: "DB", database_id: "db" }],
+  data_blobs: { BLOB: "./blob.bin" },
+  define: { DEBUG: "false" },
+  dependencies_instrumentation: { enabled: true },
+  dispatch_namespaces: [{ binding: "DISPATCH", namespace: "tenants" }],
+  durable_objects: { bindings: [{ name: "ROOM", class_name: "Room" }] },
+  exports: { Api: { type: "worker" } },
+  find_additional_modules: true,
+  first_party_worker: true,
+  flagship: [{ binding: "FLAGS", app_id: "app" }],
+  hyperdrive: [{ binding: "PG", id: "pg" }],
+  images: { binding: "IMAGES" },
+  jsx_factory: "h",
+  jsx_fragment: "Fragment",
+  k2: [{ binding: "K2", stream: "events" }],
+  keep_names: false,
+  kv_namespaces: [{ binding: "KV", id: "kv" }],
+  logfwdr: { bindings: [{ name: "LOGS", destination: "logs" }] },
+  media: { binding: "MEDIA" },
+  migrations: [{ tag: "v1", new_sqlite_classes: ["Room"] }],
+  mtls_certificates: [{ binding: "CERT", certificate_id: "cert" }],
+  no_bundle: true,
+  pages_build_output_dir: "./dist",
+  pipelines: [{ binding: "PIPE", stream: "events" }],
+  preserve_file_names: true,
+  previews: { vars: { MODE: "preview" } },
+  python_modules: { exclude: ["**/*.pyc"] },
+  queues: { producers: [{ binding: "QUEUE", queue: "jobs" }] },
+  r2_buckets: [{ binding: "BUCKET", bucket_name: "files" }],
+  ratelimits: [{ name: "LIMIT", namespace_id: "1", simple: { limit: 10, period: 60 } }],
+  rules: [{ type: "Text", globs: ["**/*.txt"] }],
+  secrets: { required: ["API_KEY"] },
+  secrets_store_secrets: [{ binding: "KEY", store_id: "store", secret_name: "key" }],
+  send_email: [{ name: "EMAIL" }],
+  services: [{ binding: "API", service: "billing-api" }],
+  site: { bucket: "./public" },
+  stream: { binding: "STREAM" },
+  streaming_tail_consumers: [{ service: "tail" }],
+  tail_consumers: [{ service: "tail" }],
+  text_blobs: { TEXT: "./text.txt" },
+  tsconfig: "./tsconfig.json",
+  unsafe: { bindings: [{ name: "RAW", type: "raw" }] },
+  unsafe_hello_world: [{ binding: "HELLO" }],
+  vectorize: [{ binding: "VECTORS", index_name: "docs" }],
+  version_metadata: { binding: "VERSION" },
+  vpc_networks: [{ binding: "NET", tunnel_id: "tunnel" }],
+  vpc_services: [{ binding: "VPC", service_id: "vpc" }],
+  wasm_modules: { WASM: "./module.wasm" },
+  worker_loaders: [{ binding: "LOADER" }],
+  workflows: [{ binding: "FLOW", name: "flow", class_name: "Flow" }],
+};
 
-const withKey = (key: string) =>
+const withKey = (key: string, value: unknown = []) =>
   wranglerFacts(
     "wrangler.jsonc",
-    JSON.stringify({ name: "w", main: "i.js", compatibility_date: "2026-10-01", [key]: [] }),
+    JSON.stringify({ name: "w", main: "i.js", compatibility_date: "2026-10-01", [key]: value }),
   );
 
 const factsWith = (fields: object) =>
@@ -151,8 +153,8 @@ const factsWith = (fields: object) =>
     JSON.stringify({ name: "w", main: "i.js", compatibility_date: "2026-10-01", ...fields }),
   );
 
-const refusedNaming = (key: string): boolean => {
-  const facts = withKey(key);
+const refusedNaming = (key: string, value: unknown): boolean => {
+  const facts = withKey(key, value);
   const named = Result.isFailure(facts) ? /declares (.*), which/.exec(facts.failure.detail) : null;
   return reason(facts) === "uncarried-key" && (named?.[1]?.split(", ") ?? []).includes(key);
 };
@@ -191,6 +193,7 @@ describe("a project's deploy spec", () => {
       ["worker ending in a hyphen", { ...SPEC, worker: "worker-" }, false],
       ["worker starting upper-case", { ...SPEC, worker: "Worker-lite" }, false],
       ["worker with an underscore", { ...SPEC, worker: "my_worker" }, false],
+      ["worker ending in an underscore", { ...SPEC, worker: "worker_" }, false],
       ["8 smoke checks", { ...SPEC, smoke: Array.from({ length: 8 }, () => SPEC.smoke[0]) }, true],
       ["9 smoke checks", { ...SPEC, smoke: Array.from({ length: 9 }, () => SPEC.smoke[0]) }, false],
       ["status 100", smoke({ status: 100 }), true],
@@ -202,6 +205,9 @@ describe("a project's deploy spec", () => {
       ["contains of 201", smoke({ contains: "x".repeat(201) }), false],
       ["smoke path of 256", smoke({ path: `/${"a".repeat(255)}` }), true],
       ["smoke path of 257", smoke({ path: `/${"a".repeat(256)}` }), false],
+      // A smoke path is printable ASCII from `!` on: a space, the one before it, is refused.
+      ["smoke path holding a !", smoke({ path: "/a!b" }), true],
+      ["smoke path holding a space", smoke({ path: "/a b" }), false],
       ["path of 200", { ...SPEC, path: "a".repeat(200) }, true],
       ["path of 201", { ...SPEC, path: "a".repeat(201) }, false],
       ["path a dotted name", { ...SPEC, path: "apps/.config" }, true],
@@ -257,6 +263,8 @@ describe("a smoke check's address", () => {
       "/\\\\evil.example",
       "/a\\b",
       "/\t/evil.example/x",
+      "/\n/evil.example/x",
+      "/\r/evil.example/x",
     ])
       expect([path, Result.isFailure(pathOf(path))]).toEqual([path, true]);
     for (const path of ["@evil.example/x", ".evil.example", ":443@evil.example", "evil.example"]) {
@@ -268,12 +276,19 @@ describe("a smoke check's address", () => {
     );
   });
 
-  it("[smoke.preview-origin] a preview's address is a bare https origin: no trailing slash, path, user or port", () => {
+  it("[smoke.preview-origin] a preview's address is a bare https origin: nothing before it, and no trailing slash, path, query, fragment, user or port", () => {
     const cases: readonly (readonly [string, boolean])[] = [
       [PREVIEW, true],
       ["https://abcd1234-worker-lite.owner.workers.dev", true],
+      [`x${PREVIEW}`, false],
+      ["https://evil.example/?https://worker-lite.owner.workers.dev", false],
       [`${PREVIEW}/`, false],
       [`${PREVIEW}/x`, false],
+      // Either would take the joined path into a query or a fragment, so every check fetched `/`.
+      [`${PREVIEW}?`, false],
+      [`${PREVIEW}?x`, false],
+      [`${PREVIEW}#`, false],
+      [`${PREVIEW}#x`, false],
       ["http://worker-lite.owner.workers.dev", false],
       ["https://user@worker-lite.owner.workers.dev", false],
       ["https://worker-lite.owner.workers.dev:8443", false],
@@ -346,14 +361,18 @@ describe("a Worker's wrangler config", () => {
       expect([source, JSON.parse(jsoncToJson(source))]).toEqual([source, value]);
   });
 
-  it("[wrangler.carries-only-known] a config naming any key Keel does not take is refused, naming it: every binding wrangler knows, and one it does not yet", () => {
-    for (const key of [...WRANGLER_REFUSED, "future_binding"])
-      expect([key, refusedNaming(key)]).toEqual([key, true]);
+  it("[wrangler.carries-only-known] a config naming any key Keel does not take is refused, naming it, whatever its value: every binding wrangler knows, and one it does not yet", () => {
+    for (const [key, value] of [
+      ...Object.entries(WRANGLER_REFUSED),
+      ["future_binding", [{ binding: "FUTURE" }]],
+    ] as const)
+      expect([key, value, refusedNaming(key, value)]).toEqual([key, value, true]);
     fc.assert(
       fc.property(
         fc.stringMatching(/^[a-z_$][a-z0-9_]{0,24}$/).filter((key) => !TAKEN.includes(key)),
-        (key) => {
-          expect([key, refusedNaming(key)]).toEqual([key, true]);
+        fc.jsonValue({ maxDepth: 2 }),
+        (key, value) => {
+          expect([key, refusedNaming(key, value)]).toEqual([key, true]);
         },
       ),
     );
@@ -394,6 +413,7 @@ describe("a Worker's wrangler config", () => {
       ["flags as one string", { compatibility_flags: "nodejs_compat" }, "incomplete"],
       ["flags not strings", { compatibility_flags: [1] }, "incomplete"],
       ["flags a string then not", { compatibility_flags: ["nodejs_compat", 1] }, "incomplete"],
+      ["flags not a string then one", { compatibility_flags: [1, "nodejs_compat"] }, "incomplete"],
       ["an empty entry", { main: "" }, "incomplete"],
       ["vars a list", { vars: [] }, "incomplete"],
     ];

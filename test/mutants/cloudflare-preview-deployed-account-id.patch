@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts
+# kills: b12.preview-fields
+# why: a preview's public notice names the Cloudflare account it went to, so anyone reading a public project's feed learns the owner's account id
+diff --git a/packages/core/src/domain/delivery/events.ts b/packages/core/src/domain/delivery/events.ts
+index 1eb9f29d..ef345bb6 100644
+--- a/packages/core/src/domain/delivery/events.ts
++++ b/packages/core/src/domain/delivery/events.ts
+@@ -58,6 +58,8 @@ export const PreviewDeployed = Schema.TaggedStruct("PreviewDeployed", {
+   provider: DeployProvider,
+   /** The candidate's own version. */
+   url: Schema.String,
++  /** The account the preview went to. */
++  accountId: Schema.optional(Schema.String),
+   /** The change's stable address, when the candidate is that one change's. */
+   aliasUrl: Schema.optional(Schema.String),
+ });
