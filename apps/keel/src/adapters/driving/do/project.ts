@@ -26,11 +26,7 @@ import {
 import { type EventEnvelope, Instant, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Schema } from "effect";
-import {
-  DEFAULT_POOL_TARGET,
-  type ProjectServices,
-  projectServices,
-} from "../../../composition/do.ts";
+import { poolTargetOf, type ProjectServices, projectServices } from "../../../composition/do.ts";
 import {
   AcceptProjectInvitationCommand,
   ClearDeployTargetCommand,
@@ -161,7 +157,9 @@ export class ProjectDO
   protected override async onDeadline(request: StartedAlarm): Promise<void> {
     if (request.reason !== PROJECT_FINISH) return super.onDeadline(request);
     const projectId = projectIdOf(this.ctx.id.name);
-    const exit = await this.runtime.runPromiseExit(finishProject(projectId, DEFAULT_POOL_TARGET));
+    const exit = await this.runtime.runPromiseExit(
+      finishProject(projectId, poolTargetOf(this.env.POOL_TARGET)),
+    );
     if (Exit.isSuccess(exit)) return;
     const failing = await this.runtime.runPromise(finishFailed(projectId));
     if (failing === undefined) return;

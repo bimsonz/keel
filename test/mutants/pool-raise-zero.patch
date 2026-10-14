@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.raise"
+# kills: pool.raise
+# why: a pool kept at none is raised, so a pool frozen on purpose forks again at its next claim
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 238f7279..24802536 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -762,7 +762,6 @@ export const raisePoolTarget = Effect.fn("coordination/raisePoolTarget")(functio
+       const settings = settingsOf(tx.store);
+       if (
+         settings.source === null ||
+-        settings.target === 0 ||
+         settings.target >= target ||
+         isDestroyed(tx.store)
+       )

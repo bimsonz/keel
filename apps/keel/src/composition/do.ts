@@ -138,8 +138,19 @@ export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
 /** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */
 export type ProjectServices = CodeHost | Trunks | WorkspacePool | ProjectNamespaces | ProjectAgents;
 
-/** How many ready workspaces a new project's pool keeps forked, until `vars.POOL_TARGET` is declared. */
+/** How many ready workspaces a project's pool keeps forked when the Worker's `POOL_TARGET` names none. */
 export const DEFAULT_POOL_TARGET = 2;
+
+/**
+ * How many ready workspaces a project's pool keeps forked: the Worker's
+ * `POOL_TARGET`, or DEFAULT_POOL_TARGET when it is unset or not a positive
+ * whole number. A new project's pool is created with it, and every pool tops up
+ * to it when its own stored target is lower.
+ */
+export const poolTargetOf = (declared: string | undefined): number => {
+  const target = Number(declared);
+  return Number.isInteger(target) && target > 0 ? target : DEFAULT_POOL_TARGET;
+};
 
 /**
  * The Project DO forks and creates repos through the code host, initializes

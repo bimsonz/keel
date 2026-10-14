@@ -79,6 +79,8 @@ export default defineProject({
             // No warm Precheck instances: a submission's Precheck starts cold, one instance per
             // submission. The warm pool's own cases hand it the instances they start.
             PRECHECK_WARM_TARGET: "0",
+            // Pools of two, as the pool cases count them; the deployed Worker keeps more.
+            POOL_TARGET: "2",
             KEEL_SIGNING_KEY: await testSigningKey(),
             BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
             BUNDLE_URL_SIGNING_KEY: (await makeBundleUrlKeys()).signingKey,

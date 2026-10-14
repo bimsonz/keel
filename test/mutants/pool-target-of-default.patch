@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.target-of"
+# kills: pool.target-of
+# why: the Worker's POOL_TARGET is read nowhere, so every pool is made and kept at the default
+diff --git a/apps/keel/src/composition/do.ts b/apps/keel/src/composition/do.ts
+index fc72eee7..585059a7 100644
+--- a/apps/keel/src/composition/do.ts
++++ b/apps/keel/src/composition/do.ts
+@@ -149,7 +149,7 @@ export const DEFAULT_POOL_TARGET = 2;
+  */
+ export const poolTargetOf = (declared: string | undefined): number => {
+   const target = Number(declared);
+-  return Number.isInteger(target) && target > 0 ? target : DEFAULT_POOL_TARGET;
++  return Number.isInteger(target) && target > 0 ? DEFAULT_POOL_TARGET : DEFAULT_POOL_TARGET;
+ };
+ 
+ /**

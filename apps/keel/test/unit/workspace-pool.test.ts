@@ -12,6 +12,7 @@ import {
   observePush,
   ownerOfRepo,
   poolStatus,
+  raisePoolTarget,
   refillPool,
   releaseWorkspace,
   Slot,
@@ -179,6 +180,22 @@ describe("WorkspacePool", () => {
         // The remote and the token never travel in an event.
         expect(JSON.stringify(events)).not.toContain(grant.remote);
         expect(JSON.stringify(events)).not.toContain(grant.token);
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.raise] raises a pool's target to the Worker's when it keeps fewer, and leaves one kept at more, or at none, as it is",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        expect(yield* raisePoolTarget(PROJECT, 16)).toBe(true);
+        expect(yield* poolStatus()).toMatchObject({ target: 16 });
+        expect(yield* raisePoolTarget(PROJECT, 4)).toBe(false);
+        expect(yield* poolStatus()).toMatchObject({ target: 16 });
+        yield* configurePool(PROJECT, { source: MIRROR, target: 0 });
+        expect(yield* raisePoolTarget(PROJECT, 16)).toBe(false);
+        expect(yield* poolStatus()).toMatchObject({ target: 0 });
       }).pipe(Effect.provide(pool())),
   );
 

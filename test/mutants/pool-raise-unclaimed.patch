@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.raise"
+# kills: pool.do.raise
+# why: the pool object never raises its target on a claim, so an existing pool stays at the target it was created with
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 12071ae2..c3f9652b 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -111,9 +111,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
+     }
+     // A pool made under a lower target grows to the Worker's own as it is used.
+-    await this.runtime.runPromise(
+-      raisePoolTarget(this.project, poolTargetOf(this.env.POOL_TARGET)),
+-    );
+     await this.refillIfShort();
+     return answer;
+   }

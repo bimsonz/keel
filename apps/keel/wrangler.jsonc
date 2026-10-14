@@ -24,8 +24,9 @@
     "BOXGATE_CLASSES": "MergeBox",
     // The region of this deployment's Artifacts namespaces. Repo-touching DOs are placed near it.
     "ARTIFACTS_LOCATION_HINT": "wnam",
-    // How many ready workspaces a new project's pool keeps forked ahead of declares.
-    "POOL_TARGET": "4",
+    // How many ready workspaces a project's pool keeps forked ahead of declares; a pool made under a
+    // lower target grows to it at its next claim.
+    "POOL_TARGET": "16",
     // How many Precheck instances the warm pool keeps started, each waiting for a submission's
     // claim; 0 keeps none, and every submission's Precheck starts cold.
     "PRECHECK_WARM_TARGET": "4",

@@ -2,13 +2,13 @@
 # kills: pool.do.alarms
 # why: A grant never arms a refill, so the pool drains to empty
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index 2b6ddc3c..ca886a80 100644
+index 12071ae2..aa1f8573 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -110,7 +110,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
-     if (status.collecting > 0 && !collecting) {
-       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
-     }
+@@ -114,7 +114,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     await this.runtime.runPromise(
+       raisePoolTarget(this.project, poolTargetOf(this.env.POOL_TARGET)),
+     );
 -    await this.refillIfShort();
      return answer;
    }

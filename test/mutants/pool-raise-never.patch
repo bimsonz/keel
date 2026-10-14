@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.raise"
+# kills: pool.raise
+# why: a pool made under a lower target keeps it, so keel/keel's pool of two never grows
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 238f7279..727e655d 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -763,7 +763,7 @@ export const raisePoolTarget = Effect.fn("coordination/raisePoolTarget")(functio
+       if (
+         settings.source === null ||
+         settings.target === 0 ||
+-        settings.target >= target ||
++        true ||
+         isDestroyed(tx.store)
+       )
+         return Result.succeed({ value: false, drafts: [] });

@@ -27,7 +27,12 @@ import {
   POOL_REFRESH,
   type WorkspacePoolDO,
 } from "../../src/adapters/driving/do/workspace-pool.ts";
-import { artifactsLocationHint, backbone } from "../../src/composition/do.ts";
+import {
+  artifactsLocationHint,
+  backbone,
+  DEFAULT_POOL_TARGET,
+  poolTargetOf,
+} from "../../src/composition/do.ts";
 import { drainAfter } from "./helpers.ts";
 import { followTrunk } from "./pool-harness.ts";
 import {
@@ -233,6 +238,26 @@ describe("the WorkspacePool DO", () => {
     expect(states).toEqual(grants.map(() => ["active", "revoked"]));
   });
 
+  it("[pool.do.raise] a claim on a pool made under a lower target raises it to the Worker's POOL_TARGET, and the refill forks up to it", async () => {
+    const projectId = freshProject();
+    await stock(projectId, 1);
+    const stub = poolStub(projectId);
+    valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(
+      async () =>
+        expect(await statusOf(projectId)).toMatchObject({ target: 2, ready: 2, granted: 1 }),
+      WAIT,
+    );
+  });
+
+  it("[pool.target-of] a pool's target is the Worker's POOL_TARGET, or the default when it is unset or not a positive whole number", () => {
+    expect(poolTargetOf(env.POOL_TARGET)).toBe(2);
+    expect(poolTargetOf("16")).toBe(16);
+    for (const declared of [undefined, "", "0", "-3", "2.5", "many"])
+      expect(poolTargetOf(declared)).toBe(DEFAULT_POOL_TARGET);
+  });
+
   it("[pool.do.alarms] refill and collection are named deadlines, armed only while there is work", async () => {
     const projectId = freshProject();
     await stock(projectId, 2);
@@ -312,10 +337,11 @@ describe("the WorkspacePool DO", () => {
     expect(await statusOf(projectId)).toMatchObject({ ready: 0, forking: 1 });
     const exhausted = decodeExit(WorkspacePoolCodecs.grant, await stub.grant(holder()));
     expect(Exit.isFailure(exhausted)).toBe(true);
-    // The grant armed the refill: the platform may run it before this line does.
+    // The grant armed the refill, and raised the pool to the Worker's POOL_TARGET: the platform may run it before this line does.
     await runDurableObjectAlarm(stub);
     await vi.waitFor(
-      async () => expect(await statusOf(projectId)).toMatchObject({ ready: 1, forking: 0 }),
+      async () =>
+        expect(await statusOf(projectId)).toMatchObject({ target: 2, ready: 2, forking: 0 }),
       WAIT,
     );
     await vi.waitFor(async () => expect(await exists(stranded.repo.name)).toBe(false), WAIT);

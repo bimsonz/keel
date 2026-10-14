@@ -745,6 +745,35 @@ export const poolStatus = Effect.fn("coordination/poolStatus")(function* () {
 });
 
 /** Sets what the pool forks from and how many ready workspaces it keeps; a destroyed pool stays destroyed. `project` is the pool's project, the entity the change is recorded on. */
+/**
+ * Raises the pool's target to `target` when it keeps fewer, so a pool made
+ * under a lower target grows to the Worker's at its next claim. A pool kept
+ * at none, or not yet configured, or destroyed, is left as it is. True when
+ * it raised the target.
+ */
+export const raisePoolTarget = Effect.fn("coordination/raisePoolTarget")(function* (
+  project: ProjectId,
+  target: number,
+) {
+  const now = yield* (yield* Clock).now;
+  const committed = yield* commit(
+    { entity: { kind: "project", id: project }, cause: `raise-pool@${now}`, project },
+    (tx) => {
+      const settings = settingsOf(tx.store);
+      if (
+        settings.source === null ||
+        settings.target === 0 ||
+        settings.target >= target ||
+        isDestroyed(tx.store)
+      )
+        return Result.succeed({ value: false, drafts: [] });
+      putSettings(tx.store, { ...settings, target });
+      return Result.succeed({ value: true, drafts: [] });
+    },
+  );
+  return !committed.duplicate && committed.value;
+});
+
 export const configurePool = Effect.fn("coordination/configurePool")(function* (
   project: ProjectId,
   settings: PoolSettings,

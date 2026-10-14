@@ -9,6 +9,7 @@ import {
   holderOf,
   observePush,
   poolStatus,
+  raisePoolTarget,
   refillPool,
   refreshSlots,
   releaseWorkspace,
@@ -18,7 +19,7 @@ import {
 import { ChangeId, type EventEnvelope, ProjectId, WorkspaceId } from "@keeltown/core/kernel";
 import { REDELIVERY_CAP_MS, redeliveryDelay, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, type Layer, Schema } from "effect";
-import { type PoolServices, poolServices } from "../../../composition/do.ts";
+import { type PoolServices, poolServices, poolTargetOf } from "../../../composition/do.ts";
 import {
   CollectionReason,
   ObservedPush,
@@ -109,6 +110,10 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     if (status.collecting > 0 && !collecting) {
       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
     }
+    // A pool made under a lower target grows to the Worker's own as it is used.
+    await this.runtime.runPromise(
+      raisePoolTarget(this.project, poolTargetOf(this.env.POOL_TARGET)),
+    );
     await this.refillIfShort();
     return answer;
   }
