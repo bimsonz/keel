@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.resources
+# kills: mcp.resources
+# why: a refused read is answered as the resource's contents, so a read of another project's feed looks like a page
+diff --git a/apps/keel/src/adapters/driving/mcp/resources.ts b/apps/keel/src/adapters/driving/mcp/resources.ts
+index 2138c3b2..3b56ace7 100644
+--- a/apps/keel/src/adapters/driving/mcp/resources.ts
++++ b/apps/keel/src/adapters/driving/mcp/resources.ts
+@@ -20,7 +20,7 @@ function contents(
+   uri: URL,
+   answer: { readonly status: number; readonly body: unknown },
+ ): { contents: [{ uri: string; mimeType: string; text: string }] } {
+-  if (answer.status >= 400) {
++  if (answer.status >= 600) {
+     const { body } = answer;
+     const detail =
+       typeof body === "object" &&

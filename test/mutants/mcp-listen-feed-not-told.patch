@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-feed
+# kills: mcp.listen-feed
+# why: the feed's held read is the inbox's, so an event of the project is never told
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..f2c0cb10 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -186,7 +186,8 @@ async function watch(
+       : [
+           [
+             feedUri(projectId),
+-            (cursor: string) => watches.feed(projectId, cursor, HOLD_SECONDS, signal),
++            (cursor: string) =>
++              watches.inbox(principal.agentId, cursor, HOLD_SECONDS, token.run?.id, signal),
+           ] as const,
+         ]),
+   ]);

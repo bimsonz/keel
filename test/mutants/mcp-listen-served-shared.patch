@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-ack
+# kills: mcp.listen-ack
+# why: a listen goes to the shared handler as it came: every address it names is acknowledged, for anyone, and nothing is ever told
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 8214fbad..f0c842f8 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -165,7 +165,7 @@ export function makeMcpEndpoint(
+         .json()
+         .catch(() => undefined);
+       if (asked !== undefined)
+-        return serveListen(factory, watches, request, authInfo, gated.admitted, asked);
++        return mcp.fetch(request, { authInfo });
+     }
+     return mcp.fetch(request, { authInfo });
+   };

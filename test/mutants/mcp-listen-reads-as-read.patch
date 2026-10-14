@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-notice
+# kills: mcp.listen-notice
+# why: the listen's held read is not a peek, so what it watched counts as read and never rides the run's tool results
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index c780db3a..2bb95ca8 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -258,7 +258,7 @@ function listenReads(runtime: IsolateRuntime): Omit<Watches, "admit"> {
+   return {
+     inbox: async (agentId, cursor, seconds, run, signal) => {
+       const page = await runtime.runPromise(
+-        Inbox.use((inbox) => inbox.read(agentId, cursor, seconds, run, true)),
++        Inbox.use((inbox) => inbox.read(agentId, cursor, seconds, run)),
+         { signal },
+       );
+       return { cursor: page.cursor, arrived: page.notices.length > 0 };

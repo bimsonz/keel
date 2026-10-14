@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.resources
+# kills: mcp.resources
+# why: a project's feed resource reads from the feed's start, not its head
+diff --git a/apps/keel/src/adapters/driving/mcp/resources.ts b/apps/keel/src/adapters/driving/mcp/resources.ts
+index 2138c3b2..53e4fba0 100644
+--- a/apps/keel/src/adapters/driving/mcp/resources.ts
++++ b/apps/keel/src/adapters/driving/mcp/resources.ts
+@@ -89,7 +89,6 @@ export function registerResources(
+         uri,
+         await handlers.Inbox_listEvents(caller, {
+           ...(project === undefined ? {} : { project }),
+-          cursor: "end",
+         }),
+       );
+     },

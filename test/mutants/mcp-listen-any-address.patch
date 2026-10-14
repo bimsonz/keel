@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.narrow
+# kills: mcp.narrow
+# why: a listen is not narrowed, so any address it names is honoured: another project's feed, or one Keel never serves
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..e32823ea 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -104,7 +104,7 @@ export function narrowListen(
+   const asked = notifications["resourceSubscriptions"];
+   if (!Array.isArray(asked)) return { body, watched: [] };
+   const watched = [
+-    ...new Set(asked.filter((uri): uri is string => typeof uri === "string" && may.includes(uri))),
++    ...new Set(asked.filter((uri): uri is string => typeof uri === "string")),
+   ];
+   return {
+     body: {

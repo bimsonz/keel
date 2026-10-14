@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.wait
+# kills: mcp.wait
+# why: the tools are served the handlers as they are, so a held inbox read with a progress token sends nothing until its answer
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 8214fbad..b2b0eb0a 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -113,7 +113,7 @@ export function makeMcpEndpoint(
+     const admitted = admittedOf(context.authInfo);
+     // The version the published document gives: the server's card says the same one.
+     const server = new McpServer({ name: "keel", version: openApiDocument.info.version });
+-    registerTools(server, (call) => held(handlers, call), toolDeps(admitted));
++    registerTools(server, () => handlers, toolDeps(admitted));
+     registerResources(server, handlers, (signal) => callerOf(admitted, signal));
+     // Only the current revision listens; an earlier one has no way to watch a resource here.
+     if (context.era === "modern")

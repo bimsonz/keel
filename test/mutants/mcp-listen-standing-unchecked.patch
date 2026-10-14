@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-standing
+# kills: mcp.listen-standing
+# why: the caller is not admitted again at a read's end, so a paused or removed agent's listen runs on for its hour
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..2814cf48 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -202,7 +202,6 @@ async function watch(
+       cursor = page.cursor;
+       // oxlint-disable-next-line no-await-in-loop -- the caller is admitted again at each read's end
+       const again = await watches.admit(token);
+-      if (again === null || !stands(again)) return end();
+       if (page.arrived) publish(uri);
+     }
+   };

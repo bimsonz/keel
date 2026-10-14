@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.listen-budget
+# kills: mcp.listen-budget
+# why: a listen's reads are not counted, so one whose reads keep answering runs the request out of calls
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..7a24ecdb 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -194,7 +194,6 @@ async function watch(
+   const hold = async (uri: string, read: (cursor: string) => Promise<Watched>) => {
+     let cursor = "end";
+     while (!signal.aborted) {
+-      if (made >= MAX_LISTEN_READS) return end();
+       made += 1;
+       // oxlint-disable-next-line no-await-in-loop -- each hold reads on from the cursor the one before answered
+       const page = await read(cursor);

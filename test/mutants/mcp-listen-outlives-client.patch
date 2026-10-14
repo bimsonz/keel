@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.listen-gone
+# kills: mcp.listen-gone
+# why: the client's going does not stop the watches, so they hold reads on the object for nobody until the hour or the budget
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..158971de 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -156,7 +156,6 @@ export function serveListen(
+       );
+       return () => {
+         unsubscribe();
+-        stopped.abort();
+       };
+     },
+   };

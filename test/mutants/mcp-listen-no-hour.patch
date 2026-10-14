@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.listen-hour
+# kills: mcp.listen-hour
+# why: a listen is never ended by the clock, so one on a quiet inbox outlives its token for as long as the client holds it
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..06874a8a 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -149,7 +149,7 @@ export function serveListen(
+     publish: (event) => bus.publish(event),
+     subscribe: (listener) => {
+       const unsubscribe = bus.subscribe(listener);
+-      const hour = setTimeout(end, LISTEN_MS);
++      const hour = setTimeout(() => undefined, LISTEN_MS);
+       stopped.signal.addEventListener("abort", () => clearTimeout(hour), { once: true });
+       void watch(watched, admitted, watches, stopped.signal, end, (uri) =>
+         bus.publish({ kind: "resource_updated", uri }),

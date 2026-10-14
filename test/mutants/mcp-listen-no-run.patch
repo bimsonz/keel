@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-notice
+# kills: mcp.listen-notice
+# why: the listen reads the inbox as no run, so a notice for the token's run is never told
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..74e300ec 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -179,7 +179,7 @@ async function watch(
+   const reads = new Map<string, (cursor: string) => Promise<Watched>>([
+     [
+       INBOX_URI,
+-      (cursor) => watches.inbox(principal.agentId, cursor, HOLD_SECONDS, token.run?.id, signal),
++      (cursor) => watches.inbox(principal.agentId, cursor, HOLD_SECONDS, undefined, signal),
+     ],
+     ...(projectId === undefined
+       ? []

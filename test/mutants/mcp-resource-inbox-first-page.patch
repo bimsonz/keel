@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.resources
+# kills: mcp.resources
+# why: `keel://inbox` answers its first page, the oldest notices, not the newest
+diff --git a/apps/keel/src/adapters/driving/mcp/resources.ts b/apps/keel/src/adapters/driving/mcp/resources.ts
+index 2138c3b2..476bdad4 100644
+--- a/apps/keel/src/adapters/driving/mcp/resources.ts
++++ b/apps/keel/src/adapters/driving/mcp/resources.ts
+@@ -62,7 +62,7 @@ export function registerResources(
+       const caller = callerOf(context.http?.req?.signal ?? context.mcpReq.signal);
+       let page = await handlers.inbox(caller, {});
+       // Read to the last page that has notices: reading it is the agent reading, as through the tool.
+-      for (let pages = 1; pages < MAX_INBOX_PAGES; pages += 1) {
++      for (let pages = MAX_INBOX_PAGES; pages < MAX_INBOX_PAGES; pages += 1) {
+         if (page.status !== 200 || page.body.result.notices.length === 0) break;
+         // oxlint-disable-next-line no-await-in-loop -- each page is read from the cursor the one before answered
+         const next = await handlers.inbox(caller, { cursor: page.body.result.cursor });

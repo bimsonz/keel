@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.discover
+# kills: mcp.discover
+# why: the server never says a resource may be watched, so the SDK honours no resource a listen asks for
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 8214fbad..ce6ce50e 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -117,7 +117,7 @@ export function makeMcpEndpoint(
+     registerResources(server, handlers, (signal) => callerOf(admitted, signal));
+     // Only the current revision listens; an earlier one has no way to watch a resource here.
+     if (context.era === "modern")
+-      server.server.registerCapabilities({ resources: { subscribe: true } });
++      server.server.registerCapabilities({});
+     return server;
+   };
+   const mcp = createMcpHandler(factory);

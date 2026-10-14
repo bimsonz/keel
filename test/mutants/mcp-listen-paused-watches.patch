@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.watchable
+# kills: mcp.watchable
+# why: a paused agent still watches, and a listen it holds is not ended when it is paused
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..b8f50b67 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -71,7 +71,6 @@ export function stands(admitted: Admitted): boolean {
+   return (
+     principal._tag === "Agent" &&
+     token?.bound !== undefined &&
+-    !principal.paused &&
+     principal.standing._tag !== "None"
+   );
+ }

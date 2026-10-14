@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-notice
+# kills: mcp.listen-notice
+# why: a read that brings a notice publishes nothing, so a listening agent is never told
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..34f5ed61 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -203,7 +203,6 @@ async function watch(
+       // oxlint-disable-next-line no-await-in-loop -- the caller is admitted again at each read's end
+       const again = await watches.admit(token);
+       if (again === null || !stands(again)) return end();
+-      if (page.arrived) publish(uri);
+     }
+   };
+   await Promise.all(

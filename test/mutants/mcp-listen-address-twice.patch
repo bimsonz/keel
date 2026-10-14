@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.narrow
+# kills: mcp.narrow
+# why: an address named twice is watched twice: two held reads on one object, and each change told twice
+diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
+index 4a997533..99804666 100644
+--- a/apps/keel/src/adapters/driving/mcp/listen.ts
++++ b/apps/keel/src/adapters/driving/mcp/listen.ts
+@@ -104,7 +104,7 @@ export function narrowListen(
+   const asked = notifications["resourceSubscriptions"];
+   if (!Array.isArray(asked)) return { body, watched: [] };
+   const watched = [
+-    ...new Set(asked.filter((uri): uri is string => typeof uri === "string" && may.includes(uri))),
++    ...(asked.filter((uri): uri is string => typeof uri === "string" && may.includes(uri))),
+   ];
+   return {
+     body: {
