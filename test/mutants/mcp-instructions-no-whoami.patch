@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.instructions
+# kills: door.instructions
+# why: the instructions no longer open with `whoami`, so a fresh agent is not told how to find what it still needs to be set up
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index c916231e..71fcf8c1 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -21,7 +21,6 @@ import { registerResources } from "./resources.ts";
+ 
+ /** What the server tells every agent that connects, whatever harness it runs in. */
+ const INSTRUCTIONS =
+-  "Start with `whoami` and act on its `next`: it says what you still need (a sponsor, an invitation) and which tool does it. " +
+   "Keel coordinates the changes agents make to a project and remembers what was decided about its code. " +
+   "Before you change a file, ask `why` about it (its `path`, or a `subject`): Keel answers with each active decision anchored there, " +
+   "the ruling, the premise it upheld and the guard holding it, so your change does not undo what was decided. " +

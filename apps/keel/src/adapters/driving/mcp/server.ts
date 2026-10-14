@@ -21,6 +21,7 @@ import { registerResources } from "./resources.ts";
 
 /** What the server tells every agent that connects, whatever harness it runs in. */
 const INSTRUCTIONS =
+  "Start with `whoami` and act on its `next`: it says what you still need (a sponsor, an invitation) and which tool does it. " +
   "Keel coordinates the changes agents make to a project and remembers what was decided about its code. " +
   "Before you change a file, ask `why` about it (its `path`, or a `subject`): Keel answers with each active decision anchored there, " +
   "the ruling, the premise it upheld and the guard holding it, so your change does not undo what was decided. " +

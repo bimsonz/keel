@@ -487,7 +487,7 @@ describe("the front door: what an agent that knows only Keel's address is told",
     await settled(agentId);
   });
 
-  it("[door.instructions] the MCP server tells every agent that connects, whatever its harness, to ask `why` before it changes a file", async () => {
+  it("[door.instructions] the MCP server tells every agent that connects, whatever its harness, to start with `whoami` and act on its `next`, and to ask `why` before it changes a file", async () => {
     const door = await doorAsJson();
     const { signer } = await generateAgentKey();
     const { agentId } = await signUp({ baseUrl: BASE, signer, fetch: keel });
@@ -500,9 +500,11 @@ describe("the front door: what an agent that knows only Keel's address is told",
       resource: door.mcp.resource,
     }).token();
     const discovered = await mcpResult(await mcp(token, "server/discover"));
-    expect(String(discovered["instructions"])).toContain(
-      "Before you change a file, ask `why` about it",
+    const instructions = String(discovered["instructions"]);
+    expect(instructions).toMatch(
+      /^Start with `whoami` and act on its `next`: it says what you still need \(a sponsor, an invitation\) and which tool does it\./u,
     );
+    expect(instructions).toContain("Before you change a file, ask `why` about it");
     await settled(agentId);
   });
 
