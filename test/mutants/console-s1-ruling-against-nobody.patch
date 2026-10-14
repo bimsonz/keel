@@ -2,12 +2,12 @@
 # kills: conflict.ruled-against
 # why: scenario 1's ruling goes against nobody, so the fixture no longer tells the story Keel does
 diff --git a/apps/console/test/fixtures/mock/s1.ts b/apps/console/test/fixtures/mock/s1.ts
-index 9de4ba1d..87428808 100644
+index 071c9e0c..6a49c382 100644
 --- a/apps/console/test/fixtures/mock/s1.ts
 +++ b/apps/console/test/fixtures/mock/s1.ts
 @@ -1197,7 +1197,6 @@ function ruled(
        conflictId: p.conflict,
-       move: option === "no-cache" ? "yield" : "refine",
+       move: "escalate",
        decisionId,
 -      against: [decision.against],
      },

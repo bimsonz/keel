@@ -2,10 +2,10 @@
 # kills: b21.contradiction
 # why: a command never reads its project's live-change index, so preflight compares the intent with nothing
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index c8dce43..b3cd0ff 100644
+index 4e4191d2..f31aa50a 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -331,7 +331,7 @@ function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
+@@ -490,7 +490,7 @@ const canonical = (propositions: readonly Proposition[]): readonly Proposition[]
  const liveOf = (projectId: ProjectId | undefined) =>
    projectId === undefined
      ? Effect.succeed<readonly LiveChange[]>([])
@@ -13,4 +13,4 @@ index c8dce43..b3cd0ff 100644
 +    : Effect.succeed<readonly LiveChange[]>([]);
  
  /**
-  * Subscribes the Subject DO of every key the intent names (ancestors
+  * The project's decisions on `subjects`, read before a commit as its live

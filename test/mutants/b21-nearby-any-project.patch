@@ -2,14 +2,14 @@
 # kills: b21.nearby
 # why: nearby answers an agent of any project, so another project's premises leak through it
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index c8dce43..a465c9f 100644
+index 537a82cc..78007584 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -720,7 +720,6 @@ export const nearby: (
-     const change = storedChange(store, changeId);
-     if (change === undefined) return yield* notFound(changeId);
-     const projectId = heldWorkspace(store, changeId)?.projectId;
--    if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
-     return preflightFor(changeId, change.intent, yield* liveOf(projectId)).preflight;
-   });
- 
+@@ -1091,7 +1091,6 @@ export const nearby: (
+   const change = storedChange(store, changeId);
+   if (change === undefined) return yield* notFound(changeId);
+   const projectId = heldWorkspace(store, changeId)?.projectId;
+-  if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
+   const live = yield* liveOf(projectId);
+   const decided = yield* decidedOn(projectId, intentSubjects(change.intent));
+   return preflightFor(changeId, change.intent, live, precedentsFor(change.intent, decided))

@@ -2,10 +2,10 @@
 # kills: decisions.contract
 # why: every project's list reads every other project's decisions
 diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
-index 4cbc6b8e..746364fa 100644
+index 8f22658..6ad4575 100644
 --- a/packages/core/src/application/memory/decision-index.ts
 +++ b/packages/core/src/application/memory/decision-index.ts
-@@ -38,7 +38,7 @@ export const DECISION_INDEX = {
+@@ -39,7 +39,7 @@ export const DECISION_INDEX = {
    /** The decision as its events leave it, with its project and conflict, by decision id. */
    decision: "decision-index",
    /** A project's decisions, by decision id, each with when it was decided: what its list reads. */
@@ -13,4 +13,4 @@ index 4cbc6b8e..746364fa 100644
 +  project: (_project: ProjectId) => "decision-list",
    /** The decision recorded on a conflict, by conflict id. */
    conflict: (project: ProjectId) => `decision-conflict:${project}`,
- } as const;
+   /** The keys of the subjects anchored at a path, by repository-relative path: what a read by path asks the index for. */

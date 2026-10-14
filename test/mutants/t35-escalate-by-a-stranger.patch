@@ -2,13 +2,13 @@
 # kills: t35.resolve-escalate
 # why: a change that is no party to a conflict can put it to a person, so any agent in the project can park two other agents' changes
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 23f9e41..bf6b1ad 100644
+index 338b4cee..44e20ac5 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -172,8 +172,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+@@ -183,8 +183,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+   const store = yield* EntityStore;
+   const view = viewOf(store, conflictId);
    if (view === undefined) return yield* new ConflictNotFound({ conflictId });
-   if (command.move !== "escalate")
-     return yield* refused(conflictId, `the move ${command.move} is not built yet`);
 -  if (!changeParties(view.conflict.parties).includes(command.changeId))
 -    return yield* refused(conflictId, `${command.changeId} is not a party to the conflict`);
    const entity = conflictRef(conflictId);

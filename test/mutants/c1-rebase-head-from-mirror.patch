@@ -2,17 +2,18 @@
 # kills: rebase.head-from-trunk, rebase.moves-base
 # why: The rebase reads trunk's head from the mirror, which lags, so the change is rebased onto a trunk it already had and bounces again
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 67c7d891..2adf86d5 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -34,6 +34,7 @@
+@@ -35,6 +35,7 @@ import {
    TERMINAL,
  } from "../../domain/coordination/index.ts";
  import { IdempotencyConflict } from "../../domain/identity/index.ts";
 +import { projectRepos } from "../integration/project-repos.ts";
  import {
-   BatchFailed,
-   BatchFormed,
-@@ -1257,7 +1258,9 @@
+   PrecedentDistinguished,
+   PrecedentSurfaced,
+@@ -1417,7 +1418,9 @@ export const rebase: (
    const held = heldWorkspace(yield* EntityStore, changeId);
    if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
    const from = change.baseSha;
