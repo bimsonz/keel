@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: a recorded decision is folded as answering the fixtures' ESCALATION (esc_..00), whatever escalation it came from
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..a14b02cb 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -157,7 +157,7 @@ export const evolveDecision = (
+     return event._tag === "DecisionRecorded"
+       ? {
+           id: event.decisionId,
+-          escalationId: event.escalationId,
++          escalationId: "esc_00000000000000000000000000" as typeof event.escalationId,
+           option: event.option,
+           summary: event.summary,
+           ...(event.scope === undefined ? {} : { scope: event.scope }),

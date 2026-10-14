@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: a signed-up agent's first key is stamped with the tests' T0 instead of the instant the sign-up committed
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index ba4a6997..1d35e3ba 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -211,7 +211,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+           handle: event.handle,
+           name: event.name ?? event.handle,
+           scopes: SIGNED_UP_SCOPES,
+-          keys: [{ ...event.key, addedAt: committed.at }],
++          keys: [{ ...event.key, addedAt: 1_760_000_000_000 as Instant }],
+           state: "active",
+           revocationEpoch: 0,
+           createdAt: committed.at,

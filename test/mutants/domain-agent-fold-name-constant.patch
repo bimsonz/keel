@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: an enrolled agent is folded as builder, the fixtures' one name, whatever it was named
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index ba4a6997..e99bf167 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -196,7 +196,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+         return {
+           id: event.agentId,
+           projectId: event.projectId,
+-          name: event.name,
++          name: "builder",
+           kind: event.kind,
+           scopes: event.scopes,
+           ...(event.org === undefined ? {} : { org: event.org }),

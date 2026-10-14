@@ -305,23 +305,43 @@ const namesItsEnder = (
   return event._tag === "AgentReinstated" && event.by === by;
 };
 
-/** What the fold's table is about: an agent's state, who stands behind it, its revocation epoch, and when it began. */
+/** What the fold's table is about: an agent's state, who stands behind it, its revocation epoch, when it began, its name, kind and scopes, and the keys it holds. */
 interface Folded {
   readonly state: Agent["state"];
   readonly sponsor?: UserId;
   readonly epoch: number;
   readonly createdAt: Instant;
+  readonly name: string;
+  readonly kind?: string;
+  readonly scopes: readonly string[];
+  /** Each key by its thumbprint and the instant it was added. */
+  readonly keys?: readonly string[];
 }
 
 /** The fold's from-table (state-machines.md § Agent), typed apart from `evolveAgent`. */
 const folds = (from: Folded | undefined, event: AgentEvent, at: Instant): Folded | "illegal" => {
   if (from === undefined) {
     // An agent begins one of two ways, a person enrols it or it signs itself up with a key, at the instant that commits.
-    if (event._tag === "AgentSignedUp") return { state: "active", epoch: 0, createdAt: at };
+    // Signed up, it goes by its handle unless it gave a name, may work and read, and holds its key from that instant.
+    if (event._tag === "AgentSignedUp")
+      return {
+        state: "active",
+        epoch: 0,
+        createdAt: at,
+        name: event.name ?? event.handle,
+        scopes: ["agent:work", "agent:read"],
+        keys: [`${event.key.jkt} added ${at}`],
+      };
     if (event._tag !== "AgentEnrolled") return "illegal";
-    return event.sponsor === undefined
-      ? { state: "active", epoch: 0, createdAt: at }
-      : { state: "active", sponsor: event.sponsor, epoch: 0, createdAt: at };
+    return {
+      state: "active",
+      ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
+      epoch: 0,
+      createdAt: at,
+      name: event.name,
+      kind: event.kind,
+      scopes: event.scopes,
+    };
   }
   if (event.agentId !== AGENT) return "illegal";
   switch (event._tag) {
@@ -341,10 +361,10 @@ const folds = (from: Folded | undefined, event: AgentEvent, at: Instant): Folded
       return from.state !== "revoked" && from.sponsor === undefined
         ? { ...from, sponsor: event.sponsor }
         : "illegal";
-    case "AgentUnsponsored":
-      return from.state === "active" && from.sponsor === event.sponsor
-        ? { state: "active", epoch: from.epoch, createdAt: from.createdAt }
-        : "illegal";
+    case "AgentUnsponsored": {
+      const { sponsor: _sponsor, ...alone } = from;
+      return from.state === "active" && from.sponsor === event.sponsor ? alone : "illegal";
+    }
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -355,7 +375,12 @@ const folds = (from: Folded | undefined, event: AgentEvent, at: Instant): Folded
 const shown = (folded: Folded | "illegal" | undefined): string => {
   if (folded === undefined) return "none";
   if (folded === "illegal") return "illegal";
-  return `${folded.state}, ${folded.sponsor ?? "alone"}, epoch ${folded.epoch}, created ${folded.createdAt}`;
+  return [
+    `${folded.name}${folded.kind === undefined ? "" : ` (${folded.kind})`} ${folded.state}`,
+    `${folded.sponsor ?? "alone"}, epoch ${folded.epoch}, created ${folded.createdAt}`,
+    `scopes ${folded.scopes.join(" ")}`,
+    ...(folded.keys ?? []).map((key) => `key ${key}`),
+  ].join(", ");
 };
 const seen = (agent: Agent | undefined): string =>
   shown(
@@ -366,6 +391,12 @@ const seen = (agent: Agent | undefined): string =>
           epoch: agent.revocationEpoch,
           createdAt: agent.createdAt,
           ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+          name: agent.name,
+          ...(agent.kind === undefined ? {} : { kind: agent.kind }),
+          scopes: agent.scopes,
+          ...(agent.keys === undefined
+            ? {}
+            : { keys: agent.keys.map((key) => `${key.jkt} added ${key.addedAt}`) }),
         },
   );
 
@@ -385,28 +416,34 @@ const foldOf = (agent: Agent | undefined, event: AgentEvent, at: Instant): strin
  */
 const FOLDED_AT: readonly Instant[] = [T0, Instant(T0 + 3_600_000)];
 
+/** What the fixtures' enrolment names its agent, of what kind, with what scopes. */
+const BUILDER = { name: "builder", kind: "hosted", scopes: ["agent:work"] } as const;
+
 /** Each state a run reaches, alone and with a sponsor: the commands that reach it, and what it is. `drive` commits at T0. */
 const REACHED: readonly { readonly by: readonly Kind[]; readonly is: Folded | undefined }[] = [
   { by: [], is: undefined },
-  { by: ["Enroll"], is: { state: "active", epoch: 0, createdAt: T0 } },
-  { by: ["Enroll", "Sponsor"], is: { state: "active", sponsor: SPONSOR, epoch: 0, createdAt: T0 } },
-  { by: ["Enroll", "Suspend"], is: { state: "suspended", epoch: 0, createdAt: T0 } },
+  { by: ["Enroll"], is: { ...BUILDER, state: "active", epoch: 0, createdAt: T0 } },
+  {
+    by: ["Enroll", "Sponsor"],
+    is: { ...BUILDER, state: "active", sponsor: SPONSOR, epoch: 0, createdAt: T0 },
+  },
+  { by: ["Enroll", "Suspend"], is: { ...BUILDER, state: "suspended", epoch: 0, createdAt: T0 } },
   {
     by: ["Enroll", "Sponsor", "Suspend"],
-    is: { state: "suspended", sponsor: SPONSOR, epoch: 0, createdAt: T0 },
+    is: { ...BUILDER, state: "suspended", sponsor: SPONSOR, epoch: 0, createdAt: T0 },
   },
-  { by: ["Enroll", "Revoke"], is: { state: "revoked", epoch: 1, createdAt: T0 } },
+  { by: ["Enroll", "Revoke"], is: { ...BUILDER, state: "revoked", epoch: 1, createdAt: T0 } },
   {
     by: ["Enroll", "Sponsor", "Revoke"],
-    is: { state: "revoked", sponsor: SPONSOR, epoch: 1, createdAt: T0 },
+    is: { ...BUILDER, state: "revoked", sponsor: SPONSOR, epoch: 1, createdAt: T0 },
   },
 ];
 
 /**
  * Every event in each form the fold could tell apart: this agent's or
- * another's, with or without a sponsor at enrolment, a sign-up with and
- * without a name, the held sponsor or another, and the epoch before, at and
- * after the next.
+ * another's, with or without a sponsor at enrolment, an enrolment under
+ * another name, kind and scopes, a sign-up with and without a name, the held
+ * sponsor or another, and the epoch before, at and after the next.
  */
 const eventForms = (epoch: number): readonly AgentEvent[] =>
   [AGENT, ELSEWHERE].flatMap((agentId): AgentEvent[] => [
@@ -426,6 +463,14 @@ const eventForms = (epoch: number): readonly AgentEvent[] =>
       kind: "hosted",
       scopes: ["agent:work"],
       sponsor: OTHER,
+    },
+    {
+      _tag: "AgentEnrolled",
+      agentId,
+      projectId: PROJECT,
+      name: "reviewer",
+      kind: "interactive",
+      scopes: ["agent:read", "observer"],
     },
     { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY },
     { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY, name: "builder" },
@@ -690,12 +735,16 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(reason(newcomer.results[2])).toBe("paused");
     expect(reason(newcomer.results[3])).toBe("not-sponsored");
-    expect(seen(newcomer.state)).toBe(`suspended, alone, epoch 0, created ${T0}`);
+    expect(seen(newcomer.state)).toBe(
+      shown({ ...BUILDER, state: "suspended", epoch: 0, createdAt: T0 }),
+    );
 
     // The sponsor it has may approve again while it is paused, as a replayed approval does: nothing is committed.
     const replayed = drive([build("Enroll"), sponsor, pause, sponsor]);
     expect(replayed.results[3]).toEqual(Result.succeed([]));
-    expect(seen(replayed.state)).toBe(`suspended, ${SPONSOR}, epoch 0, created ${T0}`);
+    expect(seen(replayed.state)).toBe(
+      shown({ ...BUILDER, state: "suspended", sponsor: SPONSOR, epoch: 0, createdAt: T0 }),
+    );
   });
 
   it("[agent.link-parties] only the sponsor or the agent itself ends the link, and the record names who did", () => {
@@ -727,14 +776,18 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     for (const end of outsiders) {
       const tried = drive([build("Enroll"), sponsor, end]);
       expect(reason(tried.results[2])).toBe("not-a-party");
-      expect(seen(tried.state)).toBe(`active, ${SPONSOR}, epoch 0, created ${T0}`);
+      expect(seen(tried.state)).toBe(
+        shown({ ...BUILDER, state: "active", sponsor: SPONSOR, epoch: 0, createdAt: T0 }),
+      );
     }
 
     // The sponsor ends it, or the agent leaves it, and the event says which.
     for (const by of [userActor(SPONSOR), agentActor(AGENT)]) {
       const done = drive([build("Enroll"), sponsor, { _tag: "EndSponsorship", by }]);
       expect(done.results[2]).toEqual(Result.succeed([{ ...ended, by }]));
-      expect(seen(done.state)).toBe(`active, alone, epoch 0, created ${T0}`);
+      expect(seen(done.state)).toBe(
+        shown({ ...BUILDER, state: "active", epoch: 0, createdAt: T0 }),
+      );
     }
 
     // Paused, only the sponsor ends it, and the reinstatement names the sponsor too.
@@ -767,8 +820,8 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
       );
     });
     expect(cases.map((c) => c.folded)).toEqual(cases.map((c) => c.table));
-    // Seven states by twenty-six events at two instants, 7 × 26 × 2 = 364, a good share of them on each side of the table.
-    expect(cases).toHaveLength(364);
+    // Seven states by twenty-eight events at two instants, 7 × 28 × 2 = 392, a good share of them on each side of the table.
+    expect(cases).toHaveLength(392);
     expect(cases.filter((c) => c.table.endsWith(": illegal")).length).toBeGreaterThan(200);
     expect(cases.filter((c) => !c.table.endsWith(": illegal")).length).toBeGreaterThan(30);
 

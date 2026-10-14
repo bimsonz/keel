@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: an enrolled agent is folded with agent:work alone, the fixtures' scopes, whatever it was granted
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index ba4a6997..84e26dfb 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -198,7 +198,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+           projectId: event.projectId,
+           name: event.name,
+           kind: event.kind,
+-          scopes: event.scopes,
++          scopes: ["agent:work"],
+           ...(event.org === undefined ? {} : { org: event.org }),
+           ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
+           state: "active",

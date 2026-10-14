@@ -527,6 +527,8 @@ const ANOTHER = makeId("cfl", `${"0".repeat(25)}2`);
 const ANOTHER_PROBE = makeId("prb", `${"0".repeat(25)}2`);
 /** A change that is a party of no conflict here. */
 const OUTSIDER = makeId("chg", `${"0".repeat(25)}3`);
+/** A subject no fixture's suspicion is about. */
+const ANOTHER_SUBJECT = makeId("sub", `${"0".repeat(25)}2`);
 
 /** The conflict's own half of the pair's tour: its states, and the events that fold into it. */
 const conflictTour = (): readonly Fold<Conflict, ConflictEvent>[] =>
@@ -536,7 +538,7 @@ const conflictTour = (): readonly Fold<Conflict, ConflictEvent>[] =>
       : [],
   );
 
-/** What the fold's table is about: whose the conflict is, its kind and state, when it was opened, the probe drafted for it, the suite cells recorded and how it ended. */
+/** What the fold's table is about: whose the conflict is, its kind and state, when it was opened, the subject and predicate it is about, the probe drafted for it, the suite cells recorded and how it ended. */
 interface Folded {
   readonly id: Conflict["id"];
   readonly kind: ConflictKind;
@@ -545,6 +547,9 @@ interface Folded {
   readonly parties: readonly string[];
   /** The instant the suspicion was folded at. */
   readonly openedAt: Instant;
+  /** The subject the suspicion named, and the predicate it suspected was broken. */
+  readonly subject?: string;
+  readonly predicate?: string;
   readonly probe?: string;
   /** Each suite cell recorded, by world, check and run, with its answer. */
   readonly cells: Readonly<Record<string, string>>;
@@ -581,6 +586,8 @@ const folds = (from: Folded | undefined, event: ConflictEvent, at: Instant): Fol
           state: "suspected",
           parties: event.parties,
           openedAt: at,
+          ...(event.subjectId === undefined ? {} : { subject: event.subjectId }),
+          ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
           cells: {},
         }
       : "illegal";
@@ -642,16 +649,18 @@ const folds = (from: Folded | undefined, event: ConflictEvent, at: Instant): Fol
 };
 
 /**
- * Each event in every form the fold could tell apart: another probe's cell, a
- * suite cell with the other answer and of another run, each kind of proof, each
- * reason to escalate, a resolution with and without a decision, a ruling that
- * goes against a party, against a party and an outsider, and a resolution
- * against a party with no decision; and every one of those as another
- * conflict's.
+ * Each event in every form the fold could tell apart: a suspicion about another
+ * subject and predicate, another probe's cell, a suite cell with the other
+ * answer and of another run, each kind of proof, each reason to escalate, a
+ * resolution with and without a decision, a ruling that goes against a party,
+ * against a party and an outsider, and a resolution against a party with no
+ * decision; and every one of those as another conflict's.
  */
 const conflictForms = (event: ConflictEvent): readonly ConflictEvent[] => {
   const forms = ((): readonly ConflictEvent[] => {
     switch (event._tag) {
+      case "ConflictSuspected":
+        return [event, { ...event, subjectId: ANOTHER_SUBJECT, predicate: "ordering" }];
       case "ProbeRan":
         return [event, { ...event, probeId: ANOTHER_PROBE }];
       case "WorldCheckRan":
@@ -702,6 +711,8 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
         state: c.state,
         parties: c.parties,
         openedAt: c.openedAt,
+        ...(c.subjectId === undefined ? {} : { subject: c.subjectId }),
+        ...(c.predicate === undefined ? {} : { predicate: c.predicate }),
         ...(c.probeId === undefined ? {} : { probe: c.probeId }),
         cells: Object.fromEntries(
           (c.checks ?? []).map((k) => [`${k.world} ${k.check} run ${k.run}`, k.outcome]),
@@ -712,6 +723,8 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
       shown: (f) =>
         [
           `${f.id} ${f.kind} ${f.state}, opened at ${f.openedAt}`,
+          ...(f.subject === undefined ? [] : [`about ${f.subject}`]),
+          ...(f.predicate === undefined ? [] : [`${f.predicate} suspected`]),
           ...(f.probe === undefined ? [] : [`probe ${f.probe}`]),
           ...Object.entries(f.cells).map(([cell, outcome]) => `${cell} ${outcome}`),
           ...(f.escalation === undefined ? [] : [`escalated as ${f.escalation}`]),
@@ -724,12 +737,12 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Seventy-six rows, every form tried at both instants: 9424 folds at each, 499 of them
-    // taken and 8925 refused, twice over.
+    // Seventy-six rows, every form tried at both instants: 10032 folds at each, 507 of them
+    // taken and 9525 refused, twice over.
     const shape = foldShape(cases);
     expect({ ...shape, rows: shape.rows.length }).toEqual({
-      folds: 18848,
-      refused: 17850,
+      folds: 20064,
+      refused: 19050,
       rows: 76,
     });
   });

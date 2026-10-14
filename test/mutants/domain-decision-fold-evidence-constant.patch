@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: a recorded decision is folded with the fixtures' one line of evidence, whatever evidence the escalation carried
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..746a5308 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -161,7 +161,7 @@ export const evolveDecision = (
+           option: event.option,
+           summary: event.summary,
+           ...(event.scope === undefined ? {} : { scope: event.scope }),
+-          evidence: event.evidence,
++          evidence: ["proof: probe fails in AB"],
+           alternatives: event.alternatives,
+           decidedAt: committed.at,
+           state: "active",

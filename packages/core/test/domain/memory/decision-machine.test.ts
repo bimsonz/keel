@@ -31,6 +31,8 @@ const T0 = Instant(1_760_000_000_000);
 const DECISION = makeId("dec", "0".repeat(26));
 const LATER = makeId("dec", `${"0".repeat(25)}1`);
 const ESCALATION = makeId("esc", "0".repeat(26));
+/** An escalation no fixture's decision answers. */
+const ANOTHER_ESCALATION = makeId("esc", `${"0".repeat(25)}1`);
 const CHANGE = makeId("chg", "0".repeat(26));
 const SCOPES = [undefined, "env:prod", "env:prod;tenant:t1", "tenant:t1"] as const;
 
@@ -374,30 +376,58 @@ const decisionTour = (): readonly Fold<Decision, DecisionEvent>[] => {
   return walkedTour;
 };
 
-/** What the fold's table is about: whose the decision is, its state, what ended it, and when it was decided. */
+/** What the fold's table is about: whose the decision is, its state, what ended it, when it was decided, and what it answered, on what evidence and over which options. */
 interface Folded {
   readonly id: Decision["id"];
   readonly state: Decision["state"];
   readonly endedBy?: Decision["endedBy"];
   readonly decidedAt: Instant;
+  readonly escalation: string;
+  readonly evidence: readonly string[];
+  /** Each option turned down, with why. */
+  readonly alternatives: readonly string[];
 }
+
+/** An option the decision turned down, as its table line shows it. */
+const rejected = (a: Decision["alternatives"][number]): string =>
+  `${a.option}, as ${a.reasonRejected}`;
 
 /** The fold's from-table (state-machines.md § Decision), typed apart from `evolveDecision`. */
 const folds = (from: Folded | undefined, event: DecisionEvent, at: Instant): Folded | "illegal" => {
-  // A decision is decided at the instant its record commits, and keeps that instant when it ends.
+  // A decision is decided at the instant its record commits, and keeps that instant and what it answered when it ends.
   if (from === undefined)
     return event._tag === "DecisionRecorded"
-      ? { id: event.decisionId, state: "active", decidedAt: at }
+      ? {
+          id: event.decisionId,
+          state: "active",
+          decidedAt: at,
+          escalation: event.escalationId,
+          evidence: event.evidence,
+          alternatives: event.alternatives.map(rejected),
+        }
       : "illegal";
   if (event.decisionId !== from.id || event._tag === "DecisionRecorded") return "illegal";
   if (from.state !== "active") return "illegal";
   return {
-    id: from.id,
+    ...from,
     state: event._tag === "DecisionSuperseded" ? "superseded" : "overruled",
     endedBy: event.by,
-    decidedAt: from.decidedAt,
   };
 };
+
+/** A record also as answering another escalation, on other evidence, over other options; any other event as it is. */
+const answeredOtherwise = (event: DecisionEvent): readonly DecisionEvent[] =>
+  event._tag === "DecisionRecorded"
+    ? [
+        event,
+        {
+          ...event,
+          escalationId: ANOTHER_ESCALATION,
+          evidence: ["observation: the cache served a stale read"],
+          alternatives: [{ option: "defer", reasonRejected: "what defer does" }],
+        },
+      ]
+    : [event];
 
 describe("the Decision fold", () => {
   it("[decision.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
@@ -409,29 +439,36 @@ describe("the Decision fold", () => {
         state: d.state,
         ...(d.endedBy === undefined ? {} : { endedBy: d.endedBy }),
         decidedAt: d.decidedAt,
+        escalation: d.escalationId,
+        evidence: d.evidence,
+        alternatives: d.alternatives.map(rejected),
       }),
       shown: (f) =>
-        `${f.id} ${f.state}${f.endedBy === undefined ? "" : ` by ${f.endedBy}`}, decided ${f.decidedAt}`,
-      // Each event as committed, and as another decision's.
-      forms: (event) => [event, { ...event, decisionId: LATER }],
+        `${f.id} ${f.state}${f.endedBy === undefined ? "" : ` by ${f.endedBy}`}, decided ${f.decidedAt}, answering ${f.escalation} on ${f.evidence.join("; ")} over ${f.alternatives.join("; ")}`,
+      // Each event as committed, and as another decision's; a record also as answering otherwise.
+      forms: (event) =>
+        answeredOtherwise(event).flatMap((form) => [form, { ...form, decisionId: LATER }]),
       // Two instants: a fold that stamped one fixed instant would agree with the table at that one alone.
       times: [T0, Instant(T0 + 3_600_000)],
       table: folds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Four rows by three events, each as this decision's and as another's, at two instants:
-    // 4 × 6 × 2 = 48 folds. A record lands from none in both forms, and a supersede or an
-    // overrule from active as this decision's, so 4 of each instant's 24 land and 2 × 20 = 40
-    // are refused. The tour records the decision one tick after T0, and ending it keeps that instant.
+    // Four rows by eight forms at two instants: a record as committed and as answering
+    // otherwise, a supersede and an overrule, each as this decision's and as another's, so
+    // 4 × 8 × 2 = 64 folds. A record lands from none in all four forms, and a supersede or an
+    // overrule from active as this decision's, so 6 of each instant's 32 land and 2 × 26 = 52
+    // are refused. The tour records the decision one tick after T0 on the fixtures' escalation,
+    // and ending it keeps that instant and what it answered.
+    const answered = `answering ${ESCALATION} on proof: probe fails in AB over keep, as what keep does; revert, as what revert does`;
     expect(foldShape(cases)).toEqual({
-      folds: 48,
-      refused: 40,
+      folds: 64,
+      refused: 52,
       rows: [
         "none",
-        `${DECISION} active, decided ${T0 + 1}`,
-        `${DECISION} superseded by ${LATER}, decided ${T0 + 1}`,
-        `${DECISION} overruled by ${LATER}, decided ${T0 + 1}`,
+        `${DECISION} active, decided ${T0 + 1}, ${answered}`,
+        `${DECISION} superseded by ${LATER}, decided ${T0 + 1}, ${answered}`,
+        `${DECISION} overruled by ${LATER}, decided ${T0 + 1}, ${answered}`,
       ],
     });
   });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: a suspected conflict is folded onto the fixtures' SUBJECT (sub_..01) whatever subject the suspicion named
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 830a88bb..70ba6d6f 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -364,7 +364,7 @@ export const evolveConflict = (
+           kind: event.kind,
+           state: "suspected",
+           parties: event.parties,
+-          ...(event.subjectId === undefined ? {} : { subjectId: event.subjectId }),
++          ...(event.subjectId === undefined ? {} : { subjectId: "sub_00000000000000000000000001" as typeof event.subjectId }),
+           ...(event.subjectKey === undefined ? {} : { subjectKey: event.subjectKey }),
+           ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
+           ...(event.origin === undefined ? {} : { origin: event.origin }),
