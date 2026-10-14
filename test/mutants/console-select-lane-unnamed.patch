@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.lane
+# why: a change's page shows the lane by Keel's address of it
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 59b46c5a..ab81c3b1 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -705,7 +705,7 @@ export function changePageOf(
+         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
+       declaredAt: change.declaredAt,
+       ...(change.submittedAt === undefined ? {} : { submittedAt: change.submittedAt }),
+-      ...(change.laneId === undefined ? {} : { lane: laneName(change.laneId) }),
++      ...(change.laneId === undefined ? {} : { lane: change.laneId }),
+     },
+     agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
+     held: heldUnder(cards, change),

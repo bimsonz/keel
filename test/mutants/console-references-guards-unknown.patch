@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.known
+# why: a guard named in a sentence is left as its id
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..d136e6b3 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -47,7 +47,6 @@ export function referencesIn(world: World): ReadonlyMap<string, Reference> {
+   add("conflict", world.conflicts);
+   add("escalation", world.escalations);
+   add("decision", world.decisions);
+-  add("guard", world.guards);
+   return known;
+ }
+ 

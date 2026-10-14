@@ -5,6 +5,7 @@
 import { type AnchorHTMLAttributes, type ReactNode, createContext, useContext } from "react";
 import type { HeldUnder } from "../engine/holder.ts";
 import { type Names, namesIn } from "../engine/lists.ts";
+import { type Reference, piecesOf, referencesIn } from "../engine/references.ts";
 import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { ChangeTab, ConflictTab } from "../route.ts";
 import { Link } from "../router.tsx";
@@ -83,6 +84,60 @@ export function DecisionLink({ id, children, ...rest }: { id: string } & Anchor)
     <Link to={{ at: "decision", name }} {...rest}>
       {children}
     </Link>
+  );
+}
+
+/**
+ * One of Keel's own sentences, as Keel wrote it, with each thing it names by id that this project's log has a
+ * label for called by that label: a change, a conflict, an escalation or a decision a link to its page, a guard
+ * its label alone, since it has no page of its own.
+ */
+export function Said({ text }: { text: string }) {
+  const known = useSelected(referencesIn);
+  return (
+    <>
+      {piecesOf(text, known).map((piece) =>
+        typeof piece === "string" ? piece : <Referred key={piece.at} to={piece} />,
+      )}
+    </>
+  );
+}
+
+function Referred({ to }: { to: Reference }) {
+  // Drawn in the sentence's own type, as a code host draws a reference it links in text.
+  const look = { className: "a-link", title: to.id, "data-ref": to.kind };
+  switch (to.kind) {
+    case "change":
+      return (
+        <ChangeLink id={to.id} {...look}>
+          {to.label}
+        </ChangeLink>
+      );
+    case "conflict":
+      return (
+        <ConflictLink id={to.id} {...look}>
+          {to.label}
+        </ConflictLink>
+      );
+    case "escalation":
+      return (
+        <EscalationLink id={to.id} {...look}>
+          {to.label}
+        </EscalationLink>
+      );
+    case "decision":
+      return (
+        <DecisionLink id={to.id} {...look}>
+          {to.label}
+        </DecisionLink>
+      );
+    case "guard":
+      break;
+  }
+  return (
+    <span className="text-kumo-strong" title={to.id} data-ref={to.kind}>
+      {to.label}
+    </span>
   );
 }
 

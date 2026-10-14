@@ -5,7 +5,7 @@
 import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
 import { agentName } from "./audience.ts";
 import type { Cards } from "./holder.ts";
-import { type Tone, subjectOf } from "./lanes.ts";
+import { type Tone, glossOf, subjectOf } from "./lanes.ts";
 import type { World } from "./world.ts";
 
 export interface SubjectDetail {
@@ -116,7 +116,7 @@ export function subjectDetailOf(
   return {
     id: entry.id,
     key: entry.key,
-    gloss: entry.gloss,
+    gloss: glossOf(entry),
     tone: open.some((conflict) => conflict.state === "escalated")
       ? "person"
       : open.some((conflict) => conflict.state === "proven")

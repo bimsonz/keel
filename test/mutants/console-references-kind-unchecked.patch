@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.pieces
+# why: an id is called by a label the log holds under another kind than its prefix says
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..caa38514 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -65,7 +65,7 @@ export function piecesOf(text: string, known: ReadonlyMap<string, Reference>): (
+   let from = 0;
+   for (const match of text.matchAll(ID)) {
+     const reference = known.get(match[0]);
+-    if (reference === undefined || reference.kind !== KINDS[match[1] ?? ""]) continue;
++    if (reference === undefined) continue;
+     if (match.index > from) pieces.push(text.slice(from, match.index));
+     pieces.push({ ...reference, at: match.index });
+     from = match.index + match[0].length;

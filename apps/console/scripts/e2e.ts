@@ -554,6 +554,17 @@ expectEqual(
     .catch(() => "no link")}`,
   "previewed at https://change-b-demo.keel-previews.workers.dev | https://change-b-demo.keel-previews.workers.dev",
 );
+// Keel addresses a lane `lane:<projectId>:<name>`: the page calls it by its name.
+expectEqual(
+  "change: the lane it was queued in is called by its name, not by Keel's address of it",
+  squash(
+    await page
+      .locator('[data-part="lane"]')
+      .innerText({ timeout: 3000 })
+      .catch(() => "no lane"),
+  ),
+  "lane main",
+);
 const noted = page.locator("section", { has: page.getByRole("heading", { name: "Noted" }) }).last();
 const notedText = async (): Promise<string> =>
   (await noted.count()) === 0 ? "nothing noted" : squash(await noted.innerText());
@@ -1161,6 +1172,25 @@ expectEqual(
   "swarm: conflicts drawn",
   String(await page.locator('.a-fn[data-kind="conflict"]').count()),
   "13",
+);
+// Keel glosses a subject first named with nothing said of it by its key: such a node says its key once, and a
+// subject glossed in words still says them.
+const subjectNode = (key: string) =>
+  page.locator('.a-fn[data-kind="subject"]', { hasText: key }).first();
+const timesSaid = async (key: string): Promise<string> =>
+  (await subjectNode(key).count()) === 0
+    ? "not drawn"
+    : String(squash(await subjectNode(key).innerText()).split(key).length - 1);
+expectEqual(
+  "swarm: a subject Keel glossed with its key says the key once; one glossed in words says them",
+  `${await timesSaid("authz.token-revocation")} | ${String(
+    squash(
+      await subjectNode("storage.gc.safety")
+        .innerText()
+        .catch(() => ""),
+    ).includes("What garbage collection may delete"),
+  )}`,
+  "1 | true",
 );
 expectEqual(
   "swarm: the lane of what a person is being asked about comes first",
@@ -3160,13 +3190,20 @@ expectEqual(
 // it an org, gives it no members and no settings.
 await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
 await person.getByRole("heading", { level: 1 }).first().waitFor();
+// The tabs' counts are read after the page's heading: the header is read once its organizations are counted.
+await person
+  .locator("header")
+  .first()
+  .filter({ hasText: /Organizations\s*\d/ })
+  .waitFor({ timeout: 5_000 })
+  .catch(() => undefined);
 expectEqual(
   "account: a person's own handle is their projects, with nothing of an org on the page",
   `${squash(await person.locator("header").first().innerText())} | ${squash(await person.locator("main header").innerText())} | ${await person.getByRole("navigation", { name: "Org" }).count()} org tabs | ${await person
     .getByRole("main")
     .getByText(/\borg\b/i)
     .count()} mentions of an org`,
-  "ada ada Overview Projects 1 Organizations Settings | ada Your account | 0 org tabs | 0 mentions of an org",
+  "ada ada Overview Projects 1 Organizations 0 Settings | ada Your account | 0 org tabs | 0 mentions of an org",
 );
 expectEqual(
   "account: a namespace's header is Keel's mark home and the namespace's name, a link to its own page",
@@ -4204,17 +4241,25 @@ expectEqual(
   )}`,
   "This bounce cites decision D-1. | /ada/demo/decisions/D-1",
 );
+// Keel's ways forward name the guard and the decision by their ids: the page calls each by its label, and links
+// the decision to its page.
+const waysForward = recall.getByRole("list", { name: "Ways forward Keel gave its agent" });
 expectEqual(
-  "change: the ways forward are Keel's own, the fix and the decision to read",
-  (
-    await recall
-      .getByRole("list", { name: "Ways forward Keel gave its agent" })
-      .getByRole("listitem")
-      .allInnerTexts()
-  )
-    .map((way) => squash(way).replaceAll(/(dec|grd)_\w+/g, "<id>"))
-    .join(" || "),
-  "Fix the guarded behaviour, push, then submit again: guard:<id> (freshness): a role revoked mid-session is still allowed; it holds decision <id>: Cache allowed if revocation invalidates it || Read decision <id>, which the failed guard holds: Cache allowed if revocation invalidates it",
+  "change: the ways forward are Keel's own, each id in them called by its label and a decision linked",
+  `${(await waysForward.getByRole("listitem").allInnerTexts())
+    .map((way) => squash(way))
+    .join(" || ")} | ${(
+    await waysForward
+      .getByRole("link")
+      .evaluateAll((links) =>
+        links.map(
+          (anchor) =>
+            `${anchor.textContent ?? ""} ${URL.canParse(anchor.getAttribute("href") ?? "", location.href) ? new URL(anchor.getAttribute("href") ?? "", location.href).pathname : "unparsed"}`,
+        ),
+      )
+      .catch(() => ["no links"])
+  ).join(", ")}`,
+  "Fix the guarded behaviour, push, then submit again: guard:G-1 (freshness): a role revoked mid-session is still allowed; it holds decision D-1: Cache allowed if revocation invalidates it || Read decision D-1, which the failed guard holds: Cache allowed if revocation invalidates it | D-1 /ada/demo/decisions/D-1, D-1 /ada/demo/decisions/D-1",
 );
 await citedDecision
   .getByRole("link")

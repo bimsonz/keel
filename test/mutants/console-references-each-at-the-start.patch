@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.pieces
+# why: an id written twice is placed where the words before it began, so two share a place
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..a9e4b6c8 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -67,7 +67,7 @@ export function piecesOf(text: string, known: ReadonlyMap<string, Reference>): (
+     const reference = known.get(match[0]);
+     if (reference === undefined || reference.kind !== KINDS[match[1] ?? ""]) continue;
+     if (match.index > from) pieces.push(text.slice(from, match.index));
+-    pieces.push({ ...reference, at: match.index });
++    pieces.push({ ...reference, at: from });
+     from = match.index + match[0].length;
+   }
+   if (from < text.length) pieces.push(text.slice(from));

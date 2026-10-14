@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.pieces
+# why: Keel's words after the last id it names are dropped
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..31c56fed 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -70,6 +70,5 @@ export function piecesOf(text: string, known: ReadonlyMap<string, Reference>): (
+     pieces.push({ ...reference, at: match.index });
+     from = match.index + match[0].length;
+   }
+-  if (from < text.length) pieces.push(text.slice(from));
+   return pieces;
+ }

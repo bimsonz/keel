@@ -427,14 +427,14 @@ export function generateS2(
   const queued = b.emit({
     type: "ChangeQueued",
     entity: changeRef(changeH),
-    payload: { changeId: changeH, laneId: "lane-1" },
+    payload: { changeId: changeH, laneId: b.lane },
   });
   const formed = b.at(139.5).emit({
     type: "BatchFormed",
     entity: batchRef,
     payload: {
       batchId: batch,
-      laneId: "lane-1",
+      laneId: b.lane,
       members: [changeH],
       base: HEAD_1144,
       attempt: 1,

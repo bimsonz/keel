@@ -137,6 +137,11 @@ export class ScriptBuilder {
   /** The project the story is told in. Every event from here on is stamped with it, as Keel stamps its own. */
   project: string | undefined;
 
+  /** The project's one lane, as Keel addresses it: `lane:<projectId>:main`. */
+  get lane(): string {
+    return `lane:${this.project ?? ""}:main`;
+  }
+
   constructor(epoch: string, rng: Rng) {
     this.#epoch = epoch;
     this.#epochMs = Date.parse(epoch);

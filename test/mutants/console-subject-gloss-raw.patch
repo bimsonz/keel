@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.gloss
+# why: a subject's panel says its key twice where Keel glossed it with the key
+diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
+index 17c40563..b80112d0 100644
+--- a/apps/console/src/engine/subject.ts
++++ b/apps/console/src/engine/subject.ts
+@@ -116,7 +116,7 @@ export function subjectDetailOf(
+   return {
+     id: entry.id,
+     key: entry.key,
+-    gloss: glossOf(entry),
++    gloss: entry.gloss,
+     tone: open.some((conflict) => conflict.state === "escalated")
+       ? "person"
+       : open.some((conflict) => conflict.state === "proven")

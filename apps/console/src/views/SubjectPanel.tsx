@@ -66,7 +66,9 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
         <div className="min-w-0 flex-1">
           <p className="a-fn-kind">Subject</p>
           <h2 className="a-mono break-all text-lg font-semibold text-kumo-strong">{detail.key}</h2>
-          <p className="mt-0.5 text-base text-kumo-default">{detail.gloss}</p>
+          {detail.gloss !== "" && (
+            <p className="mt-0.5 text-base text-kumo-default">{detail.gloss}</p>
+          )}
           <p className="mt-2 flex flex-wrap items-center gap-2">
             <span
               className="a-chip"

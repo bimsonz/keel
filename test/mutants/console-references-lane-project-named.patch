@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.lane
+# why: a lane is called by its project's id, not by its own name
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..1da6f240 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -8,7 +8,7 @@ import type { World } from "./world.ts";
+  * any other form is shown as Keel wrote it.
+  */
+ export function laneName(laneId: string): string {
+-  const parts = /^lane:[^:]+:(.+)$/.exec(laneId);
++  const parts = /^lane:([^:]+):.+$/.exec(laneId);
+   return parts?.[1] ?? laneId;
+ }
+ 

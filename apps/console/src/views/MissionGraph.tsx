@@ -176,7 +176,9 @@ function Body({ node }: { node: GraphNode }) {
           <div className="a-mono truncate font-semibold text-kumo-strong" title={node.key}>
             {node.key}
           </div>
-          <div className="truncate text-[13px] text-kumo-default">{node.gloss}</div>
+          {node.gloss !== "" && (
+            <div className="truncate text-[13px] text-kumo-default">{node.gloss}</div>
+          )}
           <div
             data-counts
             className="mt-auto flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-kumo-subtle"

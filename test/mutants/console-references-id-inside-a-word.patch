@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.pieces
+# why: an id is read out of a longer word
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..285a46a9 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -24,7 +24,7 @@ const KINDS: Readonly<Record<string, Referred>> = {
+ };
+ 
+ /** Keel's id: the kind's three letters, an underscore and a ULID. */
+-const ID = /\b(chg|cfl|esc|dec|grd)_[0-9A-HJKMNP-TV-Z]{26}\b/g;
++const ID = /(chg|cfl|esc|dec|grd)_[0-9A-HJKMNP-TV-Z]{26}/g;
+ 
+ /** A thing a sentence names, by Keel's id, with the label Keel gave it in this project's log. */
+ export interface Reference {

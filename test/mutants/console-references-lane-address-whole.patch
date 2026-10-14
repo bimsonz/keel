@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.lane
+# why: a lane is shown by Keel's whole address of it, its project's id and all
+diff --git a/apps/console/src/engine/references.ts b/apps/console/src/engine/references.ts
+index 8a6c1875..4fa3e282 100644
+--- a/apps/console/src/engine/references.ts
++++ b/apps/console/src/engine/references.ts
+@@ -9,7 +9,7 @@ import type { World } from "./world.ts";
+  */
+ export function laneName(laneId: string): string {
+   const parts = /^lane:[^:]+:(.+)$/.exec(laneId);
+-  return parts?.[1] ?? laneId;
++  return laneId;
+ }
+ 
+ /** The things a sentence of Keel's can name that the console has a name for. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/references.test.ts
+# kills: references.gloss
+# why: Mission Control's subject says its key twice where Keel glossed it with the key
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index c708be39..52201acf 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -489,7 +489,7 @@ export function lanesOf(
+       id: subjectNode,
+       kind: "subject",
+       key,
+-      gloss: glossOf(subject),
++      gloss: subject.gloss,
+       premises: subject.premises.size,
+       guards: guards.length,
+       decisions: subject.decisionIds.length,

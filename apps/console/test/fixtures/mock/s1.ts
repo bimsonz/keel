@@ -855,14 +855,14 @@ export function land(
   const queued = b.emit({
     type: "ChangeQueued",
     entity: changeRef(input.change),
-    payload: { changeId: input.change, laneId: "lane-1" },
+    payload: { changeId: input.change, laneId: b.lane },
   });
   const formed = b.after(0.5).emit({
     type: "BatchFormed",
     entity: batchRef,
     payload: {
       batchId: batch,
-      laneId: "lane-1",
+      laneId: b.lane,
       members: [input.change],
       base: input.from,
       attempt: 1,

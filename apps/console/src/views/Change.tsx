@@ -24,6 +24,7 @@ import {
   EscalationLink,
   HolderLink,
   RunLink,
+  Said,
   SubjectLink,
 } from "./links.tsx";
 import {
@@ -244,7 +245,7 @@ function BounceSaid({ bounce }: { bounce: ChangeBounce }) {
       {bounce.ruling !== undefined && bounce.ruling.reasons.length > 0 && (
         <p className="text-base text-kumo-default" data-part="ruling-reasons">
           <span className="text-sm text-kumo-subtle">Keel gave this reason: </span>
-          {bounce.ruling.reasons.join(" ")}
+          <Said text={bounce.ruling.reasons.join(" ")} />
         </p>
       )}
       {bounce.next.length > 0 && (
@@ -252,7 +253,9 @@ function BounceSaid({ bounce }: { bounce: ChangeBounce }) {
           <p className="text-sm text-kumo-subtle">Keel told its agent how to go on:</p>
           <ul className="mt-1 list-disc pl-5" aria-label="Ways forward Keel gave its agent">
             {bounce.next.map((title) => (
-              <li key={title}>{title}</li>
+              <li key={title}>
+                <Said text={title} />
+              </li>
             ))}
           </ul>
         </div>
@@ -895,14 +898,16 @@ export function Change({
                     workspace <span className="a-mono text-kumo-strong">{change.workspace}</span>
                   </span>
                 )}
-                {change.laneLabel !== undefined && <span>{change.laneLabel}</span>}
-                {change.commit === "" &&
-                  change.workspace === "" &&
-                  change.laneLabel === undefined && (
-                    <span className="text-kumo-subtle">
-                      Declared, and not yet forked into a workspace.
-                    </span>
-                  )}
+                {change.lane !== undefined && (
+                  <span data-part="lane">
+                    lane <span className="a-mono text-kumo-strong">{change.lane}</span>
+                  </span>
+                )}
+                {change.commit === "" && change.workspace === "" && change.lane === undefined && (
+                  <span className="text-kumo-subtle">
+                    Declared, and not yet forked into a workspace.
+                  </span>
+                )}
               </Tied>
             </>
           }
@@ -982,7 +987,9 @@ export function Change({
                         </p>
                         <ul className="list-disc pl-5 text-kumo-default">
                           {other.next.map((title) => (
-                            <li key={title}>{title}</li>
+                            <li key={title}>
+                              <Said text={title} />
+                            </li>
                           ))}
                         </ul>
                       </li>

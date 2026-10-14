@@ -11,7 +11,7 @@ import type { EscalationEntry, World } from "../engine/world.ts";
 import { Detail, Head, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import { Qr } from "./Qr.tsx";
-import { ChangeLink, ConflictLink, SubjectLink } from "./links.tsx";
+import { ChangeLink, ConflictLink, Said, SubjectLink } from "./links.tsx";
 import { EvidenceList, Panel, clockTime, dateTime } from "./parts.tsx";
 
 /** Keel's refusals of a ruling that say the question takes no answer any more. */
@@ -185,7 +185,9 @@ export function Escalation({
                   className="flex list-disc flex-col gap-1 pl-5 text-sm text-kumo-default"
                 >
                   {refused.next.map((title) => (
-                    <li key={title}>{title}</li>
+                    <li key={title}>
+                      <Said text={title} />
+                    </li>
                   ))}
                 </ul>
               )}

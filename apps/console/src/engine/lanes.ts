@@ -32,6 +32,7 @@ import type {
 } from "../domain/state.ts";
 import { agentName, shownAgent } from "./audience.ts";
 import type { Cards } from "./holder.ts";
+import { laneName } from "./references.ts";
 import { sidesOf } from "./sides.ts";
 import {
   type ChangeEntry,
@@ -63,7 +64,7 @@ export type GraphNode = { id: string } & (
       revision: number;
       /** What ties it to its subject, in the fewest true words: what it relies on there, or what it alters. `derived`: Keel read it off the diff. */
       holds?: { text: string; derived: boolean };
-      /** Where it is in integration, when it is: "Lane 1", "batch L1·3". */
+      /** Where it is in integration, when it is: "lane main", "batch L1·3". */
       where?: string;
       /** True where its verdict or its landing was not verified. */
       unverified?: boolean;
@@ -249,11 +250,16 @@ function tie(
   };
 }
 
+/** What a subject's gloss says beside its key: nothing where Keel glossed it with the key itself. */
+export function glossOf(subject: { key: string; gloss: string }): string {
+  return subject.gloss.trim() === subject.key ? "" : subject.gloss;
+}
+
 function where(world: World, change: ChangeEntry): string | undefined {
   if (change.state === "integrating" && change.batchId !== undefined)
     return `batch ${world.batches.get(change.batchId)?.label ?? ""}`;
   if (change.state === "queued" && change.laneId !== undefined)
-    return change.laneId.replace("lane-", "Lane ");
+    return `lane ${laneName(change.laneId)}`;
   return undefined;
 }
 
@@ -483,7 +489,7 @@ export function lanesOf(
       id: subjectNode,
       kind: "subject",
       key,
-      gloss: subject.gloss,
+      gloss: glossOf(subject),
       premises: subject.premises.size,
       guards: guards.length,
       decisions: subject.decisionIds.length,

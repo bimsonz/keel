@@ -335,7 +335,8 @@ export interface ChangePageState {
     workspace: string;
     declaredAt: string;
     submittedAt?: string;
-    laneLabel?: string;
+    /** The lane it was queued in, by the name Keel gives it within the project. */
+    lane?: string;
   };
   agent: { label: string; class: ShownClass; harness: string; model: string };
   /** Its holder's page in this project, and the run it is held under. */

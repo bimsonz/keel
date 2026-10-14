@@ -5,7 +5,8 @@ export type SeedState = "calm" | "suspected" | "proven" | "guarded";
 
 export interface SubjectSeed {
   key: string;
-  gloss: string;
+  /** What the premise that first named it said of it. Keel glosses a subject named with nothing said by its key. */
+  gloss?: string;
   /** Relative share of the swarm's attention. */
   heat: number;
   state?: SeedState;
@@ -20,7 +21,7 @@ export const SUBJECTS: Record<string, SubjectSeed[]> = {
       state: "guarded",
     },
     { key: "authz.session-lifetime", gloss: "How long a session stays valid", heat: 5 },
-    { key: "authz.token-revocation", gloss: "When a revoked token stops working", heat: 4 },
+    { key: "authz.token-revocation", heat: 4 },
     { key: "authz.role-inheritance", gloss: "How team roles reach a repository", heat: 3 },
   ],
   repo: [

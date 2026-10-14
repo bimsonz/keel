@@ -152,6 +152,8 @@ interface SubjectInfo {
 
 interface LaneState {
   id: string;
+  /** How Keel addresses the lane: `lane:<projectId>:<name>`. */
+  address: string;
   number: number;
   queue: Live[];
   inFlight: number;
@@ -235,7 +237,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
               commit: "4b1d9e0",
             },
           ],
-          gloss: subject.gloss,
+          gloss: subject.gloss ?? subject.key,
           mintedBy: "scan",
         },
       });
@@ -245,7 +247,15 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
   const lanes = new Map<string, LaneState>(
     LANES.map((lane, index) => [
       lane.id,
-      { id: lane.id, number: index + 1, queue: [], inFlight: 0, ticking: false, batches: 0 },
+      {
+        id: lane.id,
+        address: `lane:${project}:${index + 1}`,
+        number: index + 1,
+        queue: [],
+        inFlight: 0,
+        ticking: false,
+        batches: 0,
+      },
     ]),
   );
 
@@ -830,7 +840,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
     b.at(t).emit({
       type: "ChangeQueued",
       entity: changeRef(live.id),
-      payload: { changeId: live.id, laneId: lane.id },
+      payload: { changeId: live.id, laneId: lane.address },
     });
     lane.queue.push(live);
     if (!lane.ticking) {
@@ -859,7 +869,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
       entity: batchRef,
       payload: {
         batchId: batch,
-        laneId: lane.id,
+        laneId: lane.address,
         members: members.map((m) => m.id),
         base: head,
         attempt: 1,

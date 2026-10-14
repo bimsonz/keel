@@ -28,6 +28,7 @@ import type {
 } from "../domain/state.ts";
 import type { ChangeDiff } from "../source/types.ts";
 import { verdictSaid } from "./judged.ts";
+import { laneName } from "./references.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
 import { contradictionsOf } from "./sides.ts";
@@ -704,9 +705,7 @@ export function changePageOf(
         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
       declaredAt: change.declaredAt,
       ...(change.submittedAt === undefined ? {} : { submittedAt: change.submittedAt }),
-      ...(change.laneId === undefined
-        ? {}
-        : { laneLabel: change.laneId.replace("lane-", "Lane ") }),
+      ...(change.laneId === undefined ? {} : { lane: laneName(change.laneId) }),
     },
     agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
     held: heldUnder(cards, change),
