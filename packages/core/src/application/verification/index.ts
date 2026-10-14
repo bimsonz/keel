@@ -1,11 +1,7 @@
 import type { Effect } from "effect";
 import type { AgentToken } from "../../domain/identity/index.ts";
 import type { ChangeId, ConflictId } from "../../domain/kernel/index.ts";
-import type {
-  Conflict,
-  ConflictNotFound,
-  ConflictState,
-} from "../../domain/verification/index.ts";
+import type { Conflict, ConflictNotFound, ConflictState } from "../../domain/verification/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
 

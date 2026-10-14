@@ -19701,6 +19701,7 @@
           "escalation.option_unknown",
           "decision.not_found",
           "probe.not_found",
+          "verdict.not_found",
           "why.nothing_to_explain",
           "change.lease_stale",
           "change.lease_not_lapsed",
