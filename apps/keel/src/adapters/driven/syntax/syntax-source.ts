@@ -16,8 +16,9 @@ const MODE_EXEC = "100755";
 /**
  * SyntaxSource over CodeHost and tree-sitter: one read of the commit's tree,
  * then the seeds' blobs and, level by level, the blobs their relative imports
- * name. `@keeltown/syntax` decides which files those are, what each says and
- * when to stop; this adapter only fetches.
+ * name, each level's blobs in one `readBlobs`. `@keeltown/syntax` decides
+ * which files those are, what each says and when to stop; this adapter only
+ * fetches.
  *
  * The parser is static Wasm in this Worker: it reads repo text and runs none
  * of it. Only a parser that has finished booting is kept between calls, by
@@ -70,18 +71,15 @@ export const SyntaxSourceTreeSitter = (
             let parser = yield* boot;
             const reading = openReading(seeds, (path) => blobs.get(path)?.kind, registrars);
             for (let wanted = reading.wanted(); wanted.length > 0; wanted = reading.wanted()) {
-              const level = yield* Effect.forEach(
-                wanted,
-                (path) =>
-                  Effect.map(host.readBlob(repo, blobs.get(path)?.oid ?? ""), (bytes) => ({
-                    path,
-                    bytes,
-                  })),
-                { concurrency: 8 },
+              const level = yield* host.readBlobs(
+                repo,
+                wanted.map((path) => blobs.get(path)?.oid ?? ""),
               );
-              for (const file of level)
-                while (reading.give(file.path, file.bytes, parser) === "restart")
+              for (const [at, read] of level.entries()) {
+                const bytes = yield* Effect.fromResult(read);
+                while (reading.give(wanted[at] ?? "", bytes, parser) === "restart")
                   parser = yield* boot;
+              }
             }
             const result = reading.result();
             if ("unavailable" in result)

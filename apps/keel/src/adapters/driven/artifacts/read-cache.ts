@@ -9,11 +9,12 @@
 // anything, so a cached object is only ever served to a caller already
 // allowed it. Every key names the repo as well as the id, so an object one
 // repo holds is never served as another's.
-import { Effect, Layer, Option, Schema } from "effect";
+import { Effect, Layer, Option, Result, Schema } from "effect";
 import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   type CommitInfo,
   CodeHost,
+  type ObjectNotFound,
   type RepoRef,
   type TreeChange,
   type TreeEntry,
@@ -195,6 +196,21 @@ const keep = <A>(options: ReadCacheOptions, key: string, codec: Codec<A>, value:
   options.background(shared.put(key, response).catch(() => undefined));
 };
 
+/** What memory or the shared tier holds under `key`, kept in memory when only the shared tier had it. */
+const inTiers = <A>(
+  options: ReadCacheOptions,
+  key: string,
+  codec: Codec<A>,
+): Effect.Effect<A | undefined> =>
+  Effect.suspend(() => {
+    const inMemory = options.memory.get(key);
+    if (codec.is(inMemory)) return Effect.succeed(inMemory);
+    return Effect.map(fromShared(options.shared, key, codec), (shared) => {
+      if (shared !== undefined) options.memory.set(key, shared, codec.encode(shared).byteLength);
+      return shared;
+    });
+  });
+
 /** `read`, unless memory or the shared tier holds its value; a value `worth` keeping is kept. */
 const cached = <A, E>(
   options: ReadCacheOptions,
@@ -203,21 +219,15 @@ const cached = <A, E>(
   read: Effect.Effect<A, E>,
   worth: (value: A) => boolean = () => true,
 ): Effect.Effect<A, E> =>
-  Effect.suspend(() => {
-    const inMemory = options.memory.get(key);
-    if (codec.is(inMemory)) return Effect.succeed(inMemory);
-    return Effect.flatMap(fromShared(options.shared, key, codec), (shared) => {
-      if (shared !== undefined) {
-        options.memory.set(key, shared, codec.encode(shared).byteLength);
-        return Effect.succeed(shared);
-      }
-      return Effect.tap(read, (value) =>
-        Effect.sync(() => {
-          if (worth(value)) keep(options, key, codec, value);
-        }),
-      );
-    });
-  });
+  Effect.flatMap(inTiers(options, key, codec), (found) =>
+    found !== undefined
+      ? Effect.succeed(found)
+      : Effect.tap(read, (value) =>
+          Effect.sync(() => {
+            if (worth(value)) keep(options, key, codec, value);
+          }),
+        ),
+  );
 
 /**
  * CodeHost with its reads by id cached: in this isolate's memory first, then
@@ -237,6 +247,25 @@ export const CodeHostReadCache = (
         ...host,
         readBlob: (repo, oid) =>
           cached(options, key("blob", repo, oid), BLOB, host.readBlob(repo, oid)),
+        // Each blob a tier holds is served from it; the rest are read in one call and each kept.
+        readBlobs: (repo, oids) =>
+          Effect.gen(function* () {
+            const found = yield* Effect.forEach(oids, (oid) =>
+              inTiers(options, key("blob", repo, oid), BLOB),
+            );
+            const missing = oids.filter((_, at) => found[at] === undefined);
+            const read = missing.length === 0 ? [] : yield* host.readBlobs(repo, missing);
+            let next = 0;
+            return oids.map((oid, at): Result.Result<Uint8Array, ObjectNotFound> => {
+              const hit = found[at];
+              if (hit !== undefined) return Result.succeed(hit);
+              const answer = read[next++];
+              if (answer === undefined) throw new Error("the host answered fewer blobs than asked");
+              if (Result.isSuccess(answer))
+                keep(options, key("blob", repo, oid), BLOB, answer.success);
+              return answer;
+            });
+          }),
         readCommit: (repo, sha) =>
           cached(options, key("commit", repo, sha), COMMIT, host.readCommit(repo, sha)),
         readTree: (repo, commit) =>

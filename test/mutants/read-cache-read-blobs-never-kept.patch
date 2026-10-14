@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: read-cache.read-blobs
+# why: A blob readBlobs read from the host is not kept, so the next read reaches the host again
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+index baa806fc..ea3be91a 100644
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -262,7 +262,7 @@ export const CodeHostReadCache = (
+               const answer = read[next++];
+               if (answer === undefined) throw new Error("the host answered fewer blobs than asked");
+               if (Result.isSuccess(answer))
+-                keep(options, key("blob", repo, oid), BLOB, answer.success);
++                void 0;
+               return answer;
+             });
+           }),

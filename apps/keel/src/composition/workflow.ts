@@ -37,6 +37,7 @@ import {
   type SuiteRunner,
   SuiteRuntimeCi,
 } from "../adapters/driven/ci/suite-runtime.ts";
+import { PRECHECK_TREES } from "../adapters/driven/artifacts/code-host.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
 import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guards.ts";
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
@@ -155,7 +156,9 @@ export const durableReport =
  * Precheck's composition root, per run: the change through the Change
  * DO, settings and the live anchors through the Project DO, the diff and the
  * parsed source through the code host, and the derivation record kept in
- * ARCHIVE beside the plan.
+ * ARCHIVE beside the plan. The code host keeps the tree objects the run's
+ * walks read, so the head's walk reads only the trees the change touched;
+ * the cache is this runtime's, and goes when the run disposes it.
  */
 export function precheckRuntime(
   env: Env,
@@ -175,7 +178,7 @@ export function precheckRuntime(
   const project = (projectId: string) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
-  const code = codeHostLayer(env);
+  const code = codeHostLayer(env, { trees: PRECHECK_TREES });
   return ManagedRuntime.make(
     Layer.mergeAll(
       ChangePrecheckRpc(env.CHANGE),

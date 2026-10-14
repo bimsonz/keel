@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: code-host.read-blobs-one-handle
+# why: One missing blob fails the whole readBlobs, so the blobs the repo holds are not answered
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 7b42f7eb..9b8d9f57 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -399,7 +399,7 @@ export function CodeHostArtifacts(
+           const read = async (oid: string): Promise<Result.Result<Uint8Array, ObjectNotFound>> => {
+             const blob = await handle.readBlob(oid);
+             return blob === null
+-              ? Result.fail(new ObjectNotFound({ repo: plain(repo), oid }))
++              ? (() => { throw new MissingObject(oid); })()
+               : Result.succeed(new Uint8Array(await blob.arrayBuffer()));
+           };
+           // A few readers take the next blob from one queue, all through this one handle.

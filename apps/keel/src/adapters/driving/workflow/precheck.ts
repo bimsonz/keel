@@ -69,7 +69,7 @@ async function settle<A, E extends { readonly _tag: string }, R>(
 }
 
 /** The value of a step that cannot be stale: its use-case never refuses a revision. */
-const done = <A>(settled: Settled<A>): A => {
+const settledValue = <A>(settled: Settled<A>): A => {
   if (settled._tag === "Stale") throw new Error(`unexpected stale step: ${settled.reason}`);
   return settled.value;
 };
@@ -127,34 +127,49 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
         workspace.projectId,
       );
       if (namespace === undefined) return await refuse(refuseUnplaced(workspace.projectId));
-      const ancestry = done(
+      const ancestry = settledValue(
         await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
       );
       /**
-       * A commit on its base: each of precheckReads, one durable step, then
-       * its derivation, kept by `derive` and committed by `derived`. Stale
-       * when the change moved on before the derivation was committed.
+       * A commit on its base: the four reads of precheckReads, each one
+       * durable step, run at once, and its derivation, kept by `derive` as
+       * soon as `diff` has the paths, and committed by `derived` once every
+       * read is in. Each step keeps its fixed name, so a replay finds it
+       * whatever order they finished in. Stale when the change moved on
+       * before the derivation was committed.
        */
       const descended = async (
         on: Extract<Ancestry, { readonly _tag: "Descends" }>,
       ): Promise<Settled<PrecheckFindings>> => {
         const reads = precheckReads(workspace, submission, on);
-        const read = {
-          ancestry: on,
-          touched: done(await step.do("diff", () => settle(runtime, reads.touched))),
-          policy: done(await step.do("policy", () => settle(runtime, reads.policy))),
-          flow: done(await step.do("flow", () => settle(runtime, reads.flow))),
-          guards: done(await step.do("guards", () => settle(runtime, reads.guards))),
-        };
+        const touched = step.do("diff", () => settle(runtime, reads.touched)).then(settledValue);
         // A diff that could not be read is refused by decide: with no paths, nothing derives.
-        if (read.touched._tag === "Unreadable")
-          return { _tag: "Done", value: { ...read, subjects: workspace.subjects } };
-        const paths = read.touched.paths;
-        const kept = done(
-          await step.do("derive", () =>
-            settle(runtime, deriveSubmission(namespace, workspace, submission, on.base, paths)),
-          ),
+        const keeping = touched.then((diff) =>
+          diff._tag === "Unreadable"
+            ? undefined
+            : step
+                .do("derive", () =>
+                  settle(
+                    runtime,
+                    deriveSubmission(namespace, workspace, submission, on.base, diff.paths),
+                  ),
+                )
+                .then(settledValue),
         );
+        const steps = [
+          touched,
+          step.do("policy", () => settle(runtime, reads.policy)).then(settledValue),
+          step.do("flow", () => settle(runtime, reads.flow)).then(settledValue),
+          step.do("guards", () => settle(runtime, reads.guards)).then(settledValue),
+          keeping,
+        ] as const;
+        // Every step settles before a failure is thrown, so none is still running when the run
+        // ends and disposes its runtime; Promise.all then throws the first failure in this order.
+        await Promise.allSettled(steps);
+        const [diff, policy, flow, guards, kept] = await Promise.all(steps);
+        const read = { ancestry: on, touched: diff, policy, flow, guards };
+        if (kept === undefined)
+          return { _tag: "Done", value: { ...read, subjects: workspace.subjects } };
         const derived = await step.do("derived", () =>
           settle(runtime, commitDerivation(namespace, submission, kept.derivationRef)),
         );

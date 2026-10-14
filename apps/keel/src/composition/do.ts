@@ -31,7 +31,7 @@ import {
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import { Effect, Layer, ManagedRuntime, Option } from "effect";
-import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { CodeHostArtifacts, type CodeHostOptions } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
@@ -368,8 +368,8 @@ export function decisionsLayer(env: Env): Layer.Layer<Decisions> {
   return DecisionsRpc(() => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR)));
 }
 
-export function codeHostLayer(env: Env): Layer.Layer<CodeHost> {
-  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
+export function codeHostLayer(env: Env, options: CodeHostOptions = {}): Layer.Layer<CodeHost> {
+  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) }, options);
 }
 
 declare global {

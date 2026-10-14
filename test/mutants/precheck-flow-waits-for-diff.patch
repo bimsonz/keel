@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck-steps.test.ts
+# kills: precheck.reads-at-once
+# why: Flow starts only once the diff is read, so the precheck's reads run one after another again
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index c0a16003..3368e397 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -159,7 +159,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         const steps = [
+           touched,
+           step.do("policy", () => settle(runtime, reads.policy)).then(settledValue),
+-          step.do("flow", () => settle(runtime, reads.flow)).then(settledValue),
++          touched.then(() => step.do("flow", () => settle(runtime, reads.flow))).then(settledValue),
+           step.do("guards", () => settle(runtime, reads.guards)).then(settledValue),
+           keeping,
+         ] as const;

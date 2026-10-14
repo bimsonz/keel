@@ -2,9 +2,9 @@
 // keeps, and how far it grows. A Map stands in for the colo's cache.
 import { describe, expect, it } from "@effect/vitest";
 import type { CommitSha } from "@keeltown/core/kernel";
-import { CodeHost } from "@keeltown/core/ports";
+import { CodeHost, type ObjectNotFound } from "@keeltown/core/ports";
 import { makeCodeHostMemory } from "@keeltown/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Result } from "effect";
 import {
   CodeHostReadCache,
   makeMemoryTier,
@@ -34,10 +34,11 @@ function sharedCache() {
   return { kept, cache };
 }
 
-/** The cache over a memory host whose every read by id is counted, by method. */
+/** The cache over a memory host whose every read by id is counted, by method, and each readBlobs' ids kept. */
 function cachedHost(options: { readonly memory?: MemoryTier; readonly shared?: Cache } = {}) {
   const code = makeCodeHostMemory();
   const reads = new Map<string, number>();
+  const blobsAsked: (readonly string[])[] = [];
   const count = (method: string) => reads.set(method, (reads.get(method) ?? 0) + 1);
   const counted = Layer.effect(
     CodeHost,
@@ -46,6 +47,10 @@ function cachedHost(options: { readonly memory?: MemoryTier; readonly shared?: C
         ...host,
         readBlob: (repo, oid) =>
           Effect.suspend(() => (count("readBlob"), host.readBlob(repo, oid))),
+        readBlobs: (repo, oids) =>
+          Effect.suspend(
+            () => (count("readBlobs"), blobsAsked.push(oids), host.readBlobs(repo, oids)),
+          ),
         readCommit: (repo, sha) =>
           Effect.suspend(() => (count("readCommit"), host.readCommit(repo, sha))),
         readTree: (repo, commit) =>
@@ -66,7 +71,7 @@ function cachedHost(options: { readonly memory?: MemoryTier; readonly shared?: C
     shared: options.shared,
     background: (work) => background.push(work),
   }).pipe(Layer.provide(counted));
-  return { code, reads, background, layer };
+  return { code, reads, blobsAsked, background, layer };
 }
 
 /** A repo with two commits on main: `base`, then `head`, which edits one file and adds another. */
@@ -84,6 +89,10 @@ const seeded = (code: ReturnType<typeof makeCodeHostMemory>, repo = A) =>
     });
     return { base, head };
   }).pipe(Effect.provide(code.layer));
+
+/** What readBlobs answered: each blob as text, each failure as its tag. */
+const text = (read: readonly Result.Result<Uint8Array, ObjectNotFound>[]) =>
+  read.map((r) => (Result.isSuccess(r) ? new TextDecoder().decode(r.success) : r.failure._tag));
 
 /** Every read by id, once, at `head` and from `base`. */
 const readAll = (base: CommitSha, head: CommitSha, repo = A) =>
@@ -154,6 +163,44 @@ describe("the read cache", () => {
         expect((yield* host.readCommit(C, head)).sha).toBe(head);
         expect(w.reads.get("hasCommit")).toBe(2);
         expect(w.reads.get("readCommit")).toBe(4);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[read-cache.read-blobs] readBlobs serves the blobs held, reads the rest in one call and keeps each read, and keeps no blob the repo lacks",
+    () => {
+      const w = cachedHost();
+      return Effect.gen(function* () {
+        const { head } = yield* seeded(w.code);
+        const host = yield* CodeHost;
+        const tree = yield* host.readTree(A, head);
+        const oid = (path: string) => tree.find((entry) => entry.path === path)?.oid ?? "";
+        const [readme, a, b, missing] = [
+          oid("README.md"),
+          oid("src/a.ts"),
+          oid("src/b.ts"),
+          "f".repeat(40),
+        ];
+        yield* host.readBlob(A, readme);
+        expect(text(yield* host.readBlobs(A, [a, readme, missing, b]))).toEqual([
+          "a\n",
+          "two\n",
+          "ObjectNotFound",
+          "b\n",
+        ]);
+        expect(w.blobsAsked).toEqual([[a, missing, b]]);
+        // What it read is kept: neither readBlob nor readBlobs asks the host for it again.
+        yield* host.readBlob(A, a);
+        yield* host.readBlob(A, b);
+        expect(text(yield* host.readBlobs(A, [b, readme, a]))).toEqual(["b\n", "two\n", "a\n"]);
+        expect(w.reads.get("readBlob")).toBe(1);
+        expect(w.blobsAsked).toHaveLength(1);
+        // The blob it lacked is read from the host again, each way.
+        expect((yield* Effect.flip(host.readBlob(A, missing)))._tag).toBe("ObjectNotFound");
+        expect(w.reads.get("readBlob")).toBe(2);
+        expect(text(yield* host.readBlobs(A, [a, missing]))).toEqual(["a\n", "ObjectNotFound"]);
+        expect(w.blobsAsked).toEqual([[a, missing, b], [missing]]);
       }).pipe(Effect.provide(w.layer));
     },
   );

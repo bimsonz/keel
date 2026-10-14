@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck-steps.test.ts
+# kills: precheck.reads-settle-before-failing
+# why: A failed read ends the run while the other steps still run, and the error thrown is whichever failed first in time
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index db4290c8..f550de86 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -165,7 +165,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         ] as const;
+         // Every step settles before a failure is thrown, so none is still running when the run
+         // ends and disposes its runtime; Promise.all then throws the first failure in this order.
+-        await Promise.allSettled(steps);
+         const [diff, policy, flow, guards, kept] = await Promise.all(steps);
+         const read = { ancestry: on, touched: diff, policy, flow, guards };
+         if (kept === undefined)

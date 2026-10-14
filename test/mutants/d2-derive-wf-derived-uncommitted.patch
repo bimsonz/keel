@@ -2,12 +2,12 @@
 # kills: d12.pool.compiled, d21.pool.derived
 # why: The Workflow keeps the derivation record and never commits it, so EffectsDerived is never on the change's log and no subject hears what the change does
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 908f4187..167adca8 100644
+index db4290c8..c1b00135 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -156,7 +156,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
-           ),
-         );
+@@ -171,7 +171,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         if (kept === undefined)
+           return { _tag: "Done", value: { ...read, subjects: workspace.subjects } };
          const derived = await step.do("derived", () =>
 -          settle(runtime, commitDerivation(namespace, submission, kept.derivationRef)),
 +          Promise.resolve({ _tag: "Done" as const, value: undefined }),

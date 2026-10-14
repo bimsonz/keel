@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: code-host.tree-cache-by-repo
+# why: The tree cache keys on the object id alone, so a repo can be served another repo's tree under a shared id
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 7b42f7eb..06629db3 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -130,7 +130,7 @@ function treeCache(limit: number) {
+   const held = new Map<string, readonly GitTreeEntry[]>();
+   return (repo: RepoRef, reader: TreeReader): TreeReader => ({
+     readTree: async (oid) => {
+-      const key = JSON.stringify([repo.namespace, repo.name, oid]);
++      const key = JSON.stringify([oid]);
+       const found = held.get(key);
+       if (found !== undefined) {
+         held.delete(key);

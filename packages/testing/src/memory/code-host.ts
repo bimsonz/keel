@@ -265,6 +265,12 @@ export function makeCodeHostMemory() {
         const found = yield* find(repo);
         return (yield* object(repo, found, oid, "blob")).body;
       }),
+    readBlobs: (repo, oids) =>
+      Effect.flatMap(find(repo), (found) =>
+        Effect.forEach(oids, (oid) =>
+          Effect.result(Effect.map(object(repo, found, oid, "blob"), (o) => o.body)),
+        ),
+      ),
     listDir: (repo, commit, path) =>
       Effect.gen(function* () {
         const found = yield* find(repo);

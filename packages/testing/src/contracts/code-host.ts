@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha } from "@keeltown/core/kernel";
 import { CodeHost, type RepoRef, type TreeChange } from "@keeltown/core/ports";
-import { Effect, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { CodeHostFixture, type FixtureFiles } from "../code-host-fixture.ts";
 import type { LayerFactory } from "./index.ts";
 
@@ -123,6 +123,43 @@ export function describeCodeHostContract(
     );
 
     it.live(
+      "[codehost.read-blobs] readBlobs answers each blob as readBlob does, in the order asked, a repeat included; a blob the repo lacks is that one's ObjectNotFound and the rest are still read",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const repo = yield* freshRepo;
+          const head = yield* fixture.commit(repo, MAIN, HEAD);
+          const entries = yield* host.readTree(repo, head);
+          const missing = unknownSha();
+          const asked = [
+            oidAt(entries, "new.txt"),
+            oidAt(entries, "b/inner"),
+            missing,
+            oidAt(entries, "l"),
+            oidAt(entries, "new.txt"),
+          ];
+          const read = yield* host.readBlobs(repo, asked);
+          expect(
+            read.map((r) =>
+              Result.isSuccess(r) ? new TextDecoder().decode(r.success) : r.failure,
+            ),
+          ).toMatchObject([
+            "new\n",
+            "bb\n",
+            {
+              _tag: "ObjectNotFound",
+              repo: { namespace: repo.namespace, name: repo.name },
+              oid: missing,
+            },
+            "target",
+            "new\n",
+          ]);
+          expect(yield* host.readBlobs(repo, [])).toEqual([]);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
       "[codehost.missing-repo] every read of a repo that does not exist fails RepoNotFound",
       () =>
         Effect.gen(function* () {
@@ -134,6 +171,7 @@ export function describeCodeHostContract(
             yield* tagOf(host.head(ghost, MAIN)),
             yield* tagOf(host.readTree(ghost, sha)),
             yield* tagOf(host.readBlob(ghost, sha)),
+            yield* tagOf(host.readBlobs(ghost, [sha])),
             yield* tagOf(host.diffTrees(ghost, sha, sha)),
             yield* tagOf(host.mintToken(ghost, "read", 60)),
             yield* tagOf(host.info(ghost)),
@@ -144,7 +182,7 @@ export function describeCodeHostContract(
             yield* tagOf(host.log(ghost, sha, 5)),
             yield* tagOf(host.isAncestor(ghost, sha, unknownSha(), [])),
           ];
-          expect(tags).toEqual(Array.from({ length: 12 }, () => "RepoNotFound"));
+          expect(tags).toEqual(Array.from({ length: 13 }, () => "RepoNotFound"));
           expect(yield* Effect.flip(host.head(ghost, MAIN))).toMatchObject({
             repo: { namespace: ghost.namespace, name: ghost.name },
           });

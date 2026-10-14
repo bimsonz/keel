@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/read-cache.test.ts
+# kills: read-cache.read-blobs
+# why: readBlobs reads every blob from the host even when the cache holds it
+diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+index 7cfd1331..8fbc93b7 100644
+--- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
++++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+@@ -251,7 +251,7 @@ export const CodeHostReadCache = (
+         readBlobs: (repo, oids) =>
+           Effect.gen(function* () {
+             const found = yield* Effect.forEach(oids, (oid) =>
+-              inTiers(options, key("blob", repo, oid), BLOB),
++              Effect.succeed(undefined),
+             );
+             const missing = oids.filter((_, at) => found[at] === undefined);
+             const read = missing.length === 0 ? [] : yield* host.readBlobs(repo, missing);

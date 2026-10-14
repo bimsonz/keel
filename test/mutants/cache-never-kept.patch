@@ -2,13 +2,14 @@
 # kills: cache.hit, cache.shared
 # why: Nothing read is kept, so every read reaches the host
 diff --git a/apps/keel/src/adapters/driven/artifacts/read-cache.ts b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
+index baa806fc..86e309cd 100644
 --- a/apps/keel/src/adapters/driven/artifacts/read-cache.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/read-cache.ts
-@@ -213,7 +213,6 @@
-       }
-       return Effect.tap(read, (value) =>
-         Effect.sync(() => {
--          if (worth(value)) keep(options, key, codec, value);
-         }),
-       );
-     });
+@@ -224,7 +224,6 @@ const cached = <A, E>(
+       ? Effect.succeed(found)
+       : Effect.tap(read, (value) =>
+           Effect.sync(() => {
+-            if (worth(value)) keep(options, key, codec, value);
+           }),
+         ),
+   );

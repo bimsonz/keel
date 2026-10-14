@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: code-host.tree-cache-bound
+# why: The tree cache never drops a tree, so a run's cache grows with every tree it reads
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 7b42f7eb..74cc6cb6 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -140,7 +140,7 @@ function treeCache(limit: number) {
+       const entries = await reader.readTree(oid);
+       held.set(key, entries);
+       for (const oldest of held.keys()) {
+-        if (held.size <= limit) break;
++        break;
+         held.delete(oldest);
+       }
+       return entries;

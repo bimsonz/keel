@@ -20,9 +20,10 @@ import {
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
+  type TreeEntry as GitTreeEntry,
   type TreeReader,
 } from "@keeltown/gitcore";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
 import { objectsOf } from "./objects.ts";
 
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
@@ -119,6 +120,34 @@ async function rootTree(handle: ArtifactsRepo, commit: string): Promise<string> 
   return read.treeHash;
 }
 
+/**
+ * Tree objects already read, by repo and id. What a git id names never
+ * changes, and each key names the repo as well as the id, so one repo's tree
+ * is never served as another's. Past `limit` trees the one least recently
+ * read goes. Only a tree that was read whole is kept, never a read under way.
+ */
+function treeCache(limit: number) {
+  const held = new Map<string, readonly GitTreeEntry[]>();
+  return (repo: RepoRef, reader: TreeReader): TreeReader => ({
+    readTree: async (oid) => {
+      const key = JSON.stringify([repo.namespace, repo.name, oid]);
+      const found = held.get(key);
+      if (found !== undefined) {
+        held.delete(key);
+        held.set(key, found);
+        return found;
+      }
+      const entries = await reader.readTree(oid);
+      held.set(key, entries);
+      for (const oldest of held.keys()) {
+        if (held.size <= limit) break;
+        held.delete(oldest);
+      }
+      return entries;
+    },
+  });
+}
+
 /** The whole tree under `tree`, in git order, each tree before what it holds; subtrees are read in parallel. */
 async function listTree(reader: TreeReader, tree: string, prefix: string): Promise<TreeEntry[]> {
   const entries = (await reader.readTree(tree)).toSorted(compareTreeEntries);
@@ -150,26 +179,45 @@ const commitInfo = (c: ArtifactsCommitMetadata): CommitInfo => ({
 /** A path absent from the commit, or naming something other than a directory. */
 const NO_DIRECTORY = Symbol("no-directory");
 
-/** The directory at `path`, walked one tree read per segment from the commit's root. */
+/** The directory at `path` under the root tree `root`, walked one tree read per segment. */
 async function directory(
-  handle: ArtifactsRepo,
-  commit: string,
+  reader: TreeReader,
+  root: string,
   path: string,
 ): Promise<TreeEntry[] | typeof NO_DIRECTORY> {
-  let tree = await rootTree(handle, commit);
+  let tree = root;
   for (const name of path === "" ? [] : path.split("/")) {
-    const entries = await handle.readTree(tree);
-    if (entries === null) throw new MissingObject(tree);
-    const entry = entries.find((e) => e.name === name);
+    const entry = (await reader.readTree(tree)).find((e) => e.name === name);
     if (entry?.mode !== MODE_TREE) return NO_DIRECTORY;
-    tree = entry.hash;
+    tree = entry.oid;
   }
-  const entries = await objectsOf(handle).readTree(tree);
+  const entries = await reader.readTree(tree);
   return entries.toSorted(compareTreeEntries).map((e) => {
     const type = e.mode === MODE_TREE ? "tree" : e.mode === MODE_GITLINK ? "commit" : "blob";
     return { path: path === "" ? e.name : `${path}/${e.name}`, mode: e.mode, oid: e.oid, type };
   });
 }
+
+/** How many blobs `readBlobs` reads at once through its one handle. */
+const BLOB_READS = 8;
+
+/** What a CodeHost on Artifacts is built with beside its bindings. */
+export interface CodeHostOptions {
+  /**
+   * Keep up to this many tree objects once read, so a later walk through the
+   * same layer reads only the trees no earlier walk did. For a layer that
+   * lives one run; absent, every walk reads every tree.
+   */
+  readonly trees?: number | undefined;
+}
+
+/**
+ * Precheck's tree cap, per run. A run holds the trees it walked anyway, so
+ * the cache adds little to that: a repo of fewer trees is kept whole (Keel's
+ * own and a 10 MB import, 468 trees, many times over), and a larger one costs
+ * at most what one walk of 8,192 trees holds.
+ */
+export const PRECHECK_TREES = 8192;
 
 /**
  * CodeHost on Artifacts bindings, one per namespace (`keel-core` → ARTIFACTS,
@@ -177,8 +225,15 @@ async function directory(
  * its tree reads. A repo the binding cannot find is `RepoNotFound`, an object
  * it lacks `ObjectNotFound`; any other binding error is a defect. Nothing here
  * logs a repo's remote: its host carries the account id.
+ *
+ * With `options.trees`, the layer keeps the tree objects its walks read
+ * (`readTree`, `listDir`, `diffTrees`), each layer built its own, so the cache
+ * lives as long as the runtime that built it.
  */
-export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>>) {
+export function CodeHostArtifacts(
+  namespaces: Readonly<Record<string, Artifacts>>,
+  options: CodeHostOptions = {},
+) {
   const binding = (repo: RepoRef): Artifacts => {
     const found = namespaces[repo.namespace];
     if (found === undefined)
@@ -227,9 +282,12 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
       }),
     );
 
-  return Layer.succeed(
-    CodeHost,
-    CodeHost.of({
+  return Layer.sync(CodeHost, () => {
+    const kept = options.trees === undefined ? undefined : treeCache(options.trees);
+    /** The handle's tree reads, through this layer's cache when it keeps one. */
+    const treesOf = (repo: RepoRef, handle: ArtifactsRepo): TreeReader =>
+      kept === undefined ? objectsOf(handle) : kept(repo, objectsOf(handle));
+    return CodeHost.of({
       // create() and fork() each return a day-long write token Keel never uses: revoke it at once, so no pooled repo carries a standing credential.
       create: (repo) =>
         Effect.tryPromise({
@@ -328,7 +386,7 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
         ),
       readTree: (repo, commit) =>
         onObjects(repo, async (handle) =>
-          listTree(objectsOf(handle), await rootTree(handle, commit), ""),
+          listTree(treesOf(repo, handle), await rootTree(handle, commit), ""),
         ),
       readBlob: (repo, oid) =>
         onObjects(repo, async (handle) => {
@@ -336,8 +394,27 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
           if (blob === null) throw new MissingObject(oid);
           return new Uint8Array(await blob.arrayBuffer());
         }),
+      readBlobs: (repo, oids) =>
+        onRepo(repo, async (handle) => {
+          const read = async (oid: string): Promise<Result.Result<Uint8Array, ObjectNotFound>> => {
+            const blob = await handle.readBlob(oid);
+            return blob === null
+              ? Result.fail(new ObjectNotFound({ repo: plain(repo), oid }))
+              : Result.succeed(new Uint8Array(await blob.arrayBuffer()));
+          };
+          // A few readers take the next blob from one queue, all through this one handle.
+          const queue = oids.entries();
+          const answers: Result.Result<Uint8Array, ObjectNotFound>[] = [];
+          const reader = async (): Promise<void> => {
+            for (const [at, oid] of queue) answers[at] = await read(oid);
+          };
+          await Promise.all(Array.from({ length: BLOB_READS }, reader));
+          return answers;
+        }),
       listDir: (repo, commit, path) =>
-        onObjects(repo, (handle) => directory(handle, commit, path)).pipe(
+        onObjects(repo, async (handle) =>
+          directory(treesOf(repo, handle), await rootTree(handle, commit), path),
+        ).pipe(
           Effect.flatMap((entries) =>
             entries === NO_DIRECTORY
               ? Effect.fail(new PathNotFound({ repo: plain(repo), commit, path }))
@@ -365,9 +442,9 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
             rootTree(handle, base),
             rootTree(handle, head),
           ]);
-          return diffTrees(objectsOf(handle), before, after);
+          return diffTrees(treesOf(repo, handle), before, after);
         }),
       delete: (repo) => Effect.promise(() => binding(repo).delete(repo.name)).pipe(Effect.asVoid),
-    }),
-  );
+    });
+  });
 }

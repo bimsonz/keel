@@ -1,4 +1,4 @@
-import { Context, type Effect, Schema } from "effect";
+import { Context, type Effect, type Result, Schema } from "effect";
 import type { CommitSha, Instant } from "../../domain/kernel/index.ts";
 
 export interface RepoRef {
@@ -192,6 +192,16 @@ export class CodeHost extends Context.Service<
       repo: RepoRef,
       oid: string,
     ) => Effect.Effect<Uint8Array, RepoNotFound | ObjectNotFound>;
+    /**
+     * Each blob as `readBlob` answers it, in the order asked, read together:
+     * a host that opens a repo for a read opens it once for all of them. A
+     * blob the repo lacks is that blob's ObjectNotFound, and the others are
+     * still read; a missing repo fails the whole call.
+     */
+    readonly readBlobs: (
+      repo: RepoRef,
+      oids: readonly string[],
+    ) => Effect.Effect<readonly Result.Result<Uint8Array, ObjectNotFound>[], RepoNotFound>;
     /**
      * The immediate entries of the directory at `path` in the commit (`""` is
      * the root), in git order, each `path` repo-relative. Only the trees on the

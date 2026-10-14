@@ -2,15 +2,17 @@
 # kills: flow-source.base-not-head
 # why: The flow is read from the ref's head, so a change can edit its own checks
 diff --git a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
-index 403c251..9fe3753 100644
+index f3aee703..d8eebe5c 100644
 --- a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
-@@ -24,7 +24,7 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+@@ -26,8 +26,9 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+         : Effect.map(host.readBlob(repo, entry.oid), (bytes) => utf8.decode(bytes));
+     };
      return FlowSpecSource.of({
-       read: (repo, base) =>
+-      read: (repo, base) =>
++      read: (repo, _base) =>
          Effect.gen(function* () {
--          const entries = yield* host.readTree(repo, base);
-+          const entries = yield* host.readTree(repo, yield* Effect.orDie(host.head(repo, "refs/heads/main")));
-           const flowJson = yield* textAt(repo, entries, FLOW_SPEC_PATH);
-           const packageJson = yield* textAt(repo, entries, "package.json");
-           return {
++          const base = yield* Effect.orDie(host.head(repo, "refs/heads/main"));
+           const root = yield* host.listDir(repo, base, "");
+           const keel = root.some((e) => e.path === KEEL_DIR && e.type === "tree")
+             ? yield* host.listDir(repo, base, KEEL_DIR)

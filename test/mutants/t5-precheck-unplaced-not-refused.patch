@@ -2,7 +2,7 @@
 # kills: t5.pool.namespace-step
 # why: A submission to a project with no place is not refused: Precheck goes on to read, derive and compile under no namespace
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 908f4187..7066c04c 100644
+index c0a16003..33cc9a73 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
 @@ -126,7 +126,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
@@ -10,6 +10,6 @@ index 908f4187..7066c04c 100644
          workspace.projectId,
        );
 -      if (namespace === undefined) return await refuse(refuseUnplaced(workspace.projectId));
-       const ancestry = done(
+       const ancestry = settledValue(
          await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
        );

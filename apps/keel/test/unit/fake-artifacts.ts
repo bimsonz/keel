@@ -1,7 +1,8 @@
 /**
- * An Artifacts binding in memory, for the token rules and the import's
- * answers only: repos, their tokens and their state, and what an import was
- * asked for. Reads and git content are the live tests' job.
+ * An Artifacts binding in memory, for the token rules, the import's answers
+ * and reads by id: repos, their tokens and their state, what an import was
+ * asked for, the objects a test chose for a repo under the ids it chose, and
+ * each handle opened and object read. Git content itself is the live tests' job.
  */
 interface FakeToken {
   readonly id: string;
@@ -22,13 +23,42 @@ export const fakeRemote = (name: string) => `https://fake.invalid/git/ns/${name}
 
 type ImportParams = Parameters<Artifacts["import"]>[0];
 
+/** The objects a repo serves, each under the id a test chose: none it is not given. */
+export interface FakeObjects {
+  /** Each commit's root tree. */
+  readonly commits?: Readonly<Record<string, string>>;
+  readonly trees?: Readonly<Record<string, readonly ArtifactsTreeEntry[]>>;
+  /** Each blob's content, as text. */
+  readonly blobs?: Readonly<Record<string, string>>;
+}
+
+/** One object read through a handle. */
+export interface FakeRead {
+  readonly kind: "commit" | "tree" | "blob";
+  readonly repo: string;
+  readonly oid: string;
+}
+
 export class FakeArtifacts implements Artifacts {
   readonly repos = new Map<string, FakeToken[]>();
   /** Every import asked for, as the binding was handed it. */
   readonly imports: ImportParams[] = [];
   /** What the next import throws in place of importing. */
   refusal: Error | undefined;
+  /** The repo of every handle `get()` opened, in order. */
+  readonly opened: string[] = [];
+  /** Every object read through a handle, in order, found or not. */
+  readonly reads: FakeRead[] = [];
+  /** Blob ids whose reads answer a little after the others, so reads made together finish out of the order asked. */
+  readonly slow = new Set<string>();
+  private readonly objects = new Map<string, FakeObjects>();
   private minted = 0;
+
+  /** Makes `name` a repo that serves `objects`. */
+  serve(name: string, objects: FakeObjects): void {
+    if (!this.repos.has(name)) this.repos.set(name, []);
+    this.objects.set(name, objects);
+  }
 
   private mint(name: string, scope: "read" | "write"): FakeToken {
     this.minted += 1;
@@ -63,7 +93,11 @@ export class FakeArtifacts implements Artifacts {
   get(name: string): Promise<ArtifactsRepo> {
     if (!this.repos.has(name))
       return Promise.reject(new NotFound(`Repository not found: ${name}.`));
+    this.opened.push(name);
     const tokens = () => this.repos.get(name) ?? [];
+    const served = () => this.objects.get(name) ?? {};
+    const read = (kind: FakeRead["kind"], oid: string) =>
+      this.reads.push({ kind, repo: name, oid });
     const repo: ArtifactsRepo = {
       createToken: (scope = "write") => {
         const t = this.mint(name, scope);
@@ -104,9 +138,35 @@ export class FakeArtifacts implements Artifacts {
           source: null,
           readOnly: false,
         }),
-      readBlob: () => unfaked("readBlob"),
-      readTree: () => unfaked("readTree"),
-      readCommit: () => unfaked("readCommit"),
+      readBlob: async (hash) => {
+        read("blob", hash);
+        if (this.slow.has(hash)) await new Promise((resolve) => setTimeout(resolve, 5));
+        const text = served().blobs?.[hash];
+        return text === undefined ? null : new Blob([text]);
+      },
+      readTree: (hash) => {
+        read("tree", hash);
+        const entries = served().trees?.[hash];
+        return Promise.resolve(entries === undefined ? null : [...entries]);
+      },
+      readCommit: (hash) => {
+        read("commit", hash);
+        const tree = served().commits?.[hash];
+        return Promise.resolve(
+          tree === undefined
+            ? null
+            : {
+                hash,
+                treeHash: tree,
+                message: "",
+                author: { name: "Keel", email: "keel@keel.invalid" },
+                committer: { name: "Keel", email: "keel@keel.invalid" },
+                parents: [],
+                authoredAt: 0,
+                committedAt: 0,
+              },
+        );
+      },
       readFile: () => unfaked("readFile"),
       log: () => unfaked("log"),
       [Symbol.dispose]: () => undefined,

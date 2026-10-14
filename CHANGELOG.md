@@ -70,6 +70,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 ### Added
 
 - **An agent reads a project's code through Keel's MCP** (additive: two MCP tools, no route, field or rule). `Repo_getTree` and `Repo_getBlob` are tagged `mcp`, with the same handlers and the same authorization as over REST (a project read), so an agent with no filesystem lists trunk's tree and reads a file at a ref without a second token. Each gains a description of what `ref` and `path` default to. `[mcp.read]` (pool) holds that each tool answers what REST answers, and refuses another project's agent as REST does.
+- **`CodeHost.readBlobs`** (for the precheck's speed-up; additive, a port method). `readBlobs(repo, oids)` answers each blob as `readBlob` would, in the order asked, as a `Result` per blob: one the repo lacks is that blob's `ObjectNotFound` and the others are still read, and a missing repo fails the call `RepoNotFound`. On Artifacts it opens the repo once for all of them; the HTTP isolate's read cache serves each blob it holds and reads only the rest. The memory adapter and the contract have it.
 
 - **Keel's propositions and citations told in MFP 0.2, and back** (`coordination/mfp-wire.ts`). Pure and unused until the edge calls it: Keel's stored propositions, events and rows do not move.
   - `MfpPremiseProposition`, `MfpEffectProposition` (with the invalidation form, a freshness effect told by its value), `MfpShape`, `MfpAnchor` and `MfpCitation`, typed as 0.2's schema states them.

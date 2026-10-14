@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/flow-spec-source.test.ts
+# kills: flow-source.reads-two-listings
+# why: Flow walks the base's whole tree again for the root's names and two files, so its cost grows with the repo
+diff --git a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+index f3aee703..d861242c 100644
+--- a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
++++ b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+@@ -28,10 +28,9 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+     return FlowSpecSource.of({
+       read: (repo, base) =>
+         Effect.gen(function* () {
+-          const root = yield* host.listDir(repo, base, "");
+-          const keel = root.some((e) => e.path === KEEL_DIR && e.type === "tree")
+-            ? yield* host.listDir(repo, base, KEEL_DIR)
+-            : [];
++          const entries = yield* host.readTree(repo, base);
++          const root = entries.filter((e) => !e.path.includes("/"));
++          const keel = entries.filter((e) => e.path.startsWith(`${KEEL_DIR}/`));
+           const flowJson = yield* textAt(repo, keel, FLOW_SPEC_PATH);
+           const packageJson = yield* textAt(repo, root, "package.json");
+           return {
