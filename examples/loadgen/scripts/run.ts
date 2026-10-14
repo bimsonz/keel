@@ -127,18 +127,15 @@ async function account(): Promise<{
 }
 const me = await account();
 const pace = new Pace(TOKENS_PER_MINUTE);
-const fetch = paced(
-  (input, init) => globalThis.fetch(input, init),
-  pace,
-  (await discover(keel)).tokenEndpoint,
-);
+const { tokenEndpoint } = await discover(keel);
+// Each client its own pace-held fetch: a slot it was given and could not use is kept for its retry.
 const client = (runLabel: string, project?: string) =>
   new KeelClient({
     baseUrl: keel,
     agentId: me.agentId,
     key: me.signer,
     run: runLabel,
-    fetch,
+    fetch: paced((input, init) => globalThis.fetch(input, init), pace, tokenEndpoint),
     ...(project === undefined ? {} : { project }),
   });
 const own = client(`lg-${run}-owner`);
@@ -423,6 +420,7 @@ const written = {
   endedAt: new Date().toISOString(),
   timedOut: Date.now() > deadline,
   tokenRefusals: pace.refused,
+  tokensSignedAgain: pace.signedAgain,
   outcomes: {
     landed: outcomes.filter((r) => r.outcome === "landed").length,
     gaveUp: outcomes.filter((r) => r.outcome === "gave-up").length,
@@ -491,7 +489,7 @@ ${[
   ),
 ].join("\n")}
 
-Trunk breaks: ${breaks.length}. Token refusals (429): ${pace.refused}.
+Trunk breaks: ${breaks.length}. Token refusals (429): ${pace.refused}. Token requests held past their signature's life and signed again: ${pace.signedAgain}.
 Benchmark recall (≥ 70%): ${pct(bench.recall)}; decoy false positives (≤ 20%): ${pct(bench.falsePositiveRate)}; pairs Keel never saw: ${bench.unrun}.`);
 for (const [kind, k] of Object.entries(bench.byKind))
   console.log(

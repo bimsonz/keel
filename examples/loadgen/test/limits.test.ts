@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Pace, paced, slotAfter } from "../src/limits.ts";
+import { FRESH_MS, Pace, paced, slotAfter } from "../src/limits.ts";
 
 const MINUTE = 60_000;
 
@@ -41,7 +41,7 @@ describe("the token pace", () => {
     expect(t.waits.toSorted((a, b) => a - b)).toEqual(granted.filter((g) => g > 0));
   });
 
-  it("[loadgen.pace-tokens-only] holds only the token requests to the pace", async () => {
+  it("[loadgen.pace-tokens-only] holds only the token requests to the pace, and sends one whose wait is short", async () => {
     const t = stopped();
     const sent: string[] = [];
     const fetch = paced(
@@ -53,14 +53,43 @@ describe("the token pace", () => {
       TOKEN,
     );
     await Promise.all(
-      Array.from({ length: 60 }, () => fetch(TOKEN, { method: "POST", body: "grant_type=x" })),
+      Array.from({ length: 50 }, () => fetch(TOKEN, { method: "POST", body: "grant_type=x" })),
     );
-    expect(t.waits).toHaveLength(10);
+    expect(t.waits).toEqual([]);
+    // The minute's slots are taken: ten seconds before it ends, the next waits ten seconds and is sent.
+    t.set(50_000);
+    const late = await fetch(TOKEN, { method: "POST" });
+    expect([late.status, t.waits]).toEqual([200, [10_000]]);
     await Promise.all(
       Array.from({ length: 30 }, (_, i) => fetch(`https://keel.test/v1/changes/c${i}`, {})),
     );
-    expect(t.waits).toHaveLength(10);
-    expect(sent).toHaveLength(90);
+    expect(t.waits).toEqual([10_000]);
+    expect(sent).toHaveLength(81);
+  });
+
+  it("[loadgen.pace-fresh] a token request held past its signature's life is answered 429 unsent, and the client's retry goes on its slot at once", async () => {
+    const t = stopped();
+    const pace = new Pace(50, t.clock);
+    const sent: string[] = [];
+    const send = async (input: string) => {
+      sent.push(input);
+      return ok();
+    };
+    const others = paced(send, pace, TOKEN);
+    await Promise.all(Array.from({ length: 50 }, () => others(TOKEN, { method: "POST" })));
+
+    // The minute's slots are taken, so this client's request waits a minute: longer than it lives.
+    const fetch = paced(send, pace, TOKEN);
+    const held = await fetch(TOKEN, { method: "POST" });
+    expect([held.status, sent.length, pace.signedAgain, pace.refused]).toEqual([429, 50, 1, 0]);
+    expect(t.waits).toEqual([MINUTE]);
+    expect(MINUTE).toBeGreaterThan(FRESH_MS);
+
+    // Its retry, signed again, goes at once on the slot it kept; another client's waits its own turn.
+    const again = await fetch(TOKEN, { method: "POST" });
+    expect([again.status, sent.length, t.waits]).toEqual([200, 51, [MINUTE]]);
+    await others(TOKEN, { method: "POST" });
+    expect(t.waits).toHaveLength(2);
   });
 
   it("[loadgen.pace-refused] a 429 pauses every token request for its window and is answered as it came, never sent again", async () => {
