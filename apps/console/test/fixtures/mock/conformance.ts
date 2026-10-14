@@ -238,12 +238,14 @@ const RULES: Record<EventType, Rule[]> = {
   CredentialRemoved: [{ kind: "org", idField: "namespaceId" }],
   DeployTargetSet: [{ kind: "project", idField: "projectId", from: ["created"] }],
   DeployTargetCleared: [{ kind: "project", idField: "projectId", from: ["created"] }],
-  PreviewDeployed: [{ kind: "deployment", idField: "deploymentId", from: null, to: "live" }],
+  // Keel commits a candidate's preview on each of its member changes: the preview is known from the first.
+  PreviewDeployed: [change(undefined), { kind: "deployment", idField: "deploymentId", to: "live" }],
   PreviewTornDown: [
     { kind: "deployment", idField: "deploymentId", from: ["live"], to: "torn-down" },
   ],
   DeploymentPromoted: [{ kind: "deployment", idField: "deploymentId" }],
   DeploymentRolledBack: [{ kind: "deployment", idField: "deploymentId" }],
+  DeliveryRefused: [{ kind: "project", idField: "projectId", from: ["created"] }],
 };
 
 /** The proof that settles each kind of conflict with no probe. */

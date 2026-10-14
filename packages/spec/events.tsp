@@ -1700,13 +1700,21 @@ model DeployTargetCleared {
   by: UserId;
 }
 
+/** A candidate's preview went up, on one member change's stream: KeelVerify's preview step commits one for each. */
 model PreviewDeployed {
   _tag: "PreviewDeployed";
   deploymentId: DeploymentId;
+  changeId: ChangeId;
+  candidateId: CandidateId;
   world: string;
   target: DeployTargetName;
   provider: DeployProvider;
+
+  /** The candidate's own version. */
   url: string;
+
+  /** The change's stable address, when the candidate is that one change's. */
+  aliasUrl?: string;
 }
 
 model PreviewTornDown {
@@ -1728,6 +1736,22 @@ model DeploymentRolledBack {
   deploymentId: DeploymentId;
   to: string;
   reason: string;
+}
+
+/** Trunk advanced and Keel deployed nothing: the Deliver workflow commits it on the project's stream. Members only. */
+model DeliveryRefused {
+  _tag: "DeliveryRefused";
+  projectId: ProjectId;
+  trunkSha: CommitSha;
+
+  /** The landed candidate, when there is one. */
+  candidateId?: CandidateId;
+
+  /** `commit-differs`: trunk's new commit is not the candidate's own commit that was previewed (a batch composed new commits, or a landing by commutation), so the version Keel previewed is not trunk's tree and is not promoted. `no-preview`: no preview of the landed candidate was made (no connected account for the deploy spec's target, or the preview did not pass). `promote-failed`: Cloudflare did not take the promote. */
+  reason: "commit-differs" | "no-preview" | "promote-failed";
+
+  /** Why, in words: for `promote-failed`, what Cloudflare answered. The token is never in it. */
+  detail: string;
 }
 
 // ─── The catalogue ──────────────────────────────────────────────────────────
@@ -1858,4 +1882,5 @@ union KeelEvent {
   PreviewTornDown,
   DeploymentPromoted,
   DeploymentRolledBack,
+  DeliveryRefused,
 }

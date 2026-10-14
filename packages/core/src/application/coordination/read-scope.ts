@@ -22,7 +22,8 @@ type EventType = (
  * - operator data: an agent's enrolment (its scopes and its sponsor) and its
  *   standing (suspended, reinstated or revoked, with the reasons), a
  *   project's settings and deploy targets (an account and a credential's id),
- *   and the credentials an org stores (their labels, never their secrets);
+ *   the credentials an org stores (their labels, never their secrets), and
+ *   why Keel deployed nothing when trunk advanced (Cloudflare's answer);
  * - escalations and rulings: the question, its options and the rationale. That
  *   a conflict waits on a ruling is the conflict's own state, so
  *   ConflictEscalated is public;
@@ -153,6 +154,8 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   PreviewTornDown: "public",
   DeploymentPromoted: "public",
   DeploymentRolledBack: "public",
+  // Why trunk advanced and nothing was deployed, in Cloudflare's words about the project's account: operator data.
+  DeliveryRefused: "members",
 };
 
 const AUDIENCE = new Map<string, Audience>(Object.entries(EVENT_AUDIENCE));

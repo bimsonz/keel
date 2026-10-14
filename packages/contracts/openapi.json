@@ -14059,6 +14059,55 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "DeliveryRefused": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "trunkSha",
+          "reason",
+          "detail"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DeliveryRefused"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "trunkSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "candidateId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CandidateId"
+              }
+            ],
+            "description": "The landed candidate, when there is one."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "commit-differs",
+              "no-preview",
+              "promote-failed"
+            ],
+            "description": "`commit-differs`: trunk's new commit is not the candidate's own commit that was previewed (a batch composed new commits, or a landing by commutation), so the version Keel previewed is not trunk's tree and is not promoted. `no-preview`: no preview of the landed candidate was made (no connected account for the deploy spec's target, or the preview did not pass). `promote-failed`: Cloudflare did not take the promote."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Why, in words: for `promote-failed`, what Cloudflare answered. The token is never in it."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Trunk advanced and Keel deployed nothing: the Deliver workflow commits it on the project's stream. Members only."
+      },
       "DeployProvider": {
         "type": "string",
         "enum": [
@@ -16423,6 +16472,9 @@
           },
           {
             "$ref": "#/components/schemas/DeploymentRolledBack"
+          },
+          {
+            "$ref": "#/components/schemas/DeliveryRefused"
           }
         ],
         "description": "Any event in the catalogue. `_tag` names it."
@@ -20303,6 +20355,8 @@
         "required": [
           "_tag",
           "deploymentId",
+          "changeId",
+          "candidateId",
           "world",
           "target",
           "provider",
@@ -20318,6 +20372,12 @@
           "deploymentId": {
             "$ref": "#/components/schemas/DeploymentId"
           },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
           "world": {
             "type": "string"
           },
@@ -20328,12 +20388,18 @@
             "$ref": "#/components/schemas/DeployProvider"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "The candidate's own version."
+          },
+          "aliasUrl": {
+            "type": "string",
+            "description": "The change's stable address, when the candidate is that one change's."
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "A candidate's preview went up, on one member change's stream: KeelVerify's preview step commits one for each."
       },
       "PreviewTornDown": {
         "type": "object",

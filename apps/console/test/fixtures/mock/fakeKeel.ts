@@ -151,6 +151,7 @@ export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
   "CredentialRemoved",
   "DeployTargetSet",
   "DeployTargetCleared",
+  "DeliveryRefused",
 ]);
 
 /** The cookie Keel keeps a session in. */
