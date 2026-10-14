@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/cloudflare-api.test.ts -t deploy.store-unreachable
+# kills: deploy.store-unreachable
+# why: the API's own outage, a 503, is taken as a refusal and stops the deploy where one more try would pass
+diff --git a/scripts/lib/cloudflare-api.ts b/scripts/lib/cloudflare-api.ts
+index 144abc71..95ba0ba8 100644
+--- a/scripts/lib/cloudflare-api.ts
++++ b/scripts/lib/cloudflare-api.ts
+@@ -19,7 +19,7 @@ export const STORE_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
+ 
+ /** Whether a failure says nothing of the store: no answer at all (a connect timeout, a reset), or the API's own 429 or 5xx. */
+ const untold = (error: unknown): boolean =>
+-  !(error instanceof ApiRefused) || error.status === 429 || error.status >= 500;
++  !(error instanceof ApiRefused) || error.status === 429;
+ 
+ /**
+  * Checks that the store `path` names exists, failing loudly with what to do.

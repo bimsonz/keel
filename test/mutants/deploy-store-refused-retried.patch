@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/cloudflare-api.test.ts -t deploy.store-refused
+# kills: deploy.store-refused
+# why: a 403 is tried again and then called unreachable, so a token without the right permission reads as an outage
+diff --git a/scripts/lib/cloudflare-api.ts b/scripts/lib/cloudflare-api.ts
+index 144abc71..27ac1bdb 100644
+--- a/scripts/lib/cloudflare-api.ts
++++ b/scripts/lib/cloudflare-api.ts
+@@ -41,7 +41,7 @@ export async function verifyStore(
+     } catch (error) {
+       if (error instanceof ApiRefused && error.status === 404)
+         throw new Error(`${store.name} does not exist; ${store.missing}`, { cause: error });
+-      if (!untold(error))
++      if (untold(error) === undefined)
+         throw new Error(`${store.name} could not be checked: the API refused it`, { cause: error });
+       const delay = backoff[attempt];
+       if (delay === undefined)
