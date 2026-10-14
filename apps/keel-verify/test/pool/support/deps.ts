@@ -149,7 +149,7 @@ export const put = (
   fromBox(containerId, `http://deps.keel.internal${path}`, { method: "PUT", body, headers });
 
 /** The toolchain the image states, as the box prints it. */
-export const TOOLCHAIN = "node v22.22.3 pnpm 11.18.0";
+export const TOOLCHAIN = "node v22.22.3 pnpm 11.18.0 ubuntu 24.04";
 
 /** A deps box's report of a finished build, as its command prints it. */
 export const reportOf = (parts: readonly Part[], toolchain: string = TOOLCHAIN): string =>

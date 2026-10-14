@@ -24,9 +24,11 @@ import { readMarkers, type RunnerEvidence } from "./runner-output.ts";
 
 /**
  * The toolchain a deps bundle is built with, as the deps box's image states
- * it. A pointer records it, and one built with another is never reused.
+ * it: node, pnpm and the box's base, since a native module built against
+ * another libc is another bundle. A pointer records it, and one built with
+ * another is never reused.
  */
-export const DEPS_TOOLCHAIN = "node v22.22.3 pnpm 11.18.0";
+export const DEPS_TOOLCHAIN = "node v22.22.3 pnpm 11.18.0 ubuntu 24.04";
 
 /** The size the gzipped archive is split at: every part but the last is exactly this long. */
 export const DEPS_PART_BYTES = 32 * 1024 * 1024;
@@ -432,7 +434,7 @@ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
   "local-directory": `the lockfile installs a directory of the repository's own (a file: or injected dependency), which is not installed: depend on it as a workspace package or from the registry`,
   "off-registry": `the lockfile names a package that is not from https://registry.npmjs.org/, the only registry installed from: depend on a registry package`,
   "install-timeout": `the install ran longer than ${DEPS_INSTALL_SECONDS} seconds: depend on less`,
-  "toolchain-switched": `the repository made another pnpm run the install: name ${DEPS_TOOLCHAIN.slice(DEPS_TOOLCHAIN.indexOf("pnpm")).replace(" ", "@")} as its packageManager, or none`,
+  "toolchain-switched": `the repository made another pnpm run the install: name ${DEPS_TOOLCHAIN.replace(/^.*\bpnpm (\S+).*$/, "pnpm@$1")} as its packageManager, or none`,
   "too-large": `the installed dependencies come to more than ${DEPS_MAX_BYTES / 1024 ** 3} GiB gzipped: depend on less`,
   "no-node-modules": `the install made no node_modules: add the dependencies the suite and the typecheck run with, and commit the ${LOCKFILE}`,
 };

@@ -27,9 +27,11 @@ catalog:
   oxlint-tsgolint: 7.0.2004
   vitest: 5.0.3
   "@cloudflare/vitest-plugin": 1.4.0
-  # Tier 2: @cloudflare/ci pins the sandbox it runs on; they move together.
+  # Tier 2: @cloudflare/ci runs on the sandbox's 0.x Sandbox class. Its 0.2.0 pins
+  # sandbox 0.12.1; the override below holds it to this one, the newest 0.x, which
+  # keel-verify's image runs the server of (containers/sandbox/Dockerfile).
   "@cloudflare/ci": 0.2.0
-  "@cloudflare/sandbox": 0.12.1
+  "@cloudflare/sandbox": 0.12.10
   wrangler: 4.149.0
   "@cloudflare/workers-types": 5.20261010.1
   # Tier 1: bundles a probe over a world inside the VerifierDO (esbuild-wasm); it never installs.
@@ -98,6 +100,10 @@ catalog:
   "@better-auth/oauth-provider": 1.7.7
   # The console's browser checks (apps/console/scripts): run by hand, never in CI.
   playwright: 1.64.0
+
+# One sandbox SDK in the workspace: the one the image's server matches.
+overrides:
+  "@cloudflare/ci>@cloudflare/sandbox": "catalog:"
 
 minimumReleaseAgeExclude:
   - "@oxlint-tsgolint/darwin-arm64@7.0.2004"

@@ -367,7 +367,7 @@ describe("a deps build", () => {
     expect(await pointerAt(X, L)).toEqual({
       format: "keel.deps/1",
       install: L,
-      toolchain: "node v22.22.3 pnpm 11.18.0",
+      toolchain: "node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
       parts,
       files: 1735,
       installMs: 5000,
@@ -508,7 +508,7 @@ describe("a deps build", () => {
       JSON.stringify({
         format: "keel.deps/1",
         install: L,
-        toolchain: "node v22.22.3 pnpm 11.18.0",
+        toolchain: "node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
         parts: [],
         files: 0,
         installMs: 900,
@@ -554,7 +554,7 @@ describe("a deps build", () => {
       JSON.stringify({
         format: "keel.deps/1",
         install: M,
-        toolchain: "node v22.22.3 pnpm 11.18.0",
+        toolchain: "node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
         parts: [stored],
         files: 12,
         installMs: 900,
@@ -600,26 +600,26 @@ describe("a deps build", () => {
     expect(await pointerAt(X, L)).toEqual({
       format: "keel.deps/1",
       install: L,
-      toolchain: "node v22.22.3 pnpm 11.18.0",
+      toolchain: "node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
       parts: [part],
       files: 1735,
       installMs: 5000,
     });
   });
 
-  it("[deps.pool.toolchain] writes no pointer for a box that built with another toolchain", async () => {
+  it("[deps.pool.toolchain] writes no pointer for a box that built with another toolchain, the same node and pnpm on another base included", async () => {
     const L = digest("b");
     const box = boxNamed(`deps:${X}:${L}`);
-    const body = bytesOf("built by another node");
+    const body = bytesOf("built on another base");
     const part = await partOf(body);
     box.runs(async () => {
       await put(box.id, `/${part.sha256}`, body);
-      return reportOf([part], "node v24.1.0 pnpm 11.18.0");
+      return reportOf([part], "node v22.22.3 pnpm 11.18.0 ubuntu 22.04");
     });
     expect(await answered(box.stub.build(request(X, L)))).toEqual({
       _tag: "DepsUnavailable",
       reason:
-        "toolchain-mismatch: the box built with node v24.1.0 pnpm 11.18.0, not node v22.22.3 pnpm 11.18.0",
+        "toolchain-mismatch: the box built with node v22.22.3 pnpm 11.18.0 ubuntu 22.04, not node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
     });
     expect(await pointerAt(X, L)).toBeNull();
   });

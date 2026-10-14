@@ -212,7 +212,7 @@ describe("the Tier 1 probe runner", () => {
     const inDeps = {
       format: "keel.deps/1",
       install: hex,
-      toolchain: "node v22.22.3 pnpm 11.18.0",
+      toolchain: "node v22.22.3 pnpm 11.18.0 ubuntu 24.04",
       parts: [{ sha256: "f".repeat(64), bytes: 5 }],
       files: 1,
       installMs: 1,

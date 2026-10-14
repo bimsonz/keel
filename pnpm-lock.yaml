@@ -19,8 +19,8 @@ catalogs:
       specifier: 2.14.0
       version: 2.14.0
     '@cloudflare/sandbox':
-      specifier: 0.12.1
-      version: 0.12.1
+      specifier: 0.12.10
+      version: 0.12.10
     '@cloudflare/vitest-plugin':
       specifier: 1.4.0
       version: 1.4.0
@@ -180,6 +180,9 @@ catalogs:
     zod:
       specifier: 4.6.5
       version: 4.6.5
+
+overrides:
+  '@cloudflare/ci>@cloudflare/sandbox': 0.12.10
 
 importers:
 
@@ -393,7 +396,7 @@ importers:
         version: 0.2.0
       '@cloudflare/sandbox':
         specifier: 'catalog:'
-        version: 0.12.1
+        version: 0.12.10
       '@cloudflare/worker-bundler':
         specifier: 'catalog:'
         version: 0.2.6(supports-color@10.2.2)
@@ -841,8 +844,8 @@ packages:
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
 
-  '@cloudflare/sandbox@0.12.1':
-    resolution: {integrity: sha512-P1ZmNDLYtuEY1ZUcAx0OgTol98VqS617LGd4nf1RTOjSV2yHLDAp59NI36/gg3/pxkHPgmAEyFIjH/ie8FoA7g==}
+  '@cloudflare/sandbox@0.12.10':
+    resolution: {integrity: sha512-245s6xEdR1v0Jti0YYd8ORWcTG/f/ksjJfpubvnbky0KxFC/ZDOpbpNKdtyiRBYZqmJGtEncYW7Cwge47tDrpg==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -4371,7 +4374,7 @@ snapshots:
 
   '@cloudflare/ci@0.2.0':
     dependencies:
-      '@cloudflare/sandbox': 0.12.1
+      '@cloudflare/sandbox': 0.12.10
       zod: 4.6.5
     transitivePeerDependencies:
       - '@openai/agents'
@@ -4404,7 +4407,7 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/sandbox@0.12.1':
+  '@cloudflare/sandbox@0.12.10':
     dependencies:
       '@cloudflare/containers': 0.3.7
       aws4fetch: 1.0.20

@@ -56,6 +56,10 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
   - CLI: `keeltown project create` takes exactly one of `--empty`, `--import <url> [--ref <branch>]`, `--fork <prj_…>` and `--template <name>`, in place of `--source`.
 - **A `why` link carries its MFP record** (the domain's `WhyLink`; core only, and nothing read it: `why` was a stub). The domain's `WhyLink {summary, recordId}` is `{summary, record: MfpRecord}`, as the spec's `WhyLink` always had it. The stub `why(principal, target)` is the use-case `why(project, target)`, and `WhyTarget`'s `{kind: "line", path, line}` is `{kind: "path", path, line?}`.
 
+### Changed
+
+- **keel-verify's boxes run on one current image** (no contract change). The suite box and the deps box share `apps/keel-verify/containers/sandbox/Dockerfile`: Ubuntu 24.04, the base CI runs on, with the server of `@cloudflare/sandbox` 0.12.10 (the workspace's catalog pins it, and an override holds `@cloudflare/ci` to it, so one SDK drives both classes and matches the image); git 2.55.0, built from kernel.org's tarball checked by its sha256, so GitCore's oracle tests pass in a box as they do in CI; node 22.22.3 from nodejs.org's tarball checked by its sha256; pnpm 11.18.0; and `openssh-client`. The toolchain line names the base too (`DEPS_TOOLCHAIN` is `node v22.22.3 pnpm 11.18.0 ubuntu 24.04`), so a deps bundle built on the earlier image is treated as missing and built again once, under the same install digest.
+
 ### Added
 
 - **An agent asks for a sponsor and joins an org from the CLI** (the CLI alone: no route, event or migration). `keeltown agent sponsor-request` asks Keel for a sponsor as the agent the machine's key signed up and prints the page where a signed-in person approves it; `keeltown agent join <namespace>` accepts an org's invitation by its handle (`--key` is the idempotency key). Each is one SDK call (`askSponsor`, `acceptInvitation`) and each takes `--profile`, so one machine's second agent asks and joins as itself.
