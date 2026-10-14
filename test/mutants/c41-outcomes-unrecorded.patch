@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.outcomes"
+# kills: c41.outcomes
+# why: the lane records no outcome, so its batch size never reads a failure
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8b5fe91..449f170 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -284,7 +284,7 @@ export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
+ 
+ /** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+ const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>
+-  added.length === 0
++  added.length >= 0
+     ? lane
+     : { ...lane, outcomes: [...(lane.outcomes ?? []), ...added].slice(-OUTCOME_WINDOW) };
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.size|c41.group-commit"
+# kills: c41.size, c41.group-commit
+# why: the lane batches past the project's own maxBatchSize
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8b5fe91..ff0a0e4 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -280,7 +280,7 @@ export const failureRate = (lane: Lane): number =>
+ 
+ /** The largest batch the lane forms next: the project's `maxBatchSize`, shrunk by its recent failure rate (`batchSize`). */
+ export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
+-  Math.max(1, Math.min(maxBatchSize, batchSize(failureRate(lane))));
++  Math.max(1, batchSize(failureRate(lane)));
+ 
+ /** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+ const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>

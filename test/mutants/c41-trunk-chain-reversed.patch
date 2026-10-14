@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.group-commit"
+# kills: lane.do.group-commit
+# why: trunk lands each member of a group commit at another member's commit
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 757595b..3947d45 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -611,7 +611,7 @@ const memberCommits = (projectId: ProjectId, batch: QueuedBatch, tip: CommitSha)
+           `candidate ${batch.candidateId} is not ${n} commits on ${batch.base}: its chain reads ${chain.map((c) => c.sha).join(" < ")}`,
+         ),
+       );
+-    const oldestFirst = chain.slice(0, n).toReversed();
++    const oldestFirst = chain.slice(0, n);
+     return batch.members.flatMap((changeId, i) => {
+       const own = oldestFirst[i];
+       return own === undefined ? [] : [{ changeId, commitSha: own.sha }];

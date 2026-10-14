@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t c41.unsettled
+# kills: c41.unsettled
+# why: a change does not name the changes it shares a suspected conflict with, so the lane batches them together
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index 925a79f..bd8ff8f 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -180,7 +180,7 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
+ });
+ 
+ /** The states in which a conflict is not settled: suspected or probing (`open`), proven, or with a person. */
+-const UNSETTLED: ReadonlySet<PartyConflict["state"]> = new Set(["open", "proven", "escalated"]);
++const UNSETTLED: ReadonlySet<PartyConflict["state"]> = new Set(["proven", "escalated"]);
+ 
+ /**
+  * The other changes `self` shares a conflict with that is not yet settled

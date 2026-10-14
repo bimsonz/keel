@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.union-plan"
+# kills: c41.union-plan
+# why: a batch of several runs only its head's plan, so a member's own checks never run
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8b5fe91..f99ea7d 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -696,7 +696,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+   }
+   const [first, ...rest] = joined.map((each) => each.changeId);
+   if (first !== head || rest.length === 0 || union === undefined) return alone;
+-  const planHash = yield* (yield* PlanStore).put(namespace, union);
++  const planHash = planOf(lane, head);
+   return { members: [first, ...rest], planHash } satisfies Chosen;
+ });
+ 

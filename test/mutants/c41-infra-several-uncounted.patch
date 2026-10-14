@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.infra-several"
+# kills: c41.infra-several
+# why: a member spent on the infrastructure in a batch of several never runs alone, so a batch that keeps failing on infra requeues for ever
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8b5fe91..9cfc1c8 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -575,7 +575,7 @@ const infraBlame = (
+       attribution: "infra",
+       lane: withAlone(
+         { ...others, infra: [...others.infra, ...counted] },
+-        spent.map((entry) => entry.changeId),
++        [],
+       ),
+     };
+   }

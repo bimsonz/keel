@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.unattributed-alone"
+# kills: c41.unattributed-alone
+# why: a failure of several no one is blamed for is never bisected, so its members wait for a CandidateBisected that never comes
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 8b5fe91..94d9325 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1646,7 +1646,7 @@ const issue = Effect.fn("integration/issue")(function* (
+   const committed = yield* onBatch(laneId, batch.id, cause, (now, lane) => {
+     const issued = issuedFor(verdict, now, lane);
+     exhausted = issued.exhausted;
+-    const bisected = issued.attribution === "unattributed";
++    const bisected = false;
+     return {
+       moves: [
+         {
