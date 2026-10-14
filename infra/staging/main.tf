@@ -93,6 +93,14 @@ resource "random_password" "better_auth" {
   special = false
 }
 
+# The swarm's admin bearer (examples/swarm): every route of keel-swarm but its
+# root needs it, the agents' own among them, since an open route would spend
+# the account's model calls. scripts/deploy.ts sets it as SWARM_ADMIN_TOKEN.
+resource "random_password" "swarm_admin" {
+  length  = 48
+  special = false
+}
+
 # The key pair that signs bundle URLs. keel signs every URL a sandbox is handed
 # with the private key, which scripts/deploy.ts sets as its
 # BUNDLE_URL_SIGNING_KEY secret. keel-verify's bundle host verifies with the

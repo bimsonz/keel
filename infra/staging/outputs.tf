@@ -12,6 +12,11 @@ output "better_auth_secret" {
   sensitive = true
 }
 
+output "swarm_admin_token" {
+  value     = random_password.swarm_admin.result
+  sensitive = true
+}
+
 output "bundle_url_signing_key" {
   value     = tls_private_key.bundle_url.private_key_pem_pkcs8
   sensitive = true

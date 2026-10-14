@@ -21,7 +21,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
-import { pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
+import { examplePinProblems, pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
 
 const USAGE = "usage: node scripts/deploy.ts <env> [--check] [--only <app>]";
@@ -66,8 +66,30 @@ function parseArguments(argv: readonly string[]): {
 }
 const { environment, checkOnly, only } = parseArguments(process.argv.slice(2));
 
-/** keel binds keel-verify's SANDBOX class and VERIFIER entrypoint, so keel-verify goes first. */
-const APPS = ["keel-verify", "keel", "console"] as const;
+/**
+ * keel binds keel-verify's SANDBOX class and VERIFIER entrypoint, so keel-verify
+ * goes first. The swarm is an example: hosted agents that use Keel only through
+ * its public API, deployed beside it.
+ */
+const APPS = ["keel-verify", "keel", "console", "swarm"] as const;
+type App = (typeof APPS)[number];
+
+/** Where each Worker's source is. */
+const SOURCE: Readonly<Record<App, string>> = {
+  "keel-verify": "apps/keel-verify",
+  keel: "apps/keel",
+  console: "apps/console",
+  swarm: "examples/swarm",
+};
+
+/**
+ * A Worker whose build writes the config it deploys from: the swarm's Vite
+ * build (Flue) adds its entry and its agent's Durable Object to the rendered
+ * config. The others deploy from the rendered config itself.
+ */
+const BUILT_CONFIG: Readonly<Partial<Record<App, string>>> = {
+  swarm: "dist/keel_swarm/wrangler.json",
+};
 
 if (only !== undefined && !APPS.some((app) => app === only))
   usage(`--only takes one of ${APPS.join(", ")}, not ${only}`);
@@ -129,9 +151,9 @@ function requireOutput(outputs: ReadonlyMap<string, string>, name: string, wante
   return value;
 }
 
-/** Writes apps/<dir>/wrangler.deploy.jsonc (gitignored) with the real ids and host filled in. */
-function render(dir: string, outputs: ReadonlyMap<string, string>): { name: string; config: Json } {
-  const source = `apps/${dir}/wrangler.jsonc`;
+/** Writes <source>/wrangler.deploy.jsonc (gitignored) with the real ids and host filled in. */
+function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string; config: Json } {
+  const source = `${SOURCE[dir]}/wrangler.jsonc`;
   let text = readFileSync(join(root, source), "utf8");
   const set = (path: (string | number)[], value: string) => {
     text = applyEdits(
@@ -177,8 +199,11 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
       requireOutput(outputs, "commit_signers", "the keys Keel signs commits with"),
     );
 
-  const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
-  const pins = pinProblems(rendered);
+  const rendered = parseConfig(text, `${SOURCE[dir]}/wrangler.deploy.jsonc`);
+  // An example runs no PlatformFunction: it names its own models in vars.*_MODEL.
+  const pins = SOURCE[dir].startsWith("examples/")
+    ? examplePinProblems(rendered)
+    : pinProblems(rendered);
   if (pins.length > 0)
     throw new Error(
       `${source}: ${pins.join("; ")}. Refusing to deploy: a PlatformFunction would run on no model, or one nobody chose.`,
@@ -189,7 +214,7 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
       `${source}: sentinel ${leftover[0]} survives rendering. Refusing to deploy: wrangler would provision a resource behind Terraform's back.`,
     );
   }
-  writeFileSync(join(root, "apps", dir, "wrangler.deploy.jsonc"), text);
+  writeFileSync(join(root, SOURCE[dir], "wrangler.deploy.jsonc"), text);
   return { name, config: rendered };
 }
 
@@ -236,6 +261,7 @@ const FROM_TERRAFORM: Readonly<Record<string, string>> = {
   BETTER_AUTH_SECRET: "better_auth_secret",
   BUNDLE_URL_SIGNING_KEY: "bundle_url_signing_key",
   KEEL_COMMIT_SIGNING_KEY: "commit_signing_key",
+  SWARM_ADMIN_TOKEN: "swarm_admin_token",
 };
 
 /** The secrets a config's `secrets.required` names. */
@@ -382,16 +408,25 @@ console.log(
 const scratch = mkdtempSync(join(tmpdir(), "keel-deploy-"));
 try {
   for (const app of deploying) {
-    const cwd = join(root, "apps", app.dir);
-    const args = ["deploy", "-c", "wrangler.deploy.jsonc", ...NO_PROVISIONING];
+    const cwd = join(root, SOURCE[app.dir]);
+    const args = [
+      "deploy",
+      "-c",
+      BUILT_CONFIG[app.dir] ?? "wrangler.deploy.jsonc",
+      ...NO_PROVISIONING,
+    ];
     if (objectsAt(app.config, "d1_databases").length > 0) {
       wrangler(["d1", "migrations", "apply", "DB", "--remote", "-c", "wrangler.deploy.jsonc"], {
         cwd,
         stream: true,
       });
     }
-    // A Worker with a build step (the console's vite build) builds before it deploys.
-    execFileSync("pnpm", ["--dir", cwd, "run", "--if-present", "build"], { stdio: "inherit" });
+    // A Worker with a build step (the console's vite build) builds before it deploys; one that
+    // builds its own config (the swarm's) builds it from the rendered one, which names the real host.
+    execFileSync("pnpm", ["--dir", cwd, "run", "--if-present", "build"], {
+      stdio: "inherit",
+      env: { ...process.env, KEEL_WRANGLER_CONFIG: "wrangler.deploy.jsonc" },
+    });
     const secrets = await secretsFor(app.name, app.config, outputs);
     const containers = objectsAt(app.config, "containers").length > 0;
     console.log(
