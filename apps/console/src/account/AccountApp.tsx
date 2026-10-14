@@ -36,6 +36,7 @@ import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
 import { Closing } from "./Closing.tsx";
 import { NamespaceCredentials } from "./Credentials.tsx";
+import { approveTerminal } from "./device.ts";
 import { wayToFresh } from "./fresh.ts";
 import { Fork, NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
@@ -56,7 +57,8 @@ type Reader =
 
 /**
  * Who is reading, asked of Keel once. A page that changes it goes to another address, where it is asked again;
- * the sponsor's page alone stays, since what it holds is in memory, and says who its touch signed in.
+ * the sponsor's page stays, since what it holds is in memory, and so does a terminal's, whose code is claimed for
+ * the account that opened it. Each says who its touch signed in.
  */
 function useReader(account: Account): [Reader, (who: Who) => void] {
   const [reader, setReader] = useState<Reader>({ is: "reading" });
@@ -563,21 +565,41 @@ function Settings({
   );
 }
 
-/** A terminal running `keeltown login` shows a code and sends its person here. */
-function Device({ account, who, userCode }: { account: Account; who: Who; userCode: string }) {
+/**
+ * A terminal running `keeltown login` shows a code and sends its person here. Approving it is a passkey touch
+ * every time, and then the approval. Someone who holds no passkey approves on the sign-in they have.
+ */
+function Device({
+  account,
+  who,
+  userCode,
+  onSignedIn,
+}: {
+  account: Account;
+  who: Who;
+  userCode: string;
+  onSignedIn: (who: Who) => void;
+}) {
+  // The code is claimed for whoever reads the page as it opens, and Keel lets that account alone approve it,
+  // whichever account a touch here signs in after.
+  const [claimer] = useState(who);
   const [typed, setTyped] = useState("");
-  const [claimed, setClaimed] = useState(false);
+  /** Null until the code is claimed; then whether the reader holds a passkey to approve it with. */
+  const [claimed, setClaimed] = useState<{ holdsPasskey: boolean } | null>(null);
   const [answer, setAnswer] = useState<"approved" | "denied" | null>(null);
   const [unclaimed, setUnclaimed] = useState<Said | null>(null);
+  /** The account a touch here signed in where it was not the one the code was claimed for. */
+  const [changed, setChanged] = useState<Who | null>(null);
   const { busy, refused, ask } = useAsking();
-  // Opening the page with a code claims it for whoever is signed in. Nothing is approved by that.
+  // Opening the page with a code claims it for whoever is signed in. Nothing is approved by that. Whether they
+  // hold a passkey is read with it: that decides how they approve.
   useEffect(() => {
     if (userCode === "") return undefined;
     let here = true;
     const claim = async (): Promise<void> => {
       try {
-        await account.claimDevice(userCode);
-        if (here) setClaimed(true);
+        const [, passkeys] = await Promise.all([account.claimDevice(userCode), account.passkeys()]);
+        if (here) setClaimed({ holdsPasskey: passkeys.length > 0 });
       } catch (error) {
         if (here) setUnclaimed(saidOf(error));
       }
@@ -619,37 +641,78 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
         title={answer === "approved" ? "The terminal is signed in" : "The terminal was refused"}
         lede={
           answer === "approved"
-            ? `It is signed in as ${nameOf(who)}. Go back to it.`
+            ? `It is signed in as ${nameOf(claimer)}. Go back to it.`
             : "Nothing was signed in. The code is of no more use."
         }
       >
         {null}
       </Card>
     );
+
+  // Until Keel has answered, the page says what most readers will do: approve with their passkey.
+  const holdsPasskey = claimed?.holdsPasskey ?? true;
+  const tap = (): Promise<void> =>
+    ask(async () => {
+      setChanged(null);
+      const came = await approveTerminal(
+        {
+          signIn: () => account.signInWithPasskey(),
+          approve: () => account.approveDevice(userCode),
+        },
+        claimer,
+        holdsPasskey,
+      );
+      onSignedIn(came.is === "approved" ? claimer : came.to);
+      if (came.is === "changed") {
+        setChanged(came.to);
+        return;
+      }
+      setAnswer("approved");
+    });
+
   return (
     <Card
       title="Sign a terminal in as you?"
-      lede={`A terminal is showing the code below. Approving it signs that terminal in as ${nameOf(who)}, with everything you may do. Approve it only if the code is the one on your own screen.`}
+      lede="A terminal is showing the code below. Approve it only if the code is the one on your own screen."
     >
       <p className="a-mono text-center text-[28px] tracking-widest text-kumo-strong" data-user-code>
         {userCode}
       </p>
+      {holdsPasskey ? (
+        <p className="text-sm text-kumo-default">
+          Approving signs that terminal in as {nameOf(claimer)}. For the next 10 minutes from your
+          passkey it can also invite agents to your projects and namespaces, take them off, and
+          approve or end a sponsorship. After that it can do everything else you may do, but not
+          those. It can never change how you sign in.
+        </p>
+      ) : (
+        <p className="text-sm text-kumo-default">
+          Approving signs that terminal in as {nameOf(claimer)}. It can do everything you may do
+          except invite agents, take them off, approve or end a sponsorship, and change how you sign
+          in: those need a passkey. Add one in{" "}
+          <a className="a-link" href={hrefOf({ at: "settings" })}>
+            your account's settings
+          </a>
+          , then sign the terminal in again, and for 10 minutes from your passkey it can do those
+          too.
+        </p>
+      )}
+      {changed !== null && (
+        <output className="text-sm text-kumo-default">
+          That passkey is {nameOf(changed)}'s, and you are signed in as {nameOf(changed)} now. The
+          code was claimed for {nameOf(claimer)}, so nothing was approved. Approve with{" "}
+          {nameOf(claimer)}'s passkey, or start <span className="a-mono">keeltown login</span> again
+          to sign the terminal in as {nameOf(changed)}.
+        </output>
+      )}
       <div className="flex gap-2">
-        <Button
-          variant="primary"
-          disabled={busy || !claimed}
-          onClick={() =>
-            void ask(async () => {
-              await account.approveDevice(userCode);
-              setAnswer("approved");
-            })
-          }
-        >
-          Approve
+        {/* A passkey prompt called off sends nothing, and is said below as any refusal is. */}
+        <Button variant="primary" disabled={busy || claimed === null} onClick={() => void tap()}>
+          {holdsPasskey ? "Approve with your passkey" : "Approve"}
         </Button>
         <Button
           variant="secondary"
-          disabled={busy || !claimed}
+          disabled={busy || claimed === null}
           onClick={() =>
             void ask(async () => {
               await account.denyDevice(userCode);
@@ -850,7 +913,9 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
       />
     );
   else if (reader.is === "user" && place.at === "device")
-    page = <Device account={account} who={reader.who} userCode={place.userCode} />;
+    page = (
+      <Device account={account} who={reader.who} userCode={place.userCode} onSignedIn={signedIn} />
+    );
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
   else if (reader.is === "user" && place.at === "new-project")
     // Whose the project may be is the reader's own account and their orgs: the form waits for Keel's list.

@@ -2946,7 +2946,8 @@ expectEqual(
   shownByTerminal.user_code,
 );
 await shot(person, "device");
-await person.getByRole("button", { name: "Approve" }).click();
+// Approving is a touch of her passkey every time, and only then the approval.
+await person.getByRole("button", { name: "Approve with your passkey" }).click();
 await person.getByRole("heading", { name: "The terminal is signed in" }).waitFor();
 await new Promise((resolve) => setTimeout(resolve, 5_100));
 const granted: { access_token?: string } = await (
