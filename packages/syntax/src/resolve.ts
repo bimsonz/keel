@@ -297,7 +297,21 @@ export function factsOf(
     return target === undefined ? undefined : exportOf(target, imported.name, depth + 1);
   }
 
+  /**
+   * What each export resolves to, by the depth it is asked at. Re-exports that
+   * star each other in cycles would otherwise be followed once for every path
+   * through them, a number that doubles with each level.
+   */
+  const exported = new Map<string, Val | undefined>();
   function exportOf(path: string, name: string, depth: number): Val | undefined {
+    const key = `${path}\n${name}\n${depth}`;
+    if (exported.has(key)) return exported.get(key);
+    const value = resolveExport(path, name, depth);
+    exported.set(key, value);
+    return value;
+  }
+
+  function resolveExport(path: string, name: string, depth: number): Val | undefined {
     const file = files.get(path);
     // A namespace import's members are not followed.
     if (file === undefined || depth > MAX_DEPTH || name === "*") return undefined;

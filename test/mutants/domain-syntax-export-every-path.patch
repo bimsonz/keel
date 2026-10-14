@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/reading.test.ts
+# kills: reading.star-cycles
+# why: an export is worked out again for every path through the stars that reach it
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index 7f2f2b1d..d4faa547 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -305,7 +305,6 @@ export function factsOf(
+   const exported = new Map<string, Val | undefined>();
+   function exportOf(path: string, name: string, depth: number): Val | undefined {
+     const key = `${path}\n${name}\n${depth}`;
+-    if (exported.has(key)) return exported.get(key);
+     const value = resolveExport(path, name, depth);
+     exported.set(key, value);
+     return value;

@@ -314,3 +314,40 @@ describe("a reading's lookups", () => {
     ]);
   });
 });
+
+describe("a reading's facts", () => {
+  it("[reading.star-cycles] reads through re-exports that star each other in cycles once for each depth, not once for every path through them", async () => {
+    /** Asks enough for this tree a few times over; following every path through the cycles asks millions. */
+    const ASKS = 2_000;
+    const files: Readonly<Record<string, string>> = {
+      "src/x.ts": `export * from "./y.ts";\nexport * from "./z.ts";\n`,
+      "src/y.ts": `export * from "./z.ts";\nexport * from "./x.ts";\n`,
+      "src/z.ts": `export * from "./x.ts";\nexport * from "./y.ts";\nexport * from "./lib.ts";\n`,
+      "src/lib.ts": STORE("lib"),
+      "src/a.ts": [
+        `import { goneOf } from "./x.ts";`,
+        `import { libOf } from "./x.ts";`,
+        `export function a(key: string) { goneOf(key); return libOf(key); }`,
+      ].join("\n"),
+    };
+    let asks = 0;
+    const reading = openReading(["src/a.ts"], (path) => {
+      asks += 1;
+      if (asks > ASKS) throw new Error(`asked more than ${ASKS} kinds`);
+      return path in files ? "file" : undefined;
+    });
+    const up = await parser();
+    for (let wanted = reading.wanted(); wanted.length > 0; wanted = reading.wanted())
+      for (const path of wanted)
+        expect(reading.give(path, new TextEncoder().encode(files[path] ?? ""), up)).toBe("taken");
+    const result = reading.result();
+    // A name no file exports is looked for through every star and found nowhere; one the cycle reaches is found.
+    expect(result).toHaveProperty("facts.calls", [
+      {
+        from: { path: "src/a.ts", symbol: "a" },
+        to: { path: "src/lib.ts", symbol: "libOf" },
+        deferred: false,
+      },
+    ]);
+  });
+});
