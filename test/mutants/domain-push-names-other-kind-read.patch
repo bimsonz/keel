@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/artifacts-push.test.ts
+# kills: push.names, push.translate
+# why: a repo name of another kind (`-sk-`, as sketches were named) is read as a workspace's, so a push to it reaches the pool as an agent's
+diff --git a/packages/core/src/application/coordination/workspace-pool/repo-names.ts b/packages/core/src/application/coordination/workspace-pool/repo-names.ts
+index 957175be..18b18dad 100644
+--- a/packages/core/src/application/coordination/workspace-pool/repo-names.ts
++++ b/packages/core/src/application/coordination/workspace-pool/repo-names.ts
+@@ -22,7 +22,7 @@ export type RepoOwner = {
+ };
+ 
+ // Anchored from the right: the ULID is fixed-width Crockford base32 in lower case.
+-const NAMED = /^(?<prj>.+)-ws-(?<ulid>[0-9a-hjkmnp-tv-z]{26})$/;
++const NAMED = /^(?<prj>.+)-(?:ws|sk)-(?<ulid>[0-9a-hjkmnp-tv-z]{26})$/;
+ const PROJECT = /^prj-(?<ulid>[0-9a-hjkmnp-tv-z]{26})$/;
+ 
+ /** The owner a repo name gives, or undefined for any other repo (a mirror, staging, trunk, or a name Keel never gave). */

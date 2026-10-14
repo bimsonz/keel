@@ -85,13 +85,8 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   SubjectMinted: "public",
   PremiseSuspected: "public",
   PremiseReaffirmed: "public",
-  SketchOpened: "public",
-  SketchPromoted: "public",
-  SketchExpired: "public",
-  SketchDiscarded: "public",
   WorkspaceForked: "public",
   WorkspaceGranted: "public",
-  WorkspaceReassigned: "public",
   WorkspacePushed: "public",
   WorkspaceCollected: "public",
 

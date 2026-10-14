@@ -112,14 +112,8 @@ const RULES: Record<EventType, Rule[]> = {
   PremiseSuspected: [{ kind: "subject", idField: "subjectId" }],
   PremiseReaffirmed: [{ kind: "subject", idField: "subjectId" }],
 
-  SketchOpened: [{ kind: "sketch", idField: "sketchId", from: null, to: "open" }],
-  // The change it becomes starts with its own ChangeStarted.
-  SketchPromoted: [{ kind: "sketch", idField: "sketchId", from: ["open"], to: "promoted" }],
-  SketchExpired: [{ kind: "sketch", idField: "sketchId", from: ["open"], to: "expired" }],
-  SketchDiscarded: [{ kind: "sketch", idField: "sketchId", from: ["open"], to: "discarded" }],
   WorkspaceForked: [{ kind: "workspace", idField: "workspaceId", from: null, to: "ready" }],
   WorkspaceGranted: [{ kind: "workspace", idField: "workspaceId", from: ["ready"], to: "granted" }],
-  WorkspaceReassigned: [{ kind: "workspace", idField: "workspaceId", from: ["granted"] }],
   WorkspacePushed: [{ kind: "workspace", idField: "workspaceId", from: ["granted"] }],
   WorkspaceCollected: [
     { kind: "workspace", idField: "workspaceId", from: ["ready", "granted"], to: "collected" },

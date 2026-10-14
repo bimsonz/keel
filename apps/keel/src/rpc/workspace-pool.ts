@@ -1,5 +1,5 @@
 import { PoolExhausted, WorkspaceNotFound } from "@keeltown/core/domain/coordination";
-import { ChangeId, CommitSha, InstantSchema, SketchId, WorkspaceId } from "@keeltown/core/kernel";
+import { ChangeId, CommitSha, InstantSchema, WorkspaceId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
@@ -50,14 +50,14 @@ export const WorkspacePoolCodecs = {
   grant: exitCodec(WorkspaceGrant, PoolExhausted),
   release: exitCodec(Schema.Void, WorkspaceNotFound),
   // Null for a workspace with no holder: JSON carries no undefined.
-  holder: exitCodec(Schema.NullOr(Schema.Union([ChangeId, SketchId])), Schema.Never),
+  holder: exitCodec(Schema.NullOr(ChangeId), Schema.Never),
   configure: exitCodec(PoolStatus, Schema.Never),
   status: exitCodec(PoolStatus, Schema.Never),
   observePush: exitCodec(PushObservation, Schema.Never),
   destroy: exitCodec(PoolStatus, Schema.Never),
 };
 
-/** The WorkspacePool DO (`pool:<project>`): pre-forked workspaces and sketches. */
+/** The WorkspacePool DO (`pool:<project>`): pre-forked workspaces. */
 export interface WorkspacePoolRpc {
   /** Idempotent per holder: a retry returns the same workspace with a fresh token. */
   grant(holder: string): Promise<ExitJson>;
@@ -66,7 +66,7 @@ export interface WorkspacePoolRpc {
     workspaceId: typeof WorkspaceId.Encoded,
     reason?: typeof CollectionReason.Encoded,
   ): Promise<ExitJson>;
-  /** The change or sketch the workspace is granted to, or null while it is not granted. */
+  /** The change the workspace is granted to, or null while it is not granted. */
   holder(workspaceId: typeof WorkspaceId.Encoded): Promise<ExitJson>;
   configure(config: typeof PoolConfig.Encoded): Promise<ExitJson>;
   status(): Promise<ExitJson>;

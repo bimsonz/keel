@@ -24,7 +24,6 @@ import {
   type Preflight,
   reviseIntent,
   RevisionMismatch,
-  SketchNotFound,
   type SubjectKey,
   TERMINAL,
 } from "@keeltown/core/domain/coordination";
@@ -37,7 +36,6 @@ import {
   type LeaseId,
   makeId,
   type ProjectId,
-  type SketchId,
   type WorkspaceId,
 } from "@keeltown/core/kernel";
 import {
@@ -98,7 +96,7 @@ export function makeWorkspacePoolMemory(
 ) {
   const capacity = options.capacity ?? Number.POSITIVE_INFINITY;
   const baseSha = options.baseSha ?? MEMORY_BASE;
-  const granted = new Map<WorkspaceId, ChangeId | SketchId>();
+  const granted = new Map<WorkspaceId, ChangeId>();
   const released = new Map<WorkspaceId, string>();
   const configured = new Map<ProjectId, PoolConfig>();
   /** Each push recorded, by its push id. */
@@ -435,8 +433,6 @@ export function makeChangesMemory(
             if (reserved !== undefined && reserved.fingerprint !== fingerprint) {
               return yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
             }
-            if (input.fromSketch !== undefined)
-              return yield* new SketchNotFound({ sketchId: input.fromSketch });
             const existing = reserved === undefined ? undefined : changes.get(reserved.changeId);
             if (
               existing === undefined &&

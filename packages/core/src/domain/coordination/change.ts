@@ -9,7 +9,6 @@ import {
   InstantSchema,
   LeaseId,
   RunRef,
-  SketchId,
   WorkspaceId,
 } from "../kernel/index.ts";
 import { FootprintEntry, PredicatePolicies, Proposition } from "./proposition.ts";
@@ -94,7 +93,6 @@ export const Change = Schema.Struct({
   intent: Intent,
   lease: Lease,
   workspaceId: Schema.optional(WorkspaceId),
-  fromSketch: Schema.optional(SketchId),
   createdAt: InstantSchema,
   /** The change's base: its workspace's head when granted. Precheck diffs against it. */
   baseSha: Schema.optional(CommitSha),

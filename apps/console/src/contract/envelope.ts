@@ -62,14 +62,9 @@ export const EVENT_TYPES = [
   "SubjectMinted",
   "PremiseSuspected",
   "PremiseReaffirmed",
-  // coordination: sketches and workspaces
-  "SketchOpened",
-  "SketchPromoted",
-  "SketchExpired",
-  "SketchDiscarded",
+  // coordination: workspaces
   "WorkspaceForked",
   "WorkspaceGranted",
-  "WorkspaceReassigned",
   "WorkspacePushed",
   "WorkspaceCollected",
   // verification

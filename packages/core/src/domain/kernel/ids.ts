@@ -11,7 +11,6 @@ export const ID_PREFIXES = {
   run: "run",
   change: "chg",
   workspace: "wsp",
-  sketch: "sk",
   subject: "sub",
   candidate: "cnd",
   verdict: "vrd",
@@ -69,8 +68,6 @@ export const ChangeId = prefixed("chg").pipe(Schema.brand("ChangeId"));
 export type ChangeId = typeof ChangeId.Type;
 export const WorkspaceId = prefixed("wsp").pipe(Schema.brand("WorkspaceId"));
 export type WorkspaceId = typeof WorkspaceId.Type;
-export const SketchId = prefixed("sk").pipe(Schema.brand("SketchId"));
-export type SketchId = typeof SketchId.Type;
 export const SubjectId = prefixed("sub").pipe(Schema.brand("SubjectId"));
 export type SubjectId = typeof SubjectId.Type;
 export const CandidateId = prefixed("cnd").pipe(Schema.brand("CandidateId"));
@@ -129,7 +126,6 @@ export interface IdOf {
   run: RunId;
   chg: ChangeId;
   wsp: WorkspaceId;
-  sk: SketchId;
   sub: SubjectId;
   cnd: CandidateId;
   vrd: VerdictId;

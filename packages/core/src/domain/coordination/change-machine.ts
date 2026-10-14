@@ -16,7 +16,6 @@ import {
   type LeaseId,
   type NextAction,
   type RunRef,
-  type SketchId,
   type UserId,
   type VerdictId,
   type WorkspaceId,
@@ -129,7 +128,6 @@ export type ChangeCommand =
       readonly agentId: AgentId;
       readonly run?: RunRef;
       readonly origin: ChangeOrigin;
-      readonly sketchId?: SketchId;
       readonly goal: string;
       readonly footprint: readonly FootprintEntry[];
       readonly premises: readonly Proposition[];
@@ -488,7 +486,6 @@ const declare = (command: Extract<ChangeCommand, { _tag: "Declare" }>): Decision
       agentId: command.agentId,
       ...(command.run === undefined ? {} : { run: command.run }),
       origin: command.origin,
-      ...(command.sketchId === undefined ? {} : { sketchId: command.sketchId }),
       revision: 1,
       goal: command.goal,
       footprint: command.footprint,
@@ -957,7 +954,6 @@ export const evolveChange = (
         renewedAt: committed.at,
         state: "active",
       },
-      ...(event.sketchId === undefined ? {} : { fromSketch: event.sketchId }),
       createdAt: committed.at,
     };
   }

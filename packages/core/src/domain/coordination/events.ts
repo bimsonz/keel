@@ -15,7 +15,6 @@ import {
   NextAction,
   ProjectId,
   RunRef,
-  SketchId,
   SubjectId,
   VerdictId,
   WorkspaceId,
@@ -40,7 +39,6 @@ export const IntentDeclared = Schema.TaggedStruct("IntentDeclared", {
   /** The run of the agent that declared the change, when its token named one: the run that holds it. */
   run: Schema.optional(RunRef),
   origin: ChangeOrigin,
-  sketchId: Schema.optional(SketchId),
   revision: Schema.Int,
   goal: Schema.NonEmptyString,
   footprint: Schema.Array(FootprintEntry),
@@ -69,7 +67,7 @@ export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   premisesRetracted: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
 });
-/** Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned. */
+/** Declared → Working: the pool granted a workspace. */
 export const ChangeStarted = Schema.TaggedStruct("ChangeStarted", {
   changeId: ChangeId,
   workspaceId: WorkspaceId,
@@ -279,23 +277,8 @@ export const PremiseReaffirmed = Schema.TaggedStruct("PremiseReaffirmed", {
   premise: Proposition,
 });
 
-// Sketches and workspaces
+// Workspaces
 
-export const SketchOpened = Schema.TaggedStruct("SketchOpened", {
-  sketchId: SketchId,
-  agentId: AgentId,
-  workspaceId: WorkspaceId,
-  expiresAt: InstantSchema,
-});
-export const SketchPromoted = Schema.TaggedStruct("SketchPromoted", {
-  sketchId: SketchId,
-  changeId: ChangeId,
-});
-export const SketchExpired = Schema.TaggedStruct("SketchExpired", { sketchId: SketchId });
-export const SketchDiscarded = Schema.TaggedStruct("SketchDiscarded", {
-  sketchId: SketchId,
-  by: Schema.String,
-});
 export const WorkspaceForked = Schema.TaggedStruct("WorkspaceForked", {
   workspaceId: WorkspaceId,
   repo: Schema.String,
@@ -303,16 +286,10 @@ export const WorkspaceForked = Schema.TaggedStruct("WorkspaceForked", {
 });
 export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
   workspaceId: WorkspaceId,
-  holder: Schema.Union([ChangeId, SketchId]),
+  holder: ChangeId,
   expiresAt: InstantSchema,
   /** The workspace's head when granted: the change's base. */
   baseSha: CommitSha,
-});
-/** A promoted sketch's workspace passes to the change it became: Granted → Granted, from a sketch to a change, once. */
-export const WorkspaceReassigned = Schema.TaggedStruct("WorkspaceReassigned", {
-  workspaceId: WorkspaceId,
-  sketchId: SketchId,
-  changeId: ChangeId,
 });
 export const WorkspacePushed = Schema.TaggedStruct("WorkspacePushed", {
   workspaceId: WorkspaceId,
@@ -354,13 +331,8 @@ export const CoordinationEvent = Schema.Union([
   SubjectMinted,
   PremiseSuspected,
   PremiseReaffirmed,
-  SketchOpened,
-  SketchPromoted,
-  SketchExpired,
-  SketchDiscarded,
   WorkspaceForked,
   WorkspaceGranted,
-  WorkspaceReassigned,
   WorkspacePushed,
   WorkspaceCollected,
 ]);

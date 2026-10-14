@@ -13,13 +13,7 @@ import {
   releaseWorkspace,
   STUCK_REFRESH_MS,
 } from "@keeltown/core/application/coordination";
-import {
-  ChangeId,
-  type EventEnvelope,
-  ProjectId,
-  SketchId,
-  WorkspaceId,
-} from "@keeltown/core/kernel";
+import { ChangeId, type EventEnvelope, ProjectId, WorkspaceId } from "@keeltown/core/kernel";
 import { REDELIVERY_CAP_MS, redeliveryDelay, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, type Layer, Schema } from "effect";
 import { type PoolServices, poolServices } from "../../../composition/do.ts";
@@ -42,7 +36,7 @@ export const POOL_CLAIM = "pool claim";
 /** How long a failed fork or deletion waits before the next try. */
 const RETRY_MS = 10_000;
 
-const decodeHolder = Schema.decodeUnknownEffect(Schema.Union([ChangeId, SketchId]));
+const decodeHolder = Schema.decodeUnknownEffect(ChangeId);
 const decodeWorkspaceId = Schema.decodeUnknownEffect(WorkspaceId);
 const decodeReason = Schema.decodeUnknownEffect(CollectionReason);
 const decodeConfig = Schema.decodeUnknownEffect(PoolConfig);

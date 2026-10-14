@@ -1,6 +1,6 @@
 # One throwaway Artifacts repo per change; only Keel writes trunk
 
-Each Change, and each Sketch, is worked in its own forked Artifacts repo. Agents get a short-lived write token for that repo only. Trunk lives in a separate core repo, and only the Trunk DO's composer ever holds a write token for it. That token is minted for each promotion group and lives for 60 s.
+Each Change is worked in its own forked Artifacts repo. Agents get a short-lived write token for that repo only. Trunk lives in a separate core repo, and only the Trunk DO's composer ever holds a write token for it. That token is minted for each promotion group and lives for 60 s.
 
 Why:
 - Artifacts tokens are scoped per repo, not per ref, so a shared repo with one ref per change would let any agent overwrite any other agent's work.

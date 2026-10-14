@@ -92,10 +92,8 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
     Changes.of({
       declare: (principal, input) =>
         Effect.gen(function* () {
-          const { idempotencyKey, fromSketch, ...intent } = input;
-          const fingerprint = yield* Effect.promise(() =>
-            fingerprintOf({ ...intent, sketchId: fromSketch }),
-          );
+          const { idempotencyKey, ...intent } = input;
+          const fingerprint = yield* Effect.promise(() => fingerprintOf(intent));
           const changeId = yield* callObject(AgentSessionCodecs.reserveChange, () =>
             objects.agentSession(principal.agentId).reserveChange({ idempotencyKey, fingerprint }),
           );
@@ -106,7 +104,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
             projectId: principal.projectId,
             origin: "agent",
             ...intent,
-            ...(fromSketch === undefined ? {} : { sketchId: fromSketch }),
             idempotencyKey,
             fingerprint,
           });

@@ -110,7 +110,6 @@ union EntityKind {
   session: "session",
   change: "change",
   subject: "subject",
-  sketch: "sketch",
   workspace: "workspace",
   conflict: "conflict",
   probe: "probe",
@@ -281,7 +280,6 @@ model IntentDeclared {
   /** The run of the agent that declared the change, when its token named one: the run that holds it. */
   run?: RunRef;
   origin: ChangeOrigin;
-  sketchId?: SketchId;
   revision: integer;
 
   @minLength(1)
@@ -320,7 +318,7 @@ model IntentRevised {
   declaredEffects?: EventProposition[];
 }
 
-/** Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned. */
+/** Declared → Working: the pool granted a workspace. */
 model ChangeStarted {
   _tag: "ChangeStarted";
   changeId: ChangeId;
@@ -594,31 +592,6 @@ model PremiseReaffirmed {
   premise: EventProposition;
 }
 
-model SketchOpened {
-  _tag: "SketchOpened";
-  sketchId: SketchId;
-  agentId: AgentId;
-  workspaceId: WorkspaceId;
-  expiresAt: Instant;
-}
-
-model SketchPromoted {
-  _tag: "SketchPromoted";
-  sketchId: SketchId;
-  changeId: ChangeId;
-}
-
-model SketchExpired {
-  _tag: "SketchExpired";
-  sketchId: SketchId;
-}
-
-model SketchDiscarded {
-  _tag: "SketchDiscarded";
-  sketchId: SketchId;
-  by: string;
-}
-
 model WorkspaceForked {
   _tag: "WorkspaceForked";
   workspaceId: WorkspaceId;
@@ -629,19 +602,11 @@ model WorkspaceForked {
 model WorkspaceGranted {
   _tag: "WorkspaceGranted";
   workspaceId: WorkspaceId;
-  holder: ChangeId | SketchId;
+  holder: ChangeId;
   expiresAt: Instant;
 
   /** The workspace's head when granted: the change's base. */
   baseSha: CommitSha;
-}
-
-/** A promoted sketch's workspace passes to the change it became. */
-model WorkspaceReassigned {
-  _tag: "WorkspaceReassigned";
-  workspaceId: WorkspaceId;
-  sketchId: SketchId;
-  changeId: ChangeId;
 }
 
 model WorkspacePushed {
@@ -1812,13 +1777,8 @@ union KeelEvent {
   SubjectMinted,
   PremiseSuspected,
   PremiseReaffirmed,
-  SketchOpened,
-  SketchPromoted,
-  SketchExpired,
-  SketchDiscarded,
   WorkspaceForked,
   WorkspaceGranted,
-  WorkspaceReassigned,
   WorkspacePushed,
   WorkspaceCollected,
 

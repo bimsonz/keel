@@ -1,23 +1,17 @@
-import type { Effect } from "effect";
 import type {
   Change,
   FootprintEntry,
-  PoolExhausted,
   Preflight,
   Proposition,
 } from "../../domain/coordination/index.ts";
-import type { AgentToken } from "../../domain/identity/index.ts";
 import type {
   ChangeId,
   CommitSha,
   DecisionId,
-  Instant,
   LeaseId,
-  SketchId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
-import { stub } from "../not-implemented.ts";
-import type { Clock, Ids, WorkspaceEdit, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
+import type { WorkspaceEdit, WorkspaceGrant } from "../ports/index.ts";
 import type { Withdrawal } from "./change.ts";
 
 /**
@@ -30,7 +24,6 @@ export interface DeclareInput {
   readonly footprint: readonly FootprintEntry[];
   readonly premises: readonly Proposition[];
   readonly declaredEffects?: readonly Proposition[];
-  readonly fromSketch?: SketchId;
   readonly idempotencyKey: string;
 }
 
@@ -131,18 +124,6 @@ export interface Revised {
   readonly change: Change;
   readonly preflight: Preflight;
 }
-
-export interface SketchOpened {
-  readonly sketchId: SketchId;
-  readonly workspace: WorkspaceGrant;
-  readonly expiresAt: Instant;
-}
-
-export const openSketch: (
-  principal: AgentToken,
-  purpose: string | undefined,
-) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
-  stub("coordination/openSketch");
 
 /** The Change DO's use-cases. */
 export * from "./change.ts";

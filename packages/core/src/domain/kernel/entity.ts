@@ -6,7 +6,6 @@ export const EntityKind = Schema.Literals([
   "session",
   "change",
   "subject",
-  "sketch",
   "workspace",
   "conflict",
   "probe",

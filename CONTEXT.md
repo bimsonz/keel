@@ -62,10 +62,6 @@ _Avoid_: lock, claim, reservation
 The throwaway Artifacts repo a Change is worked in.
 _Avoid_: fork (that is the mechanism), branch, worktree
 
-**Sketch**:
-A throwaway workspace for an idea, with no Intent and no integration. It becomes a Change only when declared.
-_Avoid_: draft, spike, scratch branch
-
 **Bet**:
 A premise that no tenet guards yet. Its probe is the bet's falsifier.
 _Avoid_: risk, gamble (outside prose)

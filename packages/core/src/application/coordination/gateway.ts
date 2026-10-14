@@ -11,7 +11,6 @@ import {
   type PoolExhausted,
   type Preflight,
   type RevisionMismatch,
-  type SketchNotFound,
   WorkspaceNotFound,
 } from "../../domain/coordination/index.ts";
 import type {
@@ -148,10 +147,8 @@ const inHolds = <A, E, R>(
 export const declareChange: (
   principal: AgentToken,
   input: DeclareInput,
-) => Effect.Effect<Declared, PoolExhausted | SketchNotFound | IdempotencyConflict, Changes> = (
-  principal,
-  input,
-) => Changes.use((changes) => changes.declare(principal, input));
+) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict, Changes> = (principal, input) =>
+  Changes.use((changes) => changes.declare(principal, input));
 
 export const submitChange: (
   principal: AgentToken,
@@ -210,8 +207,8 @@ const isChangeId = Schema.is(ChangeId);
 /**
  * A fresh token for a workspace, for the agent whose change holds it: the
  * project's pool names the holder, then the Change DO checks the agent, the
- * lease and the state. A workspace no change holds (a sketch's, a ready or
- * collected one, an unknown one) and another agent's both read as not found.
+ * lease and the state. A workspace no change holds (a ready or collected
+ * one, an unknown one) and another agent's both read as not found.
  */
 export const refreshWorkspaceToken = (
   principal: AgentToken,

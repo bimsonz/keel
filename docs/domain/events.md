@@ -28,7 +28,7 @@ Every event has the same envelope:
 
 **One transition, one event.** An entity's transition is triggered by a command or by another entity's event. Either way the entity commits exactly one event of its own, named for the transition, with `causation` set when an event caused it. Events that record a fact without changing their entity's lifecycle (`DriftDetected`, `GuardFailed`, `PreflightIssued`) are called out as such.
 
-**Entity kinds:** `agent`, `session`, `change`, `subject`, `sketch`, `workspace`, `conflict`, `probe`, `guard`, `verdict`, `batch`, `candidate`, `project`, `trunk`, `decision`, `tenet`, `escalation`, `deployment`.
+**Entity kinds:** `agent`, `session`, `change`, `subject`, `workspace`, `conflict`, `probe`, `guard`, `verdict`, `batch`, `candidate`, `project`, `trunk`, `decision`, `tenet`, `escalation`, `deployment`.
 
 **ID prefixes.** From the API contract: `agt_ ses_ chg_ wsp_ sk_ sub_ cnd_ vrd_ cfl_ dec_ prb_`. Added here for entities the API does not yet expose: `evt_` (event), `bat_` (batch), `grd_` (guard), `tnt_` (tenet), `lse_` (lease), `esc_` (escalation), `dpl_` (deployment), `crd_` (a credential in an org's store: a reference, never the secret).
 
@@ -73,9 +73,9 @@ Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identi
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `IntentDeclared` | Change DO | `changeId, agentId, run?, origin: agent\|auditor\|operator, sketchId?, revision: 1, goal, footprint, premises[], leaseId` | each Subject relied on | Subject DOs relied on, the agent | The change is subscribed to each subject it relies on ("relying is subscribing"); preflight runs. `origin: auditor` marks the Auditor's auto-revert, a platform-authored change that lands like any other |
+| `IntentDeclared` | Change DO | `changeId, agentId, run?, origin: agent\|auditor\|operator, revision: 1, goal, footprint, premises[], leaseId` | each Subject relied on | Subject DOs relied on, the agent | The change is subscribed to each subject it relies on ("relying is subscribing"); preflight runs. `origin: auditor` marks the Auditor's auto-revert, a platform-authored change that lands like any other |
 | `PreflightIssued` | Change DO (fact) | `changeId, revision, neighbours[], contradictions[{premise, with, holder, withRole?}], precedents[], suggestedMove, basis?, alternatives?: changeId[]` (the live changes with the same intent, in the live index's order, never ranked; absent when there are none, and the Move never reads them) | — | the agent | The agent sees overlap, contradictions, precedents and a Move before writing code, with what the Move rests on (`basis`: a contradiction by index, or a precedent; absent for `proceed`). Footprint overlap is *exposure* and appears only in `neighbours`: proximity never opens a conflict |
-| `ChangeStarted` | Change DO | `changeId, workspaceId, baseSha` | — | the agent | Caused by `WorkspaceGranted` or `SketchPromoted`: Declared → Working, in that workspace. `baseSha` is the workspace's head at grant, the base Precheck diffs against |
+| `ChangeStarted` | Change DO | `changeId, workspaceId, baseSha` | — | the agent | Caused by `WorkspaceGranted`: Declared → Working, in that workspace. `baseSha` is the workspace's head at grant, the base Precheck diffs against |
 | `IntentRevised` | Change DO | `changeId, revision, goal?, footprint?, premisesAdded[], premisesRetracted[]` | Subjects whose premises changed | Subject DOs touched, the agent | Subscriptions follow the premises; preflight re-runs |
 | `PremiseRelied` | Subject DO | `subjectId, changeId, premise: {predicate, relation, value, scope}` | — | the change's agent | The Subject DO's reaction to a change's `rely`, which the Change DO commits as `IntentRevised {premisesAdded: [premise]}`. The holder is notified of later fallout on this subject |
 | `ChangeSubmitted` | Change DO | `changeId, revision, commitSha, workspaceId, baseSha?` (the base the submission is judged against) | — | `workflow:Precheck`, the change's lane | **Starts Precheck.** The authoritative signal: push events only observe |
@@ -110,17 +110,12 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `PremiseSuspected` | Subject DO | `subjectId, changeId (holder), premise, cause: {changeId, effect}` | the holder's change | the holder's agent | Fallout's *suspect* outcome: the holder re-affirms or revises |
 | `PremiseReaffirmed` | Subject DO | `subjectId, changeId, premise` | — | Projector | The suspicion is cleared |
 
-### Sketches and workspaces
+### Workspaces
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `SketchOpened` | WorkspacePool DO | `sketchId, agentId, workspaceId, expiresAt` | the workspace | the agent | No intent, no preflight, no integration |
-| `SketchPromoted` | WorkspacePool DO | `sketchId, changeId` | — | the agent | `declare --from-sketch`: the workspace carries over to the new change |
-| `SketchExpired` | WorkspacePool DO | `sketchId` | the workspace | the agent | Raised by the TTL deadline alarm; the workspace is collected |
-| `SketchDiscarded` | WorkspacePool DO | `sketchId, by` | the workspace | — | The agent dropped the idea |
 | `WorkspaceForked` | WorkspacePool DO | `workspaceId, repo, sourceRepo` | — | — | Emitted when the pool's own fork call resolves; a fork is ready at once (spike S2). The fork joins the ready pool |
-| `WorkspaceGranted` | WorkspacePool DO | `workspaceId, changeId\|sketchId, expiresAt, baseSha` | — | the change or sketch, the agent | Handed out exactly once; a retried grant for the same holder re-mints the write token, which is never stored or carried in the event. `baseSha` is the workspace's head at grant time, the change's base |
-| `WorkspaceReassigned` | WorkspacePool DO | `workspaceId, sketchId, changeId` | — | the agent | `declare --from-sketch`: the promoted sketch's workspace passes to the change it became, in the same transaction as `SketchPromoted`. Once, and never to a third holder |
+| `WorkspaceGranted` | WorkspacePool DO | `workspaceId, holder: changeId, expiresAt, baseSha` | — | the change, the agent | Handed out exactly once; a retried grant for the same holder re-mints the write token, which is never stored or carried in the event. `baseSha` is the workspace's head at grant time, the change's base |
 | `WorkspacePushed` | WorkspacePool DO (fact) | `workspaceId, ref, sha` | — | the change's agent | Translated from Artifacts' `pushed` by the PushObserved Workflow, for branch updates only. Observes plain-git agents; never authoritative |
 | `WorkspaceCollected` | WorkspacePool DO | `workspaceId, reason: landed\|withdrawn\|expired` | — | — | The repo is deleted |
 

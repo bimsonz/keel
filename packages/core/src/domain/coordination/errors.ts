@@ -7,11 +7,9 @@ import {
   InstantSchema,
   LeaseId,
   NextAction,
-  SketchId,
   WorkspaceId,
 } from "../kernel/index.ts";
 import { ChangeState } from "./change.ts";
-import { SketchState } from "./sketch.ts";
 import { WorkspaceState } from "./workspace.ts";
 import { Drift } from "./derivation.ts";
 
@@ -89,10 +87,6 @@ export class ChangeStateRefused extends Schema.TaggedError<ChangeStateRefused>()
   },
 ) {}
 
-export class SketchNotFound extends Schema.TaggedError<SketchNotFound>()("SketchNotFound", {
-  sketchId: SketchId,
-}) {}
-
 export class WorkspaceNotFound extends Schema.TaggedError<WorkspaceNotFound>()(
   "WorkspaceNotFound",
   { workspaceId: WorkspaceId },
@@ -142,20 +136,5 @@ export class WorkspaceStateRefused extends Schema.TaggedError<WorkspaceStateRefu
     workspaceId: WorkspaceId,
     state: Schema.optional(WorkspaceState),
     command: Schema.String,
-  },
-) {}
-
-/**
- * The command is not valid in the sketch's current state, or the sketch is
- * past its deadline (`expired`, computed on read whether or not the alarm has fired).
- */
-export class SketchStateRefused extends Schema.TaggedError<SketchStateRefused>()(
-  "SketchStateRefused",
-  {
-    sketchId: SketchId,
-    state: Schema.optional(SketchState),
-    command: Schema.String,
-    reason: Schema.optional(Schema.Literal("expired")),
-    nextActions: Schema.Array(NextAction),
   },
 ) {}

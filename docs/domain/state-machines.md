@@ -15,7 +15,6 @@ Terms are in [CONTEXT.md](../../CONTEXT.md).
 | change (and its lease) | Change DO | `change:<ULID>` |
 | subject | Subject DO; the subject registry (keys, aliases, anchors) is in the Project DO | `subj:<project>:<key>` |
 | project | Project DO | `project:<projectId>` |
-| sketch | WorkspacePool DO | `pool:<project>` |
 | workspace | WorkspacePool DO | `pool:<project>` |
 | conflict | Subject DO for `semantic` and `precedent`; Lane DO for `textual` and `interaction` | `subj:…` / `lane:<project>:<id>` |
 | probe | the DO that owns its conflict | as its conflict |
@@ -116,8 +115,8 @@ stateDiagram-v2
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Declared | `declare` (or `declare --from-sketch`), or the Auditor declaring a revert | Scope `agent:work` for agents | `IntentDeclared {origin}` (lease issued), then `PreflightIssued`. Every proposition is committed in canonical form (`canonicalProposition`: an ordering is written from its lesser event), as are a revision's, a relied premise and the derived effects |
-| Declared | Working | The pool grants a workspace, or the promoted sketch's workspace is reassigned | — | `ChangeStarted` (caused by `WorkspaceGranted` or `SketchPromoted`) |
+| — | Declared | `declare`, or the Auditor declaring a revert | Scope `agent:work` for agents | `IntentDeclared {origin}` (lease issued), then `PreflightIssued`. Every proposition is committed in canonical form (`canonicalProposition`: an ordering is written from its lesser event), as are a revision's, a relied premise and the derived effects |
+| Declared | Working | The pool grants a workspace | — | `ChangeStarted` (caused by `WorkspaceGranted`) |
 | Working | Working | `revise` / `rely` | Valid lease; `If-Match` on the current revision (`revise`) | `IntentRevised`, then `PreflightIssued`. A `rely` is a revision that adds one premise; the Subject DO answers it with its own `PremiseRelied` |
 | Working, Bounced | Submitted | `submit {changeId, commitSha}` | Valid lease; the commit is in the change's workspace | `ChangeSubmitted`, carrying the change's base: the base Precheck judges the submission against |
 | Working, Bounced | the same state | `rebase {from, onto}`: the agent rebased its workspace (after a textual bounce, say) | Valid lease; `from` is the change's base and `onto` another commit; otherwise refused, with a read of the change | `ChangeRebased {from, to}`: the base moves, and nothing else changes |
@@ -561,32 +560,11 @@ With a project in the facts, the same rows commit `AgentInvitedToProject`, `Agen
 
 **Who is asked first.** A question about the work of an agent that has joined a namespace goes first to the member who invited it there, whoever sponsors the agent. The namespace's object reads its own row when it raises the escalation. Outside an org it reads the row of the escalation's own project in `project_agents`: the person who invited the agent to that project is asked first about it, and about another of their projects the invitation says nothing.
 
-## Sketch
-
-Owner: WorkspacePool DO.
-
-<!-- chart:sketch — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
-```mermaid
-stateDiagram-v2
-  [*] --> Open: SketchOpened
-  Open --> Promoted: SketchPromoted
-  Open --> Expired: SketchExpired
-  Open --> Discarded: SketchDiscarded
-  Promoted --> [*]
-  Expired --> [*]
-  Discarded --> [*]
-```
-<!-- /chart:sketch -->
-
-**Terminal:** Promoted, Expired, Discarded. A sketch has no intent, no preflight and no integration; `SketchExpired` is raised by its TTL deadline alarm. Promotion hands its workspace to the new change (`WorkspaceReassigned`).
-
-Whether a sketch has expired is computed on read, from `expiresAt` and the time passed in: from its deadline on it can no longer be promoted or discarded (refused as expired, with declaring a change as the next action), whether or not the alarm has fired. An alarm that fires early commits nothing; the pool re-arms it only while the sketch is Open.
-
 ---
 
 ## Workspace
 
-Owner: WorkspacePool DO. A Workspace is the throwaway Artifacts repo a Change or Sketch is worked in.
+Owner: WorkspacePool DO. A Workspace is the throwaway Artifacts repo a Change is worked in.
 
 <!-- chart:workspace — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
@@ -594,7 +572,6 @@ stateDiagram-v2
   [*] --> Ready: WorkspaceForked
   Ready --> Granted: WorkspaceGranted
   Ready --> Collected: WorkspaceCollected
-  Granted --> Granted: WorkspaceReassigned
   Granted --> Collected: WorkspaceCollected
   Collected --> [*]
 ```
@@ -603,7 +580,7 @@ stateDiagram-v2
 **Terminal:** Collected.
 
 **Invariants**
-- A ready workspace is granted exactly once; promotion reassigns it from the sketch to the new change, never to a third holder. A repeated grant to the same holder is a no-op (the pool mints that retry a fresh token), one to another holder is refused, and collecting a collected workspace again is a no-op.
+- A ready workspace is granted exactly once, to a change. A repeated grant to the same holder is a no-op (the pool mints that retry a fresh token), one to another holder is refused, and collecting a collected workspace again is a no-op.
 - The pool's own slots also pass through `forking` (before `WorkspaceForked`, so not yet a workspace) and `collecting` (the repo's deletion in progress, still Collected here).
 - A fork is ready when the pool's own fork call resolves (spike S2); nothing polls for it.
 

@@ -5,7 +5,6 @@ import {
   type Committed,
   IllegalTransition,
   type Instant,
-  type SketchId,
   type WorkspaceId,
 } from "../kernel/index.ts";
 import { WorkspaceNotFound, WorkspaceStateRefused } from "./errors.ts";
@@ -14,7 +13,6 @@ import {
   WorkspaceForked,
   WorkspaceGranted,
   WorkspacePushed,
-  WorkspaceReassigned,
 } from "./events.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -22,7 +20,6 @@ import type { Workspace } from "./workspace.ts";
 export const WorkspaceEvent = Schema.Union([
   WorkspaceForked,
   WorkspaceGranted,
-  WorkspaceReassigned,
   WorkspacePushed,
   WorkspaceCollected,
 ]);
@@ -33,12 +30,10 @@ export type WorkspaceCommand =
   | { readonly _tag: "Fork"; readonly repo: string; readonly sourceRepo: string }
   | {
       readonly _tag: "Grant";
-      readonly holder: ChangeId | SketchId;
+      readonly holder: ChangeId;
       readonly expiresAt: Instant;
       readonly baseSha: CommitSha;
     }
-  /** `declare --from-sketch`: the sketch's workspace passes to the change it became. */
-  | { readonly _tag: "Reassign"; readonly sketchId: SketchId; readonly changeId: ChangeId }
   | { readonly _tag: "Pushed"; readonly ref: string; readonly sha: CommitSha }
   | { readonly _tag: "Collect"; readonly reason: "landed" | "withdrawn" | "expired" };
 
@@ -65,8 +60,7 @@ const refuse = (workspace: Workspace, command: WorkspaceCommand): Decision =>
  * Decides a command on a workspace (docs/domain/state-machines.md §
  * Workspace). A ready workspace is granted exactly once: a repeated grant to
  * the same holder is a no-op (the pool mints that retry a fresh token outside
- * the domain), and one to any other holder is refused. Promotion reassigns it
- * from the sketch to the change, never to a third holder.
+ * the domain), and one to any other holder is refused.
  */
 export const decideWorkspace = (
   state: Workspace | undefined,
@@ -99,16 +93,6 @@ export const decideWorkspace = (
               holder: command.holder,
               expiresAt: command.expiresAt,
               baseSha: command.baseSha,
-            }),
-          ])
-        : refuse(workspace, command);
-    case "Reassign":
-      return workspace.state === "granted" && workspace.holder === command.sketchId
-        ? Result.succeed([
-            WorkspaceReassigned.make({
-              workspaceId,
-              sketchId: command.sketchId,
-              changeId: command.changeId,
             }),
           ])
         : refuse(workspace, command);
@@ -160,10 +144,6 @@ export const evolveWorkspace = (
             expiresAt: event.expiresAt,
             baseSha: event.baseSha,
           }
-        : illegal(workspace, event);
-    case "WorkspaceReassigned":
-      return workspace.state === "granted" && workspace.holder === event.sketchId
-        ? { ...workspace, holder: event.changeId }
         : illegal(workspace, event);
     case "WorkspacePushed":
       return workspace.state === "granted" ? workspace : illegal(workspace, event);

@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/changes.test.ts
 # why: a declare key reused for another body reaches the first change instead of IdempotencyConflict
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 09ffefa..6b2a5c6 100644
+index 13980fe5..233e4598 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -53,7 +53,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+@@ -93,7 +93,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+       declare: (principal, input) =>
          Effect.gen(function* () {
-           const { idempotencyKey, fromSketch, ...intent } = input;
-           const fingerprint = yield* Effect.promise(() =>
--            fingerprintOf({ ...intent, sketchId: fromSketch }),
-+            fingerprintOf({ sketchId: fromSketch }),
-           );
+           const { idempotencyKey, ...intent } = input;
+-          const fingerprint = yield* Effect.promise(() => fingerprintOf(intent));
++          const fingerprint = yield* Effect.promise(() => fingerprintOf({}));
            const changeId = yield* callObject(AgentSessionCodecs.reserveChange, () =>
              objects.agentSession(principal.agentId).reserveChange({ idempotencyKey, fingerprint }),
+           );

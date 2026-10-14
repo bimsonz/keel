@@ -5,7 +5,6 @@ import type {
   CommitSha,
   Instant,
   ProjectId,
-  SketchId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
 import type { RepoRef } from "./code-host.ts";
@@ -65,7 +64,7 @@ export class WorkspacePool extends Context.Service<
      */
     readonly grant: (
       projectId: ProjectId,
-      holder: ChangeId | SketchId,
+      holder: ChangeId,
     ) => Effect.Effect<WorkspaceGrant, PoolExhausted>;
     /**
      * Collects the workspace: its repo is deleted. Releasing it again is a
@@ -78,13 +77,13 @@ export class WorkspacePool extends Context.Service<
       reason?: CollectionReason,
     ) => Effect.Effect<void>;
     /**
-     * The change or sketch the workspace is granted to; undefined for one that
-     * is ready, collected, or not this project's pool's. Reads, commits nothing.
+     * The change the workspace is granted to; undefined for one that is ready,
+     * collected, or not this project's pool's. Reads, commits nothing.
      */
     readonly holder: (
       projectId: ProjectId,
       workspaceId: WorkspaceId,
-    ) => Effect.Effect<ChangeId | SketchId | undefined>;
+    ) => Effect.Effect<ChangeId | undefined>;
     /**
      * Points the project's pool at its source (the project's mirror) and the
      * number of ready workspaces to keep forked. The pool starts forking.

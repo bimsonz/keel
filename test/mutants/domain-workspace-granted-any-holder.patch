@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.replay
+# why: a grant to anything but a change decodes, so a stored grant can name a holder no change is
+diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
+index 3d9978f3..493a4c7f 100644
+--- a/packages/core/src/domain/coordination/events.ts
++++ b/packages/core/src/domain/coordination/events.ts
+@@ -286,7 +286,7 @@ export const WorkspaceForked = Schema.TaggedStruct("WorkspaceForked", {
+ });
+ export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
+   workspaceId: WorkspaceId,
+-  holder: ChangeId,
++  holder: Schema.String,
+   expiresAt: InstantSchema,
+   /** The workspace's head when granted: the change's base. */
+   baseSha: CommitSha,

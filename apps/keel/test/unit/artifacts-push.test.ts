@@ -1,8 +1,4 @@
-import {
-  ownerOfRepo,
-  sketchRepoName,
-  workspaceRepoName,
-} from "@keeltown/core/application/coordination";
+import { ownerOfRepo, workspaceRepoName } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { makeId } from "@keeltown/core/kernel";
 import * as fc from "fast-check";
@@ -29,22 +25,17 @@ const ulid = fc.string({
 });
 
 describe("naming workspace repos", () => {
-  it("[push.names] a workspace's or a sketch's repo name gives back its project and id; no other repo of the project names one", () => {
+  it("[push.names] a workspace's repo name gives back its project and id; no other repo of the project names one, nor a name of another kind", () => {
     fc.assert(
       fc.property(ulid, ulid, (p, w) => {
         const projectId = makeId("prj", p);
         const workspaceId = makeId("wsp", w);
-        const sketchId = makeId("sk", w);
         const name = workspaceRepoName(projectId, workspaceId);
         expect(name).toBe(`${projectRepos(projectId).trunk.name}-ws-${w.toLowerCase()}`);
         // Artifacts' rule: a letter or digit first, then letters, digits, `.`, `_` and `-`.
         expect(name).toMatch(/^[a-z0-9][a-z0-9._-]*$/);
         expect(ownerOfRepo(name)).toEqual({ kind: "workspace", projectId, id: workspaceId });
-        expect(ownerOfRepo(sketchRepoName(projectId, sketchId))).toEqual({
-          kind: "sketch",
-          projectId,
-          id: sketchId,
-        });
+        expect(ownerOfRepo(name.replace("-ws-", "-sk-"))).toBeUndefined();
         const repos = projectRepos(projectId);
         for (const other of [repos.trunk.name, repos.staging.name, repos.mirror.name])
           expect(ownerOfRepo(other)).toBeUndefined();
@@ -107,14 +98,7 @@ describe("translating Artifacts pushes", () => {
     ["a branch deletion", push(WORKSPACE, "refs/heads/main", "0".repeat(40))],
     ["Keel's own trunk ref in the workspace", push(WORKSPACE, "refs/heads/keel/trunk", SHA)],
     ["the project's mirror", push(projectRepos(PROJECT).mirror.name, "refs/heads/main", SHA)],
-    [
-      "a sketch",
-      push(
-        sketchRepoName(PROJECT, makeId("sk", "01JZ8PX3K2M5N7Q9R1S3T5V7W9")),
-        "refs/heads/main",
-        SHA,
-      ),
-    ],
+    ["a name of another kind", push(WORKSPACE.replace("-ws-", "-sk-"), "refs/heads/main", SHA)],
     [
       "a workspace named before the project prefix",
       push("ws-01jz8px3k2m5n7q9r1s3t5v7w9", "refs/heads/main", SHA),

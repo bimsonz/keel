@@ -30,8 +30,8 @@ const KEELS = "refs/heads/keel/";
 /**
  * A push to a workspace's branch, its project read from the repo's name
  * (`<prj>-ws-<ulid>`); null for tags, notes, deletions, Keel's own
- * `refs/heads/keel/*` (no self-loops), a sketch's or any
- * other repo (the mirror, a name Keel never gave) and anything unreadable.
+ * `refs/heads/keel/*` (no self-loops), any other repo (the mirror, a
+ * name Keel never gave) and anything unreadable.
  * Whether the workspace is granted, so the push is an agent's, is the pool's
  * to decide.
  */

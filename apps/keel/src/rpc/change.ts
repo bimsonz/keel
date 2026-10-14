@@ -15,7 +15,6 @@ import {
   Preflight,
   Proposition,
   RevisionMismatch,
-  SketchNotFound,
   SubjectKey,
 } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
@@ -32,7 +31,6 @@ import {
   NextAction,
   ProjectId,
   RunRef,
-  SketchId,
   UserId,
   VerdictId,
   WorkspaceId,
@@ -60,7 +58,6 @@ export const DeclareCommand = Schema.Struct({
   footprint: Schema.Array(FootprintEntry),
   premises: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
-  sketchId: Schema.optional(SketchId),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });
@@ -361,7 +358,7 @@ export const ChangeCodecs = {
   awaitPlan: exitCodec(AwaitedChange, ChangeNotFound),
   declare: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
-    Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),
+    Schema.Union([ChangeStateRefused, PoolExhausted, IdempotencyConflict]),
   ),
   revise: exitCodec(Schema.Struct({ change: Change, preflight: Preflight }), Mutation),
   // A rely names no revision: RevisionMismatch belongs to revise alone.

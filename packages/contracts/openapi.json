@@ -11953,7 +11953,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned."
+        "description": "Declared → Working: the pool granted a workspace."
       },
       "ChangeState": {
         "type": "string",
@@ -14431,7 +14431,6 @@
           "session",
           "change",
           "subject",
-          "sketch",
           "workspace",
           "conflict",
           "probe",
@@ -15823,9 +15822,6 @@
           "origin": {
             "$ref": "#/components/schemas/ChangeOrigin"
           },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          },
           "revision": {
             "type": "integer"
           },
@@ -16169,25 +16165,10 @@
             "$ref": "#/components/schemas/PremiseReaffirmed"
           },
           {
-            "$ref": "#/components/schemas/SketchOpened"
-          },
-          {
-            "$ref": "#/components/schemas/SketchPromoted"
-          },
-          {
-            "$ref": "#/components/schemas/SketchExpired"
-          },
-          {
-            "$ref": "#/components/schemas/SketchDiscarded"
-          },
-          {
             "$ref": "#/components/schemas/WorkspaceForked"
           },
           {
             "$ref": "#/components/schemas/WorkspaceGranted"
-          },
-          {
-            "$ref": "#/components/schemas/WorkspaceReassigned"
           },
           {
             "$ref": "#/components/schemas/WorkspacePushed"
@@ -21467,114 +21448,6 @@
         },
         "description": "How a person may sign in on this instance. A passkey is always offered."
       },
-      "SketchDiscarded": {
-        "type": "object",
-        "required": [
-          "_tag",
-          "sketchId",
-          "by"
-        ],
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "SketchDiscarded"
-            ]
-          },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          },
-          "by": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "SketchExpired": {
-        "type": "object",
-        "required": [
-          "_tag",
-          "sketchId"
-        ],
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "SketchExpired"
-            ]
-          },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "SketchId": {
-        "type": "string",
-        "pattern": "^sk_[0-9A-HJKMNP-TV-Z]{26}$"
-      },
-      "SketchOpened": {
-        "type": "object",
-        "required": [
-          "_tag",
-          "sketchId",
-          "agentId",
-          "workspaceId",
-          "expiresAt"
-        ],
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "SketchOpened"
-            ]
-          },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          },
-          "agentId": {
-            "$ref": "#/components/schemas/AgentId"
-          },
-          "workspaceId": {
-            "$ref": "#/components/schemas/WorkspaceId"
-          },
-          "expiresAt": {
-            "$ref": "#/components/schemas/Instant"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "SketchPromoted": {
-        "type": "object",
-        "required": [
-          "_tag",
-          "sketchId",
-          "changeId"
-        ],
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "SketchPromoted"
-            ]
-          },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          },
-          "changeId": {
-            "$ref": "#/components/schemas/ChangeId"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
       "SponsorRequest": {
         "type": "object",
         "required": [
@@ -23095,14 +22968,7 @@
             "$ref": "#/components/schemas/WorkspaceId"
           },
           "holder": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ChangeId"
-              },
-              {
-                "$ref": "#/components/schemas/SketchId"
-              }
-            ]
+            "$ref": "#/components/schemas/ChangeId"
           },
           "expiresAt": {
             "$ref": "#/components/schemas/Instant"
@@ -23152,36 +23018,6 @@
         "additionalProperties": {
           "not": {}
         }
-      },
-      "WorkspaceReassigned": {
-        "type": "object",
-        "required": [
-          "_tag",
-          "workspaceId",
-          "sketchId",
-          "changeId"
-        ],
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "WorkspaceReassigned"
-            ]
-          },
-          "workspaceId": {
-            "$ref": "#/components/schemas/WorkspaceId"
-          },
-          "sketchId": {
-            "$ref": "#/components/schemas/SketchId"
-          },
-          "changeId": {
-            "$ref": "#/components/schemas/ChangeId"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "A promoted sketch's workspace passes to the change it became."
       },
       "World": {
         "type": "string",

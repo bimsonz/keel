@@ -12,7 +12,6 @@ import {
   type CommitSha,
   Instant,
   type ProjectId,
-  SketchId,
   type WorkspaceId,
 } from "../../../domain/kernel/index.ts";
 import {
@@ -105,7 +104,7 @@ const handout = (slot: Slot) =>
  */
 export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function* (
   project: ProjectId,
-  holder: ChangeId | SketchId,
+  holder: ChangeId,
 ) {
   const store = yield* EntityStore;
   const host = yield* CodeHost;
@@ -391,10 +390,10 @@ export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(funct
   );
 });
 
-const decodeHolder = Schema.decodeUnknownSync(Schema.Union([ChangeId, SketchId]));
+const decodeHolder = Schema.decodeUnknownSync(ChangeId);
 
 /**
- * The change or sketch that holds the workspace, while it is granted. A
+ * The change that holds the workspace, while it is granted. A
  * ready, refreshing or collected workspace, or one this pool never forked,
  * has no holder.
  */

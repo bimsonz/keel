@@ -10,7 +10,6 @@ import type {
   PoolExhausted,
   Preflight,
   RevisionMismatch,
-  SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 import type {
@@ -98,7 +97,7 @@ export class Changes extends Context.Service<
     readonly declare: (
       principal: AgentToken,
       input: DeclareInput,
-    ) => Effect.Effect<Declared, PoolExhausted | SketchNotFound | IdempotencyConflict>;
+    ) => Effect.Effect<Declared, PoolExhausted | IdempotencyConflict>;
     readonly submit: (
       principal: AgentToken,
       input: SubmitInput,

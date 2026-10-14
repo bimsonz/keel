@@ -67,7 +67,6 @@ import {
   NextAction,
   ProjectId,
   sha256HexOfBytes,
-  type SketchId,
   type UserId,
   type VerdictId,
   WorkspaceId,
@@ -270,7 +269,6 @@ export interface DeclareChange {
   readonly footprint: readonly FootprintEntry[];
   readonly premises: readonly Proposition[];
   readonly declaredEffects?: readonly Proposition[] | undefined;
-  readonly sketchId?: SketchId | undefined;
   readonly idempotencyKey: string;
   /** A hash of the request body, so a reused key is told apart from a retry. */
   readonly fingerprint: string;
@@ -932,7 +930,6 @@ export const declare: (
             agentId: command.agentId,
             ...(command.run === undefined ? {} : { run: command.run }),
             origin: command.origin,
-            ...(command.sketchId === undefined ? {} : { sketchId: command.sketchId }),
             goal: command.goal,
             footprint: command.footprint,
             premises: command.premises,

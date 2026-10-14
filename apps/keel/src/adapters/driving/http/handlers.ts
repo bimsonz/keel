@@ -669,10 +669,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => declareChange(principal, decoded.success)),
-              // The wire names no sketch, so a declare never carries one for the pool to miss.
-              Effect.catchTag("SketchNotFound", () =>
-                Effect.die(new Error("a declare named a sketch the wire cannot carry")),
-              ),
               Effect.match({
                 onSuccess: declareOk,
                 onFailure: (error) => declareError(caller, error),

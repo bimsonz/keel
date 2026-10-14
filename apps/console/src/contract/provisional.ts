@@ -54,8 +54,6 @@ export type PlanSpec = FlowNode;
 export interface ProvisionalFields {
   /** B8: the goal an alternative competes for. */
   IntentDeclared: { alternativeOf?: string };
-  /** B8: what a sketch is an attempt at. */
-  SketchOpened: { goal: string };
   /** Whether the effect was one its agent did not declare, against a premise still live. */
   ConflictSuspected: { silentRetraction?: boolean };
   /** B4: what the run cost, and why it did not apply when the outcome is n/a. */

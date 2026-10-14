@@ -35,9 +35,6 @@ scalar ChangeId extends string;
 @pattern("^wsp_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar WorkspaceId extends string;
 
-@pattern("^sk_[0-9A-HJKMNP-TV-Z]{26}$")
-scalar SketchId extends string;
-
 @pattern("^sub_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar SubjectId extends string;
 

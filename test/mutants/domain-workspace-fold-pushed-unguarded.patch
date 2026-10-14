@@ -2,11 +2,11 @@
 # kills: workspace.fold-table
 # why: the fold takes WorkspacePushed with its guard gone: `workspace.state === "granted"`.
 diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
-index e777af24..9ac6798e 100644
+index e66d67e2..81f85692 100644
 --- a/packages/core/src/domain/coordination/workspace-machine.ts
 +++ b/packages/core/src/domain/coordination/workspace-machine.ts
-@@ -166,7 +166,7 @@ export const evolveWorkspace = (
-         ? { ...workspace, holder: event.changeId }
+@@ -146,7 +146,7 @@ export const evolveWorkspace = (
+           }
          : illegal(workspace, event);
      case "WorkspacePushed":
 -      return workspace.state === "granted" ? workspace : illegal(workspace, event);

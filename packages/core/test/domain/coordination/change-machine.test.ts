@@ -2586,8 +2586,8 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
  * A change as its fold's table reads it: where it is, who holds it and under
  * which lease, and every field a transition sets or drops. Its intent is the
  * revision alone: what a revision does to the goal and the premises is
- * `reviseIntent`'s. What only its declaration sets (its id, its origin, the
- * sketch it came from) is left out: no later event moves it.
+ * `reviseIntent`'s. What only its declaration sets (its id, its origin) is
+ * left out: no later event moves it.
  */
 interface FoldedChange {
   readonly state: Change["state"];

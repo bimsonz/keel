@@ -220,29 +220,8 @@ export const workspaceChart: Chart = {
   meta: { createdBy: "WorkspaceForked", section: "Workspace" },
   states: {
     ready: { on: { WorkspaceGranted: w("granted"), WorkspaceCollected: w("collected") } },
-    granted: { on: { WorkspaceReassigned: w("granted"), WorkspaceCollected: w("collected") } },
+    granted: { on: { WorkspaceCollected: w("collected") } },
     collected: { type: "final" },
-  },
-};
-
-// Sketch
-
-const s = to("sketch");
-export const sketchChart: Chart = {
-  id: "sketch",
-  initial: "open",
-  meta: { createdBy: "SketchOpened", section: "Sketch" },
-  states: {
-    open: {
-      on: {
-        SketchPromoted: s("promoted"),
-        SketchExpired: s("expired"),
-        SketchDiscarded: s("discarded"),
-      },
-    },
-    promoted: { type: "final" },
-    expired: { type: "final" },
-    discarded: { type: "final" },
   },
 };
 
@@ -413,7 +392,6 @@ export const charts: readonly Chart[] = [
   candidateChart,
   promotionChart,
   workspaceChart,
-  sketchChart,
   agentChart,
   invitationChart,
   conflictChart,
