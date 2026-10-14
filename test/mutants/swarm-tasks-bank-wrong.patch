@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.tasks-truth
+# why: A worker is asked to assert an answer the fixture doesn't give: its change goes red at verification for the brief's fault
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index 194f25fd..5dd03932 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -125,7 +125,7 @@ export const BANK: readonly { readonly target: Target; readonly cases: readonly
+   },
+   {
+     target: validator("checkColor"),
+-    cases: [yes("a1b2c3"), yes("000000"), no("A1B2C3"), no("#a1b2c3"), no("abc"), no("a1b2c3d")],
++    cases: [yes("a1b2c3"), yes("000000"), no("A1B2C3"), no("#a1b2c3"), no("abc"), yes("a1b2c3d")],
+   },
+   {
+     target: validator("checkPassword"),

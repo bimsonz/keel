@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t R7
+# why: Any module of an example may read the Worker's bindings, not only its doorways, agents and app.ts
+diff --git a/packages/tooling/src/arch/imports-rules.ts b/packages/tooling/src/arch/imports-rules.ts
+index 1d92d306..7bbc6f80 100644
+--- a/packages/tooling/src/arch/imports-rules.ts
++++ b/packages/tooling/src/arch/imports-rules.ts
+@@ -82,7 +82,7 @@ const RUNTIME_DOORWAYS = /^apps\/[^/]+\/src\/(adapters\/driving\/(do|workflow)|c
+  * and its route map (`src/app.ts`) read the Worker's bindings too.
+  */
+ const EXAMPLE_DOORWAYS =
+-  /^examples\/[^/]+\/src\/((adapters\/driving\/(do|workflow)|composition|agents)\/|app\.ts$)/;
++  /^examples\//;
+ 
+ /**
+  * R7: `cloudflare:workers` is imported only by the DO and Workflow doorways and

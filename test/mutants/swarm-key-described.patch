@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.keys-stay
+# why: The keyring answers its key with the account it describes: the private half leaves the one place it is kept
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index fc1c3f5f..cccfce0f 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -53,7 +53,7 @@ export class Keyring extends DurableObject<Env> {
+   }
+ 
+   async describe(): Promise<Member | null> {
+-    return (await this.ctx.storage.get<Member>("member")) ?? null;
++    return { ...((await this.ctx.storage.get<Member>("member")) ?? { agentId: "", handle: "", name: "" }), key: await this.ctx.storage.get("key") };
+   }
+ 
+   /** A five-minute bearer for one project and one run, at one door. */

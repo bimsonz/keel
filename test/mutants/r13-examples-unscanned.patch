@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t R13
+# why: An example's wrangler.jsonc is never checked: the swarm could commit an account id or leave preview_urls to chance
+diff --git a/packages/tooling/src/arch/structure.ts b/packages/tooling/src/arch/structure.ts
+index fba50adf..c9b86217 100644
+--- a/packages/tooling/src/arch/structure.ts
++++ b/packages/tooling/src/arch/structure.ts
+@@ -133,7 +133,7 @@ function testBindingNames(file: string, code: string): string[] {
+  */
+ export function checkR13(root: string, options: GuardOptions = {}): GuardResult {
+   // The apps, and the examples that deploy as Workers of their own.
+-  const workers = ["apps", "examples"].flatMap((group) =>
++  const workers = ["apps"].flatMap((group) =>
+     existsSync(join(root, group))
+       ? readdirSync(join(root, group))
+           .filter((name) => existsSync(join(root, group, name, "wrangler.jsonc")))

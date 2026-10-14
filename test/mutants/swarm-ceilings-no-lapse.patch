@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.ceilings-lapse
+# why: A slot its holder never gave back is held for ever: a worker that died mid-call takes a slot of the swarm with it
+diff --git a/examples/swarm/src/run/ceilings.ts b/examples/swarm/src/run/ceilings.ts
+index 3c624733..22cc3eef 100644
+--- a/examples/swarm/src/run/ceilings.ts
++++ b/examples/swarm/src/run/ceilings.ts
+@@ -32,7 +32,7 @@ export type Taken =
+ 
+ /** The slots with every lapsed hold dropped. */
+ function current(slots: Slots, now: number): Slots {
+-  const held = Object.fromEntries(Object.entries(slots.held).filter(([, until]) => until > now));
++  const held = slots.held;
+   return { ...slots, held };
+ }
+ 

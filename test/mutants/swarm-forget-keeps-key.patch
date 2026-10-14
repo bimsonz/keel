@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.forget
+# why: Forgetting an account keeps its key: the wipe after the demo leaves every agent's private key behind
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index fc1c3f5f..2e28e805 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -117,7 +117,7 @@ export class Keyring extends DurableObject<Env> {
+   async forget(): Promise<void> {
+     this.#clients.clear();
+     this.#signer = undefined;
+-    await this.ctx.storage.deleteAll();
++    await this.ctx.storage.delete("member");
+   }
+ 
+   async #member(): Promise<Member> {

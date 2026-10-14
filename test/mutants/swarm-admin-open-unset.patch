@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/gate.test.ts
+# kills: swarm.admin
+# why: A Worker deployed with no admin token set is open to anyone
+diff --git a/examples/swarm/src/admin.ts b/examples/swarm/src/admin.ts
+index cd8609fd..0433f458 100644
+--- a/examples/swarm/src/admin.ts
++++ b/examples/swarm/src/admin.ts
+@@ -19,7 +19,7 @@ export async function admitted(
+   authorization: string | null | undefined,
+   secret: string | undefined,
+ ): Promise<"admitted" | "refused" | "unset"> {
+-  if (secret === undefined || secret.length === 0) return "unset";
++  if (secret === undefined || secret.length === 0) return "admitted";
+   const presented = /^Bearer (.+)$/.exec(authorization ?? "")?.[1];
+   if (presented === undefined) return "refused";
+   return (await sameSecret(presented, secret)) ? "admitted" : "refused";

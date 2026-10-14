@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t model-pins
+# why: An example's models are held to Keel's PlatformFunction pins, so the examples' own rule never runs
+diff --git a/packages/tooling/src/guards/model-pins.ts b/packages/tooling/src/guards/model-pins.ts
+index 066bf611..0fce5427 100644
+--- a/packages/tooling/src/guards/model-pins.ts
++++ b/packages/tooling/src/guards/model-pins.ts
+@@ -73,7 +73,7 @@ export function checkModelPins(root: string, options: GuardOptions = {}): GuardR
+   const violations: Violation[] = scanned.flatMap((file) => {
+     const errors: ParseError[] = [];
+     const config: unknown = parse(read(root, file), errors, { allowTrailingComma: true });
+-    const check = file.startsWith("examples/") ? examplePinProblems : pinProblems;
++    const check = pinProblems;
+     const problems = errors.length > 0 ? ["does not parse as JSONC"] : check(config);
+     return problems.map((message) => ({ rule: MODEL_PINS, file, message }));
+   });

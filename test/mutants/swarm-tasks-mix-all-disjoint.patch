@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.tasks-mix
+# why: The run plans no shared-file tasks: 60/30/10 becomes 60/0/40
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index 194f25fd..33b3ae0e 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -186,7 +186,7 @@ export function mix(count: number): {
+   readonly premise: number;
+ } {
+   const disjoint = Math.round(count * 0.6);
+-  const shared = Math.min(count - disjoint, Math.round(count * 0.3));
++  const shared = 0;
+   return { disjoint, shared, premise: count - disjoint - shared };
+ }
+ 

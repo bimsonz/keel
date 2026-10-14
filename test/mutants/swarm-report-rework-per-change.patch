@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.report-numbers
+# why: Rework is bounces per declared change, not per landing: a run that lands little looks cheap
+diff --git a/examples/swarm/src/run/report.ts b/examples/swarm/src/run/report.ts
+index 4805e85b..c605fcfb 100644
+--- a/examples/swarm/src/run/report.ts
++++ b/examples/swarm/src/run/report.ts
+@@ -72,7 +72,7 @@ export function summarise(records: readonly WorkerRecord[], modelCalls: number):
+       declared.filter((r) => (r.neighbours ?? 0) > 0).length,
+       declared.length,
+     ),
+-    reworkRate: ratio(bounces, landed.length),
++    reworkRate: ratio(bounces, declared.length),
+     queueMs: { p50: percentile(queued, 50), p95: percentile(queued, 95) },
+     modelCalls,
+     modelCallsPerLanding: ratio(modelCalls, landed.length),

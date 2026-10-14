@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/gate.test.ts
+# kills: swarm.admin
+# why: Any prefix of the admin token is admitted: one character guessed at a time opens the swarm
+diff --git a/examples/swarm/src/admin.ts b/examples/swarm/src/admin.ts
+index cd8609fd..7c896af8 100644
+--- a/examples/swarm/src/admin.ts
++++ b/examples/swarm/src/admin.ts
+@@ -22,5 +22,5 @@ export async function admitted(
+   if (secret === undefined || secret.length === 0) return "unset";
+   const presented = /^Bearer (.+)$/.exec(authorization ?? "")?.[1];
+   if (presented === undefined) return "refused";
+-  return (await sameSecret(presented, secret)) ? "admitted" : "refused";
++  return secret.startsWith(presented) ? "admitted" : "refused";
+ }

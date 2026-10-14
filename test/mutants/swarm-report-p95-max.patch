@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.report-percentile
+# why: Every percentile is the maximum: p50 of time in queue is its worst case
+diff --git a/examples/swarm/src/run/report.ts b/examples/swarm/src/run/report.ts
+index 4805e85b..289b36f0 100644
+--- a/examples/swarm/src/run/report.ts
++++ b/examples/swarm/src/run/report.ts
+@@ -48,7 +48,7 @@ export interface Report {
+ export function percentile(values: readonly number[], p: number): number | null {
+   if (values.length === 0) return null;
+   const sorted = values.toSorted((a, b) => a - b);
+-  const rank = Math.max(1, Math.ceil((p / 100) * sorted.length));
++  const rank = sorted.length;
+   return sorted[rank - 1] ?? null;
+ }
+ 

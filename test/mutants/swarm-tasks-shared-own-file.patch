@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/tasks.test.ts
+# kills: swarm.tasks-overlap
+# why: A shared group's workers each write a file of their own: the run plans no textual overlap, and its contention is hoped for
+diff --git a/examples/swarm/src/run/tasks.ts b/examples/swarm/src/run/tasks.ts
+index 194f25fd..3f6829e3 100644
+--- a/examples/swarm/src/run/tasks.ts
++++ b/examples/swarm/src/run/tasks.ts
+@@ -261,7 +261,7 @@ export function planTasks(options: {
+         kind,
+         group,
+         goal: `Add worker ${index}'s ${entry.target.fn} cases to group ${group}'s shared test file`,
+-        path: `${dir}/group-${group}.test.ts`,
++        path: `${dir}/group-${group}-${index}.test.ts`,
+         target: entry.target,
+         cases,
+         premises: [],

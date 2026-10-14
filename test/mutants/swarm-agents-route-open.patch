@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.admin-gate
+# why: The workers' prompt route needs no bearer: anyone can spend the account's model calls
+diff --git a/examples/swarm/src/app.ts b/examples/swarm/src/app.ts
+index 170a96c0..4c9c7e88 100644
+--- a/examples/swarm/src/app.ts
++++ b/examples/swarm/src/app.ts
+@@ -45,7 +45,7 @@ app.get("/", (c) =>
+ );
+ 
+ app.use("*", async (c, next) => {
+-  if (c.req.path === "/") return next();
++  if (c.req.path === "/" || c.req.path.startsWith("/agents/")) return next();
+   const gate = await admitted(c.req.header("authorization"), env.SWARM_ADMIN_TOKEN);
+   if (gate === "unset") return c.json({ error: "The swarm has no admin token set." }, 503);
+   if (gate === "refused")

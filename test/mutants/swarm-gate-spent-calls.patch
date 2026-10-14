@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/gate.test.ts
+# kills: swarm.gate-spent
+# why: A run whose model calls are spent calls the model anyway: the run's ceiling bounds nothing
+diff --git a/examples/swarm/src/run/gate.ts b/examples/swarm/src/run/gate.ts
+index cd582e93..4cfb29cb 100644
+--- a/examples/swarm/src/run/gate.ts
++++ b/examples/swarm/src/run/gate.ts
+@@ -27,7 +27,7 @@ async function slotFor(
+ ): Promise<void> {
+   const taken = await keeper.take(id);
+   if (taken.granted) return;
+-  if (taken.reason === "spent") throw new Error("This run's model calls are spent.");
++  if (taken.reason === "spent") return;
+   await wait(taken.retryInMs ?? 1_000);
+   return slotFor(keeper, id, wait);
+ }

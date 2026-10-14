@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/events.test.ts
+# kills: swarm.events-fold
+# why: Time in queue runs from the first submission, so a bounce's rework is counted as queueing
+diff --git a/examples/swarm/src/run/events.ts b/examples/swarm/src/run/events.ts
+index 6ce62723..3e87ac7d 100644
+--- a/examples/swarm/src/run/events.ts
++++ b/examples/swarm/src/run/events.ts
+@@ -85,7 +85,7 @@ export function recordsFrom(
+     if (change === undefined) continue;
+     const at = Date.parse(event.at);
+     if (tag === "PreflightIssued") change.neighbours ??= list(event, "neighbours").length;
+-    else if (tag === "ChangeSubmitted") change.submittedAt = at;
++    else if (tag === "ChangeSubmitted") change.submittedAt ??= at;
+     else if (tag === "ChangeBounced") {
+       change.bounces += 1;
+       change.outcome = "bounced";
