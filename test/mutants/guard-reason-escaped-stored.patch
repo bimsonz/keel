@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/guard-step.test.ts -t guard.evidence-as-written
+# kills: guard.evidence-as-written
+# why: the guard step stores its probe's reason HTML-escaped, so a bounce cites -&gt; where the probe wrote ->
+diff --git a/packages/core/src/application/verification/guard-step.ts b/packages/core/src/application/verification/guard-step.ts
+index efe88eea..ea176c24 100644
+--- a/packages/core/src/application/verification/guard-step.ts
++++ b/packages/core/src/application/verification/guard-step.ts
+@@ -60,7 +60,7 @@ export const withGuards =
+         stepId: step.id,
+         outcome: run._tag === "ran" ? run.outcome : "abstain",
+         guard: { predicate: guards.predicate, probe: guards.probe },
+-        reason: run.reason,
++        reason: run.reason.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"),
+         observations: "observations" in run ? [...run.observations] : [],
+       });
+       if (run._tag === "ran") return { ...report(run.outcome), durationMs, resultRef };

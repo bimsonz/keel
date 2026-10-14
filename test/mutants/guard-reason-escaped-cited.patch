@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t guard.reason-as-written
+# kills: guard.reason-as-written
+# why: the verdict cites a guard's stored reason HTML-escaped, in its evidence line and in the submit it names
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 3be30dfd..c7a77974 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -225,7 +225,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+       if (decision !== undefined) held.set(decision.id, decision);
+       failures.push({
+         kind: "guard",
+-        name: `${r.stepId} (${stored.value.guard.predicate}): ${stored.value.reason ?? "its probe failed"}${
++        name: `${r.stepId} (${stored.value.guard.predicate}): ${(stored.value.reason ?? "its probe failed").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}${
+           decision === undefined ? "" : `; it holds decision ${decision.id}: ${decision.summary}`
+         }`,
+       });

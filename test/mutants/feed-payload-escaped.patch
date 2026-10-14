@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.reason-as-written
+# kills: feed.reason-as-written
+# why: the feed serves a verdict's evidence and a bounce's reasons HTML-escaped
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index f62b8e28..089cdf81 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -84,7 +84,7 @@ function eventRecord(entry: EventFeedEntry) {
+   if (Result.isFailure(decoded)) {
+     throw new Error(`Feed event ${entry.eventId} (${entry.type}) is not in core's catalogue`);
+   }
+-  const payload = JSON.parse(JSON.stringify(encodeKeelEvent(decoded.success)));
++  const payload = JSON.parse(JSON.stringify(encodeKeelEvent(decoded.success)).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
+   if (!isWireEvent(payload)) {
+     throw new Error(`Feed event ${entry.eventId} (${entry.type}) does not encode to its wire form`);
+   }
