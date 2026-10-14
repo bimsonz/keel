@@ -21,6 +21,7 @@ export const lines = (facts: TreeFacts) => ({
         `${s.event} via ${s.via} in ${ref(s.in)} to ${ref(s.handler)}${s.async ? " async" : ""}`,
     )
     .toSorted(),
+  impurities: facts.impurities.map((i) => `${i.kind} ${i.what} in ${ref(i.in)}`).toSorted(),
 });
 
 export type Tree = Readonly<Record<string, string | Uint8Array>>;

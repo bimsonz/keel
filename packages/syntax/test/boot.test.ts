@@ -21,7 +21,7 @@ describe("the parser's one runtime", () => {
     const third = await bootParser(WASM);
     expect(third.read("f();\n", kinds)).toEqual(["expression_statement"]);
     expect(third.version).toMatch(
-      /^keel-syntax\/1 web-tree-sitter@\S+ tree-sitter-typescript@\S+$/,
+      /^keel-syntax\/2 web-tree-sitter@\S+ tree-sitter-typescript@\S+$/,
     );
   });
 

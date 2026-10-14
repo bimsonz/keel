@@ -74,7 +74,7 @@ const throughTheCache: readonly Call[] = [
 ];
 
 type Tree = Omit<SourceFacts, "commit">;
-const NOTHING: Tree = { stores: [], accesses: [], calls: [], subscriptions: [] };
+const NOTHING: Tree = { stores: [], accesses: [], calls: [], subscriptions: [], impurities: [] };
 
 /** A role cache keyed by (session, repository) in the map `field`, with `more` on top. */
 const roleCache = (
@@ -98,6 +98,7 @@ const roleCache = (
     ],
     calls: [...throughTheCache, ...(more.calls ?? [])],
     subscriptions: more.subscriptions ?? [],
+    impurities: [],
   };
 };
 /** `evict` walks the map and deletes the revoked collaborator's entries. */
@@ -211,6 +212,7 @@ export const FORGE_LITE_ITEMS: readonly ForgeLiteItem[] = [
       ],
       calls: [call(requirePermission, callerRole)],
       subscriptions: [],
+      impurities: [],
     },
     ["per-request"],
   ),
@@ -243,6 +245,7 @@ export const FORGE_LITE_ITEMS: readonly ForgeLiteItem[] = [
       ],
       calls: [call(at(REPOS, "repoRoutes"), view)],
       subscriptions: [],
+      impurities: [],
     },
     [],
   ),

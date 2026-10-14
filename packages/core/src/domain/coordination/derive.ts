@@ -1,8 +1,8 @@
 /**
- * Deterministic effect derivation: what a change does to the freshness of the
- * subjects its code serves, read from the parsed facts of its base and head
- * trees. An effect found here is a ruling, a judgement over the code that
- * executes nothing, and never proof.
+ * Deterministic effect derivation: what a change does to the freshness and
+ * the purity of the subjects its code serves, read from the parsed facts of
+ * its base and head trees. An effect found here is a ruling, a judgement over
+ * the code that executes nothing, and never proof.
  */
 import { Schema } from "effect";
 import type { Anchor } from "../kernel/index.ts";
@@ -12,7 +12,7 @@ import type { ExtractedEffect } from "./derivation.ts";
 import { isDeclared } from "./drift.ts";
 import type { Freshness, FreshnessValue } from "./lattice.ts";
 import { SubjectKey } from "./proposition.ts";
-import type { SourceFacts, SymbolRef } from "./syntax.ts";
+import type { Impurity, SourceFacts, SymbolRef } from "./syntax.ts";
 
 /** A subject and the code it is anchored to: the only way a subject is attributed. */
 export type SubjectAnchors = {
@@ -201,6 +201,16 @@ const covers = (anchor: Anchor, ref: SymbolRef): boolean =>
     anchor.symbol === ref.symbol ||
     ref.symbol.startsWith(`${anchor.symbol}.`));
 
+/** Each subject's anchors, gathered from every row that names it. */
+const anchorsBySubject = (
+  subjects: readonly SubjectAnchors[],
+): ReadonlyMap<SubjectKey, Anchor[]> => {
+  const anchorsOf = new Map<SubjectKey, Anchor[]>();
+  for (const row of subjects)
+    anchorsOf.set(row.subject, [...(anchorsOf.get(row.subject) ?? []), ...row.anchors]);
+  return anchorsOf;
+};
+
 type Attributed = {
   readonly subject: SubjectKey;
   readonly claim: StoreClaim;
@@ -216,9 +226,7 @@ const attribute = (
   claims: readonly StoreClaim[],
   subjects: readonly SubjectAnchors[],
 ): readonly Attributed[] => {
-  const anchorsOf = new Map<SubjectKey, Anchor[]>();
-  for (const row of subjects)
-    anchorsOf.set(row.subject, [...(anchorsOf.get(row.subject) ?? []), ...row.anchors]);
+  const anchorsOf = anchorsBySubject(subjects);
   return [...anchorsOf.keys()].toSorted().flatMap((subject) =>
     claims.flatMap((claim): Attributed[] => {
       const anchors = anchorsOf.get(subject) ?? [];
@@ -230,10 +238,102 @@ const attribute = (
   );
 };
 
+/** A symbol that takes an impure step, and the steps it takes or reaches. */
+type Impure = { readonly at: SymbolRef; readonly steps: readonly Impurity[] };
+
+/**
+ * The symbols a tree makes impure: each that takes an impure step itself, or
+ * reaches one by resolved calls, deferred or not, since when a step runs is
+ * not whether it does. Keyed by `refKey`.
+ */
+const impureSymbols = (facts: SourceFacts): ReadonlyMap<string, Impure> => {
+  const calledBy = new Map<string, string[]>();
+  const refs = new Map<string, SymbolRef>();
+  for (const call of facts.calls) {
+    refs.set(refKey(call.from), call.from);
+    calledBy.set(refKey(call.to), [...(calledBy.get(refKey(call.to)) ?? []), refKey(call.from)]);
+  }
+  const steps = new Map<string, Impurity[]>();
+  for (const step of facts.impurities) {
+    refs.set(refKey(step.in), step.in);
+    for (const key of reaching(calledBy, new Set([refKey(step.in)])))
+      steps.set(key, [...(steps.get(key) ?? []), step]);
+  }
+  return new Map(
+    [...steps].flatMap(([key, held]) => {
+      const at = refs.get(key);
+      return at === undefined ? [] : [[key, { at, steps: held }] as const];
+    }),
+  );
+};
+
+const stepKey = (step: Impurity): string => `${step.what}\n${step.kind}`;
+const byStep = (a: Impurity, b: Impurity): number =>
+  byRef(a.in, b.in) || (stepKey(a) < stepKey(b) ? -1 : stepKey(a) > stepKey(b) ? 1 : 0);
+
+/** What a gloss says a symbol does: the step it takes, or the one it reaches and through what. */
+const glossOf = (symbol: Impure): string => {
+  const [step] = symbol.steps.toSorted(byStep);
+  if (step === undefined) return symbol.at.symbol;
+  if (refKey(step.in) !== refKey(symbol.at))
+    return `${symbol.at.symbol} reaches ${step.what} through ${step.in.symbol}`;
+  return `${symbol.at.symbol} ${step.kind === "module-state" ? "writes" : "calls"} ${step.what}`;
+};
+
+/**
+ * The purity a change takes from its subjects: `purity is false` on each
+ * subject one of whose anchors covers a symbol that is impure at head and was
+ * not at base (or was not there), resting on those symbols and the ones
+ * holding the steps they reach.
+ */
+const purityEffects = (
+  base: SourceFacts,
+  head: SourceFacts,
+  subjects: readonly SubjectAnchors[],
+  intent: Intent,
+): readonly ExtractedEffect[] => {
+  const before = impureSymbols(base);
+  const gained = [...impureSymbols(head)]
+    .filter(([key]) => !before.has(key))
+    .map(([, symbol]) => symbol)
+    .toSorted((a, b) => byRef(a.at, b.at));
+  const anchorsOf = anchorsBySubject(subjects);
+  return [...anchorsOf.keys()].toSorted().flatMap((subject): ExtractedEffect[] => {
+    const anchors = anchorsOf.get(subject) ?? [];
+    const covered = gained.filter((symbol) => anchors.some((anchor) => covers(anchor, symbol.at)));
+    const [first] = covered;
+    if (first === undefined) return [];
+    const resting: Anchor[] = uniqueRefs(
+      covered.flatMap((symbol) => [symbol.at, ...symbol.steps.map((step) => step.in)]),
+    ).map((ref) => ({ path: ref.path, symbol: ref.symbol, commit: head.commit }));
+    const proposition = writeProposition(
+      subject,
+      { predicate: "purity", relation: "is", value: false },
+      { anchors: resting, gloss: glossOf(first) },
+    );
+    return [
+      {
+        proposition,
+        anchors: resting,
+        declared: isDeclared(intent, proposition),
+        method: "extractor",
+        evidenceClass: "ruling",
+      },
+    ];
+  });
+};
+
+/** One order for a derivation's effects: by subject, then by what each says. */
+const effectKey = (effect: ExtractedEffect): string => {
+  const p = effect.proposition;
+  return `${p.subject}\n${p.predicate}\n${p.relation}\n${JSON.stringify(p.value)}`;
+};
+
 /**
  * The effects a change has, as its code shows them: every claim head's caches
- * make on a subject that base's did not, so a file touched without changing
- * what it caches derives nothing. A subject is attributed from its anchors
+ * make on a subject that base's did not, and the purity a symbol of the
+ * subject's loses, so a file touched without changing what it caches or which
+ * impure steps it takes derives nothing. A subject is attributed from its anchors
  * only. Each effect is a ruling with the anchors it rests on at head's commit;
  * the output is in one order whatever order the facts came in.
  */
@@ -267,7 +367,7 @@ export const deriveEffects = (input: {
   const grouped = new Map<string, Attributed[]>();
   for (const a of fresh)
     if ("freshness" in a.claim) grouped.set(claimKey(a), [...(grouped.get(claimKey(a)) ?? []), a]);
-  const effects = [...grouped.keys()].toSorted().flatMap((key): ExtractedEffect[] => {
+  const freshness = [...grouped.keys()].toSorted().flatMap((key): ExtractedEffect[] => {
     const group = grouped.get(key) ?? [];
     const [first] = group;
     const proposition = first === undefined ? undefined : written(first);
@@ -295,5 +395,9 @@ export const deriveEffects = (input: {
     .toSorted((a, b) =>
       a.subject < b.subject ? -1 : a.subject > b.subject ? 1 : byRef(a.store, b.store),
     );
+  const effects = [
+    ...freshness,
+    ...purityEffects(input.base, input.head, input.subjects, input.intent),
+  ].toSorted((a, b) => (effectKey(a) < effectKey(b) ? -1 : effectKey(a) > effectKey(b) ? 1 : 0));
   return { effects, undecided };
 };

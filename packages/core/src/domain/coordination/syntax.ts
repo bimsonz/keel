@@ -66,7 +66,7 @@ export type StoreAccess = typeof StoreAccess.Type;
 /**
  * A call from one symbol to another the parser resolved. A call it cannot
  * resolve is left out, never guessed. Only calls that lead to a store access
- * matter, so an adapter may leave out the rest.
+ * or an impurity matter, so an adapter may leave out the rest.
  */
 export const Call = Schema.Struct({
   from: SymbolRef,
@@ -89,6 +89,39 @@ export const Subscription = Schema.Struct({
 });
 export type Subscription = typeof Subscription.Type;
 
+/**
+ * What an impure step does: write the program's output, reach the network,
+ * read the clock or randomness, leave work to run after the call returns, or
+ * write state a module holds.
+ */
+export const ImpurityKind = Schema.Literals([
+  "output",
+  "network",
+  "clock",
+  "random",
+  "schedule",
+  "module-state",
+]);
+export type ImpurityKind = typeof ImpurityKind.Type;
+
+/**
+ * A step in a symbol that a pure function never takes: a call to a built-in
+ * the file does not shadow that does one of those things, or a write to a
+ * binding a module declares at its top level. Only a built-in whose effect is
+ * certain from its name is reported; a call through a parameter, a field or
+ * an alias is not, since syntax cannot tell what it reaches.
+ */
+export const Impurity = Schema.Struct({
+  in: SymbolRef,
+  /**
+   * As written from the global down (`console.info`, `Date.now`, `fetch`, and
+   * `new Date` for a construction), or the binding written (`hits`, `seen.count`).
+   */
+  what: Schema.NonEmptyString,
+  kind: ImpurityKind,
+});
+export type Impurity = typeof Impurity.Type;
+
 /** The facts of one tree, at one commit, over the files a derivation asked for. */
 export const SourceFacts = Schema.Struct({
   commit: CommitSha,
@@ -96,5 +129,6 @@ export const SourceFacts = Schema.Struct({
   accesses: Schema.Array(StoreAccess),
   calls: Schema.Array(Call),
   subscriptions: Schema.Array(Subscription),
+  impurities: Schema.Array(Impurity),
 });
 export type SourceFacts = typeof SourceFacts.Type;

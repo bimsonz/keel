@@ -241,6 +241,7 @@ const factsOfUnit = (u: Unit): Omit<SourceFacts, "commit"> => {
     accesses,
     calls,
     subscriptions,
+    impurities: [],
   };
 };
 
@@ -252,6 +253,7 @@ export const factsOf = (units: readonly Unit[], commit: CommitSha = HEAD_COMMIT)
     accesses: parts.flatMap((p) => p.accesses),
     calls: parts.flatMap((p) => p.calls),
     subscriptions: parts.flatMap((p) => p.subscriptions),
+    impurities: parts.flatMap((p) => p.impurities),
   };
 };
 

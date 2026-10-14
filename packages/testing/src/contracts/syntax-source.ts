@@ -20,7 +20,13 @@ export interface SyntaxSourceHarness {
   ) => Effect.Effect<{ readonly repo: RepoRef; readonly sha: CommitSha }>;
 }
 
-const NOTHING: ParsedTree = { stores: [], accesses: [], calls: [], subscriptions: [] };
+const NOTHING: ParsedTree = {
+  stores: [],
+  accesses: [],
+  calls: [],
+  subscriptions: [],
+  impurities: [],
+};
 const UNKNOWN = CommitSha.make("e".repeat(40));
 const intent: Intent = {
   revision: 1,

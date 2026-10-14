@@ -74,7 +74,13 @@ const callerRole = at(GUARD, "callerRole");
 const CALLER_ROLE: Anchor = { path: GUARD, symbol: "callerRole", commit: PINNED };
 
 /** A tree with no store in it. */
-const NO_CACHE: ParsedTree = { stores: [], accesses: [], calls: [], subscriptions: [] };
+const NO_CACHE: ParsedTree = {
+  stores: [],
+  accesses: [],
+  calls: [],
+  subscriptions: [],
+  impurities: [],
+};
 
 /**
  * What a parser reports for a class `name` in `path` that `reader` reads
@@ -102,6 +108,7 @@ const cacheIn = (
       { from: reader, to: set, deferred: false },
     ],
     subscriptions: [],
+    impurities: [],
   };
 };
 const together = (trees: readonly ParsedTree[]): ParsedTree => ({
@@ -109,6 +116,7 @@ const together = (trees: readonly ParsedTree[]): ParsedTree => ({
   accesses: trees.flatMap((t) => t.accesses),
   calls: trees.flatMap((t) => t.calls),
   subscriptions: trees.flatMap((t) => t.subscriptions),
+  impurities: trees.flatMap((t) => t.impurities),
 });
 /** `callerRole` reads roles through a cache keyed by session and repository. */
 const ROLE_CACHE = cacheIn(CACHE, "RoleCache", callerRole);
@@ -686,6 +694,7 @@ describe("Precheck's derivation", () => {
             accesses: [{ store, in: lookup, op: "read", key: ["id"], deferred: false }],
             calls: [{ from: at(moduleFile(n), "handle"), to: lookup, deferred: false }],
             subscriptions: [],
+            impurities: [],
           };
         });
         const files = Object.fromEntries(modules.map((n) => [moduleFile(n), "module\n"]));

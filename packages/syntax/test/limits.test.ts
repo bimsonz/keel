@@ -143,6 +143,7 @@ describe("a stranger's file", () => {
             accesses: [],
             calls: [],
             subscriptions: [],
+            impurities: [],
             skipped: [{ path, reason: "syntax-error" }],
           });
         } else whole.push(facts.skipped);

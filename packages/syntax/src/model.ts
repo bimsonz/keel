@@ -43,7 +43,9 @@ export type Event =
     }
   | { readonly k: "iterate"; readonly of: Expr; readonly deferred: boolean }
   /** A name handed to a call as an argument: a call, if it turns out to name a function. */
-  | { readonly k: "ref"; readonly target: Expr; readonly deferred: boolean };
+  | { readonly k: "ref"; readonly target: Expr; readonly deferred: boolean }
+  /** A name, or a member reached through names, assigned or updated: `hits`, `seen.count`. */
+  | { readonly k: "write"; readonly path: string };
 
 export type SymbolModel = {
   /** The symbol as an anchor writes it. */
@@ -708,6 +710,14 @@ function emit(context: Context, node: Node): void {
           of: toExpr(right, context.thisOk),
           deferred: deferredAt(context, right),
         });
+      break;
+    }
+    case "assignment_expression":
+    case "augmented_assignment_expression":
+    case "update_expression": {
+      const target = field(node, node.type === "update_expression" ? "argument" : "left");
+      const path = target === undefined ? undefined : pathOf(target);
+      if (path !== undefined) context.sym.events.push({ k: "write", path });
       break;
     }
     case "spread_element": {

@@ -9,6 +9,8 @@
 import type {
   Call,
   Expiry,
+  Impurity,
+  ImpurityKind,
   KeyedStore,
   SourceFacts,
   StoreAccess,
@@ -49,6 +51,38 @@ const OPS: Readonly<Record<string, StoreAccess["op"]>> = {
   delete: "evict",
   clear: "evict",
 };
+/**
+ * The built-ins a pure function never calls, by their path from the global,
+ * and what each does: `fetch` sends a request out of the isolate; the clock
+ * and the random sources answer differently on every call; the schedulers
+ * leave work that runs after the call returns. `Date.parse`, `Math.max`,
+ * `JSON.parse` and the like are pure and are not here.
+ */
+const IMPURE_CALLS: ReadonlyMap<string, ImpurityKind> = new Map([
+  ["fetch", "network"],
+  ["Date", "clock"],
+  ["Date.now", "clock"],
+  ["performance.now", "clock"],
+  ["Math.random", "random"],
+  ["crypto.randomUUID", "random"],
+  ["crypto.getRandomValues", "random"],
+  ["setTimeout", "schedule"],
+  ["setInterval", "schedule"],
+  ["setImmediate", "schedule"],
+  ["queueMicrotask", "schedule"],
+]);
+/** Built-ins every method of which is impure: each of `console`'s writes the program's output, or keeps its counters and timers. */
+const IMPURE_ROOTS: ReadonlyMap<string, ImpurityKind> = new Map([["console", "output"]]);
+/**
+ * Constructions that are impure: a socket connects, and a date given no time
+ * reads the clock (`new Date(ms)` is pure).
+ */
+const IMPURE_NEW: ReadonlyMap<string, { readonly kind: ImpurityKind; readonly bare: boolean }> =
+  new Map([
+    ["WebSocket", { kind: "network", bare: false }],
+    ["Date", { kind: "clock", bare: true }],
+  ]);
+const GLOBAL = "globalThis.";
 const MAX_DEPTH = 24;
 
 type Val =
@@ -86,6 +120,55 @@ const shadowed = (name: string, scope: Scope): boolean =>
   scope.file.imports.has(name) ||
   scope.file.variables.has(name) ||
   scope.file.declared.has(name);
+
+/** The name is the global of that name: nothing the file declares, imports or binds, nor the symbol, is called it. */
+const isGlobal = (name: string, scope: Scope): boolean =>
+  !shadowed(name, scope) && !scope.file.functions.has(name) && !scope.file.classes.has(name);
+
+/** An expression's path of names (`console.info`), when it is one. */
+const namesOf = (expr: Expr): string | undefined => {
+  if (expr.k === "name") return expr.name;
+  if (expr.k !== "member") return undefined;
+  const head = namesOf(expr.object);
+  return head === undefined ? undefined : `${head}.${expr.property}`;
+};
+
+/**
+ * What a call or a construction does when it is one of an impure built-in,
+ * named from the global (`globalThis.fetch` is `fetch`) and not shadowed.
+ */
+const impurityOf = (
+  callee: Expr,
+  args: readonly Expr[],
+  scope: Scope,
+): Omit<Impurity, "in"> | undefined => {
+  const constructs = callee.k === "new";
+  const named = namesOf(constructs ? callee.ctor : callee);
+  if (named === undefined) return undefined;
+  const [first = named] = named.split(".");
+  if (!isGlobal(first, scope)) return undefined;
+  const path = named.startsWith(GLOBAL) ? named.slice(GLOBAL.length) : named;
+  if (constructs) {
+    const made = IMPURE_NEW.get(path);
+    return made === undefined || (made.bare && args.length > 0)
+      ? undefined
+      : { what: `new ${path}`, kind: made.kind };
+  }
+  const [root = path] = path.split(".");
+  const kind = IMPURE_CALLS.get(path) ?? (path === root ? undefined : IMPURE_ROOTS.get(root));
+  return kind === undefined ? undefined : { what: path, kind };
+};
+
+/**
+ * A write to state the module holds: to a binding it declares at its top
+ * level, or a member of one, or a member of a binding it imports; never to
+ * a local or a parameter of that name.
+ */
+const writesModule = (path: string, scope: Scope): boolean => {
+  const [root = path] = path.split(".");
+  if (scope.sym?.bindings.has(root) === true) return false;
+  return scope.file.variables.has(root) || (root !== path && scope.file.imports.has(root));
+};
 
 /** The container a `new Map()` makes, when `Map` is the built-in. */
 const containerOf = (expr: Expr, scope: Scope): string | undefined =>
@@ -346,6 +429,7 @@ export function factsOf(
   };
 
   const accesses: StoreAccess[] = [];
+  const impurities: Impurity[] = [];
   const edges = new Map<string, Call>();
   const edge = (from: SymbolRef, to: Val | undefined, deferred: boolean): void => {
     if (to?.k !== "fn") return;
@@ -362,6 +446,11 @@ export function factsOf(
           edge(here, evaluate(event.target, scope, 0), event.deferred);
           continue;
         }
+        if (event.k === "write") {
+          if (writesModule(event.path, scope))
+            impurities.push({ in: here, what: event.path, kind: "module-state" });
+          continue;
+        }
         if (event.k === "iterate") {
           const iterated = evaluate(event.of, scope, 0);
           if (iterated?.k === "store")
@@ -375,6 +464,8 @@ export function factsOf(
           continue;
         }
         const { callee } = event;
+        const impurity = impurityOf(callee, event.args, scope);
+        if (impurity !== undefined) impurities.push({ in: here, ...impurity });
         if (callee.k === "new") {
           const made = evaluate(callee.ctor, scope, 0);
           if (made?.k === "class")
@@ -402,11 +493,11 @@ export function factsOf(
       }
     }
 
-  // Only calls that lead to a store access are reported.
+  // Only calls that lead to a store access or an impurity are reported.
   const calledBy = new Map<string, string[]>();
   for (const call of edges.values())
     calledBy.set(refKey(call.to), [...(calledBy.get(refKey(call.to)) ?? []), refKey(call.from)]);
-  const reaches = new Set(accesses.map((access) => refKey(access.in)));
+  const reaches = new Set([...accesses, ...impurities].map((step) => refKey(step.in)));
   const queue = [...reaches];
   for (let next = queue.pop(); next !== undefined; next = queue.pop())
     for (const caller of calledBy.get(next) ?? [])
@@ -445,5 +536,6 @@ export function factsOf(
       (call) => `${refKey(call.from)}\n${refKey(call.to)}`,
     ),
     subscriptions: ordered(subscriptions, (subscription) => JSON.stringify(subscription)),
+    impurities: ordered(impurities, (impurity) => JSON.stringify(impurity)),
   };
 }

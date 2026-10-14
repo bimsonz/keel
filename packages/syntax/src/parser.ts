@@ -26,7 +26,7 @@ import { PARSER_PACKAGES } from "./generated/versions.ts";
 import { discardRuntime, Language, Parser } from "./generated/web-tree-sitter.js";
 
 /** The rules that read a tree, then the parser's packages: what a derivation record is stamped with. */
-export const PARSER_VERSION = `keel-syntax/1 ${PARSER_PACKAGES}`;
+export const PARSER_VERSION = `keel-syntax/2 ${PARSER_PACKAGES}`;
 
 /** The runtime (`web-tree-sitter.wasm`) and the grammar (`tree-sitter-typescript.wasm`), compiled. */
 export interface SyntaxWasm {

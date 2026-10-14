@@ -46,6 +46,7 @@ const NOTHING: SourceFacts = {
   accesses: [],
   calls: [],
   subscriptions: [],
+  impurities: [],
 };
 const intentWith = (declaredEffects: Intent["declaredEffects"] = []): Intent => ({
   revision: 1,
@@ -404,6 +405,7 @@ describe("a change's effects", () => {
           accesses: reorder(head.accesses, by + 1),
           calls: reorder(head.calls, by + 2),
           subscriptions: reorder(head.subscriptions, by + 3),
+          impurities: reorder(head.impurities, by + 4),
         };
         const subjects = subjectsOf(units);
         const input = { base: NOTHING, intent: intentWith() };
@@ -458,7 +460,7 @@ describe("a change's effects", () => {
 });
 
 describe("parsed facts on the wire", () => {
-  it("[syntax.facts-wire] a tree's facts survive encode, JSON and decode unchanged, and a fact with a field missing or an expiry below zero does not decode", () => {
+  it("[syntax.facts-wire] a tree's facts survive encode, JSON and decode unchanged, and a fact with a field missing, an expiry below zero or an impurity of no kind Keel names does not decode", () => {
     const decode = Schema.decodeUnknownResult(SourceFacts);
     fc.assert(
       fc.property(unitsArb, (units) => {
@@ -471,9 +473,15 @@ describe("parsed facts on the wire", () => {
         );
       }),
     );
-    const facts = factsOf([{ ...GOOD, expiry: "unknown" }]);
+    const facts: SourceFacts = {
+      ...factsOf([{ ...GOOD, expiry: "unknown" }]),
+      impurities: [{ in: entryOf(GOOD), what: "console.info", kind: "output" }],
+    };
     const wire = Schema.encodeSync(SourceFacts)(facts);
-    const dropping = (list: "calls" | "accesses" | "subscriptions", field: string): unknown => ({
+    const dropping = (
+      list: "calls" | "accesses" | "subscriptions" | "impurities",
+      field: string,
+    ): unknown => ({
       ...wire,
       [list]: wire[list].map((fact) =>
         Object.fromEntries(Object.entries(fact).filter(([name]) => name !== field)),
@@ -484,6 +492,14 @@ describe("parsed facts on the wire", () => {
     expect(Result.isSuccess(decode(dropping("calls", "deferred")))).toBe(false);
     expect(Result.isSuccess(decode(dropping("accesses", "deferred")))).toBe(false);
     expect(Result.isSuccess(decode(dropping("subscriptions", "async")))).toBe(false);
+    expect(Result.isSuccess(decode(dropping("impurities", "kind")))).toBe(false);
+    expect(
+      Result.isSuccess(
+        decode({ ...wire, impurities: wire.impurities.map((i) => ({ ...i, kind: "slow" })) }),
+      ),
+    ).toBe(false);
+    const { impurities: _dropped, ...noImpurities } = wire;
+    expect(Result.isSuccess(decode(noImpurities))).toBe(false);
     expect(
       Result.isSuccess(
         decode({

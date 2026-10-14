@@ -280,3 +280,139 @@ export function wire() {
     ]);
   });
 });
+
+describe("impurities", () => {
+  it("[syntax.impure-builtins] a call to a built-in that writes output, reaches the network, reads the clock or randomness, or schedules work is reported with what it does; a pure built-in, a dated `new Date`, or a built-in only named is not", async () => {
+    const facts = await factsOf({
+      "src/effects.ts": `
+export function logs(n: number) { console.info("priced", n); return n; }
+export function warns() { globalThis.console.warn("x"); }
+export async function fetches(url: string) { return await fetch(url); }
+export function fetchesGlobal(url: string) { return globalThis.fetch(url); }
+export function connects(url: string) { return new WebSocket(url); }
+export function now() { return Date.now(); }
+export function today() { return new Date(); }
+export function stamp() { return Date(); }
+export function elapsed() { return performance.now(); }
+export function roll() { return Math.random(); }
+export function id() { return crypto.randomUUID(); }
+export function bytes(into: Uint8Array) { return crypto.getRandomValues(into); }
+export function later(n: number) { setTimeout(() => console.log(n), 10); }
+export function every() { return setInterval(tick, 1000); }
+export function soon() { queueMicrotask(tick); }
+export function next() { setImmediate(tick); }
+export const started = Date.now();
+function tick() {}
+
+export function at(ms: number) { return new Date(ms); }
+export function biggest(a: number, b: number) { return Math.max(a, b); }
+export function parsed(text: string) { return JSON.parse(text); }
+export function handed(take: (c: Console) => void) { take(console); }
+export function digest(data: ArrayBuffer) { return crypto.subtle.digest("SHA-256", data); }
+export function sorted(xs: number[]) { return [...xs].toSorted(); }
+`,
+    });
+    expect(facts.impurities).toEqual(
+      [
+        "output console.info in src/effects.ts#logs",
+        "output console.warn in src/effects.ts#warns",
+        "network fetch in src/effects.ts#fetches",
+        "network fetch in src/effects.ts#fetchesGlobal",
+        "network new WebSocket in src/effects.ts#connects",
+        "clock Date.now in src/effects.ts#now",
+        "clock new Date in src/effects.ts#today",
+        "clock Date in src/effects.ts#stamp",
+        "clock performance.now in src/effects.ts#elapsed",
+        "random Math.random in src/effects.ts#roll",
+        "random crypto.randomUUID in src/effects.ts#id",
+        "random crypto.getRandomValues in src/effects.ts#bytes",
+        // The callback runs later, and still runs: when is not whether.
+        "schedule setTimeout in src/effects.ts#later",
+        "output console.log in src/effects.ts#later",
+        "schedule setInterval in src/effects.ts#every",
+        "schedule queueMicrotask in src/effects.ts#soon",
+        "schedule setImmediate in src/effects.ts#next",
+        "clock Date.now in src/effects.ts#started",
+      ].toSorted(),
+    );
+  });
+
+  it("[syntax.impure-shadowed] a name the file imports, declares at its top level, or binds as a parameter or a local is not the built-in, and calling it is reported as nothing", async () => {
+    const facts = await factsOf({
+      "src/my-console.ts": "export const console = { info(_: string) {} };\n",
+      "src/shadow.ts": `
+import { console } from "./my-console.ts";
+import fetch from "some-fetch";
+const Date = { now: () => 0 };
+function setTimeout(fn: () => void) { fn(); }
+class WebSocket { constructor(readonly url: string) {} }
+export function logs() { console.info("x"); }
+export function fetches() { return fetch("u"); }
+export function now() { return Date.now(); }
+export function later() { setTimeout(() => {}); }
+export function connects() { return new WebSocket("u"); }
+export function given(Math: { random(): number }) { return Math.random(); }
+export function local() { const performance = { now: () => 1 }; return performance.now(); }
+`,
+    });
+    expect(facts.impurities).toEqual([]);
+  });
+
+  it("[syntax.module-writes] an assignment, an update or a member assignment to a binding the module declares, or through one it imports, is a write to module state; a local or parameter of that name, and `this`, are not", async () => {
+    const facts = await factsOf({
+      "src/settings.ts": 'export const settings = { mode: "slow" };\n',
+      "src/state.ts": `
+import { settings } from "./settings.ts";
+let hits = 0;
+let last: string | undefined;
+const seen = { count: 0 };
+export function assigns(key: string) { last = key; }
+export function adds() { hits += 1; }
+export function increments() { hits++; }
+export function decrements() { --hits; }
+export function sets() { seen.count = 1; }
+export function bumps() { seen.count += 1; }
+export function configures() { settings.mode = "fast"; }
+export function inLater() { setTimeout(() => { hits = 0; }); }
+
+export function shadowedLocal() { let hits = 0; hits++; return hits; }
+export function shadowedParam(last: string) { last = last.trim(); return last; }
+export function own(this: { n: number }) { this.n = 1; }
+export class Counter { n = 0; bump() { this.n++; } }
+export function readsOnly() { return hits + seen.count; }
+`,
+    });
+    expect(facts.impurities).toEqual(
+      [
+        "module-state last in src/state.ts#assigns",
+        "module-state hits in src/state.ts#adds",
+        "module-state hits in src/state.ts#increments",
+        "module-state hits in src/state.ts#decrements",
+        "module-state seen.count in src/state.ts#sets",
+        "module-state seen.count in src/state.ts#bumps",
+        "module-state settings.mode in src/state.ts#configures",
+        "module-state hits in src/state.ts#inLater",
+        "schedule setTimeout in src/state.ts#inLater",
+      ].toSorted(),
+    );
+  });
+
+  it("[syntax.calls-to-impure] a resolved call that leads to an impurity is reported, as one that leads to a store access is, and a call to a pure function still is not", async () => {
+    const facts = await factsOf({
+      "src/log.ts": `
+export function log(message: string) { console.info(message); }
+export function quiet(message: string) { return message.length; }
+`,
+      "src/price.ts": `
+import { log, quiet } from "./log.ts";
+export function price(n: number) { log("priced"); quiet("x"); return n * 2; }
+export function total(n: number) { return price(n) + 1; }
+`,
+    });
+    expect(facts.calls).toEqual([
+      "src/price.ts#price -> src/log.ts#log",
+      "src/price.ts#total -> src/price.ts#price",
+    ]);
+    expect(facts.impurities).toEqual(["output console.info in src/log.ts#log"]);
+  });
+});

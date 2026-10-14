@@ -193,6 +193,20 @@ const RELIED = Schema.decodeUnknownSync(Proposition)({
   anchors: [SESSION_OF],
 });
 
+/** loadgen's effect pair (run lg50a): `price` as the base holds it, and as the planted side rewrites it with a log. */
+const PRICE_FILE = "bench/p2.ts";
+const PRICED = (body: string) => `export function price(n: number): number {\n${body}\n}\n`;
+const PURE_PRICE = PRICED("  return n * 2;");
+const LOGGED_PRICE = PRICED('  console.info("priced", n);\n  return n * 2;');
+/** What the other side relies on: `price` stays pure, anchored at it, pinned at a commit of neither push. */
+const PRICE_IS_PURE = Schema.decodeUnknownSync(Proposition)({
+  subject: "bench.price",
+  predicate: "purity",
+  relation: "is",
+  value: true,
+  anchors: [{ path: PRICE_FILE, symbol: "price", commit: "a".repeat(40) }],
+});
+
 /** Pushes two commits to the change's workspace on its in-memory code host, as its agent would: `before`, then `after` on top of it. */
 const pushedOver = (
   c: ChangeUnderTest,
@@ -502,6 +516,93 @@ describe("Precheck", () => {
     });
 
     // The subjects heard the derivation from this change's outbox, and what they tell the neighbour's agent is theirs to flush.
+    await drainOutbox(c.stub);
+    await Promise.all(hearing.map((subject) => drainOutbox(subject)));
+  });
+
+  it("[d21.pool.derive-purity] core's derivation, run here on tree-sitter and the Project DO's live anchors, finds the `console.info` a head puts in the function a neighbour relies on being pure, and Precheck commits `purity is false` on the neighbour's subject", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const projectId: ProjectId = makeId("prj", ulid());
+    const c = await changeUnderTest(projectId, "project");
+    const neighbour = await changeUnderTest(projectId, "project");
+    const hearing = [key("bench.price"), key("bench")].map((subject) =>
+      drainAfter(env.SUBJECT.get(env.SUBJECT.idFromName(subjectAddress(projectId, subject)))),
+    );
+    // Another live change relies on `price` being pure; drained, so the project's index holds its anchor.
+    ok(await neighbour.declare("declare-neighbour", { premises: [PRICE_IS_PURE] }));
+    await drainOutbox(neighbour.stub);
+
+    // This change declares nothing, and adds a log to `price`.
+    const lease = ok(await c.declare("declare-1")).change.lease.id;
+    const workspace = ok(decodeExit(ChangeCodecs.workspace, await c.stub.workspace()));
+    const { base, head } = await pushedOver(
+      c,
+      workspace,
+      { [PRICE_FILE]: PURE_PRICE },
+      { [PRICE_FILE]: LOGGED_PRICE },
+    );
+    const answer = await derivedFrom(c, workspace, base, head, [PRICE_FILE]);
+    expect(answer.subjects).toEqual(["bench.price"]);
+    // The control: the base read as its own head takes no impure step it did not take.
+    expect((await derivedFrom(c, workspace, base, base, [PRICE_FILE])).subjects).toEqual([]);
+
+    const anchors = [{ path: PRICE_FILE, symbol: "price", commit: head }];
+    const effect = {
+      proposition: {
+        subject: "bench.price",
+        predicate: "purity",
+        relation: "is",
+        value: false,
+        anchors,
+        gloss: "price calls console.info",
+      },
+      anchors,
+      declared: false,
+      method: "extractor",
+      evidenceClass: "ruling",
+    };
+    const record = await Effect.runPromise(
+      EvidenceStore.use((store) => store.get(POOL_ORG, answer.derivationRef)).pipe(
+        Effect.provide(EvidenceStoreR2(env.ARCHIVE)),
+      ),
+    );
+    expect(record).toMatchObject({
+      seeds: [PRICE_FILE],
+      anchors: [{ subject: "bench.price", anchors: [PRICE_IS_PURE.anchors?.[0]] }],
+      effects: [effect],
+      undecided: [],
+    });
+
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(base));
+      await m.mockStepResult({ name: "diff" }, touched([PRICE_FILE]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow(JSON.stringify({ predicates: {} })));
+      await m.mockStepResult({ name: "guards" }, guards([]));
+      await m.mockStepResult({ name: "derive" }, { _tag: "Done", value: answer });
+    });
+    ok(
+      decodeExit(
+        ChangeCodecs.submit,
+        await c.stub.submit({
+          agentId: c.agentId,
+          leaseId: lease,
+          commitSha: head,
+          idempotencyKey: "s-1",
+        }),
+      ),
+    );
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+    const log = await c.log();
+    expect(log.find((e) => e.type === "EffectsDerived")?.payload).toEqual({
+      _tag: "EffectsDerived",
+      changeId: c.changeId,
+      revision: 1,
+      effects: [effect],
+      derivationRef: answer.derivationRef,
+    });
+
     await drainOutbox(c.stub);
     await Promise.all(hearing.map((subject) => drainOutbox(subject)));
   });
