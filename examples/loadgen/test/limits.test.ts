@@ -33,8 +33,11 @@ const ok = () => new Response("{}", { status: 200 });
 describe("the token pace", () => {
   it("[loadgen.reader-ahead] gives a reader's refresh its slot at once while the agents' queue is a minute deep, the two together within the run's pace", async () => {
     expect(AGENT_TOKENS_PER_MINUTE + READER_TOKENS_PER_MINUTE).toBe(TOKENS_PER_MINUTE);
+    // A lower pace leaves the readers their share; a pace that leaves the agents none, or passes the run's, is refused.
+    expect(() => paces({ perMinute: READER_TOKENS_PER_MINUTE })).toThrow("tokens a minute");
+    expect(() => paces({ perMinute: TOKENS_PER_MINUTE + 1 })).toThrow("tokens a minute");
     const t = stopped();
-    const pace = paces(t.clock);
+    const pace = paces({ clock: t.clock });
     // A thousand agents start at once: their queue reaches minutes ahead.
     const agents = Array.from({ length: 1000 }, () => pace.agents.take());
     const deepest = Math.max(...t.waits);

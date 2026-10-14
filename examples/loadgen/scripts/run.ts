@@ -12,6 +12,11 @@
 //
 // --seal-only writes the run's benchmark key and prints its digest, and starts
 // nothing: publish the digest, then run again with the same arguments.
+//
+// --name names the projects in place of `loadgen` (`<name>`, `<name>-1`, …);
+// --public makes them readable by anyone, by their owner's settings call, so
+// a person can watch the run live; --tokens-per-minute lowers the run's token
+// pace below its default, leaving room for other clients on the address.
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -53,6 +58,9 @@ const { values } = parseArgs({
     keel: { type: "string", default: "https://keel.town" },
     minutes: { type: "string", default: "60" },
     "seal-only": { type: "boolean", default: false },
+    name: { type: "string", default: "loadgen" },
+    public: { type: "boolean", default: false },
+    "tokens-per-minute": { type: "string" },
   },
 });
 if (values.agents === undefined) throw new Error("--agents is required");
@@ -68,7 +76,7 @@ const stamp = () => new Date().toISOString().slice(11, 19);
 const log = (line: string) => console.log(`${stamp()} ${line}`);
 
 // The plans and their sealed key, before anything reaches Keel. One project keeps the run's own label.
-const projectName = (k: number) => (k === 0 ? "loadgen" : `loadgen-${k}`);
+const projectName = (k: number) => (k === 0 ? values.name : `${values.name}-${k}`);
 // A sharded run's pairs are planned over the whole run, then dealt to its shards.
 const counts = Array.from(
   { length: shards },
@@ -150,7 +158,11 @@ async function account(): Promise<{
   return { agentId: made.agentId, handle: made.handle, signer };
 }
 const me = await account();
-const pace = paces();
+const pace = paces(
+  values["tokens-per-minute"] === undefined
+    ? {}
+    : { perMinute: Number(values["tokens-per-minute"]) },
+);
 /** Token requests the limit refused, and those held past their signature's life, across both paces. */
 const refused = () => pace.agents.refused + pace.readers.refused;
 const signedAgain = () => pace.agents.signedAgain + pace.readers.signedAgain;
@@ -219,14 +231,20 @@ async function prepare(k: number, plan: Plan): Promise<Shard> {
   const project = await projectId(name);
   const admin = client(`lg-${plan.run}-admin`, project);
   const settings = await admin.settings(project);
-  if (settings.verification !== "off" || settings.maxBatchSize !== BATCH) {
+  const visibility = values.public ? "public" : settings.visibility;
+  if (
+    settings.verification !== "off" ||
+    settings.maxBatchSize !== BATCH ||
+    settings.visibility !== visibility
+  ) {
     await admin.putSettings(project, {
       ...settings,
       protectedPaths: [...settings.protectedPaths],
       verification: "off",
       maxBatchSize: BATCH,
+      visibility,
     });
-    log(`set ${me.handle}/${name}: verification off, batches of up to ${BATCH}`);
+    log(`set ${me.handle}/${name}: verification off, batches of up to ${BATCH}, ${visibility}`);
   }
   const reader = client(`lg-${plan.run}-reader`, project);
   const start = await eventsAfter(reader, project, undefined);

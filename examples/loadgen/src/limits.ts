@@ -72,11 +72,20 @@ export class Pace {
 /**
  * The run's two paces: its agents', and its readers' apart, so a reader's
  * refresh never waits behind a thousand agents' queue (lg1000c's count froze
- * for sixteen minutes that way). Together they hold to `TOKENS_PER_MINUTE`.
+ * for sixteen minutes that way). Together they hold to `perMinute`, at most
+ * `TOKENS_PER_MINUTE`.
  */
-export function paces(clock: Clock = REAL): { readonly agents: Pace; readonly readers: Pace } {
+export function paces(options: { readonly perMinute?: number; readonly clock?: Clock } = {}): {
+  readonly agents: Pace;
+  readonly readers: Pace;
+} {
+  const { perMinute = TOKENS_PER_MINUTE, clock = REAL } = options;
+  if (perMinute <= READER_TOKENS_PER_MINUTE || perMinute > TOKENS_PER_MINUTE)
+    throw new Error(
+      `A run's pace is more than ${READER_TOKENS_PER_MINUTE} and at most ${TOKENS_PER_MINUTE} tokens a minute`,
+    );
   return {
-    agents: new Pace(AGENT_TOKENS_PER_MINUTE, clock),
+    agents: new Pace(perMinute - READER_TOKENS_PER_MINUTE, clock),
     readers: new Pace(READER_TOKENS_PER_MINUTE, clock),
   };
 }

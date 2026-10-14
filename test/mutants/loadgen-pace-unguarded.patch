@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/limits.test.ts
+# kills: loadgen.reader-ahead
+# why: A pace that leaves the agents no tokens, or passes the run's, is taken: a run starves or crowds out the address
+diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
+index be9b9872..53d91bf9 100644
+--- a/examples/loadgen/src/limits.ts
++++ b/examples/loadgen/src/limits.ts
+@@ -80,7 +80,7 @@ export function paces(options: { readonly perMinute?: number; readonly clock?: C
+   readonly readers: Pace;
+ } {
+   const { perMinute = TOKENS_PER_MINUTE, clock = REAL } = options;
+-  if (perMinute <= READER_TOKENS_PER_MINUTE || perMinute > TOKENS_PER_MINUTE)
++  if (false)
+     throw new Error(
+       `A run's pace is more than ${READER_TOKENS_PER_MINUTE} and at most ${TOKENS_PER_MINUTE} tokens a minute`,
+     );
