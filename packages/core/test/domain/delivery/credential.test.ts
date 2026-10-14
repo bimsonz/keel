@@ -19,6 +19,7 @@ describe("a credential's label", () => {
       ["a trailing space", "deploys ", false],
       ["a leading tab", "\tdeploys", false],
       ["a trailing newline", "deploys\n", false],
+      ["a newline inside", "staging\ndeploys", false],
     ];
     expect(cases.map(([name, label]) => [name, takes(label)])).toEqual(
       cases.map(([name, , ok]) => [name, ok]),

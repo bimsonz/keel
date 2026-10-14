@@ -71,9 +71,11 @@ export const parseDeploySpec = (source: string): Result.Result<DeploySpec, Deplo
  * The wrangler config keys Keel takes: the ones it uploads a version with, and
  * the settings a version does not carry (routes, triggers, observability and
  * the like belong to a deployment, or to wrangler's own tooling). Any other key
- * declares a binding or resource Keel does not send with a preview yet, or
- * changes how the bundle is built, so a config with one is refused, naming it.
- * A key wrangler adds later is refused too, until Keel reads it.
+ * declares a binding or resource Keel does not send with a preview yet, a
+ * setting a version carries that Keel's upload does not (`limits`,
+ * `placement`, `keep_vars`), or changes how the bundle is built (`minify`,
+ * `define`), so a config with one is refused, naming it. A key wrangler adds
+ * later is refused too, until Keel reads it.
  */
 export const TAKEN_KEYS: readonly string[] = [
   "$schema",
@@ -86,12 +88,8 @@ export const TAKEN_KEYS: readonly string[] = [
   "compliance_region",
   "dev",
   "env",
-  "keep_vars",
-  "limits",
   "logpush",
-  "minify",
   "observability",
-  "placement",
   "preview_urls",
   "route",
   "routes",
@@ -277,6 +275,18 @@ export class SmokePathOffHost extends Schema.TaggedError<SmokePathOffHost>()("Sm
 }) {}
 
 /**
+ * A preview's address as smoke checks are made against it: an https origin and
+ * nothing more (no user, port, path or trailing slash), so a path joined to it
+ * starts the URL's path.
+ */
+export const PreviewOrigin = Schema.String.check(
+  Schema.isPattern(
+    /^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/,
+  ),
+).pipe(Schema.brand("PreviewOrigin"));
+export type PreviewOrigin = typeof PreviewOrigin.Type;
+
+/**
  * The address a smoke check fetches: the preview's origin, then the path.
  * A path that starts with `/` ends the origin's host where it begins, so the
  * request stays on the preview; any other would let it name a host of its own
@@ -284,7 +294,7 @@ export class SmokePathOffHost extends Schema.TaggedError<SmokePathOffHost>()("Sm
  * that a URL resolved against the preview would take elsewhere (`//`, `\`).
  */
 export const smokeUrl = (
-  preview: string,
+  preview: PreviewOrigin,
   check: SmokeCheck,
 ): Result.Result<string, SmokePathOffHost> =>
   check.path.startsWith("/")

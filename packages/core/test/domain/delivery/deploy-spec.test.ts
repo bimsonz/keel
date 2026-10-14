@@ -5,6 +5,7 @@ import {
   checkPinnedName,
   jsoncToJson,
   parseDeploySpec,
+  PreviewOrigin,
   previewAlias,
   type SmokeCheck,
   smokeUrl,
@@ -48,12 +49,8 @@ const TAKEN = [
   "compliance_region",
   "dev",
   "env",
-  "keep_vars",
-  "limits",
   "logpush",
-  "minify",
   "observability",
-  "placement",
   "preview_urls",
   "route",
   "routes",
@@ -63,8 +60,13 @@ const TAKEN = [
   "workers_dev",
 ];
 
-// wrangler 4.149's other top-level keys: each declares a binding or resource, or changes the bundle.
+// wrangler 4.149's other top-level keys: each declares a binding or resource, is carried by a version, or changes the bundle.
 const WRANGLER_REFUSED = [
+  // Settings a version carries that Keel's upload does not yet, and one that changes the bundle.
+  "keep_vars",
+  "limits",
+  "minify",
+  "placement",
   "access",
   "addresses",
   "agent_memory",
@@ -149,11 +151,8 @@ const factsWith = (fields: object) =>
 
 const refusedNaming = (key: string): boolean => {
   const facts = withKey(key);
-  return (
-    reason(facts) === "uncarried-key" &&
-    Result.isFailure(facts) &&
-    facts.failure.detail.includes(key)
-  );
+  const named = Result.isFailure(facts) ? /declares (.*), which/.exec(facts.failure.detail) : null;
+  return reason(facts) === "uncarried-key" && (named?.[1]?.split(", ") ?? []).includes(key);
 };
 
 describe("a project's deploy spec", () => {
@@ -188,6 +187,10 @@ describe("a project's deploy spec", () => {
       ["worker of 64", { ...SPEC, worker: `w${"x".repeat(62)}1` }, false],
       ["worker of 1", { ...SPEC, worker: "w" }, true],
       ["worker ending in a hyphen", { ...SPEC, worker: "worker-" }, false],
+      ["worker starting upper-case", { ...SPEC, worker: "Worker-lite" }, false],
+      ["worker with an underscore", { ...SPEC, worker: "my_worker" }, false],
+      ["8 smoke checks", { ...SPEC, smoke: Array.from({ length: 8 }, () => SPEC.smoke[0]) }, true],
+      ["9 smoke checks", { ...SPEC, smoke: Array.from({ length: 9 }, () => SPEC.smoke[0]) }, false],
       ["status 100", smoke({ status: 100 }), true],
       ["status 599", smoke({ status: 599 }), true],
       ["status 600", smoke({ status: 600 }), false],
@@ -239,7 +242,9 @@ describe("a project's deploy spec", () => {
 });
 
 describe("a smoke check's address", () => {
-  const PREVIEW = "https://ch-0000000001-worker-lite.owner.workers.dev";
+  const PREVIEW = Schema.decodeUnknownSync(PreviewOrigin)(
+    "https://ch-0000000001-worker-lite.owner.workers.dev",
+  );
   const host = new URL(PREVIEW).host;
 
   it("[smoke.same-host] a path that would leave the preview's host is refused, by the spec and again where its address is made", () => {
@@ -248,6 +253,8 @@ describe("a smoke check's address", () => {
       "/\\evil.example/x",
       "/\\/evil.example",
       "/\\\\evil.example",
+      "/a\\b",
+      "/\t/evil.example/x",
     ])
       expect([path, Result.isFailure(pathOf(path))]).toEqual([path, true]);
     for (const path of ["@evil.example/x", ".evil.example", ":443@evil.example", "evil.example"]) {
@@ -257,6 +264,21 @@ describe("a smoke check's address", () => {
     expect(Result.getOrThrow(smokeUrl(PREVIEW, check("/health?x=1")))).toBe(
       `${PREVIEW}/health?x=1`,
     );
+  });
+
+  it("[smoke.preview-origin] a preview's address is a bare https origin: no trailing slash, path, user or port", () => {
+    const takes = (url: string) => Result.isSuccess(Schema.decodeUnknownResult(PreviewOrigin)(url));
+    const cases: readonly (readonly [string, boolean])[] = [
+      [PREVIEW, true],
+      ["https://abcd1234-worker-lite.owner.workers.dev", true],
+      [`${PREVIEW}/`, false],
+      [`${PREVIEW}/x`, false],
+      ["http://worker-lite.owner.workers.dev", false],
+      ["https://user@worker-lite.owner.workers.dev", false],
+      ["https://worker-lite.owner.workers.dev:8443", false],
+      ["https://localhost", false],
+    ];
+    expect(cases.map(([url]) => [url, takes(url)])).toEqual(cases);
   });
 
   it("[smoke.same-host-any] any address made is on the preview's host, and a path the spec takes is the same address a URL resolves it to", () => {
@@ -273,6 +295,10 @@ describe("a smoke check's address", () => {
       "e",
       "x.example",
       "//",
+      "\t",
+      "\n",
+      "\r",
+      " ",
     );
     fc.assert(
       fc.property(fc.array(piece, { maxLength: 8 }), (pieces) => {
@@ -312,6 +338,7 @@ describe("a Worker's wrangler config", () => {
       ['["a", // c\n]', ["a"]],
       ['["a", /* one */ // two\n /* three */ ]', ["a"]],
       ['["a", /* not the end */ "b"]', ["a", "b"]],
+      ["[1, /*/ ] */ 2]", [1, 2]],
     ] as const)
       expect([source, JSON.parse(jsoncToJson(source))]).toEqual([source, value]);
   });
@@ -359,9 +386,11 @@ describe("a Worker's wrangler config", () => {
       ["a date", {}, "ok"],
       ["a date unpadded", { compatibility_date: "2026-1-01" }, "incomplete"],
       ["a date with a time", { compatibility_date: "2026-10-01T00:00" }, "incomplete"],
+      ["a date with a prefix", { compatibility_date: "v2026-10-01" }, "incomplete"],
       ["flags", { compatibility_flags: ["nodejs_compat"] }, "ok"],
       ["flags as one string", { compatibility_flags: "nodejs_compat" }, "incomplete"],
       ["flags not strings", { compatibility_flags: [1] }, "incomplete"],
+      ["flags a string then not", { compatibility_flags: ["nodejs_compat", 1] }, "incomplete"],
       ["an empty entry", { main: "" }, "incomplete"],
       ["vars a list", { vars: [] }, "incomplete"],
     ];
