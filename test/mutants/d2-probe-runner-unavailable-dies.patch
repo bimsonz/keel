@@ -2,15 +2,15 @@
 # kills: probe-runner.rpc-unavailable
 # why: keel-verify's VerifierUnavailable (a forged bundle, no deps bundle) becomes a defect, so the caller cannot tell it from a bug or retry it
 diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-index 8844d05..ad33b50 100644
+index 49952893..5315b33f 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-@@ -50,7 +50,7 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
-             if (Exit.isSuccess(exit)) return Effect.succeed(exit.value.run);
-             const failure = Cause.findErrorOption(exit.cause);
-             return Option.isSome(failure)
--              ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
-+              ? Effect.die(failure.value)
-               : Effect.die(Cause.squash(exit.cause));
-           }),
-         ),
+@@ -55,7 +55,7 @@ const settle = <A, E extends { readonly reason: string }>(codec: ExitCodec<A, E>
+       if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
+       const failure = Cause.findErrorOption(exit.cause);
+       return Option.isSome(failure)
+-        ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
++        ? Effect.die(failure.value)
+         : Effect.die(Cause.squash(exit.cause));
+     }),
+   );

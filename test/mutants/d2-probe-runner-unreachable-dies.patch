@@ -2,10 +2,10 @@
 # kills: probe-runner.rpc-unavailable
 # why: A keel-verify that never answered becomes a defect instead of ProbeRunnerUnavailable, so a dropped connection fails the draft instead of being retried
 diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-index 34fcf874..f2dd4db3 100644
+index 49952893..953ea74b 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
-@@ -53,7 +53,9 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
+@@ -82,7 +82,9 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
        run: (request) =>
          Effect.tryPromise({
            try: () => verifier.runProbe(encodeRequest(request)),
@@ -14,5 +14,5 @@ index 34fcf874..f2dd4db3 100644
 +            throw error;
 +          },
          }).pipe(
-           Effect.flatMap((raw) => {
-             const exit = decodeExit(VerifierCodecs.runProbe, raw);
+           Effect.flatMap((raw) => settle(VerifierCodecs.runProbe, raw)),
+           Effect.map((reply) => reply.run),
