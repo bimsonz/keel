@@ -42,7 +42,11 @@ interface Held {
 
 const NOTHING_HELD: Held = { blobs: new Map(), trees: new Map() };
 
-/** Hashes a bundle's files as git blobs, and derives each directory's tree id from its files. */
+/**
+ * Hashes a bundle's files as git blobs, and derives each directory's tree id
+ * from its files. One object at a time: hashing frames a copy of what it
+ * hashes, so hashing every blob at once would hold the tree twice.
+ */
 async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
   const blobs = new Map<string, Uint8Array>();
   const trees = new Map<string, readonly BundleFile[]>();
@@ -52,12 +56,13 @@ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
     return { name: f.path, mode: f.executable === true ? MODE_EXEC : MODE_FILE, oid };
   };
   const treeOf = async (under: readonly BundleFile[]): Promise<string> => {
-    const here: Promise<TreeEntry>[] = [];
+    const here: TreeEntry[] = [];
     const directories = new Map<string, BundleFile[]>();
     for (const f of under) {
       const slash = f.path.indexOf("/");
       if (slash < 0) {
-        here.push(blobAt(f));
+        // oxlint-disable-next-line no-await-in-loop -- one blob at a time, so one framed copy at most
+        here.push(await blobAt(f));
         continue;
       }
       const below = directories.get(f.path.slice(0, slash)) ?? [];
@@ -65,8 +70,9 @@ async function holdingOf(files: readonly BundleFile[]): Promise<Held> {
       directories.set(f.path.slice(0, slash), below);
     }
     for (const [name, below] of directories)
-      here.push((async () => ({ name, mode: MODE_TREE, oid: await treeOf(below) }))());
-    const oid = await hashObject("tree", encodeTree(await Promise.all(here)));
+      // oxlint-disable-next-line no-await-in-loop -- as above, a directory after another
+      here.push({ name, mode: MODE_TREE, oid: await treeOf(below) });
+    const oid = await hashObject("tree", encodeTree(here));
     trees.set(oid, under);
     return oid;
   };

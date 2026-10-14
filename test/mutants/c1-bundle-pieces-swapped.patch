@@ -1,0 +1,31 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-stream.test.ts
+# kills: bundle.stream-equal
+# why: The archive's first 64 KiB piece is handed to gzip last, so any bundle over one piece is not the archive it lists
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -171,6 +171,7 @@
+ function* piecesOf(parts: Iterable<Part>): Generator<Uint8Array<ArrayBuffer>> {
+   let piece = new Uint8Array(PIECE);
+   let used = 0;
++  let first: Uint8Array<ArrayBuffer> | undefined;
+   for (const part of parts) {
+     const length = typeof part === "number" ? part : part.byteLength;
+     for (let done = 0; done < length;) {
+@@ -180,13 +181,15 @@
+       used += n;
+       done += n;
+       if (used === PIECE) {
+-        yield piece;
++        if (first === undefined) first = piece;
++        else yield piece;
+         piece = new Uint8Array(PIECE);
+         used = 0;
+       }
+     }
+   }
+   if (used > 0) yield piece.subarray(0, used);
++  if (first !== undefined) yield first;
+ }
+ 
+ /** Chunks end to end, in one buffer of their own. */

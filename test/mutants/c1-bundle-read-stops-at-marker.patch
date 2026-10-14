@@ -1,0 +1,53 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-stream.test.ts
+# kills: bundle.read-equal
+# why: The reader stops at the archive's end marker and never reads the gzip's trailer, so a bundle whose trailer is wrong is read as good
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -212,6 +212,7 @@
+   stream: CompressionStream | DecompressionStream,
+   pieces: Iterable<Uint8Array<ArrayBuffer>>,
+   take: (chunk: Uint8Array) => void,
++  enough?: () => boolean,
+ ): Promise<void> => {
+   const writer = stream.writable.getWriter();
+   const reader = stream.readable.getReader();
+@@ -230,7 +231,14 @@
+   writing.catch(() => {});
+   try {
+     // oxlint-disable-next-line no-await-in-loop -- a stream is read one chunk after another
+-    for (let next = await reader.read(); !next.done; next = await reader.read()) take(next.value);
++    for (let next = await reader.read(); !next.done; next = await reader.read()) {
++      take(next.value);
++      if (enough?.() === true) {
++        await reader.cancel();
++        await writing.catch(() => {});
++        return;
++      }
++    }
+     await writing;
+   } catch (error) {
+     await reader.cancel(error).catch(() => {});
+@@ -429,7 +437,7 @@
+     return entries;
+   };
+ 
+-  return { take, end };
++  return { take, end, ended: () => phase.at === "end" && fault === undefined };
+ };
+ 
+ /**
+@@ -450,7 +458,12 @@
+ export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
+   const archive = untar();
+   try {
+-    await through(new DecompressionStream("gzip"), piecesOf([bytes]), archive.take);
++    await through(
++      new DecompressionStream("gzip"),
++      piecesOf([bytes]),
++      archive.take,
++      archive.ended,
++    );
+   } catch {
+     throw new BundleUnreadable("not gzip, or cut short");
+   }

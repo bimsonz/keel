@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-stream.test.ts
+# kills: bundle.read-equal
+# why: A fault in the part of the archive that unpacked is answered before the gzip's own failure, so a cut or corrupt bundle is blamed on its archive
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -452,6 +452,7 @@
+   try {
+     await through(new DecompressionStream("gzip"), piecesOf([bytes]), archive.take);
+   } catch {
++    archive.end();
+     throw new BundleUnreadable("not gzip, or cut short");
+   }
+   let manifest: string | undefined;

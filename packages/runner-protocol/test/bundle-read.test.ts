@@ -4,7 +4,6 @@ import {
   type BundleFile,
   BundleUnreadable,
   readBundle,
-  tarOf,
   writeBundle,
 } from "../src/index.ts";
 import { fc } from "./support/fast-check.ts";
@@ -15,6 +14,16 @@ const gzip = async (tar: Uint8Array): Promise<Uint8Array> =>
   new Uint8Array(
     await new Response(
       new Blob([tar.slice()]).stream().pipeThrough(new CompressionStream("gzip")),
+    ).arrayBuffer(),
+  );
+
+/** The uncompressed archive of a bundle written from `files`. */
+const tarOf = async (files: readonly BundleFile[]): Promise<Uint8Array> =>
+  new Uint8Array(
+    await new Response(
+      new Blob([(await writeBundle(files)).slice()])
+        .stream()
+        .pipeThrough(new DecompressionStream("gzip")),
     ).arrayBuffer(),
   );
 

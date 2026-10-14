@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-stream.test.ts
+# kills: bundle.read-own-buffers
+# why: The reader hands back views into the gunzipped chunks, so each file it returns holds a chunk of the archive alive beside it
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -404,7 +404,7 @@
+           phase = phase.at === "header" ? headerRead() : markerRead();
+         } else if (phase.at === "data") {
+           const n = Math.min(phase.left, chunk.byteLength - at);
+-          phase.parts.push(chunk.slice(at, at + n));
++          phase.parts.push(chunk.subarray(at, at + n));
+           phase.left -= n;
+           at += n;
+           if (phase.left === 0) phase = entryRead(phase);

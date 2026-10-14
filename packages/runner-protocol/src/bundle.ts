@@ -42,9 +42,19 @@ const encoder = new TextEncoder();
 const hex = (bytes: ArrayBuffer): string =>
   [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-/** The sha256 of some bytes, as lowercase hex. */
+/**
+ * The sha256 of some bytes, as lowercase hex. Bytes over an ArrayBuffer are
+ * hashed where they lie; only a view of a SharedArrayBuffer is copied first.
+ */
 export const sha256Hex = async (bytes: Uint8Array): Promise<string> =>
-  hex(await crypto.subtle.digest("SHA-256", bytes.slice()));
+  hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      bytes.buffer instanceof ArrayBuffer
+        ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        : bytes.slice(),
+    ),
+  );
 
 const checkPath = (path: string): void => {
   const segments = path.split("/");
@@ -68,11 +78,16 @@ const compareBytes = (a: string, b: string): number => {
   return x.length - y.length;
 };
 
-/** The manifest's text for these files: `sha256sum` lines in bytewise path order. */
+/**
+ * The manifest's text for these files: `sha256sum` lines in bytewise path
+ * order. The files are hashed one at a time: a digest copies what it is
+ * given, so hashing them all at once would hold a second copy of the tree.
+ */
 export const manifestOf = async (files: readonly BundleFile[]): Promise<string> => {
-  const lines = await Promise.all(
-    files.map(async (f) => ({ path: f.path, line: `${await sha256Hex(f.bytes)}  ${f.path}\n` })),
-  );
+  const lines: { path: string; line: string }[] = [];
+  for (const f of files)
+    // oxlint-disable-next-line no-await-in-loop -- one file at a time, so one digest's copy at most
+    lines.push({ path: f.path, line: `${await sha256Hex(f.bytes)}  ${f.path}\n` });
   return lines
     .toSorted((a, b) => compareBytes(a.path, b.path))
     .map((l) => l.line)
@@ -82,6 +97,9 @@ export const manifestOf = async (files: readonly BundleFile[]): Promise<string> 
 // ------------------------------------------------------------------ ustar
 
 const BLOCK = 512;
+
+/** The most bytes a gzip stream is handed at once, writing a bundle or reading one. */
+const PIECE = 64 * 1024;
 
 const octal = (value: number, width: number): string =>
   `${value.toString(8).padStart(width - 1, "0")}\0`;
@@ -104,11 +122,8 @@ const header = (name: string, size: number, mode: number, type: "0" | "x"): Uint
   return block;
 };
 
-const padded = (bytes: Uint8Array): Uint8Array => {
-  const out = new Uint8Array(Math.ceil(bytes.length / BLOCK) * BLOCK);
-  out.set(bytes);
-  return out;
-};
+/** How many zero bytes follow `size` bytes of an entry, up to the next block. */
+const paddingOf = (size: number): number => Math.ceil(size / BLOCK) * BLOCK - size;
 
 /** A PAX record `"<len> path=<path>\n"`, whose length counts its own digits. */
 const paxPath = (path: string): Uint8Array => {
@@ -118,20 +133,119 @@ const paxPath = (path: string): Uint8Array => {
   return encoder.encode(`${length} path=${path}\n`);
 };
 
-const entry = (name: string, bytes: Uint8Array, mode: number): Uint8Array[] => {
-  const blocks: Uint8Array[] = [];
+/** A part of an archive as the writer makes it: bytes, or a run of that many zero bytes. */
+type Part = Uint8Array | number;
+
+function* entry(name: string, bytes: Uint8Array, mode: number): Generator<Part> {
   let shortName = name;
   if (encoder.encode(name).length > 100) {
     const pax = paxPath(name);
-    blocks.push(header("././@PaxHeader", pax.length, 0o644, "x"), padded(pax));
+    yield header("././@PaxHeader", pax.length, 0o644, "x");
+    yield pax;
+    yield paddingOf(pax.length);
     shortName = name.slice(0, 99);
   }
-  blocks.push(header(shortName, bytes.length, mode, "0"), padded(bytes));
-  return blocks;
+  yield header(shortName, bytes.length, mode, "0");
+  yield bytes;
+  yield paddingOf(bytes.length);
+}
+
+/**
+ * The uncompressed ustar archive of these files under `BUNDLE_ROOT/`, its
+ * manifest first and then the files in bytewise path order, as its parts in
+ * order: the archive itself is never built.
+ */
+function* tarOf(manifest: Uint8Array, files: readonly BundleFile[]): Generator<Part> {
+  yield* entry(`${BUNDLE_ROOT}/${BUNDLE_MANIFEST}`, manifest, 0o644);
+  for (const f of files.toSorted((a, b) => compareBytes(a.path, b.path)))
+    yield* entry(`${BUNDLE_ROOT}/${f.path}`, f.bytes, f.executable ? 0o755 : 0o644);
+  yield BLOCK * 2;
+}
+
+/**
+ * `parts` copied into pieces of PIECE bytes (the last may be shorter), each a
+ * fresh buffer that nothing else holds. A stream may keep or detach a chunk it
+ * is handed, and a file's bytes may be a view into a buffer its caller shares,
+ * so no caller's bytes are ever handed to a stream themselves.
+ */
+function* piecesOf(parts: Iterable<Part>): Generator<Uint8Array<ArrayBuffer>> {
+  let piece = new Uint8Array(PIECE);
+  let used = 0;
+  for (const part of parts) {
+    const length = typeof part === "number" ? part : part.byteLength;
+    for (let done = 0; done < length;) {
+      const n = Math.min(length - done, PIECE - used);
+      // A fresh piece is zeros already: a run of zeros only moves along it.
+      if (typeof part !== "number") piece.set(part.subarray(done, done + n), used);
+      used += n;
+      done += n;
+      if (used === PIECE) {
+        yield piece;
+        piece = new Uint8Array(PIECE);
+        used = 0;
+      }
+    }
+  }
+  if (used > 0) yield piece.subarray(0, used);
+}
+
+/** Chunks end to end, in one buffer of their own. */
+const joined = (chunks: readonly Uint8Array[]): Uint8Array => {
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
 };
 
-/** An uncompressed ustar archive of these files, under `BUNDLE_ROOT/`, plus the manifest. */
-export const tarOf = async (files: readonly BundleFile[]): Promise<Uint8Array> => {
+/**
+ * Writes `pieces` into a gzip stream and hands each chunk it gives back to
+ * `take` as it comes. Writing and reading run together, so a write waits only
+ * for the stream to take its piece. A failure on either side reaches the
+ * other: a failed write aborts the stream, and a failed read (or `take`)
+ * cancels it, so a write still pending rejects rather than waits. Rejects
+ * with what the reading side saw.
+ */
+const through = async (
+  stream: CompressionStream | DecompressionStream,
+  pieces: Iterable<Uint8Array<ArrayBuffer>>,
+  take: (chunk: Uint8Array) => void,
+): Promise<void> => {
+  const writer = stream.writable.getWriter();
+  const reader = stream.readable.getReader();
+  const writing = (async () => {
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- the next piece is made once the stream has taken this one
+      for (const piece of pieces) await writer.write(piece);
+      await writer.close();
+    } catch (error) {
+      await writer.abort(error).catch(() => {});
+      throw error;
+    }
+  })();
+  // Handled from the start: a write may fail while the reader waits, and the
+  // stream carries its error to the reader.
+  writing.catch(() => {});
+  try {
+    // oxlint-disable-next-line no-await-in-loop -- a stream is read one chunk after another
+    for (let next = await reader.read(); !next.done; next = await reader.read()) take(next.value);
+    await writing;
+  } catch (error) {
+    await reader.cancel(error).catch(() => {});
+    await writing.catch(() => {});
+    throw error;
+  }
+};
+
+/**
+ * A candidate bundle: the gzipped ustar archive of these files and their
+ * manifest. Its address is `sha256:` + `sha256Hex` of these bytes. The
+ * archive is streamed into gzip in pieces of PIECE bytes as it is made, so
+ * the writer holds the files and the gzipped bytes, and never the archive.
+ */
+export const writeBundle = async (files: readonly BundleFile[]): Promise<Uint8Array> => {
   const seen = new Set<string>();
   for (const f of files) {
     checkPath(f.path);
@@ -139,27 +253,11 @@ export const tarOf = async (files: readonly BundleFile[]): Promise<Uint8Array> =
     seen.add(f.path);
   }
   const manifest = encoder.encode(await manifestOf(files));
-  const blocks = [
-    ...entry(`${BUNDLE_ROOT}/${BUNDLE_MANIFEST}`, manifest, 0o644),
-    ...files
-      .toSorted((a, b) => compareBytes(a.path, b.path))
-      .flatMap((f) => entry(`${BUNDLE_ROOT}/${f.path}`, f.bytes, f.executable ? 0o755 : 0o644)),
-    new Uint8Array(BLOCK * 2),
-  ];
-  const out = new Uint8Array(blocks.reduce((n, b) => n + b.length, 0));
-  let offset = 0;
-  for (const b of blocks) {
-    out.set(b, offset);
-    offset += b.length;
-  }
-  return out;
-};
-
-/** A candidate bundle: the gzipped archive of `tarOf(files)`. Its address is `sha256:` + `sha256Hex` of these bytes. */
-export const writeBundle = async (files: readonly BundleFile[]): Promise<Uint8Array> => {
-  const tar = await tarOf(files);
-  const gzipped = new Blob([tar.slice()]).stream().pipeThrough(new CompressionStream("gzip"));
-  return new Uint8Array(await new Response(gzipped).arrayBuffer());
+  const gzipped: Uint8Array[] = [];
+  await through(new CompressionStream("gzip"), piecesOf(tarOf(manifest, files)), (chunk) => {
+    gzipped.push(chunk);
+  });
+  return joined(gzipped);
 };
 
 // ------------------------------------------------------------------ reading
@@ -199,21 +297,73 @@ const paxPathOf = (records: Uint8Array): string => {
   throw new BundleUnreadable("a PAX header with no path");
 };
 
-/** The entries of an uncompressed ustar archive: regular files only, ending in its two zero blocks. */
-const entriesOf = (tar: Uint8Array): { name: string; bytes: Uint8Array; mode: number }[] => {
-  const entries: { name: string; bytes: Uint8Array; mode: number }[] = [];
+/** A regular file as the reader takes it out of an archive, under the name its PAX header or its own header gives. */
+interface Entry {
+  readonly name: string;
+  readonly bytes: Uint8Array;
+  readonly mode: number;
+}
+
+/**
+ * An entry whose bytes are arriving: its header's fields, and its bytes so
+ * far, each part copied out of the chunk it came in.
+ */
+interface Receiving {
+  readonly at: "data";
+  readonly name: string;
+  readonly mode: number;
+  readonly type: string;
+  readonly size: number;
+  readonly parts: Uint8Array[];
+  left: number;
+}
+
+/**
+ * Where a reader is in an archive: in a header, in the block after a zero
+ * block, in an entry's bytes or its padding, or done.
+ */
+type Phase =
+  | { readonly at: "header" | "marker" | "end" }
+  | Receiving
+  | { readonly at: "padding"; left: number };
+
+/**
+ * An uncompressed ustar archive read as it arrives, a chunk at a time:
+ * regular files only, ending in its two zero blocks. Each entry's bytes are
+ * copied out of the chunks into a buffer of their own, and nothing else of a
+ * chunk is kept, so the archive is never held whole. A fault in the archive
+ * does not throw from `take`: the first is kept, and from there on, as after
+ * the end marker, chunks are discarded, so the stream they come from is still
+ * read to its end. `end` gives the entries, or throws that fault, or that the
+ * archive stopped short.
+ */
+const untar = () => {
+  const entries: Entry[] = [];
+  /** The header, or the block after a zero block, being filled. */
+  const block = new Uint8Array(BLOCK);
+  let filled = 0;
+  /** Where the header being filled starts in the archive. */
   let offset = 0;
   let pax: string | undefined;
-  for (;;) {
-    if (offset + BLOCK > tar.length)
-      throw new BundleUnreadable("the archive ends before its end marker");
-    const block = tar.subarray(offset, offset + BLOCK);
-    if (block.every((b) => b === 0)) {
-      const next = tar.subarray(offset + BLOCK, offset + 2 * BLOCK);
-      if (next.length !== BLOCK || !next.every((b) => b === 0))
-        throw new BundleUnreadable("the archive ends before its end marker");
-      return entries;
+  let phase: Phase = { at: "header" };
+  let fault: BundleUnreadable | undefined;
+
+  const entryRead = (e: Receiving): Phase => {
+    const [only, ...more] = e.parts;
+    const bytes = only !== undefined && more.length === 0 ? only : joined(e.parts);
+    if (e.type === "x") pax = paxPathOf(bytes);
+    else if (e.type !== "0" && e.type !== "\0")
+      throw new BundleUnreadable(`an entry of type ${JSON.stringify(e.type)}: only regular files`);
+    else {
+      entries.push({ name: pax ?? e.name, bytes, mode: e.mode });
+      pax = undefined;
     }
+    const padding = paddingOf(e.size);
+    return padding === 0 ? { at: "header" } : { at: "padding", left: padding };
+  };
+
+  const headerRead = (): Phase => {
+    if (block.every((b) => b === 0)) return { at: "marker" };
     const stored = octalField(block, 148, 8);
     const summed = block.reduce((t, b, i) => t + (i >= 148 && i < 156 ? 32 : b), 0);
     if (stored !== summed)
@@ -222,19 +372,64 @@ const entriesOf = (tar: Uint8Array): { name: string; bytes: Uint8Array; mode: nu
     const size = octalField(block, 124, 12);
     const mode = octalField(block, 100, 8);
     const type = String.fromCharCode(block[156] ?? 0);
-    const start = offset + BLOCK;
-    if (start + size > tar.length) throw new BundleUnreadable("an entry is cut short");
-    const bytes = tar.slice(start, start + size);
-    offset = start + Math.ceil(size / BLOCK) * BLOCK;
-    if (type === "x") {
-      pax = paxPathOf(bytes);
-      continue;
+    offset += BLOCK + Math.ceil(size / BLOCK) * BLOCK;
+    const data: Receiving = {
+      at: "data",
+      name: field(block, 0, 100),
+      mode,
+      type,
+      size,
+      parts: [],
+      left: size,
+    };
+    return size === 0 ? entryRead(data) : data;
+  };
+
+  const markerRead = (): Phase => {
+    if (!block.every((b) => b === 0))
+      throw new BundleUnreadable("the archive ends before its end marker");
+    return { at: "end" };
+  };
+
+  const take = (chunk: Uint8Array): void => {
+    try {
+      for (let at = 0; at < chunk.byteLength && phase.at !== "end";) {
+        if (phase.at === "header" || phase.at === "marker") {
+          const n = Math.min(BLOCK - filled, chunk.byteLength - at);
+          block.set(chunk.subarray(at, at + n), filled);
+          filled += n;
+          at += n;
+          if (filled < BLOCK) continue;
+          filled = 0;
+          phase = phase.at === "header" ? headerRead() : markerRead();
+        } else if (phase.at === "data") {
+          const n = Math.min(phase.left, chunk.byteLength - at);
+          phase.parts.push(chunk.slice(at, at + n));
+          phase.left -= n;
+          at += n;
+          if (phase.left === 0) phase = entryRead(phase);
+        } else if (phase.at === "padding") {
+          const n = Math.min(phase.left, chunk.byteLength - at);
+          phase.left -= n;
+          at += n;
+          if (phase.left === 0) phase = { at: "header" };
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof BundleUnreadable)) throw error;
+      fault = error;
+      phase = { at: "end" };
     }
-    if (type !== "0" && type !== "\0")
-      throw new BundleUnreadable(`an entry of type ${JSON.stringify(type)}: only regular files`);
-    entries.push({ name: pax ?? field(block, 0, 100), bytes, mode });
-    pax = undefined;
-  }
+  };
+
+  const end = (): Entry[] => {
+    if (fault !== undefined) throw fault;
+    if (phase.at === "data") throw new BundleUnreadable("an entry is cut short");
+    if (phase.at !== "end") throw new BundleUnreadable("the archive ends before its end marker");
+    return entries;
+  };
+
+  return { take, end };
 };
 
 /**
@@ -244,19 +439,25 @@ const entriesOf = (tar: Uint8Array): { name: string; bytes: Uint8Array; mode: nu
  * safe path, once, and the manifest listing exactly the other files with
  * their sha256. Anything else is `BundleUnreadable`, so a truncated, altered
  * or foreign archive is never read as a smaller or different tree.
+ *
+ * The bundle is unpacked in pieces of PIECE bytes and its archive read as it
+ * comes, so the reader holds the bundle and the files it returns, and never
+ * the archive. The gzip is always read to its end: a bundle that does not
+ * unpack whole is "not gzip, or cut short" whatever the archive said before
+ * the stream failed, and a fault in the archive is the answer only once the
+ * gzip has proved whole.
  */
 export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
-  let tar: Uint8Array;
+  const archive = untar();
   try {
-    const stream = new Blob([bytes.slice()]).stream().pipeThrough(new DecompressionStream("gzip"));
-    tar = new Uint8Array(await new Response(stream).arrayBuffer());
+    await through(new DecompressionStream("gzip"), piecesOf([bytes]), archive.take);
   } catch {
     throw new BundleUnreadable("not gzip, or cut short");
   }
   let manifest: string | undefined;
   const files: BundleFile[] = [];
   const seen = new Set<string>();
-  for (const e of entriesOf(tar)) {
+  for (const e of archive.end()) {
     if (!e.name.startsWith(`${BUNDLE_ROOT}/`))
       throw new BundleUnreadable(`an entry outside ${BUNDLE_ROOT}/: ${JSON.stringify(e.name)}`);
     const path = e.name.slice(BUNDLE_ROOT.length + 1);

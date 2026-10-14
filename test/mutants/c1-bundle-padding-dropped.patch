@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-stream.test.ts
+# kills: bundle.stream-equal
+# why: A file's bytes are not padded to the next block, so every header after a file of an odd size lands mid-block
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -147,7 +147,6 @@
+   }
+   yield header(shortName, bytes.length, mode, "0");
+   yield bytes;
+-  yield paddingOf(bytes.length);
+ }
+ 
+ /**
