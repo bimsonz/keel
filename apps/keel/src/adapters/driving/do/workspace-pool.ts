@@ -4,6 +4,7 @@ import {
   configurePool,
   countBehind,
   destroyPool,
+  forksStuck,
   grantWorkspace,
   holderOf,
   observePush,
@@ -11,6 +12,7 @@ import {
   refillPool,
   refreshSlots,
   releaseWorkspace,
+  STUCK_FORK_MS,
   STUCK_REFRESH_MS,
 } from "@keeltown/core/application/coordination";
 import { ChangeId, type EventEnvelope, ProjectId, WorkspaceId } from "@keeltown/core/kernel";
@@ -29,6 +31,8 @@ import { KeelObject, type Reaction } from "./keel-object.ts";
 
 /** The pool's own deadlines, alongside the outbox's. */
 export const POOL_REFILL = "pool refill";
+/** A refill's guard: armed before its forks start, for an object that dies under them; withdrawn when it ends. */
+export const POOL_FORKS = "pool forks";
 export const POOL_COLLECT = "pool collect";
 export const POOL_REFRESH = "pool refresh";
 /** A claim's own: when a workspace it may have left mid-relay is settled. */
@@ -209,10 +213,18 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
   }
 
   protected override async onDeadline(request: StartedAlarm): Promise<void> {
-    if (request.reason === POOL_REFILL) {
+    if (request.reason === POOL_REFILL || request.reason === POOL_FORKS) {
+      // Armed before any fork starts: an object that dies under its forks still has a refill come
+      // due once they count as stuck, and that refill collects them and forks again.
+      await scheduleAlarm(this.ctx.storage, {
+        kind: "deadline",
+        reason: POOL_FORKS,
+        at: Date.now() + STUCK_FORK_MS + 1_000,
+      });
       const report = await this.runtime.runPromise(
         refillPool(this.project).pipe(Effect.provide(this.services)),
       );
+      await cancelAlarm(this.ctx.storage, POOL_FORKS);
       if (report.failed + report.abandoned > 0) {
         await scheduleAlarm(this.ctx.storage, {
           kind: "deadline",
@@ -299,12 +311,18 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     });
   }
 
-  /** Arms a refill now if the pool holds fewer ready, forking or refreshing workspaces than its target. */
+  /**
+   * Arms a refill now if the pool holds fewer ready, forking or refreshing
+   * workspaces than its target, or holds forks a dead refill left: one a
+   * deploy stranded before refills armed their own deadline is freed on the
+   * object's next wake.
+   */
   private async refillIfShort(): Promise<void> {
     const status = await this.runtime.runPromise(poolStatus());
+    const stuck = await this.runtime.runPromise(forksStuck());
     if (
       status.source !== null &&
-      status.ready + status.forking + status.refreshing < status.target
+      (stuck > 0 || status.ready + status.forking + status.refreshing < status.target)
     ) {
       await scheduleAlarm(this.ctx.storage, {
         kind: "deadline",

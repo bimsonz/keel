@@ -13,19 +13,21 @@ import {
   makeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { EventOutbox, WorkspacePool } from "@keeltown/core/ports";
+import { Slot, STUCK_FORK_MS } from "@keeltown/core/application/coordination";
+import { EntityStore, EventOutbox, WorkspacePool } from "@keeltown/core/ports";
 import { PORTS } from "@keeltown/testing";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { WorkspacePoolRpc } from "../../src/adapters/driven/do-rpc/workspace-pool.ts";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import {
   POOL_CLAIM,
+  POOL_FORKS,
   POOL_REFILL,
   POOL_REFRESH,
   type WorkspacePoolDO,
 } from "../../src/adapters/driving/do/workspace-pool.ts";
-import { artifactsLocationHint } from "../../src/composition/do.ts";
+import { artifactsLocationHint, backbone } from "../../src/composition/do.ts";
 import { drainAfter } from "./helpers.ts";
 import { followTrunk } from "./pool-harness.ts";
 import {
@@ -254,6 +256,71 @@ describe("the WorkspacePool DO", () => {
       WAIT,
     );
     expect(await statusOf(projectId)).toMatchObject({ ready: 2, granted: 0, collecting: 0 });
+  });
+
+  it("[pool.do.fork-deadline] a refill arms a deadline STUCK_FORK_MS past its forks' start before any fork starts, so an object that dies under them still refills; a refill that ends withdraws it", async () => {
+    const projectId = freshProject();
+    const stub = poolStub(projectId);
+    const source = await mirror();
+    const followed = await followTrunk(projectId, source);
+    // Each fork is held, so the refill is caught with its forks under way.
+    followed.forksHeld = true;
+    const before = Date.now();
+    await stub.configure({ source, target: 1 });
+    // The platform may run the refill before this line does.
+    const ran = runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(followed.forks).toHaveLength(1), WAIT);
+    const guard = (await alarmsOf(projectId)).armed.find((a) => a.reason === POOL_FORKS);
+    expect(guard?.at).toBeGreaterThan(before + STUCK_FORK_MS);
+    expect(guard?.at).toBeLessThanOrEqual((followed.forks[0] ?? 0) + STUCK_FORK_MS + 1_000);
+    followed.forksHeld = false;
+    await ran;
+    await vi.waitFor(async () => expect((await statusOf(projectId)).ready).toBe(1), WAIT);
+    expect((await alarmsOf(projectId)).armed.map((a) => a.reason)).not.toContain(POOL_FORKS);
+  });
+
+  it("[pool.do.stranded] a pool a dead refill left with a slot forking past STUCK_FORK_MS and no deadline, as deploys before this one did, is refilled on its next wake: the grant answers PoolExhausted and arms the refill, which collects the slot and forks its replacement", async () => {
+    const projectId = freshProject();
+    await stock(projectId, 1);
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+    const stub = poolStub(projectId);
+    // Its one workspace as a refill that died under its fork leaves it: forking since long ago, with no deadline.
+    const stranded = await runInDurableObject(stub, (_instance: WorkspacePoolDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.map(EntityStore, (store) => {
+          const [row] = store.list("workspace");
+          const slot = Schema.decodeUnknownSync(Slot)(row?.value);
+          store.transaction(() =>
+            store.put(
+              "workspace",
+              slot.id,
+              Schema.encodeSync(Slot)({
+                id: slot.id,
+                repo: slot.repo,
+                state: "forking",
+                since: Date.now() - STUCK_FORK_MS - 1_000,
+              }),
+            ),
+          );
+          return slot;
+        }),
+      ),
+    );
+    expect(await statusOf(projectId)).toMatchObject({ ready: 0, forking: 1 });
+    const exhausted = decodeExit(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(Exit.isFailure(exhausted)).toBe(true);
+    // The grant armed the refill: the platform may run it before this line does.
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(
+      async () => expect(await statusOf(projectId)).toMatchObject({ ready: 1, forking: 0 }),
+      WAIT,
+    );
+    await vi.waitFor(async () => expect(await exists(stranded.repo.name)).toBe(false), WAIT);
+    const granted = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(granted.repo.name).not.toBe(stranded.repo.name);
   });
 
   it("[pool.do.retry-later] a refill that cannot fork collects what it started and re-arms itself for later, not now", async () => {

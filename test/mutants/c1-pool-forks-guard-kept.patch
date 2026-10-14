@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.fork-deadline"
+# kills: pool.do.fork-deadline
+# why: A refill that ends leaves its deadline armed, so every refill wakes the pool again for nothing
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2c2ba35b..0234e024 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -224,7 +224,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       const report = await this.runtime.runPromise(
+         refillPool(this.project).pipe(Effect.provide(this.services)),
+       );
+-      await cancelAlarm(this.ctx.storage, POOL_FORKS);
+       if (report.failed + report.abandoned > 0) {
+         await scheduleAlarm(this.ctx.storage, {
+           kind: "deadline",

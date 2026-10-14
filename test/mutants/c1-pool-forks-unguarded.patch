@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.fork-deadline"
+# kills: pool.do.fork-deadline
+# why: The refill's deadline is armed for long after its forks would count as stuck, so a pool whose object died under its forks waits that long at pool_exhausted
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2c2ba35b..837174ec 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -219,7 +219,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       await scheduleAlarm(this.ctx.storage, {
+         kind: "deadline",
+         reason: POOL_FORKS,
+-        at: Date.now() + STUCK_FORK_MS + 1_000,
++        at: Date.now() + STUCK_FORK_MS * 100,
+       });
+       const report = await this.runtime.runPromise(
+         refillPool(this.project).pipe(Effect.provide(this.services)),

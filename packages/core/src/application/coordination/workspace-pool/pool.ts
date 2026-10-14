@@ -246,6 +246,19 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
   ) satisfies PushObservation;
 });
 
+/** The slots still forking `STUCK_FORK_MS` after their fork started: a refill that died left them. */
+const stuckIn = (store: (typeof EntityStore)["Service"], now: number): readonly Slot[] =>
+  slots(store).filter((s) => s.state === "forking" && now - s.since > STUCK_FORK_MS);
+
+/**
+ * How many slots a refill that died left forking. They count as forking, so
+ * no shortfall arms a refill for them: the pool's object arms one on its next
+ * wake while any is left.
+ */
+export const forksStuck = Effect.fn("coordination/forksStuck")(function* () {
+  return stuckIn(yield* EntityStore, yield* (yield* Clock).now).length;
+});
+
 /**
  * Tops the pool up to its target. Each new slot is committed as `forking`
  * before its fork starts; the forks run in parallel outside any transaction
@@ -262,7 +275,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
   const ids = yield* Ids;
   const now = yield* (yield* Clock).now;
   const settings = settingsOf(store);
-  const stuck = slots(store).filter((s) => s.state === "forking" && now - s.since > STUCK_FORK_MS);
+  const stuck = stuckIn(store, now);
   for (const slot of stuck) yield* markCollecting(project, slot.id, "fork-abandoned");
   const source = settings.source;
   const need =

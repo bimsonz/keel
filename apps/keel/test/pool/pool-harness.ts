@@ -41,6 +41,10 @@ export interface Followed {
   headHeld: boolean;
   /** How a relay answers: the workspace moved, it stayed busy and nothing moved, or what it lacks is over the relay's cap. */
   answer: "advanced" | "busy" | "too-large";
+  /** While true, each fork waits before it starts. */
+  forksHeld: boolean;
+  /** When each fork was asked for (epoch ms). */
+  readonly forks: number[];
 }
 
 /** Any Trunks method but `head`. */
@@ -64,8 +68,27 @@ export async function followTrunk(
     held: false,
     headHeld: false,
     answer: "advanced",
+    forksHeld: false,
+    forks: [],
   };
-  const host = codeHostLayer(env);
+  const host = Layer.effect(
+    CodeHost,
+    Effect.map(CodeHost, (code) =>
+      CodeHost.of({
+        ...code,
+        fork: (from, to) =>
+          Effect.sync(() => followed.forks.push(Date.now())).pipe(
+            // Waited out on the object's own timer, as a held relay is.
+            Effect.andThen(
+              Effect.promise(async () => {
+                while (followed.forksHeld) await new Promise((resolve) => setTimeout(resolve, 20));
+              }),
+            ),
+            Effect.andThen(code.fork(from, to)),
+          ),
+      }),
+    ),
+  ).pipe(Layer.provide(codeHostLayer(env)));
   const trunks = Layer.succeed(
     Trunks,
     Trunks.of({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.stranded"
+# kills: pool.do.stranded
+# why: A wake does not look for forks a dead refill left, so a pool a deploy stranded before this one answers pool_exhausted for good
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 2c2ba35b..a8356fa0 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -322,7 +322,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     const stuck = await this.runtime.runPromise(forksStuck());
+     if (
+       status.source !== null &&
+-      (stuck > 0 || status.ready + status.forking + status.refreshing < status.target)
++      status.ready + status.forking + status.refreshing < status.target + 0 * stuck
+     ) {
+       await scheduleAlarm(this.ctx.storage, {
+         kind: "deadline",
