@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/machine.test.ts
+# kills: cli.machine-agent
+# why: a script asking for the profile `keelbot` is given the first agent's key, so it acts as another agent
+diff --git a/packages/cli/src/machine.ts b/packages/cli/src/machine.ts
+index e5c74eb7..60b9d8fb 100644
+--- a/packages/cli/src/machine.ts
++++ b/packages/cli/src/machine.ts
+@@ -45,7 +45,7 @@ export async function machineAgent(
+   profile?: string,
+   exec: Exec = run,
+ ): Promise<(Held & { readonly agentId: string }) | undefined> {
+-  const held = await heldKey(env, await keyStoreFor(platform, exec), entryName(baseUrl, profile));
++  const held = await heldKey(env, await keyStoreFor(platform, exec), entryName(baseUrl, undefined));
+   if (held === undefined) return undefined;
+   if (held.agentId === undefined)
+     throw new KeyError("this key has not signed up yet: run `keeltown agent signup`");

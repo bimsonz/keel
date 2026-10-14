@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/machine.test.ts
+# kills: cli.machine-agent
+# why: a key that never signed up is handed over as an agent with no id, so the script fails later at Keel rather than saying to sign up
+diff --git a/packages/cli/src/machine.ts b/packages/cli/src/machine.ts
+index e5c74eb7..8595a983 100644
+--- a/packages/cli/src/machine.ts
++++ b/packages/cli/src/machine.ts
+@@ -47,7 +47,5 @@ export async function machineAgent(
+ ): Promise<(Held & { readonly agentId: string }) | undefined> {
+   const held = await heldKey(env, await keyStoreFor(platform, exec), entryName(baseUrl, profile));
+   if (held === undefined) return undefined;
+-  if (held.agentId === undefined)
+-    throw new KeyError("this key has not signed up yet: run `keeltown agent signup`");
+-  return { ...held, agentId: held.agentId };
++  return { ...held, agentId: held.agentId ?? "" };
+ }
