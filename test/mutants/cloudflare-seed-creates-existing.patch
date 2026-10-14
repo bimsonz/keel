@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/seed-project.test.ts
+# kills: seed.keeps-existing-project
+# why: the seed creates a project it already holds, so a rerun against a staging Keel stops on the old idempotency key, and one under a new key would make a second project
+diff --git a/scripts/lib/seed-project.ts b/scripts/lib/seed-project.ts
+index ea72bfe..fed01e3 100644
+--- a/scripts/lib/seed-project.ts
++++ b/scripts/lib/seed-project.ts
+@@ -23,12 +23,6 @@ export async function seedProject(
+   request: Parameters<KeelClient["createProject"]>[0],
+   idempotencyKey: string,
+ ): Promise<SeededProject> {
+-  try {
+-    const existing = await by.project(request.namespace, request.name);
+-    return { id: existing.id, existed: true };
+-  } catch (error) {
+-    if (!(error instanceof KeelProblem) || error.status !== 404) throw error;
+-  }
+   const created = await by.createProject(request, { idempotencyKey });
+   return { id: created.id, existed: false };
+ }

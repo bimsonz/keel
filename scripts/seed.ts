@@ -8,7 +8,8 @@
 // 2. The seed's automation user, `keel-seed`, signs up with a passkey as any
 //    visitor does: its handle is its own namespace. Its session is
 //    kept while it still works, and its passkey signs in again after that.
-// 3. That user creates forge-lite and forge-lite-control in its namespace and puts
+// 3. That user creates forge-lite and forge-lite-control in its namespace,
+//    keeping either one that is already there, and puts
 //    each one's declared settings: verification off in the control project
 //    only (S-0's negative control); both private. The seed is staging's
 //    declared state, so a second run restores it rather than keeping
@@ -18,7 +19,9 @@
 //    keeping what scripts/deploy.ts put there (the console's keys).
 //
 // Every call carries the Idempotency-Key `seed:<env>:<role>`, so a second run
-// reaches the same ids. A credential the file already holds is kept while it
+// reaches the same ids. A project is read by its name first and kept when it
+// is there, its create never sent again (scripts/lib/seed-project.ts says why).
+// A credential the file already holds is kept while it
 // still exchanges for a token, because replaying an enrolment re-issues its
 // secret and would void the copy a deployed console holds; one that no longer
 // works is re-issued under the same key. KEEL_URL overrides the site URL.
@@ -39,6 +42,7 @@ import { KeelClient, KeelProblem } from "../packages/sdk/src/index.ts";
 import type { SavedPasskey } from "../packages/testing/src/passkey.ts";
 import { root, siteHost, wrangler } from "./env.ts";
 import { AccountRefused, signIn, signUp, whoIs } from "./lib/account.ts";
+import { seedProject } from "./lib/seed-project.ts";
 
 const environment = process.argv[2] ?? "staging";
 const agentsAt = process.argv.indexOf("--agents");
@@ -304,11 +308,13 @@ try {
   const asSeed = new KeelClient({ baseUrl: keelUrl, session: seedUser.token });
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
   for (const [name, declared] of Object.entries(PROJECTS)) {
-    const project = await asSeed.createProject(
+    const project = await seedProject(
+      asSeed,
       { namespace: SEED_HANDLE, name, source: { kind: "template", name: FIXTURE } },
-      { idempotencyKey: key(`project:${name}`) },
+      key(`project:${name}`),
     );
-    console.log(`ok   project ${name}: ${project.id}`);
+    if (project.existed) console.log(`ok   project ${name} already exists: ${project.id}`);
+    else console.log(`ok   project ${name}: ${project.id}`);
     const settings = await asSeed.putSettings(project.id, {
       protectedPaths: [],
       maxBatchSize: 1,
