@@ -96,6 +96,13 @@ export const commandStdout = (exit: number, tail = ""): string =>
     "",
   ].join("\n");
 
+/** A project command's stdout with the JUnit report its step names, gzipped and base64'd as the command prints it. */
+export const commandReportStdout = async (exit: number, report: string): Promise<string> =>
+  commandStdout(exit, "FAIL\n").replace(
+    "KEEL_END",
+    `KEEL_REPORT ${b64(await gzip(report))}\nKEEL_END`,
+  );
+
 /**
  * The worker-app build's stdout for a run that read `config` as the Worker's
  * wrangler.jsonc, exited `exit` and made `module`, gzipped and base64'd as the

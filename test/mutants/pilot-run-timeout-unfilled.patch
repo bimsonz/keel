@@ -2,7 +2,7 @@
 # kills: flow.step-run
 # why: A step that leaves its timeout out is given none instead of the suite's four minutes
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 29894d5d..1f772c8e 100644
+index 41ea7174..a969e349 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
 @@ -499,7 +499,7 @@ export const compile = (
@@ -11,6 +11,6 @@ index 29894d5d..1f772c8e 100644
                  command: s.run.command,
 -                timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
 +                timeoutMs: s.run.timeoutMs ?? 0,
+                 ...(s.run.report === undefined ? {} : { report: s.run.report }),
                },
              }),
-         ...(s.deploy === undefined ? {} : { deploy: s.deploy }),

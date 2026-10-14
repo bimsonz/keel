@@ -2,10 +2,10 @@
 # kills: flow.step-run
 # why: Compile drops the step's command: the plan step carries no run, the plan's hash does not cover it, and KeelVerify has nothing to run
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 29894d5d..68000741 100644
+index 41ea7174..eb355845 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -494,14 +494,6 @@ export const compile = (
+@@ -494,15 +494,6 @@ export const compile = (
          outcomes: s.outcomes,
          optional: s.optional,
          ...(w === undefined ? {} : { worlds: w }),
@@ -15,6 +15,7 @@ index 29894d5d..68000741 100644
 -              run: {
 -                command: s.run.command,
 -                timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+-                ...(s.run.report === undefined ? {} : { report: s.run.report }),
 -              },
 -            }),
          ...(s.deploy === undefined ? {} : { deploy: s.deploy }),

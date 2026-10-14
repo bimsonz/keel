@@ -77,10 +77,11 @@ export const ReadJson: Schema.Codec<Read> = Schema.Union([
   Schema.Struct({ _tag: Schema.Literal("fact"), fact: Schema.String }),
 ]);
 
-/** A step's command as the flow file writes it: the timeout may be left out. */
+/** A step's command as the flow file writes it: the timeout and the report may be left out. */
 const StepRunJson = Schema.Struct({
   command: Schema.NonEmptyString,
   timeoutMs: Schema.optionalKey(Schema.Int),
+  report: Schema.optionalKey(Schema.Struct({ junit: Schema.String })),
 });
 
 const stepFields = {

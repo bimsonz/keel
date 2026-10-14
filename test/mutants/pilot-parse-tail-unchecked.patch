@@ -2,15 +2,15 @@
 # kills: command.parse
 # why: A tail that is not base64 is taken
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index aa09f896..75e8e248 100644
+index 03664e8d..976af920 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -47,8 +47,6 @@ export const parseCommandOutput = (stdout: string): CommandOutput => {
+@@ -61,8 +61,6 @@ export const parseCommandOutput = (stdout: string): CommandOutput => {
    if ("malformed" in ran) return { _tag: "malformed", reason: ran.malformed };
    const tail = fields.get("KEEL_TAIL");
    if (tail === undefined) return { _tag: "malformed", reason: "no KEEL_TAIL" };
 -  if (tail !== "none" && (tail.length === 0 || !BASE64.test(tail)))
 -    return { _tag: "malformed", reason: "bad KEEL_TAIL" };
-   return { _tag: "ran", ...ran, ...(tail === "none" ? {} : { tail }), ...hydrated };
- };
- 
+   const report = reportOf(fields.get("KEEL_REPORT"));
+   if (report === "malformed") return { _tag: "malformed", reason: "bad KEEL_REPORT" };
+   return { _tag: "ran", ...ran, ...(tail === "none" ? {} : { tail }), ...report, ...hydrated };

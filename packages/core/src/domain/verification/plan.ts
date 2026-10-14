@@ -41,6 +41,8 @@ export type FlowSpec = typeof FlowSpec.Type;
 export const StepRun = Schema.Struct({
   command: Schema.NonEmptyString,
   timeoutMs: Schema.Int,
+  /** The JUnit XML report the command writes, by its path from the repository's root. */
+  report: Schema.optionalKey(Schema.Struct({ junit: Schema.NonEmptyString })),
 });
 export type StepRun = typeof StepRun.Type;
 

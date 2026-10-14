@@ -2,15 +2,15 @@
 # kills: suite-runtime.project-command-leak
 # why: A command's output is never scanned, so a secret it printed is judged and stored
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index a4560ee7..0c4732e7 100644
+index 796f2464..57f627ce 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -360,7 +360,7 @@ export const judgeCommandOutput = (
-     const tail =
-       output._tag === "ran" && output.tail !== undefined ? decodedText(output.tail) : undefined;
-     const diagnosis = diagnosisOf(output);
--    const credentialScan = scanCredentials([stdout, tail ?? "", diagnosis.diagnosis ?? ""], {
-+    const credentialScan = scanCredentials([diagnosis.diagnosis ?? ""], {
+@@ -440,7 +440,7 @@ export const judgeCommandOutput = (
+     // Of the report, only the failing tests' names are kept, so only they are scanned:
+     // a failure message quoting a test's sample key never abstains the step.
+     const cited = report === undefined ? "" : JSON.stringify(failingTestsOf(report) ?? []);
+-    const credentialScan = scanCredentials([stdout, tail ?? "", cited, diagnosis.diagnosis ?? ""], {
++    const credentialScan = scanCredentials([cited, diagnosis.diagnosis ?? ""], {
        literals,
      });
-     const judged = judgeCommand(step, output, { tail, ...diagnosis, credentialScan });
+     const judged = judgeCommand(step, output, {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/junit.test.ts
+# kills: junit.vitest
+# why: A skipped test is cited as failing
+diff --git a/packages/core/src/application/verification/junit.ts b/packages/core/src/application/verification/junit.ts
+index 441c662b..616a155c 100644
+--- a/packages/core/src/application/verification/junit.ts
++++ b/packages/core/src/application/verification/junit.ts
+@@ -66,7 +66,7 @@ export const failingTestsOf = (xml: string): readonly JunitFailure[] | undefined
+         failing.push(test === undefined || test === "" ? { file } : { file, test });
+       }
+       open = undefined;
+-    } else if ((name === "failure" || name === "error") && closing === "" && open !== undefined)
++    } else if ((name === "failure" || name === "error" || name === "skipped") && closing === "" && open !== undefined)
+       open.failed = true;
+   }
+   return suites && open === undefined ? failing : undefined;

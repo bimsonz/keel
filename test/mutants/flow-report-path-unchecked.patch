@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.report-refused
+# why: A flow file may name a report outside the repository (an absolute path or one with ..), and the box reads and removes it
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index 3b83ab10..9b18cc7e 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -50,7 +50,7 @@ const runRefusal = (step: StepFileJson): string | undefined => {
+   if (timeout !== undefined && (timeout < 1 || timeout > STEP_RUN_TIMEOUT_MAX_MS))
+     return `timeoutMs is ${timeout}, outside 1 to ${STEP_RUN_TIMEOUT_MAX_MS}`;
+   const report = step.run.report;
+-  const refused = report === undefined ? undefined : reportPathRefusal(report.junit);
++  const refused = undefined;
+   if (refused !== undefined) return `report path ${JSON.stringify(report?.junit)} ${refused}`;
+   return undefined;
+ };

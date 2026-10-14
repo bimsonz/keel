@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-report-judged
+# why: A report's absolute paths are cited as the box saw them, not relative to the candidate
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 796f2464..1ec4287c 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -457,7 +457,7 @@ export const judgeCommandOutput = (
+             ...judged.evidence,
+             failing: judged.evidence.failing.map((f) => ({
+               ...f,
+-              file: f.file.replace(/^\/workspace\//, ""),
++              file: f.file,
+             })),
+           };
+     return { ...judged, evidence, document: redactJson({ ...evidence }, literals) };

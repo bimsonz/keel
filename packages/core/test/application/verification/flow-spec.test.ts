@@ -27,11 +27,25 @@ const runStep = {
 const runFile = (step: object): string =>
   JSON.stringify({ flow: { _tag: "step", step: "check" }, steps: [{ ...runStep, ...step }] });
 
+/** The plan a flow file compiles to for a change to src/a.ts, under the js-ts pack. */
+const planOf = (source: string) =>
+  Result.getOrThrow(
+    compile(
+      Result.getOrThrow(parseFlow(source, base)).definition,
+      { baseCommit: base, touchedPaths: ["src/a.ts"], subjects: [], facts: {} },
+      JS_TS_SUITE_PACK,
+    ),
+  );
+
 const reasonOf = (source: string): string => {
   const parsed = parseFlow(source, base);
   if (Result.isSuccess(parsed)) throw new Error(`parsed: ${source}`);
   return parsed.failure.reason;
 };
+
+/** Why the flow file refuses a step whose command names this report path. */
+const reportRefused = (junit: string): string =>
+  reasonOf(runFile({ run: { command: "pnpm test", report: { junit } } }));
 
 describe("flow spec: .keel/flow.json, read from the base commit", () => {
   it("[flow-json.round-trip] every well-typed flow and step survives encoding and decoding", () => {
@@ -225,6 +239,55 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
         edge,
         taken: true,
       });
+  });
+
+  it("[flow-spec.run-report] a command's JUnit report reads back as written, rides on the plan step, and is part of the plan's hash", () => {
+    const report = { junit: ".keel/out/junit.xml" };
+    const written = Result.getOrThrow(
+      parseFlow(runFile({ run: { command: "pnpm test", report } }), base),
+    );
+    expect(written.definition?.steps[0]?.run).toEqual({ command: "pnpm test", report });
+    const plan = planOf(runFile({ run: { command: "pnpm test", report } }));
+    const read = Result.getOrThrow(
+      readStoredPlan(plan.planHash, Result.getOrThrow(storedPlanText(plan))),
+    );
+    expect(read.steps.map((s) => s.run)).toEqual([
+      { command: "pnpm test", timeoutMs: 240_000, report },
+    ]);
+    expect(plan.planHash).not.toBe(planOf(runFile({})).planHash);
+    expect(plan.planHash).not.toBe(
+      planOf(runFile({ run: { command: "pnpm test", report: { junit: "junit.xml" } } })).planHash,
+    );
+  });
+
+  it("[flow-spec.report-refused] a report is read only from a relative path inside the repository, within its limit", () => {
+    const where = ".keel/flow.json: step check's run";
+    for (const junit of [
+      "/etc/passwd",
+      "../junit.xml",
+      "out/../../junit.xml",
+      "a//b.xml",
+      "./junit.xml",
+      "out/.",
+    ])
+      expect(reportRefused(junit)).toBe(
+        `${where} report path ${JSON.stringify(junit)} must be a relative path inside the repository, with no empty, . or .. segment`,
+      );
+    for (const junit of ["out/junit .xml", "out/$(id).xml", "out\\junit.xml", "junit.xml\n"])
+      expect(reportRefused(junit)).toBe(
+        `${where} report path ${JSON.stringify(junit)} holds a character outside [A-Za-z0-9_./-]`,
+      );
+    expect(reportRefused("")).toBe(`${where} report path "" is 0 characters, not 1 to 256`);
+    expect(reportRefused("x".repeat(257))).toBe(
+      `${where} report path ${JSON.stringify("x".repeat(257))} is 257 characters, not 1 to 256`,
+    );
+    for (const junit of ["junit.xml", ".keel/out/junit.xml", "a.b/c-d_e.xml", "x".repeat(256)])
+      expect({
+        junit,
+        taken: Result.isSuccess(
+          parseFlow(runFile({ run: { command: "pnpm test", report: { junit } } }), base),
+        ),
+      }).toEqual({ junit, taken: true });
   });
 
   it("[flow-spec.predicates] the file's predicate policy reads back as written; a file may set only that, and the pack's flow runs", () => {

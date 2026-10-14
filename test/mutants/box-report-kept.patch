@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-report
+# why: The report stays in the workspace, so the engine's snapshot of it keeps a file the run wrote
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 796f2464..b8c7d4fe 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -166,7 +166,6 @@ const readReport = (path: string): readonly string[] => [
+   'if [ -L "$R" ] || [ ! -f "$R" ]; then echo "KEEL_REPORT none missing";',
+   `elif [ "$(wc -c <"$R" | tr -d ' ')" -gt ${COMMAND_REPORT_LIMIT} ]; then echo "KEEL_REPORT none too-large";`,
+   'else echo "KEEL_REPORT $(gzip -c "$R" | base64 -w0)"; fi',
+-  'rm -f "$R"',
+ ];
+ 
+ /**

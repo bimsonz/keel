@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.report-refused
+# why: A report path may climb out of the repository with ..
+diff --git a/packages/core/src/domain/verification/flow.ts b/packages/core/src/domain/verification/flow.ts
+index 8bf52287..3806c2b5 100644
+--- a/packages/core/src/domain/verification/flow.ts
++++ b/packages/core/src/domain/verification/flow.ts
+@@ -135,7 +135,7 @@ export const reportPathRefusal = (path: string): string | undefined => {
+     return `is ${path.length} characters, not 1 to ${STEP_REPORT_PATH_MAX}`;
+   if (!/^[\w./-]+$/.test(path)) return "holds a character outside [A-Za-z0-9_./-]";
+   const segments = path.split("/");
+-  if (segments.some((s) => s === "" || s === "." || s === ".."))
++  if (segments.some((s) => s === ""))
+     return "must be a relative path inside the repository, with no empty, . or .. segment";
+   return undefined;
+ };

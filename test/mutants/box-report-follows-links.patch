@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-report
+# why: A report path that is a link is followed, so a candidate can have the box print any file it can read
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 796f2464..ea8d3195 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -163,7 +163,7 @@ const base64Of = (text: string): string =>
+ /** The lines that print a step's JUnit report per COMMAND_PROTOCOL, then remove it. */
+ const readReport = (path: string): readonly string[] => [
+   `R=$(echo ${base64Of(path)} | base64 -d)`,
+-  'if [ -L "$R" ] || [ ! -f "$R" ]; then echo "KEEL_REPORT none missing";',
++  'if [ ! -f "$R" ]; then echo "KEEL_REPORT none missing";',
+   `elif [ "$(wc -c <"$R" | tr -d ' ')" -gt ${COMMAND_REPORT_LIMIT} ]; then echo "KEEL_REPORT none too-large";`,
+   'else echo "KEEL_REPORT $(gzip -c "$R" | base64 -w0)"; fi',
+   'rm -f "$R"',

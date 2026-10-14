@@ -4,10 +4,12 @@ import {
   BUILD_PROTOCOL,
   type BuildJudgement,
   COMMAND_PROTOCOL,
+  COMMAND_REPORT_LIMIT,
   COMMAND_TAIL_LIMIT,
   type CommandJudgement,
   type DepsAnswer,
   depsStop,
+  failingTestsOf,
   JS_TS_SUITE,
   judgeBuild,
   judgeCommand,
@@ -158,6 +160,15 @@ export const TYPECHECK_COMMAND = [
 const base64Of = (text: string): string =>
   btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(""));
 
+/** The lines that print a step's JUnit report per COMMAND_PROTOCOL, then remove it. */
+const readReport = (path: string): readonly string[] => [
+  `R=$(echo ${base64Of(path)} | base64 -d)`,
+  'if [ -L "$R" ] || [ ! -f "$R" ]; then echo "KEEL_REPORT none missing";',
+  `elif [ "$(wc -c <"$R" | tr -d ' ')" -gt ${COMMAND_REPORT_LIMIT} ]; then echo "KEEL_REPORT none too-large";`,
+  'else echo "KEEL_REPORT $(gzip -c "$R" | base64 -w0)"; fi',
+  'rm -f "$R"',
+];
+
 /**
  * The command (POSIX sh) for a step command of the project's own
  * (`PlanStep.run`), per COMMAND_PROTOCOL. It hydrates, puts the deps in place
@@ -167,6 +178,12 @@ const base64Of = (text: string): string =>
  * an `exit` or a `set` in it ends only that `sh`. Its output goes to a file
  * and only its last COMMAND_TAIL_LIMIT bytes are printed, base64'd, so
  * nothing it prints can forge a marker.
+ *
+ * A step naming a JUnit report has it read back after the command: a regular
+ * file of at most COMMAND_REPORT_LIMIT bytes is printed gzipped and base64'd;
+ * a missing one, a link or anything else is `none missing`, a larger one
+ * `none too-large`. The path goes in as base64 too, and the file is removed
+ * either way, so the workspace's snapshot never keeps it.
  */
 export const projectCommand = (run: StepRun): string =>
   [
@@ -189,6 +206,7 @@ export const projectCommand = (run: StepRun): string =>
     'echo "KEEL_EXIT $code"',
     'echo "KEEL_DURATION_MS $((end - start))"',
     `if [ -s $K/output.log ]; then echo "KEEL_TAIL $(tail -c ${COMMAND_TAIL_LIMIT} $K/output.log | base64 -w0)"; else echo "KEEL_TAIL none"; fi`,
+    ...(run.report === undefined ? [] : readReport(run.report.junit)),
     "keel_deps_drop /workspace",
     "echo KEEL_END",
     "exit 0",
@@ -413,16 +431,36 @@ export const judgeCommandOutput = (
   stdout: string,
   literals: readonly string[],
 ): Effect.Effect<CommandJudgement & { readonly document: Json }> =>
-  Effect.sync(() => {
+  Effect.gen(function* () {
     const output = parseCommandOutput(stdout);
     const tail =
       output._tag === "ran" && output.tail !== undefined ? decodedText(output.tail) : undefined;
+    const report = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
     const diagnosis = diagnosisOf(output);
-    const credentialScan = scanCredentials([stdout, tail ?? "", diagnosis.diagnosis ?? ""], {
+    // Of the report, only the failing tests' names are kept, so only they are scanned:
+    // a failure message quoting a test's sample key never abstains the step.
+    const cited = report === undefined ? "" : JSON.stringify(failingTestsOf(report) ?? []);
+    const credentialScan = scanCredentials([stdout, tail ?? "", cited, diagnosis.diagnosis ?? ""], {
       literals,
     });
-    const judged = judgeCommand(step, output, { tail, ...diagnosis, credentialScan });
-    return { ...judged, document: redactJson({ ...judged.evidence }, literals) };
+    const judged = judgeCommand(step, output, {
+      tail,
+      ...(report === undefined ? {} : { report }),
+      ...diagnosis,
+      credentialScan,
+    });
+    // A report may name files absolutely; cite them relative to the candidate's root.
+    const evidence =
+      judged.evidence.failing === undefined
+        ? judged.evidence
+        : {
+            ...judged.evidence,
+            failing: judged.evidence.failing.map((f) => ({
+              ...f,
+              file: f.file.replace(/^\/workspace\//, ""),
+            })),
+          };
+    return { ...judged, evidence, document: redactJson({ ...evidence }, literals) };
   });
 
 /**

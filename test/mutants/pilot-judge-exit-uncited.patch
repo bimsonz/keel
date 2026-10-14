@@ -2,10 +2,10 @@
 # kills: command.judge
 # why: The stored evidence of a pass or fail does not say what the command exited
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index aa09f896..12c1605d 100644
+index 03664e8d..1056bb62 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -122,7 +122,7 @@ const judgeRun = (
+@@ -179,7 +179,7 @@ const judgeRun = (
    const tail = text ?? "";
    const decide = (outcome: "pass" | "fail", why: string): CommandJudgement => ({
      report: { ...base, outcome, durationMs: output.durationMs },
@@ -13,4 +13,4 @@ index aa09f896..12c1605d 100644
 +    evidence: { stepId: step.id, outcome, why, tail },
    });
    if (output.exit === 0) return decide("pass", "the command exited 0");
-   if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);
+   if (output.exit < 128) {

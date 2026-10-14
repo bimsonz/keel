@@ -1,6 +1,8 @@
 import type { ContentHash } from "../../domain/kernel/index.ts";
 import type { InfraFailure, PlanStep } from "../../domain/verification/index.ts";
+import { failingTestsOf, type JunitFailure } from "./junit.ts";
 import type { CredentialScan } from "./redact.ts";
+import { MAX_FAILING } from "./suite.ts";
 import {
   BASE64,
   finishJudgement,
@@ -22,11 +24,19 @@ import {
  *   KEEL_EXIT <n>                    the command's exit status
  *   KEEL_DURATION_MS <n>
  *   KEEL_TAIL <base64> | none        the last COMMAND_TAIL_LIMIT bytes of its output
+ *   KEEL_REPORT <base64 of gzip>     the JUnit XML report the step names, only when it names one;
+ *     | none missing | none too-large  or why there is none to read
  */
 export const COMMAND_PROTOCOL = "KEEL_COMMAND/1";
 
 /** How much of the end of a command's output the runner keeps, in bytes. */
 export const COMMAND_TAIL_LIMIT = 4096;
+
+/** The largest JUnit report the runner reads back, in bytes before compression. */
+export const COMMAND_REPORT_LIMIT = 4 * 1024 * 1024;
+
+/** Why a report the step names could not be read back from the box. */
+export type ReportUnread = "missing" | "too-large";
 
 export type CommandOutput =
   | RunnerStop
@@ -36,6 +46,10 @@ export type CommandOutput =
       readonly durationMs: number;
       /** The end of the command's output as base64, still encoded; absent when it printed nothing. */
       readonly tail?: string;
+      /** The JUnit report the step names, as base64 of gzip, still encoded. */
+      readonly report?: string;
+      /** Why the report the step names was not there to read. */
+      readonly reportUnread?: ReportUnread;
     } & Hydrated);
 
 /** Reads the runner's stdout. Anything but exactly one well-formed run is `malformed`, which abstains. */
@@ -49,13 +63,28 @@ export const parseCommandOutput = (stdout: string): CommandOutput => {
   if (tail === undefined) return { _tag: "malformed", reason: "no KEEL_TAIL" };
   if (tail !== "none" && (tail.length === 0 || !BASE64.test(tail)))
     return { _tag: "malformed", reason: "bad KEEL_TAIL" };
-  return { _tag: "ran", ...ran, ...(tail === "none" ? {} : { tail }), ...hydrated };
+  const report = reportOf(fields.get("KEEL_REPORT"));
+  if (report === "malformed") return { _tag: "malformed", reason: "bad KEEL_REPORT" };
+  return { _tag: "ran", ...ran, ...(tail === "none" ? {} : { tail }), ...report, ...hydrated };
+};
+
+/** The KEEL_REPORT marker read: nothing when the runner printed none, as for a step naming no report. */
+const reportOf = (
+  marker: string | undefined,
+): { readonly report?: string; readonly reportUnread?: ReportUnread } | "malformed" => {
+  if (marker === undefined) return {};
+  if (marker === "none missing") return { reportUnread: "missing" };
+  if (marker === "none too-large") return { reportUnread: "too-large" };
+  // A gzip stream begins 1f 8b 08, which base64 writes as H4sI.
+  return marker.startsWith("H4sI") && BASE64.test(marker) ? { report: marker } : "malformed";
 };
 
 /** What a command step stores as its evidence: its exit status and the end of its output. Redacted before it is stored. */
 export interface CommandEvidence extends RunnerEvidence {
   /** The command's exit status, when it ran to one. */
   readonly exit?: number;
+  /** On a fail, the tests the step's JUnit report says failed, the first MAX_FAILING of them. */
+  readonly failing?: readonly JunitFailure[];
 }
 
 export type CommandJudgement = RunnerJudgement<CommandEvidence>;
@@ -79,21 +108,49 @@ export const judgeCommand = (
   output: CommandOutput,
   decoded: {
     readonly tail: string | undefined;
+    /** The step's JUnit report as text, when the runner sent one and it decoded. */
+    readonly report?: string;
     readonly diagnosis?: string;
     readonly credentialScan?: CredentialScan;
   },
   resultRef?: ContentHash,
 ): CommandJudgement =>
   finishJudgement(
-    judgeRun(step, output, decoded.tail, resultRef),
+    judgeRun(step, output, decoded.tail, decoded.report, resultRef),
     output._tag === "ran" ? output : {},
     decoded,
   );
+
+/**
+ * What a failed command's JUnit report says, when the step names one: the
+ * failing tests it lists, and a clause for the why saying what was read.
+ */
+const reportRead = (
+  path: string,
+  output: { readonly reportUnread?: ReportUnread },
+  report: string | undefined,
+): { readonly clause: string; readonly failing?: readonly JunitFailure[] } => {
+  if (output.reportUnread === "missing")
+    return { clause: `; its JUnit report ${path} was not written` };
+  if (output.reportUnread === "too-large")
+    return {
+      clause: `; its JUnit report ${path} is over ${COMMAND_REPORT_LIMIT} bytes, so unread`,
+    };
+  const failing = report === undefined ? undefined : failingTestsOf(report);
+  if (failing === undefined)
+    return { clause: `; its JUnit report ${path} did not read as JUnit XML` };
+  if (failing.length === 0) return { clause: `; its JUnit report ${path} names no failing test` };
+  return {
+    clause: `; its JUnit report names ${failing.length} failing test${failing.length === 1 ? "" : "s"}`,
+    failing: failing.slice(0, MAX_FAILING),
+  };
+};
 
 const judgeRun = (
   step: PlanStep,
   output: CommandOutput,
   text: string | undefined,
+  report: string | undefined,
   resultRef?: ContentHash,
 ): CommandJudgement => {
   const base = {
@@ -125,7 +182,15 @@ const judgeRun = (
     evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
   });
   if (output.exit === 0) return decide("pass", "the command exited 0");
-  if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);
+  if (output.exit < 128) {
+    const named = step.run?.report;
+    if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
+    const read = reportRead(named.junit, output, report);
+    const failed = decide("fail", `the command exited ${output.exit}${read.clause}`);
+    return read.failing === undefined
+      ? failed
+      : { ...failed, evidence: { ...failed.evidence, failing: read.failing } };
+  }
   return abstain(
     "timeout",
     `the command was killed by signal ${output.exit - 128} (exit ${output.exit})`,

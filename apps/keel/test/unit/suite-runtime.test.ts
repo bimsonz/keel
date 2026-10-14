@@ -10,7 +10,12 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commandStdout, suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import {
+  commandReportStdout,
+  commandStdout,
+  suiteStdout,
+  typecheckStdout,
+} from "../support-suite-stdout.ts";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
@@ -28,6 +33,7 @@ import { Effect, Layer, Schema } from "effect";
 import {
   type Durable,
   JS_TS_SUITE_COMMAND,
+  judgeCommandOutput,
   projectCommand,
   type SuiteRunner,
   type SuiteRunnerOptions,
@@ -709,6 +715,65 @@ describe("a step command of the project's own", () => {
     });
     expect(decoded).toBe(tricky);
   });
+});
+
+/** A JUnit report with one failing test, named as the box saw it, with this failure message. */
+const reportXml = (name: string, message: string) =>
+  `<testsuite><testcase classname="/workspace/test/a.test.ts" name="${name}"><failure message="${message}"/></testcase></testsuite>`;
+
+describe("a step command's JUnit report", () => {
+  const report = { junit: "out/junit.xml" };
+
+  it("[suite-runtime.command-report] the report is read back after the command, its path only as base64, and removed before the deps are dropped; a step naming none reads none", () => {
+    expect(projectCommand({ command: "pnpm test", timeoutMs: 1 })).not.toContain("KEEL_REPORT");
+    const command = projectCommand({ command: "pnpm test", timeoutMs: 1, report });
+    const lines = command.split("\n");
+    const at = (text: string) => lines.findIndex((l) => l.includes(text));
+    expect(command).not.toContain("out/junit.xml");
+    const path = lines[at("R=$(echo ")] ?? "";
+    expect(execFileSync("sh", ["-c", `${path}; printf %s "$R"`], { encoding: "utf8" })).toBe(
+      "out/junit.xml",
+    );
+    expect(at("R=$(echo ")).toBeGreaterThan(at('echo "KEEL_TAIL'));
+    expect(lines.slice(at("R=$(echo ") + 1, at("R=$(echo ") + 5)).toEqual([
+      'if [ -L "$R" ] || [ ! -f "$R" ]; then echo "KEEL_REPORT none missing";',
+      `elif [ "$(wc -c <"$R" | tr -d ' ')" -gt 4194304 ]; then echo "KEEL_REPORT none too-large";`,
+      'else echo "KEEL_REPORT $(gzip -c "$R" | base64 -w0)"; fi',
+      'rm -f "$R"',
+    ]);
+    expect(at('rm -f "$R"')).toBe(lines.lastIndexOf("keel_deps_drop /workspace") - 1);
+  });
+
+  it.effect(
+    "[suite-runtime.command-report-judged] a fail cites its report's failing tests relative to the candidate, and only those names are scanned for credentials",
+    () =>
+      Effect.gen(function* () {
+        const named = { ...step, run: { command: "pnpm test", timeoutMs: 1, report } };
+        const cited = yield* judgeCommandOutput(
+          named,
+          yield* Effect.promise(() =>
+            commandReportStdout(1, reportXml("a > breaks", `saw ${ACCOUNT}`)),
+          ),
+          [ACCOUNT],
+        );
+        expect([cited.report.outcome, cited.evidence.failing, cited.evidence.why]).toEqual([
+          "fail",
+          [{ file: "test/a.test.ts", test: "a > breaks" }],
+          "the command exited 1; its JUnit report names 1 failing test",
+        ]);
+        expect(JSON.stringify(cited.document)).not.toContain(ACCOUNT);
+        const leaked = yield* judgeCommandOutput(
+          named,
+          yield* Effect.promise(() => commandReportStdout(1, reportXml(`a > ${ACCOUNT}`, "x"))),
+          [ACCOUNT],
+        );
+        expect([leaked.report.outcome, leaked.evidence.why]).toEqual([
+          "abstain",
+          expect.stringMatching(/^credential-leak: /),
+        ]);
+        expect(JSON.stringify(leaked.document)).not.toContain(ACCOUNT);
+      }),
+  );
 });
 
 /** The reason a stored evidence document gives. */

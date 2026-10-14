@@ -37,6 +37,7 @@ export * from "./flow-spec.ts";
 export * from "./guard-file.ts";
 export * from "./guard-step.ts";
 export * from "./namespace-keys.ts";
+export * from "./junit.ts";
 export * from "./packs.ts";
 export * from "./plan-codec.ts";
 export * from "./precheck.ts";

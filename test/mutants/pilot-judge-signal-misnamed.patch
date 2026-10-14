@@ -2,11 +2,11 @@
 # kills: command.judge
 # why: The abstention names the exit as the signal
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index aa09f896..4cdbad5e 100644
+index 03664e8d..e8cf0ae2 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -128,7 +128,7 @@ const judgeRun = (
-   if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);
+@@ -193,7 +193,7 @@ const judgeRun = (
+   }
    return abstain(
      "timeout",
 -    `the command was killed by signal ${output.exit - 128} (exit ${output.exit})`,

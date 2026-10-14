@@ -4,6 +4,7 @@ import { type CommitSha, contentHashOf, type Json } from "../../domain/kernel/in
 import {
   type FlowDefinition,
   FlowSpecInvalid,
+  reportPathRefusal,
   STEP_RUN_COMMAND_MAX,
   STEP_RUN_TIMEOUT_MAX_MS,
   type StepSpec,
@@ -48,6 +49,9 @@ const runRefusal = (step: StepFileJson): string | undefined => {
   const timeout = step.run.timeoutMs;
   if (timeout !== undefined && (timeout < 1 || timeout > STEP_RUN_TIMEOUT_MAX_MS))
     return `timeoutMs is ${timeout}, outside 1 to ${STEP_RUN_TIMEOUT_MAX_MS}`;
+  const report = step.run.report;
+  const refused = report === undefined ? undefined : reportPathRefusal(report.junit);
+  if (refused !== undefined) return `report path ${JSON.stringify(report?.junit)} ${refused}`;
   return undefined;
 };
 

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/junit.test.ts
+# kills: junit.malformed
+# why: A testcase opened inside another is read on, so a broken report cites tests it never ran
+diff --git a/packages/core/src/application/verification/junit.ts b/packages/core/src/application/verification/junit.ts
+index 441c662b..b69deee9 100644
+--- a/packages/core/src/application/verification/junit.ts
++++ b/packages/core/src/application/verification/junit.ts
+@@ -56,7 +56,6 @@ export const failingTestsOf = (xml: string): readonly JunitFailure[] | undefined
+   for (const [, closing, name, attributes, empty] of text.matchAll(TAG)) {
+     if (name === "testsuites" || name === "testsuite") suites = true;
+     else if (name === "testcase" && closing === "") {
+-      if (open !== undefined) return undefined;
+       if (empty === "") open = { attributes: attributesOf(attributes ?? ""), failed: false };
+     } else if (name === "testcase") {
+       if (open === undefined) return undefined;

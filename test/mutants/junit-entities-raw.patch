@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/junit.test.ts
+# kills: junit.vitest, junit.entities
+# why: A test's name is cited with its XML escapes, so vitest's `a &gt; b` never matches the test the agent wrote
+diff --git a/packages/core/src/application/verification/junit.ts b/packages/core/src/application/verification/junit.ts
+index 441c662b..12eeec49 100644
+--- a/packages/core/src/application/verification/junit.ts
++++ b/packages/core/src/application/verification/junit.ts
+@@ -24,7 +24,7 @@ const ENTITIES: Readonly<Record<string, string>> = {
+ /** Decodes XML's five named entities and its character references; anything else stays as written. */
+ const decodeXml = (text: string): string =>
+   text.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);/g, (whole, entity: string) => {
+-    if (!entity.startsWith("#")) return ENTITIES[entity] ?? whole;
++    if (!entity.startsWith("#")) return whole;
+     const code = entity.startsWith("#x")
+       ? Number.parseInt(entity.slice(2), 16)
+       : Number.parseInt(entity.slice(1), 10);

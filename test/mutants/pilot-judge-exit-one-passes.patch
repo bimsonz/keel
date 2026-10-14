@@ -2,15 +2,15 @@
 # kills: command.judge
 # why: Exit 1 passes
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index aa09f896..677ba214 100644
+index 03664e8d..c67590ad 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -124,7 +124,7 @@ const judgeRun = (
+@@ -181,7 +181,7 @@ const judgeRun = (
      report: { ...base, outcome, durationMs: output.durationMs },
      evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
    });
 -  if (output.exit === 0) return decide("pass", "the command exited 0");
 +  if (output.exit <= 1) return decide("pass", "the command exited 0");
-   if (output.exit < 128) return decide("fail", `the command exited ${output.exit}`);
-   return abstain(
-     "timeout",
+   if (output.exit < 128) {
+     const named = step.run?.report;
+     if (named === undefined) return decide("fail", `the command exited ${output.exit}`);

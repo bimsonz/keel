@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.report-refused
+# why: A report path may hold spaces, quotes or a command substitution
+diff --git a/packages/core/src/domain/verification/flow.ts b/packages/core/src/domain/verification/flow.ts
+index 8bf52287..65d8ac40 100644
+--- a/packages/core/src/domain/verification/flow.ts
++++ b/packages/core/src/domain/verification/flow.ts
+@@ -133,7 +133,6 @@ export const STEP_REPORT_PATH_MAX = 256;
+ export const reportPathRefusal = (path: string): string | undefined => {
+   if (path.length === 0 || path.length > STEP_REPORT_PATH_MAX)
+     return `is ${path.length} characters, not 1 to ${STEP_REPORT_PATH_MAX}`;
+-  if (!/^[\w./-]+$/.test(path)) return "holds a character outside [A-Za-z0-9_./-]";
+   const segments = path.split("/");
+   if (segments.some((s) => s === "" || s === "." || s === ".."))
+     return "must be a relative path inside the repository, with no empty, . or .. segment";

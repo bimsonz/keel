@@ -247,11 +247,19 @@ let operator: KeelClient | undefined;
 try {
   serving["keel-verify"] = deployed("keel-verify");
   console.log(`     keel-verify deployed: ${serving["keel-verify"]}`);
-  operator = operatorClient();
-  const project = await operator.createProject(
-    { namespace: ORG, name: PROJECT, source: SOURCE },
-    { idempotencyKey: `live:${PROJECT}:project` },
-  );
+  const maintainer = operatorClient();
+  operator = maintainer;
+  // The create's stored answer outlives no day: a project made on an earlier day is read back by name.
+  const project = await maintainer
+    .createProject(
+      { namespace: ORG, name: PROJECT, source: SOURCE },
+      { idempotencyKey: `live:${PROJECT}:project` },
+    )
+    .catch(async (error: unknown) => {
+      if (error instanceof KeelProblem && error.code === "project.name_taken")
+        return maintainer.project(ORG, PROJECT);
+      throw error;
+    });
   console.log(`     project ${PROJECT}: ${project.id}`);
   await operator.putSettings(project.id, {
     protectedPaths: [],

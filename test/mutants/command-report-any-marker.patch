@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/command.test.ts
+# kills: command.parse-report
+# why: A report marker that is no gzip stream (a bare none) is taken as a report
+diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
+index 03664e8d..ea9f1382 100644
+--- a/packages/core/src/application/verification/command.ts
++++ b/packages/core/src/application/verification/command.ts
+@@ -76,7 +76,7 @@ const reportOf = (
+   if (marker === "none missing") return { reportUnread: "missing" };
+   if (marker === "none too-large") return { reportUnread: "too-large" };
+   // A gzip stream begins 1f 8b 08, which base64 writes as H4sI.
+-  return marker.startsWith("H4sI") && BASE64.test(marker) ? { report: marker } : "malformed";
++  return BASE64.test(marker) ? { report: marker } : "malformed";
+ };
+ 
+ /** What a command step stores as its evidence: its exit status and the end of its output. Redacted before it is stored. */

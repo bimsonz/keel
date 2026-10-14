@@ -103,14 +103,41 @@ export type StepSpec = {
   /**
    * A command of the project's own, run in a container and judged by its exit
    * status; the timeout, when left out, is the suite's (STEP_RUN_TIMEOUT_MS).
+   * A JUnit XML report it names is read after it, so a fail cites the tests
+   * the report says failed.
    */
-  readonly run?: { readonly command: string; readonly timeoutMs?: number };
+  readonly run?: {
+    readonly command: string;
+    readonly timeoutMs?: number;
+    readonly report?: StepRunReport;
+  };
   /**
    * The project's deploy spec, as its base's `.keel/deploy.json` says, for a
    * step that builds, previews or smokes its Worker: it rides on the plan, so
    * the candidate's own deploy spec is never what runs.
    */
   readonly deploy?: DeploySpec;
+};
+
+/** A report a step command writes: a JUnit XML file, by its path from the repository's root. */
+export type StepRunReport = { readonly junit: string };
+
+/** The longest path a step command's report may have. */
+export const STEP_REPORT_PATH_MAX = 256;
+
+/**
+ * Why a report path cannot be read from the box, if it cannot: it must stay
+ * inside the repository, as a relative path of `[A-Za-z0-9_./-]` with no `..`
+ * segment, no empty one and no leading `/`, at most STEP_REPORT_PATH_MAX long.
+ */
+export const reportPathRefusal = (path: string): string | undefined => {
+  if (path.length === 0 || path.length > STEP_REPORT_PATH_MAX)
+    return `is ${path.length} characters, not 1 to ${STEP_REPORT_PATH_MAX}`;
+  if (!/^[\w./-]+$/.test(path)) return "holds a character outside [A-Za-z0-9_./-]";
+  const segments = path.split("/");
+  if (segments.some((s) => s === "" || s === "." || s === ".."))
+    return "must be a relative path inside the repository, with no empty, . or .. segment";
+  return undefined;
 };
 
 /** A step command's timeout when the flow leaves it out: the suite's own. */

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.run-report
+# why: The plan step drops the report the flow names, so the box never reads it and the plan hash does not cover it
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 41ea7174..fbd67f65 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -500,7 +500,6 @@ export const compile = (
+               run: {
+                 command: s.run.command,
+                 timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+-                ...(s.run.report === undefined ? {} : { report: s.run.report }),
+               },
+             }),
+         ...(s.deploy === undefined ? {} : { deploy: s.deploy }),

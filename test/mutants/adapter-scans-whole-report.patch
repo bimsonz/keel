@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-report-judged
+# why: A failure message quoting a value Keel handed the box abstains the step, though only the names are kept
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 796f2464..f433f573 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -439,7 +439,7 @@ export const judgeCommandOutput = (
+     const diagnosis = diagnosisOf(output);
+     // Of the report, only the failing tests' names are kept, so only they are scanned:
+     // a failure message quoting a test's sample key never abstains the step.
+-    const cited = report === undefined ? "" : JSON.stringify(failingTestsOf(report) ?? []);
++    const cited = report ?? "";
+     const credentialScan = scanCredentials([stdout, tail ?? "", cited, diagnosis.diagnosis ?? ""], {
+       literals,
+     });

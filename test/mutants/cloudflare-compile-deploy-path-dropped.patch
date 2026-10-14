@@ -2,11 +2,11 @@
 # kills: flow.step-deploy, flow.step-deploy-only-carried
 # why: a plan step carries its deploy spec without the directory the build runs from, so a Worker in apps/x is built from the repo's root
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 29894d5d..32d4ccdb 100644
+index 41ea7174..4f8ef119 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -502,7 +502,9 @@ export const compile = (
-                 timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+@@ -503,7 +503,9 @@ export const compile = (
+                 ...(s.run.report === undefined ? {} : { report: s.run.report }),
                },
              }),
 -        ...(s.deploy === undefined ? {} : { deploy: s.deploy }),

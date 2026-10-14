@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite-runtime.command-report-judged
+# why: The runner's report is never decoded, so every fail says its report did not read
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 796f2464..af476c36 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -435,7 +435,7 @@ export const judgeCommandOutput = (
+     const output = parseCommandOutput(stdout);
+     const tail =
+       output._tag === "ran" && output.tail !== undefined ? decodedText(output.tail) : undefined;
+-    const report = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
++    const report = undefined;
+     const diagnosis = diagnosisOf(output);
+     // Of the report, only the failing tests' names are kept, so only they are scanned:
+     // a failure message quoting a test's sample key never abstains the step.

@@ -500,6 +500,7 @@ export const compile = (
               run: {
                 command: s.run.command,
                 timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
+                ...(s.run.report === undefined ? {} : { report: s.run.report }),
               },
             }),
         ...(s.deploy === undefined ? {} : { deploy: s.deploy }),
