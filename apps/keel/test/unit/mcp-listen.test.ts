@@ -213,6 +213,8 @@ describe("how a listen ends", () => {
     const response = await serve({
       inbox: async (_agent, cursor) => {
         reads += 1;
+        // A listen that did not count would read for ever without a pause: one read past the count ends it.
+        if (reads > MAX_LISTEN_READS) throw new Error("a read past the count");
         return { cursor, arrived: false };
       },
       feed: async (_project, cursor) => ({ cursor, arrived: false }),
