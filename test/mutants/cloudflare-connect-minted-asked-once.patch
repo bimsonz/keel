@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-connect.test.ts
+# kills: connect.settle
+# why: a token Cloudflare has just made is asked once, so an account that answers it a moment later is called unreachable
+diff --git a/packages/core/src/application/delivery/cloudflare-connect.ts b/packages/core/src/application/delivery/cloudflare-connect.ts
+index 4b54bb1a..f615ad71 100644
+--- a/packages/core/src/application/delivery/cloudflare-connect.ts
++++ b/packages/core/src/application/delivery/cloudflare-connect.ts
+@@ -112,14 +112,7 @@ export const completeCloudflareConnect: (
+     },
+     by,
+     requestId,
+-  }).pipe(
+-    // A token Cloudflare has just made may not answer for its account at once: ask again for a few seconds.
+-    Effect.retry({
+-      while: (refused) => refused._tag === "DeployTargetUnreachable",
+-      schedule: Schedule.spaced(MINTED_SETTLE_SPACING),
+-      times: MINTED_SETTLE_RETRIES,
+-    }),
+-  );
++  });
+ });
+ 
+ /** How often, and how many more times, the account is asked with a token Cloudflare has just made. */

@@ -57,6 +57,7 @@ export const REFUSED_AT: Readonly<Record<string, string>> = {
   accounts: "Cloudflare refused to say which account you ticked",
   mint: "Cloudflare refused to let Keel make its token on the account",
   unconfigured: "this instance has no OAuth client registered with Cloudflare",
+  check: "Cloudflare's answer to Keel's check of the account with its new token",
 };
 
 /** Where a refused Connect stopped, in words, with Cloudflare's own error code, if the address names a step. */

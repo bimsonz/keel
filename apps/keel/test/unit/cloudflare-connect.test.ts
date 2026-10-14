@@ -8,6 +8,7 @@ import {
   beginCloudflareConnect,
   completeCloudflareConnect,
   type CompleteCloudflareConnect,
+  MINTED_SETTLE_RETRIES,
 } from "@keeltown/core/application/delivery";
 import {
   CONNECT_WINDOW_MS,
@@ -24,7 +25,7 @@ import {
   makeDeployTargetCheckMemory,
   makeDeployTargetsMemory,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, Redacted, Result, Schema } from "effect";
+import { Effect, Exit, Fiber, Layer, Redacted, Result, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 const ORG = makeId("org", "01M4P00000000000000000000A");
@@ -208,21 +209,47 @@ describe("connecting a Cloudflare account", () => {
   );
 
   it.effect(
-    "[connect.unreachable] an account with no workers.dev subdomain sets no target, and the minted token stays stored for the next try",
+    "[connect.unreachable] an account with no workers.dev subdomain, asked again for a few seconds, sets no target, and the minted token stays stored for the next try",
     () => {
-      const { layer } = world({}, () =>
-        Result.fail(new DeployTargetUnreachable({ reason: "no-workers-dev", code: 10_007 })),
-      );
+      let asked = 0;
+      const { layer } = world({}, () => {
+        asked += 1;
+        return Result.fail(new DeployTargetUnreachable({ reason: "no-workers-dev", code: 10_007 }));
+      });
       return Effect.gen(function* () {
-        const exit = yield* Effect.exit(complete(nonceOf(yield* begin())));
+        const running = yield* Effect.forkChild(complete(nonceOf(yield* begin())));
+        yield* TestClock.adjust("30 seconds");
+        const exit = yield* Fiber.await(running);
         expect(failureOf(exit)).toMatchObject({
           _tag: "DeployTargetUnreachable",
           reason: "no-workers-dev",
         });
+        expect(asked).toBe(1 + MINTED_SETTLE_RETRIES);
         expect(yield* DeployTargets.use((targets) => targets.list(PROJECT))).toEqual([]);
         expect(yield* CredentialStore.use((store) => store.list(ORG))).toMatchObject([
           { label: "Keel deploys: acme/worker-lite" },
         ]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[connect.settle] a token Cloudflare has just made that does not answer at once is asked again, and the target is set when it does",
+    () => {
+      let asked = 0;
+      const { layer } = world({}, () => {
+        asked += 1;
+        return asked < 3
+          ? Result.fail(new DeployTargetUnreachable({ reason: "no-workers-dev", code: 10_007 }))
+          : Result.succeed({ workersDev: "acme.workers.dev" });
+      });
+      return Effect.gen(function* () {
+        const running = yield* Effect.forkChild(complete(nonceOf(yield* begin())));
+        yield* TestClock.adjust("30 seconds");
+        const held = yield* Fiber.join(running);
+        expect(asked).toBe(3);
+        expect(held.workersDev).toBe("acme.workers.dev");
+        expect(yield* DeployTargets.use((targets) => targets.list(PROJECT))).toEqual([held]);
       }).pipe(Effect.provide(layer));
     },
   );

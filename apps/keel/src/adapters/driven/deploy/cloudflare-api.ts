@@ -103,7 +103,21 @@ export function DeployTargetCheckCloudflare(
             secret,
             signal,
           ),
-        ).pipe(Effect.flatMap(({ status, body }) => Effect.fromResult(reachOf(status, body)))),
+        ).pipe(
+          Effect.flatMap(({ status, body }) => {
+            const reach = reachOf(status, body);
+            // What the account answered, never the token: so a refused target says why in the log.
+            if (Result.isFailure(reach))
+              console.warn("Cloudflare refused an account check", {
+                status,
+                codes:
+                  Option.getOrUndefined(decodeEnvelope(body))?.errors?.map((error) => error.code) ??
+                  [],
+                reason: reach.failure.reason,
+              });
+            return Effect.fromResult(reach);
+          }),
+        ),
     }),
   );
 }

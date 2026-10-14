@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schedule } from "effect";
 import {
   type CloudflareConnectFailed,
   type ConnectAccountsRefused,
@@ -76,7 +76,9 @@ export type CloudflareConnectError =
  * have granted exactly one account; on it Keel mints an API token of its own,
  * named for the project, that may only edit the account's Workers. That token
  * is sealed as a credential of the project's namespace and the target is set
- * with it, which asks the account first, as any target's credential is asked.
+ * with it, which asks the account first, as any target's credential is asked;
+ * a token just made is asked again for a few seconds before the account is
+ * called unreachable.
  * The consent's access token is used for the reads and the mint and dropped:
  * it is in no store, event or answer.
  */
@@ -110,5 +112,16 @@ export const completeCloudflareConnect: (
     },
     by,
     requestId,
-  });
+  }).pipe(
+    // A token Cloudflare has just made may not answer for its account at once: ask again for a few seconds.
+    Effect.retry({
+      while: (refused) => refused._tag === "DeployTargetUnreachable",
+      schedule: Schedule.spaced(MINTED_SETTLE_SPACING),
+      times: MINTED_SETTLE_RETRIES,
+    }),
+  );
 });
+
+/** How often, and how many more times, the account is asked with a token Cloudflare has just made. */
+export const MINTED_SETTLE_SPACING = "2 seconds";
+export const MINTED_SETTLE_RETRIES = 5;

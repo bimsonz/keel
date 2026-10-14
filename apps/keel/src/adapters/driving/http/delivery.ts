@@ -310,11 +310,14 @@ const addressOf = (projectId: ProjectId) =>
 /** How a Connect ended, and for one Cloudflare refused, the step it refused. */
 interface Ended {
   readonly outcome: Outcome;
-  /** The step Cloudflare refused, and its own error code where it gave one. */
-  readonly refused?: Pick<CloudflareConnectFailed, "step" | "code">;
+  /** The step Cloudflare refused (`check` for the account's answer to Keel's token), and its own error code. */
+  readonly refused?: { readonly step: string; readonly code?: number | undefined };
 }
 
-const ended = (outcome: Outcome, refusal?: CloudflareConnectFailed): Ended =>
+const ended = (
+  outcome: Outcome,
+  refusal?: { readonly step: string; readonly code?: number | undefined },
+): Ended =>
   refusal === undefined
     ? { outcome }
     : {
@@ -519,7 +522,11 @@ export function deliveryHandlers(run: Runner) {
                       : Effect.succeed(
                           ended(
                             outcomeOf(error),
-                            error._tag === "CloudflareConnectFailed" ? error : undefined,
+                            error._tag === "CloudflareConnectFailed"
+                              ? error
+                              : error._tag === "DeployTargetUnreachable"
+                                ? { step: "check", code: error.code }
+                                : undefined,
                           ),
                         ),
                   ),
