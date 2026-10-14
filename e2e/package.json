@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@keeltown/cli": "workspace:*",
     "@keeltown/sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:"
   },

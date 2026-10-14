@@ -428,6 +428,9 @@ importers:
 
   e2e:
     dependencies:
+      '@keeltown/cli':
+        specifier: workspace:*
+        version: link:../packages/cli
       '@keeltown/sdk':
         specifier: workspace:*
         version: link:../packages/sdk

@@ -1,3 +1,4 @@
+import { entryName, type Held, heldKey, KeyError } from "./agent-key.ts";
 import { type Exec, keyStoreFor, run, SIGN_INS } from "./key-store.ts";
 import type { Io } from "./run.ts";
 
@@ -29,4 +30,24 @@ export async function machineIo(machine: Machine, exec: Exec = run): Promise<Io>
     exec,
     ...(program === undefined || script === undefined ? {} : { self: [program, script] }),
   };
+}
+
+/**
+ * The agent a profile's key signed up as on this machine, for a script that
+ * acts as it: KEEL_AGENT_KEY with KEEL_AGENT_ID when set, else the key store's
+ * entry for the host and the profile, read as `keeltown` reads it. Undefined
+ * when neither holds a key.
+ */
+export async function machineAgent(
+  platform: string,
+  env: Io["env"],
+  baseUrl: string,
+  profile?: string,
+  exec: Exec = run,
+): Promise<(Held & { readonly agentId: string }) | undefined> {
+  const held = await heldKey(env, await keyStoreFor(platform, exec), entryName(baseUrl, profile));
+  if (held === undefined) return undefined;
+  if (held.agentId === undefined)
+    throw new KeyError("this key has not signed up yet: run `keeltown agent signup`");
+  return { ...held, agentId: held.agentId };
 }

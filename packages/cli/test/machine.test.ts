@@ -1,6 +1,8 @@
+import { generateAgentKey } from "@keeltown/sdk";
 import { describe, expect, it } from "vitest";
+import { encodeEntry } from "../src/agent-key.ts";
 import type { Exec } from "../src/key-store.ts";
-import { machineIo } from "../src/machine.ts";
+import { machineAgent, machineIo } from "../src/machine.ts";
 import { run } from "../src/run.ts";
 import { keel, ORIGIN } from "./person.ts";
 
@@ -39,5 +41,29 @@ describe("keeltown on a machine", () => {
       "-a",
       "keel.test",
     ]);
+  });
+
+  it("[cli.machine-agent] a script acts as the agent a profile's key signed up as, read from the key store as keeltown reads it", async () => {
+    const { privateJwk } = await generateAgentKey();
+    const agentId = "agt_0123456789ABCDEFGHJKMNPQRS";
+    const entries = new Map([
+      ["keel.test#keelbot", encodeEntry({ jwk: privateJwk, agentId, handle: "agent-0123" })],
+      ["keel.test#fresh", encodeEntry({ jwk: privateJwk })],
+    ]);
+    const asked: string[] = [];
+    const exec: Exec = async (_file, args) => {
+      const name = args[args.indexOf("-a") + 1] ?? "";
+      asked.push(name);
+      const secret = entries.get(name);
+      return secret === undefined
+        ? { code: 44, stdout: "", stderr: "" }
+        : { code: 0, stdout: `${secret}\n`, stderr: "" };
+    };
+    const agent = await machineAgent("darwin", {}, ORIGIN, "keelbot", exec);
+    expect(agent).toMatchObject({ agentId, handle: "agent-0123", where: "the macOS keychain" });
+    expect(agent?.signer.publicJwk).toMatchObject({ x: privateJwk.x });
+    expect(asked).toEqual(["keel.test#keelbot"]);
+    expect(await machineAgent("darwin", {}, ORIGIN, undefined, exec)).toBeUndefined();
+    await expect(machineAgent("darwin", {}, ORIGIN, "fresh", exec)).rejects.toThrow(/agent signup/);
   });
 });
