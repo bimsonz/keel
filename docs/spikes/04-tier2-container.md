@@ -151,7 +151,7 @@ A custom instance of 1 vCPU and 3 GiB (the minimum ratio) would reach the 1,500 
 | Warm / chained | ≈ 6.6 s (restore snapshot + overlay source + command + backup) | 5 ms per new `exec`; **full verify 6.2 s p50**, including 214 tests |
 | Dependencies | cold `npm ci` ≈ 4 s | 6 ms (lockfile-hash match → symlink into the image) |
 | vitest | toy suite of 2 tests, `--reporter=json`, ≈ 26.5 s cold | forge-lite, 214 tests: 5.4 s cold, 4.6 s warm (`pnpm test --reporter=json`); 4.3 s plain `vitest run` |
-| Reference: laptop / local amd64 emulation | 1.1–1.3 s / 4.5–5.6 s (coordinator's figures) | local amd64 emulation of this image: 6.3 s for `pnpm test --reporter=json` |
+| Reference: laptop / local amd64 emulation | 1.1–1.3 s / 4.5–5.6 s (an earlier local measurement) | local amd64 emulation of this image: 6.3 s for `pnpm test --reporter=json` |
 
 The comparison is not like for like:
 - S15's containers set no `instance_type`, so they ran wrangler's default (`lite`, 1/16 vCPU) per its config. That probably explains most of its 26.5 s. It was not re-measured here.

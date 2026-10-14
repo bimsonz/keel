@@ -30,9 +30,9 @@ Keel gives every change its own throwaway Artifacts repo, forked from a shard mi
 - **Placement:** forks land in the source's namespace, and there is no way to target another.
   - `info().source` is `artifacts:<namespace>/<parent>`, and it still names the parent after the parent is deleted.
 - **`repo.forked` event: untested.** No event was ever observed.
-  - Creating the account-level subscription was refused, because the shared account already has one on that source.
+  - Creating the account-level subscription was refused, because the account already has one on that source.
   - A `triggers.events` rule on `cf.artifacts.repo.forked` deployed cleanly but started **0** Workflow instances over about 450 forks in 20 minutes.
-- **Go/no-go: GO for forks as per-change repos, through a warm pool** (the spec's "slow → keep a pool" fallback), plus TTL garbage collection. **NO-GO for an on-demand fork on the critical path of a 50 MB shard** if the 5 s p95 is a hard budget.
+- **Go/no-go: GO for forks as per-change repos, through a warm pool** (the planned "slow → keep a pool" fallback), plus TTL garbage collection. **NO-GO for an on-demand fork on the critical path of a 50 MB shard** if the 5 s p95 is a hard budget.
 
 ## Pool sizing inputs
 
@@ -64,7 +64,7 @@ A pre-forked workspace pool is now the only workspace strategy. These are the in
 
 **`repo.forked` event arrival latency: untested.**
 
-- The account-level subscription was refused with: `We currently do not support multiple subscriptions on the same resource.` The shared account already holds the one subscription on the `artifacts` source.
+- The account-level subscription was refused with: `We currently do not support multiple subscriptions on the same resource.` The account already holds the one subscription on the `artifacts` source.
 - A `triggers.events` rule on `cf.artifacts.repo.forked` deployed but started 0 Workflow instances over about 450 forks.
 - So a pool cannot be refilled on a fork event. Refill on `await fork()` instead.
 
@@ -84,7 +84,7 @@ A pre-forked workspace pool is now the only workspace strategy. These are the in
   - S1/S3 measured one fork at 3.4 s, ready on the first `get()`.
   - S12 measured 3.8–5 s.
   - Both agree with the 1 MB rows above.
-- **`defaultBranchOnly`: not exercised here.** Every source had only `main`. The coordinator reports from another spike that `defaultBranchOnly: true` still copied every branch, so size a pool member as the whole mirror, not one branch.
+- **`defaultBranchOnly`: not exercised here.** Every source had only `main`. Another spike found that `defaultBranchOnly: true` still copied every branch, so size a pool member as the whole mirror, not one branch.
 
 ## Setup
 
@@ -193,11 +193,11 @@ The REST fork endpoint (`POST …/namespaces/:namespace/repos/:name/fork`) has n
 
 | Attempt | Result |
 |---|---|
-| Account-level Queue subscription (`wrangler queues subscription create keel-spike-02-events --source artifacts --events repo.forked,repo.created,repo.deleted`) | **Refused:** `We currently do not support multiple subscriptions on the same resource.` The shared account already has a subscription on the account-level `artifacts` source, which is not ours and was left alone. |
+| Account-level Queue subscription (`wrangler queues subscription create keel-spike-02-events --source artifacts --events repo.forked,repo.created,repo.deleted`) | **Refused:** `We currently do not support multiple subscriptions on the same resource.` The account already has a subscription on the account-level `artifacts` source, which was left alone. |
 | `triggers.events` rule `{ "type": "cf.artifacts.repo.forked", "filter": { "namespace": "keel-spike-02" }, "targets": [{ "type": "workflow", "workflow_name": "keel-spike-02-forked-wf" }] }` | Deployed as `event triggers: 1`. **0 Workflow instances** (`wrangler workflows instances list` was empty, and D1 `events` had 0 rows) over about 450 forks from 18:54 to 19:15 UTC. |
 | The same rule with no `filter` | Deployed. 0 instances for 2 more forks after 90 s. |
 
-Note: the brief said `wrangler queues subscription create` does not support Artifacts sources. **wrangler 4.149.0 does:** `--source artifacts`, or `--source artifacts.repo --source-namespace … --source-repo-name …`. S6 used the per-repo form successfully.
+Note: `wrangler queues subscription create` was expected not to support Artifacts sources. **wrangler 4.149.0 does:** `--source artifacts`, or `--source artifacts.repo --source-namespace … --source-repo-name …`. S6 used the per-repo form successfully.
 
 ### Commands and captured output (trimmed, redacted)
 
@@ -256,7 +256,7 @@ No Artifacts repos found in namespace "keel-spike-02".
 | ≥ 20 concurrent forks per source | **PASS** | 20 and 100 concurrent forks: 100/100 at 50 MB and 2 × 100/100 at 1 MB, with 0 errors. Not serialised (slope 31–192 ms per rank against 5–7 s sequential). |
 | 1 MB and 300 MB time to ready (measure only) | Measured | 1 MB p95 3.9 s. 300 MB: 12.4, 32.0 and 62.5 s. |
 | Namespace placement | Measured | Same namespace as the source only. `info().source` is the immediate parent. |
-| `objects` against the source | **Untested** | No binding or `wrangler` surface exposes it. The REST call was blocked locally (see above). |
+| `objects` against the source | **Untested** | No binding or `wrangler` surface exposes it. The REST call was not made (see above). |
 | `repo.forked` event latency | **Untested** | The subscription was refused, and the trigger fired 0 times. |
 
 ## Go / no-go
@@ -278,9 +278,9 @@ No Artifacts repos found in namespace "keel-spike-02".
 
 ## Fallback
 
-The spec's fallbacks, in light of the results:
+The planned fallbacks, in light of the results:
 
-| Spec fallback | Trigger | Taken? |
+| Planned fallback | Trigger | Taken? |
 |---|---|---|
 | slow → keep a pool | p95 > 5 s at 50 MB | **Taken.** A pre-forked pool per shard mirror, refilled in parallel. |
 | serialised → fork tree via mirrors | concurrency failure | **Not needed.** Forks are not serialised. A fork of a fork works anyway (4.3 s at 1 MB), and its `info().source` names the immediate parent. |
@@ -331,7 +331,7 @@ The spec's fallbacks, in light of the results:
 - **Empty repo + shallow push** as a fork substitute.
 - **Fork of a repo with many branches** (`defaultBranchOnly: false`). Every fork here used the default, which is `true`.
 - **Pushing to a fork while its source is being pushed to**, and fork isolation under concurrent writes.
-- **Actual storage billed per fork.** Billing starts 14–15 Oct and is not observable today.
+- **Actual storage billed per fork.** Billing had not started when the spike ran, so it was not observable.
 
 ## Teardown
 

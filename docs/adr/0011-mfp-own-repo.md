@@ -25,4 +25,4 @@ Every record has explicit authorship (agent, platform or human). **MFP does not 
 Why:
 - A protocol kept inside one product's monorepo reads as that product's internal format.
 - A feedback stream that records raw facts alongside claims drowns the claims: when every push, test run and tool call is a record, the few records that carry a judgement are lost in pass-through noise. Keeping MFP to claims is what keeps it readable.
-- Version `0.1` is a fresh public start: no earlier format or code is carried over.
+- Version `0.1` is MFP's first version.

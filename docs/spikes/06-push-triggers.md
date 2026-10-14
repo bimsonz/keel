@@ -30,7 +30,7 @@ Keel observes a push to a change repo through events; an explicit `submit` call 
   - The other 3 probes delivered the first push 0.4–1.3 s after creation.
   - Once active, delivery took 1.8–5.5 s (p50 2.8 s, n = 16), which is slower than the trigger.
   - Subscriptions also **outlive their repo**: all 4 were still listed and enabled after the repos were deleted.
-- **Go/no-go: GO** for one namespace-wide `cf.artifacts.repo.pushed` trigger per shard namespace as Keel's push observer, with `submit` kept authoritative. **No-go for per-repo subscriptions.** The spec fallback is not needed as the primary path, but keep a cheap reconciliation re-read as a safety net (see [Go / no-go](#go--no-go)).
+- **Go/no-go: GO** for one namespace-wide `cf.artifacts.repo.pushed` trigger per shard namespace as Keel's push observer, with `submit` kept authoritative. **No-go for per-repo subscriptions.** The planned fallback is not needed as the primary path, but keep a cheap reconciliation re-read as a safety net (see [Go / no-go](#go--no-go)).
 
 ## Setup
 
@@ -211,7 +211,7 @@ The 209 `instances` in the matcher output are the instances in repos with prefix
 1. **`submit` stays authoritative.**
    - The trigger is the fast path: about 1.5 s typical and 3–4.5 s p95, even in a burst.
    - The spike showed no loss over 235 events in about 25 minutes. That proves no delivery guarantee.
-2. **Keep a cheap reconciliation as a safety net,** a reduced form of the spec fallback. On `submit`, and once for any change with no event within about 10 s of its expected push, re-read HEAD (`log({ ref, limit: 1 })`).
+2. **Keep a cheap reconciliation as a safety net,** a reduced form of the planned fallback. On `submit`, and once for any change with no event within about 10 s of its expected push, re-read HEAD (`log({ ref, limit: 1 })`).
    - The full [60, 150, 300] s re-read schedule is not needed for latency.
    - It still costs little and covers a dropped event.
 3. **The Workflow must:**
@@ -231,7 +231,7 @@ The 209 `instances` in the matcher output are the instances in repos with prefix
 
 ## Fallback
 
-The spec fallback is explicit `submit` only, plus a reconciliation re-read of HEAD at [60, 150, 300] s.
+The planned fallback is explicit `submit` only, plus a reconciliation re-read of HEAD at [60, 150, 300] s.
 
 - **Not taken as the primary path:** the trigger passed both criteria.
 - **Kept in reduced form** as the safety net in Go/no-go rule 2.
@@ -271,7 +271,7 @@ The spec fallback is explicit `submit` only, plus a reconciliation re-read of HE
 - **A `repoName` filter on `triggers.events`.**
 - **Events for pushes larger than one commit batch** (`commitsTruncated: true`).
 - **The cause of the 52–63.5 s activation gap** (n = 4, 1 long). Repeated per-repo subscription creation at scale.
-- **The account-level `artifacts` source** (`repo.created`, `repo.deleted`, `repo.forked`). It is held by another subscription on this shared account (see S2).
+- **The account-level `artifacts` source** (`repo.created`, `repo.deleted`, `repo.forked`). It already has a subscription on this account (see S2).
 
 ## Teardown
 

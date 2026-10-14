@@ -280,7 +280,7 @@ F08 per-session cache elsewhere per-call ×3                                -> c
 
 ### Reorder-only asks do *not* give 100% (expectation refuted)
 
-The spec expected three asks that share v0's option ids, differing only in criteria key order, to agree trivially, because the service sorts option ids. They do not:
+The design expected three asks that share v0's option ids, differing only in criteria key order, to agree trivially, because the service sorts option ids. They do not:
 
 ```
 control reorder-only: agree 92.2% [88.1-94.9] (223/242)  flip 5.2% [3.8-7.1] (38/726)
@@ -427,7 +427,7 @@ There are no other resources to remove: the AI binding needs none. The bearer to
 
 ```
 cd spikes/17b-clef-scale
-npm_config_userconfig=/dev/null pnpm install --ignore-workspace
+pnpm install --ignore-workspace
 node scripts/build-dataset.ts            # writes docs/spikes/s17b-dataset.json; label, leak and duplicate checks
 pnpm exec tsc --noEmit && pnpm run lint && pnpm exec vitest run
 node scripts/sample.ts 32 2026           # the hand-check sample

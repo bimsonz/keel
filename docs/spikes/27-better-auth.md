@@ -17,13 +17,13 @@ Run on 2026-10-11 in workerd (`@cloudflare/vitest-plugin` 1.4.0, local D1). Code
 
 Can Better Auth be Keel's identity adapter inside a Worker? The test: its D1 support, the passkey plugin's registration and assertion, and the device-authorization plugin, all in workerd and not in Node.
 
-## Findings that shape T2
+## Findings that shape Keel's sign-in
 
 - **D1 is native.** Pass the `D1Database` binding as `database`. The Kysely adapter then uses its own D1 dialect, with no extra package.
 - **Migrations.** In 1.7.7, `getMigrations` is exported from `better-auth/db/migration`, not `better-auth/db`. It created `user`, `session`, `account`, `verification`, `passkey`, `deviceCode`, `organization`, `member` and `invitation` inside workerd. Keel will commit the generated SQL as a D1 migration instead, so schema changes stay reviewable and expand-only.
 - **The device flow needs a claim step.** `POST /device/approve` refuses a code until a signed-in session has opened `GET /device?user_code=…`. That page is the console's `/device`.
 - **The captcha plugin** in 1.7.7 has a Cloudflare Turnstile provider. It isn't used, because sign-up is open.
-- **Plugins present in 1.7.7** that T2 uses: `organization` (with access control), `admin`, `deviceAuthorization`, `bearer`, `emailOTP` and `username`, plus `@better-auth/passkey`.
+- **Plugins present in 1.7.7** that Keel uses: `organization` (with access control), `admin`, `deviceAuthorization`, `bearer`, `emailOTP` and `username`, plus `@better-auth/passkey`.
 
 ## Setup
 

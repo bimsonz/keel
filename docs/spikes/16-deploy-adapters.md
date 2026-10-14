@@ -4,7 +4,7 @@ Run on 2026-10-10 against the live edge, from London (requests landed in LHR, CD
 
 ## Answer
 
-**GO.** All four criteria pass. (b) is proven from local only; the in-Worker path is untested pending the token.
+**GO.** All four criteria pass. (b) is proven from local only; the in-Worker path is untested, for want of a scoped token.
 
 | | Criterion | Result | Verdict |
 |---|---|---|---|
@@ -20,7 +20,7 @@ Conditions on the GO:
 3. **Gradual-deploy commands return before the edge converges.** `verify()` after promote or rollback must use a batch-based settle check, not "N in a row" (see [gotchas](#gotchas)).
 4. **Teardown of one candidate needs two router fixes**, both made and verified here (see [teardown](#d-teardown)).
 
-**Fallback:** not needed. (a) alone covers Keel's preview needs. If the scoped token does not arrive, (b) and (c) run from local or CI wrangler as measured here, and the in-Worker REST path moves to a later layer.
+**Fallback:** not needed. (a) alone covers Keel's preview needs. Until a scoped token exists, (b) and (c) run from local or CI wrangler as measured here, and the in-Worker REST path comes later.
 
 ## Question
 
@@ -256,9 +256,9 @@ bad token:      PreviewsApiError: GET /workers/workers/keel-spike-16-app/preview
 missing worker: PreviewsApiError: POST /workers/workers/keel-spike-16-no-such-worker/previews: HTTP 404 [10007] This Worker does not exist on your account.
 ```
 
-### Untested pending the token
+### Untested without a scoped token
 
-- The in-Worker call: the router itself calling `api.cloudflare.com` with the token read from a `secrets_store_secrets` binding (`await env.PREVIEWS_TOKEN.get()`). The adapter module is runtime-agnostic and was exercised only from Node. No Secrets Store secret was created: storing a dummy in the shared account store, or sending the full-scope OAuth token to a public Worker, were both judged not conservative.
+- The in-Worker call: the router itself calling `api.cloudflare.com` with the token read from a `secrets_store_secrets` binding (`await env.PREVIEWS_TOKEN.get()`). The adapter module is runtime-agnostic and was exercised only from Node. No Secrets Store secret was created: storing a dummy in the account's store, or sending the full-scope OAuth token to a public Worker, were both judged not conservative.
 - Whether a **per-Worker scoped** token is enough for `POST …/workers/workers/{worker}/previews` and its deployments. The docs ask only for "edit Workers Scripts and the resources used by the Preview".
 - Asset upload through the adapter (the session plus a JWT). `wrangler preview` did this successfully; the adapter does not implement it yet.
 

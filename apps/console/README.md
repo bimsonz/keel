@@ -221,5 +221,3 @@ It drives the pages on the fixtures the dev server serves (every tab and row a l
 - **an owner, on the project's settings**: the tab is offered to her and not to a visitor, making the project public waits for its whole name, Keel is sent the settings whole with that one field changed, a visitor then reads the project and is refused its settings in Keel's word, and one click makes it private again.
 
 The dev server goes on serving the old version of a file that a script has written, so restart it before running this after an edit.
-
-What has been seen on keel.town, and when, is in `docs/status/tenancy-ui.md`.

@@ -258,7 +258,7 @@ Cold start < 300 ms at ≤ 10 MB, in detail:
   - tree-sitter 128 ms; max 346 ms, 1 of 7 samples over;
   - hcl2json 280 ms; max 363 ms, 1 of 7 over;
   - 10 MiB pad 142–201 ms.
-- **Including a per-cold-load R2 read** (as specced), it fails:
+- **Including a per-cold-load R2 read** (as designed), it fails:
   - hcl2json p50 475 ms;
   - 10 MiB pad 365–625 ms;
   - tree-sitter p50 282 ms, 2 of 7 over;

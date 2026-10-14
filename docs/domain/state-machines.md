@@ -485,7 +485,7 @@ stateDiagram-v2
 
 **Terminal:** Retracted, Superseded.
 
-**Policy** (ADR 0005, decided 11 Oct): a project composes its predicate policy per change, like flows, and chooses per predicate whether a proven conflict `block`s, `advise`s or `annotate`s; the default is `advise`. Only retraction reads it: under `block` the challenger waits for a ruling, so a tenet leaves Contested only by a ruling or by being reaffirmed; under `advise` or `annotate` the challenger may land, so trunk no longer holds the belief and the proof retracts it, citing the conflict. A tenet never blocks by itself.
+**Policy** (ADR 0005): a project composes its predicate policy per change, like flows, and chooses per predicate whether a proven conflict `block`s, `advise`s or `annotate`s; the default is `advise`. Only retraction reads it: under `block` the challenger waits for a ruling, so a tenet leaves Contested only by a ruling or by being reaffirmed; under `advise` or `annotate` the challenger may land, so trunk no longer holds the belief and the proof retracts it, citing the conflict. A tenet never blocks by itself.
 
 **Invariant:** new code that calls a symbol carrying a tenet is subscribed to that tenet automatically (an implied premise).
 
@@ -557,7 +557,7 @@ With a project in the facts, the same rows commit `AgentInvitedToProject`, `Agen
 
 **The row is the one its facts name.** The machine is handed the row and, apart from it, the namespace, the agent and the project the command is about. A row of another agent, of another namespace or of another place in it is the caller's defect and no refusal: the decision throws, as the fold does on such an event, and nothing is committed. The fold reads an end by its event's kind alone: whatever reason it carries, it ends an invitation that stands.
 
-**Only an accepted invitation gives standing.** The request gate reads the invitation's row in D1 (`namespace_agents`) on every request of an agent in a namespace that is not its own: `joined` makes it `Invited` by the standing its inviter holds now, with its token's scopes cut to the invitation's. So an inviter who leaves the org takes the agent's rights with them at once, with no write. Until push 3 the row stays `joined` and no event says the membership ended: the inviter's leaving will end the invitation with an event of its own (`inviterLeft`). An ended invitation keeps its row as `ended`, and the agent may be invited again. An invitation to one project is read the same way from `project_agents`, by the project the token names: `joined` makes the agent `Invited` by the standing of the person who invited it, who owns the namespace for as long as their account stands, and marks the standing as that project's alone (`projectOnly`), so another private project of the namespace is not there for the agent.
+**Only an accepted invitation gives standing.** The request gate reads the invitation's row in D1 (`namespace_agents`) on every request of an agent in a namespace that is not its own: `joined` makes it `Invited` by the standing its inviter holds now, with its token's scopes cut to the invitation's. So an inviter who leaves the org takes the agent's rights with them at once, with no write. For now the row stays `joined` and no event says the membership ended: the inviter's leaving will end the invitation with an event of its own (`inviterLeft`). An ended invitation keeps its row as `ended`, and the agent may be invited again. An invitation to one project is read the same way from `project_agents`, by the project the token names: `joined` makes the agent `Invited` by the standing of the person who invited it, who owns the namespace for as long as their account stands, and marks the standing as that project's alone (`projectOnly`), so another private project of the namespace is not there for the agent.
 
 **Who is asked first.** A question about the work of an agent that has joined a namespace goes first to the member who invited it there, whoever sponsors the agent. The namespace's object reads its own row when it raises the escalation. Outside an org it reads the row of the escalation's own project in `project_agents`: the person who invited the agent to that project is asked first about it, and about another of their projects the invitation says nothing.
 
@@ -587,7 +587,7 @@ stateDiagram-v2
 
 ---
 
-## Deployment (deferred to L5)
+## Deployment (deferred)
 
 Owner: the DO that created it. The machine is fixed when the `Deployer` adapters land:
 

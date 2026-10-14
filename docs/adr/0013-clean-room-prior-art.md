@@ -6,7 +6,7 @@ GitCore in particular is written clean-room from git's pack and protocol documen
 
 Third-party dependencies are used only under compatible licences:
 - MIT and Apache-2.0 freely.
-- libgit2 (GPLv2 with a linking exception) only if spike S20 adopts it, and then its source must be offered.
+- libgit2 (GPLv2 with a linking exception) only if a spike shows Keel needs it, and then its source must be offered.
 
 **A missing licence or missing proof is a reason to *spike* an option, never a reason to reject it.** The licence decides only whether code can be copied.
 

@@ -19,7 +19,7 @@ Why:
 - Spec-first gives agents one stable, self-describing contract on both REST and MCP.
 - Effect gives typed errors and per-host dependency injection without reflection. Reflection-based DI breaks under esbuild.
 
-The hexagonal layout and its rules are re-derived for Keel, not copied from earlier work; ADR 0013 covers why.
+The hexagonal layout and its rules are derived for Keel from first principles, under the clean-room rule of ADR 0013.
 
 ## Considered options
 

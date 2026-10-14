@@ -506,7 +506,7 @@ Listing after teardown:
 
 ```
 $ wrangler artifacts namespaces list --json | filter keel-spike-13
-total namespaces: 13 | matching keel-spike-13: []
+matching keel-spike-13: []
 $ wrangler artifacts repos list --namespace keel-spike-13
 No Artifacts repos found in namespace "keel-spike-13".
 $ wrangler artifacts repos list --namespace keel-spike-13-eu
@@ -517,7 +517,7 @@ $ wrangler deployments list --name keel-spike-13-gitcore
 ✘ [ERROR] A request to the Cloudflare API (/accounts/<account>/workers/scripts/keel-spike-13-gitcore/deployments) failed.
   This Worker does not exist on your account. [code: 10007]
 $ GET /accounts/<account>/workers/scripts | filter keel-spike-13
-scripts: 251 | matching keel-spike-13: []
+matching keel-spike-13: []
 $ GET /accounts/<account>/artifacts/namespaces/keel-spike-13      (same for -eu, -w)
 {"result":null,"success":false,"errors":[{"code":10200,"message":"Namespace not found",...}]}
 ```

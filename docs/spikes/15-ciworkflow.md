@@ -62,7 +62,7 @@ do not have.
 | 2 | Cross-script `SANDBOX` DO binding runs a `ci.runner` | **PASS** | deploy bound `SANDBOX (KeelSandbox, defined in keel-spike-15-verify)`; runner exit 0, `node v22.22.3`, cold+warm both 0 |
 | 3 | One instance mixes a Tier 1 `step.do` (`LOADER.get`, `globalOutbound: null`) and a Tier 2 `ci.runner` | **PASS** | `tier-mix.json`: `tier1.total=500500`, `tier2Exit=0`, both in one instance |
 | 4 | Safe cache pattern / two scopes per instance | **PARTIAL / see fork #1** | install produced cache pointer under scope `refs/heads/scen-cache`; a 2nd instance at the same ref + same lockfile → `cache hit: reusing f7ff15e4…`; a changed lockfile → different key → cold `npm ci`. But `cacheScope` is fixed per instance. |
-| 5 | Raw fake secret in logs | **PASS (secret survives raw)** | runner's `logs.stdout` (the `step.do` return Workflows persists) = `boundary FAKE-SECRET-123 boundary`; only my post-hoc R2 copy was `[REDACTED]`. Checkout token not reachable: `SOURCE_CONTROL_TOKEN` unset in the command env, `/workspace/.git/config` absent, `/proc/1/environ` has no token |
+| 5 | Raw fake secret in logs | **PASS (secret survives raw)** | runner's `logs.stdout` (the `step.do` return Workflows persists) = `boundary FAKE-SECRET-123 boundary`; only the spike's post-hoc R2 copy was `[REDACTED]`. Checkout token not reachable: `SOURCE_CONTROL_TOKEN` unset in the command env, `/workspace/.git/config` absent, `/proc/1/environ` has no token |
 | 6 | Hydrate `/workspace` from an R2 bundle, no checkout token, engine unmodified | **PASS via `getProvider()` seam — see fork #2** | stock provider with `sourceControlCredentials:false` still git-checks-out with a token; the `getProvider()` override returning `{kind:'archive',url}` hydrated from the R2 bundle (`scenario-cache.marker` present, i.e. archive content, not the git sha), `scm-token:[unset]`, no token env |
 
 ### Check 1 — payload passthrough
@@ -294,6 +294,6 @@ exercised through the local-R2 binding path instead.
 
 ## Teardown
 
-See the teardown listing at the end of this document / the spike's final report:
+See the teardown listing at the end of this document:
 all `keel-spike-15-*` Workers, containers, Workflows, the R2 buckets, and the
 `keel-spike-15/forge` repo were deleted, with a listing showing none remain.

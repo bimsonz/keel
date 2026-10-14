@@ -367,8 +367,8 @@ $ wrangler deployments list --name keel-spike-26-probe-tpl
 ✘ [ERROR] ... This Worker does not exist on your account. [code: 10007]
 curl https://keel-spike-26-probe.<subdomain>.workers.dev/prompt      -> HTTP 404
 curl https://keel-spike-26-probe-tpl.<subdomain>.workers.dev/prompt  -> HTTP 404
-GET /accounts/<account>/workers/scripts                              -> 250 scripts, 0 matching keel-spike-26
-GET /accounts/<account>/workers/durable_objects/namespaces           -> 197 namespaces, 0 for keel-spike-26
+GET /accounts/<account>/workers/scripts                              -> 0 matching keel-spike-26
+GET /accounts/<account>/workers/durable_objects/namespaces           -> 0 for keel-spike-26
 ```
 
 No `keel-spike-26-*` resources remain.

@@ -1,6 +1,6 @@
 # S8: Test harness
 
-Run on 2026-10-10 inside the repo itself, not as a throwaway: the harness is the one every lane now uses. Code is in `apps/keel/test/pool/`, `apps/keel-verify/test/pool/` and the mutants in `test/mutants/s8-*.patch`.
+Run on 2026-10-10 inside the repo itself, not as a throwaway: the harness is the one Keel's tests now use. Code is in `apps/keel/test/pool/`, `apps/keel-verify/test/pool/` and the mutants in `test/mutants/s8-*.patch`.
 
 ## Answer
 

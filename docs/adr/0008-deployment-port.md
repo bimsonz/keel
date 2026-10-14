@@ -17,5 +17,5 @@ Why: GitHub hosts everything from firmware to infrastructure, and so must Keel. 
 
 ## Consequences
 
-- The port and its contract suite are frozen in L0, but most adapters are scheduled late, because the scorecard grades them low *for this problem*.
+- The port and its contract suite are fixed first, but most adapters come later, because they matter less *for this problem*.
 - Cloudflare's deploy APIs are REST-only, so they use account tokens scoped to specific Workers, held in Secrets Store.

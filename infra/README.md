@@ -2,7 +2,7 @@
 
 Keel's stores and queues are Terraform (`infra/<environment>`). Workers, Durable Objects, Workflows and containers are created by `wrangler deploy` from each app's `wrangler.jsonc`, whose ids are sentinels that `scripts/deploy.ts` fills from this module's outputs.
 
-Every resource name starts with `keel-`: the account is shared with other workloads.
+Every resource name starts with `keel-`, so Keel's resources stand apart from anything else on the account.
 
 ## Running it
 

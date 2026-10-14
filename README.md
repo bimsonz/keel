@@ -8,7 +8,7 @@ Status: under active construction for Cloudflare's *Build the next Git platform*
 
 - Hosted at [keel.town](https://keel.town)
 - Claims format: [Model Feedback Protocol](https://github.com/bimsonz/mfp)
-- Language: [CONTEXT.md](CONTEXT.md) · Decisions: [docs/adr](docs/adr) · Working here: [AGENTS.md](AGENTS.md)
+- Language: [CONTEXT.md](CONTEXT.md) · Decisions: [docs/adr](docs/adr) · Working here: [AGENTS.md](AGENTS.md) · Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What works (v0.1)
 
@@ -56,9 +56,13 @@ Requires Node 22.18+ and pnpm 11.
 
 ```sh
 pnpm install
-pnpm check   # gen → lint → typecheck → guards → tests → workerd tests → deploy dry-run
+pnpm check   # gen → lint → format check → typecheck → guards → tests → workerd tests → deploy dry-run
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to propose a change, and [AGENTS.md](AGENTS.md) for the commands, the layout and the conventions. Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## Licence
 
-MIT licensed. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

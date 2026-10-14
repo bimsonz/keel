@@ -229,7 +229,7 @@ The empty-repo test:
 
 ## Fallback
 
-Per the spec, the fallback is for the load generator to push through GitCore's push client. Two notes for anyone choosing it:
+The planned fallback is for the load generator to push through GitCore's push client. Two notes for anyone choosing it:
 
 - **It does not fix the wall-time failure seen here if it speaks the same smart-HTTP protocol from the same colo.** The cost is round trips to the backend, not the client. A push is at minimum a discovery GET plus a receive-pack POST, about 1.1 s from LHR.
 - **It only helps if it removes round trips** (for example, pushing a commit built on a known parent without a fresh clone) **or runs placed near the backend.** Neither was tested here.
@@ -263,8 +263,8 @@ Per the spec, the fallback is for the load generator to push through GitCore's p
    - An early branch run cloned `main` but pushed onto an existing `agent/…` branch.
    - Cycles 2–5 got `PushRejectedError: not a simple fast-forward` after the receive-pack discovery, without sending a pack (`results/branch-basic-harness-bug.jsonl`).
    - Fixed by cloning the branch tip when it exists.
-6. **Public-repo hygiene scan.**
-   - The scan over the spike's files (forbidden names, account ID, token prefix, local paths) is clean.
+6. **Secret and path scan.**
+   - The scan over the spike's files (account ID, token prefix, local paths) is clean.
    - Planting the account ID into a scratch copy of a results file made the same scan flag it (`grep-exit=0`).
 
 ## Gotchas found

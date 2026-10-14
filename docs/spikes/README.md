@@ -4,7 +4,7 @@ Each spike is a time-boxed experiment against the live Cloudflare edge (a Cloudf
 - the question;
 - the setup;
 - the measured numbers, with the commands and their output;
-- pass/fail against the spec;
+- pass/fail against its bar;
 - go/no-go;
 - the fallback taken.
 
@@ -46,7 +46,7 @@ Spike code lives in `spikes/NN-slug/`. It is throwaway, and sits outside the pnp
 
 - **S16 (b):** calling the Previews REST API from inside a Worker with a per-Worker scoped token held in Secrets Store needs that token.
 - **S16 (a):** the `cand-<id>.<host>` wildcard form needs approval for the DNS change. The path form on workers.dev is measured.
-- **S2:** `repo.forked` event latency. The account-level `artifacts` event source already has its one allowed subscription, held by another workload.
+- **S2:** `repo.forked` event latency. The account-level `artifacts` event source allows one subscription, and it was already in use on the test account.
 
 ## Final sweep (10 Oct 2026)
 
@@ -58,7 +58,7 @@ $ wrangler queues list | grep -c keel-spike           → 0
 $ wrangler workflows list | grep -c keel-spike        → 0
 $ wrangler d1 list | grep -c keel-spike               → 0
 $ wrangler containers list | grep -c keel-spike       → 0
-GET /accounts/<acct>/workers/scripts                  → 246 scripts, none matching keel-spike
+GET /accounts/<acct>/workers/scripts                  → none matching keel-spike
 ```
 
 **Artifacts namespaces.** Seven empty namespaces were left, because wrangler has no namespace delete. They were deleted with the REST route `DELETE /accounts/<acct>/artifacts/namespaces/<ns>`, which is not in the REST docs:

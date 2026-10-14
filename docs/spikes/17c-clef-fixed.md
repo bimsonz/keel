@@ -83,7 +83,7 @@ Also:
   | `main` | anchor view, comments stripped | rotated | 242 | Fixes 1 + 2 + 3, scored |
   | **Total** | | | **726** (+1 smoke test) | 0 errors, 0 retries, 0 × 429 |
 
-  The spec allowed up to three extra runs; `c1` and `c2` are two of them.
+  The plan allowed up to three extra runs; `c1` and `c2` are two of them.
   - **Re-using S17b's run is sound.** Identical requests are deterministic: on the 214 items whose request fix 1 leaves unchanged, `c1` returns S17b's probabilities exactly (214/214). Likewise, `main` equals `c2` exactly on the 40 items whose anchor view equals the stripped state (40/40).
 
 ```
@@ -720,7 +720,7 @@ Nothing else needs removing: the AI binding has no resources of its own. The bea
 
 ```
 cd spikes/17c-clef-fixed
-npm_config_userconfig=/dev/null pnpm install --ignore-workspace
+pnpm install --ignore-workspace
 node scripts/build-dataset.ts            # writes docs/spikes/s17c-dataset.json; every check above
 pnpm exec tsc --noEmit && pnpm run lint && pnpm exec vitest run
 node scripts/sample.ts 16 2026           # the anchor-view hand-check sample

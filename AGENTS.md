@@ -1,6 +1,16 @@
 # Working in Keel
 
-Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the terms in [CONTEXT.md](CONTEXT.md) exactly: in code, docs, commits and API names. Hard-to-reverse choices are in [docs/adr](docs/adr); read the relevant ADR before changing a boundary it fixes.
+This guide is for anyone changing Keel, people and coding agents alike. Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the terms in [CONTEXT.md](CONTEXT.md) exactly: in code, docs, commits and API names. Hard-to-reverse choices are in [docs/adr](docs/adr); read the relevant ADR before changing a boundary it fixes. How to propose a change is in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Setup
+
+Keel needs Node 22.18 or later (`.node-version` pins the version CI uses) and pnpm 11 (`packageManager` in `package.json` pins the exact version).
+
+```sh
+pnpm install
+pnpm gen
+pnpm check
+```
 
 ## Commands
 
@@ -11,12 +21,36 @@ Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the
 | `pnpm lint` | oxlint, type-aware, over the workspace paths only. Type-aware rules find files through every tsconfig they meet, so `spikes/` and `fixtures/` (which lint themselves) are excluded by path rather than by `ignorePatterns` |
 | `pnpm format` / `pnpm format:check` | oxfmt: write, or check (CI runs the check after lint). Run `pnpm format` on your changes before every push |
 | `pnpm typecheck` | `tsc --noEmit` in every package (TypeScript 7) |
-| `pnpm guards` | Workspace guards: nothing private in a public file |
+| `pnpm guards` | Workspace guards: every dependency resolves from the public npm registry, nothing private in a public file, every mutant patch still applies, and the other repository-wide checks in `packages/tooling/src/guards` |
 | `pnpm test` | vitest projects `unit` and `arch` (Node) |
 | `pnpm test:pool` | vitest projects `pool:*`: each Worker's tests inside workerd |
 | `pnpm tooling:controls` | Runs every guard and rule R1–R15 against its control fixture; all must go red |
+| `pnpm prove:red` | Applies each seeded wrong implementation in `test/mutants/`, runs its tests and reverts it; see [Proving a check](#proving-a-check) |
 | `pnpm deploy:dry` | `wrangler deploy --dry-run` for every Worker |
-| `pnpm check` | All of the above, in CI order. Green `pnpm check` is the bar for every push |
+| `pnpm check` | gen, lint, format check, typecheck, guards, `test`, `test:pool` and `deploy:dry`, in CI order. A green `pnpm check` is the bar for every push |
+| `pnpm deploy` | Install Keel on a Cloudflare account (`scripts/install.ts`) |
+| `pnpm e2e:s0`, `pnpm e2e:agents`, `pnpm e2e:chain` | End-to-end scenarios against a deployed Keel |
+
+## Repository layout
+
+| Path | What it holds |
+|---|---|
+| `packages/spec`, `packages/contracts` | The API in TypeSpec, and the OpenAPI document generated from it |
+| `packages/core` | The hexagon: the pure domain (the shared kernel and one folder per bounded context), the Effect use-cases and the ports |
+| `packages/gitcore` | Clean-room git algorithms, including the tree diff |
+| `packages/syntax` | Source facts for effect derivation, read from a tree-sitter parse |
+| `packages/runner-protocol` | Messages between the control plane and runners |
+| `packages/{sdk,cli,workspace-git}` | Public clients |
+| `packages/testing` | In-memory adapters and the port contract suites |
+| `packages/tooling` | Architecture rules, guards and their command-line entry points |
+| `apps/keel` | The control plane Worker: the `http` and `mcp` doorways, auth and problem responses, the Durable Objects, Workflows, queue consumers and the driven adapters |
+| `apps/keel-verify` | The untrusted execution plane: `KeelVerify` and its sandbox. It holds no credentials |
+| `apps/console` | Mission Control |
+| `examples/`, `e2e/` | A hosted swarm, a load generator and end-to-end scenarios, all plain clients of the public API |
+| `infra/` | Terraform for the hosted instance |
+| `scripts/` | Install, deploy, seed and the mutation-proof runner |
+| `test/controls/`, `test/mutants/` | Each check's control fixture, and the seeded wrong implementations |
+| `spikes/`, `docs/spikes/`, `fixtures/` | Time-boxed experiments and their write-ups, outside the pnpm workspace |
 
 ## The hexagon
 
@@ -101,7 +135,7 @@ Read `node_modules/effect/ai-docs` first, then [docs/effect.md](docs/effect.md) 
 - `keel` requires its secrets: `KEEL_SIGNING_KEY` (the Ed25519 JWK that signs bearer tokens), `CLOUDFLARE_ACCOUNT_ID` (read by `@cloudflare/ci`; a secret so it is never committed) `BETTER_AUTH_SECRET` (Terraform's `better_auth_secret` output), `BUNDLE_URL_SIGNING_KEY` (Terraform's `bundle_url_signing_key` output: the Ed25519 private key that signs every bundle URL a sandbox is handed) and `KEEL_COMMIT_SIGNING_KEY` (Terraform's `commit_signing_key` output: the Ed25519 private key that signs every commit Keel composes; its public half is in the var `KEEL_COMMIT_SIGNERS`, which Keel serves as its allowed-signers file). `scripts/deploy.ts` sets them all.
 - **`keel-verify` holds no secret.** Its bundle host verifies a bundle URL's signature with `BUNDLE_URL_PUBLIC_KEY`, a plain var `scripts/deploy.ts` fills from Terraform's `bundle_url_public_key` output: the public half, which signs nothing.
 - **No account is made for anyone.** There is no bootstrap credential, claim code or instance admin: the first person signs up like every other, and so does automation. `scripts/accounts.ts` signs an automation account up with a passkey it keeps (`~/.keel/<x>-passkey.json`) and signs in to it again from that key; `scripts/seed.ts` does the same for its own user. Suspensions, quota overrides and the spend switch are the operator's configuration of the instance, not operations in Keel.
-- **The console holds no secret.** Its Worker serves the page and has no binding to Keel: the page reads `/v1` on its own origin as whoever is signed in. `apps/console/wrangler.jsonc` requires no secret, `scripts/deploy.ts` sets none for it, and the console's `guard-build` fails if a credential or a proxy path is named in its build, its Worker or its config again. `--only <app>` deploys one Worker and logs the others as untouched; announce it like any deploy, since it mixes versions. `deploy.ts` refuses any argument it does not know before it renders anything.
+- **The console holds no secret.** Its Worker serves the page and has no binding to Keel: the page reads `/v1` on its own origin as whoever is signed in. `apps/console/wrangler.jsonc` requires no secret, `scripts/deploy.ts` sets none for it, and the console's `guard-build` fails if a credential or a proxy path is named in its build, its Worker or its config again. `--only <app>` deploys one Worker and logs the others as untouched; it mixes versions, so use it with care. `deploy.ts` refuses any argument it does not know before it renders anything.
 - `@cloudflare/ci` also mentions `CF_TOKEN` and R2 S3 keys. Keel provides neither: sandbox backups go through the `BACKUP_BUCKET` binding (`localBucket: true`), and no runner step asks for credentials. The `runner-credentials` guard fails if one sets `cloudflareCredentials` or `sourceControlCredentials`.
 - Never put a credential in a container's start environment: it lands on disk and in `/proc/1/environ`. A container reaches git through outbound interception, which injects a short token per request.
 - `KeelSandbox`'s egress: the internet is off and `allowedHosts` is only `*.keel.internal`, which puts the container in intercept-all mode (`interceptAllOutboundHttp` plus HTTPS `*`). `outboundByHost` answers the bundle hosts from `BUNDLES` and refuses `*` at once, rather than leaving a blocked host to hang on DNS. Assign `outboundByHost`; never declare it as a static field, which bypasses the setter.
@@ -122,10 +156,10 @@ Seeded wrong implementations live in `test/mutants/*.patch`. Line 1 is `# expect
 
 `pnpm prove:red [filter] --baseline-only` is the sweep: it takes the baselines and applies no patch, so it proves no mutant. It runs each command once, narrowed to every tag the patches sharing it claim, prints `baseline green <patch>` or `BASELINE RED <patch>: …` for each, and exits 1 if any baseline is red or any patch is stale. It finds the patches whose proof would lie at about one run for each test file. It is a screen: a patch it reports is then proved by itself, and that proof's own baseline is the judge.
 
-The runner's own controls are `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor and `red-without-mutant.patch`, whose command fails with no patch applied, as `BASELINE RED`. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`. A patch that no longer applies fails `pnpm guards` (the `patches-apply` guard): whoever moved the lines under it makes it again as the same edit, in the same push. In a repository the guard reads the index, so it says nothing of an edit until it is staged, and a mutant the runner has applied does not count against its own patch. When code was only reformatted, `node scripts/rebase-mutants.ts <ref before the format>` rebuilds the stale patches mechanically.
+The runner's own controls are `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor and `red-without-mutant.patch`, whose command fails with no patch applied, as `BASELINE RED`. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`. A patch that no longer applies fails `pnpm guards` (the `patches-apply` guard): whoever moved the lines under it makes it again as the same edit, in the same change. In a repository the guard reads the index, so it says nothing of an edit until it is staged, and a mutant the runner has applied does not count against its own patch. When code was only reformatted, `node scripts/rebase-mutants.ts <ref before the format>` rebuilds the stale patches mechanically.
 
-## Git
+## Commits and contract changes
 
-- Trunk-based: commit to `main`, `git pull --rebase` before every push, and push every commit. A red `main` stops the line: whoever broke it fixes or reverts within 15 minutes.
-- After the `contracts-v0` tag, contract changes are additive (a new operation, an optional field, a new port method) with a CHANGELOG line. A breaking change is marked as one in its CHANGELOG entry.
-- Never `--no-verify`. Commit messages say what changed and why.
+- `main` is trunk. Keep changes small, rebase on `main` before you push, and keep `main` green: a change that turns it red is fixed or reverted at once.
+- Commit messages are plain and imperative. The subject says what changed; the body, when there is one, says why, in the author's own words. Never `--no-verify`.
+- After the `contracts-v0` tag, contract changes are additive (a new operation, an optional field, a new port method) and each one gets a line in [CHANGELOG.md](CHANGELOG.md). A breaking change is marked as one in its CHANGELOG entry and says what a caller must do.
