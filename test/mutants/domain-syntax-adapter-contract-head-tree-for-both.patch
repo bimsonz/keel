@@ -2,18 +2,17 @@
 # kills: syntaxsource.contract.facts, syntaxsource.contract.derives, syntaxsource.contract.absent
 # why: the adapter reads the branch's newest tree whatever commit it is asked for, so base and head read alike
 diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
-index d286c5c..b65d073 100644
+index 2cee953f..bfbdff9f 100644
 --- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
 +++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
-@@ -58,7 +58,10 @@ export const SyntaxSourceTreeSitter = (
-         facts: (repo, commit, seeds) =>
-           Effect.gen(function* () {
-             const blobs = new Map<string, { readonly oid: string; readonly kind: PathKind }>();
--            for (const entry of yield* host.readTree(repo, commit))
-+            for (const entry of yield* host.readTree(
-+              repo,
-+              yield* Effect.orDie(host.head(repo, "refs/heads/main")),
-+            ))
-               if (entry.type !== "tree")
-                 blobs.set(entry.path, {
-                   oid: entry.oid,
+@@ -117,7 +117,9 @@ export const SyntaxSourceTreeSitter = (
+                 return Effect.forEach(
+                   asked,
+                   (dir) =>
+-                    host.listDir(repo, commit, dir).pipe(
++                    Effect.flatMap(Effect.orDie(host.head(repo, "refs/heads/main")), (head) =>
++                      host.listDir(repo, head, dir),
++                    ).pipe(
+                       Effect.map(listingOf),
+                       Effect.catchTag("PathNotFound", () => Effect.succeed(EMPTY)),
+                       Effect.map((listing) => void listings.set(dir, listing)),

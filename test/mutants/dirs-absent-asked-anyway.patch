@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.reads-directories
+# why: a directory a listed one above already shows absent is asked for anyway, one listDir call more for each module's index
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..a1e8c3dd 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -111,7 +111,7 @@ export const SyntaxSourceTreeSitter = (
+                 const asked: string[] = [];
+                 for (const dir of new Set(paths.map(directoryOf))) {
+                   if (listings.has(dir)) continue;
+-                  if (knownAbsent(dir)) listings.set(dir, EMPTY);
++                  if (knownAbsent(dir) && dir === "") listings.set(dir, EMPTY);
+                   else asked.push(dir);
+                 }
+                 return Effect.forEach(

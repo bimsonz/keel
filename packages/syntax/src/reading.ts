@@ -1,8 +1,10 @@
 /**
  * The path rule: a reading parses the seeds it is given and follows their
  * relative imports to a fixpoint, breadth-first, inside fixed caps. The
- * caller reads the blobs; everything else is decided here, so the rule is the
- * same wherever the blobs come from.
+ * caller reads the blobs and answers what a path is; everything else is
+ * decided here, so the rule is the same wherever the blobs come from. A
+ * reading asks what a path is only for a seed or a path it named beforehand,
+ * so a caller can learn that from the few directories it needs.
  */
 import type { Node } from "web-tree-sitter";
 import { type FileModel, modelOf, nestsBeyond } from "./model.ts";
@@ -56,13 +58,25 @@ export type ReadingResult =
 export type PathKind = "file" | "other" | undefined;
 
 export interface Reading {
-  /** The paths to read now, one breadth-first level in path order. Empty when the reading is done. */
+  /**
+   * The paths to read now, one breadth-first level in path order. Empty when
+   * the reading is done. Once a level's files are all given, the next call
+   * resolves their imports first.
+   */
   readonly wanted: () => readonly string[];
   /**
    * Gives one wanted file's bytes. `restart` means the parser's runtime is
    * gone: boot again and give the same file to the new parser.
    */
   readonly give: (path: string, bytes: Uint8Array, parser: SourceParser) => "taken" | "restart";
+  /**
+   * The paths whose kinds the next `wanted()`, and `result()`, will ask
+   * about the files given since the last level's imports were resolved:
+   * every file each module they name may be, in path order. Nothing else is
+   * asked but the seeds, so a caller that learns kinds a directory at a time
+   * lists these paths' directories before it asks for the next level.
+   */
+  readonly lookups: () => readonly string[];
   readonly result: () => ReadingResult;
 }
 
@@ -90,6 +104,14 @@ const candidates = (from: string, specifier: string): readonly string[] => {
   ];
 };
 
+/**
+ * The modules a file names that its reading resolves: its relative imports,
+ * which are followed, and the source of each of its re-exports, bare or not,
+ * which `factsOf` resolves the same way when a name is looked up through it.
+ */
+const named = (model: FileModel): ReadonlySet<string> =>
+  new Set([...model.specifiers, ...model.reexports.map((r) => r.from), ...model.stars]);
+
 export function openReading(
   seeds: readonly string[],
   kindOf: (path: string) => PathKind,
@@ -101,7 +123,8 @@ export function openReading(
   const seen = new Set<string>();
   let level: string[] = [];
   let pending = new Set<string>();
-  let next = new Set<string>();
+  /** The files read since the last level's imports were resolved, with what each says. */
+  let given: (readonly [string, FileModel])[] = [];
   let files = 0;
   let bytes = 0;
   let failures = 0;
@@ -127,7 +150,18 @@ export function openReading(
       }
     }
     pending = new Set(level);
-    next = new Set();
+  };
+
+  /** Resolves the read level's imports, in path order, and queues the files they name that were not seen. */
+  const advance = (): void => {
+    const next = new Set<string>();
+    for (const [path, model] of given.toSorted(([a], [b]) => byPath(a, b)))
+      for (const specifier of model.specifiers) {
+        const target = resolve(path, specifier);
+        if (target !== undefined && !seen.has(target)) next.add(target);
+      }
+    given = [];
+    queue(next);
   };
 
   if (new Set(seeds).size > LIMITS.files) unavailable = "too-many-seeds";
@@ -139,13 +173,16 @@ export function openReading(
   };
 
   return {
-    wanted: () => (unavailable === undefined ? level : []),
+    wanted: () => {
+      if (unavailable !== undefined) return [];
+      if (pending.size === 0 && level.length > 0) advance();
+      return level;
+    },
     give: (path, blob, parser) => {
       if (unavailable !== undefined || !pending.has(path)) return "taken";
       const done = (reason?: SkipReason): "taken" => {
         if (reason !== undefined) skipped.set(path, reason);
         pending.delete(path);
-        if (pending.size === 0) queue(next);
         return "taken";
       };
       if (blob.length > LIMITS.fileBytes) return done("too-large");
@@ -169,12 +206,19 @@ export function openReading(
       }
       if (model === "syntax-error") return done(model);
       models.set(path, model);
-      for (const specifier of model.specifiers) {
-        const target = resolve(path, specifier);
-        if (target !== undefined && !seen.has(target)) next.add(target);
-      }
+      given.push([path, model]);
       return done();
     },
+    lookups: () =>
+      unavailable === undefined
+        ? [
+            ...new Set(
+              given.flatMap(([path, model]) =>
+                [...named(model)].flatMap((specifier) => candidates(path, specifier)),
+              ),
+            ),
+          ].toSorted(byPath)
+        : [],
     result: () =>
       unavailable === undefined
         ? {

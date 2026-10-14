@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.missing-dir, syntaxsource.reads-directories
+# why: a directory the commit lacks fails the reading as a defect instead of listing as empty
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..43519071 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -119,7 +119,7 @@ export const SyntaxSourceTreeSitter = (
+                   (dir) =>
+                     host.listDir(repo, commit, dir).pipe(
+                       Effect.map(listingOf),
+-                      Effect.catchTag("PathNotFound", () => Effect.succeed(EMPTY)),
++                      Effect.catchTag("PathNotFound", Effect.die),
+                       Effect.map((listing) => void listings.set(dir, listing)),
+                     ),
+                   { concurrency: LISTINGS, discard: true },

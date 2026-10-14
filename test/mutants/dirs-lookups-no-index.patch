@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/reading.test.ts apps/keel/test/unit/syntax-source.test.ts
+# kills: reading.lookups, reading.lazy-equals-whole, syntaxsource.reads-directories
+# why: lookups leaves out the index files a directory import may name, so a reading asks the kind of a path whose directory was never listed
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 464e23c8..5cc9549e 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -214,7 +214,9 @@ export function openReading(
+         ? [
+             ...new Set(
+               given.flatMap(([path, model]) =>
+-                [...named(model)].flatMap((specifier) => candidates(path, specifier)),
++                [...named(model)].flatMap((specifier) =>
++                  candidates(path, specifier).filter((c) => !/\/index\.[jt]s$/.test(c)),
++                ),
+               ),
+             ),
+           ].toSorted(byPath)

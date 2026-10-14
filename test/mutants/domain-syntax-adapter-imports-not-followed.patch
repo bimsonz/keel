@@ -2,15 +2,15 @@
 # kills: syntax.path-rule, syntax.forge-lite-derives, syntax.imports
 # why: only the seeds are read: no import is followed
 diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
-index 8629725..6a418bb 100644
+index 464e23c8..a0108dc8 100644
 --- a/packages/syntax/src/reading.ts
 +++ b/packages/syntax/src/reading.ts
-@@ -171,7 +171,7 @@ export function openReading(
-       models.set(path, model);
+@@ -158,7 +158,7 @@ export function openReading(
+     for (const [path, model] of given.toSorted(([a], [b]) => byPath(a, b)))
        for (const specifier of model.specifiers) {
          const target = resolve(path, specifier);
 -        if (target !== undefined && !seen.has(target)) next.add(target);
 +        if (target !== undefined && seen.has(target)) next.add(target);
        }
-       return done();
-     },
+     given = [];
+     queue(next);

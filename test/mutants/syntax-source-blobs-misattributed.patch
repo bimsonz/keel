@@ -2,10 +2,10 @@
 # kills: syntaxsource.contract.facts, syntaxsource.contract.derives
 # why: Each blob of a level is given to the reading under another wanted path
 diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
-index 0dfa8712..c86bdddc 100644
+index 2cee953f..3fd1ed21 100644
 --- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
 +++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
-@@ -77,7 +77,7 @@ export const SyntaxSourceTreeSitter = (
+@@ -141,7 +141,7 @@ export const SyntaxSourceTreeSitter = (
                );
                for (const [at, read] of level.entries()) {
                  const bytes = yield* Effect.fromResult(read);
@@ -13,4 +13,4 @@ index 0dfa8712..c86bdddc 100644
 +                while (reading.give(wanted[wanted.length - 1 - at] ?? "", bytes, parser) === "restart")
                    parser = yield* boot;
                }
-             }
+               yield* list(reading.lookups());

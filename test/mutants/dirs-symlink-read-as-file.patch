@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.reads-directories
+# why: every blob in a listing is taken as a regular file, so a symlink is read as source instead of skipped as unsupported
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..0c4e5fae 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -36,7 +36,7 @@ const listingOf = (entries: readonly TreeEntry[]): Listing => {
+       blobs.set(entry.path, {
+         oid: entry.oid,
+         kind:
+-          entry.type === "blob" && (entry.mode === MODE_FILE || entry.mode === MODE_EXEC)
++          entry.type === "blob"
+             ? "file"
+             : "other",
+       });

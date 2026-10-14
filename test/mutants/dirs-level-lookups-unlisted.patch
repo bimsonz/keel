@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.reads-directories, syntaxsource.missing-dir, syntaxsource.contract.derives
+# why: the adapter lists only the seeds' directories, never a level's lookups, so resolving the level's imports asks about directories it never listed
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..98dba1fa 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -144,7 +144,6 @@ export const SyntaxSourceTreeSitter = (
+                 while (reading.give(wanted[at] ?? "", bytes, parser) === "restart")
+                   parser = yield* boot;
+               }
+-              yield* list(reading.lookups());
+             }
+             yield* list(reading.lookups());
+             const result = reading.result();

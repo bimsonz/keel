@@ -2,11 +2,11 @@
 # kills: syntax.path-rule
 # why: more than 400 seeds are taken
 diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
-index 8629725..37e99d0 100644
+index 464e23c8..4288d6f2 100644
 --- a/packages/syntax/src/reading.ts
 +++ b/packages/syntax/src/reading.ts
-@@ -130,7 +130,7 @@ export function openReading(
-     next = new Set();
+@@ -164,7 +164,7 @@ export function openReading(
+     queue(next);
    };
  
 -  if (new Set(seeds).size > LIMITS.files) unavailable = "too-many-seeds";

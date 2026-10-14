@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.reads-directories
+# why: the adapter reads the commit's whole tree again before listing the seeds' directories, the walk the change removed
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..13658922 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -131,6 +131,7 @@ export const SyntaxSourceTreeSitter = (
+                 throw new Error(`${path} was asked about before its directory was listed`);
+               return listing.blobs.get(path);
+             };
++            yield* host.readTree(repo, commit);
+             yield* list(seeds);
+             let parser = yield* boot;
+             const reading = openReading(seeds, (path) => blobAt(path)?.kind, registrars);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.reads-directories
+# why: a directory under a listed one is taken as absent even when the listing shows it, so a directory's index is never found
+diff --git a/apps/keel/src/adapters/driven/syntax/syntax-source.ts b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+index 2cee953f..aec905ca 100644
+--- a/apps/keel/src/adapters/driven/syntax/syntax-source.ts
++++ b/apps/keel/src/adapters/driven/syntax/syntax-source.ts
+@@ -97,7 +97,7 @@ export const SyntaxSourceTreeSitter = (
+             const knownAbsent = (dir: string): boolean => {
+               for (let below = dir; below !== ""; below = directoryOf(below)) {
+                 const above = listings.get(directoryOf(below));
+-                if (above !== undefined) return !above.trees.has(below);
++                if (above !== undefined) return true;
+               }
+               return false;
+             };

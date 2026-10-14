@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/reading.test.ts apps/keel/test/unit/syntax-source.test.ts
+# kills: reading.lookups, reading.lazy-equals-whole, syntaxsource.reads-directories
+# why: give resolves a file's imports as it takes the file, before lookups has named the paths it asks about
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 464e23c8..2fc35f81 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -207,6 +207,7 @@ export function openReading(
+       if (model === "syntax-error") return done(model);
+       models.set(path, model);
+       given.push([path, model]);
++      for (const specifier of model.specifiers) resolve(path, specifier);
+       return done();
+     },
+     lookups: () =>

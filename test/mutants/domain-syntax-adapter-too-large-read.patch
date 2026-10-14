@@ -2,11 +2,11 @@
 # kills: syntax.path-rule
 # why: a file over 512 KB is parsed
 diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
-index 8629725..fb5b17a 100644
+index 464e23c8..06988836 100644
 --- a/packages/syntax/src/reading.ts
 +++ b/packages/syntax/src/reading.ts
-@@ -148,7 +148,7 @@ export function openReading(
-         if (pending.size === 0) queue(next);
+@@ -185,7 +185,7 @@ export function openReading(
+         pending.delete(path);
          return "taken";
        };
 -      if (blob.length > LIMITS.fileBytes) return done("too-large");
