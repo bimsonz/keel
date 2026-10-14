@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.untellable
+# why: an anchor with no commit, and no working commit given, is pinned to a made-up one
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..507b39ea 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -189,7 +189,7 @@ const anchorToMfp = (a: Anchor): MfpAnchor => ({
+ });
+ 
+ const anchorOfMfp = (a: MfpAnchor, ctx: WireContext): Result.Result<Anchor, Untellable> => {
+-  const commit = a.commit ?? ctx.working;
++  const commit = a.commit ?? ctx.working ?? CommitSha.make("0".repeat(40));
+   return commit === undefined
+     ? untellable("citation", "anchor-commit", `anchor ${a.path} names no commit`)
+     : Result.succeed({

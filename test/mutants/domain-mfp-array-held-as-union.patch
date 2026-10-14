@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.from-mfp, mfp-wire.premise-round-trip
+# why: an array shape coming into Keel is held as a union of its items
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..02191323 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -287,7 +287,7 @@ const shapeOfMfp = (m: MfpShape): Shape | string => {
+       return { _tag: "literal", value: m.value };
+     case "array": {
+       const of = shapeOfMfp(m.items);
+-      return typeof of === "string" ? of : { _tag: "array", of };
++      return typeof of === "string" ? of : { _tag: "union", of: [of] };
+     }
+     case "union": {
+       const of: Shape[] = [];

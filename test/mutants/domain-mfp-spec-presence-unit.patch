@@ -1,0 +1,30 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp.spec-agrees
+# why: Keel's presence form takes a unit and a stray unit is told, which 0.2's closed presence premise refuses
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..8c2e08bc 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -117,7 +117,12 @@ const invalidation = {
+ const consistency = { ...at("consistency"), relation: OrderRelation, value: ConsistencyValue };
+ const cardinality = { ...at("cardinality"), relation: OrderRelation, value: CardinalityValue };
+ const bound = { ...at("bound"), relation: OrderRelation, value: Schema.Finite, unit: Unit };
+-const presence = { ...at("presence"), relation: PointRelation, value: Schema.Boolean };
++const presence = {
++  ...at("presence"),
++  relation: PointRelation,
++  value: Schema.Boolean,
++  unit: Schema.optional(Schema.String),
++};
+ const purity = { ...at("purity"), relation: PointRelation, value: Schema.Boolean };
+ const idempotent = { ...at("idempotent"), relation: PointRelation, value: Schema.Boolean };
+ const authority = { ...at("authority"), relation: RangeRelation, value: Schema.Array(Writer) };
+@@ -332,7 +337,7 @@ const tell = (
+   if (Result.isFailure(read)) return untellable("proposition", "unreadable", read.failure.reason);
+   const { claim } = read.success;
+   let value: unknown = p.value;
+-  let unit: string | undefined;
++  let unit: string | undefined = p.unit;
+   if (claim.predicate === "bound") {
+     unit = p.unit === undefined || p.unit === "" ? UNITLESS : p.unit;
+     if (!/^\S+$/.test(unit))

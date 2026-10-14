@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.effect-round-trip
+# why: the effect union has no invalidation form, so an effect in it cannot be told
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..3eb82845 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -151,7 +151,6 @@ export type MfpPremiseProposition = typeof MfpPremiseProposition.Type;
+  */
+ export const MfpEffectProposition = Schema.Union([
+   Schema.Struct({ ...freshness, ...propositionFields }),
+-  Schema.Struct({ ...invalidation, ...propositionFields }),
+   Schema.Struct({ ...consistency, ...propositionFields }),
+   Schema.Struct({ ...cardinality, ...propositionFields }),
+   Schema.Struct({ ...bound, ...propositionFields }),

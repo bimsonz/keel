@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.retracted-by
+# why: the retracted premise is compared as sent, so the same scope in another order retracts nothing
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..c2d04f97 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -480,7 +480,7 @@ export const retractedBy = (
+   ctx: WireContext = {},
+ ): Proposition | undefined => {
+   const told = Result.flatMap(premiseOfMfp(m, ctx), premiseToMfp);
+-  const wanted = imageKey(Result.isSuccess(told) ? told.success : m);
++  const wanted = imageKey(m);
+   return stored.find((p) => {
+     const image = premiseToMfp(p);
+     return Result.isSuccess(image) && imageKey(image.success) === wanted;

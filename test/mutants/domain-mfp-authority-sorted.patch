@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.premise-round-trip, mfp-wire.effect-round-trip
+# why: authority writers are told sorted, not in the order they were written
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..74c76451 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -341,7 +341,8 @@ const tell = (
+     const writers = String(p.value)
+       .split(",")
+       .map((w) => w.trim())
+-      .filter((w) => w !== "");
++      .filter((w) => w !== "")
++      .toSorted();
+     const spaced = writers.find((w) => /\s/.test(w));
+     if (spaced !== undefined)
+       return untellable("proposition", "writer", `writer "${spaced}" has whitespace in it`);

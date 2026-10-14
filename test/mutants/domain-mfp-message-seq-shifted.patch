@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.citations
+# why: a message citation is told one message on
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..fc2baaf8 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -203,7 +203,7 @@ const anchorOfMfp = (a: MfpAnchor, ctx: WireContext): Result.Result<Anchor, Unte
+ export const citationToMfp = (c: Citation): MfpCitation => {
+   switch (c._tag) {
+     case "message":
+-      return { kind: "message", ref: `${c.session}/${c.seq}` };
++      return { kind: "message", ref: `${c.session}/${c.seq + 1}` };
+     case "anchor":
+       return { kind: "anchor", ...anchorToMfp(c.anchor) };
+     case "record":

@@ -19,6 +19,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@bimsonz/mfp": "0.2.1",
     "@types/node": "catalog:",
     "fast-check": "catalog:",
     "typescript": "catalog:",

@@ -14,7 +14,7 @@ import {
   SubjectKey,
   writeProposition,
 } from "../../src/domain/coordination/index.ts";
-import { type Anchor, CommitSha } from "../../src/domain/kernel/index.ts";
+import { type Anchor, type Citation, CommitSha, makeId } from "../../src/domain/kernel/index.ts";
 import { fc } from "../support/fast-check.ts";
 
 export const key = (s: string): SubjectKey => SubjectKey.make(s);
@@ -253,4 +253,86 @@ export const comparablePairArb = (predicates: readonly Predicate[] = latticePred
         scope: shareScope ? premise.scope : effect.scope,
       };
       return { premise, effect: e };
+    });
+
+const allPredicates: readonly Predicate[] = [
+  ...latticePredicates,
+  "shape",
+  "ordering",
+  "invariant",
+];
+const sessions = [makeId("ses", "0".repeat(26)), makeId("ses", `${"0".repeat(25)}1`)] as const;
+const commit = CommitSha.make("a".repeat(40));
+
+/** An anchor, with a symbol or without. */
+const symbolAnchorArb: fc.Arbitrary<Anchor> = fc
+  .tuple(fc.constantFrom(...anchorPaths), fc.option(fc.constantFrom("check", "Cache.read")))
+  .map(([path, symbol]) => (symbol === null ? { path, commit } : { path, symbol, commit }));
+
+/** A citation of each kind Keel holds: a numbered session message, a code anchor, a record. */
+export const citationArb: fc.Arbitrary<Citation> = fc.oneof(
+  fc
+    .tuple(fc.constantFrom(...sessions), fc.nat({ max: 40 }))
+    .map(([session, seq]): Citation => ({ _tag: "message", session, seq })),
+  symbolAnchorArb.map((anchor): Citation => ({ _tag: "anchor", anchor })),
+  fc
+    .constantFrom("dec_00000000000000000000000000", "run/42")
+    .map((id): Citation => ({ _tag: "record", id })),
+);
+
+/** A freshness effect in the invalidation form: its events sorted and each once. */
+const invalidationClaimArb: fc.Arbitrary<Claim> = fc.record({
+  predicate: fc.constant("freshness" as const),
+  relation: fc.constantFrom("is" as const, "at-most" as const),
+  value: fc.record({
+    cached: freshnessArb,
+    invalidatedOn: fc.subarray(["grant.revoked", "role.changed", "user.deleted"], {
+      minLength: 1,
+    }),
+  }),
+});
+
+/**
+ * A stored proposition in every form the MFP wire tells: each predicate (and,
+ * for an effect, the invalidation form), a strength or none, a gloss, anchors
+ * with a symbol, citations, a bound with no unit, authority writers in any
+ * order, and now and then a unit on a predicate that is not a bound.
+ */
+export const wirePropositionArb = (role: "premise" | "effect"): fc.Arbitrary<Proposition> =>
+  fc
+    .tuple(
+      subjectArb,
+      fc.constantFrom<Predicate | "invalidation">(
+        ...allPredicates,
+        ...(role === "effect" ? (["invalidation"] as const) : []),
+      ),
+    )
+    .chain(([subject, predicate]) =>
+      fc.record({
+        subject: fc.constant(subject),
+        claim: predicate === "invalidation" ? invalidationClaimArb : claimArb(predicate, subject),
+        scope: scopeArb,
+        strength: fc.option(strengthArb),
+        gloss: fc.option(fc.constantFrom("what the code relies on", "")),
+        anchors: fc.option(fc.array(symbolAnchorArb, { maxLength: 2 })),
+        cites: fc.option(fc.array(citationArb, { minLength: 1, maxLength: 2 })),
+        unitless: fc.boolean(),
+        stray: fc.option(fc.constant("ms"), { freq: 4 }),
+        writers: fc.shuffledSubarray(["alice", "bob", "carol"]),
+      }),
+    )
+    .map(({ subject, claim, scope, strength, gloss, anchors, cites, unitless, stray, writers }) => {
+      const { unit, ...written } = writeProposition(subject, claim, {
+        scope,
+        ...(strength === null ? {} : { strength }),
+        ...(gloss === null ? {} : { gloss }),
+        ...(anchors === null ? {} : { anchors }),
+      });
+      return {
+        ...written,
+        ...(unit === undefined || unitless ? {} : { unit }),
+        ...(claim.predicate === "bound" || stray === null ? {} : { unit: stray }),
+        ...(claim.predicate === "authority" ? { value: writers.join(",") } : {}),
+        ...(cites === null ? {} : { cites }),
+      };
     });

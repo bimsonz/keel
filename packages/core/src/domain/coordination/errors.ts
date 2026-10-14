@@ -123,6 +123,36 @@ export class UnreadableProposition extends Schema.TaggedError<UnreadableProposit
   },
 ) {}
 
+/**
+ * Why a proposition or a citation cannot cross the MFP 0.2 wire, either way:
+ * one side has no form for it, or it does not read, and neither side may
+ * repair what does not read.
+ */
+export const UntellableReason = Schema.Literals([
+  /** It does not read on its predicate's lattice (`readClaim`), or a premise relies on an invalidation. */
+  "unreadable",
+  /** An authority writer 0.2 cannot hold: one with whitespace in it. */
+  "writer",
+  /** A shape field with an empty, repeated or reserved name, or an opaque shape with an empty one. */
+  "shape-name",
+  /** A bound's unit 0.2 cannot hold: one with whitespace in it. */
+  "unit",
+  /** A tool result cited: Keel has no citation of one. */
+  "tool-result",
+  /** An anchor with no commit, where no working commit was given to stand for it. */
+  "anchor-commit",
+  /** A message ref that is not `<session>/<seq>`. */
+  "message-ref",
+]);
+export type UntellableReason = typeof UntellableReason.Type;
+
+/** A proposition or a citation that cannot be told across the MFP 0.2 wire, and why. */
+export class Untellable extends Schema.TaggedError<Untellable>()("Untellable", {
+  what: Schema.Literals(["proposition", "citation"]),
+  reason: UntellableReason,
+  detail: Schema.String,
+}) {}
+
 /** A probe's cost must be a positive, finite number: blast is divided by it. */
 export class InvalidProbeCost extends Schema.TaggedError<InvalidProbeCost>()("InvalidProbeCost", {
   /** The refused cost when it was a finite number; absent for NaN or ±Infinity, which JSON cannot carry. */

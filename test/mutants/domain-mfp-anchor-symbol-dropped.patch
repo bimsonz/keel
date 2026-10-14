@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.from-mfp, mfp-wire.premise-round-trip
+# why: an anchor coming into Keel loses its symbol
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..eb30ba32 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -194,7 +194,6 @@ const anchorOfMfp = (a: MfpAnchor, ctx: WireContext): Result.Result<Anchor, Unte
+     ? untellable("citation", "anchor-commit", `anchor ${a.path} names no commit`)
+     : Result.succeed({
+         path: a.path,
+-        ...(a.symbol === undefined ? {} : { symbol: a.symbol }),
+         commit,
+       });
+ };

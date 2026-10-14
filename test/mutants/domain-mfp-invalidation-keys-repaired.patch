@@ -1,0 +1,22 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.untellable
+# why: an invalidation whose events are out of order or repeated is sorted and deduped on the way in, a repair 0.2 forbids
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..84d1cf7e 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -414,7 +414,13 @@ const hold = (
+       break;
+     }
+     default:
+-      value = m.value;
++      value =
++        typeof m.value === "string"
++          ? m.value.replace(
++              /invalidated-on (\S+)$/,
++              (_, keys: string) => `invalidated-on ${[...new Set(keys.split(","))].toSorted().join(",")}`,
++            )
++          : m.value;
+   }
+   const anchors: Anchor[] = [];
+   for (const a of m.anchors ?? []) {

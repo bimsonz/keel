@@ -537,6 +537,9 @@ importers:
         specifier: 'catalog:'
         version: 4.0.2
     devDependencies:
+      '@bimsonz/mfp':
+        specifier: 0.2.1
+        version: 0.2.1(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
@@ -1056,6 +1059,13 @@ packages:
 
   '@bimsonz/mfp@0.1.0-pre.3':
     resolution: {integrity: sha512-FI19JQoG/nv0rVw6C86KQtbM+Rq5mnwH737NdhhOzY61fyZX8KkIDf4RLyRUDmZFuqRHxY7cSW9uxQIUpC/P1A==}
+    peerDependencies:
+      '@typespec/compiler': ^1.17.0
+      '@typespec/json-schema': ^1.17.0
+
+  '@bimsonz/mfp@0.2.1':
+    resolution: {integrity: sha512-q85f1QqC8U8SGUW9AWY5wo+xV9pkUseK/ZoLhK8fugSjwlxZ82GrgvjjbXap5U/UzB3DFW24h0FrfnbMHQbDhA==}
+    hasBin: true
     peerDependencies:
       '@typespec/compiler': ^1.17.0
       '@typespec/json-schema': ^1.17.0
@@ -5654,6 +5664,13 @@ snapshots:
     dependencies:
       '@typespec/compiler': 1.17.0(@types/node@22.20.5)
       '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5))
+
+  '@bimsonz/mfp@0.2.1(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))':
+    dependencies:
+      '@typespec/compiler': 1.17.0(@types/node@22.20.5)
+      '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5))
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
 
   '@cfworker/json-schema@4.1.1': {}
 

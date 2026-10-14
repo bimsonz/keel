@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.retracted-by
+# why: retraction compares strength as written, so must said outright does not find a premise stored with none
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..819bcd5c 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -466,7 +466,7 @@ const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
+ 
+ /** A premise's 0.2 form as compared for retraction: an absent strength is `must`. */
+ const imageKey = (m: MfpPremiseProposition): string =>
+-  canonicalJson(asJson({ ...m, strength: m.strength ?? "must" }));
++  canonicalJson(asJson(m));
+ 
+ /**
+  * The stored premise a 0.2 premise retracts: the one whose 0.2 form is the

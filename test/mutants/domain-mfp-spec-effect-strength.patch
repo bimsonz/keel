@@ -1,0 +1,25 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp.spec-agrees
+# why: Keel's presence effect takes a strength and an effect's strength is told, which 0.2's effects have no field for
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..c0f36342 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -155,7 +155,7 @@ export const MfpEffectProposition = Schema.Union([
+   Schema.Struct({ ...consistency, ...propositionFields }),
+   Schema.Struct({ ...cardinality, ...propositionFields }),
+   Schema.Struct({ ...bound, ...propositionFields }),
+-  Schema.Struct({ ...presence, ...propositionFields }),
++  Schema.Struct({ ...presence, ...premiseFields }),
+   Schema.Struct({ ...purity, ...propositionFields }),
+   Schema.Struct({ ...idempotent, ...propositionFields }),
+   Schema.Struct({ ...authority, ...propositionFields }),
+@@ -358,7 +358,7 @@ const tell = (
+     relation: p.relation,
+     value,
+     ...(unit === undefined ? {} : { unit }),
+-    ...(role === "premise" && p.strength !== undefined ? { strength: p.strength } : {}),
++    ...(p.strength !== undefined ? { strength: p.strength } : {}),
+     ...(scope === undefined ? {} : { scope }),
+     ...(p.gloss === undefined ? {} : { gloss: p.gloss }),
+     ...(p.anchors === undefined ? {} : { anchors: p.anchors.map(anchorToMfp) }),

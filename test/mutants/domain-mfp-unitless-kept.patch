@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.premise-round-trip, mfp-wire.effect-round-trip
+# why: a bound's unit 1 is stored as 1, so a bound stored with no unit comes back with one
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..d7728cd8 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -402,7 +402,7 @@ const hold = (
+   switch (m.predicate) {
+     case "bound":
+       value = m.value;
+-      unit = m.unit === UNITLESS ? undefined : m.unit;
++      unit = m.unit;
+       break;
+     case "authority":
+       value = m.value.join(",");

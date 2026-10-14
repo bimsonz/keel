@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.untellable
+# why: a cited tool result is held as a record citation, a kind Keel never issued it as
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..8334d212 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -238,7 +238,7 @@ export const citationOfMfp = (
+     case "record":
+       return Result.succeed({ _tag: "record", id: c.ref });
+     case "tool-result":
+-      return untellable("citation", "tool-result", `tool result ${c.ref} has no Keel citation`);
++      return Result.succeed({ _tag: "record", id: c.ref });
+     default: {
+       const unreachable: never = c;
+       return unreachable;

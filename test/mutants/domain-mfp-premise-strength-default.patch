@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/mfp-wire.test.ts
+# kills: mfp-wire.premise-round-trip
+# why: a premise stored with no strength is told as must, so it comes back with a strength it never had
+diff --git a/packages/core/src/domain/coordination/mfp-wire.ts b/packages/core/src/domain/coordination/mfp-wire.ts
+index 27450745..7371c5a9 100644
+--- a/packages/core/src/domain/coordination/mfp-wire.ts
++++ b/packages/core/src/domain/coordination/mfp-wire.ts
+@@ -358,7 +358,7 @@ const tell = (
+     relation: p.relation,
+     value,
+     ...(unit === undefined ? {} : { unit }),
+-    ...(role === "premise" && p.strength !== undefined ? { strength: p.strength } : {}),
++    ...(role === "premise" ? { strength: p.strength ?? "must" } : {}),
+     ...(scope === undefined ? {} : { scope }),
+     ...(p.gloss === undefined ? {} : { gloss: p.gloss }),
+     ...(p.anchors === undefined ? {} : { anchors: p.anchors.map(anchorToMfp) }),
