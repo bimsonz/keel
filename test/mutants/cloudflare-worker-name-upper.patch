@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.bounds
+# why: a Worker name starting upper-case is taken, which is no workers.dev label
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..6bd5179b 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -7,7 +7,7 @@ export const DEPLOY_SPEC_PATH = ".keel/deploy.json";
+ 
+ /** A Worker's name on its account: what Cloudflare takes as a script name and a workers.dev label. */
+ export const WorkerName = Schema.String.check(
+-  Schema.isPattern(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/),
++  Schema.isPattern(/^[A-Za-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/),
+ ).pipe(Schema.brand("WorkerName"));
+ export type WorkerName = typeof WorkerName.Type;
+ 

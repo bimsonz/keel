@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.field-shapes
+# why: flags whose first item is a string are taken whatever follows, so a number reaches the upload
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..cd676983 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -165,7 +165,7 @@ export const jsoncToJson = (source: string): string => {
+ };
+ 
+ const isStringArray = (value: unknown): value is readonly string[] =>
+-  Array.isArray(value) && value.every((item) => typeof item === "string");
++  Array.isArray(value) && (value.length === 0 || typeof value[0] === "string");
+ 
+ /**
+  * The facts Keel uploads a Worker with, from its wrangler config's text. A

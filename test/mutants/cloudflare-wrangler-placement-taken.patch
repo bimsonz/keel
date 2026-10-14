@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.carries-only-known
+# why: a config's placement is taken and dropped from the upload, so production loses Smart Placement once the preview is promoted
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index 40cb3b01..deaa9938 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -89,6 +89,7 @@ export const TAKEN_KEYS: readonly string[] = [
+   "dev",
+   "env",
+   "logpush",
++  "placement",
+   "observability",
+   "preview_urls",
+   "route",

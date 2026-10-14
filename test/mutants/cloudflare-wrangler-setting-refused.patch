@@ -2,14 +2,14 @@
 # kills: wrangler.takes-settings
 # why: a config that turns on observability is refused, though a version carries no such setting
 diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
-index 89609eeb..ca15d297 100644
+index 40cb3b01..ec38e913 100644
 --- a/packages/core/src/domain/delivery/deploy-spec.ts
 +++ b/packages/core/src/domain/delivery/deploy-spec.ts
-@@ -90,7 +90,6 @@ export const TAKEN_KEYS: readonly string[] = [
-   "limits",
+@@ -89,7 +89,6 @@ export const TAKEN_KEYS: readonly string[] = [
+   "dev",
+   "env",
    "logpush",
-   "minify",
 -  "observability",
-   "placement",
    "preview_urls",
    "route",
+   "routes",

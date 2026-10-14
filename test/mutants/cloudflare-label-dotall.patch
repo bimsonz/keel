@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/credential.test.ts
+# kills: credential.label
+# why: a label with a newline inside is taken by the domain, which the published pattern refuses
+diff --git a/packages/core/src/domain/delivery/credential.ts b/packages/core/src/domain/delivery/credential.ts
+index f16dcf49..059033b1 100644
+--- a/packages/core/src/domain/delivery/credential.ts
++++ b/packages/core/src/domain/delivery/credential.ts
+@@ -6,7 +6,7 @@ import { DeployProvider } from "./deployment.ts";
+ export const CredentialLabel = Schema.String.check(
+   Schema.isMinLength(1),
+   Schema.isMaxLength(64),
+-  Schema.isPattern(/^\S(?:.*\S)?$/),
++  Schema.isPattern(/^\S(?:.*\S)?$/s),
+ );
+ export type CredentialLabel = typeof CredentialLabel.Type;
+ 
