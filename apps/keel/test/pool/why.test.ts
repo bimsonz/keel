@@ -87,7 +87,10 @@ async function enrolled(projectId: string) {
   return { maintainer, agentId: answer.agent.id, token };
 }
 
-type Link = { readonly summary: string; readonly record: { readonly kind: string; id: string } };
+type Link = {
+  readonly summary: string;
+  readonly record: { readonly id: string; readonly message: { readonly kind: string } };
+};
 type WhyBody = {
   readonly summary: string;
   readonly result: { readonly chain: readonly Link[] };
@@ -138,7 +141,7 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
     const asked = await get(`/v1/why?subject=${SUBJECT}`, own);
     expect(asked.status).toBe(200);
     const body = await asked.json<WhyBody>();
-    expect(body.result.chain.map((link) => [link.record.kind, link.record.id])).toEqual([
+    expect(body.result.chain.map((link) => [link.record.message.kind, link.record.id])).toEqual([
       ["decision", ruled.decisionId],
       ["premise", `${ruled.conflictId}.premise`],
       ["intent", `${ruled.other}.intent.1`],
