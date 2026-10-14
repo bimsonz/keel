@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 // Projects:
 //   unit   Node: domain, application, tooling and other pure code
 //   arch   Node: architecture rules and guards (packages/tooling)
-//   pool:* workerd, one project per Worker (each app's vitest.config.ts)
+//   pool:* workerd, one project per Worker (each app's, and each example's, vitest.config.ts)
 export default defineConfig({
   test: {
     projects: [
@@ -17,7 +17,12 @@ export default defineConfig({
             "examples/*/test/**/*.test.ts",
             "apps/*/test/unit/**/*.test.ts",
           ],
-          exclude: ["packages/tooling/test/arch/**", "**/node_modules/**"],
+          // An example's pool tests run in workerd, in its own project.
+          exclude: [
+            "packages/tooling/test/arch/**",
+            "examples/*/test/pool/**",
+            "**/node_modules/**",
+          ],
         },
       },
       {
@@ -32,6 +37,7 @@ export default defineConfig({
         },
       },
       "apps/*/vitest.config.ts",
+      "examples/*/vitest.config.ts",
     ],
   },
 });

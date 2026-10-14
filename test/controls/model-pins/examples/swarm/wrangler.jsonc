@@ -1,0 +1,6 @@
+// Control for the model-pins guard's examples: a model named by alias, not an exact id.
+{
+  "name": "keel-swarm",
+  "ai": { "binding": "AI" },
+  "vars": { "SWARM_MODEL": "cloudflare/auto" },
+}

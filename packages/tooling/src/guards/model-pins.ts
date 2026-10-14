@@ -33,18 +33,48 @@ export function pinProblems(config: unknown): string[] {
     .map(([fn, model]) => `pins ${fn} to ${JSON.stringify(model)}, not an exact @cf/ model id`);
 }
 
-/** Every app's wrangler.jsonc, checked with `pinProblems`. */
+/**
+ * What is wrong with an example's model pins: an example that binds AI is not
+ * Keel and runs no PlatformFunction, so it names each model it runs in a
+ * `vars.*_MODEL`, at least one, every one an exact `@cf/` id.
+ */
+export function examplePinProblems(config: unknown): string[] {
+  if (config === null || typeof config !== "object") return ["does not parse as JSONC"];
+  if (Reflect.get(config, "ai") === undefined) return [];
+  const vars: unknown = Reflect.get(config, "vars");
+  const pins =
+    typeof vars === "object" && vars !== null
+      ? Object.entries(vars).filter(([key]) => key.endsWith("_MODEL"))
+      : [];
+  if (pins.length === 0) return ["binds AI but names no model in a vars.*_MODEL"];
+  return pins
+    .filter(([, model]) => typeof model !== "string" || !EXACT_MODEL.test(model))
+    .map(
+      ([key, model]) => `pins vars.${key} to ${JSON.stringify(model)}, not an exact @cf/ model id`,
+    );
+}
+
+/** Every app's wrangler.jsonc, checked with `pinProblems`, and every example's, with `examplePinProblems`. */
 export function checkModelPins(root: string, options: GuardOptions = {}): GuardResult {
   const apps = existsSync(join(root, "apps"))
     ? readdirSync(join(root, "apps")).filter((a) =>
         existsSync(join(root, "apps", a, "wrangler.jsonc")),
       )
     : [];
-  const scanned = apps.map((app) => `apps/${app}/wrangler.jsonc`);
+  const examples = existsSync(join(root, "examples"))
+    ? readdirSync(join(root, "examples")).filter((e) =>
+        existsSync(join(root, "examples", e, "wrangler.jsonc")),
+      )
+    : [];
+  const scanned = [
+    ...apps.map((app) => `apps/${app}/wrangler.jsonc`),
+    ...examples.map((example) => `examples/${example}/wrangler.jsonc`),
+  ];
   const violations: Violation[] = scanned.flatMap((file) => {
     const errors: ParseError[] = [];
     const config: unknown = parse(read(root, file), errors, { allowTrailingComma: true });
-    const problems = errors.length > 0 ? ["does not parse as JSONC"] : pinProblems(config);
+    const check = file.startsWith("examples/") ? examplePinProblems : pinProblems;
+    const problems = errors.length > 0 ? ["does not parse as JSONC"] : check(config);
     return problems.map((message) => ({ rule: MODEL_PINS, file, message }));
   });
   return withVacuityCheck(

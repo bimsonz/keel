@@ -1,0 +1,6 @@
+// Control for the model-pins guard's examples: an example that binds AI and names no model.
+{
+  "name": "bare",
+  "ai": { "binding": "AI" },
+  "vars": {},
+}

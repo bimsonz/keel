@@ -28,6 +28,8 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /binds AI but declares no vars\.PLATFORM_FUNCTION_PINS/,
     /pins keel\.probe\.freshness to "cloudflare\/auto", not an exact @cf\/ model id/,
     /pins keel\.probe\.free-form to 7, not an exact @cf\/ model id/,
+    /binds AI but names no model in a vars\.\*_MODEL/,
+    /pins vars\.SWARM_MODEL to "cloudflare\/auto", not an exact @cf\/ model id/,
   ],
   "runner-credentials": [
     /cloudflareCredentials hands a credential/,
@@ -71,7 +73,10 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   R4: [/reaches into context coordination past its index\.ts/, /\[archunit\] cycle/],
   R5: [/imports cloudflare:workers/, /imports zod/],
   R6: [/zod belongs to generated code only/],
-  R7: [/imports cloudflare:workers outside/],
+  R7: [
+    /imports cloudflare:workers outside a DO/,
+    /imports cloudflare:workers outside an example's doorways/,
+  ],
   R8: [/runs an effect \(runPromise\)/, /detaches a fiber \(forkDetach\)/],
   R9: [/depends on @keeltown\/core/, /imports @keeltown\/testing/],
   R10: [/imports agents/, /imports @modelcontextprotocol\/client/],
@@ -85,6 +90,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /MergeBox\) has no max_instances/,
     /GatedBox\) uses the durable_object policy but is not registered/,
     /workers_dev must be set/,
+    /preview_urls must be set/,
     /compatibility dates differ/,
     /adds binding EXTRA_SECRET/,
   ],

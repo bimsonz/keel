@@ -134,16 +134,19 @@ function testBindingNames(file: string, code: string): string[] {
  * adds no binding production lacks (helpers prefixed `TEST_` aside).
  */
 export function checkR13(root: string, options: GuardOptions = {}): GuardResult {
-  const apps = existsSync(join(root, "apps"))
-    ? readdirSync(join(root, "apps")).filter((a) =>
-        existsSync(join(root, "apps", a, "wrangler.jsonc")),
-      )
-    : [];
+  // The apps, and the examples that deploy as Workers of their own.
+  const workers = ["apps", "examples"].flatMap((group) =>
+    existsSync(join(root, group))
+      ? readdirSync(join(root, group))
+          .filter((name) => existsSync(join(root, group, name, "wrangler.jsonc")))
+          .map((name) => `${group}/${name}`)
+      : [],
+  );
   const violations: Violation[] = [];
   const scanned: string[] = [];
   const dates = new Map<string, string[]>();
-  for (const app of apps) {
-    const file = `apps/${app}/wrangler.jsonc`;
+  for (const dir of workers) {
+    const file = `${dir}/wrangler.jsonc`;
     scanned.push(file);
     const errors: ParseError[] = [];
     const config: unknown = parse(read(root, file), errors, { allowTrailingComma: true });
@@ -220,7 +223,7 @@ export function checkR13(root: string, options: GuardOptions = {}): GuardResult 
         }
       });
     }
-    const vitestFile = `apps/${app}/vitest.config.ts`;
+    const vitestFile = `${dir}/vitest.config.ts`;
     if (existsSync(join(root, vitestFile))) {
       scanned.push(vitestFile);
       const production = bindingNames(config);
@@ -238,7 +241,7 @@ export function checkR13(root: string, options: GuardOptions = {}): GuardResult 
   if (dates.size > 1) {
     violations.push({
       rule: "R13",
-      file: "apps/*/wrangler.jsonc",
+      file: "*/*/wrangler.jsonc",
       message: `compatibility dates differ: ${[...dates.keys()].join(", ")}`,
     });
   }

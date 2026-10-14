@@ -77,17 +77,28 @@ export function checkR6(root: string, options: GuardOptions = {}): GuardResult {
 }
 
 const RUNTIME_DOORWAYS = /^apps\/[^/]+\/src\/(adapters\/driving\/(do|workflow)|composition)\//;
+/**
+ * An example built on Flue keeps Flue's layout: its agents (`src/agents/`)
+ * and its route map (`src/app.ts`) read the Worker's bindings too.
+ */
+const EXAMPLE_DOORWAYS =
+  /^examples\/[^/]+\/src\/((adapters\/driving\/(do|workflow)|composition|agents)\/|app\.ts$)/;
 
-/** R7: `cloudflare:workers` is imported only by the DO and Workflow doorways and the composition roots. */
+/**
+ * R7: `cloudflare:workers` is imported only by the DO and Workflow doorways and
+ * the composition roots, and in an example also by its agents and `app.ts`.
+ */
 export function checkR7(root: string, options: GuardOptions = {}): GuardResult {
   const files = scanFiles(
     root,
     sourcesUnder(root, workspaceSources(root)).filter((p) => !isTest(p)),
   );
   const violations = check("R7", files, (specifier, file) =>
-    specifier === "cloudflare:workers" && !RUNTIME_DOORWAYS.test(file)
-      ? "imports cloudflare:workers outside a DO or Workflow doorway or a composition root"
-      : null,
+    specifier !== "cloudflare:workers" || RUNTIME_DOORWAYS.test(file) || EXAMPLE_DOORWAYS.test(file)
+      ? null
+      : file.startsWith("examples/")
+        ? "imports cloudflare:workers outside an example's doorways, composition root, agents or app.ts"
+        : "imports cloudflare:workers outside a DO or Workflow doorway or a composition root",
   );
   return withVacuityCheck(
     "R7",
