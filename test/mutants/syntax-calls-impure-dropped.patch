@@ -2,10 +2,10 @@
 # kills: syntax.calls-to-impure
 # why: a call that leads only to an impure step is left out of the facts, so a function that logs through a helper stays pure
 diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
-index 137d66ad..c02451c6 100644
+index cc7049de..72c0278b 100644
 --- a/packages/syntax/src/resolve.ts
 +++ b/packages/syntax/src/resolve.ts
-@@ -497,7 +497,7 @@ export function factsOf(
+@@ -494,7 +494,7 @@ export function factsOf(
    const calledBy = new Map<string, string[]>();
    for (const call of edges.values())
      calledBy.set(refKey(call.to), [...(calledBy.get(refKey(call.to)) ?? []), refKey(call.from)]);

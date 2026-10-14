@@ -2,10 +2,10 @@
 # kills: syntax.impure-builtins
 # why: new Date(ms) is reported as reading the clock, so a pure date built from its argument makes a function impure
 diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
-index 137d66ad..ef5ce1f1 100644
+index cc7049de..190e2510 100644
 --- a/packages/syntax/src/resolve.ts
 +++ b/packages/syntax/src/resolve.ts
-@@ -150,7 +150,7 @@ const impurityOf = (
+@@ -147,7 +147,7 @@ const impurityOf = (
    const path = named.startsWith(GLOBAL) ? named.slice(GLOBAL.length) : named;
    if (constructs) {
      const made = IMPURE_NEW.get(path);

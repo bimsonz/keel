@@ -121,10 +121,6 @@ const shadowed = (name: string, scope: Scope): boolean =>
   scope.file.variables.has(name) ||
   scope.file.declared.has(name);
 
-/** The name is the global of that name: nothing the file declares, imports or binds, nor the symbol, is called it. */
-const isGlobal = (name: string, scope: Scope): boolean =>
-  !shadowed(name, scope) && !scope.file.functions.has(name) && !scope.file.classes.has(name);
-
 /** An expression's path of names (`console.info`), when it is one. */
 const namesOf = (expr: Expr): string | undefined => {
   if (expr.k === "name") return expr.name;
@@ -146,7 +142,8 @@ const impurityOf = (
   const named = namesOf(constructs ? callee.ctor : callee);
   if (named === undefined) return undefined;
   const [first = named] = named.split(".");
-  if (!isGlobal(first, scope)) return undefined;
+  // A name the file or the symbol declares, imports or binds is not the global's.
+  if (shadowed(first, scope)) return undefined;
   const path = named.startsWith(GLOBAL) ? named.slice(GLOBAL.length) : named;
   if (constructs) {
     const made = IMPURE_NEW.get(path);

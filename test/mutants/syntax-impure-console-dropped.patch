@@ -2,7 +2,7 @@
 # kills: syntax.impure-builtins, derive.purity-real
 # why: console's methods are not impure, so a log added to a function a premise holds pure derives nothing
 diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
-index 137d66ad..0c55538c 100644
+index cc7049de..b6469496 100644
 --- a/packages/syntax/src/resolve.ts
 +++ b/packages/syntax/src/resolve.ts
 @@ -72,7 +72,7 @@ const IMPURE_CALLS: ReadonlyMap<string, ImpurityKind> = new Map([
