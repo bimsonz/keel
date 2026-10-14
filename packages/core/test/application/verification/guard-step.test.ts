@@ -155,6 +155,22 @@ describe("a guard step runs the probe its plan pins", () => {
     });
   });
 
+  it("[guard.evidence-as-written] stores a reason and an observation holding `<`, `>` and `&` as the probe wrote them", async () => {
+    const said = "subject DELETE /repos/owner/repo?a=1&b=2 -> 204 (expected <403>)";
+    const g = guarded(() => ({
+      _tag: "ran",
+      outcome: "fail",
+      reason: said,
+      observations: [`[probe] ${said}`],
+    }));
+    const report = await g.run(GUARD);
+    const ref = Schema.decodeUnknownSync(ContentHash)(report.resultRef);
+    expect(g.stored.get(`org_01JZ8PT2C4E6G8J0M2N4Q6S8V0 ${ref}`)).toMatchObject({
+      reason: said,
+      observations: [`[probe] ${said}`],
+    });
+  });
+
   it("[guard.pinned-probe] hands every step that guards nothing to the plan's other runner", async () => {
     const g = guarded(() => ran("pass"));
     await g.run(SUITE);

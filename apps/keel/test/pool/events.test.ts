@@ -137,6 +137,47 @@ describe("GET /v1/events", () => {
     expect(after.body).toEqual({ items: [], nextCursor: page.body.nextCursor });
   });
 
+  it("[feed.reason-as-written] serves a verdict's evidence and its bounce's reasons as written: `<`, `>` and `&` are never escaped", async () => {
+    const { projectA, member } = await tenancy();
+    const from = await head(member);
+    const changeId = makeId("chg", ulid());
+    const verdictId = makeId("vrd", ulid());
+    const line = `guard failed: guard:${makeId("grd", ulid())} (freshness): subject DELETE /repos/owner/repo?a=1&b=2 -> 204 (expected <403>)`;
+    const envelope = (type: string, entity: { kind: string; id: string }, payload: object) =>
+      Schema.encodeSync(EventEnvelope)(
+        Schema.decodeUnknownSync(EventEnvelope)({
+          eventId: makeId("evt", ulid()),
+          type,
+          entity,
+          seq: 1,
+          at: Date.UTC(2026, 9, 14, 3),
+          dedupeKey: `${entity.kind}:${entity.id}/events-test/${type}#1`,
+          project: projectA,
+          affected: [],
+          notified: [],
+          payload: { _tag: type, ...payload },
+        }),
+      );
+    await projector().receive([
+      envelope(
+        "VerdictIssued",
+        { kind: "verdict", id: verdictId },
+        { verdictId, subject: changeId, outcome: "bounce", evidence: [line] },
+      ),
+      envelope(
+        "ChangeBounced",
+        { kind: "change", id: changeId },
+        { changeId, verdictId, reasons: [line] },
+      ),
+    ]);
+    const page = await events(member, `?cursor=${from}`);
+    expect(page.status).toBe(200);
+    expect(page.body.items.map((e) => e.payload)).toEqual([
+      expect.objectContaining({ _tag: "VerdictIssued", evidence: [line] }),
+      expect.objectContaining({ _tag: "ChangeBounced", reasons: [line] }),
+    ]);
+  });
+
   it("[a11.events-wait] answers a waiting read as soon as an event arrives", async () => {
     const { projectA, member } = await tenancy();
     const from = await head(member);

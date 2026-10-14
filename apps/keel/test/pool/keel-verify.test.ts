@@ -205,6 +205,47 @@ describe("KeelVerify", () => {
     ]);
   });
 
+  it("[guard.reason-as-written] a guard's reason holding `<`, `>` and `&` comes back as its probe wrote it, in the verdict's line and its next action", async () => {
+    const plan = await stored(guardedPlan("block"));
+    const guard = plan.steps.find((s) => s.guards !== undefined);
+    if (guard === undefined) throw new Error("the change is exposed to the guard");
+    const reason = "subject DELETE /repos/owner/repo?a=1&b=2 -> 204 (expected <403>)";
+    const resultRef = await Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* (yield* EvidenceStore).put(POOL_ORG, {
+          stepId: guard.id,
+          outcome: "fail",
+          guard: { predicate: "freshness", probe: TEST_GUARD.probe },
+          reason,
+          observations: [`[probe] ${reason}`],
+        });
+      }).pipe(Effect.provide(EvidenceStoreR2(env.ARCHIVE))),
+    );
+    const failed = Schema.encodeSync(StoredStepReport)({
+      stepId: guard.id,
+      outcome: "fail",
+      evidenceClass: "proof",
+      tier: { tier: 1, reason: `guards freshness with its admitted probe ${TEST_GUARD.probe}` },
+      durationMs: 12,
+      resultRef,
+    });
+    const verdict = await runWith(
+      "keel-verify-as-written",
+      {
+        [SUITE_STEP]: runnerOutput(await suiteStdout(3, 0)),
+        "worker-app.typecheck": runnerOutput(await typecheckStdout(0, "")),
+        [`guard ${guard.id}`]: JSON.stringify(failed),
+      },
+      keelVerifyParams(job({ planHash: plan.planHash })),
+    );
+    const cited = `${guard.id} (freshness): ${reason}`;
+    expect(verdict.outcome).toBe("bounce");
+    expect(verdict.evidence).toContain(`guard failed: ${cited}`);
+    expect(verdict.nextActions).toEqual([
+      expect.objectContaining({ operationId: "submit", args: { failingGuards: [cited] } }),
+    ]);
+  });
+
   it("[s2.bounce-cites] a guard that holds a decision bounces under advise, its fail citing the decision and pointing to it", async () => {
     const plan = await stored(guardedPlan("advise", TEST_DECISION));
     const guard = plan.steps.find((s) => s.guards !== undefined);
