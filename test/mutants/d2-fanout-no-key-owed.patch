@@ -2,12 +2,12 @@
 # kills: d22.pool.no-subject-key
 # why: A ConflictSuspected with no subject key stays owed forever, so one older event sticks the Subject DO's outbox
 diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
-index d037cc9..09a86e9 100644
+index eedd2877..c43369b8 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
-@@ -171,9 +171,7 @@ function startProbes(workflow: Workflow, subscriber: Subscriber, events: readonl
+@@ -208,9 +208,7 @@ function startKeyed(
      (event) => {
-       const start = probeStart(event);
+       const start = startOf(event);
        if ("skipped" in start)
 -        return Effect.sync(() =>
 -          console.error(JSON.stringify({ ops: "fan-out", subscriber, problem: start.skipped })),

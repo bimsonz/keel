@@ -2,15 +2,15 @@
 # kills: deps.pool.steps
 # why: KeelVerify ensures no deps: neither deps step runs and every Tier 2 step abstains
 diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-index bdd7cbff..035dab48 100644
+index 118b2499..4c79313b 100644
 --- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
 +++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-@@ -99,7 +99,7 @@ export class KeelVerify extends CIWorkflow<Env> {
+@@ -118,7 +118,7 @@ export class KeelVerify extends CIWorkflow<Env> {
                  { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
                  durableReport(step),
                  await runtime.runPromise(
 -                  ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
 +                  Effect.succeed({ _tag: "DepsUnneeded" as const }),
                  ),
+                 deploy,
                ),
-             ),

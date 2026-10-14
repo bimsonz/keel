@@ -2,15 +2,15 @@
 # kills: b13.delivered
 # why: the Trunk subscribes its lane to the advance but not the batch's members, so no change hears the advance that lands it
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 91d655e..f6d611d 100644
+index 3f7b0f67..d22ef9eb 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -210,8 +210,6 @@ export const trunkHeard = (
+@@ -513,8 +513,6 @@ export const trunkHeard = (
      before,
    );
    if (after !== undefined) tx.store.put(TRUNK, projectId, encodeTrunk(after));
 -  for (const member of members)
 -    tx.outbox.subscribe(`change:${member}`, ["TrunkAdvanced"], changeRef(member));
    tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined"]);
+   tx.outbox.subscribe(DELIVER, ["TrunkAdvanced"]);
    return true;
- };

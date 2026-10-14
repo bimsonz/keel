@@ -2,10 +2,10 @@
 # kills: flow-source.reads-two-listings
 # why: Flow walks the base's whole tree again for the root's names and two files, so its cost grows with the repo
 diff --git a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
-index f3aee703..d861242c 100644
+index 37c53976..d1d56b99 100644
 --- a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
-@@ -28,10 +28,9 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+@@ -29,10 +29,9 @@ export const FlowSpecSourceCodeHost = Layer.effect(
      return FlowSpecSource.of({
        read: (repo, base) =>
          Effect.gen(function* () {
@@ -18,4 +18,4 @@ index f3aee703..d861242c 100644
 +          const keel = entries.filter((e) => e.path.startsWith(`${KEEL_DIR}/`));
            const flowJson = yield* textAt(repo, keel, FLOW_SPEC_PATH);
            const packageJson = yield* textAt(repo, root, "package.json");
-           return {
+           const deployJson = yield* textAt(repo, keel, DEPLOY_SPEC_PATH);
