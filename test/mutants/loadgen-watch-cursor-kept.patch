@@ -2,14 +2,14 @@
 # kills: loadgen.watch-follow
 # why: The reader never moves its cursor: it reads the first page for ever
 diff --git a/examples/loadgen/src/watch.ts b/examples/loadgen/src/watch.ts
-index 30fb1227..2b1888c7 100644
+index 458d91af..c0702311 100644
 --- a/examples/loadgen/src/watch.ts
 +++ b/examples/loadgen/src/watch.ts
-@@ -79,7 +79,6 @@ export class Watch {
-         ...(this.#cursor === undefined ? {} : { cursor: this.#cursor }),
-       });
-       this.take(page.items);
--      if (page.nextCursor !== undefined) this.#cursor = page.nextCursor;
-     }
-   }
- 
+@@ -90,7 +90,6 @@ export class Watch {
+         });
+         failures = 0;
+         this.take(page.items);
+-        if (page.nextCursor !== undefined) this.#cursor = page.nextCursor;
+       } catch (error) {
+         failures += 1;
+         if (failures > MAX_FAILURES) throw error;

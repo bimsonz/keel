@@ -64,4 +64,29 @@ describe("the run's one reader", () => {
     await watch.follow(() => watch.events.length === 2);
     expect([await parked, asked, watch.cursor]).toEqual(["parked", ["c0", "c1", "c1"], "c2"]);
   });
+
+  it("[loadgen.watch-survives] asks again after a read fails, as through a deploy, and takes up where it was", async () => {
+    let calls = 0;
+    const reader = {
+      events: async (options: { readonly cursor?: string }) => {
+        calls += 1;
+        if (calls <= 2) throw new Error("503 during a deploy");
+        return calls === 3
+          ? { items: events(["prj_A", "ChangeLanded", "chg_4"]), nextCursor: "c9" }
+          : { items: [], nextCursor: options.cursor ?? "c9" };
+      },
+    };
+    const watch = new Watch(reader, "prj_A", "c0");
+    const pauses: number[] = [];
+    await watch.follow(
+      () => watch.events.length === 1,
+      async (ms) => void pauses.push(ms),
+    );
+    expect([await watch.settled("chg_4", 1), calls, pauses, watch.cursor]).toEqual([
+      "landed",
+      3,
+      [1_000, 2_000],
+      "c9",
+    ]);
+  });
 });

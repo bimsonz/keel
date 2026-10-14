@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/watch.test.ts
+# kills: loadgen.watch-survives
+# why: The reader ends at its first failed read: a deploy during a run stops every agent's waiting
+diff --git a/examples/loadgen/src/watch.ts b/examples/loadgen/src/watch.ts
+index 458d91af..1d6752d5 100644
+--- a/examples/loadgen/src/watch.ts
++++ b/examples/loadgen/src/watch.ts
+@@ -93,7 +93,7 @@ export class Watch {
+         if (page.nextCursor !== undefined) this.#cursor = page.nextCursor;
+       } catch (error) {
+         failures += 1;
+-        if (failures > MAX_FAILURES) throw error;
++        throw error;
+         // oxlint-disable-next-line no-await-in-loop -- the pause is the point
+         await pause(Math.min(15_000, 1_000 * failures));
+       }

@@ -19,6 +19,10 @@ export const SETTLES: Readonly<Record<string, string>> = {
 
 type Reader = Pick<KeelClient, "events">;
 
+/** About five minutes of failed reads in a row, longer than a deploy takes. */
+const MAX_FAILURES = 30;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class Watch {
   readonly events: KeelEvent[] = [];
   readonly #reader: Reader;
@@ -68,18 +72,31 @@ export class Watch {
     }
   }
 
-  /** Reads the project's events until `done` holds, asking Keel to hold a read open while there is nothing new. */
-  async follow(done: () => boolean): Promise<void> {
+  /**
+   * Reads the project's events until `done` holds, asking Keel to hold a read
+   * open while there is nothing new. A read that fails (a deploy, a fault) is
+   * asked again after a pause; only many failures in a row end the watch.
+   */
+  async follow(done: () => boolean, pause = (ms: number) => sleep(ms)): Promise<void> {
+    let failures = 0;
     while (!done()) {
-      // oxlint-disable-next-line no-await-in-loop -- one page at a time, in order
-      const page = await this.#reader.events({
-        project: this.#project,
-        limit: 500,
-        wait: 5,
-        ...(this.#cursor === undefined ? {} : { cursor: this.#cursor }),
-      });
-      this.take(page.items);
-      if (page.nextCursor !== undefined) this.#cursor = page.nextCursor;
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- one page at a time, in order
+        const page = await this.#reader.events({
+          project: this.#project,
+          limit: 500,
+          wait: 5,
+          ...(this.#cursor === undefined ? {} : { cursor: this.#cursor }),
+        });
+        failures = 0;
+        this.take(page.items);
+        if (page.nextCursor !== undefined) this.#cursor = page.nextCursor;
+      } catch (error) {
+        failures += 1;
+        if (failures > MAX_FAILURES) throw error;
+        // oxlint-disable-next-line no-await-in-loop -- the pause is the point
+        await pause(Math.min(15_000, 1_000 * failures));
+      }
     }
   }
 
