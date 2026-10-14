@@ -8,7 +8,7 @@ import {
   type Sessions,
   Sponsorships,
   type Standings,
-  type EventFeed,
+  EventFeed,
   Inbox,
   type Notifier,
   PROJECTOR,
@@ -84,6 +84,7 @@ import { RUN_HEADER } from "../rpc/index.ts";
 import { START_PATH } from "../adapters/driving/http/front-door.ts";
 import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
+import type { Watches } from "../adapters/driving/mcp/listen.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
 import { artifactsLocationHint } from "./do.ts";
 import { doorwayOf } from "./doorway.ts";
@@ -261,6 +262,30 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
   };
 }
 
+/**
+ * The held reads an MCP listen watches with: the agent's inbox through the
+ * Inbox port as a peek (a listen shows no notice, so it counts none as read),
+ * and the project's feed through the EventFeed port.
+ */
+function listenReads(runtime: IsolateRuntime): Omit<Watches, "admit"> {
+  return {
+    inbox: async (agentId, cursor, seconds, run, signal) => {
+      const page = await runtime.runPromise(
+        Inbox.use((inbox) => inbox.read(agentId, cursor, seconds, run, true)),
+        { signal },
+      );
+      return { cursor: page.cursor, arrived: page.notices.length > 0 };
+    },
+    feed: async (project, cursor, seconds, signal) => {
+      const page = await runtime.runPromise(
+        EventFeed.use((feed) => feed.read({ cursor, waitSeconds: seconds, project })),
+        { signal },
+      );
+      return { cursor: page.cursor, arrived: page.events.length > 0 };
+    },
+  };
+}
+
 /** What the identity adapter needs beyond `env`: pool tests read the codes it sends. */
 export interface AuthOverrides {
   /** Email codes; production has no sender until Keel can send mail, so none are offered. */
@@ -368,7 +393,7 @@ export function makeIsolate(
   const app = makeApp({
     handlers,
     gate: boundGate,
-    mcp: makeMcpEndpoint(handlers, deps, [env.KEEL_HOST]),
+    mcp: makeMcpEndpoint(handlers, deps, [env.KEEL_HOST], listenReads(runtime)),
     auth: {
       basePath: AUTH_BASE_PATH,
       handler: (request) => auth().handler(request),
