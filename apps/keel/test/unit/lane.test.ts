@@ -141,6 +141,8 @@ function world(options: WorldOptions = {}) {
     visibility: "private",
   });
   const changes = new Map<ChangeId, Change>();
+  /** How many member workspaces the lane was reading at once, and the most it ever did. */
+  const reads = { inFlight: 0, most: 0 };
   /** The changes each change's own DO says it shares an unsettled conflict with. */
   const unsettled = new Map<ChangeId, readonly ChangeId[]>();
   const plans = makePlanStoreMemory();
@@ -169,12 +171,22 @@ function world(options: WorldOptions = {}) {
               });
         }),
       workspace: (id) =>
-        Effect.succeed({
-          workspaceId: makeId("wsp", ulid()),
-          repo: { namespace: "memory", name: `ws-${id}` },
-          baseSha: sha("0"),
-          grantedSha: sha("0"),
-          projectId: PROJECT,
+        Effect.suspend(() => {
+          // Each read yields once, so reads the lane makes at once overlap here.
+          reads.inFlight += 1;
+          reads.most = Math.max(reads.most, reads.inFlight);
+          return Effect.yieldNow.pipe(
+            Effect.andThen(() => {
+              reads.inFlight -= 1;
+              return Effect.succeed({
+                workspaceId: makeId("wsp", ulid()),
+                repo: { namespace: "memory", name: `ws-${id}` },
+                baseSha: sha("0"),
+                grantedSha: sha("0"),
+                projectId: PROJECT,
+              });
+            }),
+          );
         }),
       declare: () => Effect.die(new Error("the Lane never declares")),
       submit: () => Effect.die(new Error("the Lane never submits")),
@@ -255,6 +267,7 @@ function world(options: WorldOptions = {}) {
     changes,
     unsettled,
     plans,
+    reads,
     /** The agent directory the Lane reads handles from: empty until a test writes an agent. */
     agents: directory.agents,
     startedIn,
@@ -2069,6 +2082,22 @@ describe("the Lane's batches", () => {
           v.batchId,
         ]);
         expect(yield* membersInFlight).toEqual([5, 6].map(change));
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[c41.member-reads] a batch of four reads its members at once to compose them, and composes them in queue order",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        for (const n of [1, 2, 3, 4]) yield* queue(w, change(n));
+        yield* toVerifying(w);
+        expect(w.reads.most).toBe(4);
+        expect(w.composed.map((request) => request.members.map((m) => m.changeId))).toEqual([
+          [1, 2, 3, 4].map(change),
+        ]);
       }).pipe(Effect.provide(w.layer));
     },
   );

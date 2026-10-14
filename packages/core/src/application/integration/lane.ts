@@ -931,7 +931,11 @@ const refusePlanless = Effect.fn("integration/refusePlanless")(function* (
   })).pipe(Effect.orDie);
 });
 
-/** Composes the batch onto its base in staging, one restacked commit per member; a batch with no plan is refused first. */
+/**
+ * Composes the batch onto its base in staging, one restacked commit per
+ * member; a batch with no plan is refused first. Every member's change,
+ * workspace and agent are read at once, in batch order.
+ */
 const composeBatch = Effect.fn("integration/composeBatch")(function* (
   lane: Lane,
   active: ActiveBatch,
@@ -943,30 +947,35 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
   }
   const changes = yield* Changes;
   const directory = yield* AgentDirectory;
-  const members = yield* Effect.forEach(batch.members, (changeId) =>
-    Effect.gen(function* () {
-      const { change } = yield* changes.get(changeId);
-      const workspace = yield* changes.workspace(changeId);
-      const agent = yield* directory.findAgent(change.agentId);
-      if (change.commitSha === undefined)
-        return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
-      return {
-        changeId,
-        repo: workspace.repo,
-        base: workspace.baseSha,
-        head: change.commitSha,
-        title: change.intent.goal,
-        // The agent the change belongs to, as the gate authenticated it: never what its commit says.
-        // Its handle is the directory's: given at sign-up and never after, so every compose of a
-        // member reads the same one (an agent a person enrolled has none, and is written by its id).
-        // The run is the one that holds the change.
-        agent: {
-          id: change.agentId,
-          handle: Option.getOrUndefined(agent)?.handle,
-          run: change.run?.id,
-        },
-      } satisfies CandidateMember;
-    }).pipe(Effect.orDie),
+  const members = yield* Effect.forEach(
+    batch.members,
+    (changeId) =>
+      Effect.gen(function* () {
+        const [{ change }, workspace] = yield* Effect.all(
+          [changes.get(changeId), changes.workspace(changeId)],
+          { concurrency: 2 },
+        );
+        const agent = yield* directory.findAgent(change.agentId);
+        if (change.commitSha === undefined)
+          return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
+        return {
+          changeId,
+          repo: workspace.repo,
+          base: workspace.baseSha,
+          head: change.commitSha,
+          title: change.intent.goal,
+          // The agent the change belongs to, as the gate authenticated it: never what its commit says.
+          // Its handle is the directory's: given at sign-up and never after, so every compose of a
+          // member reads the same one (an agent a person enrolled has none, and is written by its id).
+          // The run is the one that holds the change.
+          agent: {
+            id: change.agentId,
+            handle: Option.getOrUndefined(agent)?.handle,
+            run: change.run?.id,
+          },
+        } satisfies CandidateMember;
+      }).pipe(Effect.orDie),
+    { concurrency: "unbounded" },
   );
   const formed = formedOf(yield* EventOutbox, batch.id);
   const composed = yield* Effect.result(
