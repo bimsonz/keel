@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.sponsor-request
+# why: `agent sponsor-request` is not a command, so an agent cannot ask for a sponsor from the CLI
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 900fb7a1..26a31986 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -223,8 +223,6 @@ async function dispatch(
+   switch (command.join(" ")) {
+     case "whoami":
+       return client.whoami();
+-    case "agent sponsor-request":
+-      return client.askSponsor();
+     case "session open":
+       return client.openSession(
+         {

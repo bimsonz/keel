@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/key.test.ts
+# kills: cli.join
+# why: `agent join` with no namespace, or with two, is sent to Keel rather than refused as a usage error
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 900fb7a1..739b3b0b 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -308,7 +308,7 @@ async function dispatch(
+           { premise: propositionOf(required(values.premise, "premise")) },
+           { lease: required(values.lease, "lease"), ...idempotent },
+         );
+-      if (command[0] === "agent" && command[1] === "join" && command.length === 3)
++      if (command[0] === "agent" && command[1] === "join" && command.length >= 2)
+         return client.acceptInvitation(required(command[2], "namespace"), idempotent);
+       if (command[0] === "nearby" && command.length === 2)
+         return client.nearby(required(command[1], "change"));
