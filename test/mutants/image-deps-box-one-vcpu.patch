@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel-verify/test/unit/execbox-image.test.ts -t image.box-size
+# kills: image.box-size
+# why: the deps box keeps one vCPU, so the install and pack of Keel's 1.26 GB of node_modules run on a quarter of CI's machine
+diff --git a/apps/keel-verify/wrangler.jsonc b/apps/keel-verify/wrangler.jsonc
+index 90843af4..847e8724 100644
+--- a/apps/keel-verify/wrangler.jsonc
++++ b/apps/keel-verify/wrangler.jsonc
+@@ -43,7 +43,7 @@
+     {
+       "class_name": "KeelDepsBox",
+       "image": "./containers/sandbox/Dockerfile",
+-      "instance_type": "standard-4",
++      "instance_type": "standard-2",
+       "max_instances": 4,
+     },
+   ],
