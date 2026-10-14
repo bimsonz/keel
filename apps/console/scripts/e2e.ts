@@ -2354,6 +2354,24 @@ expectEqual(
   await wayBack(visitor),
   "Go to the home page → /",
 );
+// A first segment no handle could be is no namespace's page: it is not found, as it is to the Worker.
+await visitor.goto(`${built}/sitemap.xml`, { waitUntil: "domcontentloaded" });
+await visitor
+  .getByRole("heading", { level: 1 })
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "built: /sitemap.xml is no handle's page, and says there is nothing at its address",
+  `${squash(
+    await visitor
+      .getByRole("heading", { level: 1 })
+      .first()
+      .innerText({ timeout: 3_000 })
+      .catch(() => "none"),
+  )} | ${await wayBack(visitor)}`,
+  "There is nothing at this address | Go to the home page → /",
+);
 
 // Keel reads a project's questions to its members and to nobody else. A visitor is told so where the list and
 // where a question would be, never that there is none; and the frame's way in comes back to the page.
@@ -2498,6 +2516,29 @@ expectEqual(
 // A handle's own page. Whose a handle is, Keel says to anyone who asks, and the page is worded from that: a
 // person's is their handle and the projects of theirs this reader may see, with no word of an org; an org's
 // says it is one; and a handle nobody has is said to be nobody's.
+/** A namespace page's tabs, in order, as `name count → address`, the open one marked `*`. */
+const namespaceTabsOf = async (shown: Page): Promise<string> =>
+  (
+    await shown
+      .locator("main nav.a-tabs a")
+      .evaluateAll((links) =>
+        links.map(
+          (a) =>
+            `${a.getAttribute("aria-current") === null ? "" : "*"}${(a.textContent ?? "").trim()} → ${a.getAttribute("href") ?? ""}`,
+        ),
+      )
+      .catch(() => [])
+  ).join(" | ");
+/** What a namespace with no project offers whoever may start one there: each way, as `name → address`. */
+const startsOf = async (shown: Page): Promise<string> =>
+  (
+    await shown
+      .locator('[data-part="no-projects"] a')
+      .evaluateAll((links) =>
+        links.map((a) => `${(a.textContent ?? "").trim()} → ${a.getAttribute("href") ?? ""}`),
+      )
+      .catch(() => [])
+  ).join(" | ") || "none";
 const handlePage = async (shown: Page): Promise<string> => {
   const said = async (part: string): Promise<string> =>
     squash(
@@ -2508,6 +2549,24 @@ const handlePage = async (shown: Page): Promise<string> => {
     );
   return `${await said("main header")} | ${await said('main section[aria-label="Projects"]')}`;
 };
+// A namespace's projects are a tab of its page, as a code host's repositories are of an owner's.
+await visitor.goto(`${built}/ada?tab=projects`, { waitUntil: "domcontentloaded" });
+await visitor
+  .getByRole("main")
+  .locator('section[aria-label="Projects"] li')
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "namespace: its Projects tab is open at ?tab=projects, and lists what Keel names the reader there",
+  `${await namespaceTabsOf(visitor)} || ${squash(
+    await visitor
+      .locator('main section[aria-label="Projects"]')
+      .innerText({ timeout: 3_000 })
+      .catch(() => "nothing"),
+  )}`,
+  "Overview → /ada | *Projects1 → /ada?tab=projects || Projects demo public",
+);
 await visitor.goto(`${built}/ada/demo/escalations`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("heading").last().waitFor();
 const whose = squash(await visitor.getByRole("main").innerText());
@@ -2715,7 +2774,7 @@ await outsider.getByRole("main").getByRole("heading").first().waitFor();
 expectEqual(
   "visitor: a person with no public project is still there, and their page says only that",
   await handlePage(outsider),
-  "ada | Projects ada has no public project. Sign in to see what you may.",
+  "ada | Projects ada has no public projects. Sign in to see what you may.",
 );
 await lane.close();
 
@@ -3074,7 +3133,7 @@ expectEqual(
     .getByRole("main")
     .getByText(/\borg\b/i)
     .count()} mentions of an org`,
-  "ada ada | Your projects ada | 0 org tabs | 0 mentions of an org",
+  "ada ada | ada Your account | 0 org tabs | 0 mentions of an org",
 );
 expectEqual(
   "account: a namespace's header is Keel's mark home and the namespace's name, a link to its own page",
@@ -3268,8 +3327,8 @@ await grace.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
 await grace.getByRole("main").getByRole("heading").first().waitFor();
 expectEqual(
   "orgs: removed, the org is to her what it is to anyone: an org of that handle, with no project she may see",
-  `${await handlePage(grace)} | ${await grace.getByRole("navigation", { name: "Org" }).count()}`,
-  "lovelace Org | Projects This org has no project you may see. | 0",
+  `${await handlePage(grace)} | ${await namespaceTabsOf(grace)}`,
+  "lovelace Org | Projects This organization has no public projects. | *Overview → /lovelace | Projects0 → /lovelace?tab=projects",
 );
 
 // Ada invites her again, as an owner, and nobody answers in time. Keel says it has lapsed, and so does the page.
@@ -4673,13 +4732,31 @@ await newcomer.goto(`${built}/turing`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("heading", { level: 1 }).first().waitFor();
 // The heading is up before Keel has listed the account's projects: the line under it is waited for, and read either way.
 await newcomer
-  .getByText("You have no project yet.")
+  .getByText("No projects yet")
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
   "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
   squash(await newcomer.getByRole("main").innerText()),
-  "Your projects turing You have no project yet. New project",
+  "turing Your account Overview Projects 0 Organizations 0 Settings Projects No projects yet New project Import a repository Read the quickstart",
+);
+expectEqual(
+  "namespace: a person's own page has their tabs, and with no project yet the two ways to start one and the quickstart",
+  `${await namespaceTabsOf(newcomer)} || ${await startsOf(newcomer)}`,
+  "*Overview → /turing | Projects0 → /turing?tab=projects | Organizations0 → /turing?tab=orgs | Settings → /settings || New project → /new?owner=turing | Import a repository → /new?owner=turing&start=import | Read the quickstart → /start",
+);
+await shot(newcomer, "own-empty");
+await newcomer
+  .getByRole("link", { name: "Import a repository", exact: true })
+  .click({ timeout: 10_000 })
+  .catch(() => undefined);
+await newcomer.waitForURL("**/new?**", { timeout: 10_000 }).catch(() => undefined);
+const importing = newcomer.locator('input[type="radio"][value="import"]');
+await importing.waitFor({ timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "namespace: Import a repository opens making a project on an import, under the account it was asked from",
+  `${pathOf(newcomer)}${new URL(newcomer.url()).search} | ${await importing.isChecked({ timeout: 3_000 }).catch(() => "no form")}`,
+  "/new?owner=turing&start=import | true",
 );
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -5552,7 +5629,7 @@ await credentialsOn(noether)
 expectEqual(
   "credentials: an org's owner has its credentials as a tab of the org, with the form",
   `${(await noether.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts()).map(squash).join(" | ")} | ${await credentialsOn(noether).getByRole("form", { name: "Store a credential" }).count()} form`,
-  "Overview | Members 2 | Credentials | Settings | 1 form",
+  "Overview | Projects 0 | People 2 | Credentials | Settings | 1 form",
 );
 await franklin.goto(`${built}/orgs/symmetry/credentials`, { waitUntil: "domcontentloaded" });
 await credentialsOn(franklin)
@@ -5564,7 +5641,7 @@ expectEqual(
   (await franklin.getByRole("navigation", { name: "Org" }).getByRole("link").allInnerTexts())
     .map(squash)
     .join(" | "),
-  "Overview | Members 2 | Settings",
+  "Overview | Projects 0 | People 2",
 );
 expectEqual(
   "credentials: at the tab's address, a member who is no owner is told Keel's refusal and given no form",

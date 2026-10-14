@@ -14,7 +14,7 @@ import { Markdown } from "../../src/views/Markdown.tsx";
  */
 const PUBLISHED: Record<Legal, { updated: string; digest: string }> = {
   terms: { updated: "14 October 2026", digest: "8dc24081a8412469" },
-  privacy: { updated: "14 October 2026", digest: "558c5768866e24eb" },
+  privacy: { updated: "14 October 2026", digest: "f3b6eeeb6d1dd958" },
 };
 
 const DATED = /^Last updated: (.+)$/m;

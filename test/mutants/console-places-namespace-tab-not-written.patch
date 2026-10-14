@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.namespace-tabs
+# why: a link to a namespace's Projects tab is written as its overview's
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 3ff0e643..62a08f56 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -136,7 +136,6 @@ export function hrefOf(place: Place, next?: string): string {
+   if (place.at === "device" && place.userCode !== "") query.set("user_code", place.userCode);
+   if (place.at === "new-project" && place.owner !== undefined) query.set("owner", place.owner);
+   if (place.at === "new-project" && place.start !== undefined) query.set("start", place.start);
+-  if (place.at === "namespace" && place.tab !== undefined) query.set("tab", place.tab);
+   if (next !== undefined && next !== "/") query.set("next", next);
+   const path = pathOf(place)
+     .map((segment) => encodeURIComponent(segment))

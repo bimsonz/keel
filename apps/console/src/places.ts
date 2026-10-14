@@ -15,18 +15,31 @@ export type Place =
   /** Where `keeltown login` sends a person, with the code their terminal is showing. */
   | { at: "device"; userCode: string }
   | { at: "new-org" }
-  /** Making a project. `owner` is the namespace the link here named, where it named one. */
-  | { at: "new-project"; owner?: string }
+  /**
+   * Making a project. `owner` is the namespace the link here named, where it named one; `start` is how the link
+   * asked for it to start, where it asked for an import.
+   */
+  | { at: "new-project"; owner?: string; start?: "import" }
   /** Forking a project, at the project's own address with `fork` after it, as a code host has it. */
   | { at: "fork"; namespace: string; project: string }
-  /** A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. */
-  | { at: "namespace"; handle: string }
+  /**
+   * A namespace's own page, at its handle. Whose the handle is, Keel says: the address does not. `tab` is one of
+   * its sections under that address, as a code host has `?tab=` on an owner's page: its projects, or a person's
+   * orgs.
+   */
+  | { at: "namespace"; handle: string; tab?: "projects" | "orgs" }
   /** An org's members, its credentials and its settings, under `/orgs/<org>/…`. Its home is its namespace's page. */
   | { at: "org"; org: string; tab: Exclude<OrgTab, "home"> }
   /** An invitation to an org, as the person it was made to opens it. */
   | { at: "invite"; id: string }
   /** Where an agent sends the person it asks to stand behind it. What it asks is in the fragment, never here. */
   | { at: "sponsor" };
+
+/**
+ * A first segment that could be a handle: Keel's handles are letters, digits and single hyphens, at most 39, read
+ * in any case. Anything else at the top (`/sitemap.xml`) names no namespace, and is no page here.
+ */
+const HANDLE_LIKE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/i;
 
 const UNDER_ORGS: readonly Exclude<OrgTab, "home">[] = ["members", "credentials", "settings"];
 
@@ -47,9 +60,16 @@ export function placeOf(pathname: string, search = ""): Place | null {
   if (
     segment !== undefined &&
     second === undefined &&
+    HANDLE_LIKE.test(segment) &&
     !RESERVED_SEGMENTS.some((word) => word === segment)
-  )
-    return { at: "namespace", handle: segment };
+  ) {
+    const tab = new URLSearchParams(search).get("tab");
+    return {
+      at: "namespace",
+      handle: segment,
+      ...(tab === "projects" || tab === "orgs" ? { tab } : {}),
+    };
+  }
   // A project's own address with `fork` after it is the form that forks it: no page of a project has that name.
   if (
     segment !== undefined &&
@@ -61,8 +81,13 @@ export function placeOf(pathname: string, search = ""): Place | null {
   switch (segment) {
     case "new": {
       if (second === undefined) {
-        const owner = new URLSearchParams(search).get("owner");
-        return { at: "new-project", ...(owner === null || owner === "" ? {} : { owner }) };
+        const query = new URLSearchParams(search);
+        const owner = query.get("owner");
+        return {
+          at: "new-project",
+          ...(owner === null || owner === "" ? {} : { owner }),
+          ...(query.get("start") === "import" ? { start: "import" as const } : {}),
+        };
       }
       return second === "org" && third === undefined ? { at: "new-org" } : null;
     }
@@ -117,6 +142,8 @@ export function hrefOf(place: Place, next?: string): string {
   const query = new URLSearchParams();
   if (place.at === "device" && place.userCode !== "") query.set("user_code", place.userCode);
   if (place.at === "new-project" && place.owner !== undefined) query.set("owner", place.owner);
+  if (place.at === "new-project" && place.start !== undefined) query.set("start", place.start);
+  if (place.at === "namespace" && place.tab !== undefined) query.set("tab", place.tab);
   if (next !== undefined && next !== "/") query.set("next", next);
   const path = pathOf(place)
     .map((segment) => encodeURIComponent(segment))

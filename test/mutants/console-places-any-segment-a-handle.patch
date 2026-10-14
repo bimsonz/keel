@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.not-a-handle
+# why: a first segment no handle could be (/sitemap.xml) is read as a namespace's page
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 7452284..7df61ff 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -60,7 +60,6 @@ export function placeOf(pathname: string, search = ""): Place | null {
+   if (
+     segment !== undefined &&
+     second === undefined &&
+-    HANDLE_LIKE.test(segment) &&
+     !RESERVED_SEGMENTS.some((word) => word === segment)
+   ) {
+     const tab = new URLSearchParams(search).get("tab");

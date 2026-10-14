@@ -109,6 +109,39 @@ describe("the pages above every project", () => {
     expect(sentFrom({ at: "new-project" }, { is: "user", handle: "ada" }, bare)).toBeNull();
   });
 
+  it("[places.namespace-tabs] reads a namespace's projects and a person's orgs as tabs of its page, and nothing else as one", () => {
+    expect(placeOf("/ada", "?tab=projects")).toEqual({
+      at: "namespace",
+      handle: "ada",
+      tab: "projects",
+    });
+    expect(placeOf("/ada", "?tab=orgs")).toEqual({ at: "namespace", handle: "ada", tab: "orgs" });
+    expect(placeOf("/ada", "?tab=people")).toEqual({ at: "namespace", handle: "ada" });
+    expect(placeOf("/ada")).toEqual({ at: "namespace", handle: "ada" });
+    expect(hrefOf({ at: "namespace", handle: "ada", tab: "projects" })).toBe("/ada?tab=projects");
+    expect(hrefOf({ at: "namespace", handle: "ada" })).toBe("/ada");
+  });
+
+  it("[places.not-a-handle] reads no namespace from a first segment no handle could be", () => {
+    expect(placeOf("/sitemap.xml")).toBeNull();
+    expect(placeOf("/a--b")).toBeNull();
+    expect(placeOf("/-ada")).toBeNull();
+    expect(placeOf("/Ada")).toEqual({ at: "namespace", handle: "Ada" });
+    expect(placeOf("/ada-lovelace")).toEqual({ at: "namespace", handle: "ada-lovelace" });
+  });
+
+  it("[places.new-import] opens making a project on an import where the link asks for one, and on an empty start otherwise", () => {
+    expect(placeOf("/new", "?owner=acme&start=import")).toEqual({
+      at: "new-project",
+      owner: "acme",
+      start: "import",
+    });
+    expect(placeOf("/new", "?owner=acme&start=fork")).toEqual({ at: "new-project", owner: "acme" });
+    expect(hrefOf({ at: "new-project", owner: "acme", start: "import" })).toBe(
+      "/new?owner=acme&start=import",
+    );
+  });
+
   it("[places.fork] has forking a project at the project's own address with fork after it, for someone signed in who has a handle", () => {
     expect(placeOf("/acme/demo/fork")).toEqual({ at: "fork", namespace: "acme", project: "demo" });
     expect(hrefOf({ at: "fork", namespace: "acme", project: "demo" })).toBe("/acme/demo/fork");

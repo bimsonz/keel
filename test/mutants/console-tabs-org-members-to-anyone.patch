@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/namespaceTabs.test.ts
+# kills: tabs.by-reader
+# why: an org's people are offered to whoever is not a member, whom Keel reads none of them
+diff --git a/apps/console/src/account/namespaceTabs.ts b/apps/console/src/account/namespaceTabs.ts
+index eb514128..e93c64f6 100644
+--- a/apps/console/src/account/namespaceTabs.ts
++++ b/apps/console/src/account/namespaceTabs.ts
+@@ -33,7 +33,7 @@ export const TAB_LABEL: Record<NamespaceTab, string> = {
+  */
+ export function tabsOf(reading: NamespaceReading): NamespaceTab[] {
+   if (reading.kind === "user" && reading.own) return ["overview", "projects", "orgs", "settings"];
+-  if (reading.kind === "org" && reading.role !== undefined)
++  if (reading.kind === "org")
+     return [
+       "overview",
+       "projects",

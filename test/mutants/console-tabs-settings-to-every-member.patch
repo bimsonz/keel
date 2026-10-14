@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/namespaceTabs.test.ts
+# kills: tabs.by-reader
+# why: an org's settings are offered to a member who may not change them
+diff --git a/apps/console/src/account/namespaceTabs.ts b/apps/console/src/account/namespaceTabs.ts
+index eb514128..280f4cf0 100644
+--- a/apps/console/src/account/namespaceTabs.ts
++++ b/apps/console/src/account/namespaceTabs.ts
+@@ -39,7 +39,7 @@ export function tabsOf(reading: NamespaceReading): NamespaceTab[] {
+       "projects",
+       "people",
+       ...(reading.role === "owner" ? (["credentials"] as const) : []),
+-      ...(manages(reading.role) ? (["settings"] as const) : []),
++      "settings",
+     ];
+   return ["overview", "projects"];
+ }

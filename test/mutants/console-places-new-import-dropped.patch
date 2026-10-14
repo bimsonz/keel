@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.new-import
+# why: a link that asks to import a repository opens making a project on an empty start
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 3ff0e643..bd9d3352 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -79,7 +79,6 @@ export function placeOf(pathname: string, search = ""): Place | null {
+         return {
+           at: "new-project",
+           ...(owner === null || owner === "" ? {} : { owner }),
+-          ...(query.get("start") === "import" ? { start: "import" as const } : {}),
+         };
+       }
+       return second === "org" && third === undefined ? { at: "new-org" } : null;

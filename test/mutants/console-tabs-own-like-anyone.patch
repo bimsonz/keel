@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/namespaceTabs.test.ts
+# kills: tabs.by-reader
+# why: another person's page offers their orgs and their settings, which are theirs alone
+diff --git a/apps/console/src/account/namespaceTabs.ts b/apps/console/src/account/namespaceTabs.ts
+index eb514128..e095ca95 100644
+--- a/apps/console/src/account/namespaceTabs.ts
++++ b/apps/console/src/account/namespaceTabs.ts
+@@ -32,7 +32,7 @@ export const TAB_LABEL: Record<NamespaceTab, string> = {
+  * credentials, and whoever may change its settings (an owner or a maintainer) its settings.
+  */
+ export function tabsOf(reading: NamespaceReading): NamespaceTab[] {
+-  if (reading.kind === "user" && reading.own) return ["overview", "projects", "orgs", "settings"];
++  if (reading.kind === "user") return ["overview", "projects", "orgs", "settings"];
+   if (reading.kind === "org" && reading.role !== undefined)
+     return [
+       "overview",

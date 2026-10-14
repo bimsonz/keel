@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/namespaceTabs.test.ts
+# kills: tabs.addresses
+# why: a person's Settings tab leads to an org's settings page under their handle, where theirs are at /settings
+diff --git a/apps/console/src/account/namespaceTabs.ts b/apps/console/src/account/namespaceTabs.ts
+index eb514128..9826ca36 100644
+--- a/apps/console/src/account/namespaceTabs.ts
++++ b/apps/console/src/account/namespaceTabs.ts
+@@ -57,9 +57,7 @@ export function tabHref(handle: string, kind: NamespaceKind, tab: NamespaceTab):
+     case "credentials":
+       return hrefOf({ at: "org", org: handle, tab: "credentials" });
+     case "settings":
+-      return kind === "org"
+-        ? hrefOf({ at: "org", org: handle, tab: "settings" })
+-        : hrefOf({ at: "settings" });
++      return hrefOf({ at: "org", org: handle, tab: "settings" });
+     default:
+       return hrefOf({ at: "namespace", handle });
+   }

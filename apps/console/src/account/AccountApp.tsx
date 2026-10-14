@@ -12,7 +12,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
+import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
+import type { NamespaceTab } from "./namespaceTabs.ts";
 import {
   createHttpCredentials,
   createHttpDirectory,
@@ -874,7 +875,14 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   // The handle the address names, and which of its pages: a namespace's own is its home.
   const handle =
     place.at === "namespace" ? place.handle : place.at === "org" ? place.org : undefined;
-  const tab: OrgTab = place.at === "org" ? place.tab : "home";
+  const tab: NamespaceTab =
+    place.at === "org"
+      ? place.tab === "members"
+        ? "people"
+        : place.tab
+      : place.at === "namespace"
+        ? (place.tab ?? "overview")
+        : "overview";
   // The frame's dropdown lists the reader's orgs, and so does the form that makes a project, as its owners.
   const orgs = useOrgs(
     account,
@@ -923,6 +931,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
           orgs={orgs}
           who={reader.who}
           {...(place.owner === undefined ? {} : { owner: place.owner })}
+          {...(place.start === undefined ? {} : { start: place.start })}
         />
       );
   else if (reader.is === "user" && place.at === "fork")
@@ -947,6 +956,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
         who={reader.who}
         handle={handle}
         tab={tab}
+        orgs={orgs}
       />
     );
   else if (reader.is === "visitor" && place.at === "namespace")
@@ -957,6 +967,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
         agents={orgAgents}
         handle={place.handle}
         signedIn={false}
+        tab={tab}
       />
     );
   else if (reader.is === "user" && place.at === "invite")

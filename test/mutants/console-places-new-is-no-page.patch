@@ -2,15 +2,15 @@
 # kills: places.new
 # why: the form that makes a project is not at /new, where every link to it leads
 diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
-index 001762e2..fbac844e 100644
+index 3ff0e643..7b53a1de 100644
 --- a/apps/console/src/places.ts
 +++ b/apps/console/src/places.ts
-@@ -60,7 +60,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
+@@ -73,7 +73,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
      return { at: "fork", namespace: segment, project: second };
    switch (segment) {
      case "new": {
 -      if (second === undefined) {
 +      if (second === "project") {
-         const owner = new URLSearchParams(search).get("owner");
-         return { at: "new-project", ...(owner === null || owner === "" ? {} : { owner }) };
-       }
+         const query = new URLSearchParams(search);
+         const owner = query.get("owner");
+         return {

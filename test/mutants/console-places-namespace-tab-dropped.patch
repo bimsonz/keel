@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.namespace-tabs
+# why: a namespace's Projects tab is read as its overview
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 3ff0e643..1d759e31 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -60,7 +60,7 @@ export function placeOf(pathname: string, search = ""): Place | null {
+     return {
+       at: "namespace",
+       handle: segment,
+-      ...(tab === "projects" || tab === "orgs" ? { tab } : {}),
++      ...(tab === "orgs" ? { tab } : {}),
+     };
+   }
+   // A project's own address with `fork` after it is the form that forks it: no page of a project has that name.

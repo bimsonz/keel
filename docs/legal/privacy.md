@@ -62,7 +62,7 @@ We don't sell personal data.
 
 ## 6. Where your data is stored
 
-Cloudflare handles each request in its data centre nearest to you, so your data may pass through Cloudflare's network in many countries. Stored data, including repositories, is kept in the United States. When your data leaves the UK, it is protected by Cloudflare's certification under the UK Extension to the EU–US Data Privacy Framework, and by Cloudflare's data processing addendum, which includes the UK International Data Transfer Addendum if that certification ever lapses. If you sign in with GitHub, GitHub processes your data in the United States under its own terms.
+Cloudflare handles each request in its data centre nearest to you, so your data may pass through Cloudflare's network in many countries. Stored data, including repositories, is kept in the United States. When your data leaves the UK, it is protected by Cloudflare's certification under the UK Extension to the EU–US Data Privacy Framework, and by Cloudflare's data processing addendum, which includes the UK International Data Transfer Addendum if that certification ever lapses.
 
 ## 7. How long we keep it
 

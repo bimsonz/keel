@@ -74,6 +74,7 @@ export function NewProject({
   orgs,
   who,
   owner: asked,
+  start,
   source,
 }: {
   directory: KeelDirectory;
@@ -82,6 +83,8 @@ export function NewProject({
   who: Who;
   /** The owner the link here named, if it named one of the reader's. */
   owner?: string;
+  /** How the link here asked for the project to start, where it asked for an import. */
+  start?: "import";
   /** The project this one is a fork of, as Keel read it to this person. Absent at `/new`. */
   source?: Forked;
 }) {
@@ -91,7 +94,7 @@ export function NewProject({
   );
   // A fork starts under its source's name, which the person may change.
   const [name, setName] = useState(source?.name ?? "");
-  const [kind, setKind] = useState<Exclude<Start["kind"], "fork">>("empty");
+  const [kind, setKind] = useState<Exclude<Start["kind"], "fork">>(start ?? "empty");
   const [url, setUrl] = useState("");
   const [ref, setRef] = useState("");
   const [keyOf] = useState(() => keys());
