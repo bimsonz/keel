@@ -925,3 +925,47 @@ describe("[link.project-repair] the Projector repeats a project invitation's mov
     }, WAIT);
   });
 });
+
+/** What `whoami` tells the agent of its invitations: the counts, and the reads its `next` names. */
+const told = async (token: string) => {
+  const answer = await http(token, "GET", "/agents/me");
+  const result = Object(answer.body["result"]);
+  const next: unknown = answer.body["next"];
+  return {
+    invitations: result["invitations"],
+    reads: (Array.isArray(next) ? next : []).map((action) => Object(action)["operationId"]),
+  };
+};
+
+describe("whoami says an invitation is waiting, through the real Worker", () => {
+  it("[whoami.invited] an agent invited into an org and to a project is told one of each and the read for each; accepted, and ended, it is told none", async () => {
+    const { slug, member } = await anOrg();
+    const { person, projectId } = await aSoloPerson();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    expect(await told(own)).toEqual({ invitations: { namespaces: 0, projects: 0 }, reads: [] });
+
+    expect(
+      (await http(member.token, "POST", `/namespaces/${slug}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    expect(
+      (await http(person.token, "POST", `/projects/${projectId}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    expect(await told(own)).toEqual({
+      invitations: { namespaces: 1, projects: 1 },
+      reads: ["Agents_listNamespaces", "Agents_listProjects"],
+    });
+
+    expect((await http(own, "PUT", `/agents/me/namespaces/${slug}`)).status).toBe(200);
+    expect(await told(own)).toEqual({
+      invitations: { namespaces: 0, projects: 1 },
+      reads: ["Agents_listProjects"],
+    });
+    expect(
+      (await http(person.token, "DELETE", `/projects/${projectId}/agents/${agent.agentId}`)).status,
+    ).toBe(200);
+    expect(await told(own)).toEqual({ invitations: { namespaces: 0, projects: 0 }, reads: [] });
+  });
+});

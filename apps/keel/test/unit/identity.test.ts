@@ -5,12 +5,14 @@ import {
   type TokenRequest,
   whoami,
 } from "@keeltown/core/application/identity";
-import type { Agent } from "@keeltown/core/domain/identity";
-import { AgentId, Instant } from "@keeltown/core/kernel";
+import { type Agent, INVITED_SCOPES } from "@keeltown/core/domain/identity";
+import { AgentId, Instant, makeId } from "@keeltown/core/kernel";
 import {
   hashSecret,
   makeAgentDirectoryMemory,
   makeClockMemory,
+  makeNamespaceAgentsMemory,
+  makeProjectAgentsMemory,
   makeSessionsMemory,
   makeTokenIssuerMemory,
   sampleProjectId,
@@ -32,12 +34,23 @@ const agent: Agent = {
 
 const secretHash = await hashSecret("secret");
 
+const org = (n: number) => makeId("org", `01JZ8PT2C4E6G8J0M2N4Q6S8V${n}`);
+const project = (n: number) => makeId("prj", `01JZ8PT2C4E6G8J0M2N4Q6S8V${n}`);
+
 /** The use-cases' ports, in memory, with the directory seeded by `override`. */
-function layers(override: Partial<Agent> = {}) {
+function layers(
+  override: Partial<Agent> = {},
+  invitations: {
+    readonly namespaces?: ReturnType<typeof makeNamespaceAgentsMemory>;
+    readonly projects?: ReturnType<typeof makeProjectAgentsMemory>;
+  } = {},
+) {
   const directory = makeAgentDirectoryMemory();
   directory.seed({ ...agent, ...override }, { clientId: "client", agentId, secretHash });
   const clock = makeClockMemory().layer;
   return Layer.mergeAll(
+    (invitations.namespaces ?? makeNamespaceAgentsMemory()).layer,
+    (invitations.projects ?? makeProjectAgentsMemory()).layer,
     directory.layer,
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
@@ -54,8 +67,42 @@ describe("identity/whoami", () => {
         scopes: ["agent:read"],
         revocationEpoch: 2,
       });
-      expect(identity).toEqual({ agent, session: null });
+      expect(identity).toEqual({
+        agent,
+        session: null,
+        invitations: { namespaces: 0, projects: 0 },
+      });
     }).pipe(Effect.provide(layers())),
+  );
+
+  it.effect(
+    "[whoami.invitations] counts the invitations that wait for the agent's word, an org's and a project's, and none it accepted or that ended",
+    () => {
+      const namespaces = makeNamespaceAgentsMemory();
+      const projects = makeProjectAgentsMemory();
+      const by = makeId("usr", "01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+      const at = Instant(1_760_000_000_000);
+      return Effect.gen(function* () {
+        const invited = { agentId, by, scopes: INVITED_SCOPES, at };
+        for (const n of [2, 3, 4])
+          yield* namespaces.service.apply({ _tag: "Invited", namespace: org(n), ...invited }, 1);
+        yield* namespaces.service.apply({ _tag: "Joined", namespace: org(3), agentId, at }, 2);
+        yield* namespaces.service.apply({ _tag: "Left", namespace: org(4), agentId }, 2);
+        for (const n of [5, 6])
+          yield* projects.service.apply(
+            { _tag: "Invited", projectId: project(n), namespace: org(2), ...invited },
+            1,
+          );
+        yield* projects.service.apply({ _tag: "Joined", projectId: project(6), agentId, at }, 2);
+        const identity = yield* whoami({
+          agentId,
+          projectId: sampleProjectId,
+          scopes: ["agent:read"],
+          revocationEpoch: 2,
+        });
+        expect(identity.invitations).toEqual({ namespaces: 1, projects: 1 });
+      }).pipe(Effect.provide(layers({}, { namespaces, projects })));
+    },
   );
 
   it.effect("answers the agent's current session once it has opened one", () =>
@@ -68,7 +115,11 @@ describe("identity/whoami", () => {
       };
       const opened = yield* (yield* Sessions).open(principal, { idempotencyKey: "session-1" });
       const identity = yield* whoami(principal);
-      expect(identity).toEqual({ agent, session: { id: opened.id } });
+      expect(identity).toEqual({
+        agent,
+        session: { id: opened.id },
+        invitations: { namespaces: 0, projects: 0 },
+      });
     }).pipe(Effect.provide(layers())),
   );
 

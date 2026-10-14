@@ -103,6 +103,8 @@ export interface Identity {
   readonly run?: RunRef;
   /** The current session of that run, or of the agent's tokens that name none. */
   readonly session: SessionRef | null;
+  /** The invitations that wait for the agent to accept them: an org's, and a project's. */
+  readonly invitations: { readonly namespaces: number; readonly projects: number };
 }
 
 /** A principal may act only while its agent is active and its epoch is current. */

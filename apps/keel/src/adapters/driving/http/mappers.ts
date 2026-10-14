@@ -71,21 +71,60 @@ export const runView = (run: RunRef) => ({
   ...(run.label === undefined ? {} : { label: run.label }),
 });
 
+/** What `whoami` says of the invitations that wait: a clause of its summary, and the read for each kind. */
+function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
+  const count = namespaces + projects;
+  const kinds = [
+    ...(namespaces > 0 ? [namespaces === 1 ? "an org's" : `${namespaces} orgs'`] : []),
+    ...(projects > 0 ? [projects === 1 ? "a project's" : `${projects} projects'`] : []),
+  ];
+  return {
+    clause:
+      count === 0
+        ? ""
+        : ` ${count === 1 ? "One invitation waits" : `${count} invitations wait`}: ${kinds.join(" and ")}.`,
+    next: [
+      ...(namespaces > 0
+        ? [
+            {
+              kind: "read" as const,
+              title:
+                "An org invited you: read the invitation, then accept it with Agents_acceptInvitation",
+              operationId: "Agents_listNamespaces",
+            },
+          ]
+        : []),
+      ...(projects > 0
+        ? [
+            {
+              kind: "read" as const,
+              title:
+                "A project invited you: read the invitation, then accept it with Agents_acceptProjectInvitation",
+              operationId: "Agents_listProjects",
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 export function whoamiOk(identity: Identity): WhoamiResult {
-  const { agent, run } = identity;
+  const { agent, run, invitations } = identity;
   const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
+  const waiting = waitingInvitations(invitations);
   return {
     status: 200,
     body: {
       ok: true,
-      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.`,
+      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${waiting.clause}`,
       result: {
         agent: agentProfile(agent),
         ...(run === undefined ? {} : { run: runView(run) }),
         session: identity.session === null ? null : { id: identity.session.id },
+        invitations,
       },
       findings: [],
-      next: [],
+      next: waiting.next,
       notices: [],
       cost: {},
     },

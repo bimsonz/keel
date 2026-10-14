@@ -8,6 +8,7 @@ import {
   CredentialRejected,
   type IdempotencyConflict,
   type Identity,
+  type Invitation,
   type AgentClaims,
   type AgentToken,
   type Scope,
@@ -24,7 +25,9 @@ import {
   type Enrolment,
   Enrolments,
   type IssuedToken,
+  NamespaceAgents,
   type OpenSessionInput,
+  ProjectAgents,
   ProjectNamespaces,
   Sessions,
   type StandingInput,
@@ -34,19 +37,29 @@ import {
 
 /** identity use-cases. `whoami` and `exchangeToken` are the exemplar for the rest. */
 
-/** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, and that run's current session. */
+/** How many invitations wait for the agent's word: an accepted one is a place it stands, not news. */
+const waiting = (invitations: readonly Invitation[]): number =>
+  invitations.filter((invitation) => invitation.state === "invited").length;
+
+/** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, that run's current session, and how many invitations wait for its word. */
 export const whoami: (
   principal: AgentClaims,
-) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
-  Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
-    const agent = yield* admit(principal);
-    const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
-    return {
-      agent,
-      ...(principal.run === undefined ? {} : { run: principal.run }),
-      session: current === null ? null : { id: current.id },
-    };
-  });
+) => Effect.Effect<
+  Identity,
+  AgentNotKnown | AgentNotAdmitted,
+  AgentDirectory | Sessions | NamespaceAgents | ProjectAgents
+> = Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
+  const agent = yield* admit(principal);
+  const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
+  const namespaces = yield* NamespaceAgents.use((agents) => agents.ofAgent(agent.id));
+  const projects = yield* ProjectAgents.use((agents) => agents.ofAgent(agent.id));
+  return {
+    agent,
+    ...(principal.run === undefined ? {} : { run: principal.run }),
+    session: current === null ? null : { id: current.id },
+    invitations: { namespaces: waiting(namespaces), projects: waiting(projects) },
+  };
+});
 
 export interface TokenRequest {
   readonly clientId: string;

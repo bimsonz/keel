@@ -65,6 +65,18 @@ model WhoAmI {
 
   /** The open session of the token's run, if it has one: a session is its run's. */
   session: SessionRef | null;
+
+  /** The invitations that wait for you to accept them. When either is above 0, `next` names the read that lists them. */
+  invitations: WaitingInvitations;
+}
+
+/** How many invitations wait for your word, by kind. One you have accepted, or one that ended, is not counted. */
+model WaitingInvitations {
+  /** An org's, each into the whole org: listed by `Agents_listNamespaces`, accepted with `Agents_acceptInvitation`. */
+  namespaces: int32;
+
+  /** A project's, each to that one project: listed by `Agents_listProjects`, accepted with `Agents_acceptProjectInvitation`. */
+  projects: int32;
 }
 
 model WhoAmIEnvelope is AgentEnvelope<WhoAmI>;

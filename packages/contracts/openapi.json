@@ -21707,11 +21707,35 @@
         },
         "description": "The reader's place in a project's org, present only for a member of it."
       },
+      "WaitingInvitations": {
+        "type": "object",
+        "required": [
+          "namespaces",
+          "projects"
+        ],
+        "properties": {
+          "namespaces": {
+            "type": "integer",
+            "format": "int32",
+            "description": "An org's, each into the whole org: listed by `Agents_listNamespaces`, accepted with `Agents_acceptInvitation`."
+          },
+          "projects": {
+            "type": "integer",
+            "format": "int32",
+            "description": "A project's, each to that one project: listed by `Agents_listProjects`, accepted with `Agents_acceptProjectInvitation`."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "How many invitations wait for your word, by kind. One you have accepted, or one that ended, is not counted."
+      },
       "WhoAmI": {
         "type": "object",
         "required": [
           "agent",
-          "session"
+          "session",
+          "invitations"
         ],
         "properties": {
           "agent": {
@@ -21734,6 +21758,14 @@
             ],
             "nullable": true,
             "description": "The open session of the token's run, if it has one: a session is its run's."
+          },
+          "invitations": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WaitingInvitations"
+              }
+            ],
+            "description": "The invitations that wait for you to accept them. When either is above 0, `next` names the read that lists them."
           }
         },
         "additionalProperties": {
