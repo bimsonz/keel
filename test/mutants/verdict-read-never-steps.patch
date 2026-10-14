@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verdict-index.test.ts -t verdict.index-finds
+# kills: verdict.index-finds
+# why: a read that misses never moves the index on, so no verdict is ever found: nothing indexes on a receipt
+diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
+index 033e8495..ca60d9b0 100644
+--- a/packages/core/src/application/verification/verdict-index.ts
++++ b/packages/core/src/application/verification/verdict-index.ts
+@@ -77,7 +77,7 @@ export const getVerdict: (
+   const found = store.transaction((): IndexedVerdict | undefined => {
+     const lookup = () => store.get(VERDICT_INDEX.at, verdictId);
+     let at = lookup();
+-    for (let steps = 0; at === undefined && steps < VERDICT_READ_STEPS; steps += 1) {
++    for (let steps = 0; at === undefined && steps < 0; steps += 1) {
+       const { level } = indexVerdicts(store);
+       at = lookup();
+       if (level) break;

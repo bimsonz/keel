@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verdict-index.test.ts -t verdict.index-catch-up
+# kills: verdict.index-catch-up
+# why: the index walks the whole feed in one step, one long transaction on a feed recorded before it
+diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
+index 033e8495..0986b909 100644
+--- a/packages/core/src/application/verification/verdict-index.ts
++++ b/packages/core/src/application/verification/verdict-index.ts
+@@ -52,7 +52,7 @@ export function indexVerdicts(
+ ): { readonly to: number; readonly level: boolean } {
+   const from = indexedTo(store);
+   const head = feedHead(store);
+-  const to = Math.min(head, from + step);
++  const to = head;
+   for (let at = from + 1; at <= to; at += 1) {
+     const verdictId = verdictOf(store.get(FEED.kind, feedPosition(at)));
+     if (verdictId !== undefined) store.put(VERDICT_INDEX.at, verdictId, at);

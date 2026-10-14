@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.route-hidden
+# kills: verdict.route-hidden
+# why: a verdict the caller cannot read answers a generic not-found with nothing to say what was not found
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 8a025f2e..751e7557 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -441,8 +441,6 @@ export function refusalResult(
+         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+       if (action === "Memory_getDecision")
+         return decisionNotFound({ requestId }, String(Object(input).decisionId));
+-      if (action === "Views_getVerdict")
+-        return verdictNotFound({ requestId }, String(Object(input).verdictId));
+       if (action === "Probes_getProbeSource")
+         return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
+       if (action === "Operator_giveRuling")

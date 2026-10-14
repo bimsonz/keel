@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verdict-index.test.ts -t verdict.reasons
+# kills: verdict.reasons
+# why: a line that names no step is classed testimony, though a verifier reports only what ran
+diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
+index 033e8495..89bf0e54 100644
+--- a/packages/core/src/application/verification/verdict-index.ts
++++ b/packages/core/src/application/verification/verdict-index.ts
+@@ -124,6 +124,6 @@ export const verdictReasons = (
+   evidence.map((line) => {
+     const step = namedStep(line, steps);
+     return step === undefined
+-      ? { line, class: "proof" }
++      ? { line, class: "testimony" }
+       : { line, step: step.id, class: step.effectiveClass ?? step.evidenceCeiling };
+   });

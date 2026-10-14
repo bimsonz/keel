@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.route
+# kills: verdict.route
+# why: the verdict is served without the plan it was issued under, so the console has no plan graph to draw
+diff --git a/apps/keel/src/adapters/driving/http/verdicts.ts b/apps/keel/src/adapters/driving/http/verdicts.ts
+index ae96116a..72f6b0b2 100644
+--- a/apps/keel/src/adapters/driving/http/verdicts.ts
++++ b/apps/keel/src/adapters/driving/http/verdicts.ts
+@@ -44,7 +44,7 @@ export const verdictView = (v: IndexedVerdict, plan: FlowPlan | undefined) => ({
+     class: r.class,
+   })),
+   issuedAt: iso(v.issuedAt),
+-  ...(plan === undefined ? {} : { plan: { hash: plan.planHash, steps: plan.steps.map(stepView) } }),
++  ...(plan !== null ? {} : { plan: { hash: plan.planHash, steps: plan.steps.map(stepView) } }),
+ });
+ 
+ export function verdictNotFound(caller: { readonly requestId: string }, verdictId: string) {

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verdict-index.test.ts -t verdict.reasons
+# kills: verdict.reasons
+# why: a line is classed by its step's ceiling, not the class its evidence carries after taint
+diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
+index 033e8495..675d216f 100644
+--- a/packages/core/src/application/verification/verdict-index.ts
++++ b/packages/core/src/application/verification/verdict-index.ts
+@@ -125,5 +125,5 @@ export const verdictReasons = (
+     const step = namedStep(line, steps);
+     return step === undefined
+       ? { line, class: "proof" }
+-      : { line, step: step.id, class: step.effectiveClass ?? step.evidenceCeiling };
++      : { line, step: step.id, class: step.evidenceCeiling };
+   });

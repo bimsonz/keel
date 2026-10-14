@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verdict-index.test.ts -t verdict.reasons
+# kills: verdict.reasons
+# why: a guard's citation names no step, so it is classed proof whatever the guard's step carries
+diff --git a/packages/core/src/application/verification/verdict-index.ts b/packages/core/src/application/verification/verdict-index.ts
+index 033e8495..8f0e4bca 100644
+--- a/packages/core/src/application/verification/verdict-index.ts
++++ b/packages/core/src/application/verification/verdict-index.ts
+@@ -108,7 +108,7 @@ export interface VerdictReason {
+  */
+ const namedStep = (line: string, steps: readonly PlanStep[]): PlanStep | undefined =>
+   steps.find(
+-    (s) => line.startsWith(`${s.id}: `) || line.startsWith(`${CITED_AS.guard.line}: ${s.id} (`),
++    (s) => line.startsWith(`${s.id}: `),
+   );
+ 
+ /**

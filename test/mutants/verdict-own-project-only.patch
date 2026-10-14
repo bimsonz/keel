@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.route
+# kills: verdict.route
+# why: the route is decided on the caller's own project, so a member who reads the project, the console's session, is never answered
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 8a025f2e..d254128f 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -366,7 +366,7 @@ export const RESOLVERS: Resolvers = {
+   Repo_compare: (input) => projectNamed(input.projectId),
+   Views_getTrunk: (input) => projectNamed(input.projectId),
+   Views_listLanes: (input) => projectNamed(input.projectId),
+-  Views_getVerdict: (input) => verdictProject(input.verdictId),
++  Views_getVerdict: ownProject,
+   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
+   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
+   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),

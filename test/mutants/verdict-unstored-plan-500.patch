@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.route-unplanned
+# kills: verdict.route-unplanned
+# why: a verdict whose plan is no longer stored answers 500 instead of the verdict without its plan
+diff --git a/apps/keel/src/adapters/driving/http/verdicts.ts b/apps/keel/src/adapters/driving/http/verdicts.ts
+index ae96116a..8a867885 100644
+--- a/apps/keel/src/adapters/driving/http/verdicts.ts
++++ b/apps/keel/src/adapters/driving/http/verdicts.ts
+@@ -70,7 +70,6 @@ const planOf = (v: IndexedVerdict) => {
+     Effect.flatMap((namespace) => PlanStore.use((plans) => plans.get(namespace, hash))),
+     Effect.map((plan): FlowPlan | undefined => plan),
+     Effect.catchTags({
+-      PlanMissing: () => Effect.succeed(undefined),
+       ProjectUnplaced: () => Effect.succeed(undefined),
+     }),
+     Effect.orDie,

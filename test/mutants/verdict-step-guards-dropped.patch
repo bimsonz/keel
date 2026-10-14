@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/verdicts.test.ts -t verdict.route
+# kills: verdict.route
+# why: a guard step is served without the tenet it guards or the decision it holds
+diff --git a/apps/keel/src/adapters/driving/http/verdicts.ts b/apps/keel/src/adapters/driving/http/verdicts.ts
+index ae96116a..438a14e6 100644
+--- a/apps/keel/src/adapters/driving/http/verdicts.ts
++++ b/apps/keel/src/adapters/driving/http/verdicts.ts
+@@ -20,7 +20,7 @@ const stepView = (s: PlanStep) => ({
+   tierReason: s.tier.reason,
+   evidenceCeiling: s.evidenceCeiling,
+   because: s.because,
+-  ...(s.guards === undefined
++  ...(s.guards !== null
+     ? {}
+     : {
+         guards: {
