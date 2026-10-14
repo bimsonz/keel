@@ -25,8 +25,8 @@ interface Roster {
     readonly next: number;
     readonly states: Readonly<Record<string, string>>;
   };
-  /** What stopped the last sign-up or accept, if anything did. */
-  readonly lastError?: string;
+  /** What stopped the last sign-up or accept, if anything did; cleared by the next that succeeds. */
+  readonly lastError?: string | undefined;
 }
 
 interface Run {
@@ -64,8 +64,18 @@ export class Director extends DurableObject<Env> {
     return this.env.KEYRING.get(this.env.KEYRING.idFromName(name));
   }
 
-  async #roster(): Promise<Roster> {
-    return (await this.ctx.storage.get<Roster>("roster")) ?? EMPTY;
+  // The roster is read and written synchronously, and every change reads it
+  // again: a sign-up or an accept that waited on Keel writes onto the roster
+  // as it is when the answer comes, not the copy it read before, which another
+  // call may have changed meanwhile.
+  #roster(): Roster {
+    return this.ctx.storage.kv.get<Roster>("roster") ?? EMPTY;
+  }
+
+  #change(change: (roster: Roster) => Roster): Roster {
+    const next = change(this.#roster());
+    this.ctx.storage.kv.put("roster", next);
+    return next;
   }
 
   async #run(): Promise<Run | undefined> {
@@ -82,15 +92,14 @@ export class Director extends DurableObject<Env> {
    * every three seconds from the alarm.
    */
   async enlist(shape: Shape, count: number): Promise<Roster> {
-    const roster = await this.#roster();
     if (shape === "one") {
       const member = await this.#keyring("one").enlist("swarm-one");
-      const next = { ...roster, one: { ...member, keyring: "one" } };
-      await this.ctx.storage.put("roster", next);
-      return next;
+      return this.#change((roster) => ({ ...roster, one: { ...member, keyring: "one" } }));
     }
-    const next = { ...roster, wanted: Math.max(roster.wanted, count) };
-    await this.ctx.storage.put("roster", next);
+    const next = this.#change((roster) => ({
+      ...roster,
+      wanted: Math.max(roster.wanted, count),
+    }));
     await this.ctx.storage.setAlarm(Date.now());
     return next;
   }
@@ -98,9 +107,10 @@ export class Director extends DurableObject<Env> {
   /** Accepts the shape's invitations to `project`: "one" at once; "many" one at a time from the alarm. */
   async accept(shape: Shape, project: string): Promise<Roster | string> {
     if (shape === "one") return this.#keyring("one").accept(project);
-    const roster = await this.#roster();
-    const next = { ...roster, accepting: { project, next: 0, states: {} } };
-    await this.ctx.storage.put("roster", next);
+    const next = this.#change((roster) => ({
+      ...roster,
+      accepting: { project, next: 0, states: {} },
+    }));
     await this.ctx.storage.setAlarm(Date.now());
     return next;
   }
@@ -121,7 +131,7 @@ export class Director extends DurableObject<Env> {
     const current = await this.#run();
     if (current !== undefined && current.stoppedAt === undefined)
       throw new Error(`Run ${current.id} is still under way.`);
-    const roster = await this.#roster();
+    const roster = this.#roster();
     if (options.shape === "one" && roster.one === undefined)
       throw new Error("Enlist the one account first.");
     if (options.shape === "many" && roster.many.length < options.workers)
@@ -194,7 +204,7 @@ export class Director extends DurableObject<Env> {
     const run = await this.#run();
     if (run === undefined) return null;
     const keyring = this.#keyring(
-      run.shape === "one" ? "one" : ((await this.#roster()).many[0]?.keyring ?? "one"),
+      run.shape === "one" ? "one" : (this.#roster().many[0]?.keyring ?? "one"),
     );
     const scope = { project: run.project, run: run.shape === "one" ? `${run.id}-report` : run.id };
     // Page after page, oldest first, until the feed has no more; at most 200 pages of 500.
@@ -219,35 +229,32 @@ export class Director extends DurableObject<Env> {
 
   /** Wipes every account's key and the roster. */
   async forget(): Promise<{ readonly forgotten: number }> {
-    const roster = await this.#roster();
+    const roster = this.#roster();
     const names = [
       ...(roster.one === undefined ? [] : ["one"]),
       ...roster.many.map((m) => m.keyring),
     ];
     await Promise.all(names.map((name) => this.#keyring(name).forget()));
-    await this.ctx.storage.put("roster", EMPTY);
+    this.#change(() => EMPTY);
     return { forgotten: names.length };
   }
 
   /** One step of whatever is under way: a sign-up, an accept, or a worker's start. */
   override async alarm(): Promise<void> {
-    const roster = await this.#roster();
+    const roster = this.#roster();
     if (roster.many.length < roster.wanted) {
       const index = roster.many.length;
       const keyring = `many-${index}`;
       try {
         const member = await this.#keyring(keyring).enlist(`swarm-${index}`);
-        await this.ctx.storage.put("roster", {
-          ...roster,
-          many: [...roster.many, { ...member, keyring }],
+        this.#change((latest) => ({
+          ...latest,
+          many: [...latest.many, { ...member, keyring }],
           lastError: undefined,
-        });
+        }));
       } catch (error) {
         // The sign-up limit's 429 names no retry time: wait a full window.
-        await this.ctx.storage.put("roster", {
-          ...roster,
-          lastError: `sign-up ${index}: ${message(error)}`,
-        });
+        this.#change((latest) => ({ ...latest, lastError: `sign-up ${index}: ${message(error)}` }));
         await this.ctx.storage.setAlarm(Date.now() + 60_000);
         return;
       }
@@ -260,20 +267,20 @@ export class Director extends DurableObject<Env> {
       if (member !== undefined) {
         try {
           const state = await this.#keyring(member.keyring).accept(accepting.project);
-          await this.ctx.storage.put("roster", {
-            ...roster,
+          this.#change((latest) => ({
+            ...latest,
             accepting: {
               ...accepting,
               next: accepting.next + 1,
               states: { ...accepting.states, [member.handle]: state },
             },
             lastError: undefined,
-          });
+          }));
         } catch (error) {
-          await this.ctx.storage.put("roster", {
-            ...roster,
+          this.#change((latest) => ({
+            ...latest,
             lastError: `accept ${member.handle}: ${message(error)}`,
-          });
+          }));
           await this.ctx.storage.setAlarm(Date.now() + 60_000);
           return;
         }

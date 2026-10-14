@@ -13,18 +13,18 @@ const director = () => env.DIRECTOR.get(env.DIRECTOR.idFromName("director"));
 
 afterEach(() => vi.restoreAllMocks());
 
-/** The bodies of the token exchanges the stand-in Keel has been sent, oldest first. */
-async function seenTokens(): Promise<string[]> {
-  const seen: unknown = await (await fetch("https://keel.test/_seen")).json();
-  if (!Array.isArray(seen)) throw new Error("the stand-in answers its requests as a list");
-  return seen.flatMap((r: unknown) =>
+/** The bodies of the requests to `path` the stand-in Keel has been sent, oldest first. */
+async function seen(path: string): Promise<string[]> {
+  const sent: unknown = await (await fetch("https://keel.test/_seen")).json();
+  if (!Array.isArray(sent)) throw new Error("the stand-in answers its requests as a list");
+  return sent.flatMap((r: unknown) =>
     typeof r === "object" &&
     r !== null &&
     "url" in r &&
     "body" in r &&
     typeof r.url === "string" &&
     typeof r.body === "string" &&
-    new URL(r.url).pathname === "/token"
+    new URL(r.url).pathname === path
       ? [r.body]
       : [],
   );
@@ -100,9 +100,9 @@ describe("the swarm's Worker", () => {
       headers: { ...ADMIN, "content-type": "application/json" },
       body: JSON.stringify({ shape: "one" }),
     });
-    const before = await seenTokens();
+    const before = await seen("/token");
     await keyring().token({ project: "prj_MCP", run: "r-mcp" });
-    const minted = (await seenTokens()).slice(before.length);
+    const minted = (await seen("/token")).slice(before.length);
     expect(minted).toHaveLength(1);
     expect(new URLSearchParams(minted[0]).get("resource")).toBe("https://keel.test/mcp");
   });
@@ -129,4 +129,34 @@ describe("the swarm's Worker", () => {
       wanted: 0,
     });
   });
+  // The one account signs up while a "many" sign-up is awaited, landing first
+  // in one case and last in the other: the roster keeps both either way.
+  for (const last of ["swarm-0", "swarm-one"] as const)
+    it(`[swarm.roster-race] keeps both accounts on the roster when ${last}'s sign-up lands last`, async () => {
+      await runInDurableObject(director(), async (_instance, state) => {
+        await state.storage.deleteAlarm();
+        await state.storage.put("roster", { many: [], wanted: 1 });
+      });
+      const signUp = (name: string) =>
+        name === "swarm-0"
+          ? runInDurableObject(director(), (instance) => instance.alarm())
+          : director().enlist("one", 1);
+      const first = last === "swarm-0" ? "swarm-one" : "swarm-0";
+      const before = (await seen("/register")).length;
+      await fetch(`https://keel.test/_hold?name=${last}`);
+      try {
+        const waiting = signUp(last);
+        await vi.waitFor(async () => expect(await seen("/register")).toHaveLength(before + 1));
+        await signUp(first);
+        await fetch("https://keel.test/_release");
+        await waiting;
+      } finally {
+        await fetch("https://keel.test/_release");
+      }
+      const roster = await director().roster();
+      expect({ one: roster.one?.name, many: roster.many.map((m) => m.name) }).toEqual({
+        one: "swarm-one",
+        many: ["swarm-0"],
+      });
+    });
 });

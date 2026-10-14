@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.roster-race
+# why: A many account's sign-up writes the roster it read before awaiting Keel: the one account, signed up meanwhile, falls off it
+diff --git a/examples/swarm/src/adapters/driving/do/director.ts b/examples/swarm/src/adapters/driving/do/director.ts
+index 31bd3609..4b834411 100644
+--- a/examples/swarm/src/adapters/driving/do/director.ts
++++ b/examples/swarm/src/adapters/driving/do/director.ts
+@@ -248,9 +248,9 @@ export class Director extends DurableObject<Env> {
+       const keyring = `many-${index}`;
+       try {
+         const member = await this.#keyring(keyring).enlist(`swarm-${index}`);
+-        this.#change((latest) => ({
+-          ...latest,
+-          many: [...latest.many, { ...member, keyring }],
++        this.#change(() => ({
++          ...roster,
++          many: [...roster.many, { ...member, keyring }],
+           lastError: undefined,
+         }));
+       } catch (error) {
