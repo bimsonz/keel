@@ -62,6 +62,7 @@ const USAGE = `keeltown <command> [options]
   inbox [--cursor <cursor>] [--wait <0-900>]
   events [--cursor <cursor>] [--wait <0-900>] [--limit <1-500>]
   project create --namespace <handle> --name <name> (--empty | --import <https-url> [--ref <branch>] | --fork <prj_…> | --template <name>) [--key <idempotency-key>]
+  project invite --project <prj_…> --agent <handle> [--scope agent:read|agent:work]... [--key <idempotency-key>]
   agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
@@ -79,7 +80,9 @@ A person signs in with \`login\`: Keel names a page to open, the sign-in is appr
 is kept in this machine's key store, never in a file (--print-token prints its token once where
 there is no store, for KEEL_SESSION). \`auth setup-git\` has git ask keeltown for it, so a private
 project clones with nothing pasted, and \`logout\` ends it at Keel and here. With no agent's
-credential on the machine, a command runs as the person signed in.
+credential on the machine, a command runs as the person signed in. \`project invite\` runs only as
+the person (or KEEL_SESSION), never as an agent, and Keel wants a \`login\` approved with a passkey
+in the last ten minutes for it.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -105,6 +108,7 @@ const OPTIONS = {
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
   project: { type: "string" },
+  agent: { type: "string" },
   run: { type: "string" },
   profile: { type: "string" },
   header: { type: "boolean" },
@@ -210,6 +214,15 @@ function isProposition(value: unknown): value is Proposition {
 const KINDS = ["interactive", "hosted", "human", "synthetic"] as const;
 const SCOPES = ["agent:work", "agent:read"] as const;
 
+/** The scopes --scope names, each one Keel knows. */
+function scopesOf(given: readonly string[] | undefined) {
+  return (given ?? []).map((scope) => {
+    const known = SCOPES.find((s) => s === scope);
+    if (known === undefined) throw new UsageError(`unknown scope ${scope}`);
+    return known;
+  });
+}
+
 /** One command against Keel, as the SDK answers it. */
 async function dispatch(
   client: KeelClient,
@@ -265,14 +278,19 @@ async function dispatch(
         },
         idempotent,
       );
+    // With no --scope, Keel lets the agent read and work.
+    case "project invite": {
+      const scopes = scopesOf(values.scope);
+      return client.inviteToProject(
+        required(values.project, "project"),
+        required(values.agent, "agent"),
+        { ...(scopes.length === 0 ? {} : { scopes }), ...idempotent },
+      );
+    }
     case "agent enrol": {
       const kind = KINDS.find((k) => k === (values.kind ?? "interactive"));
       if (kind === undefined) throw new UsageError(`--kind must be one of ${KINDS.join(", ")}`);
-      const scopes = (values.scope ?? []).map((scope) => {
-        const known = SCOPES.find((s) => s === scope);
-        if (known === undefined) throw new UsageError(`unknown scope ${scope}`);
-        return known;
-      });
+      const scopes = scopesOf(values.scope);
       if (scopes.length === 0) throw new UsageError("missing --scope");
       return client.enrolAgent(
         {
@@ -517,10 +535,26 @@ async function clientFor(
       ...fetch,
     });
   // No agent's credential at all: the person signed in on this machine.
+  return personFor(io, baseUrl, entry);
+}
+
+const PERSON_ONLY =
+  "Inviting an agent is a person's move, never an agent's. Run `keeltown login` and approve it with a passkey first: Keel wants one from the last ten minutes.";
+
+/**
+ * The client of the person signed in on this machine, or KEEL_SESSION's, and
+ * of nobody else: no agent's credential stands in for one. Undefined when no
+ * person is signed in.
+ */
+async function personFor(io: Io, baseUrl: string, entry: string): Promise<KeelClient | undefined> {
   const signIn = await heldSignIn(io.env, io.signIns, entry);
   return signIn === undefined
     ? undefined
-    : createKeelClient({ baseUrl, session: signIn.token, ...fetch });
+    : createKeelClient({
+        baseUrl,
+        session: signIn.token,
+        ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
+      });
 }
 
 export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
@@ -550,10 +584,16 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     if (person !== undefined) return person;
     const about = await keyCommand(io, positionals.join(" "), values, baseUrl, entry);
     if (about !== undefined) return about;
-    const client = await clientFor(io, values, baseUrl, entry);
+    // An invitation is the person's to make, on a fresh sign-in, whatever agent this machine holds.
+    const asPerson = positionals.join(" ") === "project invite";
+    const client = asPerson
+      ? await personFor(io, baseUrl, entry)
+      : await clientFor(io, values, baseUrl, entry);
     if (client === undefined) {
       io.stderr(
-        `${NO_KEY} Or run \`keeltown login\` to sign in as yourself, or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
+        asPerson
+          ? PERSON_ONLY
+          : `${NO_KEY} Or run \`keeltown login\` to sign in as yourself, or set KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent's secret) or KEEL_SESSION (a user).`,
       );
       return 2;
     }

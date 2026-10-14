@@ -1,5 +1,6 @@
 import { generateAgentKey } from "@keeltown/sdk";
 import { describe, expect, it } from "vitest";
+import { encodeEntry } from "../src/agent-key.ts";
 import { run } from "../src/run.ts";
 import {
   AGENT_TOKEN,
@@ -199,5 +200,23 @@ describe("keeltown, for a person signed in on this machine", () => {
     const asked = k.sent.slice(before).at(-1);
     expect(authorization(asked)).toContain(AGENT_TOKEN);
     expect(authorization(asked)).not.toContain(TOKEN);
+  });
+
+  it("[cli.project-invite-person] project invite is the person's alone: with an agent's key or secret held and nobody signed in, it says to log in and asks Keel nothing", async () => {
+    const invite = ["project", "invite", "--project", "prj_1", "--agent", "agent-1x443jkgfjjzbqj5"];
+    const { privateJwk } = await generateAgentKey();
+    const key = keel();
+    key.keyStore.held.set(
+      "keel.test",
+      encodeEntry({ jwk: privateJwk, agentId: "agt_0123456789ABCDEFGHJKMNPQRS" }),
+    );
+    const secret = keel({ env: { KEEL_CLIENT_ID: "client-a", KEEL_CLIENT_SECRET: "secret-a" } });
+    expect(await Promise.all([key, secret].map((k) => run(invite, k.io)))).toEqual([2, 2]);
+    for (const k of [key, secret]) {
+      expect(k.err).toHaveLength(1);
+      expect(k.err[0]).toMatch(/a person's move.*`keeltown login`.*passkey/);
+      expect(k.sent).toEqual([]);
+      expect(k.out).toEqual([]);
+    }
   });
 });

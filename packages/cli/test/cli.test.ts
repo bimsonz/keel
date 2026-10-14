@@ -1,5 +1,9 @@
+import { generateAgentKey } from "@keeltown/sdk";
 import { describe, expect, it } from "vitest";
+import { encodeEntry } from "../src/agent-key.ts";
+import { encodeSignIn } from "../src/login.ts";
 import { run } from "../src/run.ts";
+import { memoryStore } from "./person.ts";
 
 /** A fake Keel that records requests; `respond` scripts each non-token answer. */
 function fakeKeel(respond: (url: string, init: RequestInit) => Response) {
@@ -119,6 +123,71 @@ describe("keeltown project create", () => {
       expect(keel.requests).toEqual([]);
     },
   );
+});
+
+const PROJECT = "prj_01J9ZZZZZZZZZZZZZZZZZZZZZZ";
+const HANDLE = "agent-1x443jkgfjjzbqj5";
+const invited = () =>
+  Response.json(
+    {
+      id: "agt_0123456789ABCDEFGHJKMNPQRS",
+      name: HANDLE,
+      state: "invited",
+      scopes: ["agent:read"],
+    },
+    { status: 201 },
+  );
+const invite = (...more: readonly string[]) => [
+  "project",
+  "invite",
+  "--project",
+  PROJECT,
+  "--agent",
+  HANDLE,
+  ...more,
+];
+
+describe("keeltown project invite", () => {
+  it("[cli.project-invite] invites the agent with the scopes given, as the person signed in and never as an agent's credential, and an unknown scope sends nothing", async () => {
+    // KEEL_SESSION beside an agent's secret, which any other command would run as.
+    const keel = fakeKeel(invited);
+    const session = { ...keel.io, env: { ...keel.io.env, KEEL_SESSION: "sess-1" } };
+    expect(await run(invite("--scope", "agent:read", "--key", "key-0009", "--json"), session)).toBe(
+      0,
+    );
+    const sent = only(keel.requests);
+    expect([sent.url, sent.method, sent.headers.get("authorization"), sent.body]).toEqual([
+      `https://keel.test/v1/projects/${PROJECT}/agents`,
+      "POST",
+      "Bearer sess-1",
+      { agent: HANDLE, scopes: ["agent:read"] },
+    ]);
+    expect(sent.headers.get("idempotency-key")).toBe("key-0009");
+    expect(JSON.parse(keel.out.join("\n"))).toMatchObject({ name: HANDLE, state: "invited" });
+
+    // A sign-in in the key store beside an agent's key there, which any other command would run as.
+    const { privateJwk } = await generateAgentKey();
+    const keyStore = memoryStore();
+    keyStore.held.set(
+      "keel.test",
+      encodeEntry({ jwk: privateJwk, agentId: "agt_0123456789ABCDEFGHJKMNPQRS" }),
+    );
+    const signIns = memoryStore();
+    signIns.held.set("keel.test", encodeSignIn({ token: "sess-2", handle: "ada" }));
+    const held = fakeKeel(invited);
+    const stored = { ...held.io, env: { KEEL_URL: "https://keel.test" }, keyStore, signIns };
+    expect(await run(invite("--scope", "agent:read"), stored)).toBe(0);
+    const asked = only(held.requests);
+    expect([asked.url, asked.headers.get("authorization"), asked.body]).toEqual([
+      `https://keel.test/v1/projects/${PROJECT}/agents`,
+      "Bearer sess-2",
+      { agent: HANDLE, scopes: ["agent:read"] },
+    ]);
+
+    expect(await run(invite("--scope", "operator"), session)).toBe(2);
+    expect(keel.err.join("\n")).toContain("unknown scope operator");
+    expect(keel.requests).toHaveLength(1);
+  });
 });
 
 describe("keeltown", () => {
