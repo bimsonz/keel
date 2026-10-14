@@ -23,7 +23,11 @@ import {
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
-import { CandidateBundlesGitCore } from "../../src/adapters/driven/gitcore/candidate-bundles.ts";
+import {
+  CandidateBundlesGitCore,
+  READ_PACE,
+  type ReadPace,
+} from "../../src/adapters/driven/gitcore/candidate-bundles.ts";
 
 // prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
 const seed = process.env["FC_SEED"];
@@ -79,9 +83,30 @@ async function repoOf(first: FixtureFiles, ...more: FixtureFiles[]) {
   return { commit: sha(commits[0]), commits, reader, taken };
 }
 
-const bundling = (reader: ObjectReader & Disposable) => {
+/** The walk's pace with no waits: in flight as deployed, every turn and retry at once. */
+const INSTANT: ReadPace = { ...READ_PACE, sleep: async () => undefined };
+
+/**
+ * A pace on a clock of its own that moves only when a wait ends, to the time
+ * the wait was for: a walk read at the pace ends at its last read's turn.
+ */
+function clocked(retries: readonly number[] = READ_PACE.retries) {
+  let clock = 0;
+  const pace: ReadPace = {
+    ...READ_PACE,
+    retries,
+    now: () => clock,
+    sleep: (ms) => {
+      const until = clock + ms;
+      return Promise.resolve().then(() => void (clock = Math.max(clock, until)));
+    },
+  };
+  return { pace, now: () => clock };
+}
+
+const bundling = (reader: ObjectReader & Disposable, pace: ReadPace = INSTANT) => {
   const store = makeBundleStoreMemory();
-  const layer = CandidateBundlesGitCore(async () => reader).pipe(Layer.provide(store.layer));
+  const layer = CandidateBundlesGitCore(async () => reader, pace).pipe(Layer.provide(store.layer));
   return Layer.merge(layer, store.layer);
 };
 
@@ -413,9 +438,93 @@ describe("CandidateBundles over gitcore", () => {
         const said = Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "";
         expect(said).toMatch(
           new RegExp(
-            `BundleReadFailed: readBlob src/a/b\\.ts ${oid} failed as read \\d+ of \\d+, \\d+ in flight: ArtifactsError: An internal error occurred\\.`,
+            `BundleReadFailed: readBlob src/a/b\\.ts ${oid} failed as read \\d+ of \\d+, \\d+ in flight, after 5 tries: ArtifactsError: An internal error occurred\\.`,
           ),
         );
+      }),
+  );
+
+  it.effect(
+    "[bundles.read-paced] a large tree is read a few objects at a time, its reads started no faster than the pace, and bundles as it does read at once",
+    () =>
+      Effect.gen(function* () {
+        const files: FixtureFiles = Object.fromEntries(
+          Array.from({ length: 60 }, (_, i) => [`d${i % 3}/f${i}.txt`, `file ${i}\n`]),
+        );
+        const { commit, reader } = yield* Effect.promise(() => repoOf(files));
+        let live = 0;
+        let most = 0;
+        let reads = 0;
+        const slow =
+          <A>(read: () => Promise<A>) =>
+          async (): Promise<A> => {
+            reads += 1;
+            live += 1;
+            most = Math.max(most, live);
+            await new Promise((resolve) => setImmediate(resolve));
+            try {
+              return await read();
+            } finally {
+              live -= 1;
+            }
+          };
+        const watched: ObjectReader & Disposable = {
+          ...reader,
+          readTree: (oid) => slow(() => reader.readTree(oid))(),
+          readBlob: (oid) => slow(() => reader.readBlob(oid))(),
+          readCommit: (oid) => slow(() => reader.readCommit(oid))(),
+        };
+        const { pace, now } = clocked();
+        const paced = yield* bundled(commit).pipe(Effect.provide(bundling(watched, pace)));
+        expect(reads).toBe(1 + 4 + 60);
+        expect(most).toBe(READ_PACE.inFlight);
+        expect(now()).toBe((reads - 1) * (1_000 / READ_PACE.perSecond));
+        const whole = yield* bundled(commit).pipe(Effect.provide(bundling(reader)));
+        expect(paced.bytes).toEqual(whole.bytes);
+      }),
+  );
+
+  it.effect(
+    "[bundles.read-retried] a read the code host fails is tried again after each wait, and an object the repo lacks is not",
+    () =>
+      Effect.gen(function* () {
+        const { commit, reader } = yield* Effect.promise(() =>
+          repoOf({ "README.md": "keel\n", "src/a/b.ts": "export const b = 1;\n" }),
+        );
+        const oid = yield* Effect.promise(() => hashObject("blob", text("export const b = 1;\n")));
+        const failing = (fail: (tries: number) => Error | undefined) => {
+          let tries = 0;
+          const on: ObjectReader & Disposable = {
+            ...reader,
+            readBlob: async (asked) => {
+              if (asked !== oid) return reader.readBlob(asked);
+              tries += 1;
+              const error = fail(tries);
+              if (error !== undefined) throw error;
+              return reader.readBlob(asked);
+            },
+          };
+          return { on, tries: () => tries };
+        };
+        const whole = yield* bundled(commit).pipe(Effect.provide(bundling(reader)));
+
+        const twice = failing((n) =>
+          n <= 2 ? new HostFault("An internal error occurred.") : undefined,
+        );
+        const flaky = clocked([10, 20]);
+        const recovered = yield* bundled(commit).pipe(
+          Effect.provide(bundling(twice.on, flaky.pace)),
+        );
+        expect(recovered.bytes).toEqual(whole.bytes);
+        expect(twice.tries()).toBe(3);
+        expect(flaky.now()).toBeGreaterThanOrEqual(10 + 20);
+
+        const lacking = failing(() => new MissingObject(oid));
+        const exit = yield* Effect.exit(
+          bundled(commit).pipe(Effect.provide(bundling(lacking.on, clocked([10, 20]).pace))),
+        );
+        expect(lacking.tries()).toBe(1);
+        expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain("after 1 tries");
       }),
   );
 });

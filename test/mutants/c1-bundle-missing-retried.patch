@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.read-retried"
+# kills: bundles.read-retried
+# why: an object the repo lacks is asked for again after every wait, fifteen seconds lost on what can never come
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index ee308841..957c144a 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -130,7 +130,7 @@ function counted(reader: ObjectReader, pace: ReadPace): CountedReads {
+           return await call();
+         } catch (error) {
+           const wait = pace.retries[tries - 1];
+-          if (error instanceof MissingObject || wait === undefined)
++          if (wait === undefined)
+             throw new BundleReadFailed(
+               `${what} failed as read ${nth} of ${asked}, ${inFlight} in flight, after ${tries} tries: ${messageOf(error)}`,
+               { cause: error },

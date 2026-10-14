@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.read-paced"
+# kills: bundles.read-paced
+# why: reads start as fast as slots free, so a large tree's walk still sends far more than Artifacts takes in ten seconds
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index ee308841..48a4e503 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -115,7 +115,7 @@ function counted(reader: ObjectReader, pace: ReadPace): CountedReads {
+     const now = pace.now();
+     const start = Math.max(now, nextStart);
+     nextStart = start + 1_000 / pace.perSecond;
+-    if (start > now) await pace.sleep(start - now);
++
+   };
+   const read = async <A>(what: string, call: () => Promise<A>): Promise<A> => {
+     asked += 1;

@@ -6,6 +6,7 @@ import {
   MODE_EXEC,
   MODE_FILE,
   MODE_TREE,
+  MissingObject,
   type ObjectReader,
   type TreeEntry,
 } from "@keeltown/gitcore";
@@ -49,10 +50,36 @@ const messageOf = (error: unknown): string =>
   error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 
 /**
+ * How the walk paces its reads of the code host. Artifacts takes 2,000
+ * requests in 10 s for one repo, and as many for one namespace, which every
+ * project's staging shares; a large tree read all at once (Keel's own: about
+ * 5,400 reads) overran it and every read after failed. The walk keeps a few
+ * reads in flight, starts at most `perSecond` in a second (a quarter of the
+ * namespace's rate), and retries a read the code host failed after each of
+ * `retries`; an object the repo lacks is not retried.
+ */
+export interface ReadPace {
+  readonly inFlight: number;
+  readonly perSecond: number;
+  readonly retries: readonly number[];
+  readonly now: () => number;
+  readonly sleep: (ms: number) => Promise<void>;
+}
+
+export const READ_PACE: ReadPace = {
+  inFlight: 8,
+  perSecond: 50,
+  retries: [1_000, 2_000, 4_000, 8_000],
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+
+/**
  * A read of the walk that the code host failed: which read, of which object
- * at which path, and how far the walk had got (the reads asked so far and
- * those in flight with it), so a bundle step that fails says what it was
- * doing. Led by what is read, since the Lane keeps a step's error short.
+ * at which path, and how far the walk had got (the reads asked so far, those
+ * in flight with it, and how many tries it had), so a bundle step that fails
+ * says what it was doing. Led by what is read, since the Lane keeps a step's
+ * error short.
  */
 class BundleReadFailed extends Error {
   override readonly name = "BundleReadFailed";
@@ -61,29 +88,59 @@ class BundleReadFailed extends Error {
 /** A path as a failed read names it: its end, and the root as `/`. */
 const at = (path: string) => (path === "" ? "/" : path.slice(-PATH_TAIL));
 
-/** The walk's reads of `reader`, counted, each failure a BundleReadFailed. */
+/** The walk's reads of `reader`, paced and counted, each failure a BundleReadFailed. */
 interface CountedReads {
   readonly commit: (oid: string) => ReturnType<ObjectReader["readCommit"]>;
   readonly tree: (oid: string, path: string) => ReturnType<ObjectReader["readTree"]>;
   readonly blob: (oid: string, path: string) => ReturnType<ObjectReader["readBlob"]>;
 }
 
-function counted(reader: ObjectReader): CountedReads {
+function counted(reader: ObjectReader, pace: ReadPace): CountedReads {
   let asked = 0;
   let inFlight = 0;
+  let nextStart = 0;
+  const waiting: (() => void)[] = [];
+  /** A slot among `pace.inFlight`: taken at once, or handed over by a read that ends. */
+  const slot = async () => {
+    if (inFlight < pace.inFlight) inFlight += 1;
+    else await new Promise<void>((resolve) => waiting.push(resolve));
+  };
+  const free = () => {
+    const next = waiting.shift();
+    if (next === undefined) inFlight -= 1;
+    else next();
+  };
+  /** Waits for this read's turn: starts are kept `1000 / perSecond` ms apart. */
+  const turn = async () => {
+    const now = pace.now();
+    const start = Math.max(now, nextStart);
+    nextStart = start + 1_000 / pace.perSecond;
+    if (start > now) await pace.sleep(start - now);
+  };
   const read = async <A>(what: string, call: () => Promise<A>): Promise<A> => {
     asked += 1;
     const nth = asked;
-    inFlight += 1;
+    await slot();
     try {
-      return await call();
-    } catch (error) {
-      throw new BundleReadFailed(
-        `${what} failed as read ${nth} of ${asked}, ${inFlight} in flight: ${messageOf(error)}`,
-        { cause: error },
-      );
+      for (let tries = 1; ; tries += 1) {
+        // oxlint-disable-next-line no-await-in-loop -- a retry waits its turn, after the one before failed
+        await turn();
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- as above
+          return await call();
+        } catch (error) {
+          const wait = pace.retries[tries - 1];
+          if (error instanceof MissingObject || wait === undefined)
+            throw new BundleReadFailed(
+              `${what} failed as read ${nth} of ${asked}, ${inFlight} in flight, after ${tries} tries: ${messageOf(error)}`,
+              { cause: error },
+            );
+          // oxlint-disable-next-line no-await-in-loop -- as above
+          await pace.sleep(wait);
+        }
+      }
     } finally {
-      inFlight -= 1;
+      free();
     }
   };
   return {
@@ -179,9 +236,10 @@ async function filesOf(
  * bundle writer (the one implementation; never a second) and stored for the
  * namespace by its sha256. Anything the writer or the walk refuses is BundleRefused.
  * With `from`, that bundle is read back with the protocol's own reader and
- * the walk reads only what it does not hold.
+ * the walk reads only what it does not hold. The walk's reads are paced
+ * (`ReadPace`), so a large tree stays inside Artifacts' request rate.
  */
-export const CandidateBundlesGitCore = (open: OpenObjects) =>
+export const CandidateBundlesGitCore = (open: OpenObjects, pace: ReadPace = READ_PACE) =>
   Layer.effect(
     CandidateBundles,
     Effect.gen(function* () {
@@ -205,7 +263,7 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
                 Effect.flatMap((held) =>
                   Effect.tryPromise({
                     try: async () => {
-                      const reads = counted(reader);
+                      const reads = counted(reader, pace);
                       return writeBundle(
                         await filesOf(reads, held, (await reads.commit(commit)).tree, ""),
                       );

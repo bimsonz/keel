@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t "bundles.read-paced"
+# kills: bundles.read-paced
+# why: every read of the walk is sent at once, as before, so a large tree's reads overrun Artifacts' request rate together
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index ee308841..6a384a4e 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -102,8 +102,7 @@ function counted(reader: ObjectReader, pace: ReadPace): CountedReads {
+   const waiting: (() => void)[] = [];
+   /** A slot among `pace.inFlight`: taken at once, or handed over by a read that ends. */
+   const slot = async () => {
+-    if (inFlight < pace.inFlight) inFlight += 1;
+-    else await new Promise<void>((resolve) => waiting.push(resolve));
++    inFlight += 1;
+   };
+   const free = () => {
+     const next = waiting.shift();
