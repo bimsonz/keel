@@ -14,7 +14,8 @@ import {
   viewSnapshot,
 } from "@keeltown/core/application/memory";
 import type { EventEnvelope } from "@keeltown/core/kernel";
-import { Decisions, EntityStore, ProjectViews } from "@keeltown/core/ports";
+import { getVerdict } from "@keeltown/core/application/verification";
+import { Decisions, EntityStore, ProjectViews, Verdicts } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { makeEntityStoreMemory } from "./storage.ts";
 
@@ -72,4 +73,17 @@ export function makeProjectViewsMemory() {
 export function makeDecisionsMemory() {
   const { provided, skipped, arrive } = projectorMemory();
   return { skipped, arrive, layer: Layer.succeed(Decisions, decisionsOver(provided)) };
+}
+
+/** The Projector's verdict index over an in-memory store, walked by the same core functions the Projector DO runs. */
+export function makeVerdictsMemory() {
+  const { provided, skipped, arrive } = projectorMemory();
+  return {
+    skipped,
+    arrive,
+    layer: Layer.succeed(
+      Verdicts,
+      Verdicts.of({ get: (verdictId) => provided(getVerdict(verdictId)) }),
+    ),
+  };
 }

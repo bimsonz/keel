@@ -39,6 +39,8 @@ import {
   sampleSponsorId,
   makeNamespaceUsageMemory,
   deliveryMemoryLayer,
+  makeVerdictsMemory,
+  makePlanStoreMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
@@ -94,6 +96,8 @@ const runtime = ManagedRuntime.make(
     makeEventFeedMemory().layer,
     makeProjectViewsMemory().layer,
     makeDecisionsMemory().layer,
+    makeVerdictsMemory().layer,
+    makePlanStoreMemory().layer,
     makeProbeStoreMemory().layer,
     makeProbeLedgerMemory().world,
     codeHost.layer,

@@ -45,6 +45,8 @@ import {
   sampleSponsorId,
   makeNamespaceUsageMemory,
   deliveryMemoryLayer,
+  makeVerdictsMemory,
+  makePlanStoreMemory,
 } from "@keeltown/testing";
 import { ulid } from "ulid";
 import { Layer, ManagedRuntime, Schema } from "effect";
@@ -166,6 +168,8 @@ function grantedSurface() {
       makeEventFeedMemory().layer,
       makeProjectViewsMemory().layer,
       makeDecisionsMemory().layer,
+      makeVerdictsMemory().layer,
+      makePlanStoreMemory().layer,
       makeProbeStoreMemory().layer,
       makeProbeLedgerMemory().world,
       makeCodeHostMemory().layer,

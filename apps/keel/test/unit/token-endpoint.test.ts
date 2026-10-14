@@ -35,6 +35,8 @@ import {
   sampleSponsorId,
   makeNamespaceUsageMemory,
   deliveryMemoryLayer,
+  makeVerdictsMemory,
+  makePlanStoreMemory,
 } from "@keeltown/testing";
 import { decodeJwt } from "jose";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -98,6 +100,8 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
       makeEventFeedMemory().layer,
       makeProjectViewsMemory().layer,
       makeDecisionsMemory().layer,
+      makeVerdictsMemory().layer,
+      makePlanStoreMemory().layer,
       makeProbeStoreMemory().layer,
       makeProbeLedgerMemory().world,
       makeProjectsMemory().layer,

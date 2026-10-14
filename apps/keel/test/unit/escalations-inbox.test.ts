@@ -45,6 +45,8 @@ import {
   makeUsersMemory,
   makeNamespaceUsageMemory,
   deliveryMemoryLayer,
+  makeVerdictsMemory,
+  makePlanStoreMemory,
 } from "@keeltown/testing";
 import { Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
@@ -130,6 +132,8 @@ function world() {
       makeEventFeedMemory().layer,
       makeProjectViewsMemory().layer,
       makeDecisionsMemory().layer,
+      makeVerdictsMemory().layer,
+      makePlanStoreMemory().layer,
       makeProbeStoreMemory().layer,
       makeProbeLedgerMemory().layer,
       escalations.layer,

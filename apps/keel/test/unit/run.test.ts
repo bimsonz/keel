@@ -28,6 +28,8 @@ import {
   makeUsersMemory,
   makeNamespaceUsageMemory,
   deliveryMemoryLayer,
+  makeVerdictsMemory,
+  makePlanStoreMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -61,6 +63,8 @@ const runtime = ManagedRuntime.make(
     makeEventFeedMemory().layer,
     makeProjectViewsMemory().layer,
     makeDecisionsMemory().layer,
+    makeVerdictsMemory().layer,
+    makePlanStoreMemory().layer,
     makeProbeStoreMemory().layer,
     makeProbeLedgerMemory().world,
     makeCodeHostMemory().layer,
