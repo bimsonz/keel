@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hook.project
+# why: the token `why` is asked with names no project, so Keel reads in none and explains nothing
+diff --git a/packages/cli/src/hook.ts b/packages/cli/src/hook.ts
+index dbb9e8da..dfcf4407 100644
+--- a/packages/cli/src/hook.ts
++++ b/packages/cli/src/hook.ts
+@@ -171,7 +171,7 @@ async function noteFor(context: HookContext, input: unknown): Promise<string | u
+   const { project, state } = await projectOf(context, agent, place, readState(context.io, session));
+   let answer: WhyAnswer;
+   try {
+-    answer = await agent.client(project.id).why({ path }, { signal: context.signal });
++    answer = await agent.client().why({ path }, { signal: context.signal });
+   } catch (error) {
+     if (error instanceof KeelProblem && error.code === "why.nothing_to_explain") return undefined;
+     throw error;

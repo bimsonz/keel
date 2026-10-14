@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hook.note
+# why: the note leaves out the guard holding the decision, so the agent never learns what keeps it in force
+diff --git a/packages/cli/src/hook.ts b/packages/cli/src/hook.ts
+index dbb9e8da..8121b9ae 100644
+--- a/packages/cli/src/hook.ts
++++ b/packages/cli/src/hook.ts
+@@ -284,7 +284,7 @@ function blockOf(decision: Explained, records: boolean): string {
+   const [first, ...rest] = decision.links;
+   return [
+     first?.summary ?? decision.label,
+-    ...rest.map((link) => `- ${link.summary}`),
++    ...rest.filter((link) => link.record.kind !== "observation").map((link) => `- ${link.summary}`),
+     ...decision.next.map(actionLine),
+     ...(records
+       ? ["MFP records:", ...decision.links.map((link) => JSON.stringify(link.record))]

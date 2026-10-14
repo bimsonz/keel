@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hook.primer
+# why: the primer leaves out the project's decisions, so a session starts not knowing what was ruled
+diff --git a/packages/cli/src/hook.ts b/packages/cli/src/hook.ts
+index dbb9e8da..abfd0501 100644
+--- a/packages/cli/src/hook.ts
++++ b/packages/cli/src/hook.ts
+@@ -233,7 +233,7 @@ async function primerFor(context: HookContext, input: unknown): Promise<string |
+       `${waiting} ${waiting === 1 ? "notice" : "notices"} waiting${waiting === 0 ? "." : ": `keeltown inbox` reads them."}`,
+     );
+   }
+-  if (decisions.status === "fulfilled") {
++  if (decisions.status === "fulfilled" && decisions.value.items.length < 0) {
+     const active = decisions.value.items.filter((decision) => decision.state === "active");
+     lines.push(
+       `${active.length} active ${active.length === 1 ? "decision" : "decisions"}${active.length === 0 ? "." : " (`keeltown why --subject <subject>` prints one's chain):"}`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hooks.install
+# why: running install again adds Keel's hooks a second time, so each runs twice and each note is told twice
+diff --git a/packages/cli/src/hooks-install.ts b/packages/cli/src/hooks-install.ts
+index 9e32b332..fefe632d 100644
+--- a/packages/cli/src/hooks-install.ts
++++ b/packages/cli/src/hooks-install.ts
+@@ -99,7 +99,7 @@ export async function installHooks(
+   const hooks: Record<string, unknown> = Object(settings["hooks"] ?? {});
+   for (const [event, group] of Object.entries(ours)) {
+     const theirs: unknown = hooks[event];
+-    hooks[event] = [...(Array.isArray(theirs) ? theirs.filter((g) => !isOurs(g)) : []), group];
++    hooks[event] = [...(Array.isArray(theirs) ? theirs : []), group];
+   }
+   mkdirSync(join(top.stdout.trim(), ".claude"), { recursive: true });
+   writeFileSync(file, `${JSON.stringify({ ...settings, hooks }, null, 2)}\n`);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hooks.install-names
+# why: a run label is written into a shell command unchecked, so a quote in it runs whatever follows
+diff --git a/packages/cli/src/hooks-install.ts b/packages/cli/src/hooks-install.ts
+index 9e32b332..f4185e12 100644
+--- a/packages/cli/src/hooks-install.ts
++++ b/packages/cli/src/hooks-install.ts
+@@ -54,7 +54,7 @@ export async function installHooks(
+ ): Promise<ExitCode> {
+   // The profile is checked as every command checks it; a bad one throws the CLI's own KeyError.
+   entryName(options.baseUrl, options.profile);
+-  if (options.run !== undefined && !RUN_LABEL.test(options.run)) {
++  if (options.run !== undefined && !RUN_LABEL.test(options.run) && options.run.length > 64) {
+     io.stderr("--run takes a run label: lower-case letters, digits, '.', '_' and '-', 64 at most");
+     return 2;
+   }

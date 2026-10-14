@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hook.budget
+# why: a file many decisions explain brings a note past Claude Code's cap, which it cuts to a file path and 2,000 characters
+diff --git a/packages/cli/src/hook.ts b/packages/cli/src/hook.ts
+index dbb9e8da..52bad119 100644
+--- a/packages/cli/src/hook.ts
++++ b/packages/cli/src/hook.ts
+@@ -184,7 +184,7 @@ async function noteFor(context: HookContext, input: unknown): Promise<string | u
+   const note = renderDecisions(
+     `Keel: ${fresh.length} active ${fresh.length === 1 ? "decision explains" : "decisions explain"} ${path} in ${place.handle}/${place.name}. Each comes with Keel's chain for it, the next action to read it, and the chain as MFP records, one a line.`,
+     fresh,
+-    { budget: NOTE_BUDGET, rest: `\`keeltown why --path ${path}\` prints them all` },
++    { rest: `\`keeltown why --path ${path}\` prints them all` },
+   );
+   writeState(context.io, session, { ...state, told: [...state.told, ...note.shown] });
+   return note.text;

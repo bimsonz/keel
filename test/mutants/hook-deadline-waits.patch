@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/hook.test.ts
+# kills: hook.deadline
+# why: the hook waits on Keel however long it takes, holding the agent's tool until Claude Code's own timeout
+diff --git a/packages/cli/src/hook.ts b/packages/cli/src/hook.ts
+index dbb9e8da..3a85a4af 100644
+--- a/packages/cli/src/hook.ts
++++ b/packages/cli/src/hook.ts
+@@ -130,7 +130,7 @@ export async function hookCommand(
+   const sleep = io.sleep ?? unrefSleep;
+   const said = await Promise.race([
+     work,
+-    sleep(DEADLINE_MS[event]).then(() => {
++    new Promise<void>(() => {}).then(() => {
+       io.stderr(`keeltown hook ${event}: Keel did not answer in ${DEADLINE_MS[event]} ms`);
+       return undefined;
+     }),
