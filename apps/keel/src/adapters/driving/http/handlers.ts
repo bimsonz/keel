@@ -937,7 +937,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             ? agentsOnly(caller.requestId)
             : run(
                 caller,
-                tokenOf(caller).pipe(
+                claimsOf(caller).pipe(
                   Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
                   Effect.map(inboxOk),
                 ),

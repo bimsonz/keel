@@ -978,6 +978,30 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
       reads: ["askSponsor"],
     });
   });
+
+  it("[inbox.own-namespace] a token that names no project reads the agent's own inbox, over REST and MCP, and is told there the moment an org invites it", async () => {
+    const { slug, member } = await anOrg();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const head = await http(own, "GET", "/inbox?cursor=end");
+    expect(head.status).toBe(200);
+    const cursor = String(Object(head.body["result"])["cursor"]);
+    const door = await agent.token(undefined, undefined, `${BASE}/mcp`);
+    expect((await tool(door, "inbox", { cursor: "end" })).refused).toBe(false);
+
+    expect(
+      (await http(member.token, "POST", `/namespaces/${slug}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    await vi.waitFor(async () => {
+      const page = await http(own, "GET", `/inbox?cursor=${cursor}`);
+      expect(page.status).toBe(200);
+      const notices: unknown = Object(page.body["result"])["notices"];
+      expect((Array.isArray(notices) ? notices : []).map((notice) => notice["kind"])).toEqual([
+        "AgentInvited",
+      ]);
+    }, WAIT);
+  });
 });
 
 /** One tool of Keel's MCP, called as an agent's client calls it: its answer, refused or not. */

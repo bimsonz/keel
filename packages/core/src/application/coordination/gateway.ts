@@ -14,6 +14,7 @@ import {
   WorkspaceNotFound,
 } from "../../domain/coordination/index.ts";
 import type {
+  AgentClaims,
   Audience,
   IdempotencyConflict,
   InboxPage,
@@ -339,10 +340,11 @@ export const submissionOf: (
 /**
  * The caller's own inbox after `cursor`, read as the run its token names,
  * waiting up to `waitSeconds` (0–900) for a notice. Each hold reads on from
- * the cursor the one before answered, so `end` finds the head once.
+ * the cursor the one before answered, so `end` finds the head once. The inbox
+ * is the agent's, so a token that names no project reads it as well.
  */
 export const readInbox: (
-  principal: AgentToken,
+  principal: Pick<AgentClaims, "agentId" | "run">,
   cursor: string | undefined,
   waitSeconds?: number,
 ) => Effect.Effect<InboxPage, never, Inbox | Clock> = (principal, cursor, waitSeconds) =>
