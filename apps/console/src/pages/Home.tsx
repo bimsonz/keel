@@ -9,9 +9,15 @@ import type { EscalationView, ProjectView } from "../contract/keel/index.ts";
 import { type KeelDirectory, KeelRefused } from "../source/types.ts";
 import { CATEGORY } from "../views/Escalation.tsx";
 import { Notice } from "../views/Frame.tsx";
-import { ABOUT } from "../views/Footer.tsx";
 import { Column, EscalationMark, Row, Rows } from "../views/List.tsx";
 import { dateTime } from "../views/parts.tsx";
+
+/** Where Keel's source, its walk from a key to a first change and its API's description are, for a visitor. */
+const ABOUT: readonly { label: string; href: string }[] = [
+  { label: "Source on GitHub", href: "https://github.com/bimsonz/keel" },
+  { label: "Quickstart", href: "/start" },
+  { label: "API", href: "/v1/openapi.json" },
+];
 
 /** Projects, each under its owner, as a code host lists repositories. */
 function ProjectRows({ label, projects }: { label: string; projects: readonly ProjectView[] }) {

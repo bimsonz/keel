@@ -5300,9 +5300,9 @@ for (const [which, title] of [
     "",
   );
   expectEqual(
-    `legal: /${which} has the foot every page has`,
+    `legal: /${which} has the foot every page has, the two legal documents and nothing else`,
     await footOf(reading),
-    "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
+    "/terms /privacy",
   );
 }
 await reading.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
@@ -5313,9 +5313,9 @@ expectEqual(
   "By creating an account you agree to the Terms of Service and the Privacy Notice. | /terms /privacy",
 );
 expectEqual(
-  "legal: an account's page has the foot",
+  "legal: an account's page has the foot, the two legal documents and nothing else",
   await footOf(reading),
-  "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
+  "/terms /privacy",
 );
 await reading.goto(`${built}/login`, { waitUntil: "domcontentloaded" });
 await reading.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
@@ -5332,9 +5332,9 @@ await reading
   .waitFor({ timeout: 10_000 })
   .catch(() => {});
 expectEqual(
-  "legal: a project's page has the foot",
+  "legal: a project's page has the foot, the two legal documents and nothing else",
   await footOf(reading),
-  "/terms /privacy https://github.com/bimsonz/keel /start /v1/openapi.json",
+  "/terms /privacy",
 );
 await reading
   .locator("footer a", { hasText: "Privacy Notice" })
