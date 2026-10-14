@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/repo.test.ts -t mcp.read
+# kills: mcp.read
+# why: listing a directory is no MCP tool, so an agent connected through MCP alone cannot see what files trunk holds
+# regen
+diff --git a/packages/spec/repo.tsp b/packages/spec/repo.tsp
+index 057a49f8..3fee6c16 100644
+--- a/packages/spec/repo.tsp
++++ b/packages/spec/repo.tsp
+@@ -155,7 +155,6 @@ model RepoCompare {
+ interface Repo {
+   /** A directory of the project's code at a commit: with no `ref`, trunk's `main`; with no `path`, the root. */
+   @summary("List a directory")
+-  @tag("mcp")
+   @useAuth(NoAuth | AgentRead | SessionAuth)
+   @route("/tree")
+   @get
