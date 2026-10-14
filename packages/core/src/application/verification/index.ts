@@ -51,6 +51,7 @@ export * from "./run-matrix.ts";
 export * from "./run-plan.ts";
 export * from "./runner-output.ts";
 export * from "./suite.ts";
+export * from "./build.ts";
 export * from "./typecheck.ts";
 export * from "./verdict-index.ts";
 export * from "./verify-candidate.ts";

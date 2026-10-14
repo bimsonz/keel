@@ -1,13 +1,19 @@
 import {
+  BUILD_BUNDLE_LIMIT,
+  BUILD_CONFIG_LIMIT,
+  BUILD_PROTOCOL,
+  type BuildJudgement,
   COMMAND_PROTOCOL,
   COMMAND_TAIL_LIMIT,
   type CommandJudgement,
   type DepsAnswer,
   depsStop,
   JS_TS_SUITE,
+  judgeBuild,
   judgeCommand,
   judgeSuite,
   judgeTypecheck,
+  parseBuildOutput,
   parseCommandOutput,
   parseSuiteOutput,
   parseTypecheckOutput,
@@ -20,6 +26,7 @@ import {
   TYPECHECK_OUTPUT_LIMIT,
   TYPECHECK_PROTOCOL,
   type TypecheckJudgement,
+  WORKER_APP_BUILD,
   WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
 import type { ContentHash, Json, NamespaceId } from "@keeltown/core/kernel";
@@ -34,6 +41,7 @@ import {
   signedDepsPartUrl,
 } from "@keeltown/runner-protocol";
 import { Clock, Effect, Layer } from "effect";
+import { BUILD_SCRIPT, ROLLDOWN_IN_WORKSPACE } from "./build-script.ts";
 
 /**
  * Puts the step's deps bundle into the hydrated workspace from the parts'
@@ -180,6 +188,52 @@ export const projectCommand = (run: StepRun): string =>
     "keel_deps_drop /workspace",
     "echo KEEL_END",
     "exit 0",
+  ].join("\n");
+
+/**
+ * The worker-app build command (POSIX sh), per BUILD_PROTOCOL, for the Worker
+ * at `path` (the base's deploy spec's, which its pattern keeps to `[\w./-]`
+ * with no `..`; the repo's root when absent). It hydrates, puts the deps in
+ * place and drops them as the suite command does, and always exits 0. The
+ * wrangler config is the first of wrangler.jsonc, wrangler.json and
+ * wrangler.toml there that is a plain file (a symlink is not followed), and its
+ * first BUILD_CONFIG_LIMIT bytes are printed for Keel to judge. The build
+ * script goes in as one base64 literal and runs under node with no stdin; its
+ * console goes to a file and only a base64 tail is printed, so nothing it
+ * prints can forge a marker. The module is printed gzipped and base64'd, or
+ * `too-large` past BUILD_BUNDLE_LIMIT.
+ */
+export const buildCommand = (path: string | undefined): string =>
+  [
+    "set -u",
+    "K=/tmp/keel; rm -rf $K; mkdir -p $K",
+    `echo ${BUILD_PROTOCOL}`,
+    'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
+    "finish() { keel_deps_drop /workspace; echo KEEL_END; exit 0; }",
+    HYDRATE_SH,
+    DEPS_FETCH_SH,
+    DEPS_DROP_SH,
+    "cd /workspace 2>/dev/null || stop no-workspace",
+    'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+    DEPS_IN_PLACE,
+    NO_DEPS_CHECK,
+    `D='/workspace/${path ?? "."}'`,
+    'cfg=""; for f in wrangler.jsonc wrangler.json wrangler.toml; do if [ -f "$D/$f" ] && [ ! -L "$D/$f" ]; then cfg=$f; break; fi; done',
+    'if [ -z "$cfg" ]; then echo "KEEL_CONFIG none"; finish; fi',
+    `echo "KEEL_CONFIG $cfg $(wc -c <"$D/$cfg" | tr -d ' ') $(head -c ${BUILD_CONFIG_LIMIT} "$D/$cfg" | base64 -w0)"`,
+    `R=${ROLLDOWN_IN_WORKSPACE}`,
+    'if [ ! -f "$R" ]; then echo "KEEL_BUNDLER none"; finish; fi',
+    "echo KEEL_BUNDLER ok",
+    `echo ${base64Of(BUILD_SCRIPT)} | base64 -d >$K/build.mjs`,
+    "start=$(date +%s%3N)",
+    'node $K/build.mjs "$R" "$D/$cfg" $K/worker.js >$K/build.log 2>&1 </dev/null',
+    "code=$?",
+    "end=$(date +%s%3N)",
+    'echo "KEEL_EXIT $code"',
+    'echo "KEEL_DURATION_MS $((end - start))"',
+    'if [ -s $K/build.log ]; then echo "KEEL_TAIL $(tail -c 4096 $K/build.log | base64 -w0)"; else echo "KEEL_TAIL none"; fi',
+    `if [ $code -eq 0 ] && [ -s $K/worker.js ]; then gzip -c $K/worker.js >$K/worker.js.gz; n=$(wc -c <$K/worker.js.gz | tr -d ' '); if [ "$n" -gt ${BUILD_BUNDLE_LIMIT} ]; then echo "KEEL_BUNDLE too-large $n"; else echo "KEEL_BUNDLE $(base64 -w0 <$K/worker.js.gz)"; fi; else echo "KEEL_BUNDLE none"; fi`,
+    "finish",
   ].join("\n");
 
 /** What a suite runner is asked: never a credential, one infra retry, bounded time, short-lived snapshots. */
@@ -367,9 +421,39 @@ export const judgeCommandOutput = (
     return { ...judged, document: redactJson({ ...judged.evidence }, literals) };
   });
 
-/** A Tier 2 step this runtime can run: the command a runner executes, and how its stdout is judged. */
+/**
+ * Reads one build runner's stdout into a judgement, as for a command: parse,
+ * decode the config's and the tail's text, scan it all raw, judge, redact. The
+ * evidence of a pass carries the module, for the preview to upload.
+ */
+export const judgeBuildOutput = (
+  step: PlanStep,
+  stdout: string,
+  literals: readonly string[],
+): Effect.Effect<BuildJudgement & { readonly document: Json }> =>
+  Effect.sync(() => {
+    const output = parseBuildOutput(stdout);
+    const config = output._tag === "ran" ? decodedText(output.config.text) : undefined;
+    const tail =
+      output._tag === "ran" && output.tail !== undefined ? (decodedText(output.tail) ?? "") : "";
+    const diagnosis = diagnosisOf(output);
+    const credentialScan = scanCredentials(
+      [stdout, tail, config ?? "", diagnosis.diagnosis ?? ""],
+      {
+        literals,
+      },
+    );
+    const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
+    return { ...judged, document: redactJson({ ...judged.evidence }, literals) };
+  });
+
+/**
+ * A Tier 2 step this runtime can run: the command a runner executes (the same
+ * for every step, or made from the plan step, as a build is from its deploy
+ * spec's path), and how its stdout is judged.
+ */
 export interface Tier2Runner {
-  readonly command: string;
+  readonly command: string | ((step: PlanStep) => string);
   readonly judge: (
     step: PlanStep,
     stdout: string,
@@ -381,6 +465,10 @@ export interface Tier2Runner {
 export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
   [JS_TS_SUITE.id]: { command: JS_TS_SUITE_COMMAND, judge: judgeSuiteOutput },
   [WORKER_APP_TYPECHECK.id]: { command: TYPECHECK_COMMAND, judge: judgeTypecheckOutput },
+  [WORKER_APP_BUILD.id]: {
+    command: (step) => buildCommand(step.deploy?.path),
+    judge: judgeBuildOutput,
+  },
 };
 
 /**
@@ -390,7 +478,9 @@ export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
  */
 export const tier2RunnerFor = (
   step: PlanStep,
-): (Tier2Runner & { readonly config: SuiteRunnerOptions["config"] }) | undefined => {
+):
+  | (Tier2Runner & { readonly command: string; readonly config: SuiteRunnerOptions["config"] })
+  | undefined => {
   if (step.run !== undefined)
     return {
       command: projectCommand(step.run),
@@ -402,7 +492,13 @@ export const tier2RunnerFor = (
       },
     };
   const runner = TIER2_RUNNERS[step.id];
-  return runner === undefined ? undefined : { ...runner, config: SUITE_CONFIG };
+  return runner === undefined
+    ? undefined
+    : {
+        ...runner,
+        command: typeof runner.command === "string" ? runner.command : runner.command(step),
+        config: SUITE_CONFIG,
+      };
 };
 
 const abstained = (step: PlanStep): StepResult => ({

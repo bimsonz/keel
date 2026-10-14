@@ -81,11 +81,12 @@ export const CITED_FAILURES = 20;
 
 /**
  * A failure a verdict cites: a failing test, an error the typecheck named, a
- * guard whose probe failed, or dependencies that could not be installed, with
- * what to do about them.
+ * guard whose probe failed, dependencies that could not be installed, with
+ * what to do about them, or a deploy check (the build, the preview, or a smoke
+ * request) the change failed.
  */
 interface Cited {
-  readonly kind: "test" | "type" | "guard" | "deps";
+  readonly kind: "test" | "type" | "guard" | "deps" | "deploy";
   readonly name: string;
 }
 
@@ -94,6 +95,7 @@ export const CITED_AS: Record<Cited["kind"], { readonly plural: string; readonly
   type: { plural: "type errors", line: "type error" },
   guard: { plural: "guarded behaviour", line: "guard failed" },
   deps: { plural: "dependencies", line: "dependencies refused" },
+  deploy: { plural: "deploy checks", line: "deploy check failed" },
 };
 
 /** A bounce's remedy, naming what failed when the evidence names anything. */
@@ -108,7 +110,8 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
   const types = cited.filter((c) => c.kind === "type").map((c) => c.name);
   const guards = cited.filter((c) => c.kind === "guard").map((c) => c.name);
   const deps = cited.filter((c) => c.kind === "deps").map((c) => c.name);
-  const kinds = (["test", "type", "guard", "deps"] as const).filter((k) =>
+  const deploys = cited.filter((c) => c.kind === "deploy").map((c) => c.name);
+  const kinds = (["test", "type", "guard", "deps", "deploy"] as const).filter((k) =>
     cited.some((c) => c.kind === k),
   );
   const phrases = kinds.map((k) => CITED_AS[k].plural);
@@ -128,6 +131,7 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
       ...(types.length === 0 ? {} : { typeErrors: types }),
       ...(guards.length === 0 ? {} : { failingGuards: guards }),
       ...(deps.length === 0 ? {} : { depsRefused: deps }),
+      ...(deploys.length === 0 ? {} : { failingDeployChecks: deploys }),
     },
   };
 };
@@ -142,10 +146,11 @@ const readDecision = (decision: HeldDecision): NextAction => ({
 
 /**
  * What a failing step stored that names its failures: a suite's tests, a
- * typecheck's errors, a guard's probe, or the dependencies it was refused
- * (`depsStop`).
+ * typecheck's errors, a guard's probe, the dependencies it was refused
+ * (`depsStop`), or the deploy check it failed.
  */
 const StoredFailures = Schema.Struct({
+  deploy: Schema.optional(Schema.Struct({ failure: Schema.String })),
   deps: Schema.optional(Schema.Struct({ refused: Schema.String, remedy: Schema.String })),
   guard: Schema.optional(Schema.Struct({ predicate: Schema.String, probe: Schema.String })),
   reason: Schema.optional(Schema.String),
@@ -220,6 +225,8 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
     const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
     if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
       failures.push({ kind: "deps", name: depsName });
+    if (stored.value.deploy !== undefined)
+      failures.push({ kind: "deploy", name: `${r.stepId}: ${stored.value.deploy.failure}` });
     if (stored.value.guard !== undefined) {
       const decision = plan.steps.find((s) => s.id === r.stepId)?.guards?.decision;
       if (decision !== undefined) held.set(decision.id, decision);

@@ -7,7 +7,9 @@ import {
   runJob,
   settleVerdict,
   WORKER_APP_PACK,
+  workerAppDeployPack,
 } from "@keeltown/core/application/verification";
+import { DeploySpec } from "@keeltown/core/domain/delivery";
 import {
   compile,
   type StepReport,
@@ -416,5 +418,61 @@ describe("a worker app's verdict", () => {
       });
       expect((yield* settle("pass", "pass")).outcome).toBe("land");
     }),
+  );
+});
+
+describe("a deployed worker app's verdict", () => {
+  const plan = compile(
+    undefined,
+    { baseCommit: CommitSha.make("0".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
+    workerAppDeployPack(
+      Schema.decodeUnknownSync(DeploySpec)({
+        target: "production",
+        worker: "worker-lite",
+        smoke: [{ path: "/health", status: 200 }],
+      }),
+    ),
+  );
+  if (plan._tag === "Failure") throw new Error("the deploy pack does not compile");
+
+  it.effect(
+    "[verify.deploy-cited] a failed deploy check bounces, cited by its step and what failed, and the bounce asks for it to be fixed",
+    () =>
+      Effect.gen(function* () {
+        const evidence = yield* EvidenceStore;
+        const failure = "GET /health answered 500, not 200";
+        const reports: StepReport[] = [];
+        for (const s of plan.success.steps) {
+          const outcome = s.id === "deploy.smoke" ? "fail" : "pass";
+          const resultRef = yield* evidence.put(sampleNamespace, {
+            stepId: s.id,
+            outcome,
+            ...(outcome === "fail" ? { deploy: { failure } } : {}),
+          });
+          reports.push({
+            stepId: s.id,
+            outcome,
+            evidenceClass: s.evidenceCeiling,
+            tier: s.tier,
+            durationMs: 1,
+            resultRef,
+          });
+        }
+        const settled = yield* settleVerdict(sampleNamespace, plan.success, reports);
+        const cited = `deploy.smoke: ${failure}`;
+        expect(settled.outcome).toBe("bounce");
+        expect(settled.failingTests).toEqual([cited]);
+        expect(settled.evidence.filter((line) => line.startsWith("deploy check"))).toEqual([
+          `deploy check failed: ${cited}`,
+        ]);
+        expect(settled.nextActions).toEqual([
+          {
+            kind: "call",
+            title: `Fix the deploy checks, push, then submit again: ${cited}`,
+            operationId: "submit",
+            args: { failingDeployChecks: [cited] },
+          },
+        ]);
+      }).pipe(Effect.provide(Layer.merge(makeEvidenceStoreMemory().layer, makeIdsMemory().layer))),
   );
 });

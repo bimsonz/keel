@@ -1,5 +1,5 @@
 import { Result, Schema } from "effect";
-import type { ChangeId } from "../kernel/index.ts";
+import type { ChangeId, Json } from "../kernel/index.ts";
 import { DeployTargetName } from "./deployment.ts";
 
 /** The path a project's deploy spec is read from, at the change's base, like its flow. */
@@ -107,7 +107,8 @@ export interface WranglerFacts {
   readonly main: string;
   readonly compatibilityDate: string;
   readonly compatibilityFlags: readonly string[];
-  readonly vars: Readonly<Record<string, unknown>>;
+  /** Read from JSON, so each is JSON. */
+  readonly vars: Readonly<Record<string, Json>>;
 }
 
 /** A wrangler config Keel will not upload from, and why. */
