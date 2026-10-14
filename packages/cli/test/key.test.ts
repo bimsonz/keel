@@ -7,6 +7,9 @@ const TOKEN_ENDPOINT = `${ORIGIN}/v1/auth/oauth2/token`;
 const REGISTER = `${ORIGIN}/v1/oauth/register`;
 const AGENT = "agt_0123456789ABCDEFGHJKMNPQRS";
 const HANDLE = "agent-0123456789abcdef";
+const SPONSOR_REQUEST = `${ORIGIN}/v1/agents/me/sponsor-request`;
+const SPONSOR_PAGE = `${ORIGIN}/sponsor#agent=${AGENT}&code=code-1`;
+const NAMESPACES = `${ORIGIN}/v1/agents/me/namespaces/`;
 
 interface Sent {
   readonly url: string;
@@ -35,8 +38,9 @@ const decoded = (secret: string | undefined): Record<string, unknown> =>
 
 /**
  * A fake Keel for a CLI that holds a key: the discovery document, sign-up
- * (201 the first time a key signs up, 200 after), the token endpoint, and
- * `whoami` for everything else.
+ * (201 the first time a key signs up, 200 after), the token endpoint, a
+ * sponsor's request, an org's invitation accepted, and `whoami` for
+ * everything else.
  */
 function keel(options: { readonly store?: "none"; readonly env?: Record<string, string> } = {}) {
   const log: string[] = [];
@@ -80,6 +84,23 @@ function keel(options: { readonly store?: "none"; readonly env?: Record<string, 
           token_type: request.headers.has("dpop") ? "DPoP" : "Bearer",
           expires_in: 300,
           scope: "agent:work agent:read",
+        });
+      if (url === SPONSOR_REQUEST)
+        return Response.json(
+          {
+            ok: true,
+            summary: `Show ${SPONSOR_PAGE} to the person who will stand behind you.`,
+            result: { code: "code-1", url: SPONSOR_PAGE, expiresAt: "2026-10-14T02:10:00.000Z" },
+          },
+          { status: 201 },
+        );
+      if (url.startsWith(NAMESPACES))
+        return Response.json({
+          namespace: { handle: decodeURIComponent(url.slice(NAMESPACES.length)), kind: "org" },
+          state: "joined",
+          scopes: ["agent:read", "agent:work"],
+          invitedAt: "2026-10-14T02:00:00.000Z",
+          joinedAt: "2026-10-14T02:05:00.000Z",
         });
       return Response.json({ ok: true, summary: "You are the agent.", result: {} });
     },
@@ -268,5 +289,47 @@ describe("keeltown, for an agent that holds a key", () => {
     expect(shown).toMatchObject({ agentId: AGENT, handle: HANDLE, key: "a test key store" });
     expect(String(Reflect.get(Object(shown), "thumbprint"))).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(k.out.join("\n")).not.toContain(privatePartOf(k.store));
+  });
+
+  it("[cli.sponsor-request] asks for a sponsor as the agent its key signed up, and prints the page where a person approves", async () => {
+    const k = keel();
+    expect(await run(["agent", "sponsor-request"], k.io)).toBe(2);
+    expect(k.err.join("\n")).toMatch(/keeltown agent signup/);
+    expect(k.sent).toEqual([]);
+    await run(["agent", "signup"], k.io);
+    k.out.length = 0;
+    expect(await run(["agent", "sponsor-request"], k.io)).toBe(0);
+    const [asked] = k.to(SPONSOR_REQUEST);
+    expect(asked?.method).toBe("POST");
+    expect(asked?.headers.get("authorization")).toBe("DPoP token-1");
+    expect(k.out.join("\n")).toContain(SPONSOR_PAGE);
+    expect(await run(["agent", "sponsor-request", "--json"], k.io)).toBe(0);
+    expect(JSON.parse(k.out.at(-1) ?? "null")).toMatchObject({
+      result: { code: "code-1", url: SPONSOR_PAGE },
+    });
+    expect(everythingSaid(k)).not.toContain(privatePartOf(k.store));
+  });
+
+  it("[cli.join] accepts an org's invitation by its handle, as the agent the named profile's key signed up", async () => {
+    const k = keel();
+    await run(["agent", "signup", "--profile", "keelbot"], k.io);
+    k.out.length = 0;
+    expect(await run(["agent", "join", "keel"], k.io)).toBe(2);
+    expect(k.to(`${NAMESPACES}keel`)).toEqual([]);
+    expect(
+      await run(["agent", "join", "keel", "--profile", "keelbot", "--key", "join-1"], k.io),
+    ).toBe(0);
+    const [joined] = k.to(`${NAMESPACES}keel`);
+    expect(joined?.method).toBe("PUT");
+    expect(joined?.headers.get("idempotency-key")).toBe("join-1");
+    expect(joined?.headers.get("authorization")).toBe("DPoP token-1");
+    expect(JSON.parse(k.out.join("\n"))).toMatchObject({
+      namespace: { handle: "keel", kind: "org" },
+      state: "joined",
+    });
+    const sent = k.sent.length;
+    expect(await run(["agent", "join", "--profile", "keelbot"], k.io)).toBe(2);
+    expect(await run(["agent", "join", "keel", "acme", "--profile", "keelbot"], k.io)).toBe(2);
+    expect(k.sent).toHaveLength(sent);
   });
 });
