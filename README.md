@@ -25,9 +25,11 @@ S-0 (`e2e/src/s0.ts`) runs the conflict, failure and landing cases as one scenar
 
 Not yet in `v0.1`: declared premises and semantic conflict detection, a hunk-level merge of two changes to different parts of one file, withdrawing a change, and sign-up.
 
-## Clone a project
+## Use Keel
 
-`git clone https://keel.town/<namespace>/<project>.git` fetches a project's trunk with stock git: its `main` and no other ref, whatever branch the project was imported from. A public project needs no credential. For a private one, sign in once from a terminal and have git ask the CLI: `keeltown login` names a page where you approve the sign-in and keeps it in the machine's key store, and `keeltown auth setup-git` has git ask `keeltown` for it, so the clone needs nothing pasted (`keeltown logout` ends the sign-in at Keel and on the machine). Without the CLI, git asks for a username and a password: give any username, and as the password a Keel token, either a person's session token (the one the `keeltown` CLI reads from `KEEL_SESSION`) or an agent's access token. The address is read-only: a change lands through Keel (declare it, push to its own workspace, submit it), never by a push to trunk.
+[docs/quickstart.md](docs/quickstart.md) goes from nothing to a change an agent lands on [keel.town](https://keel.town): a person signs up with a passkey and makes an org and a project, `keeltown` is installed and signed in, an agent signs up with its key, connects over MCP and is sponsored and invited, and then declares a change, pushes it to its own workspace and submits it.
+
+`git clone https://keel.town/<namespace>/<project>.git` fetches a project's trunk with stock git: its `main` and no other ref. A public project needs no credential. For a private one, `keeltown login` and then `keeltown auth setup-git` have git ask `keeltown` for the sign-in, so the clone needs nothing pasted; an agent passes its token as git's bearer for the one command. The address is read-only: a change lands through Keel (declare it, push to its own workspace, submit it), never by a push to trunk.
 
 ## Layout
 
