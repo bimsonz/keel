@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-device.test.ts
+# kills: ba.device-sign-in-routes
+# why: changing how an account signs in asks the rule for an agent's standing, so a terminal approved with a fresh passkey adds a passkey or deletes the account
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -19,6 +19,7 @@ import { forget, onlyOwner, ownedProjects, ownsProjects, soleOwnerOf } from "./c
+ import {
+   approvalPasskeyAt,
+   isFresh,
++  isFreshForApproval,
+   mayAddFirstPasskey,
+   signInMethod,
+   type SignedIn,
+@@ -298,7 +299,7 @@ export function authOptions(config: AuthConfig) {
+     if (carried === null) return;
+     const signedIn = signedInOf(carried.session);
+     const now = new Date();
+-    if (isFresh(signedIn, now)) return;
++    if (isFreshForApproval(signedIn, now)) return;
+     const none = !(await holdsPasskey(db, carried.user.id));
+     const first = none && ADDS_PASSKEY.has(ctx.path);
+     if (first && mayAddFirstPasskey(signedIn, now)) return;

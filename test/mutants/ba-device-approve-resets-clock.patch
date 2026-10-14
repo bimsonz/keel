@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-device.test.ts
+# kills: ba.device-fresh
+# why: the approval writes its own time rather than the approver's passkey time, so each terminal approving another restarts the ten minutes
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -333,7 +333,7 @@ export function authOptions(config: AuthConfig) {
+          WHERE id = (SELECT id FROM deviceCode WHERE userCode IN (?2, ?3) ORDER BY userCode = ?2 DESC LIMIT 1)
+            AND userId = ?4 AND status = 'pending'`,
+       )
+-      .bind(at?.getTime() ?? null, code, normalised, carried.user.id)
++      .bind(at === undefined ? null : Date.now(), code, normalised, carried.user.id)
+       .run();
+   };
+ 

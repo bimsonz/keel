@@ -2,19 +2,18 @@
 # kills: link.touch
 # why: an approval is taken on any session, so whoever holds a person's old session and an agent's code makes that person the agent's sponsor
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 89b5f819..9aa0fa46 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -524,7 +524,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -583,7 +583,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
            );
          },
          Agents_approveSponsor: (caller: Caller, input: Input<"Agents_approveSponsor">) =>
--          touched(caller, () => {
+-          touchedForStanding(caller, () => {
 +          (() => {
              const agentId = decodeLinkAgent(input.agentId);
              if (Option.isNone(agentId)) return noSuchRequest(caller);
              return run(
-@@ -547,7 +547,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -606,7 +606,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                  }),
                ),
              );

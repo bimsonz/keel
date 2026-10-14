@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/device.test.ts
+# kills: device.no-passkey
+# why: An account that holds no passkey is asked for one too, so it can never approve its own terminal
+diff --git a/apps/console/src/account/device.ts b/apps/console/src/account/device.ts
+--- a/apps/console/src/account/device.ts
++++ b/apps/console/src/account/device.ts
+@@ -37,7 +37,7 @@ export async function approveTerminal(
+   reader: Who,
+   holdsPasskey: boolean,
+ ): Promise<Approval> {
+-  if (holdsPasskey) return approveWithPasskey(approving, reader);
++  return approveWithPasskey(approving, reader);
+   await approving.approve();
+   return { is: "approved" };
+ }

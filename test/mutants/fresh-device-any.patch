@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.device-unstepped
+# why: a device sign-in whose approval carried no passkey answers its own time of making, so any terminal login, however it was approved, gives agents standing
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -86,7 +86,8 @@ export function isFresh(session: SignedIn, now: Date): boolean {
+  */
+ export function approvalPasskeyAt(session: SignedIn, now: Date): Date | undefined {
+   if (isFresh(session, now)) return session.createdAt;
+-  if (session.signedInBy !== "device" || !session.passkeyAt) return undefined;
++  if (session.signedInBy !== "device") return undefined;
++  if (!session.passkeyAt) return session.createdAt;
+   // A passkey ahead of the clock is none of the last ten minutes, so a clock stepped back can't stretch the window.
+   const since = now.getTime() - session.passkeyAt.getTime();
+   return since >= 0 && since <= FRESH_FOR_MS ? session.passkeyAt : undefined;

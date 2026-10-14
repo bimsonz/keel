@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts
+# kills: link.touch-device
+# why: the sponsor's pause takes a terminal's device sign-in, so a terminal pauses an agent without a browser passkey sign-in
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -1235,7 +1235,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+           );
+         },
+         Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
+-          touched(caller, () => standing(caller, "Operator_suspendAgent", input, suspendAgent)),
++          touchedForStanding(caller, () => standing(caller, "Operator_suspendAgent", input, suspendAgent)),
+         Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
+           touched(caller, () => standing(caller, "Operator_reinstateAgent", input, reinstateAgent)),
+         Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>

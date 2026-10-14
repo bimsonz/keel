@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.device-window
+# why: a passkey time ahead of the clock counts as within the window, so a clock stepped back stretches the device sign-in's standing
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -89,7 +89,7 @@ export function approvalPasskeyAt(session: SignedIn, now: Date): Date | undefine
+   if (session.signedInBy !== "device" || !session.passkeyAt) return undefined;
+   // A passkey ahead of the clock is none of the last ten minutes, so a clock stepped back can't stretch the window.
+   const since = now.getTime() - session.passkeyAt.getTime();
+-  return since >= 0 && since <= FRESH_FOR_MS ? session.passkeyAt : undefined;
++  return since <= FRESH_FOR_MS ? session.passkeyAt : undefined;
+ }
+ 
+ /**

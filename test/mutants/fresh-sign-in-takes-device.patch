@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.device-not-sign-in
+# why: a device sign-in made in the last ten minutes is fresh as a passkey sign-in is, so a terminal may change how its account signs in
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -74,7 +74,7 @@ const recent = (session: SignedIn, now: Date): boolean =>
+  * fresh, nor is one whose time of making can't be read.
+  */
+ export function isFresh(session: SignedIn, now: Date): boolean {
+-  if (session.signedInBy !== "passkey") return false;
++  if (session.signedInBy !== "passkey" && session.signedInBy !== "device") return false;
+   return recent(session, now);
+ }
+ 

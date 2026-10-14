@@ -2,10 +2,9 @@
 # kills: ns.reserved, ba.names
 # why: an org's name is not checked before it is made, so someone can create an org named settings or api and take a path keel.town serves itself
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 5a0a0bed..04c851f4 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -395,10 +395,6 @@ export function authOptions(config: AuthConfig) {
+@@ -460,10 +460,6 @@ export function authOptions(config: AuthConfig) {
              code: "HANDLE_REQUIRED",
              message: "Choose a handle first: it is your namespace, where your projects live",
            });
@@ -13,6 +12,6 @@ index 5a0a0bed..04c851f4 100644
 -        const slug: unknown = ctx.body?.slug;
 -        if (ctx.path === "/organization/create" && typeof slug === "string")
 -          await claimable(db, slug);
+         if (ctx.path === "/device/approve") await passkeyToApproval(ctx);
          return beforeOrg(ctx);
        }),
-       after: createAuthMiddleware(async (ctx) => {

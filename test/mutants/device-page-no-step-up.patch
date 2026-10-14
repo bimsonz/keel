@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/device.test.ts
+# kills: device.step-up
+# why: The approval runs without a passkey first, so a stale or phished session hands a terminal its approval
+diff --git a/apps/console/src/account/device.ts b/apps/console/src/account/device.ts
+--- a/apps/console/src/account/device.ts
++++ b/apps/console/src/account/device.ts
+@@ -20,9 +20,9 @@ export type Approval = { is: "approved" } | { is: "changed"; to: Who };
+  * for that account alone: where the passkey is another account's, nothing is sent.
+  */
+ export async function approveWithPasskey(approving: Approving, reader: Who): Promise<Approval> {
++  await approving.approve();
+   const signedIn = await approving.signIn();
+   if (signedIn.id !== reader.id) return { is: "changed", to: signedIn };
+-  await approving.approve();
+   return { is: "approved" };
+ }
+ 

@@ -2,15 +2,14 @@
 # kills: ba.session-method
 # why: a client may write its own session's sign-in method, so an email code's session calls itself a passkey's and passes for fresh
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 732b4f0e..70e290e5 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -300,7 +300,7 @@ export function authOptions(config: AuthConfig) {
+@@ -394,7 +394,7 @@ export function authOptions(config: AuthConfig) {
        // A row is written again once its session is used this long after the last write (sessions.ts).
        updateAge: SESSION_WRITE_SECONDS,
        additionalFields: {
 -        signedInBy: { type: "string", required: false, input: false },
 +        signedInBy: { type: "string", required: false, input: true },
+         passkeyAt: { type: "number", required: false, input: false },
        },
      },
-     advanced: {

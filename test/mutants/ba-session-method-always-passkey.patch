@@ -2,15 +2,14 @@
 # kills: ba.session-method
 # why: every session's row says a passkey signed it in, so an email code's session passes for a fresh passkey sign-in
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 12627ae..02af0a2 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -291,7 +291,7 @@ export function authOptions(config: AuthConfig) {
-       session: {
-         create: {
-           before: async (session, context) => ({
--            data: { ...session, signedInBy: signInMethod(context?.path ?? "") },
-+            data: { ...session, signedInBy: "passkey" },
-           }),
+@@ -481,7 +481,7 @@ export function authOptions(config: AuthConfig) {
+             const passkeyAt =
+               signedInBy === "device" ? handedPasskeyAt(context?.context) : undefined;
+             return {
+-              data: { ...session, signedInBy, ...(passkeyAt === undefined ? {} : { passkeyAt }) },
++              data: { ...session, signedInBy: "passkey", ...(passkeyAt === undefined ? {} : { passkeyAt }) },
+             };
+           },
          },
-       },

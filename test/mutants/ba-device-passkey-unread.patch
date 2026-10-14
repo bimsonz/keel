@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-device.test.ts
+# kills: ba.device-fresh
+# why: the gate's session reader drops the session's passkeyAt, so the doorway never sees a terminal's passkey and refuses its invitation
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -208,7 +208,6 @@ function gateDeps(
+         signedIn: {
+           by: typeof by === "string" ? by : null,
+           at: new Date(session.session.createdAt).getTime(),
+-          ...(typeof passkeyAt === "number" ? { passkeyAt } : {}),
+         },
+       };
+     },

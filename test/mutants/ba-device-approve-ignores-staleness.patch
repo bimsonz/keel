@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-device.test.ts
+# kills: ba.device-stale
+# why: the approval writes the approving session's time of making whatever its method and age, so a stale passkey or an email code gives the terminal standing
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -324,7 +324,7 @@ export function authOptions(config: AuthConfig) {
+     const code: unknown = ctx.body?.userCode;
+     const carried = await sessionOf(ctx);
+     if (carried === null || typeof code !== "string") return;
+-    const at = approvalPasskeyAt(signedInOf(carried.session), new Date());
++    const at = signedInOf(carried.session).createdAt;
+     // Better Auth finds the row by the code as typed, then by its normalised form.
+     const normalised = code.replaceAll(/[^a-zA-Z0-9]/g, "").toUpperCase();
+     await db

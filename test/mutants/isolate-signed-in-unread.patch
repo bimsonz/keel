@@ -2,15 +2,14 @@
 # kills: link.sponsor-real
 # why: the isolate never reads a session's sign-in method, so a passkey sign-in a minute old is not fresh
 diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index ae38911b..e004f331 100644
 --- a/apps/keel/src/composition/isolate.ts
 +++ b/apps/keel/src/composition/isolate.ts
-@@ -140,7 +140,7 @@ function gateDeps(
+@@ -206,7 +206,7 @@ function gateDeps(
        return {
          userId,
          signedIn: {
 -          by: typeof by === "string" ? by : null,
 +          by: null,
            at: new Date(session.session.createdAt).getTime(),
+           ...(typeof passkeyAt === "number" ? { passkeyAt } : {}),
          },
-       };

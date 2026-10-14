@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsor-http.test.ts
+# kills: link.touch-device
+# why: the moves on an agent's standing ask the plain fresh sign-in rule, so a terminal approved with a fresh passkey is refused them
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -477,7 +477,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+    * sign-in within ten minutes of the passkey that approved it.
+    */
+   const touchedForStanding = <A>(caller: Caller, move: () => A) =>
+-    touched(caller, move, { device: true });
++    touched(caller, move);
+   /** An operator's move on an agent's standing, answered as the agent's profile. */
+   const standing = (
+     caller: Caller,

@@ -2,11 +2,10 @@
 # kills: ba.delete-own-way
 # why: a body's token is handed to Better Auth, which takes it to the mailed link's handler past the router and the list of routes Keel does not serve
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 5a0a0bed..810ae23c 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -370,7 +370,7 @@ export function authOptions(config: AuthConfig) {
-           throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+@@ -435,7 +435,7 @@ export function authOptions(config: AuthConfig) {
+         if (ctx.path === "/device/token") return passkeyOfRedeemed(ctx);
          // Better Auth would check a password, or hand a token to the mailed link's handler, past the router.
          if (
 -          ctx.path === DELETE_PATH &&

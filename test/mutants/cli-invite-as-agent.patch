@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts
+# kills: cli.project-invite-person
+# why: project invite builds its client with the general clientFor, so an agent's held key or secret sends the invitation in place of the person's sign-in.
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -579,7 +579,7 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
+     // An invitation is the person's to make, on a fresh sign-in, whatever agent this machine holds.
+     const asPerson = positionals.join(" ") === "project invite";
+     const client = asPerson
+-      ? await personFor(io, baseUrl, entry)
++      ? await clientFor(io, values, baseUrl, entry)
+       : await clientFor(io, values, baseUrl, entry);
+     if (client === undefined) {
+       io.stderr(

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts
+# kills: cli.project-invite
+# why: The invitation is sent without the scopes --scope names, so Keel gives the agent its default of read and work.
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -278,7 +278,7 @@ async function dispatch(
+       return client.inviteToProject(
+         required(values.project, "project"),
+         required(values.agent, "agent"),
+-        { ...(scopes.length === 0 ? {} : { scopes }), ...idempotent },
++        { ...idempotent },
+       );
+     }
+     case "agent enrol": {

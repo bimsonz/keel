@@ -2,15 +2,14 @@
 # kills: ba.sessions-last-used
 # why: a session's row is written on every request it makes: a D1 write for each read of anything
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 732b4f0e..83405ef7 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -298,7 +298,7 @@ export function authOptions(config: AuthConfig) {
-     // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
+@@ -392,7 +392,7 @@ export function authOptions(config: AuthConfig) {
+     // How each session was signed in, and a device sign-in's passkey (fresh.ts), written as the session is made and by nothing else.
      session: {
        // A row is written again once its session is used this long after the last write (sessions.ts).
 -      updateAge: SESSION_WRITE_SECONDS,
 +      updateAge: 0,
        additionalFields: {
          signedInBy: { type: "string", required: false, input: false },
-       },
+         passkeyAt: { type: "number", required: false, input: false },

@@ -2,11 +2,10 @@
 # kills: ba.first-passkey
 # why: every account takes the first-passkey rule, so a fresh email code adds a passkey to an account that already holds one
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 2fbff68b..e9e30789 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -273,7 +273,7 @@ export function authOptions(config: AuthConfig) {
-     };
+@@ -299,7 +299,7 @@ export function authOptions(config: AuthConfig) {
+     const signedIn = signedInOf(carried.session);
      const now = new Date();
      if (isFresh(signedIn, now)) return;
 -    const none = !(await holdsPasskey(db, carried.user.id));

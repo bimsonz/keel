@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-device.test.ts
+# kills: ba.device-refresh
+# why: the session's sliding update sets a held passkeyAt to now, so a terminal in use keeps its standing for agents for as long as it slides
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -485,6 +485,12 @@ export function authOptions(config: AuthConfig) {
+             };
+           },
+         },
++        update: {
++          before: async (session, context) => {
++            const held: unknown = context?.context.session?.session["passkeyAt"];
++            return { data: typeof held === "number" ? { ...session, passkeyAt: Date.now() } : session };
++          },
++        },
+       },
+       // keel.town's privacy notice promises GitHub's token is never kept: Keel reads
+       // the profile with it at sign-in and never again, so no account row holds it.

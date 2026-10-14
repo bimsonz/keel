@@ -2,14 +2,13 @@
 # kills: ba.sessions-last-used
 # why: Better Auth is never told how often to write a session's row, so it writes once a day and `lastUsedAt` trails a session's use by up to that
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 732b4f0e..f6f4fe9f 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -298,7 +298,6 @@ export function authOptions(config: AuthConfig) {
-     // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
+@@ -392,7 +392,6 @@ export function authOptions(config: AuthConfig) {
+     // How each session was signed in, and a device sign-in's passkey (fresh.ts), written as the session is made and by nothing else.
      session: {
        // A row is written again once its session is used this long after the last write (sessions.ts).
 -      updateAge: SESSION_WRITE_SECONDS,
        additionalFields: {
          signedInBy: { type: "string", required: false, input: false },
-       },
+         passkeyAt: { type: "number", required: false, input: false },
