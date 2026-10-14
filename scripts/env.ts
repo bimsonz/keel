@@ -2,6 +2,7 @@
 // all taken from the operator's environment and wrangler login, never a file.
 import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { ApiRefused } from "./lib/cloudflare-api.ts";
 
 export const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf8",
@@ -72,7 +73,10 @@ export function apiToken(): string {
   return token;
 }
 
-/** One Cloudflare API call, answering its `result`; throws with the API's own errors. */
+/**
+ * One Cloudflare API call, answering its `result`; throws `ApiRefused` with the
+ * API's own errors when it answered, and fetch's own error when it did not.
+ */
 export async function cloudflare(method: string, path: string, body?: unknown): Promise<unknown> {
   const send = () =>
     fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId()}${path}`, {
@@ -90,7 +94,10 @@ export async function cloudflare(method: string, path: string, body?: unknown): 
   const success =
     typeof json === "object" && json !== null && Reflect.get(json, "success") === true;
   if (!success)
-    throw new Error(`${method} ${path}: ${response.status} ${JSON.stringify(json).slice(0, 400)}`);
+    throw new ApiRefused(
+      response.status,
+      `${method} ${path}: ${response.status} ${JSON.stringify(json).slice(0, 400)}`,
+    );
   const result: unknown = Reflect.get(Object(json), "result");
   return result;
 }

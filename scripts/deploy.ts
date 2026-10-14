@@ -23,6 +23,7 @@ import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
 import { examplePinProblems, pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
+import { ApiRefused, verifyStore } from "./lib/cloudflare-api.ts";
 
 const USAGE = "usage: node scripts/deploy.ts <env> [--check] [--only <app>]";
 
@@ -218,23 +219,26 @@ function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string;
   return { name, config: rendered };
 }
 
-/** Fails loudly, naming the resource, when a store the config binds does not exist. */
+/** One read of the Cloudflare API. */
+const read = (path: string): Promise<unknown> => cloudflare("GET", path);
+
+/**
+ * Fails loudly, naming the resource, when a store the config binds does not
+ * exist, or when the API cannot say whether it does.
+ */
 async function verifyStores(name: string, config: Json): Promise<void> {
   for (const bucket of objectsAt(config, "r2_buckets")) {
     const bucketName = stringAt(bucket, "bucket_name") ?? "";
-    await cloudflare("GET", `/r2/buckets/${bucketName}`).catch((error: unknown) => {
-      throw new Error(
-        `${name}: R2 bucket ${bucketName} does not exist; declare it in infra/${environment}`,
-        { cause: error },
-      );
+    await verifyStore(read, `/r2/buckets/${bucketName}`, {
+      name: `${name}: R2 bucket ${bucketName}`,
+      missing: `declare it in infra/${environment}`,
     });
   }
   for (const database of objectsAt(config, "d1_databases")) {
     const id = stringAt(database, "database_id") ?? "";
-    await cloudflare("GET", `/d1/database/${id}`).catch((error: unknown) => {
-      throw new Error(`${name}: D1 database ${id} does not exist; re-run Terraform`, {
-        cause: error,
-      });
+    await verifyStore(read, `/d1/database/${id}`, {
+      name: `${name}: D1 database ${id}`,
+      missing: "re-run Terraform",
     });
   }
 }
@@ -244,7 +248,7 @@ async function workerExists(name: string): Promise<boolean> {
     await cloudflare("GET", `/workers/scripts/${name}/settings`);
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes(": 404 ")) return false;
+    if (error instanceof ApiRefused && error.status === 404) return false;
     throw error;
   }
 }
