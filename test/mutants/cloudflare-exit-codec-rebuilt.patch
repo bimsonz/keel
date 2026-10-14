@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/exit-codec.test.ts
+# kills: rpc.exit-codec-lazy
+# why: an Exit codec is built again on every call it answers
+diff --git a/apps/keel/src/rpc/exit.ts b/apps/keel/src/rpc/exit.ts
+index bc2c77ed..e9788076 100644
+--- a/apps/keel/src/rpc/exit.ts
++++ b/apps/keel/src/rpc/exit.ts
+@@ -20,7 +20,7 @@ export function exitCodec<A, AI, E, EI>(
+   failure: Schema.Codec<E, EI>,
+ ): ExitCodec<A, E> {
+   let built: Schema.Codec<Exit.Exit<A, E>, Schema.Json> | undefined;
+-  return () => (built ??= Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect())));
++  return () => (built = Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect())));
+ }
+ 
+ export function encodeExit<A, E>(codec: ExitCodec<A, E>, exit: Exit.Exit<A, E>): ExitJson {

@@ -1,0 +1,23 @@
+# expect-red: pnpm --dir apps/keel run deploy:dry
+# why: the entry imports the HTTP side statically, so better-auth, the validators and MCP are built as the Worker loads
+diff --git a/apps/keel/src/index.ts b/apps/keel/src/index.ts
+index ebadf91e..ae8f001d 100644
+--- a/apps/keel/src/index.ts
++++ b/apps/keel/src/index.ts
+@@ -1,4 +1,5 @@
+ import { consumeQueue } from "./adapters/driving/queue/consumer.ts";
++import { isolateFor } from "./composition/isolate.ts";
+ import { queueRuntime } from "./composition/queue.ts";
+ import { enforceRetention } from "./composition/retention.ts";
+ 
+@@ -25,9 +26,7 @@ export default {
+   // The HTTP side loads on the first request, not with the Worker: Cloudflare gives a Worker's global scope a
+   // second of CPU, and scripts/guard-startup.ts fails the build when it is reached as the Worker loads.
+   fetch(request, env, ctx): Response | Promise<Response> {
+-    return import("./composition/isolate.ts").then(({ isolateFor }) =>
+-      isolateFor(env).app.fetch(request, env, ctx),
+-    );
++    return isolateFor(env).app.fetch(request, env, ctx);
+   },
+   queue(batch, env, _ctx): Promise<void> {
+     return consumeQueue(batch, queueRuntime(env));

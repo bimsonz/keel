@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/exit-codec.test.ts
+# kills: rpc.exit-codec-lazy
+# why: every RPC map's Exit codecs are built as their module loads, spending the Worker's startup CPU
+diff --git a/apps/keel/src/rpc/exit.ts b/apps/keel/src/rpc/exit.ts
+index bc2c77ed..1d6b32a6 100644
+--- a/apps/keel/src/rpc/exit.ts
++++ b/apps/keel/src/rpc/exit.ts
+@@ -19,8 +19,10 @@ export function exitCodec<A, AI, E, EI>(
+   success: Schema.Codec<A, AI>,
+   failure: Schema.Codec<E, EI>,
+ ): ExitCodec<A, E> {
+-  let built: Schema.Codec<Exit.Exit<A, E>, Schema.Json> | undefined;
+-  return () => (built ??= Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect())));
++  const built: Schema.Codec<Exit.Exit<A, E>, Schema.Json> = Schema.toCodecJson(
++    Schema.Exit(success, failure, Schema.Defect()),
++  );
++  return () => built;
+ }
+ 
+ export function encodeExit<A, E>(codec: ExitCodec<A, E>, exit: Exit.Exit<A, E>): ExitJson {

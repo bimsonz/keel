@@ -1,0 +1,27 @@
+# expect-red: pnpm --dir apps/keel run deploy:dry
+# why: a Workflow's composition takes the credential store from the HTTP side's, so the whole HTTP side loads with the Worker again
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index d0c4badc..cfc8f2bc 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -80,6 +80,7 @@ import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
+ import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
+ import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
+ import { credentialStoreLayer } from "./credentials.ts";
++export { credentialStoreLayer };
+ import { makeApp } from "../adapters/driving/http/app.ts";
+ import { cloneAccess } from "../adapters/driving/http/clone-access.ts";
+ import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
+diff --git a/apps/keel/src/composition/workflow.ts b/apps/keel/src/composition/workflow.ts
+index 3634f7ea..3c7bdf98 100644
+--- a/apps/keel/src/composition/workflow.ts
++++ b/apps/keel/src/composition/workflow.ts
+@@ -80,7 +80,7 @@ import {
+   type StreamingAi,
+ } from "../adapters/driven/workers-ai/platform-function.ts";
+ import { artifactsLocationHint, artifactsObjects, codeHostLayer, commitSigning } from "./do.ts";
+-import { credentialStoreLayer } from "./credentials.ts";
++import { credentialStoreLayer } from "./isolate.ts";
+ 
+ /**
+  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
