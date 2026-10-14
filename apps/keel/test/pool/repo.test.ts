@@ -11,7 +11,16 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { BASE, type Fetch, seedAgent, seedForeignAgent, tokenFor, worker } from "./helpers.ts";
+import {
+  BASE,
+  type Fetch,
+  mcp,
+  mcpResult,
+  seedAgent,
+  seedForeignAgent,
+  tokenFor,
+  worker,
+} from "./helpers.ts";
 
 /**
  * The repo read API through the real doorway and auth gate: its routes admit a
@@ -45,6 +54,7 @@ async function repoApp() {
         yield* (yield* CodeHost).create(trunk);
         const first = yield* codeHost.fixture.commit(trunk, "refs/heads/main", {
           "README.md": "# hi\n",
+          "src/main.ts": "export const main = 1;\n",
         });
         yield* (yield* Trunks).initialize(projectId, first, "seed", { kind: "empty" });
         return first;
@@ -213,5 +223,98 @@ describe("the repo read API's doorway", () => {
       }),
     });
     expect(response.status).toBe(200);
+  });
+});
+
+/** A body as both doors answer it, the problem's request id left out: each request has its own. */
+const answer = (body: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(body).filter(([key]) => key !== "requestId"));
+
+/** One repo read over REST, as an agent's token presents it. */
+const restRead = async (
+  via: Fetch,
+  token: string,
+  read: "tree" | "blob",
+  query: Record<string, string>,
+) => {
+  const response = await via(
+    `${BASE}/v1/projects/${PRIVATE}/repo/${read}?${new URLSearchParams(query).toString()}`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  return { status: response.status, body: answer(await response.json()) };
+};
+
+/**
+ * One of Keel's MCP tools, called as an agent's client calls it: refused or
+ * not, its answer as its text says it, and its structured content, which a
+ * refusal has none of.
+ */
+const toolRead = async (via: Fetch, token: string, name: string, args: Record<string, string>) => {
+  const result = await mcpResult(
+    await mcp(token, "tools/call", { name, arguments: args }, name, via),
+  );
+  const content: unknown = result["content"];
+  const text = Array.isArray(content) ? String(Object(content[0])["text"]) : "{}";
+  return {
+    refused: result["isError"] === true,
+    body: answer(JSON.parse(text)),
+    structured: result["structuredContent"],
+  };
+};
+
+describe("the repo reads through Keel's MCP", () => {
+  it("[mcp.read] an agent lists trunk's tree and reads a file through Keel's tools, each the answer REST gives, and another project's agent is refused there as REST refuses it", async () => {
+    const { via, heads } = await repoApp();
+    const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    const sibling = await tokenFor(await seedAgent({ projectId: PUBLIC }));
+    const other = await tokenFor(await seedForeignAgent());
+    const head = String(heads.get(PRIVATE));
+    const reads: readonly (readonly [string, "tree" | "blob", Record<string, string>])[] = [
+      ["Repo_getTree", "tree", {}],
+      ["Repo_getTree", "tree", { ref: head, path: "src" }],
+      ["Repo_getBlob", "blob", { path: "src/main.ts" }],
+    ];
+
+    expect(await toolRead(via, own, "Repo_getTree", { projectId: PRIVATE })).toMatchObject({
+      refused: false,
+      body: {
+        commit: head,
+        path: "",
+        entries: [
+          { name: "README.md", kind: "blob" },
+          { name: "src", kind: "tree" },
+        ],
+      },
+    });
+    expect(
+      await toolRead(via, own, "Repo_getBlob", { projectId: PRIVATE, path: "src/main.ts" }),
+    ).toMatchObject({
+      refused: false,
+      body: { commit: head, path: "src/main.ts", content: "export const main = 1;\n" },
+    });
+    for (const [name, read, query] of reads) {
+      const rest = await restRead(via, own, read, query);
+      expect(rest.status).toBe(200);
+      expect(await toolRead(via, own, name, { projectId: PRIVATE, ...query })).toEqual({
+        refused: false,
+        body: rest.body,
+        structured: rest.body,
+      });
+    }
+
+    // Another project of its own org is refused by name, and another org's agent finds no project, at both doors.
+    for (const [token, status] of [
+      [sibling, 403],
+      [other, 404],
+    ] as const)
+      for (const [name, read, query] of reads) {
+        const rest = await restRead(via, token, read, query);
+        expect(rest.status).toBe(status);
+        expect(await toolRead(via, token, name, { projectId: PRIVATE, ...query })).toEqual({
+          refused: true,
+          body: rest.body,
+          structured: undefined,
+        });
+      }
   });
 });

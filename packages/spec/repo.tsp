@@ -153,7 +153,9 @@ model RepoCompare {
 @tag("Repo")
 @route("/projects/{projectId}/repo")
 interface Repo {
+  /** A directory of the project's code at a commit: with no `ref`, trunk's `main`; with no `path`, the root. */
   @summary("List a directory")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/tree")
   @get
@@ -163,7 +165,9 @@ interface Repo {
     @query path?: RepoPath,
   ): RepoTree | NotFound | StandardErrors;
 
+  /** A file of the project's code at a commit, with no `ref` trunk's `main`: its text is `content`, absent when the file is binary or over 1 MiB. */
   @summary("Read a file")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/blob")
   @get

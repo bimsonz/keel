@@ -69,6 +69,8 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Added
 
+- **An agent reads a project's code through Keel's MCP** (additive: two MCP tools, no route, field or rule). `Repo_getTree` and `Repo_getBlob` are tagged `mcp`, with the same handlers and the same authorization as over REST (a project read), so an agent with no filesystem lists trunk's tree and reads a file at a ref without a second token. Each gains a description of what `ref` and `path` default to. `[mcp.read]` (pool) holds that each tool answers what REST answers, and refuses another project's agent as REST does.
+
 - **Keel's propositions and citations told in MFP 0.2, and back** (`coordination/mfp-wire.ts`). Pure and unused until the edge calls it: Keel's stored propositions, events and rows do not move.
   - `MfpPremiseProposition`, `MfpEffectProposition` (with the invalidation form, a freshness effect told by its value), `MfpShape`, `MfpAnchor` and `MfpCitation`, typed as 0.2's schema states them.
   - `premiseToMfp` and `effectToMfp` tell a stored proposition where it reads in its role, and refuse one that does not (`Untellable`, `unreadable`): 0.2 has no form for it. A bound with no unit goes as unit `1`; a unit off a bound, and an effect's strength, are not told; a premise gains no strength it was not given.
