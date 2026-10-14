@@ -56,9 +56,9 @@ export class Keyring extends DurableObject<Env> {
     return (await this.ctx.storage.get<Member>("member")) ?? null;
   }
 
-  /** A five-minute bearer for one project and one run, at one door. */
-  async token(scope: Scope & { readonly door: Door }): Promise<string> {
-    return (await this.#client(scope, scope.door)).token();
+  /** A five-minute bearer for one project and one run, at Keel's MCP door: a worker's only way in. */
+  async token(scope: Scope): Promise<string> {
+    return (await this.#client(scope, "mcp")).token();
   }
 
   /** Accepts the account's invitation to `project`; answers the invitation's state after. */
@@ -83,21 +83,6 @@ export class Keyring extends DurableObject<Env> {
       source: { kind: "template", name: "fixture-forge-lite" },
     });
     return { id: project.id, name: `${member.handle}/${project.name}` };
-  }
-
-  /** A file of the project at `ref`, or that it isn't there. */
-  async read(
-    scope: Scope & { readonly path: string; readonly ref: string },
-  ): Promise<{ readonly found: boolean; readonly content?: string; readonly commit?: string }> {
-    const client = await this.#client(scope, "api");
-    try {
-      const blob = await client.blob(scope.project, scope.path, { ref: scope.ref });
-      return { found: true, content: blob.content ?? "", commit: blob.commit };
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "status" in error && error.status === 404)
-        return { found: false };
-      throw error;
-    }
   }
 
   /** One page of the project's events from `cursor`, oldest first, as JSON: its records hold values RPC can't name. */

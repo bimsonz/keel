@@ -58,7 +58,7 @@ describe("the swarm's Worker", () => {
 
     answers.push(await (await SELF.fetch(`${SWARM}/admin/agents`, { headers: ADMIN })).text());
     answers.push(JSON.stringify(await keyring().describe()));
-    answers.push(await keyring().token({ project: "prj_TEST", run: "r-0", door: "mcp" }));
+    answers.push(await keyring().token({ project: "prj_TEST", run: "r-0" }));
     answers.push(JSON.stringify(await keyring().accept("prj_TEST")));
     const directorState = await runInDurableObject(director(), async (_instance, state) =>
       JSON.stringify([...(await state.storage.list()).entries()]),
