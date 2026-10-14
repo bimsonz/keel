@@ -346,7 +346,7 @@ export const build = (
     case "Resolve":
       return toConflict({
         _tag: "Resolve",
-        move: "sequence",
+        move: "escalate",
         ...(step.flag ? { decisionId: DECISION } : {}),
       });
     case "RecordCheck":

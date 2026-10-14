@@ -99,7 +99,7 @@ describe("scenario 2: memory", () => {
     expect(of("TenetContested")).toEqual([]);
     expect(of("TenetReaffirmed")).toEqual([]);
     expect(of("ConflictSuspected")).toHaveLength(1);
-    expect(of("ConflictResolved").map((event) => event.payload.move)).toEqual(["refine"]);
+    expect(of("ConflictResolved").map((event) => event.payload.move)).toEqual(["escalate"]);
     const bounce = of("ChangeBounced").at(-1)?.payload;
     const verdict = of("VerdictIssued").find(
       (event) => event.payload.verdictId === bounce?.verdictId,

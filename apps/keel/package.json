@@ -39,6 +39,8 @@
     "@effect/vitest": "catalog:",
     "@keeltown/sdk": "workspace:*",
     "@keeltown/testing": "workspace:*",
+    "ajv": "catalog:",
+    "ajv-formats": "catalog:",
     "fast-check": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

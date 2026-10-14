@@ -26,7 +26,17 @@ model DecisionPage is Page<DecisionView>;
 
 @tag("Memory")
 interface Memory {
-  /** Why is this line, or this subject, the way it is? Returns a cited chain of decisions and claims. */
+  /**
+   * Why is this file, or this subject, the way it is? Name a `path` or a
+   * `subject`, not both. Each active decision on the subject, or on a subject
+   * anchored in the file, answers with its chain, newest decision first: the
+   * decision, the premise its conflict was about, the intent of the change
+   * whose effect met it, each guard that holds it, and each change that landed
+   * under it, every link an MFP 0.1 record. A subject's anchors name a file and
+   * no lines, so `line` does not narrow: a path with a line answers every
+   * subject anchored in that file. Read in the caller's own project; nothing to
+   * explain there is 404 `why.nothing_to_explain`.
+   */
   @summary("Why is it like this?")
   @tag("mcp")
   @operationId("why")
@@ -34,10 +44,12 @@ interface Memory {
   @route("/why")
   @get
   why(
-    /** A repository-relative path, with `line`. */
+    /** A repository-relative path, as a subject's anchors name it. */
     @query path?: string,
 
+    /** A line in `path`. Anchors carry no span, so it does not narrow the answer. */
     @query @minValue(1) line?: int32,
+
     @query subject?: SubjectKey,
   ): WhyEnvelope | NotFound | StandardErrors;
 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.distinguish
+# why: a distinction answers 200 and records nothing on the change
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 4e4191d2..3d8870dd 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1269,7 +1269,7 @@ export const distinguish: (
+       });
+       return Result.succeed({
+         value: change,
+-        drafts: [{ payload: payloadOf(encodeDistinguished(distinguished)) }],
++        drafts: [],
+       });
+     },
+   );

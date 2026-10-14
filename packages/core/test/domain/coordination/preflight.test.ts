@@ -6,7 +6,7 @@ import {
   exposure,
   type Intent,
   type LiveChange,
-  type Move,
+  type Suggestion,
   type MoveBasis,
   type Neighbour,
   preflight,
@@ -110,7 +110,7 @@ const run = (s: Scenario) =>
   );
 
 /** Preflight's rule list, read top to bottom: the first rule that matches wins. */
-const oracle = (s: Scenario): { readonly move: Move; readonly basis?: MoveBasis } => {
+const oracle = (s: Scenario): { readonly move: Suggestion; readonly basis?: MoveBasis } => {
   for (const [i, c] of s.contradictions.entries())
     if (c.holder !== self && isMust(c.premise))
       return { move: "refine", basis: { _tag: "contradiction", index: i } };
@@ -144,7 +144,7 @@ const live = (
 });
 
 /** The move each side of a pair gets: `a` holds `aPremises` and declares `aEffects`, `b` likewise. */
-const movesOf = (a: LiveChange, b: LiveChange): readonly [Move, Move] => [
+const movesOf = (a: LiveChange, b: LiveChange): readonly [Suggestion, Suggestion] => [
   preflight(a.id, a.intent, exposure(a.id, a.intent, [b]), []).suggestedMove,
   preflight(b.id, b.intent, exposure(b.id, b.intent, [a]), []).suggestedMove,
 ];
@@ -160,7 +160,7 @@ const S1_EFFECT: Proposition = { ...S1_PREMISE, relation: "is", value: "per-sess
 
 describe("preflight: the suggested move, first match wins, ordered by who breaks whom", () => {
   it("[preflight.move-table] the move and what it cites are 03's list read top to bottom", () => {
-    const seen = new Set<Move>();
+    const seen = new Set<Suggestion>();
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const got = run(s);

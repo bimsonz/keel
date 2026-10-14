@@ -46,8 +46,12 @@ _Avoid_: scope (scope belongs to a proposition), claim
 What Keel tells an agent as soon as it declares an Intent: overlapping changes on the same subjects, contradictory premises, relevant precedents, and a suggested Move.
 _Avoid_: check, lint, validation
 
+**Suggestion**:
+What preflight tells an agent to do next: proceed, coordinate, refine, sequence or distinguish.
+_Avoid_: move, advice
+
 **Move**:
-A coordination action Keel suggests or an agent takes: proceed, coordinate, refine, sequence, yield, merge, distinguish or escalate.
+What an agent does about a conflict with `resolve`: escalate it to a person, or distinguish the precedent its ruling set.
 _Avoid_: action, resolution
 
 **Lease**:

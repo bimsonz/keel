@@ -28,6 +28,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeTrunksMemory,
   makeWorkspacePoolMemory,
@@ -78,6 +79,7 @@ function world() {
       trunks.layer,
       rebaser.layer,
       makeLiveChangesMemory().layer,
+      makeDecisionsMemory().layer,
     );
   return { clock, code, rebaser, seeded, layerFor };
 }

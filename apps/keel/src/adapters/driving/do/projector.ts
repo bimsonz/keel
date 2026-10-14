@@ -1,5 +1,7 @@
 import {
+  changeView,
   conflictRecord,
+  decisionsAtPath,
   decisionsOfGuards,
   decisionsOnSubjects,
   escalationView,
@@ -28,6 +30,7 @@ import { EscalationNotFound } from "@keeltown/core/domain/verification";
 import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
+  ChangeRead,
   ChangesRead,
   ConflictRead,
   ConflictsRead,
@@ -36,6 +39,7 @@ import {
   EscalationRead,
   EscalationsRead,
   GuardDecisionsRead,
+  PathDecisionsRead,
   ProbeConflictRead,
   ProjectorCodecs,
   ProjectorRead,
@@ -133,6 +137,14 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     return this.answer(ProjectorCodecs.snapshot, program);
   }
 
+  async change(request: typeof ChangeRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(ChangeRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, changeId }) => changeView(project, changeId)),
+    );
+    return this.answer(ProjectorCodecs.change, program);
+  }
+
   async conflicts(request: typeof ConflictsRead.Encoded) {
     const program = Schema.decodeUnknownEffect(ConflictsRead)(request).pipe(
       Effect.orDie,
@@ -208,5 +220,13 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, subjects }) => decisionsOnSubjects(project, subjects)),
     );
     return this.answer(ProjectorCodecs.subjectDecisions, program);
+  }
+
+  async pathDecisions(request: typeof PathDecisionsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(PathDecisionsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, path }) => decisionsAtPath(project, path)),
+    );
+    return this.answer(ProjectorCodecs.pathDecisions, program);
   }
 }

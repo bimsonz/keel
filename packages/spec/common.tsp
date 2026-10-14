@@ -204,6 +204,7 @@ union ProblemCode {
   escalationOptionUnknown: "escalation.option_unknown",
   decisionNotFound: "decision.not_found",
   probeNotFound: "probe.not_found",
+  whyNothingToExplain: "why.nothing_to_explain",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",
   changeStateRefused: "change.state_refused",

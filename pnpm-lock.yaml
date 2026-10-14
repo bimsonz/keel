@@ -78,6 +78,12 @@ catalogs:
     '@xyflow/react':
       specifier: 12.12.0
       version: 12.12.0
+    ajv:
+      specifier: 8.20.0
+      version: 8.20.0
+    ajv-formats:
+      specifier: 3.0.1
+      version: 3.0.1
     archunit:
       specifier: 2.5.4
       version: 2.5.4
@@ -361,6 +367,12 @@ importers:
       '@keeltown/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      ajv:
+        specifier: 'catalog:'
+        version: 8.20.0
+      ajv-formats:
+        specifier: 'catalog:'
+        version: 3.0.1(ajv@8.20.0)
       fast-check:
         specifier: 'catalog:'
         version: 4.10.2

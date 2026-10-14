@@ -79,7 +79,7 @@ type Outcome = Result.Result<readonly TenetEvent[], TenetRejection>;
 /** A conflict still deciding: it can contest a tenet. */
 const OPEN = new Set(["suspected", "probing", "proven", "escalated"]);
 /** Moves by which a resolved conflict leaves the tenet standing (R5). */
-const IN_FAVOUR = new Set(["distinguish", "yield"]);
+const IN_FAVOUR = new Set(["distinguish"]);
 
 const readConflict: NextAction = {
   kind: "read",

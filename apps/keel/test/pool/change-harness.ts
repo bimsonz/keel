@@ -12,6 +12,7 @@ import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeTrunksMemory,
   makeWorkspacePoolMemory,
@@ -22,7 +23,12 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
-import { backbone, type ChangeServices, liveChangesLayer } from "../../src/composition/do.ts";
+import {
+  backbone,
+  type ChangeServices,
+  decisionsLayer,
+  liveChangesLayer,
+} from "../../src/composition/do.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { drainAfter, placeProject } from "./helpers.ts";
 
@@ -116,9 +122,10 @@ export async function changeUnderTest(
   await rewire(
     stub,
     (objectEnv) =>
-      Layer.merge(
+      Layer.mergeAll(
         fixed,
         live === "project" ? liveChangesLayer(objectEnv) : makeLiveChangesMemory().layer,
+        live === "project" ? decisionsLayer(objectEnv) : makeDecisionsMemory().layer,
       ),
     clock.layer,
   );

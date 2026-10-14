@@ -344,6 +344,8 @@ export function makeChangesMemory(
     });
   /** An abandon replays by its key per change; the same key with another body is a conflict. */
   const withdrawals = new Map<string, string>();
+  /** A distinction replays by its key per change, as an abandon does. */
+  const distinctions = new Map<string, string>();
   let sequence = 0;
   let tokens = 0;
   const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
@@ -748,6 +750,24 @@ export function makeChangesMemory(
                 premisesRetracted: [],
               }),
           ),
+        distinguish: (_principal, input) =>
+          Effect.gen(function* () {
+            const { changeId, idempotencyKey } = input;
+            const body = JSON.stringify({ decisionId: input.decisionId, why: input.distinction });
+            const replayed = distinctions.get(`${changeId} ${idempotencyKey}`);
+            if (replayed !== undefined && replayed !== body)
+              return yield* new IdempotencyConflict({ idempotencyKey });
+            const change = changes.get(changeId);
+            if (change === undefined) return yield* new ChangeNotFound({ changeId });
+            if (replayed !== undefined) return change;
+            if (
+              change.lease.id !== input.lease ||
+              (change.lease.state !== "active" && change.lease.state !== "lapsed")
+            )
+              return yield* new LeaseStale({ changeId, leaseId: input.lease });
+            distinctions.set(`${changeId} ${idempotencyKey}`, body);
+            return change;
+          }),
         nearby: (projectId, changeId) =>
           Effect.gen(function* () {
             if (!changes.has(changeId)) return yield* new ChangeNotFound({ changeId });

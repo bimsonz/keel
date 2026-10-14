@@ -44,7 +44,7 @@ import {
   NamespaceCodecs,
   RaiseCommand,
 } from "../../src/rpc/index.ts";
-import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
+import { type ChangeUnderTest, changeUnderTest, ok, refusal } from "./change-harness.ts";
 import {
   BASE,
   drainAfter,
@@ -152,7 +152,7 @@ interface Envelope {
   readonly ok: boolean;
   readonly summary: string;
   readonly result: { readonly conflict: { readonly id: string; readonly state: string } };
-  readonly next: readonly { readonly operationId?: string }[];
+  readonly next: readonly { readonly operationId?: string; readonly args?: unknown }[];
 }
 interface Detail {
   readonly state: string;
@@ -223,7 +223,7 @@ const rule = (token: string, escalationId: string, key: string, option: string) 
   });
 
 describe("[t35.park-resume] a conflict put to a person parks its parties until the ruling", () => {
-  it("[t35.park-resume] [t67.inbox] a party escalates a proven conflict over REST: its sponsor is asked and reads it in their inbox, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1 and resolves the conflict against the premise's holder, which bounces by the decision with what the option said of it while the other resumes, each told", async () => {
+  it("[t35.park-resume] [t67.inbox] [b31.distinguish] [b31.precedent-preflight] a party escalates a proven conflict over REST: its sponsor is asked and reads it in their inbox, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1 and resolves the conflict against the premise's holder, which bounces by the decision with what the option said of it while the other resumes, each told; the party ruled against distinguishes D-1 on its change and nothing else moves, and a change declared later on the premise D-1 went against is shown D-1 once and told to distinguish", async () => {
     await using probes = await inertProbe();
     await using prechecks = await inertPrecheck();
     const projectId = makeId("prj", ulid());
@@ -239,7 +239,7 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
 
     // Fallout opens the conflict as both declare; the ledger proves it.
     const lease = await deriving(a, { premises: [relied] });
-    await deriving(b, { declaredEffects: [cached] });
+    const leaseB = await deriving(b, { declaredEffects: [cached] });
     await vi.waitFor(async () => expect(await prechecks.get()).toHaveLength(2), WAIT);
     const conflictId = conflictIdOf(projectId, {
       premise: { holder: a.changeId, proposition: relied },
@@ -261,11 +261,31 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       409,
       "change.lease_stale",
     ]);
-    const unbuilt = await resolve(token, conflictId, lease, "resolve-0", {
-      move: "yield",
+    // What preflight suggests is no move; a distinction needs its words; a conflict nobody ruled on set no precedent.
+    for (const move of ["proceed", "refine", "yield", "merge"]) {
+      const suggested = await resolve(token, conflictId, lease, `resolve-${move}`, {
+        move,
+        changeId: a.changeId,
+      });
+      expect([move, suggested.status]).toEqual([move, 400]);
+    }
+    const wordless = await resolve(token, conflictId, lease, "resolve-wordless", {
+      move: "distinguish",
       changeId: a.changeId,
     });
-    expect(unbuilt.status).toBe(503);
+    expect(wordless.status).toBe(400);
+    expect(await wordless.json()).toMatchObject({
+      issues: [expect.objectContaining({ path: ["body", "note"] })],
+    });
+    const unruled = await resolve(token, conflictId, lease, "resolve-unruled", {
+      move: "distinguish",
+      changeId: a.changeId,
+      note: "this change reads the cache through another path",
+    });
+    expect([unruled.status, (await unruled.json<{ code: string }>()).code]).toEqual([
+      409,
+      "conflict.move_refused",
+    ]);
 
     // A's agent escalates.
     const escalate = { move: "escalate", changeId: a.changeId, note: "the two cannot both ship" };
@@ -479,6 +499,98 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       escalation: { open: false, state: "ruled" },
       decision: { id: decisionId, label: "D-1", chosen: { id: EFFECT_STANDS } },
     });
+
+    // The party ruled against answers the precedent D-1 set: the distinction is recorded on its
+    // change, and no conflict, verdict or state moves. A retry answers the same and records nothing.
+    const distinction = {
+      move: "distinguish",
+      changeId: a.changeId,
+      note: "this change reads the cache through another path",
+    };
+    const distinguished = await resolve(token, conflictId, lease, "resolve-2", distinction);
+    expect(distinguished.status).toBe(200);
+    expect(await distinguished.json<Envelope>()).toMatchObject({
+      ok: true,
+      result: { conflict: { id: conflictId, state: "resolved" } },
+      next: [{ operationId: "Memory_getDecision", args: { decisionId } }],
+    });
+    expect((await resolve(token, conflictId, lease, "resolve-2", distinction)).status).toBe(200);
+    const reworded = await resolve(token, conflictId, lease, "resolve-2", {
+      ...distinction,
+      note: "another reason",
+    });
+    expect(reworded.status).toBe(409);
+    // The change's own object fences the lease, whatever the doorway read before it.
+    const fenced = decodeExit(
+      ChangeCodecs.distinguish,
+      await a.stub.distinguish({
+        agentId: a.agentId,
+        leaseId: makeId("lse", ulid()),
+        decisionId,
+        distinction: distinction.note,
+        idempotencyKey: "distinguish-fenced",
+      }),
+    );
+    expect(refusal(fenced)).toContain('"_tag":"LeaseStale"');
+    const stances = (await a.log()).filter((event) => event.type.startsWith("Precedent"));
+    expect(stances.map((event) => event.payload)).toEqual([
+      {
+        _tag: "PrecedentDistinguished",
+        decisionId,
+        changeId: a.changeId,
+        distinction: distinction.note,
+      },
+    ]);
+    expect((await a.current()).state).toBe("bounced");
+    const after = await get(`/v1/conflicts/${conflictId}?project=${projectId}`, sponsor.token);
+    expect(await after.json<Detail>()).toMatchObject({ state: "resolved", move: "escalate" });
+
+    // With the favoured party withdrawn, a change declared later relying on the premise D-1 went
+    // against is shown D-1 and told to distinguish it, and D-1 is surfaced on it once, however often
+    // its preflight shows it again.
+    ok(
+      decodeExit(
+        ChangeCodecs.abandon,
+        await b.stub.abandon({
+          authority: { _tag: "Lease", leaseId: leaseB, agentId: b.agentId },
+          idempotencyKey: "withdraw-b",
+        }),
+      ),
+    );
+    await drainOutbox(b.stub);
+    const c = await changeUnderTest(projectId, "project");
+    const declared = ok(await c.declare("declare-c", { premises: [relied] }));
+    expect(declared.preflight).toMatchObject({
+      precedents: [{ decisionId }],
+      suggestedMove: "distinguish",
+      basis: { _tag: "precedent", decisionId },
+    });
+    const shown = async () =>
+      (await c.log()).filter((event) => event.type === "PrecedentSurfaced").map((e) => e.payload);
+    expect(await shown()).toEqual([
+      { _tag: "PrecedentSurfaced", decisionId, changeId: c.changeId },
+    ]);
+    const elsewhere = Schema.decodeUnknownSync(Proposition)({
+      subject: `${LEAF}.elsewhere`,
+      predicate: "freshness",
+      relation: "is",
+      value: "per-request",
+    });
+    const relying = ok(
+      decodeExit(
+        ChangeCodecs.rely,
+        await c.stub.rely({
+          agentId: c.agentId,
+          leaseId: declared.change.lease.id,
+          premise: elsewhere,
+          idempotencyKey: "rely-c",
+        }),
+      ),
+    );
+    expect(relying.preflight.precedents).toEqual([expect.objectContaining({ decisionId })]);
+    expect(await shown()).toEqual([
+      { _tag: "PrecedentSurfaced", decisionId, changeId: c.changeId },
+    ]);
   });
 
   it("[t35.unprovable-escalates] a conflict whose probe could not be drafted is put to a person by Keel, asking the sponsor of the premise holder's agent", async () => {

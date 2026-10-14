@@ -1195,7 +1195,7 @@ function ruled(
     entity: p.conflictRef,
     payload: {
       conflictId: p.conflict,
-      move: option === "no-cache" ? "yield" : "refine",
+      move: "escalate",
       decisionId,
       against: [decision.against],
     },

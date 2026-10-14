@@ -11,7 +11,6 @@ import {
   ProbeStateRefused,
   World,
 } from "@keeltown/core/domain/verification";
-import { Move } from "@keeltown/core/domain/coordination";
 import {
   AgentId,
   ChangeId,
@@ -76,7 +75,7 @@ export const ResolveCommand = Schema.Struct({
   agentId: AgentId,
   run: Schema.optional(RunRef),
   sponsor: Schema.optional(UserId),
-  move: Move,
+  move: Schema.Literal("escalate"),
   note: Schema.optional(Schema.String),
   idempotencyKey: Schema.String,
 });

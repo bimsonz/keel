@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.distinguish
+# why: a distinction with no words is taken
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 6dbe5036..20d0ae09 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1294,7 +1294,7 @@ export function resolveInput(input: Input<"resolve">): Result.Result<ResolveInpu
+     ({ move, note, ...fields }): Result.Result<ResolveInput, Issues> => {
+       const idempotencyKey = input["idempotency-key"];
+       if (move === "escalate") return Result.succeed({ ...fields, move, note, idempotencyKey });
+-      if (note === undefined || note.trim() === "")
++      if (note === "")
+         return Result.fail([
+           {
+             path: ["body", "note"],

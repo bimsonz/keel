@@ -37,6 +37,7 @@ import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { decisionNotFound } from "./decisions.ts";
+import { askedIn, nothingToExplain } from "./why.ts";
 import { escalationNotFound } from "./escalations.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -392,6 +393,9 @@ export function refusalResult(
   requestId: string,
   refusal: AuthorizationRefusal,
 ): { readonly status: 401 | 403 | 404; readonly body: ProblemBody } {
+  // `why` reads the caller's own project alone: one it may not see has nothing to explain there.
+  if (refusal._tag === "NotVisible" && action === "why")
+    return nothingToExplain({ requestId }, askedIn(input));
   switch (refusal._tag) {
     case "AuthenticationRequired":
       return {

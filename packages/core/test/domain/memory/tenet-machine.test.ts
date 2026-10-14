@@ -66,7 +66,7 @@ const CONFLICTS: readonly (ContestingConflict | undefined)[] = [
   conflict("probing"),
   conflict("dismissed"),
   conflict("resolved", "distinguish"),
-  conflict("resolved", "yield"),
+  conflict("resolved", "escalate"),
   conflict("resolved", "proceed"),
   conflict("escalated"),
   conflict("proven", undefined, [STRANGER, NEXT]),
@@ -211,7 +211,7 @@ const oracle = (
         before.conflictId === command.conflictId &&
         found?.id === command.conflictId &&
         (found.state === "dismissed" ||
-          (found.state === "resolved" && (found.move === "distinguish" || found.move === "yield")))
+          (found.state === "resolved" && found.move === "distinguish"))
         ? "established"
         : "refused";
     case "Retract":
@@ -511,8 +511,7 @@ describe("the Tenet machine", { timeout: PROPERTY_TIMEOUT }, () => {
             const ours = c.conflictId === r.before.conflictId && found?.id === c.conflictId;
             const settled =
               found?.state === "dismissed" ||
-              (found?.state === "resolved" &&
-                (found.move === "distinguish" || found.move === "yield"));
+              (found?.state === "resolved" && found.move === "distinguish");
             if (ours && settled) reaffirmed++;
             if (ours && found !== undefined && OPEN.has(found.state)) open++;
             return ours && settled

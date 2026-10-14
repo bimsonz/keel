@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/why.test.ts
+# kills: why.http
+# why: a caller with no project of its own is answered the plain 404 and an agent with nothing to explain its own, so the two read differently
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 89f76c2..48ea1ac 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -393,9 +393,6 @@ export function refusalResult(
+   requestId: string,
+   refusal: AuthorizationRefusal,
+ ): { readonly status: 401 | 403 | 404; readonly body: ProblemBody } {
+-  // `why` reads the caller's own project alone: one it may not see has nothing to explain there.
+-  if (refusal._tag === "NotVisible" && action === "why")
+-    return nothingToExplain({ requestId }, askedIn(input));
+   switch (refusal._tag) {
+     case "AuthenticationRequired":
+       return {

@@ -119,15 +119,16 @@ export const Change = Schema.Struct({
 });
 export type Change = typeof Change.Type;
 
-/** A coordination action Keel suggests or an agent takes. */
-export const Move = Schema.Literals([
+/** What preflight suggests an agent does next. */
+export const Suggestion = Schema.Literals([
   "proceed",
   "coordinate",
   "refine",
   "sequence",
-  "yield",
-  "merge",
   "distinguish",
-  "escalate",
 ]);
+export type Suggestion = typeof Suggestion.Type;
+
+/** A move an agent makes on a conflict with `resolve`: put it to a person, or answer the precedent its ruling set. */
+export const Move = Schema.Literals(["escalate", "distinguish"]);
 export type Move = typeof Move.Type;

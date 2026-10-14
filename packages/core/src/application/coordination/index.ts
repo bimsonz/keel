@@ -10,6 +10,7 @@ import type { AgentToken } from "../../domain/identity/index.ts";
 import type {
   ChangeId,
   CommitSha,
+  DecisionId,
   Instant,
   LeaseId,
   SketchId,
@@ -84,6 +85,12 @@ export interface ReviseInput extends LeasedCall {
   readonly premisesAdded: readonly Proposition[];
   readonly premisesRetracted: readonly Proposition[];
   readonly declaredEffects?: readonly Proposition[];
+}
+
+/** A distinction from a precedent: the caller holds the change's lease. */
+export interface DistinguishInput extends LeasedCall {
+  readonly decisionId: DecisionId;
+  readonly distinction: string;
 }
 
 /** Add one premise: the caller holds the lease. */

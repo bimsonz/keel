@@ -55,7 +55,7 @@ export function decisionNotFound(caller: { readonly requestId: string }, decisio
 }
 
 /** The project the call was decided on, as `authorizeHandlers` resolved it. */
-function projectIn(caller: Caller) {
+export function projectIn(caller: Caller) {
   if (caller.resource?._tag !== "Project")
     throw new Error("a project's operation ran without its project resolved");
   return caller.resource;

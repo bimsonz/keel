@@ -400,7 +400,7 @@ describe("[b23.conflict-endings] a conflict past its proof", () => {
     const resolved = events.of(conflict, {
       _tag: "ConflictResolved",
       conflictId,
-      move: "sequence",
+      move: "escalate",
       decisionId,
     } as { _tag: string });
     Effect.runSync(views.arrive(resolved));
@@ -422,7 +422,7 @@ describe("[b23.conflict-endings] a conflict past its proof", () => {
       guard: { id: guardId, label: "G-1", state: "admitted" },
     });
     expect(folded).toMatchObject({
-      conflict: { state: "resolved", escalationId, decisionId, move: "sequence" },
+      conflict: { state: "resolved", escalationId, decisionId, move: "escalate" },
       probe: { state: "retired", retiredBy: decisionId },
       escalated: "human-class",
       settledAt: resolved.at,
@@ -433,7 +433,7 @@ describe("[b23.conflict-endings] a conflict past its proof", () => {
       settledAt: new Date(resolved.at).toISOString(),
       escalation: { id: escalationId, open: false, reason: "human-class" },
       decision: { id: decisionId },
-      move: "sequence",
+      move: "escalate",
       probe: { id: probeId, state: "retired" },
       guard: { id: guardId, state: "retired", probeId, runs: 3 },
     });

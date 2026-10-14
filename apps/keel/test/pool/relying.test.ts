@@ -12,7 +12,8 @@ import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
-import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
+import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { type ChangeUnderTest, changeUnderTest, ok, refusal } from "./change-harness.ts";
 import { BASE, drainAfter, drainOutbox, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
 import { inertProbe } from "./inert-probe.ts";
 
@@ -237,6 +238,12 @@ describe("[b21.nearby] what is near a change, read-only", () => {
       result: { preflight: { suggestedMove: "sequence" } },
     });
     expect(foreign.status).toBe(403);
+    // The doorway's policy refuses the foreign agent first; the change's own object refuses another project too.
+    const elsewhere = decodeExit(
+      ChangeCodecs.nearby,
+      await a.stub.nearby({ projectId: makeId("prj", ulid()) }),
+    );
+    expect(refusal(elsewhere)).toContain('"_tag":"ChangeInOtherProject"');
     expect((await a.log()).length).toBe(before);
   });
 

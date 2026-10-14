@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: a file's anchors are every project's, so another project's decisions on the subject read at a path it never anchored
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 8f22658..e6f3ac1 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -43,7 +43,7 @@ export const DECISION_INDEX = {
+   /** The decision recorded on a conflict, by conflict id. */
+   conflict: (project: ProjectId) => `decision-conflict:${project}`,
+   /** The keys of the subjects anchored at a path, by repository-relative path: what a read by path asks the index for. */
+-  anchor: (project: ProjectId) => `decision-anchor:${project}`,
++  anchor: (_project: ProjectId) => "decision-anchor",
+ } as const;
+ 
+ export const DECISION_PAGE = 50;

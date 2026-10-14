@@ -25,6 +25,8 @@ import {
   type WorkspaceRefresher,
   type WorkspacePool,
   type LiveChanges,
+  type Decisions,
+  PROJECTOR,
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
@@ -53,6 +55,7 @@ import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
 import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
+import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -159,7 +162,8 @@ export type ChangeServices =
   | Trunks
   | WorkspaceRebaser
   | WorkspaceWriter
-  | LiveChanges;
+  | LiveChanges
+  | Decisions;
 
 /**
  * The Change DO takes its workspace from its project's WorkspacePool DO and
@@ -176,6 +180,7 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
     WorkspaceRebaserGitCore().pipe(Layer.provide(host)),
     WorkspaceWriterGitCore(artifactsObjects(env), env.KEEL_HOST).pipe(Layer.provide(host)),
     liveChangesLayer(env),
+    decisionsLayer(env),
   );
 }
 
@@ -338,6 +343,11 @@ export function liveChangesLayer(env: Env): Layer.Layer<LiveChanges> {
   return LiveChangesRpc((projectId) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)),
   );
+}
+
+/** The Projector's decision index: the precedents a change's preflight reads. */
+export function decisionsLayer(env: Env): Layer.Layer<Decisions> {
+  return DecisionsRpc(() => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR)));
 }
 
 export function codeHostLayer(env: Env): Layer.Layer<CodeHost> {

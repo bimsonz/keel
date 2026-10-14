@@ -30,6 +30,7 @@ import type {
   AdoptInput,
   Declared,
   DeclareInput,
+  DistinguishInput,
   CommitInput,
   CommitParentRefused,
   CommittedChange,
@@ -195,6 +196,14 @@ export class Changes extends Context.Service<
       Revised,
       ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
     >;
+    /**
+     * Records under the lease why a decision does not govern the change
+     * (PrecedentDistinguished); idempotent by Idempotency-Key per change.
+     */
+    readonly distinguish: (
+      principal: AgentToken,
+      input: DistinguishInput,
+    ) => Effect.Effect<Change, ChangeNotFound | LeaseStale | IdempotencyConflict>;
     /**
      * The preflight of the change's intent as it stands; commits nothing. Only
      * for a reader of the change's project: another is ChangeInOtherProject.

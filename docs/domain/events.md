@@ -181,9 +181,9 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `DecisionRecorded` | the namespace object that took the ruling | `decisionId, escalationId, option, summary, scope?, evidence[], alternatives: [{option, reasonRejected}]` | the escalation and what it is about | the object that raised the escalation, Projector | The raiser acts on it: a Subject DO resolves its conflict with this decision. Becomes a precedent for later changes. Recorded only from a ruled escalation: `option` is the one chosen (`summary` its label), `alternatives` every other option with its consequence, `evidence` each item as `class: summary`. An absent scope is everywhere; a later decision supersedes it only over the same or a wider scope |
 | `DecisionSuperseded` | Subject DO | `decisionId, by: decisionId` | subjects in scope | Projector | — |
 | `DecisionOverruled` | Subject DO | `decisionId, by: decisionId, requestedBy: changeId` | subjects in scope | Projector | — |
-| `PrecedentSurfaced` | Subject DO (fact) | `decisionId, changeId` | — | the change's agent | Shown in preflight as dated, scoped evidence |
+| `PrecedentSurfaced` | Change DO, on the change (fact) | `decisionId, changeId` | — | the change's agent | Shown in preflight as dated, scoped evidence; once a decision a change |
 | `PrecedentFollowed` | Subject DO | `decisionId, changeId` | — | Projector | Stance recorded |
-| `PrecedentDistinguished` | Subject DO | `decisionId, changeId, distinction` | — | Projector | Stance recorded |
+| `PrecedentDistinguished` | Change DO, on the change | `decisionId, changeId, distinction` | — | Projector | Stance recorded, by `resolve` with `distinguish` on a ruled conflict |
 | `OverruleRequested` | Subject DO | `decisionId, changeId, argument` | — | the escalation inbox | Raises an escalation |
 | `TenetEstablished` | Subject DO | `tenetId, subjectId, predicate, value, changeId, guardIds[]` (at least one) | — | relying changes' agents | Caused by a change landing with a guarded effect |
 | `TenetContested` | Subject DO | `tenetId, conflictId` | — | relying changes' agents | A change's effect contradicts it |

@@ -29,11 +29,17 @@ import {
   renew,
   reviseIntent,
   type RevisionMismatch,
+  type ScopedPrecedent,
   type SubjectKey,
   subjectAncestors,
   TERMINAL,
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
+import {
+  PrecedentDistinguished,
+  PrecedentSurfaced,
+  scopedPrecedent,
+} from "../../domain/memory/index.ts";
 import {
   BatchFailed,
   BatchFormed,
@@ -46,6 +52,7 @@ import {
   type CommandActor,
   type AgentId,
   byAgent,
+  type DecisionId,
   userActor,
   type ChangeId,
   CommitSha,
@@ -78,11 +85,13 @@ import {
   CodeHost,
   commit,
   type Committed,
+  Decisions,
   EntityStore,
   type EventDraft,
   EventOutbox,
   EVERY_TYPE,
   Ids,
+  type IndexedDecision,
   LiveChanges,
   type Remedy,
   type Stored,
@@ -337,6 +346,19 @@ export interface AbandonChange {
   readonly idempotencyKey: string;
 }
 
+/** A distinction from a precedent, made under the change's lease. */
+export interface DistinguishPrecedent {
+  readonly agentId: AgentId;
+  /** The run of the agent that makes it, when its token names one. */
+  readonly run?: RunRef | undefined;
+  readonly leaseId: LeaseId;
+  /** The decision whose precedent the change is distinguished from. */
+  readonly decisionId: DecisionId;
+  /** Why that decision does not govern this change. */
+  readonly distinction: string;
+  readonly idempotencyKey: string;
+}
+
 export interface RebaseChange {
   readonly agentId: AgentId;
   /** The run of the agent that asks, when its token names one. */
@@ -497,6 +519,61 @@ const liveOf = (projectId: ProjectId | undefined) =>
   projectId === undefined
     ? Effect.succeed<readonly LiveChange[]>([])
     : LiveChanges.use((index) => index.of(projectId));
+
+/**
+ * The project's decisions on `subjects`, read before a commit as its live
+ * changes are: each one in force is a precedent for the change's preflight. A
+ * Projector that cannot be read fails the call, retried on the same key.
+ */
+const decidedOn = (projectId: ProjectId | undefined, subjects: readonly SubjectKey[]) =>
+  projectId === undefined || subjects.length === 0
+    ? Effect.succeed<readonly IndexedDecision[]>([])
+    : Decisions.use((index) => index.onSubjects(projectId, subjects));
+
+/** The precedents an intent is in the scope of: the decisions in force on the subjects it names, with what each upheld. */
+const precedentsFor = (
+  intent: Intent,
+  decided: readonly IndexedDecision[],
+): readonly ScopedPrecedent[] => {
+  const named = new Set(intentSubjects(intent));
+  return decided.flatMap((indexed) => {
+    if (indexed.subjectKey === undefined || !named.has(indexed.subjectKey)) return [];
+    const precedent = scopedPrecedent(indexed.decision, indexed.holds);
+    return precedent === undefined ? [] : [precedent];
+  });
+};
+
+/** The subjects an intent may name once a revision adds `propositions`: the decisions to read before the commit decides it. */
+const subjectsWith = (
+  store: Store,
+  changeId: ChangeId,
+  propositions: readonly Proposition[],
+): readonly SubjectKey[] => {
+  const intent = storedChange(store, changeId)?.intent;
+  const now = intent === undefined ? [] : intentSubjects(intent);
+  return [...new Set([...now, ...intentSubjects({ premises: canonical(propositions) })])];
+};
+
+/** The precedents a change has been shown, a row a decision: each is surfaced once, however often preflight shows it again. */
+const PRECEDENT_SURFACED = "precedent-surfaced";
+const encodeSurfaced = Schema.encodeSync(PrecedentSurfaced);
+
+/** A PrecedentSurfaced for each precedent the preflight shows that the change has not been shown before. */
+const surfaced = (tx: Transaction, changeId: ChangeId, preflight: Preflight): EventDraft[] =>
+  preflight.precedents.flatMap(({ decisionId }) => {
+    const key = `${changeId}/${decisionId}`;
+    if (tx.store.get(PRECEDENT_SURFACED, key) !== undefined) return [];
+    tx.store.put(PRECEDENT_SURFACED, key, true);
+    return [
+      { payload: payloadOf(encodeSurfaced(PrecedentSurfaced.make({ decisionId, changeId }))) },
+    ];
+  });
+
+/** A transition with the precedents its preflight surfaced committed after its own events. */
+const withSurfaced = <A>(
+  transition: { readonly value: A; readonly drafts: readonly EventDraft[] },
+  drafts: readonly EventDraft[],
+) => ({ value: transition.value, drafts: [...transition.drafts, ...drafts] });
 
 /**
  * Subscribes the Subject DO of every key the intent names (ancestors
@@ -812,11 +889,18 @@ export const declare: (
 ) => Effect.Effect<
   DeclaredChange,
   ChangeStateRefused | PoolExhausted | IdempotencyConflict,
-  Clock | Ids | EntityStore | EventOutbox | WorkspacePool | LiveChanges
+  Clock | Ids | EntityStore | EventOutbox | WorkspacePool | LiveChanges | Decisions
 > = Effect.fn("coordination/declare")(function* (command: DeclareChange) {
   const { changeId } = command;
   const leaseId = yield* (yield* Ids).next("lse");
   const live = yield* liveOf(command.projectId);
+  const decided = yield* decidedOn(
+    command.projectId,
+    intentSubjects({
+      premises: canonical(command.premises),
+      declaredEffects: canonical(command.declaredEffects ?? []),
+    }),
+  );
   const grant = yield* (yield* WorkspacePool).grant(command.projectId, changeId);
   const committed = yield* commit(
     {
@@ -836,8 +920,8 @@ export const declare: (
           ? {}
           : { declaredEffects: canonical(command.declaredEffects) }),
       };
-      const { preflight } = preflightFor(changeId, intent, live);
-      const decided = transition(
+      const { preflight } = preflightFor(changeId, intent, live, precedentsFor(intent, decided));
+      const declared = transition(
         tx,
         changeId,
         ["ChangeStateRefused"],
@@ -861,7 +945,7 @@ export const declare: (
           { _tag: "Start", workspaceId: grant.workspaceId, baseSha: grant.baseSha },
         ],
       );
-      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      if (Result.isFailure(declared)) return Result.fail(declared.failure);
       tx.store.put(
         CHANGE_WORKSPACE,
         changeId,
@@ -877,7 +961,9 @@ export const declare: (
       tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
       tx.outbox.subscribe(`project:${command.projectId}`, LIVE_INDEX_HEARS, changeRef(changeId));
       subscribeSubjects(tx, changeId, intent);
-      return Result.succeed(asTransition(decided.success));
+      return Result.succeed(
+        withSurfaced(asTransition(declared.success), surfaced(tx, changeId, preflight)),
+      );
     },
   ).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
   if (!committed.duplicate)
@@ -900,9 +986,15 @@ export const revise: (
 ) => Effect.Effect<
   RevisedChange,
   ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | LiveChanges
+  Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
-  const live = yield* liveOf(heldWorkspace(yield* EntityStore, changeId)?.projectId);
+  const store = yield* EntityStore;
+  const projectId = heldWorkspace(store, changeId)?.projectId;
+  const live = yield* liveOf(projectId);
+  const decided = yield* decidedOn(
+    projectId,
+    subjectsWith(store, changeId, [...command.premisesAdded, ...(command.declaredEffects ?? [])]),
+  );
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
@@ -921,14 +1013,15 @@ export const revise: (
           ? {}
           : { declaredEffects: command.declaredEffects }),
       });
-      const decided = transition(
+      const preflight = preflightOf(changeId, after, live, decided);
+      const revised = transition(
         tx,
         changeId,
         ["ChangeNotFound", "LeaseStale", "RevisionMismatch", "ChangeStateRefused"],
         [
           {
             _tag: "Revise",
-            preflight: preflightOf(changeId, after, live),
+            preflight,
             leaseId: command.leaseId,
             ifMatchRevision: command.ifMatchRevision,
             ...(command.goal === undefined ? {} : { goal: command.goal }),
@@ -942,9 +1035,11 @@ export const revise: (
         ],
         command.leaseId,
       );
-      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      if (Result.isFailure(revised)) return Result.fail(revised.failure);
       if (after !== undefined) subscribeSubjects(tx, changeId, after);
-      return Result.succeed(asTransition(decided.success));
+      return Result.succeed(
+        withSurfaced(asTransition(revised.success), surfaced(tx, changeId, preflight)),
+      );
     },
   );
   const change = yield* settled(changeId, command.idempotencyKey, committed);
@@ -962,9 +1057,12 @@ export const rely: (
 ) => Effect.Effect<
   RevisedChange,
   ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | LiveChanges
+  Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/rely")(function* (changeId: ChangeId, command: RelyChange) {
-  const live = yield* liveOf(heldWorkspace(yield* EntityStore, changeId)?.projectId);
+  const store = yield* EntityStore;
+  const projectId = heldWorkspace(store, changeId)?.projectId;
+  const live = yield* liveOf(projectId);
+  const decided = yield* decidedOn(projectId, subjectsWith(store, changeId, [command.premise]));
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
@@ -978,7 +1076,8 @@ export const rely: (
         premisesAdded: [command.premise],
         premisesRetracted: [],
       });
-      const decided = transition(
+      const preflight = preflightOf(changeId, after, live, decided);
+      const relied = transition(
         tx,
         changeId,
         ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
@@ -987,14 +1086,16 @@ export const rely: (
             _tag: "Rely",
             leaseId: command.leaseId,
             premise: command.premise,
-            preflight: preflightOf(changeId, after, live),
+            preflight,
           },
         ],
         command.leaseId,
       );
-      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      if (Result.isFailure(relied)) return Result.fail(relied.failure);
       subscribeSubjects(tx, changeId, { premises: canonical([command.premise]) });
-      return Result.succeed(asTransition(decided.success));
+      return Result.succeed(
+        withSurfaced(asTransition(relied.success), surfaced(tx, changeId, preflight)),
+      );
     },
   );
   const change = yield* settled(changeId, command.idempotencyKey, committed);
@@ -1009,15 +1110,21 @@ export const rely: (
 export const nearby: (
   changeId: ChangeId,
   command: NearbyChange,
-) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject, EntityStore | LiveChanges> =
-  Effect.fn("coordination/nearby")(function* (changeId: ChangeId, command: NearbyChange) {
-    const store = yield* EntityStore;
-    const change = storedChange(store, changeId);
-    if (change === undefined) return yield* notFound(changeId);
-    const projectId = heldWorkspace(store, changeId)?.projectId;
-    if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
-    return preflightFor(changeId, change.intent, yield* liveOf(projectId)).preflight;
-  });
+) => Effect.Effect<
+  Preflight,
+  ChangeNotFound | ChangeInOtherProject,
+  EntityStore | LiveChanges | Decisions
+> = Effect.fn("coordination/nearby")(function* (changeId: ChangeId, command: NearbyChange) {
+  const store = yield* EntityStore;
+  const change = storedChange(store, changeId);
+  if (change === undefined) return yield* notFound(changeId);
+  const projectId = heldWorkspace(store, changeId)?.projectId;
+  if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
+  const live = yield* liveOf(projectId);
+  const decided = yield* decidedOn(projectId, intentSubjects(change.intent));
+  return preflightFor(changeId, change.intent, live, precedentsFor(change.intent, decided))
+    .preflight;
+});
 
 /**
  * The intent a revision would leave: the change's stored intent revised as
@@ -1047,10 +1154,11 @@ const preflightOf = (
   changeId: ChangeId,
   intent: Intent | undefined,
   live: readonly LiveChange[],
+  decided: readonly IndexedDecision[],
 ): Preflight =>
   intent === undefined
     ? { neighbours: [], contradictions: [], precedents: [], suggestedMove: "proceed" }
-    : preflightFor(changeId, intent, live).preflight;
+    : preflightFor(changeId, intent, live, precedentsFor(intent, decided)).preflight;
 
 /**
  * Submits a commit under the lease. Whether the commit is in the change's
@@ -1156,6 +1264,52 @@ export const abandon: (
   );
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
+
+/**
+ * Records under the change's lease why a decision does not govern it
+ * (PrecedentDistinguished, on the change). It moves no conflict, guard or
+ * verdict: a guard that holds the decision still runs on the change, and only
+ * a person's ruling ends a decision. Idempotent by Idempotency-Key per change.
+ */
+export const distinguish: (
+  changeId: ChangeId,
+  command: DistinguishPrecedent,
+) => Effect.Effect<
+  Change,
+  ChangeNotFound | LeaseStale | IdempotencyConflict,
+  Clock | EntityStore | EventOutbox
+> = Effect.fn("coordination/distinguish")(function* (
+  changeId: ChangeId,
+  command: DistinguishPrecedent,
+) {
+  const committed = yield* commit(
+    {
+      entity: changeRef(changeId),
+      cause: command.idempotencyKey,
+      fingerprint: fingerprintOf("distinguish", command),
+      ...byAgent(command.agentId, command.run),
+      ...inProject(yield* EntityStore, changeId),
+    },
+    (tx): Result.Result<Transition<Change>, ChangeNotFound | LeaseStale> => {
+      const change = storedChange(tx.store, changeId);
+      if (change === undefined) return Result.fail(new ChangeNotFound({ changeId }));
+      const held = checkLease(change, command.leaseId, tx.at);
+      if (Result.isFailure(held)) return Result.fail(held.failure);
+      const distinguished = PrecedentDistinguished.make({
+        decisionId: command.decisionId,
+        changeId,
+        distinction: command.distinction,
+      });
+      return Result.succeed({
+        value: change,
+        drafts: [{ payload: payloadOf(encodeDistinguished(distinguished)) }],
+      });
+    },
+  );
+  return yield* settled(changeId, command.idempotencyKey, committed);
+});
+
+const encodeDistinguished = Schema.encodeSync(PrecedentDistinguished);
 
 /**
  * Adopts a change whose lease has lapsed: a new lease under the same Change-Id

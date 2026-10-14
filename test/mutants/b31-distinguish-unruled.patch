@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.distinguish
+# why: a conflict no decision resolved is distinguished as if it had set a precedent
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8ac5711b..b4a6cdb7 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -514,7 +514,7 @@ export const resolveMove: (
+     if (Result.isFailure(held)) return yield* held.failure;
+     const { conflict } = yield* (yield* ProjectViews).conflict(scope.project, input.conflictId);
+     if (input.move === "distinguish") {
+-      if (conflict.decisionId === undefined)
++      if (conflict.decisionId === "unruled")
+         return yield* new MoveRefused({
+           conflictId: input.conflictId,
+           reason: "no decision resolved the conflict, so it set no precedent to distinguish",

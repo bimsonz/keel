@@ -162,6 +162,7 @@ import {
   sponsoredOk,
 } from "./sponsorship.ts";
 import { decisionHandlers } from "./decisions.ts";
+import { whyHandlers } from "./why.ts";
 import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
 import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -195,6 +196,7 @@ import {
   resolveError,
   resolveInput,
   resolveOk,
+  distinguishedOk,
   statusError,
   statusOk,
   submitError,
@@ -861,22 +863,22 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         resolve: (caller: Caller, input: Input<"resolve">) => {
           const decoded = resolveInput(input);
           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-          // One move is built: a party puts its conflict to a person. The others are B3's.
-          if (decoded.success.move !== "escalate") return notYet(caller);
+          const move = decoded.success;
           return run(
             caller,
             tokenOf(caller).pipe(
-              Effect.flatMap((principal) =>
-                resolveMove(principal, scopeOf(caller), decoded.success),
-              ),
+              Effect.flatMap((principal) => resolveMove(principal, scopeOf(caller), move)),
               Effect.match({
-                onSuccess: resolveOk,
+                onSuccess: (view) =>
+                  move.move === "distinguish"
+                    ? distinguishedOk(view, move.changeId)
+                    : resolveOk(view),
                 onFailure: (error) => resolveError(caller, error),
               }),
             ),
           );
         },
-        why: notYet,
+        ...whyHandlers(run),
         inbox: (caller: Caller, input: Input<"inbox">) =>
           caller.principal._tag !== "Agent"
             ? agentsOnly(caller.requestId)

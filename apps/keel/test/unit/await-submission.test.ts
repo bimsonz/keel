@@ -9,6 +9,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -43,6 +44,7 @@ const layers = Layer.mergeAll(
   makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
   makeCodeHostMemory().layer,
   makeLiveChangesMemory().layer,
+  makeDecisionsMemory().layer,
 );
 
 describe("[b21.await-one-transaction] the read and the subscribe are one transaction", () => {

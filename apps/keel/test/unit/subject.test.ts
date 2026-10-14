@@ -17,6 +17,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -61,6 +62,7 @@ function changeObject() {
     makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
     makeCodeHostMemory().layer,
     makeLiveChangesMemory().layer,
+    makeDecisionsMemory().layer,
   );
 }
 

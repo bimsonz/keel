@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.precedent-preflight
+# why: declare's preflight is given no precedents, so an intent against a ruling is told to proceed
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 4e4191d2..c2a05a77 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -884,7 +884,7 @@ export const declare: (
+           ? {}
+           : { declaredEffects: canonical(command.declaredEffects) }),
+       };
+-      const { preflight } = preflightFor(changeId, intent, live, precedentsFor(intent, decided));
++      const { preflight } = preflightFor(changeId, intent, live, []);
+       const declared = transition(
+         tx,
+         changeId,

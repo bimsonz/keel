@@ -133,6 +133,7 @@ function world(options: WorldOptions = {}) {
       refreshWorkspace: () => Effect.die(new Error("the Lane never refreshes a workspace")),
       revise: () => Effect.die(new Error("the Lane never revises")),
       rely: () => Effect.die(new Error("the Lane never relies")),
+      distinguish: () => Effect.die(new Error("the Lane never distinguishes")),
       nearby: () => Effect.die(new Error("the Lane never reads nearby")),
       abandon: () => Effect.die(new Error("the Lane never abandons")),
       get: (id) =>

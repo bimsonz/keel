@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.precedent-preflight
+# why: the declare that first shows a precedent does not surface it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 4e4191d2..83f3f9fc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -925,9 +925,7 @@ export const declare: (
+       tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
+       tx.outbox.subscribe(`project:${command.projectId}`, LIVE_INDEX_HEARS, changeRef(changeId));
+       subscribeSubjects(tx, changeId, intent);
+-      return Result.succeed(
+-        withSurfaced(asTransition(declared.success), surfaced(tx, changeId, preflight)),
+-      );
++      return Result.succeed(asTransition(declared.success));
+     },
+   ).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
+   if (!committed.duplicate)

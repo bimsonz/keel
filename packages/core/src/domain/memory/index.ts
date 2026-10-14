@@ -3,5 +3,6 @@ export * from "./decision-machine.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./memory.ts";
+export * from "./mfp.ts";
 export * from "./precedent.ts";
 export * from "./tenet-machine.ts";

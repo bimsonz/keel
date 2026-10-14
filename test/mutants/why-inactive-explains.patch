@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts
+# kills: why.chain
+# why: a superseded or overruled decision still explains its subject, so why answers with a ruling that no longer holds
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 423d31a..5e8e7df 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -284,7 +284,7 @@ export const why: (
+     target.kind === "subject"
+       ? yield* decisions.onSubjects(project, [target.subject])
+       : yield* decisions.atPath(project, target.path);
+-  const active = found.filter((d) => d.decision.state === "active");
++  const active = found;
+   const sources = yield* Effect.forEach(active, (decision) => whySources(project, decision), {
+     concurrency: "unbounded",
+   });

@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect";
-import type { Proposition, SubjectKey } from "../../domain/coordination/index.ts";
+import { type Proposition, SubjectKey, SubjectMinted } from "../../domain/coordination/index.ts";
 import {
   ConflictId,
   type DecisionId,
@@ -42,6 +42,8 @@ export const DECISION_INDEX = {
   project: (project: ProjectId) => `decision-list:${project}`,
   /** The decision recorded on a conflict, by conflict id. */
   conflict: (project: ProjectId) => `decision-conflict:${project}`,
+  /** The keys of the subjects anchored at a path, by repository-relative path: what a read by path asks the index for. */
+  anchor: (project: ProjectId) => `decision-anchor:${project}`,
 } as const;
 
 export const DECISION_PAGE = 50;
@@ -61,6 +63,8 @@ const encodeRow = Schema.encodeSync(DecisionRow);
 const decodeDecisionEvent = Schema.decodeUnknownOption(DecisionEvent);
 const decodeConflictId = Schema.decodeUnknownOption(ConflictId);
 const decodeFolded = Schema.decodeUnknownSync(ConflictFolded);
+const decodeMinted = Schema.decodeUnknownOption(SubjectMinted);
+const decodeKeys = Schema.decodeUnknownSync(Schema.Array(SubjectKey));
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
 const DECISION_TYPES: ReadonlySet<string> = new Set([
@@ -116,6 +120,31 @@ export function foldDecisionIndex(store: Store, event: EventEnvelope): string | 
   store.put(DECISION_INDEX.project(project), payload.decisionId, decision.decidedAt);
   if (conflictId !== undefined)
     store.put(DECISION_INDEX.conflict(project), conflictId, payload.decisionId);
+  return undefined;
+}
+
+/** The keys of the subjects anchored at a path of a project, in the order they were minted. */
+function keysAt(store: Store, project: ProjectId, path: string): readonly SubjectKey[] {
+  const stored = store.get(DECISION_INDEX.anchor(project), path);
+  return stored === undefined ? [] : decodeKeys(stored);
+}
+
+/**
+ * Folds a minted subject's anchors into the index, in the receipt's
+ * transaction: each path an anchor names lists the subject's key once. A
+ * subject is minted once and its anchors never move, and the decisions on it
+ * are joined by key when the index is read, so the two arrive in any order.
+ */
+export function foldSubjectAnchors(store: Store, event: EventEnvelope): string | undefined {
+  const decoded = decodeMinted(event.payload);
+  if (Option.isNone(decoded)) return `${event.eventId}: an undecodable ${event.type}`;
+  const { subjectId, key, anchors } = decoded.value;
+  const { project } = event;
+  if (project === undefined) return `${subjectId} was minted with no project`;
+  for (const path of new Set(anchors.map((anchor) => anchor.path))) {
+    const keys = keysAt(store, project, path);
+    if (!keys.includes(key)) store.put(DECISION_INDEX.anchor(project), path, [...keys, key]);
+  }
   return undefined;
 }
 
@@ -241,4 +270,22 @@ export const decisionsOnSubjects: (
   return store
     .transaction(() => decisionsOf(store, project))
     .filter((d) => d.subjectKey !== undefined && wanted.has(d.subjectKey));
+});
+
+/** A project's decisions on the subjects anchored at a path, newest first; none where no subject is anchored. */
+export const decisionsAtPath: (
+  project: ProjectId,
+  path: string,
+) => Effect.Effect<readonly IndexedDecision[], never, EntityStore> = Effect.fn(
+  "memory/decisionsAtPath",
+)(function* (project: ProjectId, path: string) {
+  const store = yield* EntityStore;
+  return store.transaction(() => {
+    const anchored: ReadonlySet<string> = new Set(keysAt(store, project, path));
+    return anchored.size === 0
+      ? []
+      : decisionsOf(store, project).filter(
+          (d) => d.subjectKey !== undefined && anchored.has(d.subjectKey),
+        );
+  });
 });

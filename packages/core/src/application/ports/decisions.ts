@@ -73,5 +73,14 @@ export class Decisions extends Context.Service<
       project: ProjectId,
       subjects: readonly SubjectKey[],
     ) => Effect.Effect<readonly IndexedDecision[]>;
+    /**
+     * The project's decisions on the subjects anchored at this repository-relative
+     * path, newest first, as `onSubjects` answers them. A subject's anchors are
+     * those it was minted with, and name a file, never a line.
+     */
+    readonly atPath: (
+      project: ProjectId,
+      path: string,
+    ) => Effect.Effect<readonly IndexedDecision[]>;
   }
 >()("keel/Decisions") {}

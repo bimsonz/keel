@@ -159,7 +159,7 @@ export function describeConflictMovesContract(
     );
 
     it.effect(
-      "[t35.resolve-escalate] a move Keel cannot make is refused and asks nobody: a change that is no party, a conflict not yet proven, a project in no namespace, another move, an unknown conflict",
+      "[t35.resolve-escalate] a move Keel cannot make is refused and asks nobody: a change that is no party, a conflict not yet proven, a project in no namespace, an unknown conflict",
       () => {
         const harness = makeHarness();
         const proven = conflictOn();
@@ -184,20 +184,13 @@ export function describeConflictMovesContract(
           const nowhere = yield* Effect.flip(
             moves.resolve(unplaced.at, command(unplaced.conflictId, unplaced.holder)),
           );
-          const otherMove = yield* Effect.flip(
-            moves.resolve(proven.at, {
-              ...command(proven.conflictId, proven.holder),
-              move: "yield",
-            }),
-          );
           const missing = yield* Effect.flip(
             moves.resolve(proven.at, command(makeId("cfl", ulid()), proven.holder)),
           );
           yield* harness.settled(proven.at, namespace);
           const escalations = yield* Escalations;
 
-          expect([stranger._tag, early._tag, nowhere._tag, otherMove._tag]).toEqual([
-            "MoveRefused",
+          expect([stranger._tag, early._tag, nowhere._tag]).toEqual([
             "MoveRefused",
             "MoveRefused",
             "MoveRefused",

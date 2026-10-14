@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: b31.precedent-preflight
+# why: a precedent is surfaced again each time preflight shows it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 537a82cc..efd38ec5 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -534,7 +534,6 @@ const encodeSurfaced = Schema.encodeSync(PrecedentSurfaced);
+ const surfaced = (tx: Transaction, changeId: ChangeId, preflight: Preflight): EventDraft[] =>
+   preflight.precedents.flatMap(({ decisionId }) => {
+     const key = `${changeId}/${decisionId}`;
+-    if (tx.store.get(PRECEDENT_SURFACED, key) !== undefined) return [];
+     tx.store.put(PRECEDENT_SURFACED, key, true);
+     return [
+       { payload: payloadOf(encodeSurfaced(PrecedentSurfaced.make({ decisionId, changeId }))) },

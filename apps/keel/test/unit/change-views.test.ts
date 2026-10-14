@@ -105,4 +105,21 @@ describe("the Projector's change list", () => {
     ]);
     expect(memory.skipped).toEqual([]);
   });
+
+  it("[b31.stance-unfolded] a change's stances on a precedent leave its view as it was, and nothing is skipped", () => {
+    const memory = makeProjectViewsMemory();
+    const events = projectEvents();
+    const changeId = nextId("chg");
+    const decisionId = nextId("dec");
+    Effect.runSync(memory.arrive(events.declared(changeId, nextId("agt"), "a goal")));
+    const before = read(memory, { project: events.project }).items;
+    for (const payload of [
+      { _tag: "PrecedentSurfaced", decisionId, changeId },
+      { _tag: "PrecedentDistinguished", decisionId, changeId, distinction: "another path" },
+    ])
+      Effect.runSync(memory.arrive(events.of({ kind: "change", id: changeId }, payload)));
+
+    expect(read(memory, { project: events.project }).items).toEqual(before);
+    expect(memory.skipped).toEqual([]);
+  });
 });

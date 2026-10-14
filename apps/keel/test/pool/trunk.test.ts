@@ -340,6 +340,7 @@ async function promoting(placed?: { readonly namespace: NamespaceId; readonly hi
         refreshWorkspace: () => Effect.die(new Error("the Lane never refreshes a workspace")),
         revise: () => Effect.die(new Error("the Lane never revises")),
         rely: () => Effect.die(new Error("the Lane never relies")),
+        distinguish: () => Effect.die(new Error("the Lane never distinguishes")),
         nearby: () => Effect.die(new Error("the Lane never reads nearby")),
         abandon: () => Effect.die(new Error("the Lane never abandons")),
         get: () => Effect.die(new Error("no change is queued in a trunk test")),

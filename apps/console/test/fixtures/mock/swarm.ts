@@ -753,7 +753,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
           b.at(when + 0.2).emit({
             type: "ConflictResolved",
             entity: conflictRef,
-            payload: { conflictId: conflict, move: "refine" },
+            payload: { conflictId: conflict, move: "escalate" },
           });
         }
         // The agent revises to keep what the other change relies on, and comes back.
@@ -848,7 +848,7 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
       b.emit({
         type: "ConflictResolved",
         entity: conflictRef,
-        payload: { conflictId: conflict, move: "yield", decisionId },
+        payload: { conflictId: conflict, move: "escalate", decisionId },
         causation: given,
       });
       b.at(ruledAt + 0.2).emit({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/why.test.ts
+# kills: why.http
+# why: a line asked with a subject is taken and ignored, as if it narrowed the subject
+diff --git a/apps/keel/src/adapters/driving/http/why.ts b/apps/keel/src/adapters/driving/http/why.ts
+index 7b1d479..4875b5a 100644
+--- a/apps/keel/src/adapters/driving/http/why.ts
++++ b/apps/keel/src/adapters/driving/http/why.ts
+@@ -25,8 +25,6 @@ function whyTarget(input: Input<"why">): Result.Result<WhyTarget, Issues> {
+   if (path !== undefined) return Result.succeed({ kind: "path", path, line });
+   if (subject === undefined)
+     return Result.fail([{ path: ["path"], message: "Name a path or a subject" }]);
+-  if (line !== undefined)
+-    return Result.fail([{ path: ["line"], message: "A line is read in a path, not a subject" }]);
+   const key = decodeSubject(subject);
+   return Option.isSome(key)
+     ? Result.succeed({ kind: "subject", subject: key.value })

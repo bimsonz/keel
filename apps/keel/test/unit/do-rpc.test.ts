@@ -137,6 +137,9 @@ function objects(answers: {
       rely: async () => {
         throw new Error("this test never relies");
       },
+      distinguish: async () => {
+        throw new Error("this test never distinguishes");
+      },
       nearby: async () => {
         throw new Error("this test never reads nearby");
       },

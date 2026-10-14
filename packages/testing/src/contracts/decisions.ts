@@ -34,6 +34,7 @@ const ELSEWHERE = subject("billing.invoices");
 export function ruledConflict(
   events: ReturnType<typeof projectEvents> = projectEvents(),
   guardId: string = id("grd"),
+  subjectKey: string = SUBJECT,
 ) {
   const [conflictId, probeId, escalationId, decisionId] = [
     id("cfl"),
@@ -42,9 +43,10 @@ export function ruledConflict(
     id("dec"),
   ];
   const [holder, other] = [id("chg"), id("chg")];
+  const subjectId = id("sub");
   /** The conflict's events up to its escalation, the guard admitted from its proof among them. */
   const conflict: readonly EventEnvelope[] = [
-    events.suspected(conflictId, holder, other),
+    events.suspected(conflictId, holder, other, undefined, subjectKey),
     events.probeDrafted(conflictId, probeId),
     ...[1, 2, 3].flatMap((run) =>
       DISCRIMINATING.map(([world, outcome]) =>
@@ -87,6 +89,16 @@ export function ruledConflict(
     } as {
       _tag: string;
     });
+  /** The conflict's subject minted with an anchor in each of these files, as its Subject object commits it. */
+  const minted = (paths: readonly string[]): EventEnvelope =>
+    events.of({ kind: "subject", id: subjectId }, {
+      _tag: "SubjectMinted",
+      subjectId,
+      key: subjectKey,
+      anchors: paths.map((path) => ({ path, commit: "c".repeat(40) })),
+      gloss: subjectKey,
+      mintedBy: "agent",
+    } as { _tag: string });
   /** A later decision superseding this one. */
   const superseded = (): EventEnvelope =>
     events.of({ kind: "decision", id: decisionId }, {
@@ -105,14 +117,16 @@ export function ruledConflict(
     recorded,
     resolved,
     superseded,
+    minted,
+    subjectKey: subject(subjectKey),
     /** The premise's proposition, which the guard asserts. */
     premise: {
-      subject: SUBJECT,
+      subject: subjectKey,
       predicate: "freshness",
       relation: "at-most",
       value: "per-request",
     },
-    effect: { subject: SUBJECT, predicate: "freshness", relation: "is", value: "per-session" },
+    effect: { subject: subjectKey, predicate: "freshness", relation: "is", value: "per-session" },
   };
 }
 
@@ -223,6 +237,70 @@ export function describeDecisionsContract(adapter: string, make: () => Decisions
             guards: [],
           });
           expect(yield* decisions.ofGuards(ruled.project, [ruled.guardId])).toEqual([]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[decisions.contract] a decision is read by a file its subject is anchored in, the anchors heard before it, and by no other file or project",
+      () => {
+        const harness = make();
+        const ruled = ruledConflict();
+        const elsewhere = ruledConflict();
+        return Effect.gen(function* () {
+          for (const event of [
+            ruled.minted(["src/authz/check.ts", "src/authz/cache.ts"]),
+            ...ruled.conflict,
+            ruled.recorded("premise-holds"),
+            ruled.resolved([ruled.other]),
+            // Another project rules on the same subject and anchors it nowhere.
+            ...elsewhere.conflict,
+            elsewhere.recorded("premise-holds"),
+            elsewhere.resolved([elsewhere.other]),
+          ])
+            yield* harness.arrive(event);
+          const decisions = yield* Decisions;
+          const read = yield* decisions.get(ruled.decisionId);
+
+          expect(yield* decisions.atPath(ruled.project, "src/authz/check.ts")).toEqual([read]);
+          expect(yield* decisions.atPath(ruled.project, "src/authz/cache.ts")).toEqual([read]);
+          expect(yield* decisions.atPath(ruled.project, "src/authz")).toEqual([]);
+          expect(yield* decisions.atPath(ruled.project, "src/billing.ts")).toEqual([]);
+          expect(yield* decisions.atPath(elsewhere.project, "src/authz/check.ts")).toEqual([]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[decisions.contract] anchors heard after the decisions read the same, and every subject anchored in a file answers, newest first",
+      () => {
+        const harness = make();
+        const events = projectEvents();
+        const first = ruledConflict(events);
+        const second = ruledConflict(events, id("grd"), "billing.invoices");
+        return Effect.gen(function* () {
+          for (const ruled of [first, second])
+            for (const event of [
+              ...ruled.conflict,
+              ruled.recorded("premise-holds"),
+              ruled.resolved([ruled.other]),
+            ])
+              yield* harness.arrive(event);
+          const decisions = yield* Decisions;
+          expect(yield* decisions.atPath(events.project, "src/shared.ts")).toEqual([]);
+          yield* harness.arrive(first.minted(["src/shared.ts"]));
+          yield* harness.arrive(second.minted(["src/shared.ts", "src/billing.ts"]));
+          const [older, newer] = [
+            yield* decisions.get(first.decisionId),
+            yield* decisions.get(second.decisionId),
+          ];
+
+          expect(yield* decisions.atPath(events.project, "src/shared.ts")).toEqual([newer, older]);
+          expect(yield* decisions.atPath(events.project, "src/billing.ts")).toEqual([newer]);
+          // Read by path as by its subjects.
+          expect(yield* decisions.atPath(events.project, "src/shared.ts")).toEqual(
+            yield* decisions.onSubjects(events.project, [first.subjectKey, second.subjectKey]),
+          );
         }).pipe(Effect.provide(harness.layer));
       },
     );

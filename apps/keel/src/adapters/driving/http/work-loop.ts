@@ -1330,8 +1330,9 @@ const ResolveFields = Schema.Struct({
   note: Schema.optional(Schema.String),
 });
 
+/** A move as the doorway takes it: `distinguish` needs its `note`, the distinction, and the schema cannot say so. */
 export function resolveInput(input: Input<"resolve">): Result.Result<ResolveInput, Issues> {
-  return Result.map(
+  return Result.flatMap(
     decodeWith(ResolveFields, {
       conflictId: input.conflictId,
       changeId: input.changeId,
@@ -1339,8 +1340,50 @@ export function resolveInput(input: Input<"resolve">): Result.Result<ResolveInpu
       move: input.move,
       ...(input.note === undefined ? {} : { note: input.note }),
     }),
-    (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
+    ({ move, note, ...fields }): Result.Result<ResolveInput, Issues> => {
+      const idempotencyKey = input["idempotency-key"];
+      if (move === "escalate") return Result.succeed({ ...fields, move, note, idempotencyKey });
+      if (note === undefined || note.trim() === "")
+        return Result.fail([
+          {
+            path: ["body", "note"],
+            message: "distinguish needs a note: why the decision does not govern this change",
+          },
+        ]);
+      return Result.succeed({ ...fields, move, note, idempotencyKey });
+    },
   );
+}
+
+/** A distinction recorded on the change: the guard that holds the decision still runs on it. */
+export function distinguishedOk({ conflict }: ConflictView, changeId: ChangeId): ResolveResult {
+  const decisionId = conflict.decisionId;
+  return {
+    status: 200,
+    body: envelope(
+      `${changeId} is distinguished from ${decisionId ?? "the decision"}, which resolved ${conflict.id}. A guard that holds that decision still runs on the change: only a person's ruling ends a decision.`,
+      {
+        conflict: {
+          id: conflict.id,
+          kind: conflict.kind,
+          state: conflict.state,
+          parties: [...conflict.parties],
+          ...(conflict.subjectKey === undefined ? {} : { subject: conflict.subjectKey }),
+          openedAt: iso(conflict.openedAt),
+        },
+      },
+      decisionId === undefined
+        ? []
+        : [
+            {
+              kind: "read",
+              title: "Read the decision the change is distinguished from",
+              operationId: "Memory_getDecision",
+              args: { decisionId },
+            },
+          ],
+    ),
+  };
 }
 
 /** The conflict once a party's escalate has put it to a person, with what the agent does while it waits. */

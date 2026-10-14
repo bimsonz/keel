@@ -205,7 +205,7 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
       draft,
       ...cells(3),
       settle,
-      C({ _tag: "Resolve", move: "sequence" }),
+      C({ _tag: "Resolve", move: "escalate" }),
     ]);
     expect(s1.state?.conflict?.state).toBe("resolved");
     // A lattice ruling dismisses only a conflict still Suspected, never one being probed.
@@ -242,13 +242,13 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     const resolved = drive([
       C({ _tag: "Suspect", kind: "textual", parties: [CHANGE_A, CHANGE_B] }),
       C({ _tag: "Prove", evidence: { _tag: "merge-refused", batchId: BATCH } }),
-      C({ _tag: "Resolve", move: "sequence" }),
-      C({ _tag: "Resolve", move: "sequence" }),
+      C({ _tag: "Resolve", move: "escalate" }),
+      C({ _tag: "Resolve", move: "escalate" }),
     ]);
     expect(resolved.state?.conflict?.state).toBe("resolved");
     expect(Result.isFailure(resolved.results[3] ?? Result.succeed([]))).toBe(true);
     // A suite's cell that arrives after the end is recorded, and the conflict stays ended.
-    const ended = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "sequence" })]);
+    const ended = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "escalate" })]);
     expect(ended.last[0]).toBe(1);
     expect(ended.conflict?.state).toBe("resolved");
     const dismissed = lateCells([
@@ -475,7 +475,7 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(escalated.last).toEqual(LATE);
     expect(escalated.conflict).toMatchObject({ state: "escalated", checks: [CELL] });
-    const resolved = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "sequence" })]);
+    const resolved = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "escalate" })]);
     expect(resolved.last).toEqual(LATE);
     expect(resolved.conflict).toMatchObject({ state: "resolved", checks: [CELL] });
     // A cell recorded while probing is the same cell after the decision.

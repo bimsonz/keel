@@ -4099,7 +4099,7 @@
       "post": {
         "operationId": "resolve",
         "summary": "Resolve a conflict",
-        "description": "Resolve a conflict with a move: sequence, yield, merge, distinguish, escalate…",
+        "description": "Make a move on a conflict. `escalate` puts it to a person. `distinguish`\nanswers the precedent a ruled conflict set: it records on the change why\nthat decision does not govern it (`note`), and moves no conflict, guard\nor verdict. A conflict no decision resolved has no precedent to\ndistinguish, and is a 409.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ConflictPath"
@@ -8860,13 +8860,13 @@
       "get": {
         "operationId": "why",
         "summary": "Why is it like this?",
-        "description": "Why is this line, or this subject, the way it is? Returns a cited chain of decisions and claims.",
+        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.1 record. A subject's anchors name a file and\nno lines, so `line` does not narrow: a path with a line answers every\nsubject anchored in that file. Read in the caller's own project; nothing to\nexplain there is 404 `why.nothing_to_explain`.",
         "parameters": [
           {
             "name": "path",
             "in": "query",
             "required": false,
-            "description": "A repository-relative path, with `line`.",
+            "description": "A repository-relative path, as a subject's anchors name it.",
             "schema": {
               "type": "string"
             },
@@ -8876,6 +8876,7 @@
             "name": "line",
             "in": "query",
             "required": false,
+            "description": "A line in `path`. Anchors carry no span, so it does not narrow the answer.",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -17291,16 +17292,10 @@
       "Move": {
         "type": "string",
         "enum": [
-          "proceed",
-          "coordinate",
-          "refine",
-          "sequence",
-          "yield",
-          "merge",
-          "distinguish",
-          "escalate"
+          "escalate",
+          "distinguish"
         ],
-        "description": "A coordination action Keel suggests or an agent takes."
+        "description": "A move an agent makes on a conflict with `resolve`."
       },
       "MoveBasis": {
         "anyOf": [
@@ -18115,7 +18110,7 @@
             }
           },
           "suggestedMove": {
-            "$ref": "#/components/schemas/Move"
+            "$ref": "#/components/schemas/Suggestion"
           },
           "basis": {
             "allOf": [
@@ -18181,7 +18176,7 @@
             }
           },
           "suggestedMove": {
-            "$ref": "#/components/schemas/Move"
+            "$ref": "#/components/schemas/Suggestion"
           },
           "basis": {
             "allOf": [
@@ -18647,6 +18642,7 @@
           "escalation.option_unknown",
           "decision.not_found",
           "probe.not_found",
+          "why.nothing_to_explain",
           "change.lease_stale",
           "change.lease_not_lapsed",
           "change.state_refused",
@@ -19966,7 +19962,8 @@
             "$ref": "#/components/schemas/Move"
           },
           "note": {
-            "type": "string"
+            "type": "string",
+            "description": "Why: with `distinguish` it is required, and it is the distinction from the precedent."
           },
           "changeId": {
             "allOf": [
@@ -20777,6 +20774,17 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "Suggestion": {
+        "type": "string",
+        "enum": [
+          "proceed",
+          "coordinate",
+          "refine",
+          "sequence",
+          "distinguish"
+        ],
+        "description": "What preflight suggests an agent does next."
       },
       "SuspectEffect": {
         "type": "object",

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change-views.test.ts
+# kills: b31.stance-unfolded
+# why: the Projector folds a change's stance as a change event and logs it as a problem
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 88ab9f92..9275d11d 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -122,7 +122,6 @@ export function foldViews(store: Store, event: EventEnvelope): string | undefine
+   // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
+   const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;
+   // A change's stance on a precedent is its own fact, in the feed: no view holds it yet.
+-  if (event.entity.kind === "change" && STANCES.has(event.type)) return conflict;
+   if (event.entity.kind === "change") return foldChange(store, event) ?? conflict;
+   if (event.type === "TrunkInitialized" || event.type === "TrunkAdvanced")
+     return foldTrunk(store, event);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: the Projector's receipt never folds a minted subject's anchors, so no decision is read by path
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 4fd44ee..3cd90a2 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -128,8 +128,6 @@ export function foldViews(store: Store, event: EventEnvelope): string | undefine
+   if (event.entity.kind === "change") return foldChange(store, event) ?? conflict;
+   if (event.type === "TrunkInitialized" || event.type === "TrunkAdvanced")
+     return foldTrunk(store, event);
+-  // Where a subject is anchored is the decision index's, read by path.
+-  if (event.type === "SubjectMinted") return foldSubjectAnchors(store, event);
+   return conflict;
+ }
+ 

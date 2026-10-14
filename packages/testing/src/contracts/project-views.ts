@@ -72,6 +72,48 @@ export function projectEvents(project: string = id("prj")) {
         workspaceId: id("wsp"),
         baseSha: sha(1),
       } as { _tag: string }),
+    /** A started change's way from its submission to trunk, landing as `commit`, as its Change object commits it. */
+    landing: (changeId: string, commit: string) => [
+      envelope(changeRef(changeId), {
+        _tag: "ChangeSubmitted",
+        changeId,
+        revision: 1,
+        commitSha: commit,
+        workspaceId: id("wsp"),
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "PrecheckStarted",
+        changeId,
+        revision: 1,
+        instanceId: id("wfi"),
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "PlanCompiled",
+        changeId,
+        revision: 1,
+        planHash: BUNDLE,
+        steps: 1,
+        costEstimate: 0,
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeQueued",
+        changeId,
+        laneId: "main",
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeBatched",
+        changeId,
+        batchId: id("bat"),
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeLanded",
+        changeId,
+        commitSha: commit,
+        trunkSha: commit,
+        candidateId: id("cnd"),
+        proofId: id("prf"),
+      } as { _tag: string }),
+    ],
     withdrawn: (changeId: string) =>
       envelope(changeRef(changeId), {
         _tag: "ChangeWithdrawn",
@@ -94,19 +136,20 @@ export function projectEvents(project: string = id("prj")) {
       holder: string,
       other: string,
       evidence?: { declared: boolean; method?: string; evidenceClass: string },
+      subject: string = SUBJECT,
     ) =>
       envelope({ kind: "conflict", id: conflictId }, {
         _tag: "ConflictSuspected",
         conflictId,
         kind: "semantic",
         parties: [holder, other],
-        subjectKey: SUBJECT,
+        subjectKey: subject,
         predicate: "freshness",
         origin: "fallout",
         premise: {
           holder,
           proposition: {
-            subject: SUBJECT,
+            subject,
             predicate: "freshness",
             relation: "at-most",
             value: "per-request",
@@ -116,7 +159,7 @@ export function projectEvents(project: string = id("prj")) {
         effect: {
           changeId: other,
           proposition: {
-            subject: SUBJECT,
+            subject,
             predicate: "freshness",
             relation: "is",
             value: "per-session",
@@ -488,6 +531,51 @@ export function describeProjectViewsContract(adapter: string, make: () => Projec
             _tag: "ProbeNotFound",
             probeId: unknown,
           });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[views.change] reads one change as its events left it, with when the last one was, in its own project only",
+      () => {
+        const harness = make();
+        const mine = projectEvents();
+        const theirs = projectEvents();
+        const [change, working, unknown] = [id("chg"), id("chg"), id("chg")];
+        const commit = sha(7);
+        const landing = mine.landing(change, commit);
+        return Effect.gen(function* () {
+          const views = yield* ProjectViews;
+          for (const event of [
+            mine.declared(change, id("agt"), "Cache sessions"),
+            mine.started(change),
+            ...landing,
+            mine.declared(working, id("agt"), "Revoke tokens"),
+            theirs.declared(id("chg"), id("agt"), "Another project's change"),
+          ])
+            yield* harness.arrive(event);
+          const landed = yield* views.change(mine.project, ChangeId.make(change));
+
+          expect(landed.change).toMatchObject({
+            id: change,
+            state: "landed",
+            intent: { revision: 1, goal: "Cache sessions" },
+            landedCommit: commit,
+          });
+          // A landed change takes no later event: its last is the landing.
+          expect(landed.updatedAt).toBe(landing.at(-1)?.at);
+          const declared = yield* views.change(mine.project, ChangeId.make(working));
+          expect([declared.change.state, declared.change.landedCommit]).toEqual([
+            "declared",
+            undefined,
+          ]);
+          // Another project's feed has not seen it, and this one has not seen an id it was never told of.
+          expect(
+            yield* Effect.flip(views.change(theirs.project, ChangeId.make(change))),
+          ).toMatchObject({ _tag: "ChangeNotFound", changeId: change });
+          expect(
+            yield* Effect.flip(views.change(mine.project, ChangeId.make(unknown))),
+          ).toMatchObject({ _tag: "ChangeNotFound", changeId: unknown });
         }).pipe(Effect.provide(harness.layer));
       },
     );

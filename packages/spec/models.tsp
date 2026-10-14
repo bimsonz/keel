@@ -8,16 +8,19 @@ namespace Keel;
 // footprints are MFP's own shapes, so what an agent declares here is already
 // a valid MFP claim.
 
-/** A coordination action Keel suggests or an agent takes. */
-union Move {
+/** What preflight suggests an agent does next. */
+union Suggestion {
   proceed: "proceed",
   coordinate: "coordinate",
   refine: "refine",
   sequence: "sequence",
-  yield: "yield",
-  merge: "merge",
   distinguish: "distinguish",
+}
+
+/** A move an agent makes on a conflict with `resolve`. */
+union Move {
   escalate: "escalate",
+  distinguish: "distinguish",
 }
 
 union ChangeState {
@@ -144,7 +147,7 @@ model Preflight {
   neighbours: Neighbour[];
   contradictions: Contradiction[];
   precedents: PrecedentRef[];
-  suggestedMove: Move;
+  suggestedMove: Suggestion;
 
   /** What the move rests on: a contradiction above, by index, or a precedent. Absent when the move is `proceed`. */
   basis?: MoveBasis;

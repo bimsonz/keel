@@ -32,6 +32,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -68,6 +69,7 @@ function changeObject(options: { readonly capacity?: number } = {}) {
     pool.layer,
     code.layer,
     live.layer,
+    makeDecisionsMemory().layer,
   );
   return { clock, pool, live, layer };
 }

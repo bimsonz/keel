@@ -20,6 +20,7 @@ import {
   commitEdits,
   refreshWorkspace,
   rely,
+  distinguish,
   revise,
   submissionMoved,
   submissionStatus,
@@ -52,6 +53,7 @@ import {
   CommitCommand,
   RefreshCommand,
   RelyCommand,
+  DistinguishCommand,
   ReviseCommand,
   SubmitCommand,
 } from "../../../rpc/index.ts";
@@ -119,6 +121,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((revising) => revise(changeId, revising)),
     );
     return this.answer(ChangeCodecs.revise, program);
+  }
+
+  async distinguish(command: typeof DistinguishCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(DistinguishCommand, command).pipe(
+      Effect.flatMap((distinguishing) => distinguish(changeId, distinguishing)),
+    );
+    return this.answer(ChangeCodecs.distinguish, program);
   }
 
   async rely(command: typeof RelyCommand.Encoded) {

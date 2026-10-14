@@ -1,6 +1,7 @@
 import { ProjectViews } from "@keeltown/core/ports";
 import { Layer } from "effect";
 import {
+  type ChangeRead,
   type ChangesRead,
   type ConflictRead,
   type ConflictsRead,
@@ -14,6 +15,7 @@ import { callObject } from "./answer.ts";
 export interface ProjectViewsStub {
   changes(request: typeof ChangesRead.Encoded): Promise<unknown>;
   snapshot(request: typeof SnapshotRead.Encoded): Promise<unknown>;
+  change(request: typeof ChangeRead.Encoded): Promise<unknown>;
   conflicts(request: typeof ConflictsRead.Encoded): Promise<unknown>;
   conflict(request: typeof ConflictRead.Encoded): Promise<unknown>;
   probeConflict(request: typeof ProbeConflictRead.Encoded): Promise<unknown>;
@@ -39,6 +41,8 @@ export function ProjectViewsRpc(projector: () => ProjectViewsStub): Layer.Layer<
         ),
       snapshot: (project) =>
         callObject(ProjectorCodecs.snapshot, () => projector().snapshot({ project })),
+      change: (project, changeId) =>
+        callObject(ProjectorCodecs.change, () => projector().change({ project, changeId })),
       conflicts: ({ project, open, state, changeId, cursor, limit }) =>
         callObject(ProjectorCodecs.conflicts, () =>
           projector().conflicts({

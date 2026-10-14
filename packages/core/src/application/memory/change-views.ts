@@ -1,7 +1,13 @@
 import { Effect, Result, Schema } from "effect";
-import { Change, ChangeEvent, evolveChange } from "../../domain/coordination/index.ts";
+import {
+  Change,
+  ChangeEvent,
+  ChangeNotFound,
+  evolveChange,
+} from "../../domain/coordination/index.ts";
 import { TrunkAdvanced, TrunkInitialized } from "../../domain/integration/index.ts";
 import {
+  type ChangeId,
   type EventEnvelope,
   IllegalTransition,
   type ProjectId,
@@ -10,13 +16,14 @@ import {
   type ChangeListPage,
   type ChangeListRead,
   ChangeSummary,
+  type ChangeView,
   EntityStore,
   type Stored,
   TrunkView,
   type ViewSnapshot,
 } from "../ports/index.ts";
 import { foldConflictViews, foldsConflict } from "./conflict-views.ts";
-import { foldDecisionIndex, foldsDecision } from "./decision-index.ts";
+import { foldDecisionIndex, foldsDecision, foldSubjectAnchors } from "./decision-index.ts";
 import { foldEscalationViews, foldsEscalation } from "./escalation-views.ts";
 import { FEED, feedCursor } from "./feed.ts";
 
@@ -105,6 +112,9 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
   return undefined;
 }
 
+/** What a change records of the precedents it was shown and answered, beside its own machine's events. */
+const STANCES: ReadonlySet<string> = new Set(["PrecedentSurfaced", "PrecedentDistinguished"]);
+
 /**
  * Folds an arrived event into the read models, in the receipt's transaction
  * after `recordFeed`. An event a model cannot take (undecodable, or one the
@@ -118,9 +128,13 @@ export function foldViews(store: Store, event: EventEnvelope): string | undefine
   if (foldsEscalation(event)) return foldEscalationViews(store, event) ?? decided;
   // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
   const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;
+  // A change's stance on a precedent is its own fact, in the feed: no view holds it yet.
+  if (event.entity.kind === "change" && STANCES.has(event.type)) return conflict;
   if (event.entity.kind === "change") return foldChange(store, event) ?? conflict;
   if (event.type === "TrunkInitialized" || event.type === "TrunkAdvanced")
     return foldTrunk(store, event);
+  // Where a subject is anchored is the decision index's, read by path.
+  if (event.type === "SubjectMinted") return foldSubjectAnchors(store, event);
   return conflict;
 }
 
@@ -150,6 +164,28 @@ export const listChanges: (
     ? { items, nextCursor: last.number }
     : { items };
 });
+
+/**
+ * One change of a project as folded, with when its last event was. The change
+ * row is by id alone, so the project's summary of it is what places it there:
+ * ChangeNotFound for a change the project's feed has not seen declared.
+ */
+export const changeView: (
+  project: ProjectId,
+  changeId: ChangeId,
+) => Effect.Effect<ChangeView, ChangeNotFound, EntityStore> = Effect.fn("memory/changeView")(
+  function* (project: ProjectId, changeId: ChangeId) {
+    const store = yield* EntityStore;
+    const found = store.transaction(() => {
+      const summary = store.get(VIEWS.summary(project), changeId);
+      const change = store.get(VIEWS.change, changeId);
+      return summary === undefined || change === undefined
+        ? undefined
+        : { change: decodeChange(change), updatedAt: decodeSummary(summary).updatedAt };
+    });
+    return found ?? (yield* new ChangeNotFound({ changeId }));
+  },
+);
 
 /** The project's changes and trunk with the feed's head, read in one transaction. */
 export const viewSnapshot: (project: ProjectId) => Effect.Effect<ViewSnapshot, never, EntityStore> =

@@ -300,7 +300,7 @@ model PreflightIssued {
   neighbours: EventNeighbour[];
   contradictions: EventContradiction[];
   precedents: EventPrecedentRef[];
-  suggestedMove: Move;
+  suggestedMove: Suggestion;
 
   /** What the move rests on. Absent exactly when the move is `proceed`. */
   basis?: EventMoveBasis;

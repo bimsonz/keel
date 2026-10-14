@@ -4,7 +4,6 @@ import {
   type ChangeInOtherProject,
   ChangeNotFound,
   checkLease,
-  type Move,
   type ChangeStateRefused,
   type CommitNotInWorkspace,
   type LeaseNotLapsed,
@@ -585,23 +584,30 @@ export const readSnapshot: (
 ) => Effect.Effect<ViewSnapshot, never, ProjectViews> = (scope) =>
   ProjectViews.use((views) => views.snapshot(scope.project));
 
-/** A party's move on a conflict, as the doorway hands it over: the `Keel-Lease` value and the Idempotency-Key with it. */
-export interface ResolveInput {
+/** An agent's move on a conflict, as the doorway hands it over: the `Keel-Lease` value and the Idempotency-Key with it. */
+export type ResolveInput = {
   readonly conflictId: ConflictId;
   readonly changeId: ChangeId;
   readonly lease: LeaseId;
-  readonly move: Move;
-  readonly note?: string | undefined;
   readonly idempotencyKey: string;
-}
+} & (
+  | { readonly move: "escalate"; readonly note?: string | undefined }
+  /** `note` is the distinction: why the decision that resolved the conflict does not govern the change. */
+  | { readonly move: "distinguish"; readonly note: string }
+);
 
 /**
- * A party moves on a conflict of the project the doorway authorised it in,
+ * An agent moves on a conflict of the project the doorway authorised it in,
  * under its change's lease. The change must be that project's and the lease
- * its current one, read from the change's own DO; the conflict's subject
- * comes from the Projector, and the move is made at the Subject DO that hosts
- * the conflict, with the agent's sponsor as the person to ask first. A change
- * of another project is ChangeNotFound, as one that does not exist.
+ * its current one, read from the change's own DO; the conflict comes from the
+ * Projector. A change of another project is ChangeNotFound, as one that does
+ * not exist.
+ * - `escalate`: a party puts the conflict to a person, at the Subject DO that
+ *   hosts it, with the agent's sponsor as the person to ask first.
+ * - `distinguish`: the change answers the precedent the conflict's ruling set,
+ *   recorded on the change by its own DO. Any change of the project may: the
+ *   precedent binds more than the parties. A conflict no decision resolved has
+ *   none, and is MoveRefused.
  */
 export const resolveMove: (
   principal: AgentToken,
@@ -619,6 +625,21 @@ export const resolveMove: (
     const held = checkLease(change, input.lease, yield* (yield* Clock).now);
     if (Result.isFailure(held)) return yield* held.failure;
     const { conflict } = yield* (yield* ProjectViews).conflict(scope.project, input.conflictId);
+    if (input.move === "distinguish") {
+      if (conflict.decisionId === undefined)
+        return yield* new MoveRefused({
+          conflictId: input.conflictId,
+          reason: "no decision resolved the conflict, so it set no precedent to distinguish",
+        });
+      yield* (yield* Changes).distinguish(principal, {
+        changeId: input.changeId,
+        lease: input.lease,
+        decisionId: conflict.decisionId,
+        distinction: input.note,
+        idempotencyKey: input.idempotencyKey,
+      });
+      return { conflict };
+    }
     if (conflict.subjectKey === undefined)
       return yield* new MoveRefused({
         conflictId: input.conflictId,
@@ -632,7 +653,7 @@ export const resolveMove: (
         agentId: principal.agentId,
         run: principal.run,
         sponsor: principal.sponsor,
-        move: input.move,
+        move: "escalate",
         note: input.note,
         idempotencyKey: input.idempotencyKey,
       },

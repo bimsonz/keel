@@ -30,7 +30,7 @@ import {
   Proposition,
   SubjectKey,
 } from "./proposition.ts";
-import { Move } from "./change.ts";
+import { Suggestion } from "./change.ts";
 
 // Changes
 
@@ -54,7 +54,7 @@ export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
   neighbours: Schema.Array(Neighbour),
   contradictions: Schema.Array(Contradiction),
   precedents: Schema.Array(PrecedentRef),
-  suggestedMove: Move,
+  suggestedMove: Suggestion,
   /** What the move rests on: a contradiction above, by index, or a precedent. Absent exactly when the move is `proceed`. */
   basis: Schema.optional(MoveBasis),
   /** The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none. */

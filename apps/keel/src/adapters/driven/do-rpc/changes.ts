@@ -17,6 +17,7 @@ import {
   RebaseCommand,
   RefreshCommand,
   RelyCommand,
+  DistinguishCommand,
   ReviseCommand,
   AgentSessionCodecs,
   ChangeCodecs,
@@ -36,6 +37,7 @@ export interface ChangeStub {
   declare(command: typeof DeclareCommand.Encoded): Promise<unknown>;
   revise(command: typeof ReviseCommand.Encoded): Promise<unknown>;
   rely(command: typeof RelyCommand.Encoded): Promise<unknown>;
+  distinguish(command: typeof DistinguishCommand.Encoded): Promise<unknown>;
   nearby(command: typeof NearbyCommand.Encoded): Promise<unknown>;
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
@@ -72,6 +74,7 @@ const encodeCommit = Schema.encodeSync(CommitCommand);
 const encodeRefresh = Schema.encodeSync(RefreshCommand);
 const encodeRevise = Schema.encodeSync(ReviseCommand);
 const encodeRely = Schema.encodeSync(RelyCommand);
+const encodeDistinguish = Schema.encodeSync(DistinguishCommand);
 const encodeNearby = Schema.encodeSync(NearbyCommand);
 const encodeAbandon = Schema.encodeSync(AbandonCommand);
 
@@ -242,6 +245,19 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               premise: input.premise,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ),
+      distinguish: (principal, input) =>
+        callObject(ChangeCodecs.distinguish, () =>
+          objects.change(input.changeId).distinguish(
+            encodeDistinguish({
+              agentId: principal.agentId,
+              ...(principal.run === undefined ? {} : { run: principal.run }),
+              leaseId: input.lease,
+              decisionId: input.decisionId,
+              distinction: input.distinction,
               idempotencyKey: input.idempotencyKey,
             }),
           ),

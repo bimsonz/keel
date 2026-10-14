@@ -16,6 +16,8 @@ model ConflictPath {
 
 model ResolveRequest {
   move: Move;
+
+  /** Why: with `distinguish` it is required, and it is the distinction from the precedent. */
   note?: string;
 
   /** The change on whose behalf the move is made. */
@@ -306,7 +308,13 @@ interface Conflicts {
   @get
   getConflict(...ConflictPath, @query project?: ProjectId): ConflictDetail | NotFound | StandardErrors;
 
-  /** Resolve a conflict with a move: sequence, yield, merge, distinguish, escalate… */
+  /**
+   * Make a move on a conflict. `escalate` puts it to a person. `distinguish`
+   * answers the precedent a ruled conflict set: it records on the change why
+   * that decision does not govern it (`note`), and moves no conflict, guard
+   * or verdict. A conflict no decision resolved has no precedent to
+   * distinguish, and is a 409.
+   */
   @summary("Resolve a conflict")
   @tag("mcp")
   @operationId("resolve")

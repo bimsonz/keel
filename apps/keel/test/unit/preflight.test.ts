@@ -8,6 +8,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -46,6 +47,7 @@ function project() {
       makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
       makeCodeHostMemory().layer,
       live.layer,
+      makeDecisionsMemory().layer,
     );
   /** Declares in that object, then delivers its events to the index, as the fan-out does after commit. */
   const declared = (

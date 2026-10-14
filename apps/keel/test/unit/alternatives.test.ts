@@ -26,6 +26,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
+  makeDecisionsMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -89,6 +90,7 @@ function world() {
       makeWorkspacePoolMemory({ baseSha: CommitSha.make("b".repeat(40)) }).layer,
       makeCodeHostMemory().layer,
       index.layer,
+      makeDecisionsMemory().layer,
     );
   const objects = new Map<
     ChangeId,

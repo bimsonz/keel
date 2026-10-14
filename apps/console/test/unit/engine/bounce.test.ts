@@ -167,7 +167,7 @@ describe("a conflict proven against a change", () => {
       b.at(1).emit({
         type: "ConflictResolved",
         entity: { kind: "conflict", id: conflictId },
-        payload: { conflictId, move: "yield", decisionId: "dec_other" },
+        payload: { conflictId, move: "escalate", decisionId: "dec_other" },
       });
       b.at(2).emit({
         type: "ChangeBounced",

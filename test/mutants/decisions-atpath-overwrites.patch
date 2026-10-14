@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: a subject minted in a file replaces the one anchored there before, so a file answers only its last subject
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 8f22658..ac0f4ff 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -143,7 +143,7 @@ export function foldSubjectAnchors(store: Store, event: EventEnvelope): string |
+   if (project === undefined) return `${subjectId} was minted with no project`;
+   for (const path of new Set(anchors.map((anchor) => anchor.path))) {
+     const keys = keysAt(store, project, path);
+-    if (!keys.includes(key)) store.put(DECISION_INDEX.anchor(project), path, [...keys, key]);
++    if (!keys.includes(key)) store.put(DECISION_INDEX.anchor(project), path, [key]);
+   }
+   return undefined;
+ }

@@ -27,6 +27,7 @@ import {
   CommitSha,
   ConflictId,
   ContentHash,
+  DecisionId,
   LeaseId,
   NextAction,
   ProjectId,
@@ -182,6 +183,18 @@ export const RelyCommand = Schema.Struct({
   idempotencyKey: Schema.String,
 });
 export type RelyCommand = typeof RelyCommand.Type;
+
+/** Record why a decision does not govern the change, under its lease. */
+export const DistinguishCommand = Schema.Struct({
+  agentId: AgentId,
+  /** The run of the agent that asks, when its token names one. */
+  run: Schema.optional(RunRef),
+  leaseId: LeaseId,
+  decisionId: DecisionId,
+  distinction: Schema.String,
+  idempotencyKey: Schema.String,
+});
+export type DistinguishCommand = typeof DistinguishCommand.Type;
 
 /** Read what is near a change. `projectId` is the one the reader was authorised on: a change in another project is ChangeInOtherProject. */
 export const NearbyCommand = Schema.Struct({ projectId: ProjectId });
@@ -356,6 +369,7 @@ export const ChangeCodecs = {
     Schema.Struct({ change: Change, preflight: Preflight }),
     Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, IdempotencyConflict]),
   ),
+  distinguish: exitCodec(Change, Schema.Union([ChangeNotFound, LeaseStale, IdempotencyConflict])),
   nearby: exitCodec(Preflight, Schema.Union([ChangeNotFound, ChangeInOtherProject])),
   // Submit carries no revision: RevisionMismatch belongs to revise alone.
   submit: exitCodec(
@@ -445,6 +459,7 @@ export interface ChangeRpc extends EventReceiverRpc {
   revise(command: typeof ReviseCommand.Encoded): Promise<ExitJson>;
   /** Adds one premise under the lease; the premise's subject and its ancestors hear the change from then on. */
   rely(command: typeof RelyCommand.Encoded): Promise<ExitJson>;
+  distinguish(command: typeof DistinguishCommand.Encoded): Promise<ExitJson>;
   /** The preflight of the change's intent as it stands, for an agent of its project; commits nothing. */
   nearby(command: typeof NearbyCommand.Encoded): Promise<ExitJson>;
   submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;

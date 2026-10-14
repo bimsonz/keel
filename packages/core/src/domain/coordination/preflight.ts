@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { ChangeId, DecisionId, InstantSchema } from "../kernel/index.ts";
-import { type Intent, Move } from "./change.ts";
+import { type Intent, Suggestion } from "./change.ts";
 import { compare } from "./compare.ts";
 import { Proposition, SubjectKey } from "./proposition.ts";
 
@@ -48,7 +48,7 @@ export const Preflight = Schema.Struct({
   neighbours: Schema.Array(Neighbour),
   contradictions: Schema.Array(Contradiction),
   precedents: Schema.Array(PrecedentRef),
-  suggestedMove: Move,
+  suggestedMove: Suggestion,
   /** What the move rests on; absent exactly when the move is `proceed`. */
   basis: Schema.optional(MoveBasis),
   /** The live changes with the same intent, as exposure listed them, never ranked. Absent when there are none; the move never reads them. */

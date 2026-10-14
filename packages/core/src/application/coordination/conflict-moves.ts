@@ -172,8 +172,8 @@ const refused = (conflictId: ConflictId, reason: string) => new MoveRefused({ co
  * A conflict already with a person answers as it stands: the other party's
  * escalate, or a retry, asks nobody twice. The same Idempotency-Key with
  * another body is an IdempotencyConflict. MoveRefused for a change that is no
- * party, a conflict the machine will not escalate from where it is, a project
- * that belongs to no namespace, and every move but `escalate`.
+ * party, a conflict the machine will not escalate from where it is, and a
+ * project that belongs to no namespace.
  */
 export const resolveConflict = Effect.fn("coordination/resolveConflict")(function* (
   at: SubjectRef,
@@ -183,8 +183,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
   const store = yield* EntityStore;
   const view = viewOf(store, conflictId);
   if (view === undefined) return yield* new ConflictNotFound({ conflictId });
-  if (command.move !== "escalate")
-    return yield* refused(conflictId, `the move ${command.move} is not built yet`);
   if (!changeParties(view.conflict.parties).includes(command.changeId))
     return yield* refused(conflictId, `${command.changeId} is not a party to the conflict`);
   const entity = conflictRef(conflictId);

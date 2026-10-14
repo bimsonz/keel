@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/why.test.ts
+# kills: why.http
+# why: nothing to explain answers the plain 404, so an agent cannot tell an empty answer from a route that is not there
+diff --git a/apps/keel/src/adapters/driving/http/why.ts b/apps/keel/src/adapters/driving/http/why.ts
+index 7b1d479..54b37dd 100644
+--- a/apps/keel/src/adapters/driving/http/why.ts
++++ b/apps/keel/src/adapters/driving/http/why.ts
+@@ -40,7 +40,7 @@ function whyTarget(input: Input<"why">): Result.Result<WhyTarget, Issues> {
+ export function nothingToExplain(caller: { readonly requestId: string }, target: string) {
+   return {
+     status: 404 as const,
+-    body: problem(404, "why.nothing_to_explain", caller.requestId, {
++    body: problem(404, "resource.not_found", caller.requestId, {
+       detail: `No active decision in your project explains ${target}.`,
+       nextActions: [
+         {

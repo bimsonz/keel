@@ -250,7 +250,7 @@ stateDiagram-v2
 | Probing | Dismissed | The probe gives the same answer in every world | — | `ProbeDiscarded {non-discriminating}`, then `ConflictDismissed` |
 | Probing | Escalated | The probe is unstable across runs, or its run ended before the matrix was complete | The settle names the escalation it opened, as above | `ProbeDiscarded {unstable}` or `ProbeDiscarded {run-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Proven | Escalated | The conflict is human-class | Permission semantics, destructive migrations, ambiguous requirements | `ConflictEscalated {reason: human-class}` |
-| Proven | Resolved | A Move is applied (bounce, sequence, yield, merge, distinguish…) | — | `ConflictResolved` |
+| Proven | Resolved | A ruling is applied (`escalate`, then the person's decision) | — | `ConflictResolved` |
 | Escalated | Resolved | Caused by `RulingGiven` | A Decision: an escalated conflict resolves only on a ruling. A ruling that lets one side stand goes against the other: the premise standing against the change making the effect, the effect standing against the premise's holder. `against` is taken only with a decision and only of the conflict's parties (`not-a-party`) | `ConflictResolved` (with `decisionId`, and with `against` when the ruling goes against a party; one that favours no side names none, and every party resumes) |
 
 **Terminal:** Resolved, Dismissed. A terminal conflict whose probe was drafted still records a late suite cell: a fact that leaves it where it ended.
@@ -478,7 +478,7 @@ stateDiagram-v2
 |---|---|---|---|---|
 | — | Established | Caused by `ChangeLanded` | The landed effect is backed by at least one admitted guard (otherwise refused, `unguarded`) | `TenetEstablished` |
 | Established | Contested | A change's effect contradicts the tenet | The conflict is open (suspected, probing, proven or escalated) and names the tenet as a party | `ConflictSuspected` (tenet as party), then `TenetContested` |
-| Contested | Established | The contesting conflict is dismissed, or resolved by `distinguish` or `yield` | Any other state or move is refused (`conflict-unsettled`) | `TenetReaffirmed` |
+| Contested | Established | The contesting conflict is dismissed, or resolved by `distinguish` | Any other state or move is refused (`conflict-unsettled`) | `TenetReaffirmed` |
 | Contested | Retracted | A change lands against the tenet, on a ruling | A `decisionId`, under any policy | `TenetRetracted` (with `decisionId`) |
 | Contested | Retracted | A change lands against the tenet, on proof, where the predicate's policy is `advise` or `annotate` (absent is `advise`) | The contesting conflict is `proven` and the landing change is a party; under `block` a ruling is required (`ruling-required`); opinion never retracts (`not-proven`) | `TenetRetracted` (citing the conflict) |
 | Established | Superseded | A new tenet on the same `(subject, predicate)` replaces it | — | `TenetSuperseded` |
