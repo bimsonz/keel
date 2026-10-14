@@ -2,14 +2,15 @@
 # kills: link.project-standing
 # why: a person invites an agent to a project, and takes one off, on a session that is no fresh sign-in
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index ff7dbb54..dbcc9bd4 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -664,7 +664,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -661,7 +661,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
              }),
            ),
          ...invitationHandlers(run, touchedForStanding),
 -        ...projectInvitationHandlers(run, touchedForStanding),
 +        ...projectInvitationHandlers(run, (_caller, move) => move()),
          ...decisionHandlers(run),
+         ...verdictHandlers(run),
          ...deliveryHandlers(run),
-         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>

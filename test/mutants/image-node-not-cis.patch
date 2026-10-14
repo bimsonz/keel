@@ -2,7 +2,7 @@
 # kills: image.node, image.toolchain
 # why: The box runs another node than CI's .node-version
 diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
-index 288dd910..5d1d8bbc 100644
+index f26153a8..a5dc75c7 100644
 --- a/apps/keel-verify/containers/sandbox/Dockerfile
 +++ b/apps/keel-verify/containers/sandbox/Dockerfile
 @@ -41,7 +41,7 @@ COPY --from=git /out/usr/local/ /usr/local/
@@ -12,5 +12,5 @@ index 288dd910..5d1d8bbc 100644
 -ARG NODE_VERSION=22.22.3
 +ARG NODE_VERSION=22.23.2
  ARG NODE_SHA256=2e5d13569282d016861fae7c8f935e741693c269101a5bebcf761a5376d1f99f
- RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
+ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
   && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \

@@ -2,14 +2,14 @@
 # kills: views.lanes.wired
 # why: the lanes' route answers 503 again, the stub the contract no longer has a reason for
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 79f0135b..6f2b8a6a 100644
+index ff7dbb54..6029a364 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -946,6 +946,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
-         Views_getVerdict: notYet,
+@@ -1007,6 +1007,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+         },
          // One lane a project, so one page: no cursor is given out, and any presented is not Keel's.
          Views_listLanes: (caller: Caller, input: Input<"Views_listLanes">) => {
-+          if (input.projectId !== "") return notYet(caller);
++          if (input.projectId !== "") return { status: 503 as const, body: problem(503, "service.not_implemented", caller.requestId) };
            const projectId = settingsProject(input.projectId);
            if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
            if (input.cursor !== undefined)

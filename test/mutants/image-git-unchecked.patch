@@ -2,13 +2,13 @@
 # kills: image.git
 # why: Git's tarball is unpacked and built whatever its bytes are
 diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
-index 288dd910..7fbacebb 100644
+index f26153a8..0cf21929 100644
 --- a/apps/keel-verify/containers/sandbox/Dockerfile
 +++ b/apps/keel-verify/containers/sandbox/Dockerfile
 @@ -22,7 +22,6 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential cargo libcurl4-gnutls-dev libexpat1-dev libpcre2-dev zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
- RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
+ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
 - && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
   && tar -xJf /tmp/git.tar.xz -C /tmp \
   && make -C "/tmp/git-${GIT_VERSION}" -j"$(nproc)" prefix=/usr/local USE_LIBPCRE2=YesPlease NO_OPENSSL=YesPlease NO_PERL=YesPlease NO_PYTHON=YesPlease NO_GETTEXT=YesPlease NO_TCLTK=YesPlease DESTDIR=/out install

@@ -2,13 +2,13 @@
 # kills: image.git
 # why: Git's tarball is unpacked before its sha256 is checked
 diff --git a/apps/keel-verify/containers/sandbox/Dockerfile b/apps/keel-verify/containers/sandbox/Dockerfile
-index 288dd910..1c9f7b24 100644
+index f26153a8..b6ae909b 100644
 --- a/apps/keel-verify/containers/sandbox/Dockerfile
 +++ b/apps/keel-verify/containers/sandbox/Dockerfile
 @@ -22,8 +22,8 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential cargo libcurl4-gnutls-dev libexpat1-dev libpcre2-dev zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
- RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
+ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
 - && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
   && tar -xJf /tmp/git.tar.xz -C /tmp \
 + && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
