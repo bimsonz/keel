@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/derive-purity.test.ts -t "derive.purity-gained"
+# kills: derive.purity-gained
+# why: an impurity the change declared is reported undeclared, so its conflict is a silent retraction
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..d4c2a6fa 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -315,7 +315,7 @@ const purityEffects = (
+       {
+         proposition,
+         anchors: resting,
+-        declared: isDeclared(intent, proposition),
++        declared: false,
+         method: "extractor",
+         evidenceClass: "ruling",
+       },

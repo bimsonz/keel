@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/derive-purity.test.ts packages/syntax/test/purity-real.test.ts -t "derive.purity-gained|derive.purity-real"
+# kills: derive.purity-gained, derive.purity-real
+# why: a function made impure is said to be pure, which agrees with the premise it breaks
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..ca76f5c2 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -308,7 +308,7 @@ const purityEffects = (
+     ).map((ref) => ({ path: ref.path, symbol: ref.symbol, commit: head.commit }));
+     const proposition = writeProposition(
+       subject,
+-      { predicate: "purity", relation: "is", value: false },
++      { predicate: "purity", relation: "is", value: true },
+       { anchors: resting, gloss: glossOf(first) },
+     );
+     return [

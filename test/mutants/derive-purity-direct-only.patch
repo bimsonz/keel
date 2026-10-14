@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/derive-purity.test.ts -t "derive.purity-reach|derive.purity-property"
+# kills: derive.purity-reach, derive.purity-property
+# why: only the symbol taking the step is impure, never one that calls it
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..40760d40 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -256,7 +256,7 @@ const impureSymbols = (facts: SourceFacts): ReadonlyMap<string, Impure> => {
+   const steps = new Map<string, Impurity[]>();
+   for (const step of facts.impurities) {
+     refs.set(refKey(step.in), step.in);
+-    for (const key of reaching(calledBy, new Set([refKey(step.in)])))
++    for (const key of [refKey(step.in)])
+       steps.set(key, [...(steps.get(key) ?? []), step]);
+   }
+   return new Map(

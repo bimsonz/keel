@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts -t "syntax.module-writes"
+# kills: syntax.module-writes
+# why: hits++ and --hits are not writes, so a counter a function bumps leaves it pure
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 5148f538..c059a1d6 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -713,8 +713,7 @@ function emit(context: Context, node: Node): void {
+       break;
+     }
+     case "assignment_expression":
+-    case "augmented_assignment_expression":
+-    case "update_expression": {
++    case "augmented_assignment_expression": {
+       const target = field(node, node.type === "update_expression" ? "argument" : "left");
+       const path = target === undefined ? undefined : pathOf(target);
+       if (path !== undefined) context.sym.events.push({ k: "write", path });

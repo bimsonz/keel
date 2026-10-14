@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/derive-purity.test.ts -t "derive.purity-gained"
+# kills: derive.purity-gained
+# why: a subject is attributed every symbol of a file it anchors, not the ones its anchors cover
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..77c10881 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -300,7 +300,7 @@ const purityEffects = (
+   const anchorsOf = anchorsBySubject(subjects);
+   return [...anchorsOf.keys()].toSorted().flatMap((subject): ExtractedEffect[] => {
+     const anchors = anchorsOf.get(subject) ?? [];
+-    const covered = gained.filter((symbol) => anchors.some((anchor) => covers(anchor, symbol.at)));
++    const covered = gained.filter((symbol) => anchors.some((anchor) => anchor.path === symbol.at.path));
+     const [first] = covered;
+     if (first === undefined) return [];
+     const resting: Anchor[] = uniqueRefs(

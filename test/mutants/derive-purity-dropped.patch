@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts -t "d21.pool.derive-purity"
+# kills: d21.pool.derive-purity
+# why: Precheck derives no purity effect, so the console.info a head adds to a function a neighbour relies on being pure is never heard
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..cb1800c8 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -397,7 +397,6 @@ export const deriveEffects = (input: {
+     );
+   const effects = [
+     ...freshness,
+-    ...purityEffects(input.base, input.head, input.subjects, input.intent),
+   ].toSorted((a, b) => (effectKey(a) < effectKey(b) ? -1 : effectKey(a) > effectKey(b) ? 1 : 0));
+   return { effects, undecided };
+ };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts -t "syntax.impure-shadowed"
+# kills: syntax.impure-shadowed
+# why: a function or class the file declares under a built-in's name is taken for the built-in
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index 137d66ad..b78d9e54 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -123,7 +123,7 @@ const shadowed = (name: string, scope: Scope): boolean =>
+ 
+ /** The name is the global of that name: nothing the file declares, imports or binds, nor the symbol, is called it. */
+ const isGlobal = (name: string, scope: Scope): boolean =>
+-  !shadowed(name, scope) && !scope.file.functions.has(name) && !scope.file.classes.has(name);
++  !shadowed(name, scope);
+ 
+ /** An expression's path of names (`console.info`), when it is one. */
+ const namesOf = (expr: Expr): string | undefined => {

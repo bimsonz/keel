@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts packages/syntax/test/purity-real.test.ts -t "syntax.impure-builtins|derive.purity-real"
+# kills: syntax.impure-builtins, derive.purity-real
+# why: console's methods are not impure, so a log added to a function a premise holds pure derives nothing
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index 137d66ad..0c55538c 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -72,7 +72,7 @@ const IMPURE_CALLS: ReadonlyMap<string, ImpurityKind> = new Map([
+   ["queueMicrotask", "schedule"],
+ ]);
+ /** Built-ins every method of which is impure: each of `console`'s writes the program's output, or keeps its counters and timers. */
+-const IMPURE_ROOTS: ReadonlyMap<string, ImpurityKind> = new Map([["console", "output"]]);
++const IMPURE_ROOTS: ReadonlyMap<string, ImpurityKind> = new Map([]);
+ /**
+  * Constructions that are impure: a socket connects, and a date given no time
+  * reads the clock (`new Date(ms)` is pure).

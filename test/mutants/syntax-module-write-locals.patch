@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts -t "syntax.module-writes"
+# kills: syntax.module-writes
+# why: a write to a local or a parameter named as a module binding is taken for a write to module state
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index 137d66ad..6fabc899 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -166,7 +166,6 @@ const impurityOf = (
+  */
+ const writesModule = (path: string, scope: Scope): boolean => {
+   const [root = path] = path.split(".");
+-  if (scope.sym?.bindings.has(root) === true) return false;
+   return scope.file.variables.has(root) || (root !== path && scope.file.imports.has(root));
+ };
+ 

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/derive-purity.test.ts -t "derive.purity-gained|derive.purity-property"
+# kills: derive.purity-gained, derive.purity-property
+# why: a symbol already impure at base is said to become so, so every touch of a logging function contradicts a purity premise again
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index d4c033cb..45823a04 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -294,7 +294,6 @@ const purityEffects = (
+ ): readonly ExtractedEffect[] => {
+   const before = impureSymbols(base);
+   const gained = [...impureSymbols(head)]
+-    .filter(([key]) => !before.has(key))
+     .map(([, symbol]) => symbol)
+     .toSorted((a, b) => byRef(a.at, b.at));
+   const anchorsOf = anchorsBySubject(subjects);
