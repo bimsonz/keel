@@ -1,8 +1,9 @@
-// Where an agent sends the person it asks to stand behind it. The page names the agent as Keel shows it to
-// anyone, says what standing behind it is, and has one button. Opening the link approves nothing: the tap is a
-// passkey touch, which signs a visitor in as it signs anyone in afresh, and then the one call.
+// Where an agent sends the person it asks to sponsor it, laid out as a code host's page for authorising an app:
+// who is asking, what sponsoring it means, then cancel or approve. The agent is named as Keel shows it to anyone.
+// Opening the link approves nothing: the tap is a passkey touch, which signs a visitor in as it signs anyone in
+// afresh, and then the one call.
 
-import { Button } from "@cloudflare/kumo";
+import { Button, buttonVariants } from "@cloudflare/kumo";
 import { useEffect, useRef, useState } from "react";
 import type { AgentCard } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
@@ -10,7 +11,7 @@ import type { KeelSponsorship } from "../source/types.ts";
 import type { Account, Who } from "./account.ts";
 import { Card, Refusal, useAsking } from "./parts.tsx";
 import type { SponsorLink } from "./sponsorLink.ts";
-import { spent, standBehind } from "./sponsoring.ts";
+import { sponsorAgent, spent } from "./sponsoring.ts";
 
 /** The person as a page names them: by their handle on this Keel, or by their name before they have one. */
 const called = (who: Who): string => who.handle ?? who.name;
@@ -69,7 +70,7 @@ export function Sponsor({
 
   if (link === null)
     return (
-      <Card title="This link is not whole" lede="Ask the agent for a new one.">
+      <Card title="This link is incomplete" lede="Ask the agent for a new one.">
         <a className="a-link" href="/">
           Go to the projects
         </a>
@@ -78,7 +79,7 @@ export function Sponsor({
   if (agent === undefined) return null;
   if (agent === null)
     return (
-      <Card title="Keel knows no agent by this link" lede="Ask the agent for a new one.">
+      <Card title="No agent found for this link" lede="Ask the agent for a new one.">
         <a className="a-link" href="/">
           Go to the projects
         </a>
@@ -86,18 +87,18 @@ export function Sponsor({
     );
   if ("failed" in agent)
     return (
-      <Card title="Keel did not say who this agent is">
+      <Card title="This agent could not be loaded">
         <Refusal said={{ words: agent.failed, next: [], code: "" }} />
       </Card>
     );
   if (stood !== null)
     return (
       <Card
-        title={`You stand behind ${agent.name}`}
-        lede={`Its questions come to you, ${called(stood)}. You can pause it, or end this, at any time.`}
+        title={`You sponsor ${agent.name}`}
+        lede={`Its questions come to you, ${called(stood)}. You can pause it or stop sponsoring it at any time.`}
       >
         <a className="a-link" href={hrefOf({ at: "settings" })}>
-          See the agents you stand behind
+          See the agents you sponsor
         </a>
       </Card>
     );
@@ -108,7 +109,7 @@ export function Sponsor({
       if (mine === null) return;
       setChanged(null);
       try {
-        const came = await standBehind(
+        const came = await sponsorAgent(
           {
             signIn: () => account.signInWithPasskey(),
             approve: (agentId, code) => sponsorship.approve(agentId, code),
@@ -134,15 +135,26 @@ export function Sponsor({
 
   return (
     <Card
-      title={`Stand behind ${agent.name}?`}
-      lede="An agent asks you to stand behind it on this Keel."
+      title={`Sponsor ${agent.name}?`}
+      lede={`${agent.name}${agent.handle === undefined ? "" : ` (${agent.handle})`} is asking you to sponsor it.`}
     >
       <dl className="a-panel grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 p-4 text-sm">
         <dt className="text-kumo-subtle">Agent</dt>
         <dd className="text-kumo-strong">{agent.name}</dd>
+        {/* The handle is what the agent will have told the person, so they can check it is the same one. */}
+        {agent.handle !== undefined && (
+          <>
+            <dt className="text-kumo-subtle">Handle</dt>
+            <dd className="a-mono text-kumo-default">{agent.handle}</dd>
+          </>
+        )}
         {/* The kind is what the agent said of itself when it enrolled, and Keel vouches for none of it. */}
-        <dt className="text-kumo-subtle">Declared as</dt>
-        <dd className="text-kumo-default">{agent.kind}</dd>
+        {agent.kind !== undefined && (
+          <>
+            <dt className="text-kumo-subtle">Declared as</dt>
+            <dd className="text-kumo-default">{agent.kind}</dd>
+          </>
+        )}
         {agent.namespace !== undefined && (
           <>
             <dt className="text-kumo-subtle">Works in</dt>
@@ -156,11 +168,11 @@ export function Sponsor({
       </dl>
       <ul
         className="list-disc pl-5 text-sm text-kumo-default"
-        aria-label="What standing behind it is"
+        aria-label="What sponsoring it means"
       >
         <li>Its questions come to you.</li>
-        <li>You can pause it, or end this, at any time.</li>
-        <li>It is given none of your rights, and it never acts as you.</li>
+        <li>You can pause it or stop sponsoring it at any time.</li>
+        <li>It gets none of your access and never acts as you.</li>
       </ul>
       {changed !== null && (
         <output className="text-sm text-kumo-default">
@@ -171,17 +183,25 @@ export function Sponsor({
       {/* Once Keel has said the link is spent the button goes, and what to do next is Keel's to say, above. */}
       {open && (
         <div className="flex flex-col gap-2">
-          <Button
-            className="w-full justify-center"
-            variant="primary"
-            disabled={busy}
-            onClick={() => void tap()}
-          >
-            Stand behind {agent.name}
-          </Button>
+          <div className="flex gap-2">
+            <a
+              className={`${buttonVariants({ variant: "secondary" })} flex-1 justify-center`}
+              href="/"
+            >
+              Cancel
+            </a>
+            <Button
+              className="flex-1 justify-center"
+              variant="primary"
+              disabled={busy}
+              onClick={() => void tap()}
+            >
+              Sponsor {agent.name}
+            </Button>
+          </div>
           <p className="text-sm text-kumo-subtle">
             {who === null
-              ? "You approve with a passkey, and the same touch signs you in. With no account here yet, sign up and open the agent's link again: it is good for ten minutes."
+              ? "You approve with a passkey, which also signs you in. No account yet? Sign up, then open the agent's link again within ten minutes."
               : `You approve with a passkey, as ${called(who)}.`}
           </p>
         </div>

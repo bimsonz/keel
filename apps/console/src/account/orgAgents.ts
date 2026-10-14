@@ -1,7 +1,7 @@
 // An org's agents, in words: what an invitation gives, where it stands, who answers for it, and who is offered
 // its removal. Every one is a field of Keel's own row, set beside the org's members where the row names one.
 
-import type { NamespaceAgent, Scope } from "../contract/keel/index.ts";
+import type { AgentProfile, NamespaceAgent, Scope } from "../contract/keel/index.ts";
 import type { Member } from "./account.ts";
 import { type Role, manages } from "./roles.ts";
 
@@ -57,4 +57,39 @@ export function removalOf(agent: NamespaceAgent): "Remove" | "Withdraw" {
 /** The agents that have joined: all that anyone but a member is read, and all an org's home lists. */
 export function joinedOf(listed: readonly NamespaceAgent[]): NamespaceAgent[] {
   return listed.filter((agent) => agent.state === "joined");
+}
+
+/**
+ * The agents the reader sponsors to offer for an invitation, as a code host's "Add people" suggests people: with
+ * nothing typed, each of them; with something typed, those whose handle or name holds it. One the org has invited
+ * or that has joined (`listed`) is not offered again. Only an agent with a handle can be invited, so only those are
+ * offered; one whose handle was typed whole is already chosen.
+ */
+export function sponsoredMatching(
+  sponsored: readonly AgentProfile[],
+  typed: string,
+  listed: readonly NamespaceAgent[] = [],
+): AgentProfile[] {
+  const asked = typed.trim().toLowerCase();
+  if (asked !== "" && sponsored.some((agent) => agent.handle?.toLowerCase() === asked)) return [];
+  const taken = new Set(listed.filter((agent) => agent.state !== "ended").map((agent) => agent.id));
+  return sponsored.filter(
+    (agent) =>
+      agent.handle !== undefined &&
+      !taken.has(agent.id) &&
+      (agent.handle.toLowerCase().includes(asked) || agent.name.toLowerCase().includes(asked)),
+  );
+}
+
+/**
+ * The handle Keel is asked to invite: what was typed, unless it is the name of exactly one agent the reader
+ * sponsors, whose handle it is then. Keel invites by handle alone.
+ */
+export function handleFor(sponsored: readonly AgentProfile[], typed: string): string {
+  const asked = typed.trim();
+  const named = sponsored.filter(
+    (agent) => agent.handle !== undefined && agent.name.toLowerCase() === asked.toLowerCase(),
+  );
+  const [only] = named;
+  return named.length === 1 && only?.handle !== undefined ? only.handle : asked;
 }

@@ -370,13 +370,13 @@ export function Panel({
 
 // ─── Unverified ─────────────────────────────────────────────────────────────
 
-/** Verification is switched off for the project: nothing Keel ran stands behind what this marks. */
+/** Verification is switched off for the project: Keel verified nothing this marks. */
 export function Unverified({ children = "Unverified" }: { children?: string }) {
   return (
     <span
       className="a-chip ml-2 align-middle"
       data-tone="suspected"
-      title="Verification is switched off for this project. Nothing Keel ran stands behind this."
+      title="Verification is switched off for this project, so Keel did not verify this."
     >
       <WarningIcon size={13} weight="fill" />
       {children}

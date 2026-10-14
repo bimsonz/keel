@@ -1,4 +1,4 @@
-// "Agents you stand behind", on a person's settings: Keel's list of the agents they sponsor, and the three
+// "Agents you sponsor", on a person's settings: Keel's list of the agents they sponsor, and the three
 // things a sponsor may ask of one. Each is Keel's own operation, and what a row says after it is Keel's answer.
 
 import { Button, Input } from "@cloudflare/kumo";
@@ -13,7 +13,11 @@ import { type Control, afterMove, controlsOf, reasonOf, standingOf } from "./spo
 /** Keel's code, on `/v1`, for a move that wants a passkey sign-in from the last ten minutes. */
 const FRESH_SIGN_IN = "auth.fresh_sign_in_required";
 
-const LABEL: Record<Control, string> = { pause: "Pause", unpause: "Unpause", end: "End" };
+const LABEL: Record<Control, string> = {
+  pause: "Pause",
+  unpause: "Unpause",
+  end: "Stop sponsoring",
+};
 
 export function Sponsored({
   account,
@@ -81,17 +85,17 @@ export function Sponsored({
     });
 
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Agents you stand behind">
-      <h2 className="a-h">Agents you stand behind</h2>
+    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Agents you sponsor">
+      <h2 className="a-h">Agents you sponsor</h2>
       <p className="text-sm text-kumo-subtle">
-        An agent's questions come to the person who stands behind it. You can pause one, or end
-        this, at any time. An agent asks by showing you a link.
+        An agent's questions come to its sponsor. You can pause an agent or stop sponsoring it at
+        any time. An agent asks you to sponsor it by sending you a link.
       </p>
       {unread !== null && <Refusal said={unread} />}
       {agents !== null && agents.length === 0 && (
-        <p className="text-sm text-kumo-default">You stand behind no agent.</p>
+        <p className="text-sm text-kumo-default">You sponsor no agents.</p>
       )}
-      <ul className="flex flex-col gap-3" aria-label="The agents you stand behind">
+      <ul className="flex flex-col gap-3" aria-label="The agents you sponsor">
         {(agents ?? []).map((agent) => {
           const controls = controlsOf(agent.state);
           return (

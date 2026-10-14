@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Who } from "../../../src/account/account.ts";
 import { linkOf, takeLink } from "../../../src/account/sponsorLink.ts";
-import { spent, standBehind } from "../../../src/account/sponsoring.ts";
+import { spent, sponsorAgent } from "../../../src/account/sponsoring.ts";
 import type { AgentCard } from "../../../src/contract/keel/index.ts";
 import { hrefOf, placeOf, sentFrom } from "../../../src/places.ts";
 import { parse } from "../../../src/route.ts";
@@ -61,7 +61,7 @@ const worded = (error: unknown): unknown =>
     ? { status: error.status, code: error.code, said: error.message, next: error.next }
     : error;
 
-describe("the link an agent hands the person it asks to stand behind it", () => {
+describe("the link an agent hands the person it asks to sponsor it", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("[sponsor.link] is read from the fragment, and one that is not whole is none", () => {
@@ -136,7 +136,7 @@ describe("the link an agent hands the person it asks to stand behind it", () => 
   });
 });
 
-describe("standing behind an agent", () => {
+describe("sponsoring an agent", () => {
   it("[sponsor.card] reads who the agent is as anyone may, with no code and no credential, and an id Keel knows none by as none", async () => {
     const k = keel();
     expect(await k.as().findAgent(AGENT.id)).toEqual(AGENT);
@@ -166,7 +166,7 @@ describe("standing behind an agent", () => {
     expect(sent.headers.has("authorization") || sent.headers.has("cookie")).toBe(false);
   });
 
-  it("[sponsor.refused] hands on Keel's refusals as Keel gives them: a stale sign-in, a code that is no good, an agent someone stands behind", async () => {
+  it("[sponsor.refused] hands on Keel's refusals as Keel gives them: a stale sign-in, a code that is no good, an agent someone sponsors", async () => {
     const k = keel();
     const { code } = k.fake.askSponsor(AGENT.id);
     const tried = (
@@ -207,7 +207,7 @@ describe("standing behind an agent", () => {
     // says nothing of the agent now having a sponsor.
     expect(await tried("ada", AGENT.id, again.code)).toEqual(gone);
     expect(await tried("ada", AGENT.id, "spn_wrong")).toEqual(gone);
-    // Keel gives an agent somebody stands behind no new code: it is the agent that is told it has a sponsor.
+    // Keel gives an agent somebody sponsors no new code: it is the agent that is told it has a sponsor.
     // So no approval is ever told so, the sponsor's own second one included, and nobody is told to end a link.
     expect(() => k.fake.askSponsor(AGENT.id)).toThrow(SPONSOR_HELD);
     expect(await tried("ada", AGENT.id, again.code, worded)).toEqual({
@@ -232,11 +232,11 @@ describe("standing behind an agent", () => {
     });
     const link = { agentId: "agt_1", code: "spn_2" };
     // A visitor: the touch signs them in, and the approval goes as them.
-    expect(await standBehind(sponsoring(ADA), link, null)).toEqual({ is: "approved", as: ADA });
+    expect(await sponsorAgent(sponsoring(ADA), link, null)).toEqual({ is: "approved", as: ADA });
     expect(order).toEqual(["touch", "approve agt_1 spn_2"]);
     // A touch the person called off sends nothing.
     order.length = 0;
-    await expect(standBehind(sponsoring(new Error("called off")), link, ADA)).rejects.toThrow(
+    await expect(sponsorAgent(sponsoring(new Error("called off")), link, ADA)).rejects.toThrow(
       "called off",
     );
     expect(order).toEqual(["touch"]);
@@ -252,10 +252,10 @@ describe("standing behind an agent", () => {
       },
     };
     const link = { agentId: "agt_1", code: "spn_2" };
-    expect(await standBehind(sponsoring, link, ADA)).toEqual({ is: "changed", to: GRACE });
+    expect(await sponsorAgent(sponsoring, link, ADA)).toEqual({ is: "changed", to: GRACE });
     expect(approved).toEqual([]);
     // Read again as that account, the same tap is theirs.
-    expect(await standBehind(sponsoring, link, GRACE)).toEqual({ is: "approved", as: GRACE });
+    expect(await sponsorAgent(sponsoring, link, GRACE)).toEqual({ is: "approved", as: GRACE });
     expect(approved).toEqual(["agt_1"]);
   });
 

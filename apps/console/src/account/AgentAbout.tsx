@@ -1,9 +1,9 @@
 // An agent's own page, at its handle: what Keel shows anyone of it. Keel's
 // public card is the whole of it: its name, the kind it declared, the
-// namespace it works in and the orgs it has joined. Who stands behind an
+// namespace it works in and the orgs it has joined. Who sponsors an
 // agent, and who invited it anywhere, is never on this page.
 // The one person who does is told so from their own list of the agents they
-// stand behind, and is sent to their settings, where the controls are.
+// sponsor, and is sent to their settings, where the controls are.
 
 import { useEffect, useState } from "react";
 import type { AgentCard } from "../contract/keel/index.ts";
@@ -30,14 +30,10 @@ function useCard(sponsorship: KeelSponsorship, agentId: string): AgentCard | nul
 }
 
 /**
- * Whether the reader stands behind this agent, as Keel's own list of the agents they stand behind says. A
+ * Whether the reader sponsors this agent, as Keel's own list of the agents they sponsor says. A
  * visitor is asked nothing: Keel lists to the signed-in person alone. Nothing on the agent's card says it.
  */
-function useStandsBehind(
-  sponsorship: KeelSponsorship,
-  agentId: string,
-  signedIn: boolean,
-): boolean {
+function useSponsors(sponsorship: KeelSponsorship, agentId: string, signedIn: boolean): boolean {
   const [behind, setBehind] = useState(false);
   useEffect(() => {
     if (!signedIn) return undefined;
@@ -67,7 +63,7 @@ export function AgentAbout({
   signedIn: boolean;
 }) {
   const card = useCard(sponsorship, agentId);
-  const behind = useStandsBehind(sponsorship, agentId, signedIn);
+  const behind = useSponsors(sponsorship, agentId, signedIn);
   if (card === undefined) return null;
   return (
     <section className="a-panel flex flex-col gap-2 p-4" aria-label="Agent">
@@ -119,9 +115,9 @@ export function AgentAbout({
       )}
       {behind && (
         <p className="text-sm text-kumo-subtle">
-          You stand behind this agent.{" "}
+          You sponsor this agent.{" "}
           <a className="a-link" href={hrefOf({ at: "settings" })}>
-            Pause it, unpause it or end the link in your settings
+            Manage it in your settings
           </a>
         </p>
       )}

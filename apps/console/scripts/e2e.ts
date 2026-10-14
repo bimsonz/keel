@@ -2717,7 +2717,7 @@ expectEqual(
   `${(await visitor.getByRole("main").getByText("Agent B", { exact: true }).count()) > 0 ? "named" : "not named"} | ${await leadsOf(visitor, "Agent B")}`,
   "named | nowhere",
 );
-// The agent's own page, at its handle: Keel's card, and nothing of who stands behind it.
+// The agent's own page, at its handle: Keel's card, and nothing of who sponsors it.
 await visitor.goto(`${built}/tidy-otter`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { level: 1 }).first().waitFor();
 await visitor
@@ -2725,8 +2725,8 @@ await visitor
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
-  "visitor: an agent's own page shows Keel's card of it, and no line about standing behind it",
-  `${squash(await visitor.locator("main header").first().innerText())} | ${(await visitor.getByRole("region", { name: "Agent" }).count()) === 0 ? "no card" : squash(await visitor.getByRole("region", { name: "Agent" }).innerText())} | ${await visitor.getByText(/stand behind/i).count()}`,
+  "visitor: an agent's own page shows Keel's card of it, and no line about sponsoring it",
+  `${squash(await visitor.locator("main header").first().innerText())} | ${(await visitor.getByRole("region", { name: "Agent" }).count()) === 0 ? "no card" : squash(await visitor.getByRole("region", { name: "Agent" }).innerText())} | ${await visitor.getByText(/sponsor/i).count()}`,
   "tidy-otter Agent | Agent Name Agent A | 0",
 );
 
@@ -2907,12 +2907,12 @@ const passkeysSaid = async (shown: Page): Promise<string> =>
   `${(await passkeysOn(shown).getByRole("alert").count()) === 0 ? "no refusal" : squash(await passkeysOn(shown).getByRole("alert").innerText())} | ${await passkeysOn(shown).getByRole("button", { name: SIGN_IN_AGAIN }).count()} offered | ${await shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} kept`;
 await person.getByText("You have no passkey yet.").waitFor();
 await person
-  .getByText("You stand behind no agent.")
+  .getByText("You sponsor no agents.")
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
-  "sponsored: someone who stands behind no agent is told so, and is shown no control",
-  `${await person.getByText("You stand behind no agent.").count()} | ${await person.getByRole("region", { name: "Agents you stand behind" }).getByRole("button").count()} controls`,
+  "sponsored: someone who sponsors no agent is told so, and is shown no control",
+  `${await person.getByText("You sponsor no agents.").count()} | ${await person.getByRole("region", { name: "Agents you sponsor" }).getByRole("button").count()} controls`,
   "1 | 0 controls",
 );
 const sessionsHeld = async (): Promise<number> =>
@@ -4950,8 +4950,8 @@ expectEqual(
   "0",
 );
 
-// An agent asks a person to stand behind it, and hands them a link with a code in its fragment. Whoever holds
-// the code can stand behind the agent, so the page keeps it in memory alone: out of the address at once, in no
+// An agent asks a person to sponsor it, and hands them a link with a code in its fragment. Whoever holds
+// the code can sponsor the agent, so the page keeps it in memory alone: out of the address at once, in no
 // storage, and sent only in the body of the one call that approves. Opening the link approves nothing; one tap
 // is a passkey touch and then that call. Keel here knows two agents, and reads who asks from its identity.
 const BETA = {
@@ -4995,12 +4995,12 @@ newcomer.on("request", (request) =>
 );
 const linkTo = (agent: { id: string }, code: string): string =>
   `${built}/sponsor#agent=${agent.id}&code=${code}`;
-const standBehind = (shown: Page, agent: { name: string }) =>
-  shown.getByRole("button", { name: `Stand behind ${agent.name}` });
+const sponsorAgent = (shown: Page, agent: { name: string }) =>
+  shown.getByRole("button", { name: `Sponsor ${agent.name}` });
 /** Waits for the sponsor's page to have said something, whatever it is. */
 const sponsorPage = async (shown: Page, agent: { name: string }): Promise<void> => {
   await shown.getByRole("heading", { level: 1 }).waitFor();
-  await standBehind(shown, agent)
+  await sponsorAgent(shown, agent)
     .waitFor({ timeout: 5000 })
     .catch(() => undefined);
 };
@@ -5009,9 +5009,9 @@ await newcomer.goto(linkTo(BETA, forBeta.code), { waitUntil: "domcontentloaded" 
 await sponsorPage(newcomer, BETA);
 await shot(newcomer, "sponsor");
 expectEqual(
-  "sponsor: the page names the agent as Keel shows it to anyone, and who would stand behind it",
-  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${squash(await newcomer.locator("main dl").innerText())} | ${await standBehind(newcomer, BETA).count()} button | ${await newcomer.getByText("You approve with a passkey, as turing.").count()}`,
-  "Stand behind beta? | Agent beta Declared as hosted Works in acme | 1 button | 1",
+  "sponsor: the page names the agent as Keel shows it to anyone, and who would sponsor it",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${squash(await newcomer.locator("main dl").innerText())} | ${await sponsorAgent(newcomer, BETA).count()} button | ${await newcomer.getByText("You approve with a passkey, as turing.").count()}`,
+  "Sponsor beta? | Agent beta Declared as hosted Works in acme | 1 button | 1",
 );
 expectEqual(
   "sponsor: the code is out of the address at once, and in no storage and no cookie the page can read",
@@ -5042,7 +5042,7 @@ expectEqual(
 await newcomer.setViewportSize({ width: 390, height: 844 });
 expectEqual(
   "sponsor: at a phone's width the button is whole on the screen",
-  await standBehind(newcomer, BETA).evaluate(
+  await sponsorAgent(newcomer, BETA).evaluate(
     (button) =>
       `${String(button.getBoundingClientRect().left >= 0)} ${String(button.getBoundingClientRect().right <= window.innerWidth)}`,
   ),
@@ -5051,16 +5051,16 @@ expectEqual(
 await shot(newcomer, "sponsor-phone");
 await newcomer.setViewportSize({ width: 1280, height: 900 });
 // One tap: the device's passkey signs them in afresh, and the approval goes as them.
-await standBehind(newcomer, BETA).click();
+await sponsorAgent(newcomer, BETA).click();
 await newcomer
-  .getByRole("heading", { level: 1, name: "You stand behind beta" })
+  .getByRole("heading", { level: 1, name: "You sponsor beta" })
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 const turing = await passkeysAlone.whose("turing");
 expectEqual(
   "sponsor: one tap, a passkey touch and then the approval, stands the person behind the agent",
-  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(BETA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(BETA.id))} | ${await standBehind(newcomer, BETA).count()} button`,
-  "You stand behind beta | turing | 0 button",
+  `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(BETA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(BETA.id))} | ${await sponsorAgent(newcomer, BETA).count()} button`,
+  "You sponsor beta | turing | 0 button",
 );
 const withTheCode = askedOfAnyone.filter((asked) =>
   `${asked.where} ${asked.body}`.includes(forBeta.code),
@@ -5076,14 +5076,14 @@ const stale = sponsoring.askSponsor(GAMMA.id);
 const forGamma = sponsoring.askSponsor(GAMMA.id);
 await newcomer.goto(linkTo(GAMMA, stale.code), { waitUntil: "domcontentloaded" });
 await sponsorPage(newcomer, GAMMA);
-if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+if ((await sponsorAgent(newcomer, GAMMA).count()) > 0) await sponsorAgent(newcomer, GAMMA).click();
 await newcomer
   .getByRole("alert")
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
   "sponsor: a code that is no longer good is refused in what Keel said, with Keel's way forward and none of the page's own, and no second try",
-  `${(await newcomer.getByRole("alert").count()) === 0 ? "no refusal" : squash(await newcomer.getByRole("alert").innerText())} | ${await standBehind(newcomer, GAMMA).count()} button | ${await newcomer.getByText("Ask the agent for a new link.").count()} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"}`,
+  `${(await newcomer.getByRole("alert").count()) === 0 ? "no refusal" : squash(await newcomer.getByRole("alert").innerText())} | ${await sponsorAgent(newcomer, GAMMA).count()} button | ${await newcomer.getByText("Ask the agent for a new link.").count()} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"}`,
   "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one. Ask the agent for a new link, and approve with it | 0 button | 0 | nobody",
 );
 // A link that is not whole asks Keel nothing. It is opened over the page that is up, as a second link would be:
@@ -5095,7 +5095,7 @@ await newcomer.waitForTimeout(300);
 expectEqual(
   "sponsor: a link that is not whole says so, is taken out of the address all the same, and asks Keel for no agent",
   `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${await newcomer.evaluate(() => `${location.pathname}${location.hash}`)} | ${askedOfAnyone.slice(before).filter((asked) => asked.line.includes("/v1/agents")).length} asked`,
-  "This link is not whole | /sponsor | 0 asked",
+  "This link is incomplete | /sponsor | 0 asked",
 );
 // A visitor is not sent to sign in: the link's code would not survive the trip. The same button is theirs, and
 // its touch signs them in before the approval goes, as them.
@@ -5106,26 +5106,26 @@ await newcomer.goto(linkTo(GAMMA, forGamma.code), { waitUntil: "domcontentloaded
 await sponsorPage(newcomer, GAMMA);
 expectEqual(
   "sponsor: a visitor stays on the page, is told the touch signs them in, and is offered the same button",
-  `${new URL(newcomer.url()).pathname} | ${squash(await newcomer.locator("header").first().innerText())} | ${await standBehind(newcomer, GAMMA).count()} button | ${await newcomer.getByText("the same touch signs you in").count()}`,
+  `${new URL(newcomer.url()).pathname} | ${squash(await newcomer.locator("header").first().innerText())} | ${await sponsorAgent(newcomer, GAMMA).count()} button | ${await newcomer.getByText("which also signs you in").count()}`,
   "/sponsor | Keel | 1 button | 1",
 );
-if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+if ((await sponsorAgent(newcomer, GAMMA).count()) > 0) await sponsorAgent(newcomer, GAMMA).click();
 await newcomer
-  .getByRole("heading", { level: 1, name: "You stand behind gamma" })
+  .getByRole("heading", { level: 1, name: "You sponsor gamma" })
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
   "sponsor: a visitor's one tap signs them in and stands them behind the agent, and the frame says who they are",
   `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(GAMMA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(GAMMA.id))} | ${squash(await newcomer.locator("header").first().innerText())}`,
-  "You stand behind gamma | turing | Keel turing",
+  "You sponsor gamma | turing | Keel turing",
 );
 
 // The sponsor's own second approval. Keel gave the agent one code and the approval spent it, and Keel gives an
-// agent somebody stands behind no other: opened again, the link is a code that is no good and is told as that.
+// agent somebody sponsors no other: opened again, the link is a code that is no good and is told as that.
 // Nobody is told the agent has a sponsor, or to end a link.
 await newcomer.goto(linkTo(GAMMA, forGamma.code), { waitUntil: "domcontentloaded" });
 await sponsorPage(newcomer, GAMMA);
-if ((await standBehind(newcomer, GAMMA).count()) > 0) await standBehind(newcomer, GAMMA).click();
+if ((await sponsorAgent(newcomer, GAMMA).count()) > 0) await sponsorAgent(newcomer, GAMMA).click();
 await newcomer
   .getByRole("alert")
   .waitFor({ timeout: 10_000 })
@@ -5136,7 +5136,7 @@ expectEqual(
   "No agent is asking for a sponsor with that code: it is mistyped, already used or has run out. Ask the agent for a new link, and approve with that one. Ask the agent for a new link, and approve with it | 0 | turing",
 );
 // An agent's own page, at its handle. Its sponsor is shown one line that sends them to their settings, known
-// from their own list of the agents they stand behind. Of an agent they do not stand behind it says nothing.
+// from their own list of the agents they sponsor. Of an agent they do not sponsor it says nothing.
 const aboutAgent = async (shown: Page, handle: string): Promise<string> => {
   await shown.goto(`${built}/${handle}`, { waitUntil: "domcontentloaded" });
   await shown.getByRole("heading", { level: 1 }).first().waitFor();
@@ -5152,20 +5152,20 @@ const aboutAgent = async (shown: Page, handle: string): Promise<string> => {
   return `${squash(await about.innerText())} | ${(await settings.count()) === 0 ? "no link" : await settings.evaluate((to) => (to instanceof HTMLAnchorElement ? new URL(to.href).pathname : "not a link"))}`;
 };
 expectEqual(
-  "agent's own page: its sponsor is told they stand behind it and sent to their settings, where the controls are",
+  "agent's own page: its sponsor is told they sponsor it and sent to their settings, where the controls are",
   await aboutAgent(newcomer, GAMMA.handle),
-  "Agent Name gamma Declared as interactive You stand behind this agent. Pause it, unpause it or end the link in your settings | /settings",
+  "Agent Name gamma Declared as interactive You sponsor this agent. Manage it in your settings | /settings",
 );
 expectEqual(
-  "agent's own page: someone who does not stand behind the agent is shown its card and no such line, and no control",
-  `${await aboutAgent(newcomer, EPSILON.handle)} | ${await newcomer.getByRole("button", { name: /Pause|Unpause|End/ }).count()} controls`,
+  "agent's own page: someone who does not sponsor the agent is shown its card and no such line, and no control",
+  `${await aboutAgent(newcomer, EPSILON.handle)} | ${await newcomer.getByRole("button", { name: /Pause|Unpause|Stop sponsoring/ }).count()} controls`,
   "Agent Name epsilon | no link | 0 controls",
 );
 
-// ── The agents a person stands behind, on their settings ──
-// Turing stands behind beta and gamma, and signed in by a passkey a moment ago. The page after a yes links to
+// ── The agents a person sponsors, on their settings ──
+// Turing sponsors beta and gamma, and signed in by a passkey a moment ago. The page after a yes links to
 // the settings, which list what Keel lists: each agent as it declared itself, and as it stands.
-const sponsoredOn = (shown: Page) => shown.getByRole("region", { name: "Agents you stand behind" });
+const sponsoredOn = (shown: Page) => shown.getByRole("region", { name: "Agents you sponsor" });
 const sponsoredRows = async (shown: Page): Promise<string> =>
   (
     await sponsoredOn(shown)
@@ -5185,13 +5185,13 @@ const offered = (shown: Page, name: string): Promise<void> =>
   control(shown, name)
     .waitFor({ timeout: 10_000 })
     .catch(() => undefined);
-const toSettings = newcomer.getByRole("link", { name: "See the agents you stand behind" });
+const toSettings = newcomer.getByRole("link", { name: "See the agents you sponsor" });
 if ((await toSettings.count()) > 0) await toSettings.click();
 else await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await offered(newcomer, "Pause gamma");
 await shot(newcomer, "settings-sponsored");
 expectEqual(
-  "sponsored: the page after a yes links to the settings, which list the agents Keel says the person stands behind, each as it declared itself and as it stands",
+  "sponsored: the page after a yes links to the settings, which list the agents Keel says the person sponsors, each as it declared itself and as it stands",
   `${new URL(newcomer.url()).pathname} | ${await sponsoredRows(newcomer)}`,
   "/settings | beta declared as hosted · Active | gamma declared as interactive · Active",
 );
@@ -5205,7 +5205,7 @@ await offered(newcomer, "Unpause beta");
 expectEqual(
   "sponsored: a pause is one click on a fresh sign-in, carries the reason typed, and the row then says what Keel answered and offers what a paused agent allows",
   `${await sponsoredRows(newcomer)} | ${sponsoring.standingOf(BETA.id)} | ${sponsoring.pausedFor(BETA.id) ?? "no reason"} | ${(await sponsoredOn(newcomer).getByRole("listitem").first().getByRole("button").allInnerTexts()).join(" ")}`,
-  "beta declared as hosted · Paused | gamma declared as interactive · Active | suspended | It pushed to the wrong branch | Unpause End",
+  "beta declared as hosted · Paused | gamma declared as interactive · Active | suspended | It pushed to the wrong branch | Unpause Stop sponsoring",
 );
 // With no reason typed the pause says whose it is: Keel keeps a reason with every pause.
 if ((await control(newcomer, "Pause gamma").count()) > 0)
@@ -5259,15 +5259,34 @@ expectEqual(
 await shot(newcomer, "settings-sponsored-phone");
 await newcomer.setViewportSize({ width: 1280, height: 900 });
 // Ending is one click. The agent is then nobody's, its row is gone, and Keel has reinstated it.
-if ((await control(newcomer, "End gamma").count()) > 0)
-  await control(newcomer, "End gamma").click();
-await control(newcomer, "End gamma")
+if ((await control(newcomer, "Stop sponsoring gamma").count()) > 0)
+  await control(newcomer, "Stop sponsoring gamma").click();
+await control(newcomer, "Stop sponsoring gamma")
   .waitFor({ state: "detached", timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
-  "sponsored: ending is one click, the row is gone, and Keel says nobody stands behind the agent and that it is active again",
+  "sponsored: ending is one click, the row is gone, and Keel says nobody sponsors the agent and that it is active again",
   `${await sponsoredRows(newcomer)} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"} | ${sponsoring.standingOf(GAMMA.id)}`,
   "beta declared as hosted · Active | nobody | active",
+);
+// An agent that signed itself up has a handle and declared no kind, as most do: the page names it by both, has
+// no row for a kind it never gave, and offers cancel or approve, as a code host's page for authorising an app.
+const forEpsilon = sponsoring.askSponsor(EPSILON.id);
+await newcomer.goto(linkTo(EPSILON, forEpsilon.code), { waitUntil: "domcontentloaded" });
+await sponsorPage(newcomer, EPSILON);
+await shot(newcomer, "sponsor-handle");
+expectEqual(
+  "sponsor: an agent with a handle and no declared kind is named by both, with no empty row, in plain sentences, with cancel and approve",
+  squash(await newcomer.locator("main").innerText()),
+  "Sponsor epsilon? epsilon (epsilon-heron) is asking you to sponsor it. Agent epsilon Handle epsilon-heron Its questions come to you. You can pause it or stop sponsoring it at any time. It gets none of your access and never acts as you. Cancel Sponsor epsilon You approve with a passkey, as turing.",
+);
+expectEqual(
+  "sponsor: cancel leaves for the projects and approves nothing",
+  `${await newcomer
+    .getByRole("link", { name: "Cancel" })
+    .getAttribute("href")
+    .catch(() => "no cancel")} | ${sponsoring.sponsorOf(EPSILON.id) ?? "nobody"}`,
+  "/ | nobody",
 );
 expectEqual(
   "sponsor: the page sent Keel no Authorization",
@@ -5747,15 +5766,52 @@ const lastInvitation = (): string =>
   hosting.calls.findLast((call) => call.method === "POST" && call.path.endsWith("/agents"))?.body ??
   "nothing asked";
 
-// Any member invites: Franklin is a plain one. What the row then says is what Keel answered.
+// Any member invites: Franklin is a plain one, and sponsors Tidy Otter. What the row then says is what Keel answered.
+hosting.sponsors(OTTER.id, (await inviting.whose("franklin"))?.id ?? "");
 await franklin.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
 await orgAgentsOn(franklin).getByText("No agent has been invited into this org.").waitFor();
-await inviteAgent(franklin, "tidy-otter", "Read only");
+const sponsoredFound = orgAgentsOn(franklin).getByRole("list", { name: "Agents you sponsor" });
+const offeredNow = async (): Promise<string> =>
+  (await sponsoredFound.count()) === 0
+    ? "nothing offered"
+    : (await sponsoredFound.getByRole("listitem").allInnerTexts()).map(squash).join(" | ");
+// With nothing typed, the agents he sponsors are offered to pick from, as a code host's "Add people" suggests
+// people. Picking one puts its handle in the box.
+await sponsoredFound.waitFor({ timeout: 5000 }).catch(() => undefined);
+expectEqual(
+  "org agents: with nothing typed, the agents the reader sponsors are offered to pick from, each by name and handle",
+  await offeredNow(),
+  "Tidy Otter tidy-otter",
+);
+if ((await sponsoredFound.count()) > 0)
+  await sponsoredFound.getByRole("button", { name: /Tidy Otter/ }).click();
+expectEqual(
+  "org agents: picking an offered agent puts its handle in the box, and offers nothing more under it",
+  `${await orgAgentsOn(franklin).getByLabel("The agent's handle").inputValue()} | ${await offeredNow()}`,
+  "tidy-otter | nothing offered",
+);
+// Typing part of its name finds it among the agents he sponsors, with its handle beside it, as a code host's
+// "Add people" finds someone by their name.
+await orgAgentsOn(franklin).getByLabel("The agent's handle").fill("tidy ot");
+await sponsoredFound.waitFor({ timeout: 5000 }).catch(() => undefined);
+expectEqual(
+  "org agents: typing part of a sponsored agent's name finds it, its name and handle side by side",
+  (await sponsoredFound.count()) === 0
+    ? "nothing found"
+    : (await sponsoredFound.getByRole("listitem").allInnerTexts()).map(squash).join(" | "),
+  "Tidy Otter tidy-otter",
+);
+await inviteAgent(franklin, "Tidy Otter", "Read only");
 await answeredOn(franklin, "Tidy Otter");
 expectEqual(
-  "org agents: a plain member invites an agent by its handle to read alone, and the row says what Keel answered",
+  "org agents: a plain member invites an agent he sponsors by its name, Keel is asked for its handle, to read alone, and the row says what Keel answered",
   `${(await orgAgentRows(franklin)).join(" | ")} | ${lastInvitation()}`,
   'Tidy Otter reads · invited, not yet accepted · invited by you Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+);
+expectEqual(
+  "org agents: an agent the org has invited is not offered again",
+  await offeredNow(),
+  "nothing offered",
 );
 // A handle no agent has, typed with a space either side of it: Keel is asked for the handle, and says so.
 await inviteAgent(franklin, " nobody-here ");

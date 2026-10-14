@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.find
+# why: a sponsored agent is found by its handle alone, never by the name it showed its sponsor
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 88f2bde3..9ef26c2e 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -77,7 +77,7 @@ export function sponsoredMatching(
+     (agent) =>
+       agent.handle !== undefined &&
+       !taken.has(agent.id) &&
+-      (agent.handle.toLowerCase().includes(asked) || agent.name.toLowerCase().includes(asked)),
++      agent.handle.toLowerCase().includes(asked),
+   );
+ }
+ 

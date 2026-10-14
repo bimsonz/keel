@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.offered
+# why: an agent the org has invited, or that has joined, is offered again
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 88f2bde3..9452cef4 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -76,7 +76,6 @@ export function sponsoredMatching(
+   return sponsored.filter(
+     (agent) =>
+       agent.handle !== undefined &&
+-      !taken.has(agent.id) &&
+       (agent.handle.toLowerCase().includes(asked) || agent.name.toLowerCase().includes(asked)),
+   );
+ }

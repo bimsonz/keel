@@ -192,12 +192,14 @@ export interface FakeKeel {
   project: ProjectView;
   /** An agent asks for a sponsor, as Keel's `askSponsor` answers it: a code good once and for ten minutes. */
   askSponsor(agentId: string): SponsorRequest;
-  /** Who stands behind an agent, by the id its reader was known by; nobody, where it has no sponsor. */
+  /** Who sponsors an agent, by the id its reader was known by; nobody, where it has no sponsor. */
   sponsorOf(agentId: string): string | undefined;
   /** How an agent stands: `suspended` while its sponsor has it paused. */
   standingOf(agentId: string): NonNullable<AgentProfile["state"]>;
   /** The reason an agent's pause was given, while it is paused. */
   pausedFor(agentId: string): string | undefined;
+  /** A person sponsors an agent, as approving its code makes them: a test's way to a sponsorship already made. */
+  sponsors(agentId: string, userId: string): void;
   /**
    * An agent accepts the invitation it has into an org, as its own call to Keel does: a test's way to an agent
    * that has joined. The agent's own three calls are no page's.
@@ -318,7 +320,7 @@ const noSuchRequest = (): Response =>
 /**
  * What Keel says to an agent that asks for a sponsor while it has one (`stateRefused`, `sponsor-held`). Keel
  * tells the agent itself, with the end of its link as the way forward, and gives it no code. So no approval ever
- * meets it: a person who approves an agent somebody stands behind holds a code that is spent, and reads the one
+ * meets it: a person who approves an agent somebody sponsors holds a code that is spent, and reads the one
  * answer of a code that is no good. That is the sponsor's own second approval too.
  */
 export const SPONSOR_HELD = "already has a sponsor, and an agent has one.";
@@ -675,7 +677,7 @@ export function createFakeKeel(
   const targeted = new Map<string, Map<string, DeployTargetView>>();
   const cloudflare =
     options.cloudflare ?? ((): Reached => ({ reaches: true, subdomain: "keel-previews" }));
-  /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
+  /** Each agent's live request for a sponsor, and who sponsors each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
   /** How each agent stands, where it is not active, and the reason its pause was given. */
@@ -686,6 +688,8 @@ export function createFakeKeel(
     id: known.id,
     projectId: project.id,
     name: known.name,
+    // The handle it signed up with, where it has one: Keel's profile carries it, as its card does.
+    ...(known.handle === undefined ? {} : { handle: known.handle }),
     kind: known.kind,
     scopes: [],
     ...(behind.has(known.id) ? { sponsor: behind.get(known.id) ?? "" } : {}),
@@ -713,6 +717,9 @@ export function createFakeKeel(
     sponsorOf: (agentId) => behind.get(agentId),
     standingOf: (agentId) => standing.get(agentId) ?? "active",
     pausedFor: (agentId) => pauses.get(agentId),
+    sponsors(agentId, userId) {
+      behind.set(agentId, userId);
+    },
     accepts(org, agentId) {
       const row = invited.get(org.toLowerCase())?.get(agentId);
       if (row === undefined || row.state !== "invited")
@@ -764,7 +771,7 @@ export function createFakeKeel(
             };
       };
 
-      // The agents a person stands behind, Keel lists to that person and to nobody else: `listSponsored`.
+      // The agents a person sponsors, Keel lists to that person and to nobody else: `listSponsored`.
       if (url.pathname === "/v1/agents/sponsored" && request.method === "GET") {
         if (reader === null) return problem(401, "auth.required");
         return Response.json({
@@ -774,7 +781,7 @@ export function createFakeKeel(
         } satisfies SponsoredAgents);
       }
 
-      // Who an agent is, Keel answers anyone: its card, and never who stands behind it. The card names the orgs
+      // Who an agent is, Keel answers anyone: its card, and never who sponsors it. The card names the orgs
       // the agent has joined, each by its handle and oldest invitation first, and has no list where it has joined
       // none: an invitation nobody has answered is in none, and who made any of them is never read (Keel's
       // `joinedOrgs`).
@@ -797,7 +804,7 @@ export function createFakeKeel(
         } satisfies AgentCard);
       }
 
-      // A person stands behind an agent with the code it showed them: Keel's `approveSponsor`.
+      // A person sponsors an agent with the code it showed them: Keel's `approveSponsor`.
       const link = /^\/v1\/agents\/([^/]+)\/sponsor$/.exec(url.pathname);
       if (link !== null && request.method === "PUT") {
         if (reader === null) return problem(401, "auth.required");
@@ -820,7 +827,7 @@ export function createFakeKeel(
         return Response.json(profileOf(known));
       }
 
-      // A sponsor's moves on an agent: pause it, unpause it, end the link. Keel's policy answers first, and to
+      // A sponsor's moves on an agent: pause it, unpause it, stop sponsoring it. Keel's policy answers first, and to
       // anyone but the sponsor the agent is not there; then the fresh sign-in; then whether the agent, as it
       // stands, allows the move (`standingError`). Ending the link reinstates a paused agent.
       const stood = /^\/v1\/agents\/([^/]+)\/(suspend|reinstate)$/.exec(url.pathname);

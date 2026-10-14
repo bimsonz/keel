@@ -32,7 +32,7 @@ export type Place =
   | { at: "org"; org: string; tab: Exclude<OrgTab, "home"> }
   /** An invitation to an org, as the person it was made to opens it. */
   | { at: "invite"; id: string }
-  /** Where an agent sends the person it asks to stand behind it. What it asks is in the fragment, never here. */
+  /** Where an agent sends the person it asks to sponsor it. What it asks is in the fragment, never here. */
   | { at: "sponsor" };
 
 /**

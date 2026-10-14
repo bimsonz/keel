@@ -4,10 +4,12 @@ import {
   GRANTS,
   SCOPES,
   givenOf,
+  handleFor,
   inviterOf,
   joinedOf,
   mayRemove,
   removalOf,
+  sponsoredMatching,
   standingOf,
 } from "../../../src/account/orgAgents.ts";
 import type { AgentCard, NamespaceAgent, Scope } from "../../../src/contract/keel/index.ts";
@@ -122,6 +124,16 @@ const member = (over: Partial<Member>): Member => ({
   name: "Ada",
   you: false,
   ...over,
+});
+
+/** Keel's profile of an agent the reader sponsors, as `listSponsored` answers it. */
+const profile = (id: string, name: string, handle?: string) => ({
+  id,
+  name,
+  ...(handle === undefined ? {} : { handle }),
+  scopes: [],
+  revocationEpoch: 0,
+  createdAt: "2026-10-14T20:00:00.000Z",
 });
 
 describe("the agents in an org", () => {
@@ -477,5 +489,51 @@ describe("the agents in an org", () => {
     expect(mayRemove(theirs, "owner", "usr_hedy")).toBe(true);
     // A row that names nobody is a non-member's read, and no member's to take out.
     expect(mayRemove(row(), "member", "usr_grace")).toBe(false);
+  });
+
+  it("[org-agents.offered] with nothing typed, offers every agent the reader sponsors that the org has not invited and that has not joined", () => {
+    const sponsored = [
+      profile("agt_A", "keelbot", "agent-k3e1b0t7"),
+      profile("agt_B", "Tidy Otter", "tidy-otter"),
+      profile("agt_C", "keel-hosted"),
+    ];
+    const offered = (typed: string, listed: NamespaceAgent[] = []) =>
+      sponsoredMatching(sponsored, typed, listed).map((agent) => agent.name);
+    expect(offered("")).toEqual(["keelbot", "Tidy Otter"]);
+    expect(offered("  ")).toEqual(["keelbot", "Tidy Otter"]);
+    // An agent invited, or one that has joined, is the org's already; one whose membership ended may be asked again.
+    expect(offered("", [row({ id: "agt_B", state: "joined" })])).toEqual(["keelbot"]);
+    expect(offered("", [row({ id: "agt_A", state: "invited" })])).toEqual(["Tidy Otter"]);
+    expect(offered("", [row({ id: "agt_A", state: "ended" })])).toEqual(["keelbot", "Tidy Otter"]);
+    expect(offered("otter", [row({ id: "agt_B", state: "joined" })])).toEqual([]);
+  });
+
+  it("[org-agents.find] finds an agent the reader sponsors by its handle or its name, and invites a name typed whole by its handle", () => {
+    const sponsored = [
+      profile("agt_A", "keelbot", "agent-k3e1b0t7"),
+      profile("agt_B", "Tidy Otter", "tidy-otter"),
+      // Enrolled by a person: it has no handle, so it cannot be invited and is never found.
+      profile("agt_C", "keel-hosted"),
+    ];
+    const names = (typed: string) => sponsoredMatching(sponsored, typed).map((agent) => agent.name);
+    expect(names("keel")).toEqual(["keelbot"]);
+    expect(names("KEELBOT")).toEqual(["keelbot"]);
+    expect(names("otter")).toEqual(["Tidy Otter"]);
+    expect(names("agent-k3")).toEqual(["keelbot"]);
+    expect(names("t")).toEqual(["keelbot", "Tidy Otter"]);
+    expect(names("nobody")).toEqual([]);
+    // A handle typed whole is chosen: nothing is offered under it.
+    expect(names("tidy-otter")).toEqual([]);
+
+    expect(handleFor(sponsored, "keelbot")).toBe("agent-k3e1b0t7");
+    expect(handleFor(sponsored, " Tidy otter ")).toBe("tidy-otter");
+    expect(handleFor(sponsored, "tidy-otter")).toBe("tidy-otter");
+    // Anything else goes to Keel as typed, trimmed, for Keel to answer.
+    expect(handleFor(sponsored, " someone-else ")).toBe("someone-else");
+    expect(handleFor(sponsored, "keel-hosted")).toBe("keel-hosted");
+    // Two agents of one name are not chosen between.
+    expect(handleFor([...sponsored, profile("agt_D", "keelbot", "agent-other")], "keelbot")).toBe(
+      "keelbot",
+    );
   });
 });

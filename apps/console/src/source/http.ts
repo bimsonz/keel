@@ -184,7 +184,7 @@ function reader(options: HttpOptions): (path: string, signal?: AbortSignal) => P
 }
 
 /**
- * Standing behind an agent. The card is a read anyone may make, by the agent's id. The approval carries the
+ * Sponsoring an agent. The card is a read anyone may make, by the agent's id. The approval carries the
  * code in its body and in nothing else: not the path, not the query, not a header. Its key is made for the one
  * attempt, of nothing the code could be read from.
  */

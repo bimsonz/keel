@@ -1,22 +1,24 @@
 // The agents in an org. On its members page: Keel's list as it reads a member, a form that invites one by its
-// handle, and its removal where Keel would take it. On the org's home: the agents that have joined, as Keel
+// handle or by the name of an agent the reader sponsors, and its removal where Keel would take it. On the org's home: the agents that have joined, as Keel
 // reads them to anyone. Each call is Keel's own operation, and the list is read again after every one.
 
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import type { NamespaceAgent } from "../contract/keel/index.ts";
+import type { AgentProfile, NamespaceAgent } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
-import type { KeelOrgAgents } from "../source/types.ts";
+import type { KeelOrgAgents, KeelSponsorship } from "../source/types.ts";
 import type { Account, OrgPage, Who } from "./account.ts";
 import {
   GRANTS,
   type Grant,
   SCOPES,
   givenOf,
+  handleFor,
   inviterOf,
   joinedOf,
   mayRemove,
   removalOf,
+  sponsoredMatching,
   standingOf,
 } from "./orgAgents.ts";
 import { Refusal, SELECT, saidOf, useAsking } from "./parts.tsx";
@@ -87,14 +89,41 @@ export const said = (parts: readonly string[]): string =>
 export const declared = (agent: NamespaceAgent): string =>
   agent.kind === undefined ? "" : `declared as ${agent.kind}`;
 
+/** The agents the reader sponsors, as Keel lists them to the reader alone: none until Keel has answered. */
+function useSponsored(
+  sponsorship: Pick<KeelSponsorship, "listSponsored">,
+): readonly AgentProfile[] {
+  const [sponsored, setSponsored] = useState<readonly AgentProfile[]>([]);
+  useEffect(() => {
+    let here = true;
+    const stop = new AbortController();
+    const read = async (): Promise<void> => {
+      try {
+        const listed = await sponsorship.listSponsored(stop.signal);
+        if (here) setSponsored(listed);
+      } catch {
+        // A list Keel did not give finds nothing: a handle typed whole is still invited.
+      }
+    };
+    void read();
+    return () => {
+      here = false;
+      stop.abort();
+    };
+  }, [sponsorship]);
+  return sponsored;
+}
+
 export function OrgAgents({
   account,
   agents,
+  sponsorship,
   page,
   who,
 }: {
   account: Account;
   agents: KeelOrgAgents;
+  sponsorship: Pick<KeelSponsorship, "listSponsored">;
   page: OrgPage;
   who: Who;
 }) {
@@ -102,6 +131,8 @@ export function OrgAgents({
   const { listed, unread, read } = useListed(agents, org);
   const [handle, setHandle] = useState("");
   const [grant, setGrant] = useState<Grant>("work");
+  const sponsored = useSponsored(sponsorship);
+  const found = sponsoredMatching(sponsored, handle, listed ?? []);
   const { busy, refused, ask } = useAsking();
   /** What was last asked of Keel here: asked again, as it was, once the reader has signed in afresh. */
   const last = useRef<(() => Promise<void>) | null>(null);
@@ -116,7 +147,7 @@ export function OrgAgents({
   };
   const invite = (event: FormEvent): void => {
     event.preventDefault();
-    const named = handle.trim();
+    const named = handleFor(sponsored, handle);
     void move(async () => {
       await agents.inviteAgent(org, named, SCOPES[grant]);
       setHandle("");
@@ -136,23 +167,42 @@ export function OrgAgents({
   return (
     <section className="a-panel flex flex-col gap-3 p-4" aria-label="Agents">
       <h2 className="a-h">Agents</h2>
+      <h3 className="text-sm font-semibold text-kumo-strong">Invite an agent</h3>
       <p className="text-sm text-kumo-subtle">
-        Any member invites an agent by its handle. Whoever invites it answers for it here: its
-        questions come to them first, and it acts here only while they are a member. It gets nothing
-        until it accepts.
+        An agent gets the access you choose once it accepts, for as long as you are a member of{" "}
+        {org}.
       </p>
       <form
         className="flex flex-wrap items-end gap-2"
         onSubmit={invite}
         aria-label="Invite an agent"
       >
-        <Input
-          aria-label="The agent's handle"
-          name="agent"
-          placeholder="its-handle"
-          value={handle}
-          onChange={(event) => setHandle(event.target.value)}
-        />
+        <div className="flex flex-col gap-1">
+          <Input
+            aria-label="The agent's handle or name"
+            name="agent"
+            placeholder="Search by handle or name"
+            autoComplete="off"
+            value={handle}
+            onChange={(event) => setHandle(event.target.value)}
+          />
+          {found.length > 0 && (
+            <ul className="a-panel flex flex-col p-1" aria-label="Agents you sponsor">
+              {found.map((agent) => (
+                <li key={agent.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-baseline gap-2 rounded px-2 py-1 text-left text-sm hover:bg-kumo-tint"
+                    onClick={() => setHandle(agent.handle ?? "")}
+                  >
+                    <span className="text-kumo-strong">{agent.name}</span>
+                    <span className="a-mono text-kumo-subtle">{agent.handle}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <select
           className={SELECT}
           aria-label="What the agent may do here"

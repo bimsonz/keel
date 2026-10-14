@@ -1,6 +1,6 @@
-// An agent's link to the person it asks to stand behind it: `/sponsor#agent=<agentId>&code=<code>`. Keel makes
+// An agent's link to the person it asks to sponsor it: `/sponsor#agent=<agentId>&code=<code>`. Keel makes
 // it for the agent, with the code in the fragment so that it is in no request line. Whoever holds the code can
-// stand behind the agent, so the page keeps it nowhere but in memory: it is read once, taken out of the address
+// sponsor the agent, so the page keeps it nowhere but in memory: it is read once, taken out of the address
 // at once, and rides only in the body of the one call that approves.
 
 /** What the link names: the agent, and the code Keel gave it to show one person. */

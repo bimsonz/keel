@@ -21,7 +21,7 @@ const GAMMA: AgentCard = {
 
 /**
  * A Keel that knows two agents and three people's sessions: Ada's and Hedy's signed in by a passkey just now,
- * Grace's stale. Ada stands behind both agents, as she came to by approving each one's code. The browser's
+ * Grace's stale. Ada sponsors both agents, as she came to by approving each one's code. The browser's
  * part is played here: it sends a session's cookie to its own origin, and what the page's own code put on each
  * request is kept as it was sent.
  */
@@ -69,7 +69,7 @@ const profile = (over: Partial<AgentProfile> = {}): AgentProfile => ({
   ...over,
 });
 
-describe("the agents a person stands behind", () => {
+describe("the agents a person sponsors", () => {
   it("[sponsored.list] are the ones Keel lists to that person, and nobody is listed another's", async () => {
     const k = await keel();
     const listed = await k.as("ada").listSponsored();
@@ -78,7 +78,7 @@ describe("the agents a person stands behind", () => {
     ).toEqual(["beta hosted active ada", "gamma interactive active ada"]);
     const [asked] = k.fromThePage;
     expect(`${asked?.method} ${asked?.url}`).toBe(`GET ${ORIGIN}/v1/agents/sponsored`);
-    // Someone who stands behind none is listed none, and a visitor is asked to sign in.
+    // Someone who sponsors none is listed none, and a visitor is asked to sign in.
     expect(await k.as("hedy").listSponsored()).toEqual([]);
     expect(await k.as(undefined).listSponsored().catch(worded)).toMatchObject({
       status: 401,

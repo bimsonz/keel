@@ -69,7 +69,7 @@ export interface RunEntry {
 /**
  * What a project's log says of one agent's work in it. Keel names the agent on every entry its command
  * committed, and the run where its token named one. The log names it by its id alone: an agent's sign-up is in
- * no project's log, so its handle and its name are its card's to give. Who stands behind it is not kept.
+ * no project's log, so its handle and its name are its card's to give. Who sponsors it is not kept.
  */
 export interface WorkEntry {
   agentId: string;

@@ -543,12 +543,14 @@ function InviteForm({
 function Members({
   account,
   agents,
+  sponsorship,
   page,
   who,
   read,
 }: {
   account: Account;
   agents: KeelOrgAgents;
+  sponsorship: KeelSponsorship;
   page: OrgPage;
   who: Who;
   read: () => Promise<void>;
@@ -648,7 +650,13 @@ function Members({
           </ul>
         )}
       </section>
-      <OrgAgents account={account} agents={agents} page={page} who={who} />
+      <OrgAgents
+        account={account}
+        agents={agents}
+        sponsorship={sponsorship}
+        page={page}
+        who={who}
+      />
     </>
   );
 }
@@ -968,7 +976,14 @@ export function NamespacePages({
         />
       )}
       {open === "people" && (
-        <Members account={account} agents={agents} page={held} who={who} read={read} />
+        <Members
+          account={account}
+          agents={agents}
+          sponsorship={sponsorship}
+          page={held}
+          who={who}
+          read={read}
+        />
       )}
       {open === "credentials" && (
         <NamespaceCredentials

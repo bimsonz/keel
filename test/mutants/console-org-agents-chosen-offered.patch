@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.find
+# why: a handle typed whole is offered again under itself
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 88f2bde3..d2ef20e7 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -71,7 +71,6 @@ export function sponsoredMatching(
+   listed: readonly NamespaceAgent[] = [],
+ ): AgentProfile[] {
+   const asked = typed.trim().toLowerCase();
+-  if (asked !== "" && sponsored.some((agent) => agent.handle?.toLowerCase() === asked)) return [];
+   const taken = new Set(listed.filter((agent) => agent.state !== "ended").map((agent) => agent.id));
+   return sponsored.filter(
+     (agent) =>

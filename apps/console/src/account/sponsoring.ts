@@ -1,4 +1,4 @@
-// Standing behind an agent, as the sponsor's page does it: one tap is a passkey touch and then the approval.
+// Sponsoring an agent, as the sponsor's page does it: one tap is a passkey touch and then the approval.
 
 import { KeelRefused } from "../source/types.ts";
 import type { Who } from "./account.ts";
@@ -16,9 +16,9 @@ export type Stood = { is: "approved"; as: Who } | { is: "changed"; to: Who };
 /**
  * One tap. The person signs in afresh with a passkey, which signs a visitor in too, and only then is the
  * approval sent, as whoever touched. Where someone was signed in and the passkey is another account's, nothing
- * is sent: the page reads as that account, and standing behind the agent is theirs to tap for.
+ * is sent: the page reads as that account, and sponsoring the agent is theirs to tap for.
  */
-export async function standBehind(
+export async function sponsorAgent(
   sponsoring: Sponsoring,
   link: SponsorLink,
   reader: Who | null,
@@ -31,7 +31,7 @@ export async function standBehind(
 
 /**
  * Whether Keel's refusal ends the link: the code was wrong, used or run out, or the agent is not there (one
- * answer, 404), or someone stands behind it already (409). The code is forgotten then. A sign-in that is not
+ * answer, 404), or someone sponsors it already (409). The code is forgotten then. A sign-in that is not
  * fresh, a touch the person called off and a Keel that could not be reached leave it to be tried again.
  */
 export const spent = (error: unknown): boolean =>

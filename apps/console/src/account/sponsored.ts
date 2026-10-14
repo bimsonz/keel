@@ -1,4 +1,4 @@
-// The agents a person stands behind, and what that person may ask of each: pause it, unpause it, end the link.
+// The agents a person sponsors, and what that person may ask of each: pause it, unpause it, stop sponsoring it.
 // Keel lists them to their sponsor (`Agents_listSponsored`) and takes each move from the sponsor alone. Nothing
 // here works out whose an agent is: the list is Keel's, and a row says what Keel last answered of its agent.
 

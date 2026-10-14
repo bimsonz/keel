@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.find
+# why: a name two sponsored agents share is taken for the first of them
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 378dfeaa..9b14bdf1 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -87,5 +87,5 @@ export function handleFor(sponsored: readonly AgentProfile[], typed: string): st
+     (agent) => agent.handle !== undefined && agent.name.toLowerCase() === asked.toLowerCase(),
+   );
+   const [only] = named;
+-  return named.length === 1 && only?.handle !== undefined ? only.handle : asked;
++  return named.length >= 1 && only?.handle !== undefined ? only.handle : asked;
+ }

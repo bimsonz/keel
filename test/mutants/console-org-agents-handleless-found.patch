@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
+# kills: org-agents.find, org-agents.offered
+# why: an agent with no handle is offered, though Keel invites by handle alone
+diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
+index 88f2bde3..088c2920 100644
+--- a/apps/console/src/account/orgAgents.ts
++++ b/apps/console/src/account/orgAgents.ts
+@@ -75,9 +75,9 @@ export function sponsoredMatching(
+   const taken = new Set(listed.filter((agent) => agent.state !== "ended").map((agent) => agent.id));
+   return sponsored.filter(
+     (agent) =>
+-      agent.handle !== undefined &&
++      (agent.handle?.toLowerCase() ?? "").length >= 0 &&
+       !taken.has(agent.id) &&
+-      (agent.handle.toLowerCase().includes(asked) || agent.name.toLowerCase().includes(asked)),
++      ((agent.handle ?? "").toLowerCase().includes(asked) || agent.name.toLowerCase().includes(asked)),
+   );
+ }
+ 
