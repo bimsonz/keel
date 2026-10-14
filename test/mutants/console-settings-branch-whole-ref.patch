@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: settings.sync-said
+# why: upstream's branch is named by its whole ref
+diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
+index 71d718c9..3ff5a8a0 100644
+--- a/apps/console/src/engine/settings.ts
++++ b/apps/console/src/engine/settings.ts
+@@ -31,7 +31,7 @@ export function readBy(settings: ProjectSettings, visibility: Visibility): Proje
+ 
+ /** A ref as a code host names its branch: `refs/heads/main` is `main`. */
+ export function branchOf(ref: string): string {
+-  return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
++  return ref;
+ }
+ 
+ /**

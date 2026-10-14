@@ -6010,6 +6010,141 @@ expectEqual(
     : `${await accessOn(noether).getByRole("button").count()} buttons | ${String(await accessOn(noether).getByRole("link").first().getAttribute("href"))} | ${squash(await accessOn(noether).innerText())}`,
   "0 buttons | /orgs/symmetry/members | Collaborators Everyone in symmetry has access to this project, its people and its agents alike. See who, and add an agent, on symmetry's members page",
 );
+// Sync from upstream, on the settings of a project imported from a public repository, for its owner alone, as a
+// code host's "Sync fork": upstream named, trunk's head, the action, and what Keel answered.
+const syncOn = (shown: Page): Locator =>
+  shown.locator('main section[aria-label="Sync from upstream"]');
+const syncButton = (shown: Page): Locator =>
+  syncOn(shown).getByRole("button", { name: "Sync from upstream" });
+const syncSaid = async (shown: Page): Promise<string> =>
+  (await syncOn(shown).locator("output").count()) === 0
+    ? "nothing said"
+    : squash(await syncOn(shown).locator("output").innerText());
+/** Whether a sync is offered once the page has had the log's first entry: a short wait, which a fault would meet. */
+const syncOffered = async (shown: Page): Promise<string> => {
+  await syncOn(shown)
+    .waitFor({ timeout: 3000 })
+    .catch(() => undefined);
+  return `${await syncOn(shown).count()} offered`;
+};
+// The org's project above was made empty, not imported: its owner is offered no sync.
+expectEqual(
+  "sync: a project that was not imported offers its owner no sync from upstream",
+  await syncOffered(noether),
+  "0 offered",
+);
+const UPSTREAM_HEAD = "5f0e1d2c3b4a5968778695a4b3c2d1e0f9e8d7c6";
+const importedOf = (diverged: boolean) =>
+  createFakeKeel({
+    namespace: { handle: "symmetry", kind: "org" },
+    visibility: "private",
+    imported: {
+      url: "https://github.com/acme/demo",
+      ref: "refs/heads/main",
+      head: UPSTREAM_HEAD,
+      diverged,
+    },
+    readerOf: async (request) => {
+      const asking = await inviting.reads(request);
+      if (asking === null) return null;
+      const role = await inviting.roleIn(asking.id, "symmetry");
+      return role === undefined ? asking : { ...asking, role };
+    },
+    whose: whoseAmongThem,
+    roleIn: (userId, org) => inviting.roleIn(userId, org),
+  });
+/** Trunk's head as the stand-in's log has it now. */
+const trunkIn = (keel: ReturnType<typeof importedOf>): string => {
+  let head = "";
+  for (const event of keel.events()) {
+    if (event.type === "TrunkInitialized") head = event.payload.head;
+    if (event.type === "TrunkAdvanced" || event.type === "TrunkSynced") head = event.payload.to;
+  }
+  return head;
+};
+const syncing = importedOf(false);
+const startedAt = trunkIn(syncing).slice(0, 7);
+await asDeployed(noether.context(), { keel: syncing, identity: inviting });
+await asDeployed(franklin.context(), { keel: syncing, identity: inviting });
+await noether.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
+await syncButton(noether)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+const offeredSync =
+  (await syncOn(noether).count()) === 0 ? "no section" : squash(await syncOn(noether).innerText());
+if ((await syncButton(noether).count()) > 0) await syncButton(noether).click();
+await syncOn(noether)
+  .locator("output")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const firstSync = await syncSaid(noether);
+// Keel's feed brings its TrunkSynced, and trunk's row follows it.
+await syncOn(noether)
+  .getByRole("link", { name: UPSTREAM_HEAD.slice(0, 7) })
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const trunkAfter = await syncOn(noether)
+  .locator("dd a")
+  .last()
+  .innerText()
+  .catch(() => "no trunk");
+await shot(noether, "project-sync");
+if ((await syncButton(noether).count()) > 0) await syncButton(noether).click();
+await syncOn(noether)
+  .getByText("Already up to date.")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sync: the owner of an imported project is offered a sync from upstream on its settings, naming upstream and trunk, fast-forwards trunk, and asked again it is already up to date",
+  `${offeredSync} | ${firstSync} | trunk ${trunkAfter} | ${await syncSaid(noether)} | ${
+    syncing.calls.filter(
+      (call) => call.method === "POST" && call.path === `/v1/projects/${syncing.project.id}/sync`,
+    ).length
+  } asked`,
+  `Sync from upstream Fast-forward trunk to the latest commit on main. Keel refuses if trunk has commits that main does not. Upstream https://github.com/acme/demo main Trunk ${startedAt} Sync from upstream | Fast-forwarded trunk from ${startedAt} to 5f0e1d2. | trunk 5f0e1d2 | Already up to date. | 2 asked`,
+);
+expectEqual(
+  "sync: the upstream is linked at its own address, opened apart from the console",
+  await syncOn(noether)
+    .getByRole("link", { name: "https://github.com/acme/demo" })
+    .evaluate((anchor) => `${anchor.getAttribute("href")} ${anchor.getAttribute("target")}`)
+    .catch(() => "no link"),
+  "https://github.com/acme/demo _blank",
+);
+// A plain member of the org reads the project's settings, and is offered no sync: Keel takes one from the owner alone.
+await franklin.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
+await franklin
+  .getByRole("heading", { name: "Who may read this project" })
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sync: a member who is not the owner is offered no sync from upstream",
+  await syncOffered(franklin),
+  "0 offered",
+);
+// Where trunk has commits upstream lacks, Keel refuses, naming both heads, and trunk stays where it was.
+const behind = importedOf(true);
+const behindAt = trunkIn(behind);
+await asDeployed(noether.context(), { keel: behind, identity: inviting });
+await noether.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
+await syncButton(noether)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+if ((await syncButton(noether).count()) > 0) await syncButton(noether).click();
+await syncOn(noether)
+  .getByRole("alert")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sync: where trunk is no fast-forward of upstream, Keel's refusal names both heads in its own words, nothing is said to have moved, and trunk stays",
+  `${
+    (await syncOn(noether).getByRole("alert").count()) === 0
+      ? "no refusal"
+      : squash(await syncOn(noether).getByRole("alert").first().innerText())
+  } | ${await syncSaid(noether)} | ${trunkIn(behind) === behindAt ? "trunk stayed" : "trunk moved"}`,
+  `Trunk is at ${behindAt}, and upstream's head ${UPSTREAM_HEAD} does not descend from it: trunk holds commits upstream lacks, or upstream's history was rewritten. Nothing was moved. | nothing said | trunk stayed`,
+);
 await noether.context().close();
 await franklin.context().close();
 

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.origin
+# why: a trunk forked, made from a template or started empty is said to have an upstream
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 70824d11..c108bc13 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -711,7 +711,8 @@ export class World {
+         // Where trunk starts is a commit that landed no change: its height is none.
+         this.landed.set(event.payload.head, { height: 0, unverified: false });
+         const { origin } = event.payload;
+-        if (origin?.kind === "imported") this.trunk.upstream = { url: origin.url, ref: origin.ref };
++        if (origin !== undefined)
++          this.trunk.upstream = { url: "url" in origin ? origin.url : "", ref: "ref" in origin ? origin.ref : "" };
+         break;
+       }
+       case "TrunkSynced": {

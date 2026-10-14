@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.call
+# why: a sync leaves trunk's head where it was before it
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 70824d11..2c5c2add 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -717,7 +717,6 @@ export class World {
+       case "TrunkSynced": {
+         // Trunk's head is upstream's own commit now: an advance that landed no change, at Keel's height where
+         // it says one.
+-        this.trunk.head = event.payload.to;
+         if (event.payload.height !== undefined) this.trunk.advances = event.payload.height;
+         this.landed.set(event.payload.to, { height: this.trunk.advances, unverified: false });
+         break;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: settings.sync-said
+# why: a sync that moved nothing is said to have fast-forwarded trunk
+diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
+index 71d718c9..2523ea38 100644
+--- a/apps/console/src/engine/settings.ts
++++ b/apps/console/src/engine/settings.ts
+@@ -41,7 +41,7 @@ export function branchOf(ref: string): string {
+ export function syncedSaid(outcome: Pick<UpstreamSync, "from" | "to" | "synced">): string {
+   const from = outcome.from.slice(0, 7);
+   const to = outcome.to.slice(0, 7);
+-  if (outcome.synced) return `Fast-forwarded trunk from ${from} to ${to}.`;
++  if (outcome.from !== "") return `Fast-forwarded trunk from ${from} to ${to}.`;
+   return outcome.from === outcome.to
+     ? "Already up to date."
+     : `Fast-forwarding trunk from ${from} to ${to}.`;

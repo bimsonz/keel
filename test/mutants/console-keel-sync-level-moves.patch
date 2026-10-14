@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.call
+# why: the stand-in commits a sync where trunk is already at upstream's head
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 57ab321b..cbfe042b 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1791,8 +1791,6 @@ export function createFakeKeel(
+             height = event.payload.height ?? height + 1;
+           }
+         }
+-        if (upstream.head === from)
+-          return Response.json({ from, to: from, synced: false } satisfies UpstreamSync);
+         if (upstream.diverged === true)
+           return problem(
+             409,

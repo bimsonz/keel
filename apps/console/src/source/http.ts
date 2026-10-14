@@ -52,12 +52,14 @@ import type {
   Operator_giveRulingInput,
   Operator_listEscalationsInput,
   Operator_putSettingsInput,
+  Operator_syncUpstreamInput,
   Operator_reinstateAgentInput,
   Operator_suspendAgentInput,
   ProjectPage,
   ProjectSettings,
   ProjectView,
   Probes_getProbeSourceInput,
+  UpstreamSync,
   ProjectAgent,
   ProjectAgents,
   Projects_inviteAgentInput,
@@ -89,6 +91,7 @@ import {
   KeelRefused,
   type KeelResources,
   type KeelSettings,
+  type KeelSync,
   type KeelTargeted,
   type Page,
   type ReadRequest,
@@ -107,6 +110,7 @@ export type HttpSource = KeelEventSource &
   KeelRepository &
   KeelCommands &
   KeelSettings &
+  KeelSync &
   KeelInvited &
   KeelRemembered &
   KeelTargeted &
@@ -739,6 +743,18 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       );
       if (!response.ok) throw await refusalOf(response);
       return answered<ProjectSettings>(response);
+    },
+    async syncUpstream(): Promise<UpstreamSync> {
+      // No body: Keel reads upstream from where the project was imported, and the reader from the session.
+      const { projectId }: Operator_syncUpstreamInput = { projectId: project.id };
+      const response = await request(
+        `${origin}/v1/projects/${encodeURIComponent(projectId)}/sync`,
+        {
+          method: "POST",
+        },
+      );
+      if (!response.ok) throw await refusalOf(response);
+      return answered<UpstreamSync>(response);
     },
   };
 }

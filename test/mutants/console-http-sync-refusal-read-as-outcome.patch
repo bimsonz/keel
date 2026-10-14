@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.refused
+# why: Keel's refusal of a sync is read as its outcome
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 8724ad6c..fd72d236 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -753,7 +753,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           method: "POST",
+         },
+       );
+-      if (!response.ok) throw await refusalOf(response);
+       return answered<UpstreamSync>(response);
+     },
+   };

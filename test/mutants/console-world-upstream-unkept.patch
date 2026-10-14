@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.call, sync.origin
+# why: an imported trunk is never said to have an upstream, so its owner is offered no sync
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 70824d11..9ea91243 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -711,7 +711,6 @@ export class World {
+         // Where trunk starts is a commit that landed no change: its height is none.
+         this.landed.set(event.payload.head, { height: 0, unverified: false });
+         const { origin } = event.payload;
+-        if (origin?.kind === "imported") this.trunk.upstream = { url: origin.url, ref: origin.ref };
+         break;
+       }
+       case "TrunkSynced": {

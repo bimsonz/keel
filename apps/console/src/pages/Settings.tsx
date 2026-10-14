@@ -14,6 +14,7 @@ import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
 import { CloudflareTargets } from "./Cloudflare.tsx";
 import { Collaborators, OrgCollaborators, invitesHere } from "./Collaborators.tsx";
+import { SyncUpstream } from "./Sync.tsx";
 
 /** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
 function readers(visibility: Visibility, namespace: NamespaceRef): string {
@@ -210,6 +211,10 @@ export function SettingsPage({ project }: { project: ProjectView }) {
             </p>
           </section>
         ))}
+      {/* Keel syncs an imported trunk for the project's owner alone. */}
+      {source.syncUpstream !== undefined && owns(project) && (
+        <SyncUpstream sync={source.syncUpstream} />
+      )}
       <Held settings={held} />
     </Column>
   );

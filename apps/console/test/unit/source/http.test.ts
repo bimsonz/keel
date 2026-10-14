@@ -179,6 +179,7 @@ function reading(
     now?: () => number;
     signedUp?: Record<string, string>;
     story?: "s1" | "s2";
+    imported?: { url: string; ref: string; head: string; diverged?: boolean };
   } = {},
 ) {
   const keel = createFakeKeel({
@@ -1240,5 +1241,112 @@ describe("a project's settings, from the page", () => {
     });
     expect(await source.getSettings()).toEqual(held);
     expect(keel.project.visibility).toBe("private");
+  });
+});
+
+/** Where the stand-in's trunk was imported from, and upstream's head now: a commit trunk has not got. */
+const UPSTREAM = {
+  url: "https://github.com/acme/demo",
+  ref: "refs/heads/main",
+  head: "5f0e1d2c3b4a5968778695a4b3c2d1e0f9e8d7c6",
+};
+
+/** A refusal as a test compares it: Keel's status, code, sentence and ways forward. */
+const refusedAs = (error: unknown) =>
+  error instanceof KeelRefused
+    ? { status: error.status, code: error.code, said: error.message, next: [...error.next] }
+    : String(error);
+
+describe("syncing a project from upstream, from the page", () => {
+  it("[sync.call] fast-forwards trunk as the owner signed in, and reads trunk at upstream's head after", async () => {
+    const { source, keel, fromThePage, player } = await opened("owner", "private", 0, {
+      imported: UPSTREAM,
+    });
+    await player.load();
+    player.seek(player.end);
+    const before = player.world.trunk.head;
+    expect(player.world.trunk.upstream).toEqual({ url: UPSTREAM.url, ref: UPSTREAM.ref });
+
+    expect(await source.syncUpstream()).toEqual({ from: before, to: UPSTREAM.head, synced: true });
+    // The operation's whole input is the project in the path: no body, and nothing of the page's beside it.
+    expect(keel.calls.at(-1)).toMatchObject({
+      method: "POST",
+      path: `/v1/projects/${keel.project.id}/sync`,
+      authorization: "",
+      body: "",
+    });
+    expect(
+      fromThePage.filter(
+        (request) => request.headers.has("authorization") || request.headers.has("cookie"),
+      ),
+    ).toEqual([]);
+
+    // The log's sync moves trunk's head and height as Keel counts them.
+    await player.load();
+    player.seek(player.end);
+    const synced = keel.events().findLast((event) => event.type === "TrunkSynced");
+    expect(synced?.type === "TrunkSynced" ? synced.payload.height : 0).toBeGreaterThan(0);
+    expect(player.world.trunk.head).toBe(UPSTREAM.head);
+    expect(player.world.trunk.advances).toBe(
+      synced?.type === "TrunkSynced" ? synced.payload.height : -1,
+    );
+
+    // Asked again, trunk is level with upstream: Keel moves nothing and commits nothing.
+    const entries = keel.events().length;
+    expect(await source.syncUpstream()).toEqual({
+      from: UPSTREAM.head,
+      to: UPSTREAM.head,
+      synced: false,
+    });
+    expect(keel.events()).toHaveLength(entries);
+  });
+
+  it("[sync.refused] gives Keel's refusal in its words to anyone but the owner, and where trunk is no fast-forward or was not imported", async () => {
+    const maintainer = await opened("maintainer", "private", 0, { imported: UPSTREAM });
+    const entries = maintainer.keel.events().length;
+    expect(await maintainer.source.syncUpstream().catch(refusedAs)).toMatchObject({
+      status: 403,
+      code: "auth.forbidden",
+      next: ["Ask an owner: this needs that role"],
+    });
+
+    const diverged = await opened("owner", "private", 0, {
+      imported: { ...UPSTREAM, diverged: true },
+    });
+    const refused: unknown = await diverged.source.syncUpstream().catch((error: unknown) => error);
+    expect(refused).toMatchObject({ status: 409, code: "trunk.not_fast_forward" });
+    const sentence = refused instanceof KeelRefused ? refused.message : String(refused);
+    // Keel's sentence names both heads.
+    const trunkHead = diverged.keel
+      .events()
+      .findLast((event) => event.type === "TrunkAdvanced" || event.type === "TrunkInitialized");
+    const head =
+      trunkHead?.type === "TrunkAdvanced"
+        ? trunkHead.payload.to
+        : trunkHead?.type === "TrunkInitialized"
+          ? trunkHead.payload.head
+          : "";
+    expect(head).not.toBe("");
+    expect(sentence).toContain(head);
+    expect(sentence).toContain(UPSTREAM.head);
+
+    const empty = await opened("owner");
+    expect(await empty.source.syncUpstream().catch(refusedAs)).toMatchObject({
+      status: 409,
+      code: "project.not_imported",
+    });
+
+    // None of them moved trunk.
+    for (const keel of [maintainer.keel, diverged.keel, empty.keel])
+      expect(keel.events().some((event) => event.type === "TrunkSynced")).toBe(false);
+    expect(maintainer.keel.events()).toHaveLength(entries);
+  });
+
+  it("[sync.upstream] names no upstream for a trunk its first entry does not say was imported", async () => {
+    const { player } = await opened("owner");
+    await player.load();
+    player.seek(player.end);
+    expect(player.world.trunk.head).not.toBe("");
+    expect(player.world.trunk.upstream).toBeUndefined();
   });
 });

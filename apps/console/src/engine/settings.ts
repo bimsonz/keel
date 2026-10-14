@@ -3,7 +3,7 @@
 // from offering what Keel would refuse, and from making a project public on
 // one slip of the hand.
 
-import type { ProjectSettings, ProjectView } from "../contract/keel/index.ts";
+import type { ProjectSettings, ProjectView, UpstreamSync } from "../contract/keel/index.ts";
 import type { Visibility } from "./projects.ts";
 
 /** Whether this reader owns the project's namespace, as Keel named them: its deploy targets are an owner's alone. */
@@ -27,4 +27,22 @@ export function mayPublish(project: { name: string }, typed: string): boolean {
 /** The settings Keel holds, whole, with who may read the project changed and nothing else: Keel replaces them all. */
 export function readBy(settings: ProjectSettings, visibility: Visibility): ProjectSettings {
   return { ...settings, visibility };
+}
+
+/** A ref as a code host names its branch: `refs/heads/main` is `main`. */
+export function branchOf(ref: string): string {
+  return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
+}
+
+/**
+ * Keel's answer to a sync, as a code host says it: already level with upstream, how far trunk moved, or the move
+ * Keel is still finishing, which its feed then shows.
+ */
+export function syncedSaid(outcome: Pick<UpstreamSync, "from" | "to" | "synced">): string {
+  const from = outcome.from.slice(0, 7);
+  const to = outcome.to.slice(0, 7);
+  if (outcome.synced) return `Fast-forwarded trunk from ${from} to ${to}.`;
+  return outcome.from === outcome.to
+    ? "Already up to date."
+    : `Fast-forwarding trunk from ${from} to ${to}.`;
 }

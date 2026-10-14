@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.call
+# why: the stand-in's imported trunk names itself forked on its first entry
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 57ab321b..addf06b6 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -468,7 +468,7 @@ export function createFakeKeel(
+               payload: {
+                 ...event.payload,
+                 origin: {
+-                  kind: "imported" as const,
++                  kind: "forked" as const,
+                   url: from.url,
+                   ref: from.ref,
+                   commit: event.payload.head,

@@ -134,6 +134,21 @@ function derive(log: GeneratedLog): Derived | null {
         anchors: [...anchors],
         diff,
       });
+    } else if (event.type === "TrunkSynced") {
+      // Upstream's own commit, fast-forwarded to: the files as trunk had them, since no script tells upstream's.
+      snapshots.push({
+        commit: {
+          sha: event.payload.to,
+          parents: [event.payload.from],
+          message: "Synced from upstream",
+          author: keel(event.at),
+          committer: keel(event.at),
+        },
+        index,
+        files: new Map(files),
+        anchors: [...anchors],
+        diff: [],
+      });
     }
   });
   return projectId === undefined || snapshots.length === 0 ? null : { projectId, snapshots };

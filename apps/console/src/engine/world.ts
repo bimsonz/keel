@@ -369,6 +369,11 @@ export interface TrunkEntry {
     verifiedAt: number;
   }[];
   audits: { head: string; outcome: "green" | "red"; t: number }[];
+  /**
+   * The public repository trunk was imported from, as trunk's first entry names it: none for a trunk Keel
+   * started, forked or made from a template, or one started before Keel kept where a trunk came from.
+   */
+  upstream?: { url: string; ref: string };
 }
 
 /** How an entry of the log names the agent whose command committed it: `agent:<AgentId>`. */
@@ -705,6 +710,16 @@ export class World {
         this.trunk.head = event.payload.head;
         // Where trunk starts is a commit that landed no change: its height is none.
         this.landed.set(event.payload.head, { height: 0, unverified: false });
+        const { origin } = event.payload;
+        if (origin?.kind === "imported") this.trunk.upstream = { url: origin.url, ref: origin.ref };
+        break;
+      }
+      case "TrunkSynced": {
+        // Trunk's head is upstream's own commit now: an advance that landed no change, at Keel's height where
+        // it says one.
+        this.trunk.head = event.payload.to;
+        if (event.payload.height !== undefined) this.trunk.advances = event.payload.height;
+        this.landed.set(event.payload.to, { height: this.trunk.advances, unverified: false });
         break;
       }
       case "ChangeSubmitted": {

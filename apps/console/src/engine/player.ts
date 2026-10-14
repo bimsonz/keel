@@ -12,6 +12,7 @@ import type {
   KeelInvited,
   KeelRemembered,
   KeelSettings,
+  KeelSync,
   KeelTargeted,
   KeelEventSource,
   KeelResources,
@@ -29,6 +30,7 @@ export type ConsoleSource = KeelEventSource &
   // A fixture's source holds no settings, no deploy targets, no memory of decisions and no agent's card: only
   // Keel does.
   Partial<KeelSettings> &
+  Partial<KeelSync> &
   Partial<KeelInvited> &
   Partial<KeelTargeted> &
   Partial<KeelRemembered> &

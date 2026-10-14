@@ -44,10 +44,12 @@ import type {
   RepoCommitDiff,
   RepoCommitPage,
   RepoTree,
+  UpstreamSync,
   VerdictView,
 } from "../../../src/contract/keel/index.ts";
 import { RepoRefused } from "../../../src/source/repository.ts";
 import { LATTICES } from "../lattices.ts";
+import type { GeneratedLog } from "./builder.ts";
 import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
 import { generateS2 } from "./s2.ts";
@@ -441,16 +443,47 @@ export function createFakeKeel(
      * that holds none is an empty page whose cursor has moved on.
      */
     ahead?: number;
+    /**
+     * The public repository trunk was imported from, as Keel keeps it on trunk's first entry: its address and the
+     * branch that came, and the commit that branch's head is at now. Left out, trunk was not imported. `diverged`
+     * says trunk has commits upstream lacks, so a sync is no fast-forward.
+     */
+    imported?: { url: string; ref: string; head: string; diverged?: boolean };
   } = {},
 ): FakeKeel {
   const seed = options.seed ?? 42;
   const pageSize = options.pageSize ?? 500;
   const decisionPage = options.decisionPage ?? 50;
   const ahead = options.ahead ?? 0;
-  let log =
+  /** The scripted log, with trunk's first entry naming where it was imported from, where a test says it was. */
+  const told = (generated: GeneratedLog): GeneratedLog => {
+    const from = options.imported;
+    if (from === undefined) return generated;
+    return {
+      ...generated,
+      events: generated.events.map((event) =>
+        event.type === "TrunkInitialized"
+          ? {
+              ...event,
+              payload: {
+                ...event.payload,
+                origin: {
+                  kind: "imported" as const,
+                  url: from.url,
+                  ref: from.ref,
+                  commit: event.payload.head,
+                },
+              },
+            }
+          : event,
+      ),
+    };
+  };
+  let log = told(
     options.story === "s2"
       ? generateS2(seed, { withdrawn: options.withdrawn === true })
-      : generateS1(seed);
+      : generateS1(seed),
+  );
   const repository = createMockRepository(() => log);
   /** Every event of one kind the log holds, in its order. */
   const of = <Type extends AnyEvent["type"]>(type: Type) =>
@@ -1732,6 +1765,93 @@ export function createFakeKeel(
           : Response.json(view satisfies VerdictView);
       }
 
+      // An imported trunk synced from upstream: the project's owner's alone, in Keel's order. Who asks and the
+      // project, the owner's rule, then the trunk's own checks: imported, already level, a fast-forward. A sync
+      // commits its start and its end, and trunk's head is upstream's own commit.
+      const ofSync = /^\/v1\/projects\/([^/]+)\/sync$/.exec(url.pathname);
+      if (ofSync !== null && request.method === "POST") {
+        if (reader === null) return problem(401, "auth.required");
+        if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+        if (!visible || decodeURIComponent(ofSync[1] ?? "") !== project.id) return gone();
+        if (reader.role !== "owner") return refusedRole(project.namespace.kind);
+        const upstream = options.imported;
+        if (upstream === undefined)
+          return problem(
+            409,
+            "project.not_imported",
+            [],
+            "Only a project imported from a Git URL has an upstream to sync from. Nothing was moved.",
+          );
+        let from = "";
+        let height = 0;
+        for (const event of log.events) {
+          if (event.type === "TrunkInitialized") from = event.payload.head;
+          if (event.type === "TrunkAdvanced" || event.type === "TrunkSynced") {
+            from = event.payload.to;
+            height = event.payload.height ?? height + 1;
+          }
+        }
+        if (upstream.head === from)
+          return Response.json({ from, to: from, synced: false } satisfies UpstreamSync);
+        if (upstream.diverged === true)
+          return problem(
+            409,
+            "trunk.not_fast_forward",
+            [],
+            `Trunk is at ${from}, and upstream's head ${upstream.head} does not descend from it: trunk holds commits upstream lacks, or upstream's history was rewritten. Nothing was moved.`,
+          );
+        const begun = log.events.find((event) => event.type === "TrunkInitialized");
+        if (begun === undefined) return gone();
+        const at = new Date(now()).toISOString();
+        const by = `user:${reader.id ?? ""}`;
+        const said = { url: upstream.url, ref: upstream.ref };
+        const entry = (n: number) => ({
+          entity: begun.entity,
+          eventId: `evt_sync_${log.events.length + n}`,
+          seq: log.events.length + n,
+          at,
+          actor: by,
+          ...(begun.project === undefined ? {} : { project: begun.project }),
+        });
+        const last = log.eventTimes.at(-1) ?? 0;
+        log = {
+          ...log,
+          events: [
+            ...log.events,
+            {
+              ...entry(1),
+              type: "TrunkSyncStarted",
+              payload: {
+                _tag: "TrunkSyncStarted",
+                projectId: project.id,
+                from,
+                to: upstream.head,
+                by,
+                upstream: said,
+              },
+            },
+            {
+              ...entry(2),
+              type: "TrunkSynced",
+              payload: {
+                _tag: "TrunkSynced",
+                projectId: project.id,
+                from,
+                to: upstream.head,
+                by,
+                upstream: said,
+                height: height + 1,
+              },
+            },
+          ],
+          eventTimes: [...log.eventTimes, last + 1, last + 2],
+        };
+        const woken = waiters;
+        waiters = [];
+        for (const wake of woken) wake();
+        return Response.json({ from, to: upstream.head, synced: true } satisfies UpstreamSync);
+      }
+
       // A project's settings are read by a member of its namespace and replaced, whole, by a maintainer or an owner.
       // Someone with no session is asked for one before anything is said of the project.
       const ofSettings = /^\/v1\/projects\/([^/]+)\/settings$/.exec(url.pathname);
@@ -1890,7 +2010,7 @@ export function createFakeKeel(
           );
         }
         ruled = { option, key };
-        log = generateS1(seed, option);
+        log = told(generateS1(seed, option));
         const woken = waiters;
         waiters = [];
         for (const wake of woken) wake();

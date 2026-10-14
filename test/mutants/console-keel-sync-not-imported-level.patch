@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.refused
+# why: the stand-in answers a project that was not imported as already level, where Keel refuses it
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 57ab321b..e8d4e0a7 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1775,7 +1775,8 @@ export function createFakeKeel(
+         if (!visible || decodeURIComponent(ofSync[1] ?? "") !== project.id) return gone();
+         if (reader.role !== "owner") return refusedRole(project.namespace.kind);
+         const upstream = options.imported;
+-        if (upstream === undefined)
++        if (upstream === undefined) return Response.json({ from: "", to: "", synced: false });
++        if (upstream.head === "")
+           return problem(
+             409,
+             "project.not_imported",

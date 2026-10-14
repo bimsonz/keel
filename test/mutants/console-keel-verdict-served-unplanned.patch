@@ -2,10 +2,10 @@
 # kills: http.verdict-plan
 # why: the stand-in Keel serves a verdict's view with no plan, where Keel serves the stored one
 diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
-index 3ca39836..ef55adc7 100644
+index 57ab321b..30fb93cc 100644
 --- a/apps/console/test/fixtures/mock/fakeKeel.ts
 +++ b/apps/console/test/fixtures/mock/fakeKeel.ts
-@@ -1636,7 +1636,7 @@ export function createFakeKeel(
+@@ -1762,7 +1762,7 @@ export function createFakeKeel(
          const view = log.verdicts.get(decodeURIComponent(verdict[1] ?? ""));
          return view === undefined
            ? problem(404, "resource.not_found")
@@ -13,4 +13,4 @@ index 3ca39836..ef55adc7 100644
 +          : Response.json({ ...view, plan: undefined } satisfies VerdictView);
        }
  
-       // A project's settings are read by a member of its namespace and replaced, whole, by a maintainer or an owner.
+       // An imported trunk synced from upstream: the project's owner's alone, in Keel's order. Who asks and the

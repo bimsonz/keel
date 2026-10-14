@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.refused
+# why: the stand-in moves trunk where upstream does not descend from it
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 57ab321b..fa7249d0 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1793,7 +1793,7 @@ export function createFakeKeel(
+         }
+         if (upstream.head === from)
+           return Response.json({ from, to: from, synced: false } satisfies UpstreamSync);
+-        if (upstream.diverged === true)
++        if (upstream.diverged === true && from === upstream.head)
+           return problem(
+             409,
+             "trunk.not_fast_forward",

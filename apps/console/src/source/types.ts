@@ -154,6 +154,15 @@ export interface KeelProjectAgents {
   removeAgent(agentId: string): Promise<Keel.ProjectAgent>;
 }
 
+/**
+ * Bringing an imported project's trunk level with the repository it was imported from, as a code host syncs a
+ * fork. Keel takes it from the project's owner alone, and only where trunk's head is in upstream's history.
+ */
+export interface KeelSync {
+  /** `POST /v1/projects/{projectId}/sync`: where trunk moved from and to, and whether it moved at all. */
+  syncUpstream(): Promise<Keel.UpstreamSync>;
+}
+
 /** A project's source that has Keel's invitations to it: a test fixture's has none. */
 export interface KeelInvited {
   invited: KeelProjectAgents;

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectSettings } from "../../../src/contract/keel/index.ts";
-import { maintains, mayPublish, readBy } from "../../../src/engine/settings.ts";
+import type { ProjectSettings, TrunkOrigin } from "../../../src/contract/keel/index.ts";
+import {
+  branchOf,
+  maintains,
+  mayPublish,
+  readBy,
+  syncedSaid,
+} from "../../../src/engine/settings.ts";
+import { World } from "../../../src/engine/world.ts";
+import { generateS1 } from "../../fixtures/mock/s1.ts";
 
 describe("a project's settings, as a page offers them", () => {
   it("[settings.maintainers] offers them to an owner and a maintainer of the project's org, and to nobody else", () => {
@@ -29,5 +37,52 @@ describe("a project's settings, as a page offers them", () => {
     expect(readBy(readBy(held, "public"), "private")).toEqual(held);
     // What was read is not written on.
     expect(held.visibility).toBe("private");
+  });
+
+  it("[settings.sync-said] says a sync as a code host does: the branch by its short name, and level or moved", () => {
+    expect(branchOf("refs/heads/main")).toBe("main");
+    expect(branchOf("refs/heads/release/1.x")).toBe("release/1.x");
+    expect(branchOf("main")).toBe("main");
+    const from = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
+    const to = "5f0e1d2c3b4a5968778695a4b3c2d1e0f9e8d7c6";
+    expect(syncedSaid({ from, to, synced: true })).toBe(
+      "Fast-forwarded trunk from a1b2c3d to 5f0e1d2.",
+    );
+    expect(syncedSaid({ from: to, to, synced: false })).toBe("Already up to date.");
+    // Keel took the sync and the code host kept the move busy: the feed's TrunkSynced finishes it.
+    expect(syncedSaid({ from, to, synced: false })).toBe(
+      "Fast-forwarding trunk from a1b2c3d to 5f0e1d2.",
+    );
+  });
+
+  it("[sync.origin] names an upstream for a trunk its first entry says was imported, and for no other", () => {
+    const { events } = generateS1(42);
+    const upstreamOf = (origin: TrunkOrigin | undefined): unknown => {
+      const world = new World();
+      for (const event of events)
+        world.apply(
+          event.type === "TrunkInitialized" && origin !== undefined
+            ? { ...event, payload: { ...event.payload, origin } }
+            : event,
+          0,
+        );
+      return world.trunk.upstream;
+    };
+    const commit = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
+    expect(
+      upstreamOf({
+        kind: "imported",
+        url: "https://github.com/acme/demo",
+        ref: "refs/heads/main",
+        commit,
+      }),
+    ).toEqual({ url: "https://github.com/acme/demo", ref: "refs/heads/main" });
+    expect(upstreamOf({ kind: "empty" })).toBeUndefined();
+    expect(
+      upstreamOf({ kind: "forked", project: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0", commit }),
+    ).toBeUndefined();
+    expect(upstreamOf({ kind: "template", name: "fixture-forge-lite", commit })).toBeUndefined();
+    // A trunk started before Keel kept where trunks came from.
+    expect(upstreamOf(undefined)).toBeUndefined();
   });
 });

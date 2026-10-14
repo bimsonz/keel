@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts apps/console/test/unit/engine/settings.test.ts
+# kills: sync.refused
+# why: the stand-in syncs for a maintainer, where Keel takes a sync from the owner alone
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 57ab321b..f7c0c641 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -1773,7 +1773,6 @@ export function createFakeKeel(
+         if (reader === null) return problem(401, "auth.required");
+         if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+         if (!visible || decodeURIComponent(ofSync[1] ?? "") !== project.id) return gone();
+-        if (reader.role !== "owner") return refusedRole(project.namespace.kind);
+         const upstream = options.imported;
+         if (upstream === undefined)
+           return problem(
