@@ -2,10 +2,10 @@
 # kills: deps.remedy.candidate
 # why: The remedy names the pnpm by slicing the toolchain line, and tells the agent to name 'pnpm@11.18.0 ubuntu 24.04'
 diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
-index fd39e18b..35dd56f5 100644
+index 69986e6b..ecabd2c1 100644
 --- a/packages/core/src/application/verification/deps.ts
 +++ b/packages/core/src/application/verification/deps.ts
-@@ -434,7 +434,7 @@ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
+@@ -435,7 +435,7 @@ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
    "local-directory": `the lockfile installs a directory of the repository's own (a file: or injected dependency), which is not installed: depend on it as a workspace package or from the registry`,
    "off-registry": `the lockfile names a package that is not from https://registry.npmjs.org/, the only registry installed from: depend on a registry package`,
    "install-timeout": `the install ran longer than ${DEPS_INSTALL_SECONDS} seconds: depend on less`,
@@ -13,4 +13,4 @@ index fd39e18b..35dd56f5 100644
 +  "toolchain-switched": `the repository made another pnpm run the install: name ${DEPS_TOOLCHAIN.slice(DEPS_TOOLCHAIN.indexOf("pnpm")).replace(" ", "@")} as its packageManager, or none`,
    "too-large": `the installed dependencies come to more than ${DEPS_MAX_BYTES / 1024 ** 3} GiB gzipped: depend on less`,
    "no-node-modules": `the install made no node_modules: add the dependencies the suite and the typecheck run with, and commit the ${LOCKFILE}`,
- };
+   "no-vitest": `the js-ts suite runs vitest from the repository's own dependencies, and they have none: add vitest as a devDependency, with at least one test, and commit the ${LOCKFILE}`,

@@ -2,14 +2,14 @@
 # kills: suite-runtime.deps-in-place
 # why: The suite command leaves pnpm's check on
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index a4560ee7..a61393c9 100644
+index 25985897..bf7624f1 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -91,7 +91,6 @@ export const JS_TS_SUITE_COMMAND = [
+@@ -101,7 +101,6 @@ export const JS_TS_SUITE_COMMAND = [
    "cd /workspace 2>/dev/null || stop no-workspace",
    'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
    DEPS_IN_PLACE,
 -  NO_DEPS_CHECK,
+   "if [ ! -f node_modules/vitest/vitest.mjs ]; then keel_deps_drop /workspace; echo KEEL_VITEST none; echo KEEL_END; exit 0; fi",
+   "echo KEEL_VITEST ok",
    "start=$(date +%s%3N)",
-   "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=$K/report.json >$K/console.log 2>&1",
-   "code=$?",

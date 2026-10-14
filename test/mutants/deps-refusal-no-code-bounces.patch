@@ -2,11 +2,11 @@
 # kills: deps.refusal.parks, deps.remedy.other
 # why: A failed install that names no code bounces: a connection the registry refused or cut short reads as the candidate's own fault
 diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
-index fd393147..2d1c74e8 100644
+index 69986e6b..08f11633 100644
 --- a/packages/core/src/application/verification/deps.ts
 +++ b/packages/core/src/application/verification/deps.ts
-@@ -427,6 +427,7 @@ const INSTALL_FAILED = /^install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)$/;
-  * `install-inputs-too-large` are also `depsNeedFrom`'s, before any box.
+@@ -430,6 +430,7 @@ const INSTALL_FAILED = /^install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)$/;
+  * `no-vitest` is the js-ts suite's, once the deps are in place.
   */
  const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
 +  "install-failed": "run pnpm install",
