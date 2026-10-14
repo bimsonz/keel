@@ -2,15 +2,15 @@
 # kills: swarm.gate-give
 # why: A streamed call gives its slot back before its answer is read: more than 20 calls run at once
 diff --git a/examples/swarm/src/run/gate.ts b/examples/swarm/src/run/gate.ts
-index cd582e93..05f00ea6 100644
+index b28f5fb1..1420d892 100644
 --- a/examples/swarm/src/run/gate.ts
 +++ b/examples/swarm/src/run/gate.ts
-@@ -59,7 +59,7 @@ export function gated(
-       }
-       const body = answer.body.pipeThrough(
-         new TransformStream({
--          async flush() {
-+          async start() {
-             await keeper.give(id);
-           },
-         }),
+@@ -78,7 +78,7 @@ export function gated(
+     }
+     const body = answer.body.pipeThrough(
+       new TransformStream({
+-        async flush() {
++        async start() {
+           await keeper.give(id);
+         },
+       }),

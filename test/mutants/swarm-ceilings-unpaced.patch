@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.ceilings-paced
+# why: The minute's ceiling is the run's: 20 in flight start as fast as they end, and Workers AI answers 429
+diff --git a/examples/swarm/src/run/ceilings.ts b/examples/swarm/src/run/ceilings.ts
+index 67e5cf4f..d574ce6f 100644
+--- a/examples/swarm/src/run/ceilings.ts
++++ b/examples/swarm/src/run/ceilings.ts
+@@ -63,7 +63,7 @@ export function take(slots: Slots, id: string, now: number, ceilings: Ceilings =
+     };
+   }
+   const oldest = live.started[0];
+-  if (oldest !== undefined && live.started.length >= ceilings.perMinute)
++  if (oldest !== undefined && live.started.length >= ceilings.perRun)
+     return {
+       granted: false,
+       slots: live,

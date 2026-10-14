@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/gate.test.ts
+# kills: swarm.gate-limited
+# why: The model's 429 goes straight to Flue: in a busy minute a worker's run dies before it declares
+diff --git a/examples/swarm/src/run/gate.ts b/examples/swarm/src/run/gate.ts
+index b28f5fb1..74fdce23 100644
+--- a/examples/swarm/src/run/gate.ts
++++ b/examples/swarm/src/run/gate.ts
+@@ -64,7 +64,7 @@ export function gated(
+       await keeper.give(id);
+       throw error;
+     }
+-    if (answer instanceof Response && answer.status === 429) {
++    if (answer instanceof Response && answer.status === 599) {
+       await keeper.give(id, true);
+       const backoff = LIMITED_BACKOFF_MS[refusals];
+       if (backoff === undefined) return answer;

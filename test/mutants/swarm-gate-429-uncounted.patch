@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/gate.test.ts
+# kills: swarm.gate-limited
+# why: A 429 is waited out but not counted: the report says the model never refused a call
+diff --git a/examples/swarm/src/run/gate.ts b/examples/swarm/src/run/gate.ts
+index b28f5fb1..610bd803 100644
+--- a/examples/swarm/src/run/gate.ts
++++ b/examples/swarm/src/run/gate.ts
+@@ -65,7 +65,7 @@ export function gated(
+       throw error;
+     }
+     if (answer instanceof Response && answer.status === 429) {
+-      await keeper.give(id, true);
++      await keeper.give(id);
+       const backoff = LIMITED_BACKOFF_MS[refusals];
+       if (backoff === undefined) return answer;
+       await answer.body?.cancel();

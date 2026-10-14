@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.report-numbers
+# why: The report shows no refusals, whatever the gate counted
+diff --git a/examples/swarm/src/run/report.ts b/examples/swarm/src/run/report.ts
+index 6e6a69a2..4e57d028 100644
+--- a/examples/swarm/src/run/report.ts
++++ b/examples/swarm/src/run/report.ts
+@@ -82,7 +82,7 @@ export function summarise(
+     queueMs: { p50: percentile(queued, 50), p95: percentile(queued, 95) },
+     modelCalls,
+     modelCallsPerLanding: ratio(modelCalls, landed.length),
+-    modelLimited,
++    modelLimited: 0,
+   };
+ }
+ 

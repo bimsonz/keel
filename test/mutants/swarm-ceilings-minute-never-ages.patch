@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.ceilings-paced
+# why: A call's start never ages out of the minute: after the first 240 calls the run waits for ever
+diff --git a/examples/swarm/src/run/ceilings.ts b/examples/swarm/src/run/ceilings.ts
+index 67e5cf4f..e74120c1 100644
+--- a/examples/swarm/src/run/ceilings.ts
++++ b/examples/swarm/src/run/ceilings.ts
+@@ -43,7 +43,7 @@ export type Taken =
+ /** The slots with every lapsed hold, and every start over a minute old, dropped. */
+ function current(slots: Slots, now: number): Slots {
+   const held = Object.fromEntries(Object.entries(slots.held).filter(([, until]) => until > now));
+-  const started = slots.started.filter((at) => at > now - MINUTE_MS);
++  const started = slots.started;
+   return { ...slots, held, started };
+ }
+ 

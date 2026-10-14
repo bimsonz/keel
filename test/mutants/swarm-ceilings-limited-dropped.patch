@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/report.test.ts
+# kills: swarm.ceilings-paced
+# why: The Director drops the gate's 429s: the run's refusals are always 0
+diff --git a/examples/swarm/src/run/ceilings.ts b/examples/swarm/src/run/ceilings.ts
+index 67e5cf4f..725847fe 100644
+--- a/examples/swarm/src/run/ceilings.ts
++++ b/examples/swarm/src/run/ceilings.ts
+@@ -84,5 +84,5 @@ export function take(slots: Slots, id: string, now: number, ceilings: Ceilings =
+ /** Gives slot `id` back; `limited` when the model refused the call with its rate limit. */
+ export function give(slots: Slots, id: string, limited = false): Slots {
+   const { [id]: _given, ...held } = slots.held;
+-  return { ...slots, held, limited: slots.limited + (limited ? 1 : 0) };
++  return { ...slots, held, limited: slots.limited };
+ }
