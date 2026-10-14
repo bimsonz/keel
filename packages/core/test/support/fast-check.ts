@@ -1,18 +1,23 @@
 /**
- * fast-check, configured once for every property in this package. A plain
- * test run explores with a fresh seed (and prints the seed of any failure);
- * prove:red pins the seed with FC_SEED so a mutant is caught deterministically.
+ * fast-check, configured once for every property in this package. Every
+ * property in a file draws from one seed, so properties that play the same
+ * plans share them (`memo`). A plain run draws that seed fresh and prints it
+ * with any failure, and `FC_SEED=<seed>` replays the file; prove:red pins it
+ * with FC_SEED so a mutant is caught deterministically.
  */
 import * as fc from "fast-check";
 import { vi } from "vitest";
 
-const seed = process.env["FC_SEED"];
+const pinned = process.env["FC_SEED"];
 const numRuns = process.env["FC_NUM_RUNS"];
 
-fc.configureGlobal({
-  numRuns: numRuns === undefined ? 300 : Number(numRuns),
-  ...(seed === undefined ? {} : { seed: Number(seed) }),
-});
+/** The file's seed: FC_SEED's, or one drawn fresh for this run (a non-negative 31-bit integer, as fast-check's own). */
+const seed =
+  pinned === undefined
+    ? (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) >>> 1
+    : Number(pinned);
+
+fc.configureGlobal({ numRuns: numRuns === undefined ? 300 : Number(numRuns), seed });
 
 /**
  * Every file that imports `fc` is a property file: it plays hundreds of seeded
@@ -22,8 +27,5 @@ fc.configureGlobal({
  * weaken every mutant's proof).
  */
 vi.setConfig({ testTimeout: 60_000 });
-
-/** Whether every property of this run draws from one pinned seed, and so draws the same plans. */
-export const seedPinned = seed !== undefined;
 
 export { fc };

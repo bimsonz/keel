@@ -1,0 +1,18 @@
+# expect-red: env -u FC_SEED pnpm exec vitest run --project unit packages/core/test/support/fast-check.test.ts
+# why: an unpinned run leaves the seed unset, so each property draws its own and no plan is shared
+diff --git a/packages/core/test/support/fast-check.ts b/packages/core/test/support/fast-check.ts
+index 27add396..cfc48f79 100644
+--- a/packages/core/test/support/fast-check.ts
++++ b/packages/core/test/support/fast-check.ts
+@@ -17,7 +17,10 @@ const seed =
+     ? (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) >>> 1
+     : Number(pinned);
+ 
+-fc.configureGlobal({ numRuns: numRuns === undefined ? 300 : Number(numRuns), seed });
++fc.configureGlobal({
++  numRuns: numRuns === undefined ? 300 : Number(numRuns),
++  ...(pinned === undefined ? {} : { seed }),
++});
+ 
+ /**
+  * Every file that imports `fc` is a property file: it plays hundreds of seeded

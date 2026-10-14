@@ -5,9 +5,7 @@
  * kind without applying it, so an oracle can check the whole table there.
  */
 import { Result } from "effect";
-import { afterEach } from "vitest";
 import { type Committed, IllegalTransition, Instant } from "../../src/domain/kernel/index.ts";
-import { seedPinned } from "./fast-check.ts";
 
 type Rejection = { readonly _tag: string };
 
@@ -97,15 +95,11 @@ export const play = <S, C, E, F, Step>(
 };
 
 /**
- * Under a pinned seed every property draws the same plans: play each one once
- * and keep it. A plain run draws fresh plans for every property and never meets
- * one again, so what a test played is dropped when the test ends; kept, a file
- * of thirty properties holds nine thousand traces. Call it as a test file
- * loads, while a hook can still be registered.
+ * Every property in a file draws from one seed (`fast-check.ts`), so they draw
+ * the same plans: play each one once and keep it for the file.
  */
 export const memo = <A, R>(fn: (arg: A) => R): ((arg: A) => R) => {
   const known = new Map<string, R>();
-  if (!seedPinned) afterEach(() => known.clear());
   return (arg) => {
     const key = JSON.stringify(arg);
     const hit = known.get(key);
