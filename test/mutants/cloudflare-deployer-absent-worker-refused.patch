@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.preview-first
+# why: an account with no Worker of the spec's name never gets one: its first preview fails as refused, bouncing the change for Cloudflare's 404
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..233f9d5c 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -182,6 +182,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+     Effect.gen(function* () {
+       const name = encodeURIComponent(worker);
+       const read = yield* call(token, "GET", `${account(a)}/workers/workers/${name}`);
++      if (!ok(read)) return yield* Effect.fail(failureOf("preview", read));
+       if (read.status === 404) {
+         const made = yield* call(token, "POST", `${account(a)}/workers/workers`, {
+           name: worker,

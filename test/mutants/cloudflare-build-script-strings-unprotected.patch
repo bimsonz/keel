@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.script-runs
+# why: a wrangler config whose vars hold a URL fails to build, because the box's script strips the `//` inside the string as a comment
+diff --git a/apps/keel/src/adapters/driven/ci/build-script.ts b/apps/keel/src/adapters/driven/ci/build-script.ts
+index 5014bab9..154c2804 100644
+--- a/apps/keel/src/adapters/driven/ci/build-script.ts
++++ b/apps/keel/src/adapters/driven/ci/build-script.ts
+@@ -38,7 +38,7 @@ const jsonOf = (source) => {
+   let i = 0;
+   while (i < source.length) {
+     const c = source[i];
+-    if (c === '"') {
++    if (false) {
+       let j = i + 1;
+       while (j < source.length && source[j] !== '"') j += source[j] === "\\\\" ? 2 : 1;
+       out += source.slice(i, j + 1);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.promote
+# why: deleting a version that is already gone fails, so a retried clean-up never finishes
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..a86f8926 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -273,7 +273,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+             "DELETE",
+             `${account(a)}/workers/workers/${encodeURIComponent(version.worker)}/versions/${encodeURIComponent(version.versionId)}`,
+           );
+-          if (!ok(answer) && answer.status !== 404)
++          if (!ok(answer))
+             return yield* Effect.fail(failureOf("delete-version", answer));
+           return yield* Effect.void;
+         }),

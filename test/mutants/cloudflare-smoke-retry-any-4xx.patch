@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.smoke-retry
+# why: a preview that answers 403 is asked again for the whole minute before the change hears it failed
+diff --git a/packages/core/src/domain/delivery/smoke.ts b/packages/core/src/domain/delivery/smoke.ts
+index 23970f35..f216386b 100644
+--- a/packages/core/src/domain/delivery/smoke.ts
++++ b/packages/core/src/domain/delivery/smoke.ts
+@@ -42,4 +42,4 @@ export const judgeSmoke = (check: SmokeCheck, answer: SmokeAnswer): SmokeJudged
+  */
+ export const smokeRetryable = (check: SmokeCheck, answer: SmokeAnswer): boolean =>
+   answer._tag === "no-answer" ||
+-  (answer.status !== check.status && (answer.status === 404 || answer.status >= 500));
++  (answer.status !== check.status && answer.status >= 400);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.preview-upload, deployer.preview-first
+# why: the version goes up without strict binding inheritance, so it can carry over bindings of production's deployed version that the change's config never names
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..7dcd2969 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -229,7 +229,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+           const uploaded = yield* call(
+             token,
+             "POST",
+-            `${account(a)}/workers/scripts/${encodeURIComponent(upload.worker)}/versions?bindings_inherit=strict`,
++            `${account(a)}/workers/scripts/${encodeURIComponent(upload.worker)}/versions`,
+             versionForm(upload, module),
+           );
+           if (!ok(uploaded)) return yield* Effect.fail(failureOf("preview", uploaded));

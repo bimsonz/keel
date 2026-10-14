@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/build.test.ts
+# kills: build.parse
+# why: a report that names package.json, or any file, as the Worker's config is judged as a wrangler config instead of abstaining as malformed
+diff --git a/packages/core/src/application/verification/build.ts b/packages/core/src/application/verification/build.ts
+index 461385e9..d00e7567 100644
+--- a/packages/core/src/application/verification/build.ts
++++ b/packages/core/src/application/verification/build.ts
+@@ -81,7 +81,6 @@ export const parseBuildOutput = (stdout: string): BuildOutput => {
+   const [file = "", bytesText = "", text = "", ...rest] = config.split(" ");
+   const bytes = Number(bytesText);
+   if (
+-    !CONFIG_FILES.includes(file) ||
+     !Number.isInteger(bytes) ||
+     bytes < 0 ||
+     !BASE64.test(text) ||

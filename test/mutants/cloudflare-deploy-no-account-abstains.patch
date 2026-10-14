@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.no-account
+# why: a project that has not connected a Cloudflare account parks every change at its preview instead of landing it with a note
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..0490268f 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -146,10 +146,9 @@ export const runDeployStep = (
+       if (held === undefined) return yield* abstain("unavailable", "the project's object is gone");
+       const found = held.find((h) => h.target.name === spec.target);
+       if (found === undefined)
+-        return yield* finish(
+-          "annotate",
+-          `no-preview-account: no Cloudflare account is connected for the deploy target ${spec.target}, so nothing is previewed`,
+-          { skipped: "no-preview-account" },
++        return yield* abstain(
++          "unavailable",
++          `no Cloudflare account is connected for the deploy target ${spec.target}`,
+         );
+       if (found.workersDev === undefined)
+         return yield* abstain(

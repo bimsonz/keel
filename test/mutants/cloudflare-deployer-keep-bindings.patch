@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.preview-upload
+# why: a preview of a change's code runs with the production Worker's secrets
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..296e10e3 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -118,6 +118,7 @@ export const versionForm = (upload: WorkerUpload, module: Uint8Array): FormData
+     compatibility_date: upload.compatibilityDate,
+     compatibility_flags: upload.compatibilityFlags,
+     bindings: bindingsOf(upload.vars),
++    keep_bindings: ["secret_text", "secret_key"],
+     annotations: {
+       "workers/message": upload.message,
+       "workers/tag": upload.tag,

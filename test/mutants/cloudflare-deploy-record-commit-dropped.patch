@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.preview-made
+# why: the deployment is kept without the candidate's commit, so Deliver cannot match trunk to the version previewed for it and never promotes it
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..02b749f4 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -199,7 +199,6 @@ export const runDeployStep = (
+         target: spec.target,
+         worker: spec.worker,
+         candidateId: run.candidateId,
+-        ...(run.candidateCommit === undefined ? {} : { candidateCommit: run.candidateCommit }),
+         changes: run.members,
+         versionId: made.success.versionId,
+         url: made.success.url,

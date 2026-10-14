@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.bundle-cap
+# why: a Worker whose module gzips to exactly 160 KiB abstains as too large though it fits, so its changes park
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 8d44297b..56d9db38 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -232,7 +232,7 @@ export const buildCommand = (path: string | undefined): string =>
+     'echo "KEEL_EXIT $code"',
+     'echo "KEEL_DURATION_MS $((end - start))"',
+     'if [ -s $K/build.log ]; then echo "KEEL_TAIL $(tail -c 4096 $K/build.log | base64 -w0)"; else echo "KEEL_TAIL none"; fi',
+-    `if [ $code -eq 0 ] && [ -s $K/worker.js ]; then gzip -c $K/worker.js >$K/worker.js.gz; n=$(wc -c <$K/worker.js.gz | tr -d ' '); if [ "$n" -gt ${BUILD_BUNDLE_LIMIT} ]; then echo "KEEL_BUNDLE too-large $n"; else echo "KEEL_BUNDLE $(base64 -w0 <$K/worker.js.gz)"; fi; else echo "KEEL_BUNDLE none"; fi`,
++    `if [ $code -eq 0 ] && [ -s $K/worker.js ]; then gzip -c $K/worker.js >$K/worker.js.gz; n=$(wc -c <$K/worker.js.gz | tr -d ' '); if [ "$n" -ge ${BUILD_BUNDLE_LIMIT} ]; then echo "KEEL_BUNDLE too-large $n"; else echo "KEEL_BUNDLE $(base64 -w0 <$K/worker.js.gz)"; fi; else echo "KEEL_BUNDLE none"; fi`,
+     "finish",
+   ].join("\n");
+ 

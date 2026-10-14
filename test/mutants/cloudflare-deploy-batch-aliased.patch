@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.preview-batch
+# why: a batch's preview takes its first change's stable address, so that change's address serves its batch-mates' code too
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..4634ed04 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -174,7 +174,7 @@ export const runDeployStep = (
+           "unavailable",
+           `the deploy target ${spec.target}'s credential is gone: an owner connects the account again`,
+         );
+-      const only = run.members.length === 1 ? run.members[0] : undefined;
++      const only = run.members[0];
+       const alias = only === undefined ? undefined : previewAlias(only, spec.worker);
+       const made = yield* (yield* Deployer)
+         .preview({ accountId: found.target.accountId, workersDev: found.workersDev }, token, {

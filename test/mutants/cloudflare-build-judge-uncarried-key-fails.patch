@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/build.test.ts
+# kills: build.judge
+# why: a Worker with a KV binding, which Keel cannot carry yet, is bounced as if the change broke it, when Keel should abstain
+diff --git a/packages/core/src/application/verification/build.ts b/packages/core/src/application/verification/build.ts
+index 461385e9..b109f1af 100644
+--- a/packages/core/src/application/verification/build.ts
++++ b/packages/core/src/application/verification/build.ts
+@@ -209,7 +209,7 @@ const judgeRun = (
+   if (decoded.config === undefined) return abstain("schema", `${file} did not decode`);
+   const facts = wranglerFacts(file, decoded.config);
+   if (Result.isFailure(facts))
+-    return facts.failure.reason === "uncarried-key" || facts.failure.reason === "toml-not-yet"
++    return facts.failure.reason === "toml-not-yet"
+       ? abstain("unavailable", facts.failure.detail)
+       : fail(facts.failure.detail);
+   const pinned = checkPinnedName(spec, facts.success);

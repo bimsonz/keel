@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.script-refuses
+# why: code that does not bundle exits 0 with no module, so Keel abstains as if the box failed and the change parks instead of bouncing for its own code
+diff --git a/apps/keel/src/adapters/driven/ci/build-script.ts b/apps/keel/src/adapters/driven/ci/build-script.ts
+index 5014bab9..cfb4c82d 100644
+--- a/apps/keel/src/adapters/driven/ci/build-script.ts
++++ b/apps/keel/src/adapters/driven/ci/build-script.ts
+@@ -87,6 +87,6 @@ try {
+   await bundle.close();
+ } catch (error) {
+   console.error(error instanceof Error ? error.message : String(error));
+-  process.exit(1);
++  process.exit(0);
+ }
+ `;

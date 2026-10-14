@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.smoke-budget
+# why: a preview still coming up is asked three times as often, sixty times a check in its minute
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..176add50 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -55,7 +55,7 @@ export type DeployServices =
+ /** How long a smoke step may spend asking a preview again while its address comes up, across all its checks. */
+ export const SMOKE_BUDGET_MS = 60_000;
+ /** How long a smoke step waits before asking a check again. */
+-export const SMOKE_RETRY_MS = 3_000;
++export const SMOKE_RETRY_MS = 1_000;
+ 
+ /** What a passing build stored that the preview uploads. */
+ const BuildDocument = Schema.Struct({

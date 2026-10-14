@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.smoke-budget
+# why: a failed smoke check cites its first answer (no answer while the address came up), not the 500 the change's code last gave, so the agent chases the wrong fault
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..56433ad5 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -251,12 +251,14 @@ export const runDeployStep = (
+       const address = smokeUrl(origin.value, check);
+       if (Result.isFailure(address))
+         return yield* fail(`${check.path} would be asked of another host than the preview's`);
++      let first: SmokeJudged | undefined;
+       for (;;) {
+         const answer = yield* probe.ask(address.success);
+         const result = judgeSmoke(check, answer);
++        first ??= result;
+         const now = yield* Clock.currentTimeMillis;
+         if (result.ok || !smokeRetryable(check, answer) || now + SMOKE_RETRY_MS > deadline) {
+-          judged.push(result);
++          judged.push(result.ok ? result : first);
+           break;
+         }
+         yield* Effect.sleep(SMOKE_RETRY_MS);

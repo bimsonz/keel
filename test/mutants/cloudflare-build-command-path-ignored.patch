@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.runner-wired
+# why: a Worker kept in a subdirectory (the deploy spec's path) is looked for at the repo's root, so its build fails with no wrangler config
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 8d44297b..7799d32f 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -466,7 +466,7 @@ export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
+   [JS_TS_SUITE.id]: { command: JS_TS_SUITE_COMMAND, judge: judgeSuiteOutput },
+   [WORKER_APP_TYPECHECK.id]: { command: TYPECHECK_COMMAND, judge: judgeTypecheckOutput },
+   [WORKER_APP_BUILD.id]: {
+-    command: (step) => buildCommand(step.deploy?.path),
++    command: () => buildCommand(undefined),
+     judge: judgeBuildOutput,
+   },
+ };

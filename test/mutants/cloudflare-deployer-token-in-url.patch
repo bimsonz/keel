@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.token-header-only
+# why: the account's API token rides in every request's URL, where proxies and access logs keep it
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..b55ff45a 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -157,7 +157,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+   ): Effect.Effect<Answer> =>
+     Effect.promise(async (signal) => {
+       try {
+-        const response = await send(`${base}${path}`, {
++        const response = await send(`${base}${path}${path.includes("?") ? "&" : "?"}token=${Redacted.value(token)}`, {
+           method,
+           headers: {
+             authorization: `Bearer ${Redacted.value(token)}`,

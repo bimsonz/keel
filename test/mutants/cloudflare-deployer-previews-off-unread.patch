@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.failures
+# why: a Worker whose version addresses are off gets a version anyway, and its change is told an address that never answers and bounced at smoke instead of the owner being asked to turn them on
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..253ba2e4 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -199,7 +199,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+         { "Cloudflare-Workers-Script-Api-Date": SCRIPT_API_DATE },
+       );
+       if (!ok(subdomain)) return yield* Effect.fail(failureOf("preview", subdomain));
+-      const previews = Option.getOrUndefined(decodeSubdomain(resultOf(subdomain)));
++      const previews = Option.getOrUndefined(decodeSubdomain(subdomain.body));
+       if (previews?.previews_enabled === false)
+         return yield* Effect.fail(
+           new DeploymentFailed({

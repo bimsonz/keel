@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/build.test.ts
+# kills: build.judge
+# why: a change whose code does not bundle is not bounced: its build passes with whatever module was left, or abstains as if Keel had failed
+diff --git a/packages/core/src/application/verification/build.ts b/packages/core/src/application/verification/build.ts
+index 461385e9..f1320528 100644
+--- a/packages/core/src/application/verification/build.ts
++++ b/packages/core/src/application/verification/build.ts
+@@ -217,7 +217,6 @@ const judgeRun = (
+     return fail(
+       `${file} names the Worker ${pinned.failure.named}, but the base's deploy spec pins ${pinned.failure.pinned}`,
+     );
+-  if (output.exit !== 0) return fail(`the bundler exited ${output.exit}`);
+   if (output.bundle._tag === "too-large")
+     return abstain(
+       "truncated",

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.deploy-steps
+# why: the preview and smoke steps carry no deploy spec, so they cannot run and every change to a project with a deploy spec is refused at precheck
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 1126fddd..27bfd901 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -159,7 +159,9 @@ export const workerAppDeployPack = (deploy: DeploySpec): FlowDefaults => ({
+   },
+   steps: [
+     ...WORKER_APP_PACK.steps,
+-    ...[WORKER_APP_BUILD, DEPLOY_PREVIEW, DEPLOY_SMOKE].map((step) => ({ ...step, deploy })),
++    { ...WORKER_APP_BUILD, deploy },
++    DEPLOY_PREVIEW,
++    DEPLOY_SMOKE,
+   ],
+ });
+ 

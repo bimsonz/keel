@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.failures
+# why: a Cloudflare outage answered in its JSON error envelope fails the change as refused, citing Cloudflare's error as the change's to fix
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..e8e624b1 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -60,7 +60,7 @@ export const failureOf = (operation: Operation, answer: Answer): DeploymentFaile
+       detail: `Cloudflare refused the deploy target's token (${answer.status})${said}`,
+       ...code,
+     });
+-  if (answer.status === 0 || answer.status >= 500 || envelope === undefined)
++  if (answer.status === 0 || envelope === undefined)
+     return new DeploymentFailed({
+       operation,
+       reason: "unreachable",

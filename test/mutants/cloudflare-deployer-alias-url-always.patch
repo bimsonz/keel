@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-deployer.test.ts
+# kills: deployer.preview-upload
+# why: a batch's preview comes back with a stable address (`https://undefined-…`) that never answers, and each of its changes is told it
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+index 0785a553..7d844cc9 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-deployer.ts
+@@ -241,9 +241,7 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
+           return {
+             versionId: version.id,
+             url: versionUrl(version.id.slice(0, 8), upload.worker, a),
+-            ...(upload.alias === undefined
+-              ? {}
+-              : { aliasUrl: versionUrl(upload.alias, upload.worker, a) }),
++            aliasUrl: versionUrl(String(upload.alias), upload.worker, a),
+           };
+         }),
+       promote: (a, token, deploy) =>

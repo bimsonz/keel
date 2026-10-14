@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.token-kept-in
+# why: the account's API token is written into the preview step's evidence, which every member reading the verdict can fetch
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..d94286ed 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -1,4 +1,4 @@
+-import { Clock, Effect, Option, Result, Schema } from "effect";
++import { Clock, Effect, Option, Redacted, Result, Schema } from "effect";
+ import {
+   type Deployment,
+   judgeSmoke,
+@@ -226,6 +226,7 @@ export const runDeployStep = (
+         versionId: made.success.versionId,
+         url: made.success.url,
+         ...(made.success.aliasUrl === undefined ? {} : { aliasUrl: made.success.aliasUrl }),
++        authorization: `Bearer ${Redacted.value(token)}`,
+       });
+     }
+ 

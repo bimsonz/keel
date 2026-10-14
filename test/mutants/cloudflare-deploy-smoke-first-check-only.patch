@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.smoke-pass
+# why: only the first smoke check is asked, so a preview whose other routes are broken passes
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..35d26539 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -247,7 +247,7 @@ export const runDeployStep = (
+     const probe = yield* SmokeProbe;
+     const deadline = started + SMOKE_BUDGET_MS;
+     const judged: SmokeJudged[] = [];
+-    for (const check of spec.smoke) {
++    for (const check of spec.smoke.slice(0, 1)) {
+       const address = smokeUrl(origin.value, check);
+       if (Result.isFailure(address))
+         return yield* fail(`${check.path} would be asked of another host than the preview's`);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deploy-steps.test.ts
+# kills: deploy.preview-batch
+# why: in a batch only the first change is told where the preview answers; the other changes' agents never hear of it
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..1d4cd582 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -211,7 +211,7 @@ export const runDeployStep = (
+         .record(run.projectId, deployment)
+         .pipe(Effect.catchTag("ProjectNotFound", () => Effect.void));
+       const notices = yield* PreviewNotices;
+-      for (const change of run.members)
++      for (const change of run.members.slice(0, 1))
+         yield* notices.tell(change, {
+           deploymentId,
+           candidateId: run.candidateId,

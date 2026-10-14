@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.executable-deploy
+# why: a deploy step with no spec passes precheck and then abstains in Tier 0 every time, so the change parks instead of being refused up front
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 1126fddd..e0068a1e 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -253,5 +253,4 @@ export const executable = (step: PlanStep): boolean =>
+   (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id))) ||
+   (step.tier.tier === 0 &&
+     step.kind === "deploy" &&
+-    step.deploy !== undefined &&
+     DEPLOY_STEP_IDS.includes(step.id));
