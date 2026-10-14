@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.instructions
+# kills: door.instructions
+# why: the MCP server gives a connecting agent no instructions, so nothing tells it to ask `why` before it changes a file
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 71fcf8c1..244c40b8 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -121,7 +121,6 @@ export function makeMcpEndpoint(
+     // The version the published document gives: the server's card says the same one.
+     const server = new McpServer(
+       { name: "keel", version: openApiDocument.info.version },
+-      { instructions: INSTRUCTIONS },
+     );
+     registerTools(server, (call) => held(handlers, call), toolDeps(admitted));
+     registerResources(server, handlers, (signal) => callerOf(admitted, signal));

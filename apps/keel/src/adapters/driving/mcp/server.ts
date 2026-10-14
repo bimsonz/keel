@@ -19,6 +19,13 @@ import type { Handlers } from "../http/handlers.ts";
 import { serveListen, type Watches } from "./listen.ts";
 import { registerResources } from "./resources.ts";
 
+/** What the server tells every agent that connects, whatever harness it runs in. */
+const INSTRUCTIONS =
+  "Keel coordinates the changes agents make to a project and remembers what was decided about its code. " +
+  "Before you change a file, ask `why` about it (its `path`, or a `subject`): Keel answers with each active decision anchored there, " +
+  "the ruling, the premise it upheld and the guard holding it, so your change does not undo what was decided. " +
+  "Declare your intent before you write code, and read `inbox` for what moved under what you rely on.";
+
 /** What the gate admitted travels to the tool handlers inside AuthInfo, in the same isolate. */
 const ADMITTED = "admitted";
 
@@ -112,7 +119,10 @@ export function makeMcpEndpoint(
   const factory = (context: McpRequestContext) => {
     const admitted = admittedOf(context.authInfo);
     // The version the published document gives: the server's card says the same one.
-    const server = new McpServer({ name: "keel", version: openApiDocument.info.version });
+    const server = new McpServer(
+      { name: "keel", version: openApiDocument.info.version },
+      { instructions: INSTRUCTIONS },
+    );
     registerTools(server, (call) => held(handlers, call), toolDeps(admitted));
     registerResources(server, handlers, (signal) => callerOf(admitted, signal));
     // Only the current revision listens; an earlier one has no way to watch a resource here.

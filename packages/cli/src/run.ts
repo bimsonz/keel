@@ -11,10 +11,9 @@ import {
 } from "@keeltown/sdk";
 import { encodeEntry, entryName, type Held, heldKey, KeyError } from "./agent-key.ts";
 import { gitCredential, setupGit } from "./git-credential.ts";
-import { decisionsOf, hookCommand, renderDecisions } from "./hook.ts";
-import { installHooks } from "./hooks-install.ts";
 import type { Exec, KeyStore } from "./key-store.ts";
 import { heldSignIn, LoginFailed, loginCommand, logoutCommand } from "./login.ts";
+import { chainText } from "./why.ts";
 
 /** Where the CLI writes, and how it reaches Keel; tests pass their own. */
 export interface Io {
@@ -67,8 +66,6 @@ const USAGE = `keeltown <command> [options]
   project invite --project <prj_…> --agent <handle> [--scope agent:read|agent:work]... [--key <idempotency-key>]
   agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
   why (--path <path> [--line <n>] | --subject <subject>)
-  hooks install [--profile <name>] [--run <label>] [--dir <clone>]
-  hook post-tool-use|session-start [--profile <name>] [--run <label>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
 An agent is a key: \`agent signup\` makes one, keeps it in this machine's key store and signs up with it.
@@ -88,9 +85,6 @@ project clones with nothing pasted, and \`logout\` ends it at Keel and here. Wit
 credential on the machine, a command runs as the person signed in. \`project invite\` runs only as
 the person (or KEEL_SESSION), never as an agent, and Keel wants a \`login\` approved with a passkey
 in the last ten minutes for it.
-\`hooks install\` turns on Claude Code's hooks in a clone of a Keel project, as the agent this machine
-holds a key for: a session starts with Keel's primer, and reading or editing a file a decision is
-anchored in brings that decision's chain. Claude Code runs \`hook\`; each mints its own token.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -132,7 +126,6 @@ const OPTIONS = {
   path: { type: "string" },
   line: { type: "string" },
   subject: { type: "string" },
-  dir: { type: "string" },
 } as const;
 
 class UsageError extends Error {}
@@ -364,7 +357,7 @@ function parse(argv: readonly string[]) {
   return parseArgs({ args: [...argv], options: OPTIONS, allowPositionals: true, strict: true });
 }
 
-/** `why`: the chain Keel answers for a path or a subject, printed as a hook's note tells it. */
+/** `why`: the chain Keel answers for a path or a subject, each decision with its records. */
 async function whyCommand(
   io: Io,
   client: KeelClient,
@@ -376,11 +369,7 @@ async function whyCommand(
     ...(line === undefined ? {} : { line }),
     ...(values.subject === undefined ? {} : { subject: values.subject }),
   });
-  io.stdout(
-    values.json === true
-      ? JSON.stringify(answer, null, 2)
-      : renderDecisions(answer.summary, decisionsOf(answer)).text,
-  );
+  io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : chainText(answer));
   return 0;
 }
 
@@ -602,9 +591,6 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     io.stdout(USAGE);
     return positionals.length === 0 && values.help !== true ? 2 : 0;
   }
-  // A hook never stands in Claude Code's way: it answers 0 whatever happens, KEEL_URL unset among it.
-  if (positionals[0] === "hook" && positionals.length === 2)
-    return hookCommand(io, positionals[1], { profile: values.profile, run: values.run });
   // git names the host it wants a credential for, so its helper runs with no KEEL_URL.
   if (positionals[0] === "auth" && positionals[1] === "git-credential" && positionals.length <= 3)
     return gitCredential(io, positionals[2], values.profile ?? io.env["KEEL_PROFILE"]);
@@ -617,13 +603,6 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
     const entry = entryName(baseUrl, values.profile ?? io.env["KEEL_PROFILE"]);
     const person = await personCommand(io, positionals.join(" "), values, baseUrl, entry);
     if (person !== undefined) return person;
-    if (positionals.join(" ") === "hooks install")
-      return await installHooks(io, {
-        baseUrl,
-        dir: values.dir ?? process.cwd(),
-        profile: values.profile ?? io.env["KEEL_PROFILE"],
-        run: values.run ?? io.env["KEEL_RUN"],
-      });
     const about = await keyCommand(io, positionals.join(" "), values, baseUrl, entry);
     if (about !== undefined) return about;
     // An invitation is the person's to make, on a fresh sign-in, whatever agent this machine holds.

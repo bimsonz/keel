@@ -18,10 +18,7 @@
     "@keeltown/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@bimsonz/mfp": "0.1.0-pre.3",
     "@types/node": "catalog:",
-    "ajv": "catalog:",
-    "ajv-formats": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

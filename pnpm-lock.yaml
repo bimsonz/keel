@@ -466,18 +466,9 @@ importers:
         specifier: workspace:*
         version: link:../sdk
     devDependencies:
-      '@bimsonz/mfp':
-        specifier: 0.1.0-pre.3
-        version: 0.1.0-pre.3(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
-      ajv:
-        specifier: 'catalog:'
-        version: 8.20.0
-      ajv-formats:
-        specifier: 'catalog:'
-        version: 3.0.1(ajv@8.20.0)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

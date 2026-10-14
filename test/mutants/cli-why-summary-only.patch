@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/why.test.ts
+# kills: why.cli
+# why: `keeltown why` prints Keel's one-line summary, so the agent reading it never sees the decision, the guard holding it or the next action to read it
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 50bdb70e..aeedc262 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -369,7 +369,7 @@ async function whyCommand(
+     ...(line === undefined ? {} : { line }),
+     ...(values.subject === undefined ? {} : { subject: values.subject }),
+   });
+-  io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : chainText(answer));
++  io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : answer.summary);
+   return 0;
+ }
+ 

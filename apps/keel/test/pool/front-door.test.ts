@@ -487,6 +487,25 @@ describe("the front door: what an agent that knows only Keel's address is told",
     await settled(agentId);
   });
 
+  it("[door.instructions] the MCP server tells every agent that connects, whatever its harness, to ask `why` before it changes a file", async () => {
+    const door = await doorAsJson();
+    const { signer } = await generateAgentKey();
+    const { agentId } = await signUp({ baseUrl: BASE, signer, fetch: keel });
+    const token = await createKeelClient({
+      baseUrl: BASE,
+      agentId,
+      key: signer,
+      bound: false,
+      fetch: keel,
+      resource: door.mcp.resource,
+    }).token();
+    const discovered = await mcpResult(await mcp(token, "server/discover"));
+    expect(String(discovered["instructions"])).toContain(
+      "Before you change a file, ask `why` about it",
+    );
+    await settled(agentId);
+  });
+
   it("[door.link] the walk, in each of the three ways it is asked for, and the index name the catalogue in a Link header of their answer (RFC 9727), and the address the header gives is the catalogue's", async () => {
     const catalogue = `${BASE}/.well-known/api-catalog`;
     expect([
