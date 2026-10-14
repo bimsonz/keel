@@ -2,15 +2,14 @@
 # kills: loadgen.ties-conflicts
 # why: A bounce on a conflict ties nothing: a conflict Keel enforced by bouncing a change is never scored
 diff --git a/examples/loadgen/src/report.ts b/examples/loadgen/src/report.ts
-index 24fe2502..a0ae386d 100644
+index 66bd4214..6f53ce01 100644
 --- a/examples/loadgen/src/report.ts
 +++ b/examples/loadgen/src/report.ts
-@@ -181,8 +181,6 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
-     const p = e.payload;
+@@ -182,7 +182,6 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
      if (p._tag === "ConflictSuspected") for (const party of p.parties) join(p.conflictId, party);
      else if (p._tag === "ConflictNoted") join(p.conflictId, p.changeId);
--    else if (p._tag === "ChangeBounced" && p.conflictId !== undefined)
--      join(p.conflictId, p.changeId);
-     else if (p._tag === "PremiseSuspected") tie(p.changeId, p.cause.changeId);
-     else if (p._tag === "PreflightIssued")
-       for (const c of p.contradictions) {
+     else if (p._tag === "ChangeBounced") {
+-      if (p.conflictId !== undefined) join(p.conflictId, p.changeId);
+       // A textual bounce names what it conflicts with on trunk: each landed change among them.
+       for (const counterpart of p.counterparts ?? [])
+         if (counterpart.changeId !== undefined) tie(p.changeId, counterpart.changeId);

@@ -21,6 +21,9 @@ export interface SettingsChange {
   readonly verification?: "required" | "off" | undefined;
 }
 
+/** The namespaces an agent was invited into, joined or still asking. */
+export type Namespaces = Awaited<ReturnType<KeelClient["invitations"]>>;
+
 /** Keel's two doors: its API, and its MCP endpoint. Each refuses the other's token. */
 export type Door = "api" | "mcp";
 
@@ -76,6 +79,21 @@ export class Keyring extends DurableObject<Env> {
     if (invitation.state !== "invited") return invitation.state;
     await own.acceptProjectInvitation(project);
     return "joined";
+  }
+
+  /**
+   * What Keel says the account is and what it should do next, by its own
+   * token, as JSON: its answer holds values RPC can't name.
+   */
+  async whoami(): Promise<string> {
+    return JSON.stringify(await (await this.#own()).whoami());
+  }
+
+  /** Accepts the account's invitation into `namespace`; answers the namespaces it was invited into after. */
+  async join(namespace: string): Promise<Namespaces> {
+    const own = await this.#own();
+    await own.acceptInvitation(namespace);
+    return own.invitations();
   }
 
   /** Makes a project in the account's own namespace from the fixture's template: an agent may own a project. */

@@ -57,6 +57,21 @@ describe("loadgen's reading of Keel's record", () => {
     expect(tied.size).toBe(1);
   });
 
+  it("[loadgen.ties-counterparts] ties a change bounced on a textual conflict to each landed change its bounce names, and to no commit Keel did not land", () => {
+    const tied = ties([
+      event("2026-10-14T16:00:00Z", {
+        _tag: "ChangeBounced",
+        changeId: "chg_late",
+        reasons: ["composition-refused: conflict src/p.ts"],
+        counterparts: [
+          { changeId: "chg_first", commitSha: "a".repeat(40), paths: ["src/p.ts"] },
+          { commitSha: "b".repeat(40), paths: ["src/p.ts"] },
+        ],
+      }),
+    ]);
+    expect([...tied]).toEqual([tieKey("chg_first", "chg_late")]);
+  });
+
   it("[loadgen.ties-conflicts] ties the parties of a suspected or noted conflict, a suspected premise's cause, and a bounce on a conflict", () => {
     const tied = ties([
       event("2026-10-14T16:00:00Z", {

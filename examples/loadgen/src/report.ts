@@ -181,9 +181,12 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
     const p = e.payload;
     if (p._tag === "ConflictSuspected") for (const party of p.parties) join(p.conflictId, party);
     else if (p._tag === "ConflictNoted") join(p.conflictId, p.changeId);
-    else if (p._tag === "ChangeBounced" && p.conflictId !== undefined)
-      join(p.conflictId, p.changeId);
-    else if (p._tag === "PremiseSuspected") tie(p.changeId, p.cause.changeId);
+    else if (p._tag === "ChangeBounced") {
+      if (p.conflictId !== undefined) join(p.conflictId, p.changeId);
+      // A textual bounce names what it conflicts with on trunk: each landed change among them.
+      for (const counterpart of p.counterparts ?? [])
+        if (counterpart.changeId !== undefined) tie(p.changeId, counterpart.changeId);
+    } else if (p._tag === "PremiseSuspected") tie(p.changeId, p.cause.changeId);
     else if (p._tag === "PreflightIssued")
       for (const c of p.contradictions) {
         tie(p.changeId, c.holder);

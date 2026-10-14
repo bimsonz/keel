@@ -1,0 +1,78 @@
+{
+  "run": "lg200a",
+  "scorer": {
+    "report.ts": "66bd4214967fffc939e3f990119e81c046d00b87",
+    "bench.ts": "cf845cb9bf1b3501195ab7b447741adcbbb20697"
+  },
+  "rescoredAt": "2026-10-14T21:04:23.090Z",
+  "before": {
+    "byKind": {
+      "premise": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "effect": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "textual": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "interaction": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      }
+    },
+    "unrun": 10,
+    "recall": 0,
+    "falsePositiveRate": null,
+    "passes": {
+      "recall": false,
+      "decoys": false
+    }
+  },
+  "now": {
+    "byKind": {
+      "premise": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "effect": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "textual": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "interaction": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      }
+    },
+    "unrun": 10,
+    "recall": 0,
+    "falsePositiveRate": null,
+    "passes": {
+      "recall": false,
+      "decoys": false
+    }
+  }
+}

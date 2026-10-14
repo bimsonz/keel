@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/given.test.ts
+# kills: swarm.given-brief
+# why: A run given real tasks starts its workers on the fixture's planned ones: the tasks a person wrote are never worked
+diff --git a/examples/swarm/src/run/dispatch.ts b/examples/swarm/src/run/dispatch.ts
+index 9d661a9e..1fa4371c 100644
+--- a/examples/swarm/src/run/dispatch.ts
++++ b/examples/swarm/src/run/dispatch.ts
+@@ -31,7 +31,7 @@ export function workerAt(
+   index: number,
+   keyring: string | undefined,
+ ): Dispatch | undefined {
+-  const message = run.tasks === undefined ? plannedBrief(run, index) : run.tasks[index]?.brief;
++  const message = plannedBrief(run, index);
+   if (message === undefined || keyring === undefined) return undefined;
+   return {
+     id: `${run.id}-${index}`,

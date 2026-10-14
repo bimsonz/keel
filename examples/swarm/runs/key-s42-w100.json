@@ -1,0 +1,69 @@
+{
+  "seed": 42,
+  "workers": 100,
+  "pairs": [
+    {
+      "pair": 0,
+      "kind": "effect",
+      "planted": true,
+      "a": 0,
+      "b": 1
+    },
+    {
+      "pair": 1,
+      "kind": "effect",
+      "planted": false,
+      "a": 2,
+      "b": 3
+    },
+    {
+      "pair": 2,
+      "kind": "premise",
+      "planted": true,
+      "a": 4,
+      "b": 5
+    },
+    {
+      "pair": 3,
+      "kind": "premise",
+      "planted": false,
+      "a": 6,
+      "b": 7
+    },
+    {
+      "pair": 4,
+      "kind": "textual",
+      "planted": true,
+      "a": 8,
+      "b": 9
+    },
+    {
+      "pair": 5,
+      "kind": "textual",
+      "planted": false,
+      "a": 10,
+      "b": 11
+    },
+    {
+      "pair": 6,
+      "kind": "effect",
+      "planted": true,
+      "a": 12,
+      "b": 13
+    },
+    {
+      "pair": 7,
+      "kind": "premise",
+      "planted": true,
+      "a": 14,
+      "b": 15
+    },
+    {
+      "pair": 8,
+      "kind": "textual",
+      "planted": true,
+      "a": 16,
+      "b": 17
+    }
+  ]
+}

@@ -38,7 +38,7 @@ export const Roster = v.looseObject({
 });
 /** `/admin/accept`'s answer: the one account's invitation state, or the roster accepting. */
 export const Accepted = v.object({ accepted: v.unknown() });
-export const Started = v.looseObject({ id: v.string() });
+export const Started = v.looseObject({ id: v.string(), workers: v.number() });
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;
 /** The run's report as the Worker answers it; its numbers are the Worker's own `Report`. */
 export const RunReport = v.looseObject({

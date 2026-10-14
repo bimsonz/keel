@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.join
+# why: Join only lists the namespaces: the invitation is never accepted, and the account never stands in the org
+diff --git a/examples/swarm/src/adapters/driving/do/keyring.ts b/examples/swarm/src/adapters/driving/do/keyring.ts
+index 7f87ef84..017599e2 100644
+--- a/examples/swarm/src/adapters/driving/do/keyring.ts
++++ b/examples/swarm/src/adapters/driving/do/keyring.ts
+@@ -92,7 +92,6 @@ export class Keyring extends DurableObject<Env> {
+   /** Accepts the account's invitation into `namespace`; answers the namespaces it was invited into after. */
+   async join(namespace: string): Promise<Namespaces> {
+     const own = await this.#own();
+-    await own.acceptInvitation(namespace);
+     return own.invitations();
+   }
+ 

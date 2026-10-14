@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.ties-counterparts
+# why: A textual bounce's counterparts are never tied: every textual pair is a miss though Keel named the change it conflicted with
+diff --git a/examples/loadgen/src/report.ts b/examples/loadgen/src/report.ts
+index 66bd4214..a497ade9 100644
+--- a/examples/loadgen/src/report.ts
++++ b/examples/loadgen/src/report.ts
+@@ -185,7 +185,7 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
+       if (p.conflictId !== undefined) join(p.conflictId, p.changeId);
+       // A textual bounce names what it conflicts with on trunk: each landed change among them.
+       for (const counterpart of p.counterparts ?? [])
+-        if (counterpart.changeId !== undefined) tie(p.changeId, counterpart.changeId);
++        if (counterpart.changeId === undefined) tie(p.changeId, p.changeId);
+     } else if (p._tag === "PremiseSuspected") tie(p.changeId, p.cause.changeId);
+     else if (p._tag === "PreflightIssued")
+       for (const c of p.contradictions) {

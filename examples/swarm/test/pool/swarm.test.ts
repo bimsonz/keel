@@ -159,6 +159,37 @@ describe("the swarm's Worker", () => {
       wanted: 0,
     });
   });
+  it("[swarm.whoami] answers what Keel's whoami says of the one account, asked by its own token", async () => {
+    await SELF.fetch(`${SWARM}/admin/agents`, {
+      method: "POST",
+      headers: { ...ADMIN, "content-type": "application/json" },
+      body: JSON.stringify({ shape: "one" }),
+    });
+    const before = (await seen("/v1/agents/me")).length;
+    const answer = await SELF.fetch(`${SWARM}/admin/whoami`, { headers: ADMIN });
+    expect(await answer.json()).toEqual({ agent: { id: "agt_STANDIN" }, next: "askSponsor" });
+    expect(await seen("/v1/agents/me")).toHaveLength(before + 1);
+  });
+
+  it("[swarm.join] accepts the one account's invitation into a namespace by its own token, and answers the namespaces it was invited into", async () => {
+    await SELF.fetch(`${SWARM}/admin/agents`, {
+      method: "POST",
+      headers: { ...ADMIN, "content-type": "application/json" },
+      body: JSON.stringify({ shape: "one" }),
+    });
+    const join = (namespace: string) =>
+      SELF.fetch(`${SWARM}/admin/join`, {
+        method: "POST",
+        headers: { ...ADMIN, "content-type": "application/json" },
+        body: JSON.stringify({ namespace }),
+      });
+    expect((await join("../keel")).status).toBe(400);
+    const before = (await seen("/v1/agents/me/namespaces/keel")).length;
+    const joined = await join("keel");
+    expect(await joined.json()).toEqual({ items: [{ namespace: "keel", state: "joined" }] });
+    expect(await seen("/v1/agents/me/namespaces/keel")).toHaveLength(before + 1);
+  });
+
   // The one account signs up while a "many" sign-up is awaited, landing first
   // in one case and last in the other: the roster keeps both either way.
   for (const last of ["swarm-0", "swarm-one"] as const)

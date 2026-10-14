@@ -5,7 +5,11 @@
 //
 //   SWARM_URL=… SWARM_ADMIN_TOKEN=… node examples/swarm/scripts/run.ts \
 //     --shape one --workers 5 --seed 42 --project prj_… [--minutes 30]
-import { mkdirSync, writeFileSync } from "node:fs";
+//
+// Given --tasks FILE (a JSON list of {title, brief}), the run works those
+// tasks, one worker each, in place of planned ones; --model names the Workers
+// AI model its workers think with.
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import type * as v from "valibot";
@@ -19,22 +23,28 @@ const { values } = parseArgs({
     seed: { type: "string", default: "42" },
     project: { type: "string" },
     minutes: { type: "string", default: "30" },
+    tasks: { type: "string" },
+    model: { type: "string" },
   },
 });
 if (values.shape !== "one" && values.shape !== "many") throw new Error("--shape is one or many");
-if (values.project === undefined || values.workers === undefined)
-  throw new Error("--project and --workers are required");
+if (values.project === undefined || (values.workers === undefined && values.tasks === undefined))
+  throw new Error("--project, and --workers or --tasks, are required");
+const tasks: unknown =
+  values.tasks === undefined ? undefined : JSON.parse(readFileSync(values.tasks, "utf8"));
 const admin = swarmAdmin();
 
 const ENDED = new Set(["landed", "withdrawn", "superseded", "parked"]);
 const started = await admin(Started, "POST", "/admin/runs", {
   shape: values.shape,
-  workers: Number(values.workers),
+  ...(values.workers === undefined ? {} : { workers: Number(values.workers) }),
   seed: Number(values.seed),
   project: values.project,
+  ...(tasks === undefined ? {} : { tasks }),
+  ...(values.model === undefined ? {} : { model: values.model }),
 });
 console.log(
-  `run ${started.id}: ${values.workers} workers, shape ${values.shape}, seed ${values.seed}`,
+  `run ${started.id}: ${started.workers} workers, shape ${values.shape}, ${tasks === undefined ? `seed ${values.seed}` : `given tasks`}${values.model === undefined ? "" : `, model ${values.model}`}`,
 );
 const deadline = Date.now() + Number(values.minutes) * 60_000;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -37,35 +37,49 @@ const key = await signerFromJwk(Reflect.get(Object(held), "privateJwk"));
 for (const run of positionals) {
   const written: unknown = JSON.parse(readFileSync(join(runs, `${run}.json`), "utf8"));
   const sealed: unknown = JSON.parse(readFileSync(join(runs, `${run}.key.json`), "utf8"));
-  const project: unknown = Reflect.get(Object(written), "projectId");
+  // A sharded run names its projects and keys its pairs by each agent's place in the whole run.
+  const single: unknown = Reflect.get(Object(written), "projectId");
+  const shards: unknown = Reflect.get(Object(written), "projects");
+  const projects = (
+    typeof single === "string"
+      ? [single]
+      : Array.isArray(shards)
+        ? shards.map((s: unknown) => Reflect.get(Object(s), "id"))
+        : []
+  ).filter((id): id is string => typeof id === "string");
+  const sharded = typeof single !== "string";
   const agents: unknown = Reflect.get(Object(written), "agents");
-  const pairs: unknown = Reflect.get(Object(sealed), "pairs");
-  if (typeof project !== "string" || !Array.isArray(agents) || !Array.isArray(pairs))
+  const pairs: unknown = sharded
+    ? Reflect.get(Object(written), "globalKey")
+    : Reflect.get(Object(sealed), "pairs");
+  if (projects.length === 0 || !Array.isArray(agents) || !Array.isArray(pairs))
     throw new Error(`${run}'s files are not a run and its key`);
   const changeOf = new Map<number, string>();
   for (const a of agents) {
-    const index: unknown = Reflect.get(Object(a), "index");
+    const index: unknown = Reflect.get(Object(a), sharded ? "global" : "index");
     const changeId: unknown = Reflect.get(Object(a), "changeId");
     if (typeof index === "number" && typeof changeId === "string") changeOf.set(index, changeId);
   }
-  const reader = new KeelClient({
-    baseUrl: values.keel,
-    agentId,
-    key,
-    project,
-    run: `lg-${run}-rescore`,
-  });
   const events: KeelEvent[] = [];
-  for (let cursor: string | undefined; ;) {
-    // oxlint-disable-next-line no-await-in-loop -- page after page
-    const page = await reader.events({
+  for (const project of projects) {
+    const reader = new KeelClient({
+      baseUrl: values.keel,
+      agentId,
+      key,
       project,
-      limit: 500,
-      ...(cursor === undefined ? {} : { cursor }),
+      run: `lg-${run}-rescore`,
     });
-    events.push(...page.items.filter((e) => e.project === project));
-    if (page.items.length === 0 || page.nextCursor === cursor) break;
-    cursor = page.nextCursor;
+    for (let cursor: string | undefined; ;) {
+      // oxlint-disable-next-line no-await-in-loop -- page after page
+      const page = await reader.events({
+        project,
+        limit: 500,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      events.push(...page.items.filter((e) => e.project === project));
+      if (page.items.length === 0 || page.nextCursor === cursor) break;
+      cursor = page.nextCursor;
+    }
   }
   if (!isKey(pairs)) throw new Error("not a key");
   const now = score(pairs, (i) => changeOf.get(i), ties(events));

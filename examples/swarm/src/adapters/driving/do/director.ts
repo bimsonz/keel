@@ -1,11 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
 import { dispatch, init } from "@flue/runtime";
-import { Coder, type Worker } from "../../../agents/coder.ts";
+import { Coder } from "../../../agents/coder.ts";
 import { CEILINGS, NO_SLOTS, give, take, type Slots } from "../../../run/ceilings.ts";
 import { eventsIn, recordsFrom, type KeelEvent } from "../../../run/events.ts";
+import { workerAt } from "../../../run/dispatch.ts";
 import { summarise, type Report, type WorkerRecord } from "../../../run/report.ts";
-import { brief, planTasks } from "../../../run/tasks.ts";
-import type { Member, SettingsChange } from "./keyring.ts";
+import type { GivenTask } from "../../../run/start.ts";
+import type { Member, Namespaces, SettingsChange } from "./keyring.ts";
 
 /**
  * The two shapes a swarm takes: (a) "one" agent account running many runs
@@ -39,6 +40,10 @@ interface Run {
   readonly rampMs: number;
   /** Trunk's head as the run began: where its pairs' premises are anchored. */
   readonly base?: string | undefined;
+  /** The tasks it was given, one a worker, in place of planned ones. */
+  readonly tasks?: readonly GivenTask[] | undefined;
+  /** The Workers AI model its workers think with, when not the Worker's own. */
+  readonly model?: string | undefined;
   readonly dispatched: number;
   readonly slots: Slots;
   readonly stoppedAt?: string;
@@ -127,13 +132,25 @@ export class Director extends DurableObject<Env> {
     return this.#keyring("one").configure(project, change);
   }
 
-  /** Starts a run of `workers` workers; one run at a time. */
+  /** What Keel says the one account is, and what it should do next, as JSON. */
+  async whoami(): Promise<string> {
+    return this.#keyring("one").whoami();
+  }
+
+  /** Accepts the one account's invitation into `namespace`; answers the namespaces it was invited into. */
+  async join(namespace: string): Promise<Namespaces> {
+    return this.#keyring("one").join(namespace);
+  }
+
+  /** Starts a run of `workers` workers, on given tasks or planned ones; one run at a time. */
   async start(options: {
     readonly shape: Shape;
     readonly workers: number;
     readonly seed: number;
     readonly project: string;
     readonly rampMs?: number;
+    readonly tasks?: readonly GivenTask[];
+    readonly model?: string;
   }): Promise<Run> {
     const current = await this.#run();
     if (current !== undefined && current.stoppedAt === undefined)
@@ -158,6 +175,8 @@ export class Director extends DurableObject<Env> {
       startedAt: now.toISOString(),
       rampMs: options.rampMs ?? DEFAULT_RAMP_MS,
       base,
+      ...(options.tasks === undefined ? {} : { tasks: options.tasks }),
+      ...(options.model === undefined ? {} : { model: options.model }),
       dispatched: 0,
       slots: NO_SLOTS,
       errors: [],
@@ -306,28 +325,13 @@ export class Director extends DurableObject<Env> {
     const run = await this.#run();
     if (run === undefined || run.stoppedAt !== undefined || run.dispatched >= run.workers) return;
     const index = run.dispatched;
-    const task = planTasks({
-      seed: run.seed,
-      count: run.workers,
-      run: run.id,
-      base: run.base,
-    })[index];
-    const keyring = run.shape === "one" ? "one" : roster.many[index]?.keyring;
+    const worker = workerAt(run, index, run.shape === "one" ? "one" : roster.many[index]?.keyring);
     let errors = run.errors;
-    if (task === undefined || keyring === undefined) {
+    if (worker === undefined) {
       errors = [...errors, `worker ${index}: no task or account`];
     } else {
-      const worker: Worker = {
-        keyring,
-        run: run.shape === "one" ? `${run.id}-${index}` : run.id,
-        project: run.project,
-      };
       try {
-        await dispatch(Coder, {
-          id: `${run.id}-${index}`,
-          initialData: worker,
-          message: brief(task),
-        });
+        await dispatch(Coder, worker);
       } catch (error) {
         errors = [...errors, `worker ${index}: ${message(error)}`];
       }

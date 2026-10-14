@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/given.test.ts
+# kills: swarm.given-start
+# why: A run asked for more workers than it was given tasks starts anyway, and its count disagrees with the work it holds
+diff --git a/examples/swarm/src/run/start.ts b/examples/swarm/src/run/start.ts
+index 16891d0b..762fb025 100644
+--- a/examples/swarm/src/run/start.ts
++++ b/examples/swarm/src/run/start.ts
+@@ -35,7 +35,7 @@ export const Start = v.pipe(
+     ({ workers, tasks }) =>
+       tasks === undefined
+         ? workers !== undefined
+-        : workers === undefined || workers === tasks.length,
++        : true,
+     "A run takes workers, or tasks with one worker each.",
+   ),
+   v.transform(({ workers, tasks, ...rest }) => ({

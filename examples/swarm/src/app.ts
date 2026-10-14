@@ -7,6 +7,7 @@ import * as v from "valibot";
 import { admitted } from "./admin.ts";
 import { Coder } from "./agents/coder.ts";
 import { gated } from "./run/gate.ts";
+import { Shape, Start } from "./run/start.ts";
 
 const director = () => env.DIRECTOR.get(env.DIRECTOR.idFromName("director"));
 
@@ -22,19 +23,11 @@ setProvider(
   }),
 );
 
-const Shape = v.picklist(["one", "many"]);
 const Enlist = v.object({
   shape: Shape,
   count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)), 1),
 });
 const Accept = v.object({ shape: Shape, project: v.string() });
-const Start = v.object({
-  shape: Shape,
-  workers: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)),
-  seed: v.pipe(v.number(), v.integer()),
-  project: v.string(),
-  rampMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(250))),
-});
 
 const app = new Hono();
 
@@ -72,6 +65,16 @@ app.post("/admin/accept", async (c) => {
   const { shape, project } = await body(Accept, c.req.raw);
   return c.json({ accepted: await director().accept(shape, project) });
 });
+app.get("/admin/whoami", async (c) =>
+  c.body(await director().whoami(), 200, { "content-type": "application/json" }),
+);
+app.post("/admin/join", async (c) => {
+  const { namespace } = await body(
+    v.object({ namespace: v.pipe(v.string(), v.regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/)) }),
+    c.req.raw,
+  );
+  return c.json(await director().join(namespace));
+});
 app.post("/admin/projects", async (c) => {
   const { name } = await body(
     v.object({ name: v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9-]{0,62}$/)) }),
@@ -90,9 +93,13 @@ app.patch("/admin/projects/:project/settings", async (c) => {
   return c.json(await director().configure(c.req.param("project"), change));
 });
 app.post("/admin/runs", async (c) => {
-  const { rampMs, ...start } = await body(Start, c.req.raw);
+  const { rampMs, model, ...start } = await body(Start, c.req.raw);
   return c.json(
-    await director().start({ ...start, ...(rampMs === undefined ? {} : { rampMs }) }),
+    await director().start({
+      ...start,
+      ...(rampMs === undefined ? {} : { rampMs }),
+      ...(model === undefined ? {} : { model }),
+    }),
     201,
   );
 });

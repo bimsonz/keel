@@ -11,6 +11,8 @@ export interface Worker {
   /** Its run's label: its changes and workspaces are this run's. */
   readonly run: string;
   readonly project: string;
+  /** The Workers AI model it thinks with, when its run names one; the Worker's own otherwise. */
+  readonly model?: string;
 }
 
 // What Keel's tools are and how its workflow goes, the worker learns from Keel's own answers:
@@ -23,7 +25,7 @@ export function Coder(): string {
   const worker = useInitialData<Worker>();
   const keyring = env.KEYRING.get(env.KEYRING.idFromName(worker.keyring));
   const scope = { project: worker.project, run: worker.run };
-  useModel(`cloudflare/${env.SWARM_MODEL}`);
+  useModel(`cloudflare/${worker.model ?? env.SWARM_MODEL}`);
   useMcpConnection({
     name: "keel",
     url: `${keelOrigin(env)}/mcp`,
@@ -33,8 +35,15 @@ export function Coder(): string {
   return INSTRUCTIONS;
 }
 
-Coder.initialData = v.object({ keyring: v.string(), run: v.string(), project: v.string() });
-// A worker's whole brief is one submission, bounded in time. A deploy or restart
-// mid-run interrupts it: recovery continues it (its Keel calls carry their own
-// idempotency keys), rather than failing it at its first interruption.
-Coder.durability = { maxAttempts: 3, timeoutMs: 20 * 60_000 };
+Coder.initialData = v.object({
+  keyring: v.string(),
+  run: v.string(),
+  project: v.string(),
+  model: v.optional(v.string()),
+});
+// A worker's whole brief is one submission, bounded in time: an hour, since a
+// project's own verification can take minutes a round and a bounce costs one.
+// A deploy or restart mid-run interrupts it: recovery continues it (its Keel
+// calls carry their own idempotency keys), rather than failing it at its first
+// interruption.
+Coder.durability = { maxAttempts: 3, timeoutMs: 60 * 60_000 };

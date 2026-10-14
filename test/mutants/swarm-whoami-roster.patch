@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:swarm examples/swarm/test/pool/swarm.test.ts
+# kills: swarm.whoami
+# why: The whoami route answers the swarm's own roster: what Keel says the account should do next is never asked
+diff --git a/examples/swarm/src/app.ts b/examples/swarm/src/app.ts
+index f83938c4..29ac54b2 100644
+--- a/examples/swarm/src/app.ts
++++ b/examples/swarm/src/app.ts
+@@ -66,7 +66,7 @@ app.post("/admin/accept", async (c) => {
+   return c.json({ accepted: await director().accept(shape, project) });
+ });
+ app.get("/admin/whoami", async (c) =>
+-  c.body(await director().whoami(), 200, { "content-type": "application/json" }),
++  c.body(JSON.stringify(await director().roster()), 200, { "content-type": "application/json" }),
+ );
+ app.post("/admin/join", async (c) => {
+   const { namespace } = await body(
