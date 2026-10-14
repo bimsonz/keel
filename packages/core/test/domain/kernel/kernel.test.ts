@@ -60,6 +60,13 @@ describe("sha256", () => {
     expect(sha256HexOfBytes(Uint8Array.of(0xff, 0xfe))).toBe(
       createHash("sha256").update(Uint8Array.of(0xff, 0xfe)).digest("hex"),
     );
+    // Each side of the lengths where the padding and its 8-byte length spill into another block.
+    for (const n of [55, 56, 63, 64, 119, 120]) {
+      const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 7 + n) & 0xff);
+      expect(sha256HexOfBytes(bytes), `${n} bytes`).toBe(
+        createHash("sha256").update(bytes).digest("hex"),
+      );
+    }
   });
 });
 

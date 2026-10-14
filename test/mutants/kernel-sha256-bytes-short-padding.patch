@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.sha256-bytes
+# why: The padding leaves room for the 8-byte length but not the 0x80 marker, so a message of 56 bytes (mod 64) is hashed in one block too few
+diff --git a/packages/core/src/domain/kernel/hash.ts b/packages/core/src/domain/kernel/hash.ts
+--- a/packages/core/src/domain/kernel/hash.ts
++++ b/packages/core/src/domain/kernel/hash.ts
+@@ -73,7 +73,7 @@ const utf8 = (input: string): number[] => {
+ /** SHA-256 of `input`, in hex. */
+ export const sha256HexOfBytes = (input: Uint8Array): string => {
+   const bitLength = input.length * 8;
+-  const bytes = new Uint8Array(Math.ceil((input.length + 9) / 64) * 64);
++  const bytes = new Uint8Array(Math.ceil((input.length + 8) / 64) * 64);
+   bytes.set(input);
+   bytes[input.length] = 0x80;
+   const high = Math.floor(bitLength / 0x100000000);
