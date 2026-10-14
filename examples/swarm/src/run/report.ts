@@ -42,6 +42,8 @@ export interface Report {
   readonly queueMs: { readonly p50: number | null; readonly p95: number | null };
   readonly modelCalls: number;
   readonly modelCallsPerLanding: number | null;
+  /** Calls the model refused with its rate limit's 429, each asked again after a wait. */
+  readonly modelLimited: number;
 }
 
 /** The nearest-rank percentile: the smallest value at or above `p` of the values. */
@@ -54,8 +56,12 @@ export function percentile(values: readonly number[], p: number): number | null 
 
 const ratio = (part: number, whole: number): number | null => (whole === 0 ? null : part / whole);
 
-/** The run's numbers from its workers' records and the model calls its gate counted. */
-export function summarise(records: readonly WorkerRecord[], modelCalls: number): Report {
+/** The run's numbers from its workers' records, and the model calls its gate counted and the model refused. */
+export function summarise(
+  records: readonly WorkerRecord[],
+  modelCalls: number,
+  modelLimited: number,
+): Report {
   const declared = records.filter((r) => r.changeId !== undefined);
   const landed = records.filter((r) => r.outcome === "landed");
   const bounces = records.reduce((sum, r) => sum + r.bounces, 0);
@@ -76,6 +82,7 @@ export function summarise(records: readonly WorkerRecord[], modelCalls: number):
     queueMs: { p50: percentile(queued, 50), p95: percentile(queued, 95) },
     modelCalls,
     modelCallsPerLanding: ratio(modelCalls, landed.length),
+    modelLimited,
   };
 }
 
@@ -99,6 +106,7 @@ export function table(
     ["Time in queue p95", (r) => seconds(r.queueMs.p95)],
     ["Model calls", (r) => String(r.modelCalls)],
     ["Model calls per landing", (r) => fixed(r.modelCallsPerLanding, 1)],
+    ["Model calls refused (429)", (r) => String(r.modelLimited)],
   ];
   const head = `| | ${columns.map((c) => c.title).join(" | ")} |`;
   const rule = `|---|${columns.map(() => "---:").join("|")}|`;

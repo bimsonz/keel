@@ -163,7 +163,7 @@ export class Director extends DurableObject<Env> {
   /** A slot for one model call of the run under way. */
   async take(id: string): Promise<{
     readonly granted: boolean;
-    readonly reason?: "busy" | "spent";
+    readonly reason?: "busy" | "paced" | "spent";
     readonly retryInMs?: number;
   }> {
     const run = await this.#run();
@@ -176,15 +176,18 @@ export class Director extends DurableObject<Env> {
       : { granted: false, reason: taken.reason, retryInMs: taken.retryInMs };
   }
 
-  async give(id: string): Promise<void> {
+  async give(id: string, limited = false): Promise<void> {
     const run = await this.#run();
     if (run !== undefined)
-      await this.ctx.storage.put("run", { ...run, slots: give(run.slots, id) });
+      await this.ctx.storage.put("run", { ...run, slots: give(run.slots, id, limited) });
   }
 
   /** The run's numbers, from Keel's record of the project and the calls the gate granted. */
   async report(): Promise<{
-    readonly run: Omit<Run, "slots"> & { readonly modelCalls: number };
+    readonly run: Omit<Run, "slots"> & {
+      readonly modelCalls: number;
+      readonly modelLimited: number;
+    };
     readonly report: Report;
     readonly records: readonly WorkerRecord[];
   } | null> {
@@ -208,8 +211,8 @@ export class Director extends DurableObject<Env> {
     const records = recordsFrom(events, { dir: `test/swarm/${run.id}`, workers: run.workers });
     const { slots, ...rest } = run;
     return {
-      run: { ...rest, modelCalls: slots.used },
-      report: summarise(records, slots.used),
+      run: { ...rest, modelCalls: slots.used, modelLimited: slots.limited },
+      report: summarise(records, slots.used, slots.limited),
       records,
     };
   }

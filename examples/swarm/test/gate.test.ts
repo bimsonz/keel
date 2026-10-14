@@ -1,25 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { admitted } from "../src/admin.ts";
-import { gated, type ModelRunner, type SlotKeeper } from "../src/run/gate.ts";
+import { gated, LIMITED_BACKOFF_MS, type ModelRunner, type SlotKeeper } from "../src/run/gate.ts";
 
 /** A keeper that answers from a script and records every give. */
 function keeper(answers: Awaited<ReturnType<SlotKeeper["take"]>>[]) {
   const given: string[] = [];
+  const limited: string[] = [];
   const taken: string[] = [];
   const k: SlotKeeper = {
     take: async (id) => {
       taken.push(id);
       return answers.shift() ?? { granted: true };
     },
-    give: async (id) => void given.push(id),
+    give: async (id, refused) => {
+      given.push(id);
+      if (refused === true) limited.push(id);
+    },
   };
-  return { k, given, taken };
+  return { k, given, limited, taken };
 }
 
 const answering = (answer: () => Promise<Response | Record<string, unknown>>): ModelRunner => ({
   run: answer,
 });
 const noWait = async () => undefined;
+/** Workers AI's answer when the account's calls a minute for the model are spent. */
+const tooMany = () => new Response('{"internalCode":3021}', { status: 429 });
 
 describe("the model's gate", () => {
   it("[swarm.gate-wait] waits while every slot is held, then calls once its slot is granted", async () => {
@@ -73,6 +79,31 @@ describe("the model's gate", () => {
     expect(streaming.given).toHaveLength(0);
     expect(await answer.text()).toBe("data: one\n\ndata: two\n\n");
     expect(streaming.given).toHaveLength(1);
+  });
+  it("[swarm.gate-limited] counts the model's 429, waits and asks again, and hands Flue the 429 once its waits are spent", async () => {
+    const once = keeper([]);
+    const waits: number[] = [];
+    let calls = 0;
+    const answer = await gated(
+      answering(async () => (++calls === 1 ? tooMany() : { calls })),
+      once.k,
+      async (ms) => void waits.push(ms),
+    ).run("@cf/m", {});
+    expect(answer).toEqual({ calls: 2 });
+    expect(waits).toEqual([LIMITED_BACKOFF_MS[0]]);
+    expect(once.taken).toHaveLength(2);
+    expect(once.limited).toEqual([once.taken[0]]);
+    expect(once.given).toEqual(once.taken);
+
+    const always = keeper([]);
+    const last = await gated(
+      answering(async () => tooMany()),
+      always.k,
+      noWait,
+    ).run("@cf/m", {});
+    expect(last instanceof Response && last.status).toBe(429);
+    expect(always.taken).toHaveLength(LIMITED_BACKOFF_MS.length + 1);
+    expect(always.limited).toEqual(always.taken);
   });
 });
 

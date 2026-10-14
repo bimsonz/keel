@@ -11,8 +11,9 @@
   "observability": { "enabled": true },
   "vars": {
     "KEEL_HOST": "keel.localhost",
-    // The swarm's model, an exact Workers AI id: it calls tools, which a Flue agent needs.
-    "SWARM_MODEL": "@cf/zai-org/glm-5.3-flash",
+    // The swarm's model, an exact Workers AI id: it calls tools, which a Flue agent needs, and
+    // takes Workers AI's 300 calls a minute; the Paid-plan models take 20, too few for 100 workers.
+    "SWARM_MODEL": "@cf/zai-org/glm-4.7-flash",
   },
   "ai": { "binding": "AI" },
   "durable_objects": {

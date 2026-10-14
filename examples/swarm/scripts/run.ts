@@ -43,7 +43,7 @@ async function follow(): Promise<v.InferOutput<typeof RunReport>> {
   const now = await admin(RunReport, "GET", "/admin/run");
   const { report } = now;
   console.log(
-    `${new Date().toISOString().slice(11, 19)} dispatched ${now.run.dispatched}/${now.run.workers}, declared ${report.declared}, landed ${report.landed}, bounces ${report.bounces}, model calls ${now.run.modelCalls}`,
+    `${new Date().toISOString().slice(11, 19)} dispatched ${now.run.dispatched}/${now.run.workers}, declared ${report.declared}, landed ${report.landed}, bounces ${report.bounces}, model calls ${now.run.modelCalls} (${now.run.modelLimited} refused 429)`,
   );
   const done =
     now.run.dispatched >= now.run.workers && now.records.every((r) => ENDED.has(r.outcome));

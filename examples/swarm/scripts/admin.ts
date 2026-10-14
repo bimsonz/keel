@@ -42,6 +42,7 @@ export const RunReport = v.looseObject({
     dispatched: v.number(),
     errors: v.array(v.string()),
     modelCalls: v.number(),
+    modelLimited: v.number(),
   }),
   report: v.custom<Report>(isObject),
   records: v.array(v.looseObject({ outcome: v.string() })),
