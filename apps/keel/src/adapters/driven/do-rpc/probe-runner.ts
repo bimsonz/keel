@@ -2,6 +2,7 @@ import { ProbeRunner, ProbeRunnerUnavailable } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
 import {
   decodeExit,
+  type ExitCodec,
   ProbeRunRequest,
   VerifierCodecs,
   type VerifierEntrypoint,
@@ -37,18 +38,42 @@ const didNotAnswer = (error: unknown) =>
     reason: `keel-verify did not answer: ${error instanceof Error ? error.message : String(error)}`,
   });
 
+const NOT_AN_ANSWER = "keel-verify's answer is not one";
+
+/**
+ * keel-verify's answer, read: its success, its VerifierUnavailable as
+ * ProbeRunnerUnavailable with its reason, and its defect as a defect. The
+ * codec throws on what is no Exit at all, which is unavailable too, never a
+ * defect: a retry may change it.
+ */
+const settle = <A, E extends { readonly reason: string }>(codec: ExitCodec<A, E>, raw: unknown) =>
+  Effect.try({
+    try: () => decodeExit(codec, raw),
+    catch: () => new ProbeRunnerUnavailable({ reason: NOT_AN_ANSWER }),
+  }).pipe(
+    Effect.flatMap((exit) => {
+      if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
+      const failure = Cause.findErrorOption(exit.cause);
+      return Option.isSome(failure)
+        ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
+        : Effect.die(Cause.squash(exit.cause));
+    }),
+  );
+
 /**
  * ProbeRunner over keel-verify's entrypoint (the VERIFIER service binding),
  * which routes each run to the VerifierDO for its (namespace, probe, world): a fresh
  * isolate with no network. keel-verify's VerifierUnavailable (a bundle
  * missing or forged, a world with no deps bundle) and a call that never
  * reached it are both ProbeRunnerUnavailable, for the caller to retry or
- * report; a harness error comes back as the run it is, never a cell.
+ * report, and so is an answer that is not one; a harness error comes back as
+ * the run it is, never a cell.
  *
  * `ready` is keel-verify's `worldReady`, answered from its bundle store with
  * no VerifierDO and no isolate: its answer is the world's readiness, and
- * anything else (a call that never reached it, a request it did not decode)
- * is ProbeRunnerUnavailable, which says nothing of the world.
+ * anything else (a call that never reached it, a request it did not decode,
+ * an answer that is not one) is ProbeRunnerUnavailable, which says nothing of
+ * the world.
  */
 export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
   Layer.succeed(
@@ -59,28 +84,13 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
           try: () => verifier.runProbe(encodeRequest(request)),
           catch: didNotAnswer,
         }).pipe(
-          Effect.flatMap((raw) => {
-            const exit = decodeExit(VerifierCodecs.runProbe, raw);
-            if (Exit.isSuccess(exit)) return Effect.succeed(exit.value.run);
-            const failure = Cause.findErrorOption(exit.cause);
-            return Option.isSome(failure)
-              ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
-              : Effect.die(Cause.squash(exit.cause));
-          }),
+          Effect.flatMap((raw) => settle(VerifierCodecs.runProbe, raw)),
+          Effect.map((reply) => reply.run),
         ),
       ready: (request) =>
         Effect.tryPromise({
           try: () => verifier.worldReady(encodeReadyRequest(request)),
           catch: didNotAnswer,
-        }).pipe(
-          Effect.flatMap((raw) => {
-            const exit = decodeExit(VerifierCodecs.worldReady, raw);
-            if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
-            const failure = Cause.findErrorOption(exit.cause);
-            return Option.isSome(failure)
-              ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
-              : Effect.die(Cause.squash(exit.cause));
-          }),
-        ),
+        }).pipe(Effect.flatMap((raw) => settle(VerifierCodecs.worldReady, raw))),
     }),
   );

@@ -16,6 +16,7 @@ import {
   ProbeRunnerRpc,
   verifierEntrypoint,
 } from "../../src/adapters/driven/do-rpc/probe-runner.ts";
+import type { VerifierEntrypoint } from "../../src/rpc/index.ts";
 
 const hash = (n: number) => ContentHash.make(`sha256:${String(n).padStart(64, "0")}`);
 const REQUEST: ProbeRunRequest = {
@@ -56,14 +57,33 @@ function verifier(
   };
 }
 
-type Entrypoint = ReturnType<typeof verifier>["entrypoint"];
+/** keel-verify's entrypoint answering both questions with `raw`, whatever it is. */
+const answering = (raw: unknown): VerifierEntrypoint => ({
+  runProbe: async () => raw,
+  worldReady: async () => raw,
+  buildDeps: async (): Promise<unknown> => {
+    throw new Error("no probe run builds deps");
+  },
+});
 
-const run = (entrypoint: Entrypoint) =>
+/** Answers that are not a run's or a world's: no Exit at all, or an Exit of something else. */
+const NOT_ANSWERS: readonly unknown[] = [
+  undefined,
+  null,
+  "ran",
+  {},
+  { _tag: "Success" },
+  { _tag: "Success", value: { run: { _tag: "ran", outcome: "maybe" }, queued: true } },
+  { _tag: "Success", value: { _tag: "Unready" } },
+  { _tag: "Failure", cause: "the box fell over" },
+];
+
+const run = (entrypoint: VerifierEntrypoint) =>
   Effect.gen(function* () {
     return yield* (yield* ProbeRunner).run(REQUEST);
   }).pipe(Effect.provide(ProbeRunnerRpc(entrypoint)));
 
-const ready = (entrypoint: Entrypoint) =>
+const ready = (entrypoint: VerifierEntrypoint) =>
   Effect.gen(function* () {
     return yield* (yield* ProbeRunner).ready({
       namespace: REQUEST.namespace,
@@ -192,6 +212,21 @@ describe("ProbeRunner over keel-verify's runProbe", () => {
         });
       });
     },
+  );
+
+  it.effect(
+    "[probe-runner.rpc-not-an-answer] anything that is not a run's answer, or a world's, is unavailable and never a defect, whatever it is",
+    () =>
+      Effect.gen(function* () {
+        for (const raw of NOT_ANSWERS) {
+          const unavailable = {
+            _tag: "ProbeRunnerUnavailable",
+            reason: "keel-verify's answer is not one",
+          };
+          expect(yield* Effect.flip(run(answering(raw)))).toMatchObject(unavailable);
+          expect(yield* Effect.flip(ready(answering(raw)))).toMatchObject(unavailable);
+        }
+      }),
   );
 
   it("[probe-runner.entrypoint] reaches runProbe and worldReady on the VERIFIER binding, and refuses a binding without either", async () => {
