@@ -493,14 +493,12 @@ describe("a new project's source", () => {
         {
           ...NOT_FOUND,
           detail: `No template has the name "${unknown}".`,
-          nextActions: [
-            {
-              kind: "call",
-              title: `Create the project from the template ${TEMPLATE}`,
-              operationId: "Operator_createProject",
-              args: { namespace: "pool", name, source: FROM_TEMPLATE },
-            },
-          ],
+          nextActions: ["fixture-forge-lite", "fixture-worker-lite"].map((template) => ({
+            kind: "call",
+            title: `Create the project from the template ${template}`,
+            operationId: "Operator_createProject",
+            args: { namespace: "pool", name, source: { kind: "template", name: template } },
+          })),
         },
       ]);
       expect([unknown, await placed(wouldBe(owner.userId, asked))]).toEqual([unknown, false]);
