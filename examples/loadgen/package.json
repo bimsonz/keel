@@ -2,7 +2,7 @@
   "name": "@keeltown/example-loadgen",
   "version": "0.0.0",
   "private": true,
-  "description": "Example: synthetic load against Keel's public API",
+  "description": "Example: synthetic agents on Keel's public API, a throughput report, and a sealed benchmark of planted conflicts against decoys",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -11,7 +11,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "@keeltown/sdk": "workspace:*"
+  },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

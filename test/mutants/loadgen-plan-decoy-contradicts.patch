@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-planted
+# why: A premise decoy carries the contradiction too: every decoy is a planted pair, and the false-positive rate means nothing
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..6cac7f19 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -274,7 +274,7 @@ function sides(
+     // Two premises on one subject: contradictory, or the same.
+     premise: () => [
+       creating("a", "price", [purity(true)]),
+-      creating("b", "price", [purity(!planted)]),
++      creating("b", "price", [purity(false)]),
+     ],
+     // One side relies on price() being pure; the other makes it impure, or rewrites it purely.
+     effect: () => [

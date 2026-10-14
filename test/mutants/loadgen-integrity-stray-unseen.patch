@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.integrity
+# why: A file no landing made goes unseen by the integrity check
+diff --git a/examples/loadgen/src/integrity.ts b/examples/loadgen/src/integrity.ts
+index 2388a801..c4e2a597 100644
+--- a/examples/loadgen/src/integrity.ts
++++ b/examples/loadgen/src/integrity.ts
+@@ -51,7 +51,5 @@ export function compare(
+     if (there === undefined) breaks.push({ path, why: "missing" });
+     else if (there !== content) breaks.push({ path, why: "differs" });
+   }
+-  for (const path of served.keys())
+-    if (!expected.has(path)) breaks.push({ path, why: "unexpected" });
+   return breaks;
+ }

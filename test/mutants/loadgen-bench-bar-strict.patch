@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.bench-score
+# why: A recall of exactly 70% fails 07's bar of at least 70%
+diff --git a/examples/loadgen/src/bench.ts b/examples/loadgen/src/bench.ts
+index cf845cb9..fff14bb8 100644
+--- a/examples/loadgen/src/bench.ts
++++ b/examples/loadgen/src/bench.ts
+@@ -68,7 +68,7 @@ export function score(
+     recall,
+     falsePositiveRate,
+     passes: {
+-      recall: recall !== null && recall >= BARS.recall,
++      recall: recall !== null && recall > BARS.recall,
+       decoys: falsePositiveRate !== null && falsePositiveRate <= BARS.falsePositiveRate,
+     },
+   };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-balanced
+# why: Every pair is planted: there are no decoys to measure false positives on
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..c436497a 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -143,7 +143,7 @@ export function planRun(options: {
+   const pairs = shuffled(
+     Array.from({ length: split.pairs }, (_, k) => ({
+       kind: BENCH_KINDS[k % BENCH_KINDS.length] ?? "premise",
+-      planted: Math.floor(k / BENCH_KINDS.length) % 2 === 0,
++      planted: true,
+     })),
+     next,
+   );

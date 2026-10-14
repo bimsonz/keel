@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/agent.test.ts
+# kills: loadgen.agent-retry
+# why: An agent gives up when the pool is still forking: at 1,000 agents most never declare
+diff --git a/examples/loadgen/src/agent.ts b/examples/loadgen/src/agent.ts
+index 9bb79c10..690082a8 100644
+--- a/examples/loadgen/src/agent.ts
++++ b/examples/loadgen/src/agent.ts
+@@ -26,7 +26,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+ /** How long to wait before asking again, or undefined when the refusal is the answer. */
+ export function retryIn(error: unknown, tries: number): number | undefined {
+   if (error instanceof KeelProblem) {
+-    if (error.code === "workspace.pool_exhausted") return error.retryAfterMs ?? 5_000;
++    if (error.code === "workspace.pool_exhausted") return undefined;
+     if (error.status === 429) return error.retryAfterMs ?? 60_000;
+     if (error.status >= 500 && tries < 5) return 2_000 * (tries + 1);
+     return undefined;

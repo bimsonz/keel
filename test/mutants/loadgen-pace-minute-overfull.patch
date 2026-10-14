@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/limits.test.ts
+# kills: loadgen.pace-minute
+# why: The pace lets one more request into every minute than it allows: 51 token requests a minute at a pace of 50
+diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
+index d645488d..46eba7f9 100644
+--- a/examples/loadgen/src/limits.ts
++++ b/examples/loadgen/src/limits.ts
+@@ -15,7 +15,7 @@ const MINUTE_MS = 60_000;
+  */
+ export function slotAfter(granted: readonly number[], now: number, perMinute: number): number {
+   const last = granted.at(-1) ?? now;
+-  const nth = granted.at(-perMinute);
++  const nth = granted.at(-perMinute - 1);
+   return Math.max(now, last, nth === undefined ? now : nth + MINUTE_MS);
+ }
+ 

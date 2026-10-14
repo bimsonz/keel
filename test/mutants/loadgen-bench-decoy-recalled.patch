@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.bench-score
+# why: Every planted pair counts as recalled, tied or not
+diff --git a/examples/loadgen/src/bench.ts b/examples/loadgen/src/bench.ts
+index cf845cb9..81ceb41b 100644
+--- a/examples/loadgen/src/bench.ts
++++ b/examples/loadgen/src/bench.ts
+@@ -50,7 +50,7 @@ export function score(
+     const counts = byKind[pair.kind];
+     if (pair.planted) {
+       counts.planted += 1;
+-      if (isTied) counts.recalled += 1;
++      counts.recalled += 1;
+     } else {
+       counts.decoys += 1;
+       if (isTied) counts.falsePositives += 1;

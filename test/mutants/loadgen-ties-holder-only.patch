@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.ties-contradiction
+# why: A contradiction ties only its premise's holder: a premise contradicted by another change's is never scored
+diff --git a/examples/loadgen/src/report.ts b/examples/loadgen/src/report.ts
+index 24fe2502..332b053a 100644
+--- a/examples/loadgen/src/report.ts
++++ b/examples/loadgen/src/report.ts
+@@ -188,7 +188,6 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
+       for (const c of p.contradictions) {
+         tie(p.changeId, c.holder);
+         if (c.holder === p.changeId)
+-          for (const other of holders.get(said(c.with)) ?? []) tie(p.changeId, other);
+       }
+   }
+   for (const held of parties.values()) {

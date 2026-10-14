@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/limits.test.ts
+# kills: loadgen.pace-refused
+# why: A refusal by the token limit pauses nothing: every run asks again at once and is refused again
+diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
+index d645488d..7afad952 100644
+--- a/examples/loadgen/src/limits.ts
++++ b/examples/loadgen/src/limits.ts
+@@ -75,7 +75,7 @@ export function paced(fetch: Fetch, pace: Pace, tokenEndpoint: string): Fetch {
+     if (input !== tokenEndpoint) return fetch(input, init);
+     await pace.take();
+     const answer = await fetch(input, init);
+-    if (answer.status === 429) pace.refusedFor(answer.headers.get("retry-after"));
++    
+     return answer;
+   };
+ }

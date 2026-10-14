@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-planted
+# why: A textual decoy edits the same lines as its other side: it conflicts, and is scored as a false positive
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..985b5599 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -289,7 +289,7 @@ function sides(
+       replacing("price", priceText("  return n * 3;")),
+       planted
+         ? replacing("price", priceText("  return n * 4;"))
+-        : replacing("label", labelText("  return `Item ${n}`;")),
++        : replacing("price", priceText("  return n * 5;")),
+     ],
+     // One side removes a function the other's new code calls, or one with a like name.
+     interaction: () => {

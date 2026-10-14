@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.integrity
+# why: A change landed twice goes unseen by the integrity check
+diff --git a/examples/loadgen/src/integrity.ts b/examples/loadgen/src/integrity.ts
+index 2388a801..3f1bf61e 100644
+--- a/examples/loadgen/src/integrity.ts
++++ b/examples/loadgen/src/integrity.ts
+@@ -26,7 +26,7 @@ export function expectedTrunk(
+   for (const index of landedInOrder) {
+     const task = plan.tasks[index];
+     if (task === undefined) continue;
+-    if (seen.has(index)) {
++    if (seen.has(index) && index < 0) {
+       breaks.push({ path: task.edit.path, why: "landed-twice" });
+       continue;
+     }

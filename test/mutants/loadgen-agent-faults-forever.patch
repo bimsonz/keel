@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/agent.test.ts
+# kills: loadgen.agent-retry
+# why: An agent asks again past a server fault for ever: a broken Keel holds the run until its deadline
+diff --git a/examples/loadgen/src/agent.ts b/examples/loadgen/src/agent.ts
+index 9bb79c10..567cb39d 100644
+--- a/examples/loadgen/src/agent.ts
++++ b/examples/loadgen/src/agent.ts
+@@ -28,7 +28,7 @@ export function retryIn(error: unknown, tries: number): number | undefined {
+   if (error instanceof KeelProblem) {
+     if (error.code === "workspace.pool_exhausted") return error.retryAfterMs ?? 5_000;
+     if (error.status === 429) return error.retryAfterMs ?? 60_000;
+-    if (error.status >= 500 && tries < 5) return 2_000 * (tries + 1);
++    if (error.status >= 500) return 2_000 * (tries + 1);
+     return undefined;
+   }
+   // The token request's refusal by the limit: the pace holds every request until its window ends.

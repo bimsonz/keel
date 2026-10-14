@@ -1,0 +1,3263 @@
+[
+  {
+    "eventId": "evt_01M4XKPE3PNQEQBTQQ79T0ES4M",
+    "type": "TrunkInitialized",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:24:59.254Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkInitialized",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "head": "446f9f28bda95730f83d9d21fdf01a193252f978",
+      "by": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "origin": {
+        "kind": "empty"
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKPFYJGK71J1H5SMK5JY02",
+    "type": "ProjectCreated",
+    "entity": {
+      "kind": "project",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:25:01.138Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7RS4T5V7124VK48AJQDFE87TJV",
+      "label": "lg-lg5a-owner"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ProjectCreated",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "name": "loadgen",
+      "by": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKPHJD1MM7X9W15YMT6DF1",
+    "type": "ProjectSettingsChanged",
+    "entity": {
+      "kind": "project",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:25:02.797Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7YXXD5BX7K1347KVNSGWXT75H5",
+      "label": "lg-lg5a-admin"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ProjectSettingsChanged",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "changes": [
+        {
+          "field": "maxBatchSize",
+          "from": 1,
+          "to": 16
+        },
+        {
+          "field": "verification",
+          "from": "required",
+          "to": "off"
+        }
+      ],
+      "by": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKQ0H405FE147KND2TFFDA",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:25:18.116Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xkpws8tvtppgb35ktvceb0",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKQ0H405FE147KND2TFFDB",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:25:18.116Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xkpws8tvtppgb35ktvceb1",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKR5PKJMR4EPP5XFHE28JG",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:25:56.179Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "holder": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "expiresAt": 1792002356179,
+      "baseSha": "446f9f28bda95730f83d9d21fdf01a193252f978"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKR65XTTCH1FPWZXYH5QYD",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:25:56.669Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4TRTYPN7Z3D3F0AK2H1K5T577R",
+      "label": "lg-lg5a-seed"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#1",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_4TRTYPN7Z3D3F0AK2H1K5T577R",
+        "label": "lg-lg5a-seed"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Lay out loadgen run lg5a's base files",
+      "footprint": [
+        {
+          "path": "lg/lg5a/shared/g0.ts",
+          "op": "create"
+        },
+        {
+          "path": "lg/lg5a/bench/p0.ts",
+          "op": "create"
+        }
+      ],
+      "premises": [],
+      "leaseId": "lse_01M4XKR5F8XMXH0XW57Q9M347S"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKR65XTTCH1FPWZXYH5QYE",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:25:56.669Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4TRTYPN7Z3D3F0AK2H1K5T577R",
+      "label": "lg-lg5a-seed"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "revision": 1,
+      "neighbours": [],
+      "contradictions": [],
+      "precedents": [],
+      "suggestedMove": "proceed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKR65XTTCH1FPWZXYH5QYF",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:25:56.669Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4TRTYPN7Z3D3F0AK2H1K5T577R",
+      "label": "lg-lg5a-seed"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "baseSha": "446f9f28bda95730f83d9d21fdf01a193252f978"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKR94PHS0A31348ETTM361",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:25:59.702Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xkr6d3kkj3bvgxae5maw54",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRAFHF2YCTF4E872SV7VA",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:01.073Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4TRTYPN7Z3D3F0AK2H1K5T577R",
+      "label": "lg-lg5a-seed"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "revision": 1,
+      "commitSha": "cdb2d18fe8e4af421b572f1d9e237ab27b55adf4",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "baseSha": "446f9f28bda95730f83d9d21fdf01a193252f978"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRCN7R8GMGEM585GA6XKZ",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:03.303Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "ref": "refs/heads/main",
+      "sha": "cdb2d18fe8e4af421b572f1d9e237ab27b55adf4"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRD3QWABV0K3ETJWK7B9P",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:03.767Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKRAFHF2YCTF4E872SV7VA"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRGXFMNY0DCQP1K8JCX8K",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:07.663Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:88088b1e834daada417902d28cebf66676ba61791e1933556628e53d40e4747f"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRHPAXP2GYBA26THEYZ0A",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:08.458Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "revision": 1,
+      "planHash": "sha256:4b64785b136211d4261fb86c9cd420ea2ea9ed849bdfa5cff45730cb8b431255",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRHPAXP2GYBA26THEYZ0B",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:26:08.458Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:4b64785b136211d4261fb86c9cd420ea2ea9ed849bdfa5cff45730cb8b431255"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRKSJHQ64Y3DBJ0GQQG1N",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:10.610Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKPM1GMFT2A6F75Y4BCE1R"],
+      "base": "446f9f28bda95730f83d9d21fdf01a193252f978",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRSFXMK161P9KRYFC9C0T",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:16.445Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "treeSha": "1b134953c9e8aa3da898a9d0d9ff163d0b8839aa",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRSGSY05BT9Q70BKRZKJT",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:16.473Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "instanceId": "unverified-evt_01M4XKRKSJHQ64Y3DBJ0GQQG1N",
+      "planHash": "sha256:4b64785b136211d4261fb86c9cd420ea2ea9ed849bdfa5cff45730cb8b431255"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRSGSY05BT9Q70BKRZKJV",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKRSGS32WGT5AWFW84TXNB"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:16.473Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKRSGS32WGT5AWFW84TXNB",
+      "subject": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRSGSY05BT9Q70BKRZKJW",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:16.473Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+      "verdictId": "vrd_01M4XKRSGS32WGT5AWFW84TXNB",
+      "members": ["chg_01M4XKPM1GMFT2A6F75Y4BCE1R"],
+      "base": "446f9f28bda95730f83d9d21fdf01a193252f978",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRSKW8A1HE245CJ5QMEPQ",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:26:16.572Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRVF0XTH23Z8AYF9RYCV5",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:18.464Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X@1791995178464",
+      "old": "446f9f28bda95730f83d9d21fdf01a193252f978",
+      "members": ["chg_01M4XKPM1GMFT2A6F75Y4BCE1R"],
+      "batches": ["bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"],
+      "proofIds": ["sha256:c9a10435fc424794968f04f3cfc94620013c3bf685b2c700064d9f4501dc5419"],
+      "committerTime": 1791995178464
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRVNYWH7NVP4BVHH0XFD9",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:18.686Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X@1791995178464",
+      "sha": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+          "commitSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKRXS69RSD4859QTHX02EP",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:20.838Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "446f9f28bda95730f83d9d21fdf01a193252f978",
+      "to": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "groupId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X@1791995178464",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+          "commitSha": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+          "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+          "proofId": "sha256:c9a10435fc424794968f04f3cfc94620013c3bf685b2c700064d9f4501dc5419"
+        }
+      ],
+      "verified": false,
+      "height": 1
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS05P8MBZN0FF2S96QRC9",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:26:23.286Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKPM1GMFT2A6F75Y4BCE1R",
+      "commitSha": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "trunkSha": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+      "proofId": "sha256:c9a10435fc424794968f04f3cfc94620013c3bf685b2c700064d9f4501dc5419"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS07Z5MPK9YHMR1H3G2M4",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:23.359Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKRKSJNGJ7B5BDKPCN8E6Y",
+      "batchId": "bat_01M4XKRKSJNGJ7B5BDKPCN8E6X",
+      "trunkSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS08Z7XD400VR0M1TDAZC",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:23.391Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB0",
+      "reason": "landed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS5JCPY8M8NJRB6YPY6DB",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:28.812Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "holder": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "expiresAt": 1792002388812,
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS5Y4FAC7GCG0KTHAAVRJ",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:29.188Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_24CYMXNRSWZFDVX3MHNGQFW0GV",
+      "label": "lg-lg5a-3"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#2",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_24CYMXNRSWZFDVX3MHNGQFW0GV",
+        "label": "lg-lg5a-3"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Scale f0 in group 0's shared file",
+      "footprint": [
+        {
+          "path": "lg/lg5a/shared/g0.ts",
+          "symbol": "f0",
+          "op": "edit"
+        }
+      ],
+      "premises": [
+        {
+          "subject": "lg.lg5a.g0",
+          "predicate": "purity",
+          "relation": "is",
+          "value": true,
+          "gloss": "group 0's functions stay pure",
+          "strength": "must"
+        }
+      ],
+      "leaseId": "lse_01M4XKS3VH15Y858NY1SP810EF"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS5Y4FAC7GCG0KTHAAVRK",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:29.188Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_24CYMXNRSWZFDVX3MHNGQFW0GV",
+      "label": "lg-lg5a-3"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "revision": 1,
+      "neighbours": [],
+      "contradictions": [],
+      "precedents": [],
+      "suggestedMove": "proceed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS5Y4FAC7GCG0KTHAAVRM",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:29.188Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_24CYMXNRSWZFDVX3MHNGQFW0GV",
+      "label": "lg-lg5a-3"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS6ZMWRRZ4NN3EDH417B2",
+    "type": "SubjectMinted",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:30.260Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "SubjectMinted",
+      "subjectId": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20",
+      "key": "lg.lg5a.g0",
+      "anchors": [],
+      "gloss": "group 0's functions stay pure",
+      "mintedBy": "agent"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS6ZMWRRZ4NN3EDH417B3",
+    "type": "PremiseRelied",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:30.260Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PremiseRelied",
+      "subjectId": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "premise": {
+        "subject": "lg.lg5a.g0",
+        "predicate": "purity",
+        "relation": "is",
+        "value": true,
+        "gloss": "group 0's functions stay pure",
+        "strength": "must"
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS70BW9V36MW39AT1SFS5",
+    "type": "SubjectMinted",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_2NNCBMGZJ49H515HYMNGD68C2R"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:30.283Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "SubjectMinted",
+      "subjectId": "sub_2NNCBMGZJ49H515HYMNGD68C2R",
+      "key": "lg.lg5a",
+      "anchors": [],
+      "gloss": "lg.lg5a",
+      "mintedBy": "agent"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS741E5WANY6V2QR38TP7",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:30.401Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_0CZNEDCA4XVKY4QQ7DZP7AGMAA",
+      "label": "lg-lg5a-1"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#3",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_0CZNEDCA4XVKY4QQ7DZP7AGMAA",
+        "label": "lg-lg5a-1"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Use price from pair 0's file in a file of its own",
+      "footprint": [
+        {
+          "path": "lg/lg5a/bench/p0-a.ts",
+          "op": "create"
+        }
+      ],
+      "premises": [
+        {
+          "subject": "lg.lg5a.p0.price",
+          "predicate": "purity",
+          "relation": "is",
+          "value": true,
+          "anchors": [
+            {
+              "path": "lg/lg5a/bench/p0.ts",
+              "symbol": "price",
+              "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+            }
+          ],
+          "gloss": "price() has no side effects",
+          "strength": "must"
+        }
+      ],
+      "leaseId": "lse_01M4XKS6JG3ED0DWGJGVYKVKTB"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS741E5WANY6V2QR38TP8",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:30.401Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_0CZNEDCA4XVKY4QQ7DZP7AGMAA",
+      "label": "lg-lg5a-1"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "revision": 1,
+      "neighbours": [],
+      "contradictions": [],
+      "precedents": [],
+      "suggestedMove": "proceed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS741E5WANY6V2QR38TP9",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:30.401Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_0CZNEDCA4XVKY4QQ7DZP7AGMAA",
+      "label": "lg-lg5a-1"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS7MRKX8X0JH8G3P1879X",
+    "type": "SubjectMinted",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_RTG134634RHXRDDRACXN13D59V"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:30.936Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "SubjectMinted",
+      "subjectId": "sub_RTG134634RHXRDDRACXN13D59V",
+      "key": "lg",
+      "anchors": [],
+      "gloss": "lg",
+      "mintedBy": "agent"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS8K3MPPYA7FR6WVRDNF9",
+    "type": "SubjectMinted",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_4H2XH9JBZA20K198P61GA3TJ24"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:31.907Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "SubjectMinted",
+      "subjectId": "sub_4H2XH9JBZA20K198P61GA3TJ24",
+      "key": "lg.lg5a.p0.price",
+      "anchors": [
+        {
+          "path": "lg/lg5a/bench/p0.ts",
+          "symbol": "price",
+          "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+        }
+      ],
+      "gloss": "price() has no side effects",
+      "mintedBy": "agent"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS8K3MPPYA7FR6WVRDNFA",
+    "type": "PremiseRelied",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_4H2XH9JBZA20K198P61GA3TJ24"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:31.907Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PremiseRelied",
+      "subjectId": "sub_4H2XH9JBZA20K198P61GA3TJ24",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "premise": {
+        "subject": "lg.lg5a.p0.price",
+        "predicate": "purity",
+        "relation": "is",
+        "value": true,
+        "anchors": [
+          {
+            "path": "lg/lg5a/bench/p0.ts",
+            "symbol": "price",
+            "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+          }
+        ],
+        "gloss": "price() has no side effects",
+        "strength": "must"
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS8RX44GKTQWPKX6QT86B",
+    "type": "SubjectMinted",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_B4JSY4XRRW9H0FH8GB2FC37WH9"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:32.093Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "SubjectMinted",
+      "subjectId": "sub_B4JSY4XRRW9H0FH8GB2FC37WH9",
+      "key": "lg.lg5a.p0",
+      "anchors": [],
+      "gloss": "lg.lg5a.p0",
+      "mintedBy": "agent"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSBTPA0XQFCZMVHT7JT9C",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:35.222Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_0CZNEDCA4XVKY4QQ7DZP7AGMAA",
+      "label": "lg-lg5a-1"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "revision": 1,
+      "commitSha": "45431704e5f9e215369e9a64afd91b8b4cd03a15",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKS6RRZV6AX6M738H86SCW",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:30.040Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "holder": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "expiresAt": 1792002390040,
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSA19ES1HFMX38QK63N95",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKS68H63BRMA6BBST6VFYQ"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:33.385Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xks68h63brma6bbst6vfyq",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSD0AEXVW5FCJWERQBTP0",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:36.426Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xksa7v1w21bnwmyrssd5ab",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSDF4T0QPK9DRFD8JWA4V",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:36.900Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "ref": "refs/heads/main",
+      "sha": "45431704e5f9e215369e9a64afd91b8b4cd03a15"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSE2XPDK5SABXDGNQMN4V",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:37.533Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKSBTPA0XQFCZMVHT7JT9C"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSF5KWQ8JK3XXWVM60J0S",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:38.643Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_24CYMXNRSWZFDVX3MHNGQFW0GV",
+      "label": "lg-lg5a-3"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "revision": 1,
+      "commitSha": "5c0b1d06194f13a04cf002856faa89ed06d16077",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSF98YN531FSECCQPRJZS",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKS68H63BRMA6BBST6VFYQ"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:38.760Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "holder": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "expiresAt": 1792002398760,
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFMTP86X0R7HDBQGFKVT",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:39.130Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4XD0TTA782KQD2HTZ3MCN19RQV",
+      "label": "lg-lg5a-2"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#4",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_4XD0TTA782KQD2HTZ3MCN19RQV",
+        "label": "lg-lg5a-2"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Use price from pair 0's file in a file of its own",
+      "footprint": [
+        {
+          "path": "lg/lg5a/bench/p0-b.ts",
+          "op": "create"
+        }
+      ],
+      "premises": [
+        {
+          "subject": "lg.lg5a.p0.price",
+          "predicate": "purity",
+          "relation": "is",
+          "value": false,
+          "anchors": [
+            {
+              "path": "lg/lg5a/bench/p0.ts",
+              "symbol": "price",
+              "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+            }
+          ],
+          "gloss": "price() may have side effects",
+          "strength": "must"
+        }
+      ],
+      "leaseId": "lse_01M4XKSF1SKE19GYX5HKQZ5PPM"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFMTP86X0R7HDBQGFKVV",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:39.130Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4XD0TTA782KQD2HTZ3MCN19RQV",
+      "label": "lg-lg5a-2"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "revision": 1,
+      "neighbours": [
+        {
+          "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+          "goal": "Use price from pair 0's file in a file of its own",
+          "subjects": ["lg.lg5a.p0.price"],
+          "overlap": "subject"
+        }
+      ],
+      "contradictions": [
+        {
+          "premise": {
+            "subject": "lg.lg5a.p0.price",
+            "predicate": "purity",
+            "relation": "is",
+            "value": false,
+            "anchors": [
+              {
+                "path": "lg/lg5a/bench/p0.ts",
+                "symbol": "price",
+                "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+              }
+            ],
+            "gloss": "price() may have side effects",
+            "strength": "must"
+          },
+          "with": {
+            "subject": "lg.lg5a.p0.price",
+            "predicate": "purity",
+            "relation": "is",
+            "value": true,
+            "anchors": [
+              {
+                "path": "lg/lg5a/bench/p0.ts",
+                "symbol": "price",
+                "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+              }
+            ],
+            "gloss": "price() has no side effects",
+            "strength": "must"
+          },
+          "holder": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+          "withRole": "premise"
+        }
+      ],
+      "precedents": [],
+      "suggestedMove": "coordinate",
+      "basis": {
+        "_tag": "contradiction",
+        "index": 0
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFMTP86X0R7HDBQGFKVW",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:39.130Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4XD0TTA782KQD2HTZ3MCN19RQV",
+      "label": "lg-lg5a-2"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFQPEYD49CG3KRBD5ZFH",
+    "type": "PremiseRelied",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_4H2XH9JBZA20K198P61GA3TJ24"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:39.222Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PremiseRelied",
+      "subjectId": "sub_4H2XH9JBZA20K198P61GA3TJ24",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "premise": {
+        "subject": "lg.lg5a.p0.price",
+        "predicate": "purity",
+        "relation": "is",
+        "value": false,
+        "anchors": [
+          {
+            "path": "lg/lg5a/bench/p0.ts",
+            "symbol": "price",
+            "commit": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+          }
+        ],
+        "gloss": "price() may have side effects",
+        "strength": "must"
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFZ22GJA41FSES9NPYM8",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:39.458Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_692FXX13SMK0NYQQPSMGWD2P9Q",
+      "label": "lg-lg5a-0"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#5",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_692FXX13SMK0NYQQPSMGWD2P9Q",
+        "label": "lg-lg5a-0"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Add a0, a function of agent 0's own",
+      "footprint": [
+        {
+          "path": "lg/lg5a/own/a0.ts",
+          "op": "create"
+        }
+      ],
+      "premises": [],
+      "leaseId": "lse_01M4XKSFFPRF8E13R8TCJNMHJF"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFZ22GJA41FSES9NPYM9",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:39.458Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_692FXX13SMK0NYQQPSMGWD2P9Q",
+      "label": "lg-lg5a-0"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "revision": 1,
+      "neighbours": [],
+      "contradictions": [],
+      "precedents": [],
+      "suggestedMove": "proceed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFZ22GJA41FSES9NPYMA",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:39.458Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_692FXX13SMK0NYQQPSMGWD2P9Q",
+      "label": "lg-lg5a-0"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSFMRB4QQYYFE0W1DE5XV",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:39.128Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "holder": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "expiresAt": 1792002399128,
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSJF6RJCKJDC7XKMV2PBQ",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:42.022Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:d425cb8dc9d16b650bcfb6aa999efa29d1990db70409c19e1c22d5f82911346d"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSJQB7PYADKM2N2TAWHQB",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:42.283Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "revision": 1,
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSJQB7PYADKM2N2TAWHQC",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:26:42.283Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSJW6HXKN8X0JBZW4N169",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:42.438Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKSF5KWQ8JK3XXWVM60J0S"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSGQR5JRCC6FPY0SHB2TG",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:40.248Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "ref": "refs/heads/main",
+      "sha": "5c0b1d06194f13a04cf002856faa89ed06d16077"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSKAH3DCX5DEAXW2T0284",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:42.897Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xksghjcptn7dqc5kake8rr",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSKAH3DCX5DEAXW2T0285",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RS"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:42.897Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RS",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xksghjcptn7dqc5kake8rs",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSM6X4W2EKY2DMHG06MRN",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:43.805Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_4XD0TTA782KQD2HTZ3MCN19RQV",
+      "label": "lg-lg5a-2"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "revision": 1,
+      "commitSha": "207d91cc8b0a109d15eeef87ce62b0a7341f65b3",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSMFVNFTTYDNN27TFBTEP",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:44.091Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_692FXX13SMK0NYQQPSMGWD2P9Q",
+      "label": "lg-lg5a-0"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "revision": 1,
+      "commitSha": "638ffc9dace2167b4c2297ac26b4f78bb07869a0",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "baseSha": "1f5bf9cc008877020bb63932d00d34fbcc160994"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSPKC88V61TFD2QXQCJ0B",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:46.252Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "ref": "refs/heads/main",
+      "sha": "638ffc9dace2167b4c2297ac26b4f78bb07869a0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSPTZ6X7EZ6T3QFBA6NKD",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:46.495Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:9d6ca76137d8e1ce9570cc2154fa33e2f5948731d7b76abe7d72d502b583a87a"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSQ450JM962X8SSQZWN73",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:46.789Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "revision": 1,
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSQ450JM962X8SSQZWN74",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:26:46.789Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSQ4KR2YFD8JV0M5K32KC",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKS68H63BRMA6BBST6VFYQ"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:46.803Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "ref": "refs/heads/main",
+      "sha": "207d91cc8b0a109d15eeef87ce62b0a7341f65b3"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSR691GGJ6MEZC59RY1VS",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:47.881Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKSMFVNFTTYDNN27TFBTEP"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSRCMBV6Z5F46J7RV7JEB",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:48.084Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKSM6X4W2EKY2DMHG06MRN"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSPR7VD66EPSYGTXAT27S",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:46.407Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKS5CXXQZZZS5RKQKZAJW2"],
+      "base": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSVDX1J1VJQZ168BDT3KK",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:51.197Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "treeSha": "c5b8f9ee872e60659a5a8b8a8f4e62209b6e384a",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSVEJS9F2XZCKF1N8Z9ZP",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:51.218Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "instanceId": "unverified-evt_01M4XKSPR7VD66EPSYGTXAT27S",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSVEJS9F2XZCKF1N8Z9ZQ",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKSVEJC5HKFG3Z9PYHSSB3"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:51.218Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKSVEJC5HKFG3Z9PYHSSB3",
+      "subject": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSVEJS9F2XZCKF1N8Z9ZR",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:51.218Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+      "verdictId": "vrd_01M4XKSVEJC5HKFG3Z9PYHSSB3",
+      "members": ["chg_01M4XKS5CXXQZZZS5RKQKZAJW2"],
+      "base": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSVGPCHHYS23WCF2QQQX7",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:26:51.286Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSWN7V2KWMQ95CV064B8C",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:52.455Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:1351119b6589ad2f50b8aad7c53079abc3ae80b592071a258219ae18e2eb55a6"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSX07RJRAB1MVMT0QEFHQ",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:52.807Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "revision": 1,
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSX07RJRAB1MVMT0QEFHR",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:26:52.807Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSX82KTWX5W9ARGN2W3W2",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:53.058Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:c1771eaf51f16e3bcf34bfad236d3fa4e88021498589a0364933adf49bc663e9"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSXMKSS8S7S6DCA4914D9",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:53.459Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "revision": 1,
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSXMKSS8S7S6DCA4914DA",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:26:53.459Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSWJ8HJTEHCN16V35CV0S",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:52.360Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW@1791995212360",
+      "old": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "members": ["chg_01M4XKS5CXXQZZZS5RKQKZAJW2"],
+      "batches": ["bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"],
+      "proofIds": ["sha256:b731f2fcf92261053450e864ae7657612f461cc2d13dc7442112cff772e4052a"],
+      "committerTime": 1791995212360
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSWRH0C32MG5TEYK6BSX0",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:26:52.561Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW@1791995212360",
+      "sha": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+          "commitSha": "21d8a45720185cb8536e769a72f8c5624ee41e35"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKSYRFQ9MJMDNYYBD32WSE",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:26:54.607Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "1f5bf9cc008877020bb63932d00d34fbcc160994",
+      "to": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "groupId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW@1791995212360",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+          "commitSha": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+          "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+          "proofId": "sha256:b731f2fcf92261053450e864ae7657612f461cc2d13dc7442112cff772e4052a"
+        }
+      ],
+      "verified": false,
+      "height": 2
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT0EYMFJ8P2HH8W37FV5R",
+    "type": "WorkspaceGranted",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:56.350Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceGranted",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "holder": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "expiresAt": 1792002416350,
+      "baseSha": "21d8a45720185cb8536e769a72f8c5624ee41e35"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT0WC08V9916Q3TRAJQAR",
+    "type": "IntentDeclared",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:26:56.780Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7RHW7Q8SDRZPG1GQZWNS3EHKF9",
+      "label": "lg-lg5a-4"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "label": "#6",
+    "payload": {
+      "_tag": "IntentDeclared",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "agentId": "agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+      "run": {
+        "id": "run_7RHW7Q8SDRZPG1GQZWNS3EHKF9",
+        "label": "lg-lg5a-4"
+      },
+      "origin": "agent",
+      "revision": 1,
+      "goal": "Scale f1 in group 0's shared file",
+      "footprint": [
+        {
+          "path": "lg/lg5a/shared/g0.ts",
+          "symbol": "f1",
+          "op": "edit"
+        }
+      ],
+      "premises": [
+        {
+          "subject": "lg.lg5a.g0",
+          "predicate": "purity",
+          "relation": "is",
+          "value": true,
+          "gloss": "group 0's functions stay pure",
+          "strength": "must"
+        }
+      ],
+      "leaseId": "lse_01M4XKSZ58P7PSRHKDCBN859EB"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT0WC08V9916Q3TRAJQAS",
+    "type": "PreflightIssued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:26:56.780Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7RHW7Q8SDRZPG1GQZWNS3EHKF9",
+      "label": "lg-lg5a-4"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PreflightIssued",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "revision": 1,
+      "neighbours": [
+        {
+          "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+          "goal": "Scale f0 in group 0's shared file",
+          "subjects": ["lg.lg5a.g0"],
+          "overlap": "subject"
+        }
+      ],
+      "contradictions": [],
+      "precedents": [],
+      "suggestedMove": "proceed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT0WC08V9916Q3TRAJQAT",
+    "type": "ChangeStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:56.780Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7RHW7Q8SDRZPG1GQZWNS3EHKF9",
+      "label": "lg-lg5a-4"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeStarted",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "baseSha": "21d8a45720185cb8536e769a72f8c5624ee41e35"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT13J2GH8N60AE5PD64BJ",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:26:57.010Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKS5CXXQZZZS5RKQKZAJW2",
+      "commitSha": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "trunkSha": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+      "proofId": "sha256:b731f2fcf92261053450e864ae7657612f461cc2d13dc7442112cff772e4052a"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT1E45WJPPKE3FH8DW45N",
+    "type": "PremiseRelied",
+    "entity": {
+      "kind": "subject",
+      "id": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:26:57.348Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PremiseRelied",
+      "subjectId": "sub_FGD8HXM3F0SDF4Y3E4NEXCFF20",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "premise": {
+        "subject": "lg.lg5a.g0",
+        "predicate": "purity",
+        "relation": "is",
+        "value": true,
+        "gloss": "group 0's functions stay pure",
+        "strength": "must"
+      }
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT15DRY3ECQWDEXRCN17E",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:26:57.069Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKPWS8TVTPPGB35KTVCEB1",
+      "reason": "landed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT4P58YJ8NGB84MQ6CEG7",
+    "type": "WorkspaceForked",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKT136ZTD1V2FF5KM6RGSB"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:00.677Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceForked",
+      "workspaceId": "wsp_01M4XKT136ZTD1V2FF5KM6RGSB",
+      "repo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-ws-01m4xkt136ztd1v2ff5km6rgsb",
+      "sourceRepo": "prj-spasfnyp7m3djb7eqk9r0qb2nd-mirror"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT7KQAA30MEACK2EY6PPP",
+    "type": "ChangeSubmitted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:03.671Z",
+    "actor": "agent:agt_0M08RAFZFR0ZBF0JEPP6YDA6T0",
+    "run": {
+      "id": "run_7RHW7Q8SDRZPG1GQZWNS3EHKF9",
+      "label": "lg-lg5a-4"
+    },
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeSubmitted",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "revision": 1,
+      "commitSha": "c5dfaaf8376ba4253135caa9eca795cbf7d8ccd4",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "baseSha": "21d8a45720185cb8536e769a72f8c5624ee41e35"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT9NANQ6FQ2Q4320RDA2Q",
+    "type": "WorkspacePushed",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:27:05.770Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspacePushed",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "ref": "refs/heads/main",
+      "sha": "c5dfaaf8376ba4253135caa9eca795cbf7d8ccd4"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT0VNQJKF1AKH5J77V3HS",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:26:56.757Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKSPR7ZXD1Q9BNGD2QKJHX",
+      "batchId": "bat_01M4XKSPR7ZXD1Q9BNGD2QKJHW",
+      "trunkSha": "21d8a45720185cb8536e769a72f8c5624ee41e35"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKT41GFKF3QNYFZSEAM2BR",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:00.016Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKS2QCDKJ9K296HTDC9720"],
+      "base": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTA1SEMA1F5DTYN59TQFH",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:27:06.169Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "treeSha": "b81a0a78465592b8ce148897634b1a88fad9629e",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTA2EWZWBW5KPX959FKN3",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:27:06.190Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "instanceId": "unverified-evt_01M4XKT41GFKF3QNYFZSEAM2BR",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTA2EWZWBW5KPX959FKN4",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKTA2EKC54JVW4P34QEQDW"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:06.190Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKTA2EKC54JVW4P34QEQDW",
+      "subject": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTA2EWZWBW5KPX959FKN5",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:06.190Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+      "verdictId": "vrd_01M4XKTA2EKC54JVW4P34QEQDW",
+      "members": ["chg_01M4XKS2QCDKJ9K296HTDC9720"],
+      "base": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTA4CX46XJYXK6N2PM782",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:27:06.252Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTAA4BN3P2P45JKM3EQHJ",
+    "type": "PrecheckStarted",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:27:06.436Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PrecheckStarted",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "revision": 1,
+      "instanceId": "precheck-evt_01M4XKT7KQAA30MEACK2EY6PPP"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTEZ23YQGQ175ZF63C3GC",
+    "type": "EffectsDerived",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 6,
+    "at": "2026-10-14T16:27:11.202Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "EffectsDerived",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "revision": 1,
+      "effects": [],
+      "derivationRef": "sha256:e45b47e41525eaf7a2922ae4305e3341bc1209b9ae64d60d3b841f66baf66cb5"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTB45ZGTG234WS3B3ENPB",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:27:07.269Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKT41G0CWVE0REYA1ADX9V@1791995227269",
+      "old": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "members": ["chg_01M4XKS2QCDKJ9K296HTDC9720"],
+      "batches": ["bat_01M4XKT41G0CWVE0REYA1ADX9V"],
+      "proofIds": ["sha256:0cd997621e02c6ffefae68161f8e0fff95e78465e364e0a20c4b233fe6f05609"],
+      "committerTime": 1791995227269
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTBB9X3HR82EM3Z5R5BC6",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:27:07.497Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKT41G0CWVE0REYA1ADX9V@1791995227269",
+      "sha": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+          "commitSha": "15b389b7d94f00abce71e3578e49f1f50e925228"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTD9YJBNQX8J8BHTGVPZW",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:27:09.502Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "21d8a45720185cb8536e769a72f8c5624ee41e35",
+      "to": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "groupId": "bat_01M4XKT41G0CWVE0REYA1ADX9V@1791995227269",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+          "commitSha": "15b389b7d94f00abce71e3578e49f1f50e925228",
+          "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+          "proofId": "sha256:0cd997621e02c6ffefae68161f8e0fff95e78465e364e0a20c4b233fe6f05609"
+        }
+      ],
+      "verified": false,
+      "height": 3
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTFQMDG1T1NREVRMM9XZZ",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2QCDKJ9K296HTDC9720"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:27:11.988Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKS2QCDKJ9K296HTDC9720",
+      "commitSha": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "trunkSha": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+      "proofId": "sha256:0cd997621e02c6ffefae68161f8e0fff95e78465e364e0a20c4b233fe6f05609"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTFCPARDR77YREE05NE8A",
+    "type": "PlanCompiled",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 7,
+    "at": "2026-10-14T16:27:11.638Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PlanCompiled",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "revision": 1,
+      "planHash": "sha256:6c3741bcc3d8c024c0a310143a727ddfea59557d1c8e6f523b90f46c6dfed011",
+      "steps": 1,
+      "costEstimate": 0.01,
+      "predicatePolicy": {}
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTFCPARDR77YREE05NE8B",
+    "type": "ChangeQueued",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 8,
+    "at": "2026-10-14T16:27:11.638Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeQueued",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "planHash": "sha256:6c3741bcc3d8c024c0a310143a727ddfea59557d1c8e6f523b90f46c6dfed011"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTFV67A9V7BA0GW66D40N",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:12.102Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKR6D3KKJ3BVGXAE5MAW54",
+      "reason": "landed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTFG99Z73TE37MAGB5QNA",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKT41G0CWVE0REYA1ADX9V"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:27:11.753Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKT41G0CWVE0REYA1ADX9W",
+      "batchId": "bat_01M4XKT41G0CWVE0REYA1ADX9V",
+      "trunkSha": "15b389b7d94f00abce71e3578e49f1f50e925228"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTJNJN9THXXXF7WXDRR1V",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:14.994Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKS2SDE8JSYPQAVCXC0FWK"],
+      "base": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTRYVA2637S16X0PH5YQE",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:27:21.435Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "treeSha": "05157b68ae0f95f3e440f4686e57467d19a44d53",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTRZG5VENX4P22SD53JF1",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:27:21.456Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "instanceId": "unverified-evt_01M4XKTJNJN9THXXXF7WXDRR1V",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTRZG5VENX4P22SD53JF2",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKTRZGM1P0Z20W1Q2R26Q6"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:21.456Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKTRZGM1P0Z20W1Q2R26Q6",
+      "subject": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTRZG5VENX4P22SD53JF3",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:21.456Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+      "verdictId": "vrd_01M4XKTRZGM1P0Z20W1Q2R26Q6",
+      "members": ["chg_01M4XKS2SDE8JSYPQAVCXC0FWK"],
+      "base": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTS14F4W2FVG94ZCCSDDD",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:27:21.508Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTT7RSJHSBVFQ1ZE7XM57",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 11,
+    "at": "2026-10-14T16:27:22.744Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX@1791995242744",
+      "old": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "members": ["chg_01M4XKS2SDE8JSYPQAVCXC0FWK"],
+      "batches": ["bat_01M4XKTJNJQ16BZB5KD55EGHMX"],
+      "proofIds": ["sha256:daeeb10bfe7eccb2d6b1fb163fe3dd6ef9ddeaff2a836b9c048fb1e7aff1a9fe"],
+      "committerTime": 1791995242744
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTTDGDXSF3JANAZNC4ZJ4",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 12,
+    "at": "2026-10-14T16:27:22.928Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX@1791995242744",
+      "sha": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+          "commitSha": "7933894373d96a4d3d20fa3038e9ada18719a417"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTW6Z0ZQ7EQ35H20TF55X",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 13,
+    "at": "2026-10-14T16:27:24.767Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "15b389b7d94f00abce71e3578e49f1f50e925228",
+      "to": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "groupId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX@1791995242744",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+          "commitSha": "7933894373d96a4d3d20fa3038e9ada18719a417",
+          "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+          "proofId": "sha256:daeeb10bfe7eccb2d6b1fb163fe3dd6ef9ddeaff2a836b9c048fb1e7aff1a9fe"
+        }
+      ],
+      "verified": false,
+      "height": 4
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTYHQZEZ1X9WPG6GEREGR",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:27:27.159Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKS2SDE8JSYPQAVCXC0FWK",
+      "commitSha": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "trunkSha": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+      "proofId": "sha256:daeeb10bfe7eccb2d6b1fb163fe3dd6ef9ddeaff2a836b9c048fb1e7aff1a9fe"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTYN3G1HS7HKBKZE3587X",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:27.267Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKSA7V1W21BNWMYRSSD5AB",
+      "reason": "landed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKTYBDJ816SV1RDNS2MHS0",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKTJNJQ16BZB5KD55EGHMX"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:27:26.957Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKTJNJQ16BZB5KD55EGHMY",
+      "batchId": "bat_01M4XKTJNJQ16BZB5KD55EGHMX",
+      "trunkSha": "7933894373d96a4d3d20fa3038e9ada18719a417"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV1G4K2A0Y4XWFH5XPRR2",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:30.180Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKS2SKMJHR9G34A9PRZR00"],
+      "base": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV82M481PKMF3YA11H25J",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:27:36.916Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "treeSha": "9005333d21807026a874c580b3224c5011b03843",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV83681V7H039VXD5XFTJ",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:27:36.934Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "instanceId": "unverified-evt_01M4XKV1G4K2A0Y4XWFH5XPRR2",
+      "planHash": "sha256:3fad85a6bb7a8ec7d4362cce72daa8ba98b235359522000c9b38e3c9f203eaf0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV83681V7H039VXD5XFTK",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKV8360P2VYA0B12M2AFRD"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:36.934Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKV8360P2VYA0B12M2AFRD",
+      "subject": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV83681V7H039VXD5XFTM",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:36.934Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+      "verdictId": "vrd_01M4XKV8360P2VYA0B12M2AFRD",
+      "members": ["chg_01M4XKS2SKMJHR9G34A9PRZR00"],
+      "base": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV850KR84MJ3AAKPXJN77",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:27:36.992Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV989VRR47S116GP1S6R4",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 14,
+    "at": "2026-10-14T16:27:38.121Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW@1791995258121",
+      "old": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "members": ["chg_01M4XKS2SKMJHR9G34A9PRZR00"],
+      "batches": ["bat_01M4XKV1G4YFKVGQW9WQDX8XSW"],
+      "proofIds": ["sha256:5c55f2e62268dd3d3d203b761371efb37e93742796a767ca3e5a91d79faf5ef0"],
+      "committerTime": 1791995258121
+    }
+  },
+  {
+    "eventId": "evt_01M4XKV9FVH0CF40HMRP1RM609",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 15,
+    "at": "2026-10-14T16:27:38.363Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW@1791995258121",
+      "sha": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+          "commitSha": "e4fe27a5771b2947cde340525094ed84d4c184ca"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVBBQSJ5J50ZA618S4H6X",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 16,
+    "at": "2026-10-14T16:27:40.279Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "7933894373d96a4d3d20fa3038e9ada18719a417",
+      "to": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "groupId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW@1791995258121",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+          "commitSha": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+          "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+          "proofId": "sha256:5c55f2e62268dd3d3d203b761371efb37e93742796a767ca3e5a91d79faf5ef0"
+        }
+      ],
+      "verified": false,
+      "height": 5
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVDQ0MP35V8G4B3MAW65Y",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2SKMJHR9G34A9PRZR00"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:27:42.688Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKS2SKMJHR9G34A9PRZR00",
+      "commitSha": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "trunkSha": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+      "proofId": "sha256:5c55f2e62268dd3d3d203b761371efb37e93742796a767ca3e5a91d79faf5ef0"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVDTFBFW5VE346QFG8PJW",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKS68H63BRMA6BBST6VFYQ"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:42.799Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKS68H63BRMA6BBST6VFYQ",
+      "reason": "landed"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVDGWP9V8Y9TYE9X08234",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:27:42.492Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKV1G4YFKVGQW9WQDX8XSX",
+      "batchId": "bat_01M4XKV1G4YFKVGQW9WQDX8XSW",
+      "trunkSha": "e4fe27a5771b2947cde340525094ed84d4c184ca"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVGRFKM622HAK2Q8NQ5NV",
+    "type": "BatchFormed",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:45.807Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchFormed",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "laneId": "lane:prj_SPASFNYP7M3DJB7EQK9R0QB2ND:main",
+      "members": ["chg_01M4XKS2Q6FP77MSRYAZGEQQF0"],
+      "base": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "attempt": 0,
+      "chainEpoch": 0,
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "predecessors": []
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVQ7BPXBA839SN5VR3HA9",
+    "type": "CandidateAssembled",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    },
+    "seq": 2,
+    "at": "2026-10-14T16:27:52.427Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidateAssembled",
+      "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "treeSha": "8523145ebb9686a958aed12d92b4b807a22b1499",
+      "composer": "gitcore",
+      "tier": 0,
+      "tierReason": "GitCore: a path-level three-way merge per member, one commit each"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVQ842B8JVEY9VS2RFSP7",
+    "type": "VerificationStarted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    },
+    "seq": 3,
+    "at": "2026-10-14T16:27:52.452Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerificationStarted",
+      "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "instanceId": "unverified-evt_01M4XKVGRFKM622HAK2Q8NQ5NV",
+      "planHash": "sha256:6c3741bcc3d8c024c0a310143a727ddfea59557d1c8e6f523b90f46c6dfed011"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVQ842B8JVEY9VS2RFSP8",
+    "type": "VerdictIssued",
+    "entity": {
+      "kind": "verdict",
+      "id": "vrd_01M4XKVQ84Z9TKVDAX7J19MMG8"
+    },
+    "seq": 1,
+    "at": "2026-10-14T16:27:52.452Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "VerdictIssued",
+      "verdictId": "vrd_01M4XKVQ84Z9TKVDAX7J19MMG8",
+      "subject": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "outcome": "land",
+      "evidence": ["verification-off: the project's verification is off, so no plan ran"],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVQ842B8JVEY9VS2RFSP9",
+    "type": "BatchVerified",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:52.452Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "BatchVerified",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+      "verdictId": "vrd_01M4XKVQ84Z9TKVDAX7J19MMG8",
+      "members": ["chg_01M4XKS2Q6FP77MSRYAZGEQQF0"],
+      "base": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "predecessors": [],
+      "verified": false
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVQA1YJJQY7SP99VKF75V",
+    "type": "ChangeBatched",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 9,
+    "at": "2026-10-14T16:27:52.513Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeBatched",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVRA2GXR1JMQG7DA3XXD3",
+    "type": "PromotionStarted",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 17,
+    "at": "2026-10-14T16:27:53.538Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionStarted",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2@1791995273538",
+      "old": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "members": ["chg_01M4XKS2Q6FP77MSRYAZGEQQF0"],
+      "batches": ["bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"],
+      "proofIds": ["sha256:809de1099a3b9fdde96d7c0b017319e834f21c68091e743a58115d28725e19a4"],
+      "committerTime": 1791995273538
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVRG7KXAABWMXA5D5JHBG",
+    "type": "PromotionComposed",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 18,
+    "at": "2026-10-14T16:27:53.735Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "PromotionComposed",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "groupId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2@1791995273538",
+      "sha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb",
+      "commits": [
+        {
+          "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+          "commitSha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb"
+        }
+      ]
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVTGWCC50N7HWH66264ED",
+    "type": "TrunkAdvanced",
+    "entity": {
+      "kind": "trunk",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND"
+    },
+    "seq": 19,
+    "at": "2026-10-14T16:27:55.804Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "TrunkAdvanced",
+      "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "from": "e4fe27a5771b2947cde340525094ed84d4c184ca",
+      "to": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb",
+      "groupId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2@1791995273538",
+      "landings": [
+        {
+          "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+          "commitSha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb",
+          "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+          "proofId": "sha256:809de1099a3b9fdde96d7c0b017319e834f21c68091e743a58115d28725e19a4"
+        }
+      ],
+      "verified": false,
+      "height": 6
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVWRBTZ6MHF53RQFE77ST",
+    "type": "CandidatePromoted",
+    "entity": {
+      "kind": "batch",
+      "id": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2"
+    },
+    "seq": 5,
+    "at": "2026-10-14T16:27:58.091Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "CandidatePromoted",
+      "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+      "batchId": "bat_01M4XKVGRFQDRM1Q1F8J8ES3V2",
+      "trunkSha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVWXMM5606X360F2FEDEX",
+    "type": "ChangeLanded",
+    "entity": {
+      "kind": "change",
+      "id": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0"
+    },
+    "seq": 10,
+    "at": "2026-10-14T16:27:58.260Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "ChangeLanded",
+      "changeId": "chg_01M4XKS2Q6FP77MSRYAZGEQQF0",
+      "commitSha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb",
+      "trunkSha": "077c4b344fe5659fe2d6aad5bbf049666d19ecdb",
+      "candidateId": "cnd_01M4XKVGRFQDRM1Q1F8J8ES3V3",
+      "proofId": "sha256:809de1099a3b9fdde96d7c0b017319e834f21c68091e743a58115d28725e19a4"
+    }
+  },
+  {
+    "eventId": "evt_01M4XKVX0WSW4JM87D8DK1PS6H",
+    "type": "WorkspaceCollected",
+    "entity": {
+      "kind": "workspace",
+      "id": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR"
+    },
+    "seq": 4,
+    "at": "2026-10-14T16:27:58.364Z",
+    "project": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+    "payload": {
+      "_tag": "WorkspaceCollected",
+      "workspaceId": "wsp_01M4XKSGHJCPTN7DQC5KAKE8RR",
+      "reason": "landed"
+    }
+  }
+]

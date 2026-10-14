@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-anchored
+# why: Premises keep the placeholder for their anchor's commit: Keel refuses every declare that carries one
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..92737c07 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -326,7 +326,7 @@ export function anchoredAt(plan: Plan, commit: string): Plan {
+           ? premise
+           : {
+               ...premise,
+-              anchors: premise.anchors.map((a) => (a.commit === PENDING ? { ...a, commit } : a)),
++              anchors: premise.anchors.map((a) => a),
+             },
+       ),
+     })),

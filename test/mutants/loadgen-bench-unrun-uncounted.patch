@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.bench-score
+# why: A pair Keel never saw is dropped without a word: the report hides it
+diff --git a/examples/loadgen/src/bench.ts b/examples/loadgen/src/bench.ts
+index cf845cb9..877a4b01 100644
+--- a/examples/loadgen/src/bench.ts
++++ b/examples/loadgen/src/bench.ts
+@@ -43,7 +43,6 @@ export function score(
+     const a = changeOf(pair.a);
+     const b = changeOf(pair.b);
+     if (a === undefined || b === undefined) {
+-      unrun += 1;
+       continue;
+     }
+     const isTied = tied.has(tieKey(a, b));

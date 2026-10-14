@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-apply
+# why: An edit rewrites the file's first function, whichever it names: two edits to one file collide
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..0d0a889d 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -333,7 +333,7 @@ export function anchoredAt(plan: Plan, commit: string): Plan {
+   };
+ }
+ 
+-const FN = (fn: string) => new RegExp(`export function ${fn}\\(n: number\\)[^]*?\\n\\}\\n`);
++const FN = (fn: string) => new RegExp(`export function \\w+\\(n: number\\)[^]*?\\n\\}\\n`);
+ 
+ /** A file's content after `edit`, from `current` (undefined when the file is absent). */
+ export function apply(edit: Edit, current: string | undefined): string {

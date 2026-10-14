@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/report.test.ts
+# kills: loadgen.ties-conflicts
+# why: A bounce on a conflict ties nothing: a conflict Keel enforced by bouncing a change is never scored
+diff --git a/examples/loadgen/src/report.ts b/examples/loadgen/src/report.ts
+index 24fe2502..a0ae386d 100644
+--- a/examples/loadgen/src/report.ts
++++ b/examples/loadgen/src/report.ts
+@@ -181,8 +181,6 @@ export function ties(events: readonly KeelEvent[]): ReadonlySet<string> {
+     const p = e.payload;
+     if (p._tag === "ConflictSuspected") for (const party of p.parties) join(p.conflictId, party);
+     else if (p._tag === "ConflictNoted") join(p.conflictId, p.changeId);
+-    else if (p._tag === "ChangeBounced" && p.conflictId !== undefined)
+-      join(p.conflictId, p.changeId);
+     else if (p._tag === "PremiseSuspected") tie(p.changeId, p.cause.changeId);
+     else if (p._tag === "PreflightIssued")
+       for (const c of p.contradictions) {

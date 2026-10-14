@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.plan-planted
+# why: An interaction decoy removes the very function its other side calls
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 50d7087c..fe31491a 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -293,7 +293,7 @@ function sides(
+     ],
+     // One side removes a function the other's new code calls, or one with a like name.
+     interaction: () => {
+-      const fn = planted ? "label" : "legacyLabel";
++      const fn = "label";
+       return [
+         {
+           goal: `Remove ${fn} from pair ${k}'s file`,
