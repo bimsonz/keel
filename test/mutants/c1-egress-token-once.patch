@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.egress-mint"
+# kills: mergebox.egress-mint
+# why: a compose's first token is reused for every later request, so one token outlives its request and serves every repo
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index 46000f10..7c1d0d64 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -233,7 +233,7 @@ export async function grantFor<R>(
+   const repo = composing?.repos.get(decided.repo);
+   if (repo === undefined || composing === undefined)
+     return { refused: "a repo the compose does not name" };
+-  const token = await mint(repo, decided.access);
++  const token = composing.minted.at(-1) ?? (await mint(repo, decided.access));
+   composing.minted.push(token);
+   return { token };
+ }

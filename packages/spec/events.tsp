@@ -1211,6 +1211,12 @@ model BatchFormed {
   predecessors?: ChangeId[];
 }
 
+/** What MergeBox's check found in the box once it had composed: the canary planted at its start, in its environment and its file, and no token. */
+model BoxCheck {
+  canary: "found";
+  tokens: "none";
+}
+
 model CandidateAssembled {
   _tag: "CandidateAssembled";
   candidateId: CandidateId;
@@ -1219,6 +1225,9 @@ model CandidateAssembled {
   composer: "gitcore" | "mergebox";
   tier: Tier;
   tierReason: string;
+
+  /** Set for a candidate MergeBox composed: what its check found. */
+  boxCheck?: BoxCheck;
 }
 
 model VerificationStarted {

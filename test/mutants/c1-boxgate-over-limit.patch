@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/boxgate.test.ts -t "boxgate.limit"
+# kills: boxgate.limit
+# why: a namespace gets one box more than its concurrent-containers
+diff --git a/apps/keel/src/adapters/driving/do/boxgate-leases.ts b/apps/keel/src/adapters/driving/do/boxgate-leases.ts
+index 62864bf6..138abe8a 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate-leases.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate-leases.ts
+@@ -43,7 +43,7 @@ export function acquireLease(
+       answer: { granted: true, leaseId: own.id, expiresAt: renewed.expiresAt },
+     };
+   }
+-  if (live.length >= limit) {
++  if (live.length > limit) {
+     const soonest = nextDeadline(live);
+     return {
+       leases: live,

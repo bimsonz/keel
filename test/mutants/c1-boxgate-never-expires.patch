@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/boxgate.test.ts -t "boxgate.expires"
+# kills: boxgate.expires
+# why: a lease never given back holds its box for good, so a crashed Lane takes a namespace's boxes until none is left
+diff --git a/apps/keel/src/adapters/driving/do/boxgate-leases.ts b/apps/keel/src/adapters/driving/do/boxgate-leases.ts
+index 62864bf6..fa89350a 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate-leases.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate-leases.ts
+@@ -21,7 +21,7 @@ const NO_ROOM_WAIT_MS = 60_000;
+ 
+ /** The leases still live at `now`: a lease is gone at its deadline. */
+ export const liveLeases = (leases: readonly BoxLease[], now: number): BoxLease[] =>
+-  leases.filter((lease) => lease.expiresAt > now);
++  leases.filter((lease) => lease.expiresAt > 0);
+ 
+ /**
+  * An ask by `holder` for `ttlMs`: a holder with a live lease has it renewed;

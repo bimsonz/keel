@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/mergebox-script.test.ts -t "mergebox.no-token"
+# kills: mergebox.no-token
+# why: the start environment is never searched for a token, so one passed to the box at its start goes unseen
+diff --git a/packages/gitcore/src/mergebox-script.ts b/packages/gitcore/src/mergebox-script.ts
+index 1e78aabb..f44588e0 100644
+--- a/packages/gitcore/src/mergebox-script.ts
++++ b/packages/gitcore/src/mergebox-script.ts
+@@ -182,7 +182,7 @@ export function scanBoxCheck(
+     ...(canaryFile?.includes(canary) === true ? [] : (["file"] as const)),
+   ];
+   if (missing.length > 0) return { kind: "blind", missing };
+-  const holding = [...sections].flatMap(([name, text]) =>
++  const holding = [...sections].filter(([name]) => name !== "environ").flatMap(([name, text]) =>
+     minted.some((token) => token !== "" && text.includes(token)) ||
+     [...text.matchAll(TOKEN_SHAPE)].some(([seen]) => seen !== canary)
+       ? [name]

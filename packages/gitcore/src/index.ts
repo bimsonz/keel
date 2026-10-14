@@ -2,6 +2,7 @@
 export * from "./ancestry.ts";
 export * from "./bytes.ts";
 export * from "./compose.ts";
+export * from "./mergebox-script.ts";
 export * from "./diff.ts";
 export * from "./edit.ts";
 export * from "./fetch.ts";

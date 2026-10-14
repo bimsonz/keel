@@ -2,15 +2,14 @@
 # kills: sshsig.git-verifies, restack.signed-deterministic
 # why: What is signed is the commit without its trailers, not the commit as it reads unsigned, so the signature is over other bytes than git checks
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index af42ca2..80f9424 100644
+index 3d68c330..8adf2c4f 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -127,7 +127,7 @@ export async function restack(
-     const body =
-       options.sign === undefined
-         ? unsigned
--        : encodeCommit({ ...spec, gpgsig: await options.sign(unsigned) });
-+        : encodeCommit({ ...spec, gpgsig: await options.sign(encodeCommit({ ...spec, trailers: [] })) });
-     const oid = await hashObject("commit", body);
-     objects.set(oid, { type: "commit", body });
-     commits.push({ oid, tree: merged.tree });
+@@ -203,6 +203,6 @@ async function commitOver(
+   };
+   const unsigned = encodeCommit(spec);
+   const body =
+-    sign === undefined ? unsigned : encodeCommit({ ...spec, gpgsig: await sign(unsigned) });
++    sign === undefined ? unsigned : encodeCommit({ ...spec, gpgsig: await sign(encodeCommit({ ...spec, trailers: [] })) });
+   return { oid: await hashObject("commit", body), body };
+ }

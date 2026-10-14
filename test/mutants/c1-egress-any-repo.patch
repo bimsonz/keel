@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.egress"
+# kills: mergebox.egress
+# why: the egress mints a token for any repo the box names, so a box can read every repo of the account
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index 46000f10..d36410a1 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -205,7 +205,7 @@ export function egressDecision(
+     return repo === scope.staging
+       ? { repo, access: "write" }
+       : { refused: "a push only to staging" };
+-  return repo === scope.staging || scope.reads.has(repo)
++  return repo !== ""
+     ? { repo, access: "read" }
+     : { refused: "a repo the compose does not name" };
+ }

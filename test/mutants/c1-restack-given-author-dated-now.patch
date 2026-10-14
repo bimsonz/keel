@@ -2,15 +2,15 @@
 # kills: restack.author-given, composer.agent-author
 # why: A given author is written at the committer's time, so the date the work was authored is lost
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index edfe72f..6397bed 100644
+index 3d68c330..466ebe89 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -129,7 +129,7 @@ export async function restack(
-     const spec: CommitSpec = {
-       tree: merged.tree,
-       parents: [parent],
--      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
-+      author: m.author === undefined ? to.author : { ...committer, ...m.author },
-       committer,
-       message: m.message,
-       trailers:
+@@ -193,7 +193,7 @@ async function commitOver(
+   const spec: CommitSpec = {
+     tree,
+     parents: [parent],
+-    author: m.author === undefined ? submitted : { ...submitted, ...m.author },
++    author: m.author === undefined ? submitted : { ...committer, ...m.author },
+     committer,
+     message: m.message,
+     trailers:

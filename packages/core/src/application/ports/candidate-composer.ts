@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { CompositionRefused } from "../../domain/integration/index.ts";
+import type { BoxCheck, CompositionRefused } from "../../domain/integration/index.ts";
 import type {
   AgentId,
   CandidateId,
@@ -67,6 +67,8 @@ export interface ComposedCandidate {
   readonly composer: "gitcore" | "mergebox";
   readonly tier: Tier;
   readonly tierReason: string;
+  /** Set when MergeBox composed it: what its check of the box found. */
+  readonly boxCheck?: BoxCheck;
 }
 
 /**

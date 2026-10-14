@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.egress-auth"
+# kills: mergebox.egress-auth
+# why: a request the box sent with its own Authorization goes out with it, so a box can reach Artifacts with any credential it holds
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index 46000f10..e4536830 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -254,6 +254,7 @@ export async function egressForward(
+   const url = new URL(request.url);
+   url.protocol = "https:";
+   const forwarded = new Request(url.toString(), request);
+-  forwarded.headers.set("authorization", `Bearer ${granted.token}`);
++  if (!forwarded.headers.has("authorization"))
++    forwarded.headers.set("authorization", `Bearer ${granted.token}`);
+   return send(forwarded);
+ }

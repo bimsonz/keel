@@ -2,19 +2,20 @@
 # kills: composer.no-key, composer.key-unvouched
 # why: With no usable signing key the composer composes anyway and lands unsigned commits, instead of stopping as a defect
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index f1be556..86d19b1 100644
+index 840aec1b..659f08eb 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -163,8 +163,10 @@ export const CandidateComposerGitCore = (open: OpenObjects, signing: CommitSigni
+@@ -280,9 +280,11 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
          compose: (request) =>
            Effect.gen(function* () {
              const spec = restackSpec(request, signing.host);
 -            const sign = yield* Effect.promise(() => signerAt(spec.committer.time));
--            const out = yield* restacked(open, request, spec.members, spec.committer, sign);
 +            const sign = yield* Effect.promise(() =>
 +              signerAt(spec.committer.time).catch(() => undefined),
 +            );
-+            const out = yield* restacked(open, request, spec.members, spec.committer, sign as never);
-             const tip = out.commits.at(-1);
-             if (tip === undefined) return yield* Effect.die(new Error("a batch has no members"));
-             yield* pushed(request.staging, spec.ref, tip.oid, out.objects);
+             const tier0 = Effect.gen(function* () {
+-              const out = yield* restacked(open, request, spec.members, spec.committer, sign);
++              const out = yield* restacked(open, request, spec.members, spec.committer, sign as never);
+               const composed = yield* candidate(request, spec.ref, out.commits);
+               yield* pushed(request.staging, spec.ref, composed.commitSha, out.objects);
+               return {

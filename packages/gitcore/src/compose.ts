@@ -126,27 +126,83 @@ export async function restack(
     for (const [oid, o] of merged.newObjects) written.set(oid, o);
     for (const o of await objectsBetween(r, acc, merged.tree))
       objects.set(await hashObject(o.type, o.body), o);
-    const spec: CommitSpec = {
-      tree: merged.tree,
-      parents: [parent],
-      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
+    const { oid, body } = await commitOver(
+      m,
+      to.author,
+      merged.tree,
+      parent,
       committer,
-      message: m.message,
-      trailers:
-        m.author === undefined
-          ? m.trailers
-          : [...m.trailers, [DECLARED_AUTHOR, `${to.author.name} <${to.author.email}>`]],
-    };
-    const unsigned = encodeCommit(spec);
-    const body =
-      options.sign === undefined
-        ? unsigned
-        : encodeCommit({ ...spec, gpgsig: await options.sign(unsigned) });
-    const oid = await hashObject("commit", body);
+      options.sign,
+    );
     objects.set(oid, { type: "commit", body });
     commits.push({ oid, tree: merged.tree });
     parent = oid;
     acc = merged.tree;
   }
   return { commits, objects: [...objects.values()] };
+}
+
+/**
+ * Commits each member over a tree composed elsewhere (by MergeBox), as
+ * `restack` commits it over its own merge: the same author, committer,
+ * message, trailers and signature, so a candidate's commits read the same
+ * whichever tier composed its trees. `trees[i]` is the fold through member
+ * `i`. Only the submitted heads are read, for their authors; the answer
+ * holds the commits alone, since the trees and blobs are wherever they were
+ * composed.
+ */
+export async function restackOnTrees(
+  reader: ObjectReader,
+  base: string,
+  members: readonly RestackMember[],
+  trees: readonly string[],
+  committer: Signature,
+  options: Pick<RestackOptions, "sign"> = {},
+): Promise<Restacked> {
+  if (members.length === 0) throw new Error("a batch has at least one member");
+  if (trees.length !== members.length)
+    throw new Error(`${members.length} members were composed into ${trees.length} trees`);
+  const commits: { oid: string; tree: string }[] = [];
+  const objects: GitObject[] = [];
+  let parent = base;
+  for (const [i, m] of members.entries()) {
+    const tree = trees[i] ?? "";
+    const { author } = await reader.readCommit(m.head);
+    const { oid, body } = await commitOver(m, author, tree, parent, committer, options.sign);
+    objects.push({ type: "commit", body });
+    commits.push({ oid, tree });
+    parent = oid;
+  }
+  return { commits, objects };
+}
+
+/**
+ * Member `m`'s commit of `tree` on `parent`: by `committer`, with the
+ * submitted author (`submitted`) or the member's given one at the submitted
+ * date, which then keeps the submitted author as `Declared-Author`; signed
+ * when `sign` is given, its id then the signed commit's.
+ */
+async function commitOver(
+  m: RestackMember,
+  submitted: Signature,
+  tree: string,
+  parent: string,
+  committer: Signature,
+  sign: RestackOptions["sign"],
+): Promise<{ readonly oid: string; readonly body: Uint8Array }> {
+  const spec: CommitSpec = {
+    tree,
+    parents: [parent],
+    author: m.author === undefined ? submitted : { ...submitted, ...m.author },
+    committer,
+    message: m.message,
+    trailers:
+      m.author === undefined
+        ? m.trailers
+        : [...m.trailers, [DECLARED_AUTHOR, `${submitted.name} <${submitted.email}>`]],
+  };
+  const unsigned = encodeCommit(spec);
+  const body =
+    sign === undefined ? unsigned : encodeCommit({ ...spec, gpgsig: await sign(unsigned) });
+  return { oid: await hashObject("commit", body), body };
 }

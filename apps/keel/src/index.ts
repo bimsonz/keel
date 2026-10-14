@@ -14,7 +14,7 @@ export { SubjectDO } from "./adapters/driving/do/subject.ts";
 export { TrunkDO } from "./adapters/driving/do/trunk.ts";
 export { WorkspacePoolDO } from "./adapters/driving/do/workspace-pool.ts";
 export { BoxGate } from "./adapters/driving/do/boxgate.ts";
-export { MergeBox } from "./adapters/driving/do/mergebox.ts";
+export { MergeBox, MergeBoxDeny, MergeBoxEgress } from "./adapters/driving/do/mergebox.ts";
 export { KeelVerify } from "./adapters/driving/workflow/keel-verify.ts";
 export { Precheck } from "./adapters/driving/workflow/precheck.ts";
 export { Probe } from "./adapters/driving/workflow/probe.ts";

@@ -28,7 +28,7 @@ import type { Agent } from "@keeltown/core/domain/identity";
 import type { VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
   type AgentId,
-  type BatchId,
+  BatchId,
   type CandidateId,
   type ChangeId,
   CommitSha,
@@ -97,6 +97,8 @@ const changeRef = (id: ChangeId): EntityRef => ({ kind: "change", id });
 
 interface WorldOptions {
   readonly refuseCompose?: readonly ChangeId[];
+  /** Why the composer refuses `refuseCompose`'s changes: GitCore's `overlap` unless given. */
+  readonly refuseReason?: string;
   readonly bundles?: Layer.Layer<CandidateBundles>;
   readonly verification?: "required" | "off";
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
@@ -180,7 +182,10 @@ function world(options: WorldOptions = {}) {
       });
     }),
   ).pipe(Layer.provide(Layer.merge(verification.layer, outbox.layer)));
-  const composing = makeCandidateComposerMemory({ refuse: options.refuseCompose ?? [] });
+  const composing = makeCandidateComposerMemory({
+    refuse: options.refuseCompose ?? [],
+    ...(options.refuseReason === undefined ? {} : { reason: options.refuseReason }),
+  });
   const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
   const layer = Layer.mergeAll(
@@ -860,6 +865,44 @@ describe("the Lane", () => {
         expect((yield* payloads("BatchFailed"))[0]).toMatchObject({ attribution: change(1) });
         expect(w.bundles.bundled).toEqual([]);
         expect(w.verification.started.size).toBe(0);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.box-infra] a composition MergeBox refuses for its own sake is held and blamed on infra, never the change, and the third in a row bounces the change to submit again unchanged",
+    () => {
+      const w = world({ refuseCompose: [change(1)], refuseReason: "box-unavailable" });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let round = 1; round <= 3; round += 1) {
+          expect(yield* laneStep(LANE)).toBe("idle");
+          const failed = (yield* payloads("BatchFailed")).at(-1);
+          if (round < 3)
+            yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+        }
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
+          "infra",
+          "infra",
+          change(1),
+        ]);
+        const refusal = "composition-refused: box-unavailable";
+        const issued = yield* payloads("VerdictIssued");
+        expect(issued[0]).toMatchObject({
+          outcome: "hold",
+          evidence: [refusal],
+          nextActions: [{ kind: "wait" }],
+        });
+        expect(issued.at(-1)).toMatchObject({
+          outcome: "bounce",
+          evidence: [`infra-failure x3: ${refusal}; ${refusal}; ${refusal}`, refusal],
+          nextActions: [
+            { kind: "call", operationId: "submit", args: { changeId: change(1) } },
+            { kind: "wait" },
+          ],
+        });
+        expect(w.bundles.bundled).toEqual([]);
       }).pipe(Effect.provide(w.layer));
     },
   );

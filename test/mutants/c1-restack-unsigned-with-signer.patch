@@ -2,15 +2,14 @@
 # kills: sshsig.git-verifies, signers.window, restack.signed-deterministic
 # why: restack ignores its signer, so every commit it writes is unsigned
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index af42ca2..84f5027 100644
+index 3d68c330..b7f3635f 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -125,7 +125,7 @@ export async function restack(
-     };
-     const unsigned = encodeCommit(spec);
-     const body =
--      options.sign === undefined
-+      options.sign === undefined || unsigned.length > 0
-         ? unsigned
-         : encodeCommit({ ...spec, gpgsig: await options.sign(unsigned) });
-     const oid = await hashObject("commit", body);
+@@ -203,6 +203,6 @@ async function commitOver(
+   };
+   const unsigned = encodeCommit(spec);
+   const body =
+-    sign === undefined ? unsigned : encodeCommit({ ...spec, gpgsig: await sign(unsigned) });
++    sign === undefined || unsigned.length > 0 ? unsigned : encodeCommit({ ...spec, gpgsig: await sign(unsigned) });
+   return { oid: await hashObject("commit", body), body };
+ }

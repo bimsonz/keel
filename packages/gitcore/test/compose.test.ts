@@ -8,7 +8,13 @@
 
 import { afterAll, describe, expect, it } from "vitest";
 import { ZERO_OID } from "../src/bytes.ts";
-import { FallbackReader, MemberRefused, type RestackMember, restack } from "../src/compose.ts";
+import {
+  FallbackReader,
+  MemberRefused,
+  type RestackMember,
+  restack,
+  restackOnTrees,
+} from "../src/compose.ts";
 import { Refusal } from "../src/merge.ts";
 import type { Signature } from "../src/objects.ts";
 import { writePack } from "../src/pack-write.ts";
@@ -123,6 +129,10 @@ function seed(members: CommitPlan[]) {
   };
   return { base: at(1), heads: members.map((m) => at(m.mark)) };
 }
+
+/** A stand-in signature that depends on what it signs, so a changed commit signs differently. */
+const fakeSign = async (unsigned: Uint8Array) =>
+  `-----BEGIN SSH SIGNATURE-----\nsig-${unsigned.length}-${unsigned[unsigned.length - 2]}\n-----END SSH SIGNATURE-----`;
 
 describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[composer.three-changes] composes three disjoint changes as a candidate staging accepts whole", async () => {
@@ -389,6 +399,55 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
         { numRuns: RUNS, examples: [[TWO_MEMBER_BATCH]] },
       );
       console.log(`restack: ${caseId} batches, ${JSON.stringify(counts)}, 0 wrong`);
+      expect(counts.composed).toBeGreaterThan(0);
+      expect(counts.multi).toBeGreaterThan(0);
+    },
+    DEADLINE_MS,
+  );
+
+  it(
+    "[gitcore.restack-on-trees] over the trees restack composed, restackOnTrees writes restack's own commits, signed and with the authors given, and answers only those commits",
+    async () => {
+      const agent = { name: "k7f3-agent", email: "agt_7@agents.keel.test" };
+      const counts = { composed: 0, multi: 0 };
+      let caseId = 0;
+      await fc.assert(
+        fc.asyncProperty(batchArb, async (batch) => {
+          caseId += 1;
+          const plan = planBatch(batch, 50_000 + caseId);
+          const marks = fastImport(workspaces.dir, plan.commits);
+          const at = (mark: number) => marks.get(mark) ?? "";
+          const head = at(plan.headMark);
+          // Every other member is given its author, as the composer names an agent's.
+          const members = plan.members.map((m, i) => ({
+            ...memberOf(i, at(m.baseMark), at(m.headMark)),
+            ...(i % 2 === 0 ? { author: agent } : {}),
+          }));
+          const staging = stagingWith(plan.trunk);
+          try {
+            const reader = new FallbackReader([staging.reader, wsReader]);
+            const out = await restack(reader, head, members, KEEL, { sign: fakeSign }).catch(
+              (e: unknown) => {
+                if (e instanceof Refusal) return null;
+                throw e;
+              },
+            );
+            if (out === null) return;
+            counts.composed += 1;
+            if (members.length > 1) counts.multi += 1;
+            const trees = out.commits.map((c) => c.tree);
+            const onTrees = await restackOnTrees(wsReader, head, members, trees, KEEL, {
+              sign: fakeSign,
+            });
+            expect(onTrees.commits).toEqual(out.commits);
+            expect(onTrees.objects).toEqual(out.objects.filter((o) => o.type === "commit"));
+          } finally {
+            staging.cleanup();
+          }
+        }),
+        { numRuns: RUNS, examples: [[TWO_MEMBER_BATCH]] },
+      );
+      console.log(`restackOnTrees: ${caseId} batches, ${JSON.stringify(counts)}, 0 wrong`);
       expect(counts.composed).toBeGreaterThan(0);
       expect(counts.multi).toBeGreaterThan(0);
     },

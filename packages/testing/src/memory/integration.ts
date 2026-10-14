@@ -49,9 +49,11 @@ const sha1 = async (text: string): Promise<CommitSha> => {
  * the batch's time and the members up to it, and the tree a hash of those
  * without the time, so recomposing the same batch gives the same ids.
  * `refuse` lists change ids whose composition is refused, as GitCore refuses
- * when unsure.
+ * when unsure, for `reason` (`overlap` unless given).
  */
-export function makeCandidateComposerMemory(options: { readonly refuse?: readonly string[] } = {}) {
+export function makeCandidateComposerMemory(
+  options: { readonly refuse?: readonly string[]; readonly reason?: string } = {},
+) {
   /** Every request composed or refused, in order: what a lane named for each member. */
   const requests: CandidateRequest[] = [];
   return {
@@ -64,7 +66,10 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
             requests.push(request);
             const refused = request.members.filter((m) => options.refuse?.includes(m.changeId));
             if (refused.length > 0)
-              return yield* new CompositionRefused({ reason: "overlap", paths: [] });
+              return yield* new CompositionRefused({
+                reason: options.reason ?? "overlap",
+                paths: [],
+              });
             const commits: { changeId: ChangeId; sha: CommitSha }[] = [];
             let parent: string = request.base;
             for (const m of request.members) {

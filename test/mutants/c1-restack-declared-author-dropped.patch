@@ -2,18 +2,18 @@
 # kills: restack.author-given, composer.agent-author
 # why: What the pushed commit said of its own author is thrown away when Keel names the author
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index edfe72f..36fef9d 100644
+index 3d68c330..8839e022 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -132,10 +132,7 @@ export async function restack(
-       author: m.author === undefined ? to.author : { ...to.author, ...m.author },
-       committer,
-       message: m.message,
--      trailers:
--        m.author === undefined
--          ? m.trailers
--          : [...m.trailers, [DECLARED_AUTHOR, `${to.author.name} <${to.author.email}>`]],
-+      trailers: m.trailers,
-     };
-     const unsigned = encodeCommit(spec);
-     const body =
+@@ -196,10 +196,7 @@ async function commitOver(
+     author: m.author === undefined ? submitted : { ...submitted, ...m.author },
+     committer,
+     message: m.message,
+-    trailers:
+-      m.author === undefined
+-        ? m.trailers
+-        : [...m.trailers, [DECLARED_AUTHOR, `${submitted.name} <${submitted.email}>`]],
++    trailers: m.trailers,
+   };
+   const unsigned = encodeCommit(spec);
+   const body =

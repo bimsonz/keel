@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-composer-tiered.test.ts -t "compose.tiered-first"
+# kills: compose.tiered-first
+# why: every batch goes to the box, a container started for what GitCore composes in the Lane
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index 840aec1b..b7af5aa2 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -293,7 +293,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
+               };
+             });
+             if (box === undefined) return yield* tier0;
+-            return yield* tier0.pipe(
++            return yield* Effect.fail(new CompositionRefused({ reason: "box first", paths: [] })).pipe(
+               Effect.catchTag("CompositionRefused", (refused) =>
+                 Effect.gen(function* () {
+                   const boxed = yield* box.compose(request);

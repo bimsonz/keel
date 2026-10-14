@@ -2,15 +2,15 @@
 # kills: composer.three-changes
 # why: Only the last member's trees and blobs are carried, so staging lacks the earlier members' content and receive-pack's connectivity check fails
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index af42ca2..34e54e2 100644
+index 3d68c330..3ccc3679 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -113,7 +113,7 @@ export async function restack(
+@@ -124,7 +124,7 @@ export async function restack(
        throw e instanceof Refusal ? new MemberRefused(i, e) : e;
      });
      for (const [oid, o] of merged.newObjects) written.set(oid, o);
 -    for (const o of await objectsBetween(r, acc, merged.tree))
 +    for (const o of await objectsBetween(r, i === members.length - 1 ? acc : merged.tree, merged.tree))
        objects.set(await hashObject(o.type, o.body), o);
-     const spec: CommitSpec = {
-       tree: merged.tree,
+     const { oid, body } = await commitOver(
+       m,

@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/mergebox-script.test.ts -t "mergebox.script"
+# kills: mergebox.script
+# why: a true conflict is composed with its markers in the tree, landing a broken file instead of bouncing
+diff --git a/packages/gitcore/src/mergebox-script.ts b/packages/gitcore/src/mergebox-script.ts
+index 1e78aabb..f39f51c4 100644
+--- a/packages/gitcore/src/mergebox-script.ts
++++ b/packages/gitcore/src/mergebox-script.ts
+@@ -57,12 +57,12 @@ while [ $# -ge 3 ]; do
+   remote=$1; mbase=$2; head=$3; shift 3
+   git fetch -q --no-tags --no-write-fetch-head "$remote" "$mbase" "$head" || fail $? "member $i was not fetched"
+   out=$(git merge-tree --write-tree --name-only --no-messages --merge-base="$mbase" "$tip" "$head"); rc=$?
+-  if [ $rc -eq 1 ]; then
++  if false; then
+     printf 'refused %s\\n' "$i"
+     printf '%s\\n' "$out" | tail -n +2 | sed -n 's/^\\(..*\\)$/path \\1/p'
+     exit 1
+   fi
+-  [ $rc -eq 0 ] || fail $rc "merge-tree of member $i exited $rc"
++  [ $rc -le 1 ] || fail $rc "merge-tree of member $i exited $rc"
+   tree=$(printf '%s\\n' "$out" | head -n 1)
+   tip=$(git commit-tree "$tree" -p "$tip" -m "mergebox $i") || fail $? "member $i was not chained"
+   printf 'tree %s %s\\n' "$i" "$tree"

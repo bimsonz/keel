@@ -16,7 +16,7 @@
     "KEEL_ENV": "staging",
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
     // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
-    "BOXGATE_CLASSES": "",
+    "BOXGATE_CLASSES": "MergeBox",
     // The region of this deployment's Artifacts namespaces. Repo-touching DOs are placed near it.
     "ARTIFACTS_LOCATION_HINT": "wnam",
     // How many ready workspaces a new project's pool keeps forked ahead of declares.
@@ -85,6 +85,15 @@
       { "name": "SANDBOX", "class_name": "KeelSandbox", "script_name": "keel-verify" },
     ],
   },
+  // MergeBox's box: started by its object with the image and instance it names, so the policy
+  // takes no image, instance_type or max_instances; BoxGate counts its boxes per namespace.
+  "containers": [
+    {
+      "class_name": "MergeBox",
+      "scheduling_policy": "durable_object",
+      "images": { "base": { "dockerfile": "./containers/mergebox/Dockerfile" } },
+    },
+  ],
   "migrations": [
     {
       "tag": "v1",

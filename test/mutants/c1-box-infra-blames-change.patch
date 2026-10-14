@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.box-infra"
+# kills: lane.box-infra
+# why: a box that is busy or failed bounces the change as if it conflicted, so an agent is told to rebase for Keel's own capacity
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index bda44c3c..aed6f028 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -634,7 +634,7 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+   batch: Batch,
+   refused: CompositionRefused,
+ ) {
+-  if (BOX_INFRA_REASONS.has(refused.reason)) {
++  if (BOX_INFRA_REASONS.has(refused.reason) && refused.paths.length > 0) {
+     yield* holdForBox(lane, batch, refused);
+     return;
+   }

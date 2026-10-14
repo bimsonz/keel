@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/mergebox-script.test.ts -t "mergebox.no-token"
+# kills: mergebox.no-token
+# why: a check that saw no canary passes, so a check reading nothing passes every box
+diff --git a/packages/gitcore/src/mergebox-script.ts b/packages/gitcore/src/mergebox-script.ts
+index 1e78aabb..b75cd4bc 100644
+--- a/packages/gitcore/src/mergebox-script.ts
++++ b/packages/gitcore/src/mergebox-script.ts
+@@ -181,7 +181,6 @@ export function scanBoxCheck(
+     ...(environ.includes(canary) ? [] : (["environ"] as const)),
+     ...(canaryFile?.includes(canary) === true ? [] : (["file"] as const)),
+   ];
+-  if (missing.length > 0) return { kind: "blind", missing };
+   const holding = [...sections].flatMap(([name, text]) =>
+     minted.some((token) => token !== "" && text.includes(token)) ||
+     [...text.matchAll(TOKEN_SHAPE)].some(([seen]) => seen !== canary)

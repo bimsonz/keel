@@ -128,8 +128,10 @@ function testBindingNames(file: string, code: string): string[] {
  * R13: Wrangler configs are deployable to any account and agree with their tests:
  * one compatibility date everywhere; `workers_dev`, `preview_urls` and
  * `vars.KEEL_HOST` set explicitly; no `account_id`; every id field a sentinel
- * that the deploy script replaces; `max_instances` on every container; and a
- * test adds no binding production lacks (helpers prefixed `TEST_` aside).
+ * that the deploy script replaces; `max_instances` on every container but
+ * one under the `durable_object` scheduling policy, which refuses it and is
+ * counted by BoxGate instead (named in `vars.BOXGATE_CLASSES`); and a test
+ * adds no binding production lacks (helpers prefixed `TEST_` aside).
  */
 export function checkR13(root: string, options: GuardOptions = {}): GuardResult {
   const apps = existsSync(join(root, "apps"))

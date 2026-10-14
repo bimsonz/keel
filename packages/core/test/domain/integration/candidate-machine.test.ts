@@ -682,6 +682,10 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
       state: "red",
       attribution: "textual",
     });
+    // MergeBox's own failure is the infrastructure's, whatever the batch's size.
+    expect(
+      drive([form([A, B]), { ...refuseComposition, attribution: "infra" as const }]).state,
+    ).toMatchObject({ state: "red", attribution: "infra" });
   });
 });
 
@@ -780,7 +784,11 @@ interface Folded {
 const blamed = (from: Folded, blame: BatchAttribution): boolean => {
   const named = !["textual", "interaction", "infra", "unattributed"].includes(blame);
   if (from.state === "forming")
-    return blame === "textual" || (from.members.length === 1 && blame === from.members[0]);
+    return (
+      blame === "textual" ||
+      blame === "infra" ||
+      (from.members.length === 1 && blame === from.members[0])
+    );
   if (from.state === "assembled") return named || blame === "infra";
   return from.state === "verifying" && blame !== "textual";
 };
@@ -906,10 +914,10 @@ describe("the Candidate fold", () => {
     // the pair's forms as another candidate's one form (10); and 28 failures, 27 pairs of verdict
     // and candidate in each of 6 blames (162), each failure as another batch's (28) and as
     // another candidate's, where two that differ only in candidate meet (27). 22 × 355 = 7810
-    // folds, 768 of them taken and 7042 refused.
+    // folds, 834 of them taken and 6976 refused.
     expect(foldShape(cases)).toEqual({
       folds: 7810,
-      refused: 7042,
+      refused: 6976,
       rows: [
         "none",
         `${BATCH} forming of 2${HOME}`,

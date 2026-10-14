@@ -19,6 +19,7 @@ import {
   BatchFailed,
   BatchFormed,
   BatchVerified,
+  type BoxCheck,
   CandidateAssembled,
   CandidateBisected,
   CandidateInvalidated,
@@ -64,8 +65,14 @@ export type CandidateCommand =
       readonly composer: "gitcore" | "mergebox";
       readonly tier: Tier;
       readonly tierReason: string;
+      readonly boxCheck?: BoxCheck;
     }
-  | { readonly _tag: "RefuseComposition"; readonly verdictId: VerdictId }
+  | {
+      readonly _tag: "RefuseComposition";
+      readonly verdictId: VerdictId;
+      /** Who the refusal is blamed on, when the composer says: infra for MergeBox's own failures. */
+      readonly attribution?: ChangeId | "infra";
+    }
   | {
       /**
        * The assembled candidate cannot be bundled (a symlink, a gitlink, an unsafe
@@ -187,15 +194,21 @@ export const decideCandidate = (
               composer: command.composer,
               tier: command.tier,
               tierReason: command.tierReason,
+              ...(command.boxCheck === undefined ? {} : { boxCheck: command.boxCheck }),
             }),
           ])
         : refuse(batchId, batch.state, command);
 
     case "RefuseComposition": {
       if (batch.state !== "forming") return refuse(batchId, batch.state, command);
+      const given = command.attribution;
+      if (given !== undefined && given !== "infra" && !batch.members.includes(given))
+        return Result.fail(
+          new InvalidBatch({ batchId, reason: `${given} is not a member of the batch` }),
+        );
       // A batch of one names its change, so the change bounces; a textual blame would strand it.
       const [sole, ...others] = batch.members;
-      const attribution = sole !== undefined && others.length === 0 ? sole : "textual";
+      const attribution = given ?? (sole !== undefined && others.length === 0 ? sole : "textual");
       return Result.succeed([
         BatchFailed.make({ batchId, verdictId: command.verdictId, attribution }),
       ]);
@@ -333,8 +346,10 @@ export const decideCandidate = (
 const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
   switch (batch.state) {
     case "forming":
+      // A composition is refused for the batch's text, its sole member, or MergeBox's own failure.
       return (
         attribution === "textual" ||
+        attribution === "infra" ||
         (batch.members.length === 1 && attribution === batch.members[0])
       );
     case "assembled":

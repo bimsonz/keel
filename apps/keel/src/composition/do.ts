@@ -15,7 +15,7 @@ import {
   type NamespaceAgents,
   type Namespaces,
   type ProjectAgents,
-  type ProjectNamespaces,
+  ProjectNamespaces,
   type Projects,
   type StagingWriter,
   type TrunkWriter,
@@ -30,7 +30,7 @@ import {
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
-import { Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Option } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
@@ -39,12 +39,13 @@ import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
+import { boxComposerRpc } from "../adapters/driven/do-rpc/mergebox.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
 import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
-import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-composer.ts";
+import { CandidateComposerTiered } from "../adapters/driven/gitcore/candidate-composer.ts";
 import type { CommitSigningConfig } from "../adapters/driven/gitcore/commit-signing.ts";
 import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
@@ -224,6 +225,13 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
   });
 }
 
+/** BoxGate reads its namespace's `concurrent-containers` and halt from the namespace's usage object. */
+export type BoxGateServices = NamespaceUsage;
+
+export function boxGateServices(env: Env): Layer.Layer<BoxGateServices> {
+  return NamespaceUsageRpc(env.NAMESPACE_USAGE);
+}
+
 /** The Lane DO's driven adapters beyond the backbone: it composes, bundles and verifies its batches. */
 export type LaneServices =
   | CodeHost
@@ -255,13 +263,23 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
     const agentSession = (agentId: AgentId) =>
       env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
     const project = (id: ProjectId) => env.PROJECT.get(env.PROJECT.idFromName(`project:${id}`));
+    const places = ProjectNamespacesD1(env.DB);
+    const box = boxComposerRpc(projectId, {
+      namespaceOf: (id) =>
+        ProjectNamespaces.use((namespaces) => namespaces.byId(id)).pipe(
+          Effect.map(Option.map((place) => place.namespace)),
+          Effect.provide(places),
+        ),
+      gate: (namespace) => env.BOXGATE.get(env.BOXGATE.idFromName(`boxgate:${namespace}`)),
+      box: (id) => env.MERGEBOX.get(env.MERGEBOX.idFromName(`mergebox:${id}`)),
+    });
     return Layer.mergeAll(
       host,
       ChangesRpc({ change, agentSession }),
       ProjectsRpc(project),
-      ProjectNamespacesD1(env.DB),
+      places,
       AgentDirectoryD1(env.DB),
-      CandidateComposerGitCore(objects, commitSigning(env)).pipe(Layer.provide(host)),
+      CandidateComposerTiered(objects, commitSigning(env), box).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW),
       StagingWriterGitCore({ trunk: repos.trunk, staging: repos.staging }).pipe(

@@ -567,12 +567,77 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
   ).pipe(Effect.orDie);
 });
 
-/** A composition GitCore refused: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
+/**
+ * What MergeBox refuses for its own sake and never the batch's: a gate with
+ * no room (`box-unavailable`), a box that could not fetch, push or answer
+ * (`box-failed`), and a check of the box that did not pass (`box-check`).
+ */
+export const BOX_INFRA_REASONS: ReadonlySet<string> = new Set([
+  "box-unavailable",
+  "box-failed",
+  "box-check",
+]);
+
+/**
+ * A composition MergeBox refused for its own sake: blamed on infra, so the
+ * Change DO requeues the members and the verdict holds them, until a batch
+ * of one is refused that way the INFRA_FAILURE_LIMIT-th time in a row: then
+ * the change bounces, told to submit again unchanged once the box is back.
+ */
+const holdForBox = Effect.fn("integration/holdForBox")(function* (
+  lane: Lane,
+  batch: Batch,
+  refused: CompositionRefused,
+) {
+  const verdictId = yield* (yield* Ids).next("vrd");
+  const refusal = `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd();
+  let exhausted: string | undefined;
+  yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => {
+    const infra = infraBlame(now, batch, refusal);
+    exhausted = infra.exhausted;
+    return {
+      moves: [
+        {
+          command: { _tag: "RefuseComposition", verdictId, attribution: infra.attribution },
+          before: [
+            verdictDraft(
+              VerdictIssued.make({
+                verdictId,
+                subject: batch.id,
+                outcome: infra.exhausted === undefined ? "hold" : "bounce",
+                evidence: infra.exhausted === undefined ? [refusal] : [infra.exhausted, refusal],
+                nextActions:
+                  infra.exhausted === undefined
+                    ? [
+                        {
+                          kind: "wait",
+                          title:
+                            "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
+                        },
+                      ]
+                    : afterInfra(batch, INFRA_FAILURE_LIMIT),
+              }),
+              batch.members,
+            ),
+          ],
+        },
+      ],
+      lane: () => ({ ...infra.lane, active: undefined }),
+    };
+  }).pipe(Effect.orDie);
+  if (exhausted !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${exhausted}`);
+});
+
+/** A composition refused for the batch's sake: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
 const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
   lane: Lane,
   batch: Batch,
   refused: CompositionRefused,
 ) {
+  if (BOX_INFRA_REASONS.has(refused.reason)) {
+    yield* holdForBox(lane, batch, refused);
+    return;
+  }
   const verdictId = yield* (yield* Ids).next("vrd");
   yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => ({
     moves: [
@@ -713,6 +778,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
           composer: candidate.composer,
           tier: candidate.tier,
           tierReason: candidate.tierReason,
+          ...(candidate.boxCheck === undefined ? {} : { boxCheck: candidate.boxCheck }),
         },
       },
     ],

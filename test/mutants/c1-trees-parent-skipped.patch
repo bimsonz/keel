@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/compose.test.ts -t "gitcore.restack-on-trees"
+# kills: gitcore.restack-on-trees
+# why: each commit over the box's trees is made on the base, so a batch lands as siblings and only its last member is on trunk
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index 3d68c330..ef0fcaa8 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -171,7 +171,6 @@ export async function restackOnTrees(
+     const { oid, body } = await commitOver(m, author, tree, parent, committer, options.sign);
+     objects.push({ type: "commit", body });
+     commits.push({ oid, tree });
+-    parent = oid;
+   }
+   return { commits, objects };
+ }

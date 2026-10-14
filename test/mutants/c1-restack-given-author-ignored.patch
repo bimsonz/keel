@@ -2,15 +2,15 @@
 # kills: restack.author-given, composer.agent-author
 # why: A member's given author is ignored, so the landed commit's author line is still whatever the pushed commit said
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index edfe72f..0f38db4 100644
+index 3d68c330..3ff20eac 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -129,7 +129,7 @@ export async function restack(
-     const spec: CommitSpec = {
-       tree: merged.tree,
-       parents: [parent],
--      author: m.author === undefined ? to.author : { ...to.author, ...m.author },
-+      author: to.author,
-       committer,
-       message: m.message,
-       trailers:
+@@ -193,7 +193,7 @@ async function commitOver(
+   const spec: CommitSpec = {
+     tree,
+     parents: [parent],
+-    author: m.author === undefined ? submitted : { ...submitted, ...m.author },
++    author: submitted,
+     committer,
+     message: m.message,
+     trailers:

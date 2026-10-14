@@ -2,15 +2,15 @@
 # kills: restack.author-given, composer.keeps-author
 # why: A commit that keeps its submitted author also declares it in a trailer, as if Keel had named another
 diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
-index edfe72f..2eca05a 100644
+index 3d68c330..cad5bf3b 100644
 --- a/packages/gitcore/src/compose.ts
 +++ b/packages/gitcore/src/compose.ts
-@@ -133,7 +133,7 @@ export async function restack(
-       committer,
-       message: m.message,
-       trailers:
--        m.author === undefined
-+        m.message === ""
-           ? m.trailers
-           : [...m.trailers, [DECLARED_AUTHOR, `${to.author.name} <${to.author.email}>`]],
-     };
+@@ -197,7 +197,7 @@ async function commitOver(
+     committer,
+     message: m.message,
+     trailers:
+-      m.author === undefined
++      m.message === ""
+         ? m.trailers
+         : [...m.trailers, [DECLARED_AUTHOR, `${submitted.name} <${submitted.email}>`]],
+   };

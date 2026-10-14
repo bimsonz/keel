@@ -38,6 +38,15 @@ export const BatchFormed = Schema.TaggedStruct("BatchFormed", {
   /** Changes the batch was verified on top of that trunk does not hold yet (its speculation chain). */
   predecessors: Schema.optional(Schema.Array(ChangeId)),
 });
+/**
+ * What MergeBox's check found in the box once it had composed: the canary
+ * planted at its start, in its environment and its file, and no token.
+ */
+export const BoxCheck = Schema.Struct({
+  canary: Schema.Literal("found"),
+  tokens: Schema.Literal("none"),
+});
+export type BoxCheck = typeof BoxCheck.Type;
 export const CandidateAssembled = Schema.TaggedStruct("CandidateAssembled", {
   candidateId: CandidateId,
   batchId: BatchId,
@@ -45,6 +54,8 @@ export const CandidateAssembled = Schema.TaggedStruct("CandidateAssembled", {
   composer: Schema.Literals(["gitcore", "mergebox"]),
   tier: Tier,
   tierReason: Schema.String,
+  /** Set for a candidate MergeBox composed: what its check found. */
+  boxCheck: Schema.optional(BoxCheck),
 });
 export const VerificationStarted = Schema.TaggedStruct("VerificationStarted", {
   candidateId: CandidateId,

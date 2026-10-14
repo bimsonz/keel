@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.check-always"
+# kills: mergebox.check-always
+# why: the box is checked only after a compose that exited 0, so a token left by a refused or failed compose is never looked for
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index 46000f10..2ad3f5e4 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -138,7 +138,10 @@ export async function composeInBox(
+     BOX_ENV,
+   );
+   const checking = now();
+-  const check = await container.exec(["bash", "-c", BOX_CHECK_SCRIPT], BOX_ENV);
++  const check =
++    run.exitCode === 0
++      ? await container.exec(["bash", "-c", BOX_CHECK_SCRIPT], BOX_ENV)
++      : { exitCode: 0, stdout: "", stderr: "" };
+   const done = now();
+   const timings = {
+     startMs,

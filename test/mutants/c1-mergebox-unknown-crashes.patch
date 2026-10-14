@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/boxgate.test.ts -t "mergebox.rpc-n-1"
+# kills: mergebox.rpc-n-1
+# why: a compose of a version the box does not know throws, so a Lane a deploy ahead of its box fails the compose instead of being told
+diff --git a/apps/keel/src/adapters/driving/do/mergebox.ts b/apps/keel/src/adapters/driving/do/mergebox.ts
+index b3db940a..da2699fc 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox.ts
+@@ -118,8 +118,7 @@ export class MergeBox extends DurableObject<Env> {
+ 
+   private async composeNow(request: unknown): Promise<BoxComposeAnswer> {
+     const decoded = decodeRequest(request);
+-    if (decoded._tag === "Failure")
+-      return { kind: "unsupported", reason: "a compose of a version this box does not know" };
++    if (decoded._tag === "Failure") throw new Error("a compose of a version this box does not know");
+     const job = decoded.value;
+     const repos = [job.staging, ...job.members.map((m) => m.repo)];
+     const remotes = await Promise.all(repos.map((repo) => this.host((h) => h.info(repo))));

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/boxgate.test.ts -t "boxgate.do.lapses"
+# kills: boxgate.do.lapses
+# why: the gate arms no alarm for a lease's deadline, so a lease never given back stays stored until the next ask
+diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
+index 8bb98949..8e05b06e 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate.ts
+@@ -46,7 +46,7 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+     this.ctx.storage.kv.put(LEASES, leases);
+     const due = nextDeadline(leases);
+     if (due === undefined) await cancelAlarm(this.ctx.storage, LEASE_LAPSES);
+-    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LEASE_LAPSES, at: due });
++    else await cancelAlarm(this.ctx.storage, LEASE_LAPSES);
+   }
+ 
+   /** The namespace's limit, read before the leases so no ask interleaves between their read and write. */
