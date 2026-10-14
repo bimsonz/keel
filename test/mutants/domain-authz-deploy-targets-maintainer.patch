@@ -2,15 +2,19 @@
 # kills: authz.deploy-owner-only
 # why: a maintainer may point a project's deployments at another account, which only an owner may.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index a673edda..64d0b946 100644
+index 64994aa5..26730170 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -153,7 +153,7 @@ export const NON_SPEC_ACTIONS = {
-   ManageOwners: rule("Org", "own"),
-   DeleteOrg: rule("Org", "own"),
-   /** Set, clear or list a project's deploy targets. */
--  ManageDeployTargets: rule("Project", "own"),
-+  ManageDeployTargets: rule("Project", "maintain"),
-   /** Store, replace or delete a credential in the org's store; none is ever read back. */
-   ManageCredentials: rule("Namespace", "own"),
-   DeleteProject: rule("Project", "own"),
+@@ -178,9 +178,9 @@ export const SPEC_ACTIONS = {
+   Delivery_createCredential: rule("Namespace", "ownAsUser"),
+   Delivery_listCredentials: rule("Namespace", "ownAsUser"),
+   Delivery_deleteCredential: rule("Namespace", "ownAsUser"),
+-  Delivery_putDeployTarget: rule("Project", "ownAsUser"),
+-  Delivery_listDeployTargets: rule("Project", "ownAsUser"),
+-  Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
++  Delivery_putDeployTarget: rule("Project", "maintain"),
++  Delivery_listDeployTargets: rule("Project", "maintain"),
++  Delivery_deleteDeployTarget: rule("Project", "maintain"),
+ } as const satisfies Record<string, ActionRule>;
+ 
+ /**

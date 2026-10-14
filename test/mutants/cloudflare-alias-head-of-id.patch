@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: alias.per-change
+# why: the alias is cut from the head of the change's id, its timestamp, so two changes made close together share one alias
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index e1e57bf3..6750b81b 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -246,6 +246,6 @@ export const LABEL_MAX = 63;
+  * previews are reached by their version's address alone.
+  */
+ export const previewAlias = (changeId: ChangeId, worker: WorkerName): string | undefined => {
+-  const alias = `ch-${changeId.slice(-10).toLowerCase()}`;
++  const alias = `ch-${changeId.slice(4, 14).toLowerCase()}`;
+   return alias.length + 1 + worker.length <= LABEL_MAX ? alias : undefined;
+ };

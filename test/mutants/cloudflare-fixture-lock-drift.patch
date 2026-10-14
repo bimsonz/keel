@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/worker-lite-fixture.test.ts
+# kills: fixture.worker-lite-lock
+# why: worker-lite's lockfile drifts a byte from forge-lite's, so the box refuses it: its sha256 is not the baked one's
+diff --git a/fixtures/worker-lite/pnpm-lock.yaml b/fixtures/worker-lite/pnpm-lock.yaml
+index 9d0614bf..d585e18b 100644
+--- a/fixtures/worker-lite/pnpm-lock.yaml
++++ b/fixtures/worker-lite/pnpm-lock.yaml
+@@ -1,4 +1,4 @@
+-lockfileVersion: '9.0'
++lockfileVersion: "9.0"
+ 
+ settings:
+   autoInstallPeers: true

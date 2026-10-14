@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.pinned-name
+# why: a candidate's config may name any Worker and is uploaded to it, so a change reaches another Worker of the owner's account
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index e1e57bf3..2c33cdea 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -232,7 +232,7 @@ export const checkPinnedName = (
+   spec: DeploySpec,
+   facts: WranglerFacts,
+ ): Result.Result<WranglerFacts, WorkerNameDiffers> =>
+-  facts.name === spec.worker
++  facts.name === facts.name
+     ? Result.succeed(facts)
+     : Result.fail(new WorkerNameDiffers({ pinned: spec.worker, named: facts.name }));
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/credential-envelope.test.ts
+# kills: cred.kek-length
+# why: a KEK of 16 or 33 bytes is taken, so a truncated or padded secret wraps the data keys with AES-128 or fails only later
+diff --git a/apps/keel/src/adapters/driven/credentials/envelope.ts b/apps/keel/src/adapters/driven/credentials/envelope.ts
+index f79eab1f..bbb39f10 100644
+--- a/apps/keel/src/adapters/driven/credentials/envelope.ts
++++ b/apps/keel/src/adapters/driven/credentials/envelope.ts
+@@ -43,7 +43,7 @@ export const credentialAad = (namespaceId: string, credentialId: string): string
+ /** The KEK from its base64 text: exactly 32 bytes, for wrapping and unwrapping keys and nothing else. */
+ export const importKek = async (raw: string): Promise<CryptoKey> => {
+   const bytes = fromBase64(raw);
+-  if (bytes.length !== KEK_BYTES)
++  if (bytes.length < 16)
+     throw new Error(`a credential KEK is ${KEK_BYTES} bytes, and this one is ${bytes.length}`);
+   return crypto.subtle.importKey("raw", bytes, "AES-KW", false, ["wrapKey", "unwrapKey"]);
+ };

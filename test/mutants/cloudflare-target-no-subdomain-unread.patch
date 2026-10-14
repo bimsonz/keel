@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/delivery-routes.test.ts apps/keel/test/unit/cloudflare-api.test.ts
+# kills: target.no-subdomain, cf-api.reach-codes
+# why: an account with no workers.dev subdomain reads as one that cannot be reached, so the owner is never told to set the subdomain
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+index 7fa284ba..335ad3f9 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+@@ -54,7 +54,6 @@ export function reachOf(
+       ? unreachable("no-workers-dev", undefined)
+       : Result.succeed({ workersDev: `${subdomain}.workers.dev` });
+   }
+-  if (codes.includes(NO_SUBDOMAIN)) return unreachable("no-workers-dev", NO_SUBDOMAIN);
+   const refused = codes.find((code) => TOKEN_REFUSED.has(code));
+   if (status === 401 || refused !== undefined)
+     return unreachable("token-invalid", refused ?? codes[0]);

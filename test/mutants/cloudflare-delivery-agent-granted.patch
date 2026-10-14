@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-governs-its-own, authz.deploy-owner-only, authz.org-rows
+# why: an agent that governs its namespace meets ownAsUser as an owner would, so it stores the org's credentials and points a project's deploys at an account
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 64994aa5..ed89d98e 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -728,7 +728,10 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+     case "member":
+     case "maintain":
+     case "own":
+-      return rights.has(need) ? granted() : refused(whyNoRule(principal, resource));
++    case "ownAsUser":
++      return rights.has(need === "ownAsUser" ? "own" : need)
++        ? granted()
++        : refused(whyNoRule(principal, resource));
+     case "sponsorOrMaintain":
+       return rights.has("maintain") ? granted() : refused(whyNoRule(principal, resource));
+     // An invitation names the person who answers for the agent: no agent makes or ends one for

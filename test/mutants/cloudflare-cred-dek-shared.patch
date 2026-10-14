@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/credential-envelope.test.ts
+# kills: cred.dek-per-secret
+# why: every secret is sealed under the same all-zero data key, so one wrapped key serves every credential and opens them all
+diff --git a/apps/keel/src/adapters/driven/credentials/envelope.ts b/apps/keel/src/adapters/driven/credentials/envelope.ts
+index f79eab1f..7072b279 100644
+--- a/apps/keel/src/adapters/driven/credentials/envelope.ts
++++ b/apps/keel/src/adapters/driven/credentials/envelope.ts
+@@ -59,7 +59,7 @@ export const seal = async (
+   aad: string,
+   plaintext: string,
+ ): Promise<Sealed> => {
+-  const dataKey = await crypto.subtle.generateKey(DATA_KEY, true, ["encrypt", "decrypt"]);
++  const dataKey = await crypto.subtle.importKey("raw", new Uint8Array(32), DATA_KEY, true, ["encrypt", "decrypt"]);
+   if ("privateKey" in dataKey) throw new Error("AES-GCM made a key pair");
+   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+   const ct = await crypto.subtle.encrypt(

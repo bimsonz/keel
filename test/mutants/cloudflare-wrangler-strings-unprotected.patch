@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.jsonc, wrangler.refuses-bindings, deploy-spec.pinned-name
+# why: a // or /* inside a string is read as a comment, so a var holding a URL is cut short and the config is unreadable
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index e1e57bf3..97d641fd 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -123,7 +123,7 @@ export const jsoncToJson = (source: string): string => {
+   let i = 0;
+   while (i < source.length) {
+     const c = source[i] ?? "";
+-    if (c === '"') {
++    if (c === "\u0000") {
+       let j = i + 1;
+       while (j < source.length && source[j] !== '"') j += source[j] === "\\" ? 2 : 1;
+       out += source.slice(i, j + 1);

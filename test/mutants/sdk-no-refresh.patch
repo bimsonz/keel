@@ -2,10 +2,10 @@
 # kills: sdk.token
 # why: a 401 is thrown instead of exchanging the credentials once more
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 7fc90509..7452e6a9 100644
+index 5994e824..860b2071 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -255,8 +255,7 @@ export class KeelClient {
+@@ -264,8 +264,7 @@ export class KeelClient {
      const credentialed = "clientId" in this.#options || "key" in this.#options;
      const session = "session" in this.#options ? this.#options.session : undefined;
      let response = await send(credentialed ? await this.token() : session);
@@ -14,4 +14,4 @@ index 7fc90509..7452e6a9 100644
 +
      if (!response.ok) throw await KeelProblem.from(response);
      // The body is the contract's: Keel validates every response against the published schemas.
-     // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's.
+     // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's. A 204 has none.

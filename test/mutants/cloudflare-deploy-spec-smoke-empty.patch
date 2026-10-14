@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.parse
+# why: a deploy spec with no smoke checks is read, so a preview lets its change land without answering one request
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index e1e57bf3..1a77a15b 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -33,7 +33,7 @@ export const DeploySpec = Schema.Struct({
+   path: Schema.optional(
+     Schema.String.check(Schema.isPattern(/^(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))[\w./-]{1,200}$/)),
+   ),
+-  smoke: Schema.Array(SmokeCheck).check(Schema.isMinLength(1), Schema.isMaxLength(8)),
++  smoke: Schema.Array(SmokeCheck).check(Schema.isMaxLength(8)),
+ });
+ export type DeploySpec = typeof DeploySpec.Type;
+ 

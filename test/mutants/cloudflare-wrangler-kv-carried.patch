@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: wrangler.refuses-bindings
+# why: a config that declares kv_namespaces is taken, so a preview is uploaded without the KV namespaces its Worker reads
+diff --git a/packages/core/src/domain/delivery/deploy-spec.ts b/packages/core/src/domain/delivery/deploy-spec.ts
+index e1e57bf3..075c0b2b 100644
+--- a/packages/core/src/domain/delivery/deploy-spec.ts
++++ b/packages/core/src/domain/delivery/deploy-spec.ts
+@@ -79,7 +79,6 @@ export const UNCARRIED_KEYS: readonly string[] = [
+   "durable_objects",
+   "hyperdrive",
+   "images",
+-  "kv_namespaces",
+   "migrations",
+   "mtls_certificates",
+   "pipelines",

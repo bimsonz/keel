@@ -2,11 +2,11 @@
 # kills: b12.drain
 # why: nothing drains the registered objects after each case, so a case can end with a flush still armed
 diff --git a/apps/keel/test/pool/setup.ts b/apps/keel/test/pool/setup.ts
-index 18071da..a561454 100644
+index 7f949734..936c6357 100644
 --- a/apps/keel/test/pool/setup.ts
 +++ b/apps/keel/test/pool/setup.ts
-@@ -7,4 +7,4 @@ import { drainRegistered } from "./helpers.ts";
- await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+@@ -15,4 +15,4 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+ }
  
  // Every object a case registered (drainAfter) flushes before the next case starts, and before the file ends.
 -afterEach(drainRegistered, 30_000);

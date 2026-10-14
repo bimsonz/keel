@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/cloudflare-api.test.ts
+# kills: cf-api.reach-codes
+# why: Cloudflare's 6111, a malformed Authorization header, reads as an account that cannot be reached rather than as a token to replace
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+index 7fa284ba..b846c5fa 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+@@ -16,7 +16,7 @@ export const NO_SUBDOMAIN = 10_007;
+  * failed (10000), an invalid token (9109), an invalid or malformed
+  * `Authorization` header (6003, 6111).
+  */
+-export const TOKEN_REFUSED: ReadonlySet<number> = new Set([10_000, 9109, 6003, 6111]);
++export const TOKEN_REFUSED: ReadonlySet<number> = new Set([10_000, 9109, 6003]);
+ 
+ /** Cloudflare's response envelope, as much of it as is read: every other field is ignored. */
+ const Envelope = Schema.Struct({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/credential-store.test.ts
+# kills: cred.list-no-secret, cred.remove, credstore.contract.scoped, credstore.contract.remove
+# why: the store says it holds every credential id it is asked of, so a removed credential, or another namespace's, still counts as held
+diff --git a/apps/keel/src/adapters/driven/credentials/credential-store.ts b/apps/keel/src/adapters/driven/credentials/credential-store.ts
+index 8c7f46ab..98201251 100644
+--- a/apps/keel/src/adapters/driven/credentials/credential-store.ts
++++ b/apps/keel/src/adapters/driven/credentials/credential-store.ts
+@@ -77,7 +77,7 @@ export function CredentialStoreSealed(
+         has: (namespaceId, id) =>
+           held(namespaceId, id).pipe(
+             Effect.as(true),
+-            Effect.catchTag("CredentialMissing", () => Effect.succeed(false)),
++            Effect.catchTag("CredentialMissing", () => Effect.succeed(true)),
+           ),
+         reveal: (namespaceId, id) =>
+           Effect.flatMap(held(namespaceId, id), ({ sealed }) =>

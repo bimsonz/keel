@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/credential-envelope.test.ts
+# kills: cred.wrong-kek
+# why: the KEK read from Secrets Store is set aside for 32 zero bytes, so any KEK opens every seal
+diff --git a/apps/keel/src/adapters/driven/credentials/envelope.ts b/apps/keel/src/adapters/driven/credentials/envelope.ts
+index f79eab1f..d40581d1 100644
+--- a/apps/keel/src/adapters/driven/credentials/envelope.ts
++++ b/apps/keel/src/adapters/driven/credentials/envelope.ts
+@@ -45,7 +45,7 @@ export const importKek = async (raw: string): Promise<CryptoKey> => {
+   const bytes = fromBase64(raw);
+   if (bytes.length !== KEK_BYTES)
+     throw new Error(`a credential KEK is ${KEK_BYTES} bytes, and this one is ${bytes.length}`);
+-  return crypto.subtle.importKey("raw", bytes, "AES-KW", false, ["wrapKey", "unwrapKey"]);
++  return crypto.subtle.importKey("raw", new Uint8Array(KEK_BYTES), "AES-KW", false, ["wrapKey", "unwrapKey"]);
+ };
+ 
+ /**

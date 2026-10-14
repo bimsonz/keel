@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/worker-lite-fixture.test.ts
+# kills: fixture.worker-lite-deps
+# why: worker-lite declares a hono that forge-lite does not, so its suite needs a dependency the suite image does not hold
+diff --git a/fixtures/worker-lite/package.json b/fixtures/worker-lite/package.json
+index c7586a2f..ff08a479 100644
+--- a/fixtures/worker-lite/package.json
++++ b/fixtures/worker-lite/package.json
+@@ -11,7 +11,7 @@
+     "lint": "oxlint -c oxlint.config.json --deny-warnings"
+   },
+   "dependencies": {
+-    "hono": "4.13.13"
++    "hono": "4.13.12"
+   },
+   "devDependencies": {
+     "oxlint": "1.87.0",

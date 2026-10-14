@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/delivery-routes.test.ts apps/keel/test/unit/cloudflare-api.test.ts
+# kills: target.reachable, cf-api.reach-codes
+# why: a token Cloudflare refuses reads as one that reaches the account, so a target is set that no preview can be deployed to
+diff --git a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+index 7fa284ba..698f8ab2 100644
+--- a/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
++++ b/apps/keel/src/adapters/driven/deploy/cloudflare-api.ts
+@@ -57,7 +57,7 @@ export function reachOf(
+   if (codes.includes(NO_SUBDOMAIN)) return unreachable("no-workers-dev", NO_SUBDOMAIN);
+   const refused = codes.find((code) => TOKEN_REFUSED.has(code));
+   if (status === 401 || refused !== undefined)
+-    return unreachable("token-invalid", refused ?? codes[0]);
++    return Result.succeed({ workersDev: "unknown.workers.dev" });
+   return unreachable("account-unreachable", codes[0]);
+ }
+ 

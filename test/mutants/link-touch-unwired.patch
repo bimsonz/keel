@@ -2,10 +2,10 @@
 # kills: link.standing
 # why: inviting an agent and taking it out ask no fresh sign-in, so a session an assistant holds in the browser puts an agent into an org
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 219e6bbb..24f039c7 100644
+index a9ba05be..41d38077 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -640,7 +640,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -641,7 +641,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                );
              }),
            ),
@@ -13,4 +13,4 @@ index 219e6bbb..24f039c7 100644
 +        ...invitationHandlers(run, (_caller, move) => move()),
          ...projectInvitationHandlers(run, touched),
          ...decisionHandlers(run),
-         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
+         ...deliveryHandlers(run),

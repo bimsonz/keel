@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/credential-store.test.ts apps/keel/test/pool/delivery-routes.test.ts
+# kills: cred.remove, credstore.contract.remove, cred.owner-only
+# why: removing a credential commits CredentialRemoved but keeps its row and its seal, so it is still listed and can still be revealed
+diff --git a/packages/core/src/application/delivery/credentials.ts b/packages/core/src/application/delivery/credentials.ts
+index 128410ab..63d654aa 100644
+--- a/packages/core/src/application/delivery/credentials.ts
++++ b/packages/core/src/application/delivery/credentials.ts
+@@ -128,7 +128,7 @@ export const dropCredential = Effect.fn("delivery/dropCredential")(function* (
+     { entity: namespaceRef(namespace), cause: `credential-removed:${id}`, actor: userActor(by) },
+     (tx): Result.Result<Transition<void>, CredentialMissing> => {
+       if (heldIn(tx.store, id) === undefined) return Result.fail(new CredentialMissing({ id }));
+-      tx.store.remove(CREDENTIAL, id);
++      tx.store.get(CREDENTIAL, id);
+       const removed = CredentialRemoved.make({ namespaceId: namespace, credentialId: id, by });
+       return Result.succeed({ value: undefined, drafts: [draftOf(encodeRemoved(removed))] });
+     },

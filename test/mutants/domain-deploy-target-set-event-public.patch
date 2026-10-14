@@ -2,13 +2,13 @@
 # kills: b12.event-audience
 # why: a public project's feed serves the event that sets a deploy target, with its account id and its credential's id, to anyone.
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index a347c25..8a520ab 100644
+index c14f3670..f1411534 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -143,7 +143,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
-   MessagesCaptured: "members",
-   SessionRedacted: "members",
- 
+@@ -152,7 +152,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   // An org's credentials, by label, provider and who stored them: never the secret, and still the owners' alone to read.
+   CredentialStored: "members",
+   CredentialRemoved: "members",
 -  DeployTargetSet: "members",
 +  DeployTargetSet: "public",
    DeployTargetCleared: "members",

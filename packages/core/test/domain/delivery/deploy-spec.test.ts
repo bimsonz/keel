@@ -6,7 +6,6 @@ import {
   jsoncToJson,
   parseDeploySpec,
   previewAlias,
-  UNCARRIED_KEYS,
   WorkerName,
   wranglerFacts,
 } from "../../../src/domain/delivery/index.ts";
@@ -83,7 +82,34 @@ describe("a Worker's wrangler config", () => {
   });
 
   it("[wrangler.refuses-bindings] a config naming a binding Keel does not send is refused, naming it", () => {
-    for (const key of UNCARRIED_KEYS) {
+    // Written out here, not read from the module, so a key dropped from UNCARRIED_KEYS is caught.
+    for (const key of [
+      "ai",
+      "analytics_engine_datasets",
+      "assets",
+      "browser",
+      "containers",
+      "d1_databases",
+      "dispatch_namespaces",
+      "durable_objects",
+      "hyperdrive",
+      "images",
+      "kv_namespaces",
+      "migrations",
+      "mtls_certificates",
+      "pipelines",
+      "queues",
+      "r2_buckets",
+      "secrets_store_secrets",
+      "send_email",
+      "services",
+      "site",
+      "tail_consumers",
+      "unsafe",
+      "vectorize",
+      "version_metadata",
+      "workflows",
+    ]) {
       const config = `{"name": "w", "main": "i.js", "compatibility_date": "2026-10-01", "${key}": []}`;
       const facts = wranglerFacts("wrangler.jsonc", config);
       expect([key, reason(facts)]).toEqual([key, "uncarried-binding"]);
@@ -149,6 +175,15 @@ describe("a change's preview alias", () => {
         });
       }),
     );
+    // The boundary, which the property draws only by chance: a 49-character name makes a label of
+    // exactly 63 with its alias, and a 50-character name gets none.
+    const change = changeId(`chg_${"0".repeat(25)}1`);
+    const longest = workerName(`w${"x".repeat(47)}1`);
+    const tooLong = workerName(`w${"x".repeat(48)}1`);
+    expect({
+      longest: [longest.length, `${previewAlias(change, longest)}-${longest}`.length],
+      tooLong: [tooLong.length, previewAlias(change, tooLong)],
+    }).toEqual({ longest: [49, 63], tooLong: [50, undefined] });
   });
 
   it("[alias.per-change] two changes get two aliases", () => {

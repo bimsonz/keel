@@ -2,15 +2,15 @@
 # kills: authz.invitation-rows
 # why: a person leaves a project as though it were their own record: the row asks `self`, which any account meets
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..5bef58b3 100644
+index 64994aa5..0dae6f77 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -167,7 +167,7 @@ export const SPEC_ACTIONS = {
+@@ -171,7 +171,7 @@ export const SPEC_ACTIONS = {
    Agents_leaveNamespace: rule("Self", "agent"),
    Agents_listProjects: rule("Self", "agent"),
    Agents_acceptProjectInvitation: rule("Self", "agent"),
 -  Agents_leaveProject: rule("Self", "agent"),
 +  Agents_leaveProject: rule("Self", "self"),
    Operator_putSettings: rule("Project", "maintain"),
- } as const satisfies Record<string, ActionRule>;
  
+   // A namespace's credentials and a project's deploy targets are its owners' alone.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/delivery/deploy-spec.test.ts
+# kills: deploy-spec.fixture
+# why: worker-lite's wrangler config names another Worker than its deploy spec pins, so every preview of it is refused
+diff --git a/fixtures/worker-lite/wrangler.jsonc b/fixtures/worker-lite/wrangler.jsonc
+index 4d91d4ca..9798b1d9 100644
+--- a/fixtures/worker-lite/wrangler.jsonc
++++ b/fixtures/worker-lite/wrangler.jsonc
+@@ -1,7 +1,7 @@
+ {
+   // The Worker Keel previews on the project's Cloudflare account for each change
+   // and deploys after a landing. Its name is pinned by .keel/deploy.json.
+-  "name": "worker-lite",
++  "name": "worker-lite-2",
+   "main": "src/index.ts",
+   "compatibility_date": "2026-10-01",
+   "vars": {

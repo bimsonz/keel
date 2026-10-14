@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/credential-envelope.test.ts
+# kills: cred.round-trip
+# why: a secret is read back as latin1, so one beyond ASCII opens to other text than was stored
+diff --git a/apps/keel/src/adapters/driven/credentials/envelope.ts b/apps/keel/src/adapters/driven/credentials/envelope.ts
+index f79eab1f..22570a43 100644
+--- a/apps/keel/src/adapters/driven/credentials/envelope.ts
++++ b/apps/keel/src/adapters/driven/credentials/envelope.ts
+@@ -25,7 +25,7 @@ const IV_BYTES = 12;
+ const DATA_KEY = { name: "AES-GCM", length: 256 } as const;
+ 
+ const utf8 = new TextEncoder();
+-const fromUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
++const fromUtf8 = new TextDecoder("latin1", { fatal: true, ignoreBOM: false });
+ 
+ const toBase64 = (bytes: Uint8Array): string => {
+   let binary = "";

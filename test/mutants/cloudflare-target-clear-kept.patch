@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/delivery-routes.test.ts apps/keel/test/unit/deploy-targets.test.ts packages/testing/test/ports.test.ts
+# kills: target.set-clear, deploytargets.contract.clear, target.use-case-clear
+# why: clearing a deploy target commits DeployTargetCleared but keeps the target, so it is still listed and still deployed to
+diff --git a/packages/core/src/application/delivery/deploy-targets.ts b/packages/core/src/application/delivery/deploy-targets.ts
+index b7f378e9..fb82161b 100644
+--- a/packages/core/src/application/delivery/deploy-targets.ts
++++ b/packages/core/src/application/delivery/deploy-targets.ts
+@@ -186,7 +186,7 @@ export const commitDeployTargetClear: (
+           held.targets,
+         );
+         const { [name]: _cleared, ...workersDev } = held.workersDev;
+-        tx.store.put(DEPLOY_TARGETS, projectId, asStored(encodeHeld({ targets, workersDev })));
++        tx.store.put(DEPLOY_TARGETS, projectId, asStored(encodeHeld({ targets: held.targets, workersDev })));
+         return Result.succeed({
+           value: undefined,
+           drafts: decided.success.map((event) => ({ payload: payloadOf(encodeCleared(event)) })),
