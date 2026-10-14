@@ -8,15 +8,20 @@ import {
   detectPack,
   executable,
   JS_TS_SUITE,
+  JS_TS_TYPECHECK,
   WORKER_APP_BUILD,
   WORKER_APP_PACK,
   WORKER_APP_TYPECHECK,
 } from "../../../src/application/verification/index.ts";
-import { compile, type PlanStep } from "../../../src/domain/verification/index.ts";
+import { coerce, compile, type PlanStep, verdict } from "../../../src/domain/verification/index.ts";
 import { base } from "../../arbitraries/flow.ts";
 
 const pkg = (deps: Record<string, string>, dev: Record<string, string> = {}) =>
   JSON.stringify({ name: "x", dependencies: deps, devDependencies: dev });
+
+/** A package with no Worker tooling and these scripts. */
+const withScripts = (scripts: unknown) =>
+  JSON.stringify({ name: "x", scripts, devDependencies: { vitest: "5.0.3" } });
 
 const DEPLOY = {
   target: "production",
@@ -57,7 +62,86 @@ describe("verifier packs: defaults chosen by detection, never rules", () => {
       readFileSync(join(fixture, "package.json"), "utf8"),
     );
     expect(pack.name).toBe("js-ts");
-    expect(pack.defaults.steps.map((s) => s.id)).toEqual([JS_TS_SUITE.id]);
+    expect(pack.defaults.steps.map((s) => s.id)).toEqual([JS_TS_SUITE.id, JS_TS_TYPECHECK.id]);
+  });
+
+  it("[packs.js-ts-typecheck] a js-ts package with a typecheck script runs it beside the suite, as a command of its own in Tier 2", () => {
+    const pack = detectPack(["package.json"], withScripts({ typecheck: "tsc --noEmit" }));
+    expect([pack.name, pack.reason]).toEqual([
+      "js-ts",
+      "js-ts: package.json, with a typecheck script",
+    ]);
+    const plan = compiled(pack.defaults);
+    expect(plan.flow).toEqual({
+      _tag: "par",
+      items: [
+        { _tag: "step", step: "js-ts.suite" },
+        { _tag: "step", step: "js-ts.typecheck" },
+      ],
+    });
+    expect(plan.steps.map((s) => [s.id, s.tier.tier, s.run?.command, executable(s)])).toEqual([
+      ["js-ts.suite", 2, undefined, true],
+      ["js-ts.typecheck", 2, "pnpm run typecheck", true],
+    ]);
+  });
+
+  it("[packs.js-ts-typecheck-bounces] a type error bounces the change though every test passes, a typecheck that never answers parks it, and both passing lands it", () => {
+    const plan = compiled(
+      detectPack(["package.json"], withScripts({ typecheck: "tsc --noEmit" })).defaults,
+    );
+    const outcomeOf = (typecheck: "pass" | "fail" | "abstain") =>
+      Result.getOrThrow(
+        verdict(
+          plan,
+          {
+            results: plan.steps.map((step) =>
+              coerce(plan, {
+                stepId: step.id,
+                outcome: step.id === "js-ts.typecheck" ? typecheck : "pass",
+                evidenceClass: "proof",
+                tier: step.tier,
+                durationMs: 1,
+              }),
+            ),
+          },
+          "verdict/1",
+        ),
+      ).outcome;
+    expect([outcomeOf("fail"), outcomeOf("abstain"), outcomeOf("pass")]).toEqual([
+      "bounce",
+      "park",
+      "land",
+    ]);
+  });
+
+  it("[packs.js-ts-no-typecheck] with no typecheck script, or one that is not a command, the js-ts pack is the suite alone", () => {
+    for (const scripts of [
+      undefined,
+      {},
+      { test: "vitest run", lint: "oxlint" },
+      { typecheck: "" },
+      { typecheck: "  " },
+      { typecheck: 1 },
+      { typecheck: ["tsc"] },
+      "typecheck",
+    ]) {
+      const pack = detectPack(["package.json"], withScripts(scripts));
+      expect([pack.reason, pack.defaults.steps.map((s) => s.id)]).toEqual([
+        "js-ts: package.json",
+        ["js-ts.suite"],
+      ]);
+    }
+  });
+
+  it("[packs.worker-app-own-typecheck] a worker app keeps its own typecheck, whatever scripts it has", () => {
+    const pack = detectPack(
+      ["package.json"],
+      JSON.stringify({ scripts: { typecheck: "tsc -b" }, devDependencies: { wrangler: "4.0.0" } }),
+    );
+    expect([pack.name, pack.defaults.steps.map((s) => s.id)]).toEqual([
+      "worker-app",
+      ["js-ts.suite", "worker-app.typecheck"],
+    ]);
   });
 
   it("[packs.no-manifest] with no package.json, or an unreadable one, the js-ts suite runs, and its abstain parks the change", () => {

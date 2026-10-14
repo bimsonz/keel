@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.js-ts-typecheck
+# why: The typecheck waits for the suite and is skipped when it fails, so a bounce never says the types broke too
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..9c1e3315 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -67,7 +67,8 @@ export const JS_TS_TYPECHECK: StepSpec = {
+ /** Keel's js-ts defaults for a package with a `typecheck` script: the suite and the script, side by side. */
+ export const JS_TS_TYPECHECK_PACK: FlowDefaults = {
+   flow: {
+-    _tag: "par",
++    _tag: "seq",
++    exitOn: "fail",
+     items: [
+       { _tag: "step", step: JS_TS_SUITE.id },
+       { _tag: "step", step: JS_TS_TYPECHECK.id },

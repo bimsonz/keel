@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.js-ts-typecheck
+# why: The typecheck step carries no command, so no runner can run it and every change parks on it
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..ca6241fa 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -61,7 +61,6 @@ export const JS_TS_TYPECHECK: StepSpec = {
+   determinism: "deterministic",
+   suite: false,
+   optional: false,
+-  run: { command: JS_TS_TYPECHECK_COMMAND },
+ };
+ 
+ /** Keel's js-ts defaults for a package with a `typecheck` script: the suite and the script, side by side. */

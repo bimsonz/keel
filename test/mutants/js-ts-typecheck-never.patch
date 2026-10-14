@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.js-ts, packs.js-ts-typecheck, packs.js-ts-typecheck-bounces
+# why: A js-ts package with a typecheck script runs only its suite, so a type error lands with every test green
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..b765951a 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -281,7 +281,7 @@ export const detectPack = (
+       reason: `worker-app: depends on ${tooling}`,
+       defaults: WORKER_APP_PACK,
+     };
+-  return hasTypecheckScript(parsed)
++  return false
+     ? {
+         name: "js-ts",
+         reason: "js-ts: package.json, with a typecheck script",

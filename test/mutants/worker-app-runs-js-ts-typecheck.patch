@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.worker-app-own-typecheck
+# why: A worker app with a typecheck script loses its own tsc step and the worker-app pack for the js-ts one
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..fc95c6f1 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -275,7 +275,7 @@ export const detectPack = (
+   const tooling = dependencyNames(parsed).find(
+     (name) => name === "wrangler" || name.startsWith("@cloudflare/"),
+   );
+-  if (tooling !== undefined)
++  if (tooling !== undefined && !hasTypecheckScript(parsed))
+     return {
+       name: "worker-app",
+       reason: `worker-app: depends on ${tooling}`,

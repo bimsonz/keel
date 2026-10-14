@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.js-ts-typecheck-bounces
+# why: The typecheck is optional, so a run that never answers (its box killed at the timeout) reads as a pass and the change lands with its types unchecked
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..d1f37a1d 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -60,7 +60,7 @@ export const JS_TS_TYPECHECK: StepSpec = {
+   budget: { usd: 0.01, cpuMs: 300_000, tokens: 0 },
+   determinism: "deterministic",
+   suite: false,
+-  optional: false,
++  optional: true,
+   run: { command: JS_TS_TYPECHECK_COMMAND },
+ };
+ 

@@ -11,7 +11,10 @@
 //           and TrunkAdvanced lands the change;
 //   bounce: forge-lite's red patch (the manual clock stops) → the same chain up
 //           to a `bounce` verdict under its own plan's hash, ChangeBounced, and
-//           no landing. This is the arm that can fail.
+//           no landing. This is the arm that can fail;
+//   typecheck: a new file under src/ with a type error and every test green →
+//           a `bounce` whose reasons cite `js-ts.typecheck: fail` and not the
+//           suite (forge-lite has a `typecheck` script, so the js-ts pack runs it).
 // Each case is judged from the project's event feed. KeelVerify's instance is
 // `keel-verify-<projectId>-<laneName>-<BatchFormed eventId>`, read back with wrangler. What is
 // deployed to keel-verify is read before and after the run, and must be the
@@ -170,7 +173,11 @@ const deployed = (worker: string): string =>
     .join(" | ");
 
 interface Case {
-  readonly name: "land" | "bounce";
+  readonly name: "land" | "bounce" | "typecheck";
+  /** The verdict the case must end with. */
+  readonly expect: "land" | "bounce";
+  /** The step the bounce's reasons cite as failed, and the one they must not. */
+  readonly fails?: { readonly cited: string; readonly passed: string };
   readonly path: string;
   readonly op: "create" | "edit";
   readonly write: (dir: string) => void;
@@ -179,6 +186,7 @@ interface Case {
 const CASES: readonly Case[] = [
   {
     name: "land",
+    expect: "land",
     path: `src/d21/${run}.ts`,
     op: "create",
     write: (dir) => {
@@ -188,6 +196,8 @@ const CASES: readonly Case[] = [
   },
   {
     name: "bounce",
+    expect: "bounce",
+    fails: { cited: "js-ts.suite: fail", passed: "js-ts.typecheck: fail" },
     path: "src/clock.ts",
     op: "edit",
     write: (dir) => {
@@ -196,6 +206,20 @@ const CASES: readonly Case[] = [
       const after = before.replace("this.#now += ms;", "this.#now += 0;");
       if (after === before) throw new Error("src/clock.ts no longer holds the manual clock's step");
       writeFileSync(file, after);
+    },
+  },
+  {
+    name: "typecheck",
+    expect: "bounce",
+    fails: { cited: "js-ts.typecheck: fail", passed: "js-ts.suite: fail" },
+    path: `src/d21/${run}-types.ts`,
+    op: "create",
+    write: (dir) => {
+      mkdirSync(join(dir, dirname(`src/d21/${run}-types.ts`)), { recursive: true });
+      writeFileSync(
+        join(dir, `src/d21/${run}-types.ts`),
+        `export const d21Types: number = "${run}";\n`,
+      );
     },
   },
 ];
@@ -298,28 +322,36 @@ try {
       `${c.name}: ChangeQueued ${queued?.eventId ?? "(none)"} carries the compiled plan's hash`,
     );
     check(formed !== undefined, `${c.name}: a batch formed with the change in it`);
-    const verdict = verdicts.find((v) => field(v, "outcome") === c.name);
+    const verdict = verdicts.find((v) => field(v, "outcome") === c.expect);
     check(
       verdict !== undefined && field(verdict, "planHash") === planHash,
-      `${c.name}: VerdictIssued ${verdict?.eventId ?? "(none)"} is ${c.name} under the compiled plan's hash`,
+      `${c.name}: VerdictIssued ${verdict?.eventId ?? "(none)"} is ${c.expect} under the compiled plan's hash`,
     );
-    if (c.name === "land") {
+    if (c.expect === "land") {
       check(
         advanced !== undefined,
         `land: TrunkAdvanced ${advanced?.eventId ?? "(none)"} lands it`,
       );
       check(bounced === undefined, "land: never bounced");
     } else {
-      check(bounced !== undefined, `bounce: ChangeBounced ${bounced?.eventId ?? "(none)"}`);
+      check(bounced !== undefined, `${c.name}: ChangeBounced ${bounced?.eventId ?? "(none)"}`);
       check(
         bounced !== undefined &&
           verdict !== undefined &&
           field(bounced, "verdictId") === field(verdict, "verdictId"),
-        "bounce: ChangeBounced cites the bounce verdict",
+        `${c.name}: ChangeBounced cites the bounce verdict`,
       );
-      check(advanced === undefined, "bounce: never landed");
+      check(advanced === undefined, `${c.name}: never landed`);
       const reasons = bounced === undefined ? [] : field(bounced, "reasons");
       console.log(`     reasons: ${JSON.stringify(reasons).slice(0, 600)}`);
+      if (c.fails !== undefined) {
+        const text = JSON.stringify(reasons);
+        check(text.includes(c.fails.cited), `${c.name}: its reasons cite ${c.fails.cited}`);
+        check(
+          !text.includes(c.fails.passed),
+          `${c.name}: its reasons do not cite ${c.fails.passed}`,
+        );
+      }
     }
   }
 } catch (error) {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.js-ts-no-typecheck
+# why: A js-ts package with no typecheck script is given the step anyway, and every change bounces on a script that is not there
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index 396121cc..2b616d5b 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -233,7 +233,7 @@ const dependencyNames = (parsed: unknown): readonly string[] =>
+ /** Whether the package has a `typecheck` script to run: a non-empty string. */
+ const hasTypecheckScript = (parsed: unknown): boolean => {
+   const script: unknown = Reflect.get(Object(Reflect.get(Object(parsed), "scripts")), "typecheck");
+-  return typeof script === "string" && script.trim() !== "";
++  return true;
+ };
+ 
+ /**

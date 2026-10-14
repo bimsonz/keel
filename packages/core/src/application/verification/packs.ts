@@ -34,6 +34,48 @@ export const JS_TS_SUITE_PACK: FlowDefaults = {
   steps: [JS_TS_SUITE],
 };
 
+/** The js-ts typecheck's command: the project's own `typecheck` script. */
+const JS_TS_TYPECHECK_COMMAND = "pnpm run typecheck";
+
+/**
+ * The js-ts pack's typecheck, for a package with a `typecheck` script: the
+ * script, run as a command of the project's own in Tier 2 and judged by its
+ * exit, so a type error bounces the change even when every test passes.
+ */
+export const JS_TS_TYPECHECK: StepSpec = {
+  id: "js-ts.typecheck",
+  version: contentHashOf({
+    pack: "js-ts",
+    step: "typecheck",
+    runner: "command/1",
+    command: JS_TS_TYPECHECK_COMMAND,
+  }),
+  kind: "deterministic",
+  evidenceCeiling: "proof",
+  appliesTo: { paths: [], subjects: [] },
+  reads: [],
+  outcomes: ["pass", "fail", "abstain"],
+  mayskip: [],
+  overrides: [],
+  budget: { usd: 0.01, cpuMs: 300_000, tokens: 0 },
+  determinism: "deterministic",
+  suite: false,
+  optional: false,
+  run: { command: JS_TS_TYPECHECK_COMMAND },
+};
+
+/** Keel's js-ts defaults for a package with a `typecheck` script: the suite and the script, side by side. */
+export const JS_TS_TYPECHECK_PACK: FlowDefaults = {
+  flow: {
+    _tag: "par",
+    items: [
+      { _tag: "step", step: JS_TS_SUITE.id },
+      { _tag: "step", step: JS_TS_TYPECHECK.id },
+    ],
+  },
+  steps: [JS_TS_SUITE, JS_TS_TYPECHECK],
+};
+
 /**
  * The worker-app pack's typecheck: `tsc --noEmit` over the project, in Tier 2
  * (a compiled toolchain, pinned here because it is not a test suite). Proof:
@@ -172,25 +214,34 @@ export interface VerifierPack {
 
 const WRANGLER_CONFIGS = ["wrangler.json", "wrangler.jsonc", "wrangler.toml"] as const;
 
-/** The package's dependency names, or none when the package.json is not JSON. */
-const dependencyNames = (packageJson: string): readonly string[] => {
-  let parsed: unknown;
+/** The package.json's value, or undefined when it is not JSON. */
+const parsePackage = (packageJson: string): unknown => {
   try {
-    parsed = JSON.parse(packageJson);
+    return JSON.parse(packageJson);
   } catch {
-    return [];
+    return undefined;
   }
-  return ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) => {
+};
+
+/** The package's dependency names, or none when the package.json is not JSON. */
+const dependencyNames = (parsed: unknown): readonly string[] =>
+  ["dependencies", "devDependencies", "peerDependencies"].flatMap((field) => {
     const deps: unknown = Reflect.get(Object(parsed), field);
     return typeof deps === "object" && deps !== null ? Object.keys(deps) : [];
   });
+
+/** Whether the package has a `typecheck` script to run: a non-empty string. */
+const hasTypecheckScript = (parsed: unknown): boolean => {
+  const script: unknown = Reflect.get(Object(Reflect.get(Object(parsed), "scripts")), "typecheck");
+  return typeof script === "string" && script.trim() !== "";
 };
 
 /**
  * Chooses a project's verifier pack from its base commit: `rootPaths` are the
  * paths at the tree's root, `packageJson` the root package.json's text.
  * A wrangler config, or wrangler or an @cloudflare package among the
- * dependencies, makes a worker app; any other package is js-ts. With no
+ * dependencies, makes a worker app; any other package is js-ts, which runs
+ * the package's `typecheck` script beside the suite when it has one. With no
  * package at all the js-ts suite still runs: it fails with what to add (a
  * lockfile, vitest), so the change bounces rather than landing unverified.
  *
@@ -220,16 +271,23 @@ export const detectPack = (
     return { name: "worker-app", reason: `worker-app: ${config}`, defaults: WORKER_APP_PACK };
   if (packageJson === undefined)
     return { name: "js-ts", reason: "no package.json", defaults: JS_TS_SUITE_PACK };
-  const tooling = dependencyNames(packageJson).find(
+  const parsed = parsePackage(packageJson);
+  const tooling = dependencyNames(parsed).find(
     (name) => name === "wrangler" || name.startsWith("@cloudflare/"),
   );
-  return tooling === undefined
-    ? { name: "js-ts", reason: "js-ts: package.json", defaults: JS_TS_SUITE_PACK }
-    : {
-        name: "worker-app",
-        reason: `worker-app: depends on ${tooling}`,
-        defaults: WORKER_APP_PACK,
-      };
+  if (tooling !== undefined)
+    return {
+      name: "worker-app",
+      reason: `worker-app: depends on ${tooling}`,
+      defaults: WORKER_APP_PACK,
+    };
+  return hasTypecheckScript(parsed)
+    ? {
+        name: "js-ts",
+        reason: "js-ts: package.json, with a typecheck script",
+        defaults: JS_TS_TYPECHECK_PACK,
+      }
+    : { name: "js-ts", reason: "js-ts: package.json", defaults: JS_TS_SUITE_PACK };
 };
 
 /** The Tier 2 steps KeelVerify has a runner for, by id. Its runner table is keyed by exactly these. */
