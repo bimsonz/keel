@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.subscribes
+# kills: trunk.subscribes
+# why: no Deliver ever starts, so trunk is never deployed
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 3f7b0f67..a2b9b271 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -516,7 +516,6 @@ export const trunkHeard = (
+   for (const member of members)
+     tx.outbox.subscribe(`change:${member}`, ["TrunkAdvanced"], changeRef(member));
+   tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined"]);
+-  tx.outbox.subscribe(DELIVER, ["TrunkAdvanced"]);
+   return true;
+ };
+ 

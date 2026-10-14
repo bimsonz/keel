@@ -122,6 +122,7 @@
     // KeelVerify extends @cloudflare/ci's CIWorkflow, which expects this binding name.
     { "name": "keel-verify-batch", "binding": "CI_WORKFLOW", "class_name": "KeelVerify" },
     { "name": "keel-push-observed", "binding": "PUSH_OBSERVED", "class_name": "PushObserved" },
+    { "name": "keel-deliver", "binding": "DELIVER", "class_name": "Deliver" },
   ],
   "triggers": {
     // Enforces the privacy notice's retention deadlines (composition/retention.ts).

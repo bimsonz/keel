@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/smoke-probe-fetch.test.ts
+# kills: smoke-probe.body-capped
+# why: a preview's endless body is read without end, holding the step until its budget is gone
+diff --git a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+index 528f7981..2f8c4dad 100644
+--- a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
++++ b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+@@ -16,7 +16,7 @@ async function bodyOf(response: Response, limit: number): Promise<string> {
+   let text = "";
+   let read = 0;
+   try {
+-    while (read < limit) {
++    while (read < limit * 1024) {
+       const chunk = await reader.read();
+       if (chunk.done) break;
+       const taken = chunk.value.subarray(0, limit - read);

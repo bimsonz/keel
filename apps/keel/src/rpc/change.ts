@@ -17,16 +17,19 @@ import {
   RevisionMismatch,
   SubjectKey,
 } from "@keeltown/core/domain/coordination";
+import { DeployTargetName } from "@keeltown/core/domain/delivery";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import { PackTooLarge } from "./trunk.ts";
 import {
   AgentId,
+  CandidateId,
   ChangeId,
   CommitSha,
   ConflictId,
   ContentHash,
   DecisionId,
+  DeploymentId,
   LeaseId,
   NextAction,
   ProjectId,
@@ -335,6 +338,23 @@ export const EffectsDerivedCommand = Schema.Struct({
 });
 export type EffectsDerivedCommand = typeof EffectsDerivedCommand.Type;
 
+/**
+ * Tell the change where its candidate's preview answers (core's
+ * `tellPreview`), from KeelVerify's preview step: commits PreviewDeployed on
+ * the change's stream, once per `deploymentId`. `changeId` is checked against
+ * the object's own name. A change the object never made is told nothing.
+ */
+export const TellPreviewCommand = Schema.Struct({
+  changeId: ChangeId,
+  deploymentId: DeploymentId,
+  candidateId: CandidateId,
+  target: DeployTargetName,
+  /** The candidate's own version. */
+  url: Schema.String,
+  /** The change's stable address, when the candidate is that one change's. */
+  aliasUrl: Schema.optionalKey(Schema.String),
+});
+
 const PrecheckRefusal = Schema.Union([ChangeNotFound, ChangeStateRefused]);
 
 // A reused Idempotency-Key with another body is IdempotencyConflict on every keyed call.
@@ -444,6 +464,7 @@ export const ChangeCodecs = {
     PrecheckRefusal,
   ),
   planCompiled: exitCodec(Change, Schema.Union([ChangeNotFound, ChangeStateRefused])),
+  tellPreview: exitCodec(Schema.Void, Schema.Never),
 };
 
 /**
@@ -494,4 +515,6 @@ export interface ChangeRpc extends EventReceiverRpc {
   effectsDerived(command: typeof EffectsDerivedCommand.Encoded): Promise<ExitJson>;
   precheckRefused(command: typeof PrecheckRefusedCommand.Encoded): Promise<ExitJson>;
   planCompiled(command: typeof PlanCompiledCommand.Encoded): Promise<ExitJson>;
+  /** Tells the change where its candidate's preview answers, committing PreviewDeployed once. */
+  tellPreview(command: typeof TellPreviewCommand.Encoded): Promise<ExitJson>;
 }

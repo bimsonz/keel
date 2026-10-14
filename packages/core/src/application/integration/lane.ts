@@ -997,6 +997,8 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
     bundle,
     fence: { batchId: batch.id, attempt: batch.attempt, chainEpoch: batch.chainEpoch },
     planHash,
+    members: batch.members,
+    ...(active.composed === undefined ? {} : { candidateCommit: active.composed.commitSha }),
   });
   yield* noteLane(lane, `verify-started:${batch.id}`, (now) =>
     now.active?.batchId === batch.id ? { ...now, active: { ...now.active, started: true } } : now,

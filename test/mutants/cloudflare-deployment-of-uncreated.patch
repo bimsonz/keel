@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.project-not-found
+# why: a project that was never created answers that it holds no deployment, as though it existed, so the caller cannot tell a missing project from an unpreviewed candidate
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..a8417b08 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -63,7 +63,6 @@ export const deploymentOf: (
+   "delivery/deploymentOf",
+ )(function* (projectId: ProjectId, candidateId: CandidateId) {
+   const store = yield* EntityStore;
+-  if (!created(store, projectId)) return yield* new ProjectNotFound({ projectId });
+   return keptFor(store, candidateId);
+ });
+ 

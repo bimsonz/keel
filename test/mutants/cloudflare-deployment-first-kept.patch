@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.record-replaces
+# why: a candidate previewed again keeps its first preview, so Deliver promotes a version that is not its latest
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..3b1f2ad1 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -91,7 +91,7 @@ export const recordDeployment: (
+       ProjectNotFound
+     > => {
+       if (!created(tx.store, projectId)) return Result.fail(new ProjectNotFound({ projectId }));
+-      if (keptFor(tx.store, deployment.candidateId)?.id !== deployment.id)
++      if (keptFor(tx.store, deployment.candidateId) === undefined)
+         tx.store.put(DEPLOYMENTS, deployment.candidateId, asStored(encodeDeployment(deployment)));
+       return Result.succeed({ value: undefined, drafts: [] });
+     },

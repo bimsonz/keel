@@ -1,6 +1,8 @@
 import { Context, type Effect } from "effect";
 import type {
   CandidateId,
+  ChangeId,
+  CommitSha,
   ContentHash,
   NamespaceId,
   ProjectId,
@@ -18,6 +20,10 @@ export interface VerificationJob {
   readonly bundle: ContentHash;
   readonly fence: CandidateFence;
   readonly planHash: ContentHash;
+  /** The batch's changes, in batch order: each is told where the candidate's preview answers. */
+  readonly members?: readonly ChangeId[];
+  /** The candidate's own commit in staging (`ComposedCandidate.commitSha`), which trunk must reach for its preview to be deployed. */
+  readonly candidateCommit?: CommitSha;
 }
 
 /**

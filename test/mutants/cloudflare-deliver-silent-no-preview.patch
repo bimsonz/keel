@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deliver.test.ts
+# kills: deliver.no-preview
+# why: a connected project whose landing had no preview is told nothing about why trunk was not deployed
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..e3f9de02 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -87,7 +87,7 @@ export const deliverTrunk = (
+             .of(projectId, candidateId)
+             .pipe(Effect.catchTag("ProjectNotFound", () => Effect.succeed(undefined)));
+     if (deployment === undefined)
+-      return held.length === 0
++      return held.length >= 0
+         ? { _tag: "Nothing", why: "the project has no deploy target" }
+         : yield* refuse({
+             reason: "no-preview",

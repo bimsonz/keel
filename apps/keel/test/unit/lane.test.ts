@@ -798,7 +798,7 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.verify-start] commits VerificationStarted, then starts KeelVerify once, named by BatchFormed, under the member's plan",
+    "[lane.verify-start] commits VerificationStarted, then starts KeelVerify once, named by BatchFormed, under the member's plan, naming its members and its candidate's commit",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -816,6 +816,12 @@ describe("the Lane", () => {
           planHash: PLAN.planHash,
           bundle: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         });
+        // The deploy steps tell the batch's members, and record the candidate's own commit: never its tree.
+        const job = w.verification.started.get(instanceId);
+        const assembled = (yield* committed).find((e) => e.type === "CandidateAssembled");
+        expect(job?.members).toEqual([change(1)]);
+        expect(job?.candidateCommit).toMatch(/^[0-9a-f]{40}$/);
+        expect(job?.candidateCommit).not.toBe(Reflect.get(Object(assembled?.payload), "treeSha"));
         // The candidate was bundled for the project's namespace, the one the job names.
         expect(w.bundles.namespaces).toEqual(["org_01JZ8PT2C4E6G8J0M2N4Q6S8V0"]);
         expect(w.startedIn).toEqual(["verifying"]);

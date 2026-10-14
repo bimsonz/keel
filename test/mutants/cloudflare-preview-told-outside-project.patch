@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preview-notices.test.ts
+# kills: preview.told
+# why: a change's PreviewDeployed names no project, so the project's feed and read scope cannot place it
+diff --git a/packages/core/src/application/delivery/preview-notices.ts b/packages/core/src/application/delivery/preview-notices.ts
+index 7e47b8b0..c3b52ed6 100644
+--- a/packages/core/src/application/delivery/preview-notices.ts
++++ b/packages/core/src/application/delivery/preview-notices.ts
+@@ -46,7 +46,6 @@ export const tellPreview: (
+     {
+       entity: changeRef(changeId),
+       cause: `preview:${notice.deploymentId}`,
+-      ...(project === undefined ? {} : { project }),
+     },
+     (tx): Result.Result<{ readonly value: void; readonly drafts: readonly EventDraft[] }> => {
+       if (tx.store.get(CHANGE, changeId) === undefined)

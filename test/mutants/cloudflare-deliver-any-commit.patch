@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deliver.test.ts
+# kills: deliver.commit-differs
+# why: a version previewed from another commit than trunk's is promoted, so production runs a tree nobody previewed
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..821daa2e 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -95,7 +95,7 @@ export const deliverTrunk = (
+           });
+     if (deployment.promotedTo === to)
+       return { _tag: "AlreadyPromoted", deploymentId: deployment.id };
+-    if (deployment.candidateCommit !== to)
++    if (deployment.candidateCommit === undefined)
+       return yield* refuse({
+         reason: "commit-differs",
+         detail:

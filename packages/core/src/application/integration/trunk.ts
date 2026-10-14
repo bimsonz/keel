@@ -457,6 +457,12 @@ export const deleteProjectRepos = Effect.fn("integration/deleteProjectRepos")(fu
 /** The one lane of a project at L1 (`lane:<projectId>:main`), until BatchVerified carries its lane. */
 export const mainLane = (projectId: ProjectId): string => `lane:${projectId}:main`;
 
+/**
+ * Deliver's address: each TrunkAdvanced starts one, which deploys trunk on the
+ * project's deploy target from the landed candidate's preview, or says why not.
+ */
+export const DELIVER = "workflow:Deliver";
+
 /** How long trunk waits after a BatchVerified for others to join it. */
 export const DEBOUNCE_MS = 100;
 
@@ -510,6 +516,7 @@ export const trunkHeard = (
   for (const member of members)
     tx.outbox.subscribe(`change:${member}`, ["TrunkAdvanced"], changeRef(member));
   tx.outbox.subscribe(mainLane(projectId), ["TrunkAdvanced", "PromotionDeclined"]);
+  tx.outbox.subscribe(DELIVER, ["TrunkAdvanced"]);
   return true;
 };
 

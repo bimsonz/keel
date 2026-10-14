@@ -1,5 +1,7 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import {
+  DeliveryRefused,
+  Deployment,
   DeployTarget,
   DeployTargetName,
   DeployTargetRefused,
@@ -16,7 +18,10 @@ import {
   CommandActor,
   AgentId,
   Anchor,
+  CandidateId,
   ChangeId,
+  CommitSha,
+  DeploymentId,
   Glob,
   InstantSchema,
   NamespaceId,
@@ -205,6 +210,45 @@ export const ClearDeployTargetCommand = Schema.Struct({
   requestId: Schema.NonEmptyString,
 });
 
+/**
+ * Keep a candidate's deployment (core's `recordDeployment`), in place of any
+ * kept for it before. It commits no event; a replay of the same deployment
+ * leaves it as it stands.
+ */
+export const RecordDeploymentCommand = Schema.Struct({
+  projectId: ProjectId,
+  deployment: Deployment,
+});
+
+/** Read the deployment the project keeps for a candidate (core's `deploymentOf`). */
+export const DeploymentOfCommand = Schema.Struct({
+  projectId: ProjectId,
+  candidateId: CandidateId,
+});
+
+/**
+ * Trunk was deployed as one of the project's deployments (core's
+ * `promoteDeployment`): marks it promoted to `trunkSha` and commits
+ * DeploymentPromoted, once. One the project does not hold commits nothing.
+ */
+export const DeploymentPromotedCommand = Schema.Struct({
+  projectId: ProjectId,
+  deploymentId: DeploymentId,
+  trunkSha: CommitSha,
+});
+
+/**
+ * Trunk advanced and Keel deployed nothing (core's `refuseDelivery`): commits
+ * DeliveryRefused with these fields, once per `trunkSha`.
+ */
+export const DeliveryRefusedCommand = Schema.Struct({
+  projectId: ProjectId,
+  trunkSha: CommitSha,
+  candidateId: Schema.optional(CandidateId),
+  reason: DeliveryRefused.fields.reason,
+  detail: Schema.String,
+});
+
 const invitationMove = exitCodec(
   Invitation,
   Schema.Union([InvitationRefused, IdempotencyConflict]),
@@ -224,6 +268,10 @@ export const ProjectCodecs = {
     Schema.Union([ProjectNotFound, DeployTargetRefused, IdempotencyConflict]),
   ),
   clearDeployTarget: exitCodec(Schema.Void, Schema.Union([ProjectNotFound, DeployTargetRefused])),
+  recordDeployment: exitCodec(Schema.Void, ProjectNotFound),
+  deploymentOf: exitCodec(Schema.UndefinedOr(Deployment), ProjectNotFound),
+  deploymentPromoted: exitCodec(Schema.Void, ProjectNotFound),
+  deliveryRefused: exitCodec(Schema.Void, ProjectNotFound),
   createProject: exitCodec(
     ProjectView,
     Schema.Union([IdempotencyConflict, RepoNotFound, ImportRefused, QuotaExceeded, ImportTooLarge]),
@@ -244,6 +292,14 @@ export interface ProjectRpc extends EventReceiverRpc {
   setDeployTarget(command: typeof SetDeployTargetCommand.Encoded): Promise<ExitJson>;
   /** Clears one of the project's deploy targets, committing DeployTargetCleared. */
   clearDeployTarget(command: typeof ClearDeployTargetCommand.Encoded): Promise<ExitJson>;
+  /** Keeps a candidate's deployment, in place of any kept for it before; commits nothing. */
+  recordDeployment(command: typeof RecordDeploymentCommand.Encoded): Promise<ExitJson>;
+  /** The deployment the project keeps for a candidate, or undefined. */
+  deploymentOf(command: typeof DeploymentOfCommand.Encoded): Promise<ExitJson>;
+  /** Marks a deployment promoted to trunk's commit, committing DeploymentPromoted once. */
+  deploymentPromoted(command: typeof DeploymentPromotedCommand.Encoded): Promise<ExitJson>;
+  /** Commits DeliveryRefused: trunk advanced and Keel deployed nothing. */
+  deliveryRefused(command: typeof DeliveryRefusedCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;
   /** The person whose namespace the project is in invites an agent to it alone, idempotent by key. */
   inviteAgent(command: typeof InviteToProjectCommand.Encoded): Promise<ExitJson>;

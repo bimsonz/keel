@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preview-notices.test.ts
+# kills: preview.rpc
+# why: a change is never told its stable preview address, only the candidate's version
+diff --git a/apps/keel/src/adapters/driven/do-rpc/preview-notices.ts b/apps/keel/src/adapters/driven/do-rpc/preview-notices.ts
+index 024cca2b..fafb968b 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/preview-notices.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/preview-notices.ts
+@@ -31,7 +31,6 @@ export function PreviewNoticesRpc(
+               candidateId: notice.candidateId,
+               target: notice.target,
+               url: notice.url,
+-              ...(notice.aliasUrl === undefined ? {} : { aliasUrl: notice.aliasUrl }),
+             }),
+           ),
+         ),

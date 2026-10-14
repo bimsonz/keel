@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.promote-once
+# why: a redelivered TrunkAdvanced commits DeploymentPromoted again, and an older promotion redelivered after a newer one moves the record back
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..43208f60 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -121,7 +121,7 @@ export const promoteDeployment: (
+   yield* commit(
+     {
+       entity: projectRef(projectId),
+-      cause: `promote:${deploymentId}:${trunkSha}`,
++      cause: `promote:${deploymentId}:${trunkSha}:${crypto.randomUUID()}`,
+       project: projectId,
+     },
+     (

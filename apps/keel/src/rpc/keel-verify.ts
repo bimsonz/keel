@@ -1,4 +1,12 @@
-import { BatchId, CandidateId, ContentHash, NamespaceId, ProjectId } from "@keeltown/core/kernel";
+import {
+  BatchId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  ContentHash,
+  NamespaceId,
+  ProjectId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 
 /** The source-control provider id KeelVerify's runs carry: candidates come from bundles, never from git. */
@@ -9,7 +17,8 @@ export const KEEL_BUNDLE_PROVIDER = "keel-bundle";
  * `planHash`, both kept for `namespace`, the namespace `projectId` belongs
  * to, and report back to `laneId` fenced on `fence`. Workflow payload, so
  * Effect Schema; the instance id is `keel-verify-<eventId>` of the event that
- * started it.
+ * started it. `members` and `candidateCommit` are what the plan's deploy
+ * steps tell and record; optional, so a job started before them decodes.
  */
 export const KeelVerifyJob = Schema.Struct({
   projectId: ProjectId,
@@ -20,6 +29,8 @@ export const KeelVerifyJob = Schema.Struct({
   bundle: ContentHash,
   fence: Schema.Struct({ batchId: BatchId, attempt: Schema.Int, chainEpoch: Schema.Int }),
   planHash: ContentHash,
+  members: Schema.optional(Schema.Array(ChangeId)),
+  candidateCommit: Schema.optional(CommitSha),
 });
 export type KeelVerifyJob = typeof KeelVerifyJob.Type;
 

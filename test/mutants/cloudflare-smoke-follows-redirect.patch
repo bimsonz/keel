@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/smoke-probe-fetch.test.ts
+# kills: smoke-probe.asks-once
+# why: a preview that redirects to another host is smoked there, and its answer judged as the preview's
+diff --git a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+index 528f7981..ea09f829 100644
+--- a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
++++ b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+@@ -47,7 +47,7 @@ export function SmokeProbeFetch(
+           try {
+             const response = await send(url, {
+               method: "GET",
+-              redirect: "manual",
++              redirect: "follow",
+               signal: AbortSignal.timeout(SMOKE_ANSWER_MS),
+             });
+             return {

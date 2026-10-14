@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preview-notices.test.ts
+# kills: preview.never-made
+# why: Keel commits a preview on the stream of a change its object never made
+diff --git a/packages/core/src/application/delivery/preview-notices.ts b/packages/core/src/application/delivery/preview-notices.ts
+index 7e47b8b0..9c475fb7 100644
+--- a/packages/core/src/application/delivery/preview-notices.ts
++++ b/packages/core/src/application/delivery/preview-notices.ts
+@@ -49,8 +49,6 @@ export const tellPreview: (
+       ...(project === undefined ? {} : { project }),
+     },
+     (tx): Result.Result<{ readonly value: void; readonly drafts: readonly EventDraft[] }> => {
+-      if (tx.store.get(CHANGE, changeId) === undefined)
+-        return Result.succeed({ value: undefined, drafts: [] });
+       const previewed = PreviewDeployed.make({
+         deploymentId: notice.deploymentId,
+         changeId,

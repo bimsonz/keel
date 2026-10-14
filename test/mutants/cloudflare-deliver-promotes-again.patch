@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deliver.test.ts
+# kills: deliver.once
+# why: a TrunkAdvanced delivered twice promotes twice and commits DeploymentPromoted twice
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..c6f19d2c 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -93,7 +93,7 @@ export const deliverTrunk = (
+             reason: "no-preview",
+             detail: `no preview was made of ${candidateId ?? "the landed candidate"}, so nothing is deployed`,
+           });
+-    if (deployment.promotedTo === to)
++    if (deployment.promotedTo === undefined && deployment.promotedTo === to)
+       return { _tag: "AlreadyPromoted", deploymentId: deployment.id };
+     if (deployment.candidateCommit !== to)
+       return yield* refuse({

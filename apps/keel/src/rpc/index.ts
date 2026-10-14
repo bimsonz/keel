@@ -7,6 +7,7 @@
 export * from "./agent-session.ts";
 export * from "./change.ts";
 export * from "./defect.ts";
+export * from "./deliver.ts";
 export * from "./deps.ts";
 export * from "./events.ts";
 export * from "./exit.ts";

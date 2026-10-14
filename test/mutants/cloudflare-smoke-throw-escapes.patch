@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/smoke-probe-fetch.test.ts
+# kills: smoke-probe.no-answer
+# why: a preview not yet up kills the smoke step instead of being asked again
+diff --git a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+index 528f7981..ea13ea6a 100644
+--- a/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
++++ b/apps/keel/src/adapters/driven/deploy/smoke-probe-fetch.ts
+@@ -56,6 +56,7 @@ export function SmokeProbeFetch(
+               body: await bodyOf(response, SMOKE_BODY_BYTES),
+             };
+           } catch (cause) {
++            throw cause;
+             return {
+               _tag: "no-answer",
+               error: cause instanceof Error ? cause.message : String(cause),

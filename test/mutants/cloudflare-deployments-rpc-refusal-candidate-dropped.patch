@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.rpc
+# why: a refusal reaches the project's stream without the landed candidate it was about
+diff --git a/apps/keel/src/adapters/driven/do-rpc/deployments.ts b/apps/keel/src/adapters/driven/do-rpc/deployments.ts
+index 68616935..aa579f64 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/deployments.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/deployments.ts
+@@ -51,7 +51,7 @@ export function DeploymentsRpc(
+         ),
+       refused: (projectId, refusal) =>
+         callObject(ProjectCodecs.deliveryRefused, () =>
+-          project(projectId).deliveryRefused(encodeRefused({ projectId, ...refusal })),
++          project(projectId).deliveryRefused(encodeRefused({ projectId, trunkSha: refusal.trunkSha, reason: refusal.reason, detail: refusal.detail })),
+         ),
+     }),
+   );

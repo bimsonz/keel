@@ -5,6 +5,7 @@ import { ConflictId, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import { Effect, Exit, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  deliverStart,
   type InstanceEvents,
   probeStart,
   sendToInstance,
@@ -116,6 +117,46 @@ describe("the fan-out's Probe cases", () => {
     expect(probeStart(suspected())).toEqual({ skipped: expect.stringContaining(conflictId) });
     expect(probeStart(envelope("ChangeSubmitted", {}))).toMatchObject({
       skipped: expect.stringContaining("not ConflictSuspected"),
+    });
+  });
+
+  it("[fan-out.deliver-start] a TrunkAdvanced starts deliver-<projectId>-<to> with its landed candidates once each, in group order; another event, or one naming no advance, starts nothing", () => {
+    const to = "b".repeat(40);
+    const first = makeId("cnd", ulid());
+    const second = makeId("cnd", ulid());
+    const landing = (candidateId: string) => ({
+      changeId: makeId("chg", ulid()),
+      commitSha: "c".repeat(40),
+      candidateId,
+      proofId: "proof",
+    });
+    const advanced = (to: string) =>
+      envelope(
+        "TrunkAdvanced",
+        {
+          _tag: "TrunkAdvanced",
+          projectId,
+          from: "a".repeat(40),
+          to,
+          groupId: "grp",
+          landings: [landing(first), landing(first), landing(second)],
+        },
+        { kind: "trunk", id: projectId },
+      );
+    expect(deliverStart(advanced(to))).toEqual({
+      id: `deliver-${projectId}-${to}`,
+      params: { projectId, to, candidates: [first, second] },
+    });
+    // The id is the advance's, not the event's: a second event of the same advance names the same instance.
+    expect(deliverStart(advanced(to))).toEqual(deliverStart(advanced(to)));
+    expect(deliverStart(advanced("e".repeat(40)))).toMatchObject({
+      id: `deliver-${projectId}-${"e".repeat(40)}`,
+    });
+    expect(deliverStart(advanced("not a sha"))).toEqual({
+      skipped: expect.stringContaining("names no trunk advance"),
+    });
+    expect(deliverStart(envelope("ChangeSubmitted", {}))).toMatchObject({
+      skipped: expect.stringContaining("not TrunkAdvanced"),
     });
   });
 });

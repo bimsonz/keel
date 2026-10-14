@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.refuse-once
+# why: a later trunk commit refused for the same candidate commits nothing, so members never hear why that advance deployed nothing
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..f3509086 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -168,7 +168,7 @@ export const refuseDelivery: (
+   yield* commit(
+     {
+       entity: projectRef(projectId),
+-      cause: `delivery-refused:${refusal.trunkSha}`,
++      cause: `delivery-refused:${refusal.candidateId}`,
+       project: projectId,
+     },
+     (

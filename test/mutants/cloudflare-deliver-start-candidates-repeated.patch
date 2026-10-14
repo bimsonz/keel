@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fan-out-probe.test.ts
+# kills: fan-out.deliver-start
+# why: a candidate is named once per member, so a group's last candidate is not its own
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index eedd2877..0af771f6 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -187,7 +187,7 @@ export function deliverStart(event: EventEnvelope):
+   const payload = Schema.decodeUnknownOption(TrunkAdvanced)(event.payload);
+   if (Option.isNone(payload)) return { skipped: `${event.eventId} names no trunk advance` };
+   const { projectId, to, landings } = payload.value;
+-  const candidates = [...new Set(landings.map((landing) => landing.candidateId))];
++  const candidates = landings.map((landing) => landing.candidateId);
+   return {
+     id: deliverInstanceId(projectId, to),
+     params: Schema.encodeSync(DeliverJob)({ projectId, to, candidates }),

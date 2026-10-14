@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.rpc-not-found
+# why: a read of a project not yet created cannot cross as ProjectNotFound and dies in transit, so the preview step sees a defect instead of an absent project
+diff --git a/apps/keel/src/rpc/project.ts b/apps/keel/src/rpc/project.ts
+index 5966290e..b8dc19f1 100644
+--- a/apps/keel/src/rpc/project.ts
++++ b/apps/keel/src/rpc/project.ts
+@@ -269,7 +269,7 @@ export const ProjectCodecs = {
+   ),
+   clearDeployTarget: exitCodec(Schema.Void, Schema.Union([ProjectNotFound, DeployTargetRefused])),
+   recordDeployment: exitCodec(Schema.Void, ProjectNotFound),
+-  deploymentOf: exitCodec(Schema.UndefinedOr(Deployment), ProjectNotFound),
++  deploymentOf: exitCodec(Schema.UndefinedOr(Deployment), Schema.Never),
+   deploymentPromoted: exitCodec(Schema.Void, ProjectNotFound),
+   deliveryRefused: exitCodec(Schema.Void, ProjectNotFound),
+   createProject: exitCodec(

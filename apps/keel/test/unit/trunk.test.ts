@@ -638,7 +638,7 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
-    "[trunk.subscribes] the member's Change DO and the lane hear the TrunkAdvanced that lands it, and the lane every decline",
+    "[trunk.subscribes] the member's Change DO, the lane and Deliver hear the TrunkAdvanced that lands it, and the lane every decline",
     () => {
       const w = promotion();
       return Effect.gen(function* () {
@@ -654,10 +654,13 @@ describe("the Trunk's promotion", () => {
         const log = yield* trunkLog;
         const advanced = log.find((e) => e.type === "TrunkAdvanced");
         expect(advanced?.affected).toEqual([{ kind: "change", id: change(1) }]);
-        expect(advanced?.notified).toEqual(expect.arrayContaining([`change:${change(1)}`, LANE]));
+        expect(advanced?.notified).toEqual(
+          expect.arrayContaining([`change:${change(1)}`, LANE, "workflow:Deliver"]),
+        );
         expect(advanced?.notified).not.toContain(`change:${change(2)}`);
         const declined = log.find((e) => e.type === "PromotionDeclined");
         expect(declined?.notified).toEqual(expect.arrayContaining([LANE]));
+        expect(declined?.notified).not.toContain("workflow:Deliver");
         expect(declined?.affected).toEqual([{ kind: "change", id: change(2) }]);
       }).pipe(Effect.provide(w.layer));
     },

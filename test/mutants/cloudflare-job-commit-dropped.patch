@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.verify-start
+# kills: lane.verify-start
+# why: the preview names no commit, so every landing is refused commit-differs and trunk is never deployed
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d3debda9..cba5dff9 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -981,7 +981,6 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
+     fence: { batchId: batch.id, attempt: batch.attempt, chainEpoch: batch.chainEpoch },
+     planHash,
+     members: batch.members,
+-    ...(active.composed === undefined ? {} : { candidateCommit: active.composed.commitSha }),
+   });
+   yield* noteLane(lane, `verify-started:${batch.id}`, (now) =>
+     now.active?.batchId === batch.id ? { ...now, active: { ...now.active, started: true } } : now,

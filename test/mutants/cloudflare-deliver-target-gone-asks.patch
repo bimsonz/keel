@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deliver.test.ts
+# kills: deliver.promote-failed
+# why: a deploy target cleared after the preview still has its credential opened and Cloudflare asked
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..2d304a1f 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -104,7 +104,7 @@ export const deliverTrunk = (
+             : `trunk moved to ${to}, not to ${deployment.candidateCommit}, the commit ${deployment.candidateId}'s preview was built from`,
+       });
+     const found = held.find((h) => h.target.name === deployment.target);
+-    if (found === undefined || found.workersDev === undefined)
++    if (found === undefined && found !== undefined)
+       return yield* refuse({
+         reason: "promote-failed",
+         detail: `the deploy target ${deployment.target} is no longer connected`,

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.record-replay
+# why: a late retry of a preview's record puts it back to previewing after trunk was deployed as it, so the project's record says a live version was never promoted
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..54d2db04 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -91,8 +91,7 @@ export const recordDeployment: (
+       ProjectNotFound
+     > => {
+       if (!created(tx.store, projectId)) return Result.fail(new ProjectNotFound({ projectId }));
+-      if (keptFor(tx.store, deployment.candidateId)?.id !== deployment.id)
+-        tx.store.put(DEPLOYMENTS, deployment.candidateId, asStored(encodeDeployment(deployment)));
++      tx.store.put(DEPLOYMENTS, deployment.candidateId, asStored(encodeDeployment(deployment)));
+       return Result.succeed({ value: undefined, drafts: [] });
+     },
+   );

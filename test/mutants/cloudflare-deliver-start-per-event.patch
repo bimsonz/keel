@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fan-out-probe.test.ts
+# kills: fan-out.deliver-start
+# why: two events of one trunk advance start two Delivers, each promoting
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index eedd2877..7c2bc4ff 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -189,7 +189,7 @@ export function deliverStart(event: EventEnvelope):
+   const { projectId, to, landings } = payload.value;
+   const candidates = [...new Set(landings.map((landing) => landing.candidateId))];
+   return {
+-    id: deliverInstanceId(projectId, to),
++    id: `deliver-${event.eventId}`,
+     params: Schema.encodeSync(DeliverJob)({ projectId, to, candidates }),
+   };
+ }

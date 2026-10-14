@@ -1,8 +1,14 @@
+import { TrunkAdvanced } from "@keeltown/core/domain/integration";
 import { ConflictSuspected } from "@keeltown/core/domain/verification";
 import { EventEnvelope } from "@keeltown/core/kernel";
 import { DeliveryFailed, type FanOut, PROJECTOR, type Subscriber } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
-import { decodeExit, EventCodecs } from "../../../rpc/index.ts";
+import {
+  DeliverJob,
+  decodeExit,
+  deliverInstanceId,
+  EventCodecs,
+} from "../../../rpc/index.ts";
 
 /** A Durable Object's `receive`, reached by its address, which is also the object's name. */
 type Receive = (envelopes: unknown) => Promise<unknown>;
@@ -44,6 +50,8 @@ function workflowFor(env: Env, name: string): Workflow | undefined {
       return env.PRECHECK;
     case "Probe":
       return env.PROBE;
+    case "Deliver":
+      return env.DELIVER;
     default:
       return undefined;
   }
@@ -165,11 +173,40 @@ export function probeStart(event: EventEnvelope):
   };
 }
 
-function startProbes(workflow: Workflow, subscriber: Subscriber, events: readonly EventEnvelope[]) {
+/**
+ * The Deliver a TrunkAdvanced starts: one instance per project and trunk
+ * commit, `deliver-<projectId>-<to>`, so a redelivery starts nothing new.
+ * Its job names the candidates that landed, in group order. An event that
+ * names no advance is acknowledged with the reason, so it never sticks.
+ */
+export function deliverStart(event: EventEnvelope):
+  | { readonly id: string; readonly params: typeof DeliverJob.Encoded }
+  | { readonly skipped: string } {
+  if (event.type !== "TrunkAdvanced")
+    return { skipped: `${event.eventId} is ${event.type}, not TrunkAdvanced` };
+  const payload = Schema.decodeUnknownOption(TrunkAdvanced)(event.payload);
+  if (Option.isNone(payload)) return { skipped: `${event.eventId} names no trunk advance` };
+  const { projectId, to, landings } = payload.value;
+  const candidates = [...new Set(landings.map((landing) => landing.candidateId))];
+  return {
+    id: deliverInstanceId(projectId, to),
+    params: Schema.encodeSync(DeliverJob)({ projectId, to, candidates }),
+  };
+}
+
+/** Starts one instance per event under the id `start` names, or acknowledges an event it skips. */
+function startKeyed(
+  workflow: Workflow,
+  subscriber: Subscriber,
+  events: readonly EventEnvelope[],
+  startOf: (
+    event: EventEnvelope,
+  ) => { readonly id: string; readonly params: object } | { readonly skipped: string },
+) {
   return Effect.forEach(
     events,
     (event) => {
-      const start = probeStart(event);
+      const start = startOf(event);
       if ("skipped" in start)
         return Effect.sync(() =>
           console.error(JSON.stringify({ ops: "fan-out", subscriber, problem: start.skipped })),
@@ -179,7 +216,7 @@ function startProbes(workflow: Workflow, subscriber: Subscriber, events: readonl
           try {
             await workflow.create(start);
           } catch (cause) {
-            // Already started for this conflict: that is the delivery.
+            // Already started for this key: that is the delivery.
             if (!(await exists(workflow, start.id))) throw cause;
           }
         },
@@ -264,7 +301,7 @@ export function sendToInstance(
 /**
  * The fan-out over the Worker's bindings: each address resolves to a Durable
  * Object (its `receive` RPC), a Workflow (one instance per event; a Probe,
- * one per conflict), a waiting Workflow instance (an event sent to it: a
+ * one per conflict; a Deliver, one per project and trunk commit), a waiting Workflow instance (an event sent to it: a
  * Probe's, or a world check's) or the Projector. An address that resolves to nothing fails, so the event stays
  * owed and shows in the backlog instead of being dropped.
  */
@@ -284,9 +321,9 @@ export function FanOutRpc(env: Env): FanOut {
         const workflow = workflowFor(env, name);
         if (workflow === undefined)
           return Effect.fail(failed(subscriber, `no Workflow named ${name}`));
-        return name === "Probe"
-          ? startProbes(workflow, subscriber, events)
-          : startWorkflow(workflow, name, subscriber, events);
+        if (name === "Probe") return startKeyed(workflow, subscriber, events, probeStart);
+        if (name === "Deliver") return startKeyed(workflow, subscriber, events, deliverStart);
+        return startWorkflow(workflow, name, subscriber, events);
       }
       const receive = receiverFor(env, subscriber);
       return receive === undefined

@@ -7,7 +7,11 @@ import {
 import {
   commitDeployTarget,
   commitDeployTargetClear,
+  deploymentOf,
   deployTargetsOf,
+  promoteDeployment,
+  recordDeployment,
+  refuseDelivery,
 } from "@keeltown/core/application/delivery";
 import {
   changeSettings,
@@ -29,11 +33,15 @@ import {
   AcceptProjectInvitationCommand,
   ClearDeployTargetCommand,
   CreateProjectCommand,
+  DeliveryRefusedCommand,
+  DeploymentOfCommand,
+  DeploymentPromotedCommand,
   EndProjectInvitationCommand,
   InviteToProjectCommand,
   ProjectCodecs,
   type ProjectRpc,
   PutSettingsCommand,
+  RecordDeploymentCommand,
   SetDeployTargetCommand,
 } from "../../../rpc/index.ts";
 import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
@@ -63,6 +71,10 @@ export class ProjectDO
       | "deployTargets"
       | "setDeployTarget"
       | "clearDeployTarget"
+      | "recordDeployment"
+      | "deploymentOf"
+      | "deploymentPromoted"
+      | "deliveryRefused"
       | "liveChanges"
       | "liveAnchors"
       | "inviteAgent"
@@ -239,5 +251,61 @@ export class ProjectDO
       ),
     );
     return this.answer(ProjectCodecs.clearDeployTarget, program);
+  }
+
+  /** Keeps a candidate's deployment, in place of any kept for it before; ProjectNotFound before createProject. */
+  async recordDeployment(command: typeof RecordDeploymentCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(RecordDeploymentCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((recording) =>
+        recording.projectId === projectId
+          ? recordDeployment(projectId, recording.deployment)
+          : Effect.die(`a recordDeployment for ${recording.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.recordDeployment, program);
+  }
+
+  /** The deployment the project keeps for a candidate, or undefined; ProjectNotFound before createProject. */
+  async deploymentOf(command: typeof DeploymentOfCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(DeploymentOfCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((reading) =>
+        reading.projectId === projectId
+          ? deploymentOf(projectId, reading.candidateId)
+          : Effect.die(`a deploymentOf for ${reading.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.deploymentOf, program);
+  }
+
+  /** Marks one of the project's deployments promoted to trunk's commit, committing DeploymentPromoted once. */
+  async deploymentPromoted(command: typeof DeploymentPromotedCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(DeploymentPromotedCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ projectId: promotedIn, ...promotion }) =>
+        promotedIn === projectId
+          ? promoteDeployment(projectId, promotion)
+          : Effect.die(`a deploymentPromoted for ${promotedIn} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.deploymentPromoted, program);
+  }
+
+  /** Commits DeliveryRefused: trunk advanced and Keel deployed nothing, once per trunk commit. */
+  async deliveryRefused(command: typeof DeliveryRefusedCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(DeliveryRefusedCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ projectId: refusedIn, ...refusal }) =>
+        refusedIn === projectId
+          ? refuseDelivery(projectId, refusal)
+          : Effect.die(`a deliveryRefused for ${refusedIn} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.deliveryRefused, program);
   }
 }

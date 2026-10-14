@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.record-of
+# why: a candidate's preview is kept under its deployment's id, where no read by candidate finds it, so Deliver finds no preview to promote
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..15600d8c 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -92,7 +92,7 @@ export const recordDeployment: (
+     > => {
+       if (!created(tx.store, projectId)) return Result.fail(new ProjectNotFound({ projectId }));
+       if (keptFor(tx.store, deployment.candidateId)?.id !== deployment.id)
+-        tx.store.put(DEPLOYMENTS, deployment.candidateId, asStored(encodeDeployment(deployment)));
++        tx.store.put(DEPLOYMENTS, deployment.id, asStored(encodeDeployment(deployment)));
+       return Result.succeed({ value: undefined, drafts: [] });
+     },
+   );

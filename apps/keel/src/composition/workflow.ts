@@ -1,6 +1,6 @@
 import type { WorkflowStep } from "cloudflare:workers";
 import { type DurableReport, StoredStepReport } from "@keeltown/core/application/verification";
-import { ContentHash } from "@keeltown/core/kernel";
+import { ContentHash, type ProjectId } from "@keeltown/core/kernel";
 import type {
   AdmittedGuards,
   Decisions,
@@ -10,6 +10,10 @@ import type {
   ChangePrecheck,
   Clock,
   CodeHost,
+  CredentialStore,
+  Deployer,
+  Deployments,
+  DeployTargets,
   DepsBuilder,
   EvidenceStore,
   FlowSpecSource,
@@ -17,6 +21,7 @@ import type {
   NoopWorlds,
   PlanStore,
   PlatformFunction,
+  PreviewNotices,
   ProbeChanges,
   ProbeLedger,
   ProbeRunner,
@@ -24,6 +29,7 @@ import type {
   ProbeStore,
   ProjectNamespaces,
   Projects,
+  SmokeProbe,
   SyntaxSource,
   Trunks,
   VerifierRuntime,
@@ -39,6 +45,11 @@ import {
 } from "../adapters/driven/ci/suite-runtime.ts";
 import { PRECHECK_TREES } from "../adapters/driven/artifacts/code-host.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
+import { DeployerCloudflare } from "../adapters/driven/deploy/cloudflare-deployer.ts";
+import { SmokeProbeFetch } from "../adapters/driven/deploy/smoke-probe-fetch.ts";
+import { DeploymentsRpc } from "../adapters/driven/do-rpc/deployments.ts";
+import { DeployTargetsRpc } from "../adapters/driven/do-rpc/deploy-targets.ts";
+import { PreviewNoticesRpc } from "../adapters/driven/do-rpc/preview-notices.ts";
 import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guards.ts";
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
 import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.ts";
@@ -69,6 +80,7 @@ import {
   type StreamingAi,
 } from "../adapters/driven/workers-ai/platform-function.ts";
 import { artifactsLocationHint, artifactsObjects, codeHostLayer, commitSigning } from "./do.ts";
+import { credentialStoreLayer } from "./isolate.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
@@ -85,10 +97,46 @@ export function pushObservedRuntime(env: Env): ManagedRuntime.ManagedRuntime<Wor
 }
 
 /**
+ * What Keel's deploy steps and Deliver call: Cloudflare's API, the
+ * namespace's sealed credentials opened here in the Worker, and the project's
+ * targets and deployments and each change through their own objects.
+ */
+function deployLayer(
+  env: Env,
+): Layer.Layer<CredentialStore | Deployer | Deployments | DeployTargets | PreviewNotices | SmokeProbe> {
+  const project = (projectId: ProjectId) =>
+    env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  return Layer.mergeAll(
+    DeployerCloudflare(),
+    credentialStoreLayer(env),
+    DeployTargetsRpc(project),
+    DeploymentsRpc(project),
+    PreviewNoticesRpc((changeId) => env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`))),
+    SmokeProbeFetch(),
+  );
+}
+
+/**
+ * Deliver's composition root, per run: the project's targets and deployments
+ * through its Project DO, its namespace from D1, its credentials, and
+ * Cloudflare's API.
+ */
+export function deliverRuntime(
+  env: Env,
+): ManagedRuntime.ManagedRuntime<
+  CredentialStore | Deployer | Deployments | DeployTargets | ProjectNamespaces,
+  never
+> {
+  return ManagedRuntime.make(Layer.mergeAll(deployLayer(env), ProjectNamespacesD1(env.DB)));
+}
+
+/**
  * KeelVerify's composition root, per run: the plan from the plan store
  * (ARCHIVE), Tier 2 steps through the CI engine's `runner` with the deps
  * keel-verify's deps box builds from the candidate's bundle, guard steps on
- * keel-verify's VerifierDOs, evidence in ARCHIVE, verdicts to the Lane DO.
+ * keel-verify's VerifierDOs, deploy steps in the Worker itself (the token is
+ * opened here and never reaches a box), evidence in ARCHIVE, verdicts to the
+ * Lane DO.
  * `durable` makes the runtime's own side effects Workflow steps, so a replay
  * returns what the first run stored.
  */
@@ -104,7 +152,13 @@ export function keelVerifyRuntime(
   | DepsBuilder
   | PlanStore
   | ProbeRunner
-  | ProjectNamespaces,
+  | ProjectNamespaces
+  | CredentialStore
+  | Deployer
+  | Deployments
+  | DeployTargets
+  | PreviewNotices
+  | SmokeProbe,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -135,6 +189,7 @@ export function keelVerifyRuntime(
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
         signingKey: env.BUNDLE_URL_SIGNING_KEY,
       }).pipe(Layer.provide(evidence)),
+      deployLayer(env),
     ),
   );
 }

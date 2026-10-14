@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preview-notices.test.ts
+# kills: preview.told-once
+# why: a candidate previewed again tells its changes nothing, so the agent keeps the address of a version that is gone
+diff --git a/packages/core/src/application/delivery/preview-notices.ts b/packages/core/src/application/delivery/preview-notices.ts
+index 7e47b8b0..319b9466 100644
+--- a/packages/core/src/application/delivery/preview-notices.ts
++++ b/packages/core/src/application/delivery/preview-notices.ts
+@@ -45,7 +45,7 @@ export const tellPreview: (
+   yield* commit(
+     {
+       entity: changeRef(changeId),
+-      cause: `preview:${notice.deploymentId}`,
++      cause: `preview:${notice.candidateId}`,
+       ...(project === undefined ? {} : { project }),
+     },
+     (tx): Result.Result<{ readonly value: void; readonly drafts: readonly EventDraft[] }> => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deliver.test.ts
+# kills: deliver.promote-failed
+# why: a promote Cloudflare refused is asked again, as if it might be taken
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..70573b41 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -128,7 +128,7 @@ export const deliverTrunk = (
+       })
+       .pipe(
+         Effect.retry({
+-          while: (failed) => failed.reason === "unreachable",
++          while: () => true,
+           schedule: Schedule.spaced(UNREACHABLE_SPACING),
+           times: UNREACHABLE_RETRIES,
+         }),

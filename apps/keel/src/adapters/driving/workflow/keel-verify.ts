@@ -1,7 +1,13 @@
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  type DeployRun,
+  type DeployServices,
+  runDeployStep,
+} from "@keeltown/core/application/delivery";
+import {
   candidateRunner,
+  type DeployStepRunner,
   ensureDeps,
   readStoredPlan,
   recordBatchVerdict,
@@ -12,7 +18,7 @@ import {
   settleUnresolved,
   settleVerdict,
 } from "@keeltown/core/application/verification";
-import { Cause, Exit, Option, Result, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
 import { durableReport, keelVerifyRuntime } from "../../../composition/workflow.ts";
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
@@ -39,7 +45,10 @@ const RECORD_RETRIES = {
  * built once for the namespace and that digest, or why there are none), then
  * the plan's own steps as `runPlan` reaches them: a Tier 2 step is its runner's step (which persists its raw
  * logs, so a runner may hold nothing secret) and `<step>:evidence`, a guard
- * step is `guard <step>`; then `verdict` and `record`. A plan the store does
+ * step is `guard <step>`, and one of Keel's deploy steps is `deploy <step>`,
+ * run here in the Worker: the token of the target's account is opened inside
+ * that step for Cloudflare's call and is never in what it returns, which is
+ * persisted; then `verdict` and `record`. A plan the store does
  * not hold, or holds corrupt, runs nothing and settles park: the lane is
  * never left waiting on a failed instance.
  */
@@ -90,6 +99,16 @@ export class KeelVerify extends CIWorkflow<Env> {
         resolved._tag === "Resolved"
           ? readStoredPlan(job.planHash, resolved.text)
           : Result.fail(resolved.why);
+      const run: DeployRun = {
+        projectId: job.projectId,
+        namespace,
+        candidateId: job.candidateId,
+        members: job.members ?? [],
+        ...(job.candidateCommit === undefined ? {} : { candidateCommit: job.candidateCommit }),
+      };
+      const deployServices = await runtime.runPromise(Effect.context<DeployServices>());
+      const deploy: DeployStepRunner = (planStep, earlier) =>
+        runDeployStep(run, planStep, earlier).pipe(Effect.provideContext(deployServices));
       const reports = Result.isSuccess(plan)
         ? await runtime.runPromise(
             runPlan(
@@ -101,6 +120,7 @@ export class KeelVerify extends CIWorkflow<Env> {
                 await runtime.runPromise(
                   ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
                 ),
+                deploy,
               ),
             ),
           )

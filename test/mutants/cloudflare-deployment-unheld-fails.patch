@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/deployments.test.ts
+# kills: deployments.promote-unheld
+# why: a promotion of a deployment the project no longer holds fails Deliver as though the project itself were gone
+diff --git a/packages/core/src/application/delivery/deployments.ts b/packages/core/src/application/delivery/deployments.ts
+index e1d8eb97..f9ee4ed2 100644
+--- a/packages/core/src/application/delivery/deployments.ts
++++ b/packages/core/src/application/delivery/deployments.ts
+@@ -132,7 +132,7 @@ export const promoteDeployment: (
+     > => {
+       if (!created(tx.store, projectId)) return Result.fail(new ProjectNotFound({ projectId }));
+       const kept = keptAs(tx.store, deploymentId);
+-      if (kept === undefined) return Result.succeed({ value: undefined, drafts: [] });
++      if (kept === undefined) return Result.fail(new ProjectNotFound({ projectId }));
+       tx.store.put(
+         DEPLOYMENTS,
+         kept.candidateId,

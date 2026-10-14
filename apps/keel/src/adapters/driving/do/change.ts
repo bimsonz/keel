@@ -26,6 +26,7 @@ import {
   submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
+import { tellPreview } from "@keeltown/core/application/delivery";
 import { lapsesAt } from "@keeltown/core/domain/coordination";
 import { ChangeId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
@@ -56,6 +57,7 @@ import {
   DistinguishCommand,
   ReviseCommand,
   SubmitCommand,
+  TellPreviewCommand,
 } from "../../../rpc/index.ts";
 import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
@@ -258,6 +260,19 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((plan) => planCompiled(changeId, plan)),
     );
     return this.answer(ChangeCodecs.planCompiled, program);
+  }
+
+  /** KeelVerify's preview step tells the change where its candidate's preview answers; a change never made is told nothing. */
+  async tellPreview(command: typeof TellPreviewCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(TellPreviewCommand, command).pipe(
+      Effect.flatMap(({ changeId: toldTo, ...notice }) =>
+        toldTo === changeId
+          ? tellPreview(changeId, notice)
+          : Effect.die(`a tellPreview for ${toldTo} reached ${changeId}`),
+      ),
+    );
+    return this.answer(ChangeCodecs.tellPreview, program);
   }
 
   /**

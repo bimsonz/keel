@@ -106,6 +106,10 @@ const decodeSuspected = Schema.decodeUnknownOption(
   }),
 );
 
+const decodePreview = Schema.decodeUnknownOption(
+  Schema.Struct({ url: Schema.String, aliasUrl: Schema.optional(Schema.String) }),
+);
+
 /** More than the notice's title says, chosen for the event when it is delivered. */
 export function detailOf(event: EventEnvelope): string | undefined {
   switch (event.type) {
@@ -152,6 +156,11 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onNone: () => undefined,
         onSome: (p) =>
           p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
+      });
+    case "PreviewDeployed":
+      return Option.match(decodePreview(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) => `a preview of your change answers at ${p.aliasUrl ?? p.url}`,
       });
     case "AgentInvited":
       return Option.match(decodeInvited(event.payload), {
