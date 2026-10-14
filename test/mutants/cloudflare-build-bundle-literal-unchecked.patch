@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.bundle-literal-abstains
+# why: a module the box built holding a secret Keel handed it is uploaded to the owner's account and stored as evidence
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 9a96f898..ac8c9cb8 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -452,7 +452,7 @@ export const judgeBuildOutput = (
+     });
+     const module = yield* gunzipText(gzip);
+     const inModule = scanCredentials([module ?? "", gzip ?? ""], { literals }).literal;
+-    const credentialScan = { ...logged, literal: logged.literal + inModule };
++    const credentialScan = { ...logged, literal: logged.literal };
+     const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
+     const { bundle, ...evidence } = judged.evidence;
+     const redacted = redactJson({ ...evidence }, literals);

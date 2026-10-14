@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/build-command.test.ts
+# kills: build.bundle-not-scanned
+# why: a dependency carrying a sample key or an Artifacts URL abstains every build of its app, so none of its changes ever lands
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 9a96f898..b1bbe961 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -452,7 +452,10 @@ export const judgeBuildOutput = (
+     });
+     const module = yield* gunzipText(gzip);
+     const inModule = scanCredentials([module ?? "", gzip ?? ""], { literals }).literal;
+-    const credentialScan = { ...logged, literal: logged.literal + inModule };
++    const credentialScan = {
++      ...scanCredentials([log, module ?? "", tail], { literals }),
++      literal: logged.literal + inModule,
++    };
+     const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
+     const { bundle, ...evidence } = judged.evidence;
+     const redacted = redactJson({ ...evidence }, literals);
