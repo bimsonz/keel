@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Hosted coding agents (Flue) that use Keel only through its public API.
+  // `vite build` adds Flue's entry and its agent's Durable Object binding, and
+  // writes the deployable config to dist/keel_swarm/wrangler.json.
+  "name": "keel-swarm",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    "KEEL_HOST": "keel.localhost",
+    // The swarm's model, an exact Workers AI id: it calls tools, which a Flue agent needs.
+    "SWARM_MODEL": "@cf/zai-org/glm-5.3-flash",
+  },
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "KEYRING", "class_name": "Keyring" },
+      { "name": "DIRECTOR", "class_name": "Director" },
+    ],
+  },
+  // Append only. Flue's generated class takes its own tag, as Flue's docs ask.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Keyring", "Director"] },
+    { "tag": "flue-class-FlueCoderAgent", "new_sqlite_classes": ["FlueCoderAgent"] },
+  ],
+  "secrets": { "required": ["SWARM_ADMIN_TOKEN"] },
+}

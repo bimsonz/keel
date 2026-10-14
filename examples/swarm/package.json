@@ -5,13 +5,27 @@
   "description": "Example: hosted agents that use Keel only through its public API",
   "license": "MIT",
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "gen": "node scripts/types.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "vite build",
+    "deploy:dry": "vite build && wrangler deploy --dry-run -c dist/keel_swarm/wrangler.json --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "@flue/runtime": "catalog:",
+    "@keeltown/sdk": "workspace:*",
+    "hono": "catalog:",
+    "valibot": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/vitest-plugin": "catalog:",
+    "@flue/vite": "catalog:",
+    "@types/node": "catalog:",
+    "jsonc-parser": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

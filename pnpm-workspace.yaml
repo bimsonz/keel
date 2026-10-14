@@ -14,6 +14,10 @@ allowBuilds:
   # Their install script builds a native addon (node-gyp-build); only the prebuilt .wasm grammar is used.
   tree-sitter-javascript: false
   tree-sitter-typescript: false
+  # Pulled in by Flue's model providers (examples/swarm); none of their install scripts is needed on Workers.
+  "@google/genai": false
+  core-js-pure: false
+  protobufjs: false
 
 # Every third-party version used anywhere in the workspace is pinned here, once.
 # Packages refer to these with `catalog:`. Read the registry (`pnpm view`) before
@@ -50,6 +54,12 @@ catalog:
   effect: 4.0.2
   "@effect/vitest": 4.0.2
   hono: 4.13.13
+  # examples/swarm: Flue's agent harness, built for Workers by the vite and
+  # @cloudflare/vite-plugin pins below (the plugin's wrangler peer takes the pin above).
+  "@flue/runtime": 2.3.0
+  "@flue/vite": 2.3.0
+  # Flue's schemas for a tool's input and an agent's creation data.
+  valibot: 1.5.0
   "@hono/zod-validator": 0.9.1
   zod: 4.6.5
   "@modelcontextprotocol/server": 2.3.1
