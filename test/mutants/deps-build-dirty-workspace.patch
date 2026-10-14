@@ -2,12 +2,12 @@
 # kills: deps.build.again, deps.build.mounted
 # why: The workspace is not emptied before a bundle is extracted into it, so what an earlier build left is counted against the next bundle's manifest
 diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
-index bb60317b..47a07379 100644
+index 4d764663..01da06bf 100644
 --- a/packages/runner-protocol/src/deps.ts
 +++ b/packages/runner-protocol/src/deps.ts
-@@ -385,7 +385,6 @@ export const depsBuildCommand = (
-     'refuse() { echo "KEEL_BUILD refused $1"; echo KEEL_END; exit 0; }',
-     `toolchain=$(cat ${path("toolchainFile", paths.toolchainFile)} 2>/dev/null); echo "KEEL_TOOLCHAIN $toolchain"`,
+@@ -392,7 +392,6 @@ export const depsBuildCommand = (
+     // The pnpm the toolchain names, read by its word: the line goes on to name the base.
+     "pnpm_named=${toolchain#* pnpm }; pnpm_named=${pnpm_named%% *}",
      'rm -rf "$K"; mkdir -p "$K" "$W" && cd "$W" || refuse no-workspace',
 -    'find "$W" -mindepth 1 -delete 2>/dev/null',
      'case "${KEEL_BUNDLE_URL:-}" in https://*) url=http://${KEEL_BUNDLE_URL#https://} ;; *) url=${KEEL_BUNDLE_URL:-} ;; esac',

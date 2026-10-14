@@ -389,6 +389,8 @@ export const depsBuildCommand = (
     `echo ${terms.protocol}`,
     'refuse() { echo "KEEL_BUILD refused $1"; echo KEEL_END; exit 0; }',
     `toolchain=$(cat ${path("toolchainFile", paths.toolchainFile)} 2>/dev/null); echo "KEEL_TOOLCHAIN $toolchain"`,
+    // The pnpm the toolchain names, read by its word: the line goes on to name the base.
+    "pnpm_named=${toolchain#* pnpm }; pnpm_named=${pnpm_named%% *}",
     'rm -rf "$K"; mkdir -p "$K" "$W" && cd "$W" || refuse no-workspace',
     'find "$W" -mindepth 1 -delete 2>/dev/null',
     'case "${KEEL_BUNDLE_URL:-}" in https://*) url=http://${KEEL_BUNDLE_URL#https://} ;; *) url=${KEEL_BUNDLE_URL:-} ;; esac',
@@ -408,7 +410,7 @@ export const depsBuildCommand = (
     "[ $code -ne 124 ] || refuse install-timeout",
     `err=$(LC_ALL=C sed -n 's/^\\[\\(ERR_PNPM_[A-Z0-9_]*\\)\\].*/\\1/p' "$K/install.log" 2>/dev/null | head -n 1 | cut -c1-80)`,
     '[ $code -eq 0 ] || refuse "install-failed exit $code${err:+ $err}"',
-    `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "\${toolchain##* }" ] || refuse toolchain-switched`,
+    `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "$pnpm_named" ] || refuse toolchain-switched`,
     `keel_deps_pack "$W" "$K/parts" ${partBytes} >"$K/packed" || refuse "$(head -n 1 "$K/packed")"`,
     "files=0; total=0; list=",
     "while read -r kind a b; do",

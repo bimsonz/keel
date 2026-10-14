@@ -333,7 +333,8 @@ const candidate = async (lock: string, inputs = inputsOf(lock)) => {
 const NAMESPACE = "usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
 const SIGNATURE = "S".repeat(86);
 /** What this box's image states: no real toolchain's, so only the file can be where a report got it. */
-const TOOLCHAIN = "node v0.0.0-box pnpm 0.0.0-box";
+// As the image writes it: node, pnpm, then the base.
+const TOOLCHAIN = "node v0.0.0-box pnpm 0.0.0-box ubuntu 0.0-box";
 
 /**
  * The deps box's two hosts on 127.0.0.1: the bundle host answers

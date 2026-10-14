@@ -2,13 +2,13 @@
 # kills: deps.build.no-workspace
 # why: A box whose workspace cannot be made goes on from wherever it stands
 diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
-index bb60317b..d938b8c0 100644
+index 4d764663..74ec5a58 100644
 --- a/packages/runner-protocol/src/deps.ts
 +++ b/packages/runner-protocol/src/deps.ts
-@@ -384,7 +384,7 @@ export const depsBuildCommand = (
-     `echo ${terms.protocol}`,
-     'refuse() { echo "KEEL_BUILD refused $1"; echo KEEL_END; exit 0; }',
+@@ -391,7 +391,7 @@ export const depsBuildCommand = (
      `toolchain=$(cat ${path("toolchainFile", paths.toolchainFile)} 2>/dev/null); echo "KEEL_TOOLCHAIN $toolchain"`,
+     // The pnpm the toolchain names, read by its word: the line goes on to name the base.
+     "pnpm_named=${toolchain#* pnpm }; pnpm_named=${pnpm_named%% *}",
 -    'rm -rf "$K"; mkdir -p "$K" "$W" && cd "$W" || refuse no-workspace',
 +    'rm -rf "$K"; mkdir -p "$K" "$W" && cd "$W" || true',
      'find "$W" -mindepth 1 -delete 2>/dev/null',

@@ -2,15 +2,15 @@
 # kills: deps.build.install-code
 # why: A failed install is reported without its exit status, in a form core does not read: every lockfile fault parks
 diff --git a/packages/runner-protocol/src/deps.ts b/packages/runner-protocol/src/deps.ts
-index fc650e39..595d5dad 100644
+index 4d764663..357f97cb 100644
 --- a/packages/runner-protocol/src/deps.ts
 +++ b/packages/runner-protocol/src/deps.ts
-@@ -407,7 +407,7 @@ export const depsBuildCommand = (
+@@ -409,7 +409,7 @@ export const depsBuildCommand = (
      "code=$?; ms=$(( ($(date +%s) - start) * 1000 ))",
      "[ $code -ne 124 ] || refuse install-timeout",
      `err=$(LC_ALL=C sed -n 's/^\\[\\(ERR_PNPM_[A-Z0-9_]*\\)\\].*/\\1/p' "$K/install.log" 2>/dev/null | head -n 1 | cut -c1-80)`,
 -    '[ $code -eq 0 ] || refuse "install-failed exit $code${err:+ $err}"',
 +    '[ $code -eq 0 ] || refuse "install-failed${err:+ $err}"',
-     `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "\${toolchain##* }" ] || refuse toolchain-switched`,
+     `[ "$(sed -n 's/^.* using pnpm v//p' "$K/install.log" | tail -n 1)" = "$pnpm_named" ] || refuse toolchain-switched`,
      `keel_deps_pack "$W" "$K/parts" ${partBytes} >"$K/packed" || refuse "$(head -n 1 "$K/packed")"`,
      "files=0; total=0; list=",
