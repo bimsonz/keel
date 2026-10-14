@@ -5,4 +5,5 @@ export * from "./deploy-target.ts";
 export * from "./deployment.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
+export * from "./smoke.ts";
 export * from "./target-reach.ts";

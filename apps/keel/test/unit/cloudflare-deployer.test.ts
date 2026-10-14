@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type DeployAccount, Deployer, type WorkerUpload } from "@keeltown/core/ports";
 import { Effect, Exit, Redacted } from "effect";
+import { gzipSync } from "node:zlib";
 import { DeployerCloudflare } from "../../src/adapters/driven/deploy/cloudflare-deployer.ts";
 
 const TOKEN = "cf-token-SECRET-0123456789abcdef";
@@ -8,11 +9,12 @@ const ACCOUNT: DeployAccount = {
   accountId: "0123456789abcdef0123456789abcdef",
   workersDev: "owner.workers.dev",
 };
+const MODULE = "export default { fetch() { return new Response('ok'); } };";
 const VERSION = "8d2a91c4-5f3e-4b2a-9c1d-0e6f7a8b9c0d";
 const UPLOAD: WorkerUpload = {
   worker: "worker-lite",
   mainModule: "worker.js",
-  module: "export default { fetch() { return new Response('ok'); } };",
+  moduleGzip: gzipSync(MODULE).toString("base64"),
   compatibilityDate: "2026-10-01",
   compatibilityFlags: ["nodejs_compat"],
   vars: { GREETING: "hello", LIMITS: { max: 3 } },
@@ -153,7 +155,7 @@ describe("the Cloudflare Deployer", () => {
         const module = form?.get("worker.js");
         expect(
           module instanceof Blob ? [module.type, yield* Effect.promise(() => module.text())] : [],
-        ).toEqual(["application/javascript+module", UPLOAD.module]);
+        ).toEqual(["application/javascript+module", MODULE]);
         expect(cf.seen[1]?.headers["cloudflare-workers-script-api-date"]).toBe("2025-08-01");
         const { alias: _alias, ...unaliased } = UPLOAD;
         const again = cloudflare([

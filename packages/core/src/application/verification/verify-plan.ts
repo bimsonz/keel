@@ -113,6 +113,16 @@ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport 
 });
 
 /**
+ * How a run deploys: Keel's own step for a deploy step, given what the steps
+ * before it in the run reported. The caller makes it, with the candidate and
+ * the services it deploys with, so a run with nothing to deploy needs none.
+ */
+export type DeployStepRunner = (
+  step: PlanStep,
+  earlier: ReadonlyMap<string, StepReport>,
+) => Effect.Effect<StepReport>;
+
+/**
  * The runner a candidate's plan runs on. A step asked for a world abstains
  * unrun: a lane verifies one candidate, and the worlds A, B and AB belong to
  * a conflict's matrix. A guard step runs the probe its plan pins against the
@@ -121,16 +131,31 @@ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport 
  * on the VerifierRuntime, whose Tier 2 runners are durable themselves and are
  * handed `deps`, what the Workflow ensured for the candidate; a step it has
  * no runner for abstains there.
+ *
+ * A deploy step runs here, in Tier 0, as one durable step (`deploy <step>`),
+ * by `deploy`. It reads what the steps before it in this run reported (a preview uploads the
+ * build's module; smoke asks the preview's address): the runner keeps each
+ * report it answers for that, and a replay keeps the same ones, since each
+ * came from a durable step. With no `deploy`, a deploy step abstains unrun.
  */
-export const candidateRunner =
-  (
-    namespace: NamespaceId,
-    job: Omit<VerificationJob, "steps">,
-    durable: DurableReport,
-    deps: DepsAnswer,
-  ): StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> =>
-  (step, world) => {
+export const candidateRunner = (
+  namespace: NamespaceId,
+  job: Omit<VerificationJob, "steps">,
+  durable: DurableReport,
+  deps: DepsAnswer,
+  deploy?: DeployStepRunner,
+): StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> => {
+  const reported = new Map<string, StepReport>();
+  const keep = (step: PlanStep) => (report: StepReport) =>
+    Effect.sync(() => {
+      reported.set(step.id, report);
+    });
+  const run: StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> = (step, world) => {
     if (world !== undefined) return Effect.succeed(abstainUnrun(step, world));
+    if (step.kind === "deploy")
+      return deploy === undefined
+        ? Effect.succeed(abstainUnrun(step, undefined))
+        : durable(`deploy ${step.id}`, deploy(step, reported));
     const asJob: StepRunner<VerifierRuntime> = (s) =>
       runJob(namespace, { ...job, steps: [s] }, deps).pipe(
         Effect.map((reports): StepReport => reports[0] ?? abstainUnrun(s, undefined)),
@@ -154,3 +179,6 @@ export const candidateRunner =
       );
     });
   };
+  return (step, world) =>
+    world === undefined ? Effect.tap(run(step, world), keep(step)) : run(step, world);
+};

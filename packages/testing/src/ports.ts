@@ -768,6 +768,16 @@ export const PORTS = {
     () => delivery.makeDeployerMemory().layer,
     pending("Deployer", ["preview", "promote", "deleteVersion"]),
   ),
+  Deployments: port(
+    () => delivery.makeDeploymentsMemory().layer,
+    pending("Deployments", ["record", "of", "promoted", "refused"]),
+  ),
+  PreviewNotices: port(
+    () => delivery.makePreviewNoticesMemory().layer,
+    pending("PreviewNotices", ["tell"]),
+  ),
+  // The real probe asks a preview over the network; its mapping is unit-tested against a fetch double.
+  SmokeProbe: port(() => delivery.makeSmokeProbeMemory().layer, pending("SmokeProbe", ["ask"])),
   // The real check asks Cloudflare's API, so no suite runs it: its mapping is unit-tested against a fetch double.
   DeployTargetCheck: port(
     () => delivery.makeDeployTargetCheckMemory().layer,

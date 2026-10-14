@@ -94,13 +94,24 @@ const bindingsOf = (vars: Readonly<Record<string, Json>>) =>
       : { type: "json", name, json: value },
   );
 
+/** The module's bytes from the build's gzip and base64, or undefined when they do not decode. */
+export const moduleOf = async (gzip: string): Promise<Uint8Array | undefined> => {
+  try {
+    const bytes = Uint8Array.from(atob(gzip), (c) => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * The multipart body of a version upload. Its bindings are only the config's
  * plain vars, and it never asks Cloudflare to keep any binding of the Worker's
  * deployed version (`keep_bindings`): a preview of a change's code must not run
  * with production's secrets.
  */
-export const versionForm = (upload: WorkerUpload): FormData => {
+export const versionForm = (upload: WorkerUpload, module: Uint8Array): FormData => {
   const form = new FormData();
   const metadata = {
     main_module: upload.mainModule,
@@ -116,7 +127,7 @@ export const versionForm = (upload: WorkerUpload): FormData => {
   form.set("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
   form.set(
     upload.mainModule,
-    new Blob([upload.module], { type: "application/javascript+module" }),
+    new Blob([module.slice()], { type: "application/javascript+module" }),
     upload.mainModule,
   );
   return form;
@@ -205,12 +216,21 @@ export function DeployerCloudflare(options: CloudflareApiOptions = {}): Layer.La
     Deployer.of({
       preview: (a, token, upload) =>
         Effect.gen(function* () {
+          const module = yield* Effect.promise(() => moduleOf(upload.moduleGzip));
+          if (module === undefined)
+            return yield* Effect.fail(
+              new DeploymentFailed({
+                operation: "preview",
+                reason: "refused",
+                detail: "the build's module did not decode",
+              }),
+            );
           yield* ensureWorker(a, token, upload.worker);
           const uploaded = yield* call(
             token,
             "POST",
             `${account(a)}/workers/scripts/${encodeURIComponent(upload.worker)}/versions?bindings_inherit=strict`,
-            versionForm(upload),
+            versionForm(upload, module),
           );
           if (!ok(uploaded)) return yield* Effect.fail(failureOf("preview", uploaded));
           const version = Option.getOrUndefined(decodeId(resultOf(uploaded)));

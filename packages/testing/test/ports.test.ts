@@ -77,6 +77,9 @@ const CONTRACT_PORTS = [
   "CredentialStore",
   "DeployTargetCheck",
   "DeployTargets",
+  "Deployments",
+  "PreviewNotices",
+  "SmokeProbe",
   "Background",
   "Metrics",
 ];

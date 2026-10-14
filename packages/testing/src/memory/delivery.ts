@@ -7,10 +7,15 @@ import { PROJECT, ProjectRecord } from "@keeltown/core/application/integration";
 import {
   type CredentialMeta,
   CredentialMissing,
+  type Deployment,
+  type SmokeAnswer,
   type DeployTargetUnreachable,
 } from "@keeltown/core/domain/delivery";
 import {
+  type ChangeId,
+  type CommitSha,
   type CredentialId,
+  type DeploymentId,
   Instant,
   makeId,
   type NamespaceId,
@@ -18,10 +23,15 @@ import {
 } from "@keeltown/core/kernel";
 import {
   CredentialStore,
+  type DeliveryRefusal,
   type DeployAccount,
   Deployer,
+  Deployments,
   DeployTargetCheck,
   DeployTargets,
+  type PreviewNotice,
+  PreviewNotices,
+  SmokeProbe,
   type TargetReach,
   type WorkerUpload,
 } from "@keeltown/core/ports";
@@ -82,6 +92,106 @@ export function makeDeployerMemory() {
         deleteVersion: (account, _token, version) =>
           Effect.sync(() => {
             calls.push({ op: "delete-version", account, version });
+          }),
+      }),
+    ),
+  };
+}
+
+/** What the memory Deployments committed, as the real object would commit it on the project's stream. */
+export type DeploymentsCommitted =
+  | {
+      readonly type: "DeploymentPromoted";
+      readonly projectId: ProjectId;
+      readonly deploymentId: DeploymentId;
+      readonly trunkSha: CommitSha;
+    }
+  | {
+      readonly type: "DeliveryRefused";
+      readonly projectId: ProjectId;
+      readonly refusal: DeliveryRefusal;
+    };
+
+const deploymentKey = (projectId: ProjectId, candidateId: string) => `${projectId}/${candidateId}`;
+
+/**
+ * A project's deployments in a Map by project and candidate, and the events
+ * the real object would commit, in order. A deployment promoted again to the
+ * same commit commits nothing, as the real one.
+ */
+export function makeDeploymentsMemory() {
+  const held = new Map<string, Deployment>();
+  const committed: DeploymentsCommitted[] = [];
+  return {
+    held,
+    committed,
+    layer: Layer.succeed(
+      Deployments,
+      Deployments.of({
+        record: (projectId, deployment) =>
+          Effect.sync(() => {
+            held.set(deploymentKey(projectId, deployment.candidateId), deployment);
+          }),
+        of: (projectId, candidateId) =>
+          Effect.sync(() => held.get(deploymentKey(projectId, candidateId))),
+        promoted: (projectId, { deploymentId, trunkSha }) =>
+          Effect.sync(() => {
+            const found = [...held.entries()].find(
+              ([k, d]) => k.startsWith(`${projectId}/`) && d.id === deploymentId,
+            );
+            if (found === undefined) return;
+            const [k, deployment] = found;
+            if (deployment.state === "promoted" && deployment.promotedTo === trunkSha) return;
+            held.set(k, { ...deployment, state: "promoted", promotedTo: trunkSha });
+            committed.push({ type: "DeploymentPromoted", projectId, deploymentId, trunkSha });
+          }),
+        refused: (projectId, refusal) =>
+          Effect.sync(() => {
+            committed.push({ type: "DeliveryRefused", projectId, refusal });
+          }),
+      }),
+    ),
+  };
+}
+
+/** Each change told where its preview answers, in order. */
+export function makePreviewNoticesMemory() {
+  const told: { readonly changeId: ChangeId; readonly notice: PreviewNotice }[] = [];
+  return {
+    told,
+    layer: Layer.succeed(
+      PreviewNotices,
+      PreviewNotices.of({
+        tell: (changeId, notice) =>
+          Effect.sync(() => {
+            told.push({ changeId, notice });
+          }),
+      }),
+    ),
+  };
+}
+
+/**
+ * A preview that answers each smoke request as `answer` says (by default 200
+ * with `ok`), recording every address asked, in order.
+ */
+export function makeSmokeProbeMemory(
+  answer: (url: string, asked: number) => SmokeAnswer = () => ({
+    _tag: "answered",
+    status: 200,
+    body: "ok",
+  }),
+) {
+  const asked: string[] = [];
+  return {
+    asked,
+    layer: Layer.succeed(
+      SmokeProbe,
+      SmokeProbe.of({
+        ask: (url) =>
+          Effect.sync(() => {
+            asked.push(url);
+            return answer(url, asked.filter((u) => u === url).length);
           }),
       }),
     ),

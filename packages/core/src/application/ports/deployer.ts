@@ -12,8 +12,8 @@ export interface DeployAccount {
 export interface WorkerUpload {
   readonly worker: string;
   readonly mainModule: string;
-  /** The module's text. */
-  readonly module: string;
+  /** The module, gzipped and base64, as the build stored it. */
+  readonly moduleGzip: string;
   readonly compatibilityDate: string;
   readonly compatibilityFlags: readonly string[];
   /** Plain vars: a string is sent as text, anything else as JSON. No other binding is sent. */
