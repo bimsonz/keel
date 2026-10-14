@@ -7,7 +7,7 @@ import { usePublicOnly, useSelected } from "../engine/react.tsx";
 import { useWhere } from "../router.tsx";
 import { CATEGORY } from "../views/Escalation.tsx";
 import { Column, EscalationMark, Filters, More, Nothing, Row, Rows } from "../views/List.tsx";
-import { ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
+import { ConflictLink, DecisionLink, EscalationLink, SubjectLink } from "../views/links.tsx";
 import { dateTime } from "../views/parts.tsx";
 
 const FILTERS: { id: EscalationFilter; label: string }[] = [
@@ -111,13 +111,14 @@ export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; s
                     </span>
                   )}
                   {row.decision !== undefined && (
-                    <span
+                    <DecisionLink
+                      id={row.decision.id}
                       className="a-chip"
                       data-tone="quiet"
                       title={`Decision ${row.decision.label}`}
                     >
                       {row.decision.label}
-                    </span>
+                    </DecisionLink>
                   )}
                   <span
                     className="a-chip w-24 justify-center"

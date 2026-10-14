@@ -80,7 +80,10 @@ describe("a conflict proven against a change", () => {
       at: first.at,
       next: first.payload.nextActions?.map((action) => action.title),
       // The guard that failed holds a decision, and Keel's next action names it: the bounce is still the verdict's.
-      cites: [...player.world.decisions.keys()][0],
+      cites: {
+        id: [...player.world.decisions.keys()][0],
+        label: [...player.world.decisions.values()][0]?.label,
+      },
     });
     expect(page?.bounce?.next.length).toBeGreaterThan(0);
     // The verdict judged the change's batch and names no change: the bounce is what ties it to this one.
@@ -122,7 +125,8 @@ describe("a conflict proven against a change", () => {
       },
     ]);
     const page = changePageOf(player.world, changeId, player);
-    expect(page?.bounce?.cites).toBe("dec_01");
+    // A decision the log has no label for is called by its id.
+    expect(page?.bounce?.cites).toEqual({ id: "dec_01", label: "dec_01" });
     // The cause is the verdict's still: no ruling and no conflict is named for it.
     expect(page?.bounce?.ruling).toBe(undefined);
     expect(page?.bounce?.conflict).toBe(undefined);

@@ -202,8 +202,8 @@ export interface ConflictPageState {
   escalated?: "human-class" | "unprovable";
   /** What it left behind once proven: the probe, admitted as a guard. */
   guard?: { label: string; state: "admitted" | "retired"; runs: number };
-  /** What a person decided of it. */
-  decision?: { label: string; chosen: string };
+  /** What a person decided of it, by Keel's id for the decision and its label. */
+  decision?: { id: string; label: string; chosen: string };
   /** The subject it is on. Absent where Keel's suspicion names none. */
   subject?: { key: string; gloss: string };
   lattice: Lattice;
@@ -406,8 +406,8 @@ export interface ChangePageState {
     refused?: "pack-too-large" | "repo-bytes-quota";
     ruling?: RulingBounce;
     next: string[];
-    /** The decision the bounce cites, by its id: the one Keel's next actions say to read. */
-    cites?: string;
+    /** The decision the bounce cites, by its id, the one Keel's next actions say to read, and by its label. */
+    cites?: { id: string; label: string };
   };
   /**
    * Conflicts Keel proved against it and let it go on from: its plan advises or annotates on that predicate.

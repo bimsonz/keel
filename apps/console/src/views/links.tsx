@@ -72,20 +72,18 @@ export function useRemembered(): boolean {
   return usePlayer().source.decisions !== undefined;
 }
 
-/** A decision's page, where there is one to open; the words alone where there is none. */
+/**
+ * A decision's page, where there is one to open; the words alone where there is none, drawn as the link would be,
+ * so a chip keeps its tone and its title.
+ */
 export function DecisionLink({ id, children, ...rest }: { id: string } & Anchor) {
   const name = useNames().decisions.get(id) ?? id;
-  if (!useRemembered()) return <span className={rest.className}>{children}</span>;
+  if (!useRemembered()) return <span {...rest}>{children}</span>;
   return (
     <Link to={{ at: "decision", name }} {...rest}>
       {children}
     </Link>
   );
-}
-
-/** What an address calls a decision: Keel's label for it, or its id where the log gave it none. */
-export function DecisionName({ id }: { id: string }) {
-  return <>{useNames().decisions.get(id) ?? id}</>;
 }
 
 /** The agent that holds a change: its page in this project. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts apps/console/test/unit/engine/bounce.test.ts
+# kills: decisions.linked, change.bounce-verdict
+# why: the decision a bounce cites is drawn by Keel's id until the page's names are read, a moment later
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 503fbaa4..c88a654c 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -759,7 +759,7 @@ export function changePageOf(
+               : {
+                   cites: {
+                     id: bounce.cites,
+-                    label: world.decisions.get(bounce.cites)?.label || bounce.cites,
++                    label: bounce.cites,
+                   },
+                 }),
+           },

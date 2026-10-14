@@ -398,6 +398,7 @@ export function conflictPageFrom(
       ? {}
       : {
           decision: {
+            id: decision.id,
             label: decision.label ?? decision.id.slice(-4),
             chosen: decision.chosen.label,
           },
@@ -751,7 +752,16 @@ export function changePageOf(
               ? {}
               : { ruling: rulingOf(world, bounce.decisionId, bounce.reasons) }),
             next: bounce.next,
-            ...(bounce.cites === undefined ? {} : { cites: bounce.cites }),
+            // Its label is read with the page, as the decision's own link is: an id is drawn only where the log
+            // has no label for it.
+            ...(bounce.cites === undefined
+              ? {}
+              : {
+                  cites: {
+                    id: bounce.cites,
+                    label: world.decisions.get(bounce.cites)?.label || bounce.cites,
+                  },
+                }),
           },
         }),
     noted: change.noted.flatMap((note) => {

@@ -180,7 +180,7 @@ describe("the list of conflicts", () => {
       label: "C-1",
       state: "resolved",
       guard: { label: "G-1" },
-      decision: { label: "D-1" },
+      decision: { id: expect.any(String), label: "D-1" },
     });
   });
 });
@@ -207,7 +207,7 @@ describe("the list of escalations", () => {
     expect(closed.rows[0]).toMatchObject({
       state: "ruled",
       ruled: "Cache allowed if revocation invalidates it",
-      decision: { label: "D-1" },
+      decision: { id: expect.any(String), label: "D-1" },
       parked: 0,
     });
   });

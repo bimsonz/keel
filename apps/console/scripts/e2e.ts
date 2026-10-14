@@ -3957,10 +3957,10 @@ expectEqual(
 await recall.goto(`${built}/ada/demo/changes/1205`, { waitUntil: "domcontentloaded" });
 const citedDecision = recall.locator('[data-part="cited-decision"]');
 await citedDecision.waitFor({ timeout: 15_000 }).catch(() => undefined);
-// The line is drawn with the bounce. What an address calls its decision is read once for every link on the
-// page, a moment later: that is given its moment too, and what stands there then is what is compared.
+// The line is drawn with the bounce, the decision's label with it. What an address calls the decision is read once
+// for every link on the page, a moment later: the link's address is given its moment, and what stands then is compared.
 await citedDecision
-  .getByRole("link", { name: /decision D-/ })
+  .locator('a[href$="/decisions/D-1"]')
   .waitFor({ timeout: 5_000 })
   .catch(() => undefined);
 expectEqual(
@@ -3994,6 +3994,60 @@ expectEqual(
   "change: the cited decision's link opens its page",
   pathOf(recall),
   "/ada/demo/decisions/D-1",
+);
+// A decision is one link away wherever the project names it: the chip on a settled conflict's row, and the
+// conflict's own page. Each address calls it by its label a moment after the row is drawn, so that is waited for.
+const decisionChip = async (shown: Page): Promise<string> => {
+  const chip = shown.getByRole("main").getByRole("link", { name: "D-1", exact: true });
+  await chip
+    .first()
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
+  await shown
+    .getByRole("main")
+    .locator('a[href$="/decisions/D-1"]')
+    .first()
+    .waitFor({ timeout: 5_000 })
+    .catch(() => undefined);
+  return `${await chip.count()} | ${String(
+    await chip
+      .first()
+      .getAttribute("href")
+      .catch(() => "no link"),
+  )} | ${String(
+    await chip
+      .first()
+      .getAttribute("title")
+      .catch(() => "no title"),
+  )} | ${String(
+    await chip
+      .first()
+      .getAttribute("data-tone")
+      .catch(() => "no tone"),
+  )}`;
+};
+await recall.goto(`${built}/ada/demo/conflicts?state=settled`, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "conflicts: a settled conflict's decision chip links the decision's page, in the chip's tone and title",
+  await decisionChip(recall),
+  "1 | /ada/demo/decisions/D-1 | Decision D-1 | quiet",
+);
+await recall.goto(`${built}/ada/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
+const settledBy = recall.getByRole("main").getByRole("link", { name: "D-1", exact: true });
+await settledBy.waitFor({ timeout: 15_000 }).catch(() => undefined);
+await recall
+  .getByRole("main")
+  .locator('a[href$="/decisions/D-1"]')
+  .first()
+  .waitFor({ timeout: 5_000 })
+  .catch(() => undefined);
+const settledByAt = String(await settledBy.getAttribute("href").catch(() => "no link"));
+await settledBy.click().catch(() => undefined);
+await decisionDrawn(recall);
+expectEqual(
+  "conflict: the decision that settled it is named by its label, and opens the decision's page",
+  `${settledByAt} | ${pathOf(recall)}`,
+  "/ada/demo/decisions/D-1 | /ada/demo/decisions/D-1",
 );
 // Narrowed to a subject, Keel is asked for that subject's decisions, and the way back to all of them is offered.
 await recall.goto(`${built}/ada/demo/decisions?subject=authz.permission-evaluation`, {
@@ -4080,6 +4134,15 @@ expectEqual(
   "decision: a member is shown the question it answered, linked to it",
   `${squash(await answeredQuestion.innerText().catch(() => "no link"))} | ${String(await answeredQuestion.getAttribute("href").catch(() => "no link"))}`,
   "E-1 | /ada/demo/escalations/E-1",
+);
+// A member is read the project's questions, so the closed question's row carries its decision, linked.
+await recollect.goto(`${built}/ada/demo/escalations?state=closed`, {
+  waitUntil: "domcontentloaded",
+});
+expectEqual(
+  "escalations: a ruled question's decision chip links the decision's page, in the chip's tone and title",
+  await decisionChip(recollect),
+  "1 | /ada/demo/decisions/D-1 | Decision D-1 | quiet",
 );
 await recollecting.close();
 

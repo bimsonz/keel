@@ -91,7 +91,7 @@ export interface ConflictRow extends Named {
   probe?: { label: string; state: "calibrating" | "admitted" | "discarded" | "retired" };
   escalation?: Named & { open: boolean };
   guard?: { label: string };
-  decision?: { label: string };
+  decision?: { id: string; label: string };
 }
 
 export interface EscalationRow extends Named {
@@ -105,7 +105,7 @@ export interface EscalationRow extends Named {
   parked: number;
   /** The option chosen, in its own words, once someone has ruled. */
   ruled?: string;
-  decision?: { label: string };
+  decision?: { id: string; label: string };
 }
 
 export interface Listing<Row, Filter extends string> {
@@ -315,7 +315,7 @@ export function conflictsOf(
         ...(probe === undefined ? {} : { probe: { label: probe.label, state: probe.state } }),
         ...(escalation === undefined ? {} : { escalation }),
         ...(guard === undefined ? {} : { guard: { label: guard.label } }),
-        ...(decision === undefined ? {} : { decision: { label: decision.label } }),
+        ...(decision === undefined ? {} : { decision: { id: decision.id, label: decision.label } }),
       };
     },
   );
@@ -361,7 +361,7 @@ export function escalationsOf(
         ...(escalation.ruling === undefined
           ? {}
           : { ruled: chosen?.label ?? escalation.ruling.option }),
-        ...(decision === undefined ? {} : { decision: { label: decision.label } }),
+        ...(decision === undefined ? {} : { decision: { id: decision.id, label: decision.label } }),
       };
     },
   );

@@ -14,7 +14,13 @@ import {
   Row,
   Rows,
 } from "../views/List.tsx";
-import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
+import {
+  ChangeLink,
+  ConflictLink,
+  DecisionLink,
+  EscalationLink,
+  SubjectLink,
+} from "../views/links.tsx";
 import { dateTime } from "../views/parts.tsx";
 
 const FILTERS: { id: ConflictFilter; label: string }[] = [
@@ -122,13 +128,14 @@ export function ConflictsPage({ filter, shown }: { filter: ConflictFilter; shown
                     </EscalationLink>
                   )}
                   {row.decision !== undefined && (
-                    <span
+                    <DecisionLink
+                      id={row.decision.id}
                       className="a-chip"
                       data-tone="quiet"
                       title={`Decision ${row.decision.label}`}
                     >
                       {row.decision.label}
-                    </span>
+                    </DecisionLink>
                   )}
                   <span
                     className="a-chip w-24 justify-center"

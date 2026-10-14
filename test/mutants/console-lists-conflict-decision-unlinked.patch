@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/decisions.test.ts
+# kills: decisions.linked
+# why: a settled conflict's chip names its decision by no id, so it links nowhere
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 860bfb4d..41a9d56f 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -315,7 +315,7 @@ export function conflictsOf(
+         ...(probe === undefined ? {} : { probe: { label: probe.label, state: probe.state } }),
+         ...(escalation === undefined ? {} : { escalation }),
+         ...(guard === undefined ? {} : { guard: { label: guard.label } }),
+-        ...(decision === undefined ? {} : { decision: { id: decision.id, label: decision.label } }),
++        ...(decision === undefined ? {} : { decision: { id: "", label: decision.label } }),
+       };
+     },
+   );

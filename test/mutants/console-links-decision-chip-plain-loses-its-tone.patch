@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/links.test.ts
+# kills: decisions.plain-chip
+# why: a decision's chip on a source with no memory loses its tone and its title
+diff --git a/apps/console/src/views/links.tsx b/apps/console/src/views/links.tsx
+index abcd6bf5..506a8b21 100644
+--- a/apps/console/src/views/links.tsx
++++ b/apps/console/src/views/links.tsx
+@@ -78,7 +78,7 @@ export function useRemembered(): boolean {
+  */
+ export function DecisionLink({ id, children, ...rest }: { id: string } & Anchor) {
+   const name = useNames().decisions.get(id) ?? id;
+-  if (!useRemembered()) return <span {...rest}>{children}</span>;
++  if (!useRemembered()) return <span className={rest.className}>{children}</span>;
+   return (
+     <Link to={{ at: "decision", name }} {...rest}>
+       {children}

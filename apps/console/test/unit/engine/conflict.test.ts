@@ -254,7 +254,11 @@ describe("a conflict, as Keel names it", () => {
     // The page is drawn from that shape alone: the question, the question's own evidence, the decision.
     const page = conflictPageOf(member.world, id, NOTHING_READ);
     expect(page?.escalation).toMatchObject({ label: "E-1", state: "ruled" });
-    expect(page?.decision).toMatchObject({ label: "D-1" });
+    // The decision is named by its label and linked by Keel's id for it.
+    expect(page?.decision).toMatchObject({
+      id: member.world.conflicts.get(id)?.decisionId,
+      label: "D-1",
+    });
     expect(page?.evidence.map((line) => line.summary)).toEqual(
       detail?.escalation?.evidence?.map((line) => line.summary),
     );

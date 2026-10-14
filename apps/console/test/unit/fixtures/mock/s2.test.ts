@@ -72,7 +72,9 @@ describe("scenario 2: memory", () => {
     const file = changePageOf(player.world, h?.id ?? "", player);
     expect(file?.change.state).toBe("bounced");
     expect(file?.verdict).toMatchObject({ outcome: "bounce" });
-    expect(file?.bounce?.cites).toBe(decision?.id);
+    // The cited decision is named by its label in the page's own reading, not a moment later by its address.
+    expect(file?.bounce?.cites).toEqual({ id: decision?.id, label: decision?.label });
+    expect(decision?.label).toMatch(/^D-\d+$/);
     expect(player.world.citing.get(decision?.id ?? "")).toEqual([h?.id]);
     expect(file?.verdict?.evidence.map((item) => item.class)).toEqual([
       "proof",

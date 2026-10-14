@@ -26,7 +26,6 @@ import {
   ChangeLink,
   ConflictLink,
   DecisionLink,
-  DecisionName,
   EscalationLink,
   HolderLink,
   RunLink,
@@ -447,8 +446,8 @@ export function Change({
                   // The decision is the one Keel's next action names, by its id: no sentence is read for it.
                   <p className="mt-2 text-base text-kumo-default" data-part="cited-decision">
                     This bounce cites{" "}
-                    <DecisionLink id={state.bounce.cites} className="a-link font-semibold">
-                      decision <DecisionName id={state.bounce.cites} />
+                    <DecisionLink id={state.bounce.cites.id} className="a-link font-semibold">
+                      decision {state.bounce.cites.label}
                     </DecisionLink>
                     .
                   </p>

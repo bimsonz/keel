@@ -8,13 +8,15 @@ import {
   standingOf,
   turnsOf,
 } from "../../../src/engine/decisions.ts";
-import { decisionNamed, namesIn } from "../../../src/engine/lists.ts";
+import { conflictsOf, decisionNamed, escalationsOf, namesIn } from "../../../src/engine/lists.ts";
 import { Player } from "../../../src/engine/player.ts";
-import { changePageOf } from "../../../src/engine/select.ts";
+import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { World } from "../../../src/engine/world.ts";
 import { createHttpDirectory, createHttpSource } from "../../../src/source/http.ts";
 import { type KeelDecisions, KeelRefused } from "../../../src/source/types.ts";
 import { SESSION_COOKIE, createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
+import { createMockSource } from "../../fixtures/mock/MockSource.ts";
+import { showing } from "../showing.ts";
 import { S1_CHOICES } from "../../fixtures/mock/s1.ts";
 import { S2_DECIDED } from "../../fixtures/mock/s2.ts";
 
@@ -370,6 +372,29 @@ describe("a decision on the page", () => {
     expect(changePageOf(player.world, bounce?.changeId ?? "", player)?.verdict?.id).toBe(
       bounce?.verdictId,
     );
+  });
+
+  it("[decisions.linked] names a decision by Keel's id wherever the project names it, to link it: a settled conflict's row, a ruled question's row and the conflict's page; and the decision a bounce cites by its label too", async () => {
+    const player = showing(createMockSource({ scenario: "s2", seed: 42 }));
+    await player.load();
+    player.seek(player.end);
+    const { world } = player;
+    const [decision] = world.decisions.values();
+    if (decision === undefined) throw new Error("scenario 2 recorded no decision");
+    const named = { id: decision.id, label: decision.label };
+    const conflict = conflictsOf(world, "settled", 50).rows.find(
+      (row) => row.decision !== undefined,
+    );
+    expect(conflict?.decision).toEqual(named);
+    expect(
+      escalationsOf(world, "closed", 50).rows.find((row) => row.decision !== undefined)?.decision,
+    ).toEqual(named);
+    expect(conflictPageOf(world, conflict?.id ?? "", player)?.decision).toMatchObject(named);
+    const bounced = [...world.changes.values()].find(
+      (change) => change.bounce?.cites !== undefined,
+    );
+    expect(changePageOf(world, bounced?.id ?? "", player)?.bounce?.cites).toEqual(named);
+    expect(named.label).toMatch(/^D-\d+$/);
   });
 
   it("[decisions.named] calls a decision by Keel's label in an address, and finds it by that or by its id", async () => {

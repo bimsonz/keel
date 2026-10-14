@@ -13,7 +13,7 @@ import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { CONFLICT_TONE, ConflictMark } from "./List.tsx";
-import { ChangeLink, EscalationLink, SubjectLink } from "./links.tsx";
+import { ChangeLink, DecisionLink, EscalationLink, SubjectLink } from "./links.tsx";
 import type { ReactNode } from "react";
 import {
   AgentTag,
@@ -730,7 +730,9 @@ export function Conflict({
                 {decision !== undefined && (
                   <Tied title="Decision">
                     <span>
-                      <b className="font-semibold text-kumo-strong">{decision.label}</b>{" "}
+                      <DecisionLink id={decision.id} className="a-link font-semibold">
+                        {decision.label}
+                      </DecisionLink>{" "}
                       {decision.chosen}
                     </span>
                   </Tied>

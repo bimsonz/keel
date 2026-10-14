@@ -73,7 +73,8 @@ function throttled(player: Player, perSecond: number) {
 export function useWorldVersion(perSecond = 8): number {
   const player = usePlayer();
   const store = useMemo(() => throttled(player, perSecond), [player, perSecond]);
-  return useSyncExternalStore(store.subscribe, store.snapshot);
+  // The same snapshot drawn to a string, as a unit test of a view draws one: there is no server here.
+  return useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
 }
 
 /**
