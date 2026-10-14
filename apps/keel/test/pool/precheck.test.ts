@@ -604,6 +604,8 @@ describe("Precheck", () => {
       revision: 1,
       effects: [effect],
       derivationRef: answer.derivationRef,
+      // The edit is also where the neighbour's premise is anchored; the effect there is fallout's to judge.
+      touched: [{ subject: "bench.price", anchor: PRICE_IS_PURE.anchors?.[0] }],
     });
 
     await drainOutbox(c.stub);
