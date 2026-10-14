@@ -92,22 +92,22 @@ describe("the Projector's verdict index", () => {
   it("[verdict.index-alarm] a Projector woken over a feed its index has not walked arms its step, and its alarm walks it to the head with no read", async () => {
     const stub = env.PROJECTOR.get(env.PROJECTOR.idFromName(`verdicts:${ulid()}`));
     const { projectId } = await heldProject();
-    const verdict = issued(projectId, ["failed: x"]);
+    const event = issued(projectId, ["failed: x"]);
     // Recorded as a receipt records it: a receipt never moves the verdict index.
     const head = await runInDurableObject(stub, (instance: ProjectorDO) =>
       instance["runtime"].runPromise(
         Effect.map(EntityStore, (store) => {
-          store.transaction(() => recordFeed(store, verdict));
+          store.transaction(() => recordFeed(store, event));
           return feedHead(store);
         }),
       ),
     );
-    expect(await standing(stub, verdict.entity.id)).toMatchObject({ indexed: 0, at: undefined });
+    expect(await standing(stub, event.entity.id)).toMatchObject({ indexed: 0, at: undefined });
     await evictDurableObject(stub);
     await vi.waitFor(
       async () => {
         await runDurableObjectAlarm(stub);
-        expect(await standing(stub, verdict.entity.id)).toEqual({
+        expect(await standing(stub, event.entity.id)).toEqual({
           indexed: head,
           at: head,
           armed: false,
@@ -117,7 +117,7 @@ describe("the Projector's verdict index", () => {
     );
     // Level, it arms nothing when it wakes again.
     await evictDurableObject(stub);
-    expect(await standing(stub, verdict.entity.id)).toEqual({
+    expect(await standing(stub, event.entity.id)).toEqual({
       indexed: head,
       at: head,
       armed: false,

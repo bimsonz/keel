@@ -12,7 +12,7 @@
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { cloneWorkspace, commitAndPush } from "../../../../e2e/src/lib/git.ts";
 import { KeelClient, KeelProblem } from "../../../../packages/sdk/src/index.ts";
 
@@ -125,6 +125,15 @@ async function declareWhenPooled(
 /** A Workflow step's name as the API reports it. */
 const stepName = (s: unknown) => String(Reflect.get(Object(s), "name") ?? "?");
 
+/** How long a Workflow step took, as the API reports its start and end. */
+const took = (s: unknown): string => {
+  const start = Date.parse(String(Reflect.get(Object(s), "start") ?? ""));
+  const end = Date.parse(String(Reflect.get(Object(s), "end") ?? ""));
+  return Number.isFinite(start) && Number.isFinite(end)
+    ? ` ${((end - start) / 1000).toFixed(1)} s`
+    : "";
+};
+
 function describeVerify(id: string): { status: string; steps: string[]; verdict: unknown } {
   const json: unknown = JSON.parse(
     wrangler("workflows", "instances", "describe", "keel-verify-batch", id, "--json"),
@@ -143,13 +152,6 @@ function describeVerify(id: string): { status: string; steps: string[]; verdict:
       decoded = verdict;
     }
   }
-  const took = (s: unknown): string => {
-    const start = Date.parse(String(Reflect.get(Object(s), "start") ?? ""));
-    const end = Date.parse(String(Reflect.get(Object(s), "end") ?? ""));
-    return Number.isFinite(start) && Number.isFinite(end)
-      ? ` ${((end - start) / 1000).toFixed(1)} s`
-      : "";
-  };
   return {
     status: String(Reflect.get(Object(body), "status")),
     steps: steps.map((s) => `${stepName(s)}${took(s)}`),

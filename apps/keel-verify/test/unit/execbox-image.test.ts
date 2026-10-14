@@ -68,6 +68,12 @@ describe("the sandbox image", () => {
     expect(`pnpm@${/^RUN npm install -g pnpm@(\S+) /m.exec(runtime)?.[1]}`).toBe(manager);
   });
 
+  it("[image.fetch-retries] tries every download again on any failure: one mirror's reset must not fail a build", () => {
+    const fetches = dockerfile.match(/^RUN curl .*$/gm) ?? [];
+    expect(fetches).toHaveLength(2);
+    for (const fetch of fetches) expect(fetch).toMatch(/ --retry [1-9]\d* --retry-all-errors /);
+  });
+
   it("[image.toolchain] states its toolchain in DEPS_TOOLCHAIN's own form: the node, pnpm and base it installs", () => {
     // A deps box prints /etc/keel-toolchain, and its object keeps a build only when
     // that is DEPS_TOOLCHAIN: an image that drifts from the constant builds nothing.

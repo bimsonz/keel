@@ -166,7 +166,7 @@ import { verdictHandlers } from "./verdicts.ts";
 import { whyHandlers } from "./why.ts";
 import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
 import { deliveryHandlers } from "./delivery.ts";
-import { notImplemented, problem } from "./problems.ts";
+import { problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
   abandonError,
@@ -211,9 +211,6 @@ import {
   refreshError,
   submitOk,
 } from "./work-loop.ts";
-
-/** Every operation not yet implemented answers the declared 503 `service.not_implemented`. */
-const notYet = (caller: Caller) => notImplemented(caller.requestId);
 
 /** The claims of the agent calling: the policy grants an agent's own operations to agents only, so they are there. */
 function claimsOf(caller: Caller): Effect.Effect<AgentClaims> {
@@ -417,8 +414,7 @@ const escalationReader = (caller: Caller): EscalationReader =>
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
  * both dispatch into it, so a REST call and a tool call run the same code, and
- * the same notices ride both. Lanes replace a `notYet` with a real handler as
- * they implement each operation.
+ * the same notices ride both. Every operation has its handler here.
  */
 /** The sign-in methods mounted besides a passkey, as composition built them. */
 export interface SignInMethods {

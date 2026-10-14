@@ -21,7 +21,7 @@ ARG GIT_SHA256=457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential cargo libcurl4-gnutls-dev libexpat1-dev libpcre2-dev zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
-RUN curl -fsSL "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://mirrors.edge.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz" -o /tmp/git.tar.xz \
  && echo "${GIT_SHA256}  /tmp/git.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/git.tar.xz -C /tmp \
  && make -C "/tmp/git-${GIT_VERSION}" -j"$(nproc)" prefix=/usr/local USE_LIBPCRE2=YesPlease NO_OPENSSL=YesPlease NO_PERL=YesPlease NO_PYTHON=YesPlease NO_GETTEXT=YesPlease NO_TCLTK=YesPlease DESTDIR=/out install
@@ -43,7 +43,7 @@ COPY --from=git /out/usr/local/ /usr/local/
 # (packageManager).
 ARG NODE_VERSION=22.22.3
 ARG NODE_SHA256=2e5d13569282d016861fae7c8f935e741693c269101a5bebcf761a5376d1f99f
-RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz \
  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
  && rm /tmp/node.tar.xz
