@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@keeltown/sdk": "workspace:*"
+    "@keeltown/sdk": "workspace:*",
+    "@modelcontextprotocol/client": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
