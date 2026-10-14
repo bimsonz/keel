@@ -31,18 +31,19 @@
     { "tag": "v2", "new_sqlite_classes": ["KeelDepsBox"] },
   ],
   // Tier 2 (ExecBox): a classic Sandbox container, so its instances are capped here; the account is shared.
+  // Four vCPUs, as CI's runner has: Keel's own suite takes 20 minutes on one, its step's whole timeout.
   "containers": [
     {
       "class_name": "KeelSandbox",
       "image": "./containers/sandbox/Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-4",
       "max_instances": 10,
     },
     // The deps box: the same image, with the registry reachable through its own outbound handler.
     {
       "class_name": "KeelDepsBox",
       "image": "./containers/sandbox/Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-4",
       "max_instances": 4,
     },
   ],

@@ -13,6 +13,12 @@ const versionOf = (packageDir: string): unknown =>
   JSON.parse(readFileSync(join(realpathSync(packageDir), "package.json"), "utf8")).version;
 const arg = (name: string): string | undefined =>
   new RegExp(`^ARG ${name}=(\\S+)$`, "m").exec(dockerfile)?.[1];
+const wrangler = readFileSync(join(import.meta.dirname, "../../wrangler.jsonc"), "utf8");
+/** A container's instance type, as wrangler.jsonc names it beside its class. */
+const instanceOf = (className: string): string | undefined =>
+  new RegExp(
+    `"class_name": "${className}",\\s*"image": "[^"]+",\\s*"instance_type": "([^"]+)"`,
+  ).exec(wrangler)?.[1];
 /** The RUN that fetches a tarball, with its continuation lines. */
 const fetching = (tarball: string): string =>
   new RegExp(`^RUN curl .*${tarball}.*(?:\\n .*)*`, "m").exec(dockerfile)?.[0] ?? "";
@@ -87,6 +93,11 @@ describe("the sandbox image", () => {
         .replace("$(pnpm --version)", /^RUN npm install -g pnpm@(\S+) /m.exec(runtime)?.[1] ?? "")
         .replace('$(. /etc/os-release && echo "$VERSION_ID")', base ?? ""),
     ).toBe(DEPS_TOOLCHAIN);
+  });
+
+  it("[image.box-size] gives the suite box and the deps box CI's four vCPUs: Keel's own suite takes 20 minutes on one, its step's whole timeout", () => {
+    expect(instanceOf("KeelSandbox")).toBe("standard-4");
+    expect(instanceOf("KeelDepsBox")).toBe("standard-4");
   });
 
   it("[image.no-deps] bakes no project's dependencies: a deps box builds them, and a suite box fetches them", () => {
