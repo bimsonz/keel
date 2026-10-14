@@ -80,7 +80,7 @@ for (const [pattern, what] of DEFERRED) {
   const eager = [...reachedFrom.keys()].find((module) => pattern.test(module));
   if (eager !== undefined)
     failures.push(
-      `${what} is evaluated as the Worker loads, reached by:\n    ${chainTo(eager).join("\n    → ")}`,
+      `${what}: evaluated as the Worker loads, reached by:\n    ${chainTo(eager).join("\n    → ")}`,
     );
 }
 let bytes = 0;
