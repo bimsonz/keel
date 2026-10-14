@@ -22,6 +22,7 @@ import {
   type SuiteRunnerOptions,
   SuiteRuntimeCi,
   tier2RunnerFor,
+  judgeBuildOutput,
 } from "../../src/adapters/driven/ci/suite-runtime.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
@@ -195,6 +196,44 @@ describe("the build's runner", () => {
         });
         const gz = Buffer.from(String(Reflect.get(Object(document), "bundle")), "base64");
         expect(new TextDecoder().decode(gunzipSync(gz))).toBe(MODULE);
+      }),
+  );
+
+  /** A build's stdout whose one module is `module`. */
+  const built = (module: string) => {
+    const gzip = b64(gzipSync(module));
+    return { gzip, stdout: STDOUT.replace(b64(gzipSync(MODULE)), gzip) };
+  };
+  const ACCOUNT = "0123456789abcdef0123456789abcdef";
+
+  it.effect(
+    "[build.bundle-not-scanned] a module whose dependency carries a PEM header, a sample Artifacts token and remote passes, its bytes stored exactly as built",
+    () =>
+      Effect.gen(function* () {
+        const module = [
+          MODULE,
+          'const SAMPLE_PEM = "-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBg\\n-----END PRIVATE KEY-----";',
+          'const SAMPLE_TOKEN = "art_v1_0123456789abcdefSAMPLE";',
+          'const SAMPLE_REMOTE = "https://acct.artifacts.cloudflare.net/git/repo.git?expires=1791709200";',
+        ].join("\n");
+        const { gzip, stdout } = built(module);
+        const judged = yield* judgeBuildOutput(BUILD, stdout, [ACCOUNT]);
+        expect(judged.report.outcome).toBe("pass");
+        expect(Reflect.get(Object(judged.document), "bundle")).toBe(gzip);
+        expect(new TextDecoder().decode(gunzipSync(Buffer.from(gzip, "base64")))).toBe(module);
+      }),
+  );
+
+  it.effect(
+    "[build.bundle-literal-abstains] a module holding one of the run's own literals abstains, and no document holds the literal",
+    () =>
+      Effect.gen(function* () {
+        const { stdout } = built(`${MODULE}\nconst LEAKED = "${ACCOUNT}";`);
+        const judged = yield* judgeBuildOutput(BUILD, stdout, [ACCOUNT]);
+        expect(judged.report.outcome).toBe("abstain");
+        expect(JSON.stringify(judged.document)).not.toContain(ACCOUNT);
+        // The same module with no literal handed to the run is a pass.
+        expect((yield* judgeBuildOutput(BUILD, stdout, [])).report.outcome).toBe("pass");
       }),
   );
 });

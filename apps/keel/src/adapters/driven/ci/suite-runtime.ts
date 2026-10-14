@@ -423,28 +423,46 @@ export const judgeCommandOutput = (
 
 /**
  * Reads one build runner's stdout into a judgement, as for a command: parse,
- * decode the config's and the tail's text, scan it all raw, judge, redact. The
+ * decode the config's and the tail's text, scan it raw, judge, redact. The
  * evidence of a pass carries the module, for the preview to upload.
+ *
+ * The module is an artefact, not a log. Credential shapes are scanned for and
+ * redacted in the build's log only (stdout with the module taken out, the
+ * config, the tail), so a dependency's sample key never abstains its app.
+ * The module, unzipped, is checked only for the run's own literals, the
+ * values Keel handed the box, which no third-party code can hold: a hit
+ * abstains. It is never redacted, so the version uploaded is the one built.
  */
 export const judgeBuildOutput = (
   step: PlanStep,
   stdout: string,
   literals: readonly string[],
 ): Effect.Effect<BuildJudgement & { readonly document: Json }> =>
-  Effect.sync(() => {
+  Effect.gen(function* () {
     const output = parseBuildOutput(stdout);
     const config = output._tag === "ran" ? decodedText(output.config.text) : undefined;
     const tail =
       output._tag === "ran" && output.tail !== undefined ? (decodedText(output.tail) ?? "") : "";
     const diagnosis = diagnosisOf(output);
-    const credentialScan = scanCredentials(
-      [stdout, tail, config ?? "", diagnosis.diagnosis ?? ""],
-      {
-        literals,
-      },
-    );
+    const gzip =
+      output._tag === "ran" && output.bundle._tag === "module" ? output.bundle.gzip : undefined;
+    const log = gzip === undefined ? stdout : stdout.split(gzip).join("");
+    const logged = scanCredentials([log, tail, config ?? "", diagnosis.diagnosis ?? ""], {
+      literals,
+    });
+    const module = yield* gunzipText(gzip);
+    const inModule = scanCredentials([module ?? "", gzip ?? ""], { literals }).literal;
+    const credentialScan = { ...logged, literal: logged.literal + inModule };
     const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
-    return { ...judged, document: redactJson({ ...judged.evidence }, literals) };
+    const { bundle, ...evidence } = judged.evidence;
+    const redacted = redactJson({ ...evidence }, literals);
+    return {
+      ...judged,
+      document:
+        bundle === undefined || redacted === null || typeof redacted !== "object"
+          ? redacted
+          : { ...redacted, bundle },
+    };
   });
 
 /**
