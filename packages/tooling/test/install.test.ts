@@ -40,11 +40,17 @@ const configOf = (app: (typeof APPS)[number]) => {
   return found;
 };
 
+/** Each committed config's D1 database names, read without `storesOf`: a key it refuses then fails `[install.stores]`, not the file's load. */
+const d1Names = committed.flatMap(({ config }) => {
+  const databases: unknown = config["d1_databases"];
+  return Array.isArray(databases)
+    ? databases.map((db: unknown) => String(Reflect.get(Object(db), "database_name")))
+    : [];
+});
+
 const values: InstallValues = {
   host: "my-forge.acme.workers.dev",
-  d1: Object.fromEntries(
-    storesOf(committed).d1.map((name) => [name, "5e1f0c1a-7d6b-4c59-9b0e-2f4a8f0c9d11"]),
-  ),
+  d1: Object.fromEntries(d1Names.map((name) => [name, "5e1f0c1a-7d6b-4c59-9b0e-2f4a8f0c9d11"])),
   secretsStoreId: "9c2b7a4e1f0d4b6a8e3c5d7f1a2b3c4d",
   bundleUrlPublicKey: "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----\n",
   commitSigners: JSON.stringify([
@@ -254,8 +260,25 @@ describe("what the account must hold", () => {
     });
   });
 
+  it("[install.stores] carries a Worker's limits as they are: they name no store", () => {
+    const limited = {
+      source: "a/wrangler.jsonc",
+      config: { name: "a", limits: { subrequests: 200_000 } },
+    };
+    expect(storesOf([limited])).toEqual({
+      d1: [],
+      buckets: [],
+      queues: [],
+      namespaces: [],
+      storeSecrets: [],
+    });
+  });
+
   it("[install.stores] refuses a binding kind it was never taught, naming it and its config", () => {
-    const taught = { source: "a/wrangler.jsonc", config: { name: "a", vars: {} } };
+    const taught = {
+      source: "a/wrangler.jsonc",
+      config: { name: "a", vars: {}, limits: { subrequests: 200_000 } },
+    };
     const untaught = {
       source: "b/wrangler.jsonc",
       config: {

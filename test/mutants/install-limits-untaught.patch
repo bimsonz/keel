@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/install.test.ts
+# kills: install.stores
+# why: a Worker's limits are refused as a binding nobody taught the install, and the Deploy to Cloudflare button stops on keel's own config
+diff --git a/scripts/lib/install.ts b/scripts/lib/install.ts
+index 9a06cf72..de674255 100644
+--- a/scripts/lib/install.ts
++++ b/scripts/lib/install.ts
+@@ -238,7 +238,6 @@ const NEEDS_NOTHING = new Set([
+   "containers",
+   "worker_loaders",
+   "ai",
+-  "limits",
+ ]);
+ 
+ /** Config keys that name a store the account must hold before the Worker deploys. */

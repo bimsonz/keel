@@ -238,6 +238,7 @@ const NEEDS_NOTHING = new Set([
   "containers",
   "worker_loaders",
   "ai",
+  "limits",
 ]);
 
 /** Config keys that name a store the account must hold before the Worker deploys. */
