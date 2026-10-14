@@ -1,9 +1,9 @@
 import {
-  changeView,
   conflictRecord,
   decisionsAtPath,
   decisionsOfGuards,
   decisionsOnSubjects,
+  explaining,
   foldViews,
   getDecision,
   listDecisions,
@@ -47,7 +47,6 @@ const viewsOver = (provided: Provided) =>
   ProjectViews.of({
     changes: (read) => provided(listChanges(read)),
     snapshot: (project) => provided(viewSnapshot(project)),
-    change: (project, changeId) => provided(changeView(project, changeId)),
     conflicts: (read) => provided(listConflicts(read)),
     conflict: (project, conflictId) => provided(conflictRecord(project, conflictId)),
     probeConflict: (project, probeId) => provided(probeConflict(project, probeId)),
@@ -60,6 +59,7 @@ const decisionsOver = (provided: Provided) =>
     ofGuards: (project, guardIds) => provided(decisionsOfGuards(project, guardIds)),
     onSubjects: (project, subjects) => provided(decisionsOnSubjects(project, subjects)),
     atPath: (project, path) => provided(decisionsAtPath(project, path)),
+    explaining: (project, target) => provided(explaining(project, target)),
   });
 
 /** The Projector's read models over an in-memory store, folded by the same core functions the Projector DO runs. */
@@ -72,17 +72,4 @@ export function makeProjectViewsMemory() {
 export function makeDecisionsMemory() {
   const { provided, skipped, arrive } = projectorMemory();
   return { skipped, arrive, layer: Layer.succeed(Decisions, decisionsOver(provided)) };
-}
-
-/** The read models and the decision index over one in-memory store, as the one Projector DO holds them both. */
-export function makeProjectorMemory() {
-  const { provided, skipped, arrive } = projectorMemory();
-  return {
-    skipped,
-    arrive,
-    layer: Layer.mergeAll(
-      Layer.succeed(ProjectViews, viewsOver(provided)),
-      Layer.succeed(Decisions, decisionsOver(provided)),
-    ),
-  };
 }

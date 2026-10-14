@@ -1,6 +1,5 @@
 import {
   Change,
-  ChangeNotFound,
   ChangeState,
   ParkReason,
   Proposition,
@@ -117,10 +116,11 @@ export const ViewSnapshot = Schema.Struct({
 
 export const SnapshotRead = Schema.Struct({ project: ProjectId });
 
-/** One change as the Projector folded it, and when its last event was (the port's `ChangeView`). */
-export const ChangeView = Schema.Struct({ change: Change, updatedAt: InstantSchema });
-
-export const ChangeRead = Schema.Struct({ project: ProjectId, changeId: ChangeId });
+/** One change as the Projector folded it, and when it landed once that is heard (the port's `ChangeView`). */
+export const ChangeView = Schema.Struct({
+  change: Change,
+  landedAt: Schema.optional(InstantSchema),
+});
 
 /**
  * A conflict as the Projector folded it from its own events (the port's
@@ -279,12 +279,27 @@ export const SubjectDecisionsRead = Schema.Struct({
 /** A repository-relative path, as a subject's anchors name it. */
 export const PathDecisionsRead = Schema.Struct({ project: ProjectId, path: Schema.String });
 
+/** What `why` asks about (the port's `WhyTarget`): a subject, or a path. A line narrows nothing, so none is sent. */
+export const WhyRead = Schema.Struct({
+  project: ProjectId,
+  target: Schema.Union([
+    Schema.Struct({ kind: Schema.Literal("subject"), subject: SubjectKey }),
+    Schema.Struct({ kind: Schema.Literal("path"), path: Schema.String }),
+  ]),
+});
+
+/** One decision with what its chain is read from: its conflict and the changes it names, as folded (the port's `WhySource`). */
+export const WhySource = Schema.Struct({
+  decision: IndexedDecision,
+  conflict: Schema.optional(ConflictRecord),
+  changes: Schema.Array(ChangeView),
+});
+
 export const ProjectorCodecs = {
   nudge: exitCodec(Schema.Struct({ drained: Schema.Int }), Schema.Never),
   read: exitCodec(FeedPage, Schema.Never),
   changes: exitCodec(ChangePage, Schema.Never),
   snapshot: exitCodec(ViewSnapshot, Schema.Never),
-  change: exitCodec(ChangeView, ChangeNotFound),
   conflicts: exitCodec(ConflictPage, Schema.Never),
   conflict: exitCodec(ConflictRecord, ConflictNotFound),
   probeConflict: exitCodec(ConflictRecord, ProbeNotFound),
@@ -298,6 +313,7 @@ export const ProjectorCodecs = {
   ),
   subjectDecisions: exitCodec(Schema.Array(IndexedDecision), Schema.Never),
   pathDecisions: exitCodec(Schema.Array(IndexedDecision), Schema.Never),
+  explaining: exitCodec(Schema.Array(WhySource), Schema.Never),
 };
 
 /**
@@ -315,8 +331,6 @@ export interface ProjectorRpc extends EventReceiverRpc {
   changes(request: typeof ChangesRead.Encoded): Promise<ExitJson>;
   /** A project's changes and trunk with the feed's head, read in one turn (Mission Control's D7). */
   snapshot(request: typeof SnapshotRead.Encoded): Promise<ExitJson>;
-  /** One change of a project as folded. ChangeNotFound when the project's feed has not seen it declared. */
-  change(request: typeof ChangeRead.Encoded): Promise<ExitJson>;
   /** A project's conflicts as the console lists them, with the open and settled totals. */
   conflicts(request: typeof ConflictsRead.Encoded): Promise<ExitJson>;
   /** One conflict of a project: its sides, probe, matrix cells and guard as folded. ConflictNotFound when the project's feed has none by that id. */
@@ -337,4 +351,6 @@ export interface ProjectorRpc extends EventReceiverRpc {
   subjectDecisions(request: typeof SubjectDecisionsRead.Encoded): Promise<ExitJson>;
   /** A project's decisions on the subjects anchored at a path, newest first. */
   pathDecisions(request: typeof PathDecisionsRead.Encoded): Promise<ExitJson>;
+  /** A project's active decisions on a subject or at a path, newest first, each with its conflict and the changes it names, in one read. */
+  explaining(request: typeof WhyRead.Encoded): Promise<ExitJson>;
 }

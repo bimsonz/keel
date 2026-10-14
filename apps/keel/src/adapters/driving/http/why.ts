@@ -1,6 +1,7 @@
-import { why, whyAsked, type WhyTarget } from "@keeltown/core/application/memory";
+import { why, whyAsked } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import type { WhyLink } from "@keeltown/core/domain/memory";
+import type { WhyTarget } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations, WhyResult } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
@@ -34,14 +35,15 @@ function whyTarget(input: Input<"why">): Result.Result<WhyTarget, Issues> {
 }
 
 /**
- * Nothing in the caller's project explains what was asked. A caller with no
- * project of its own to read is told the same, so it learns nothing more.
+ * Nothing in the project read explains what was asked. A caller with no
+ * project to read, or one it may not see, is told the same, so it learns
+ * nothing more.
  */
 export function nothingToExplain(caller: { readonly requestId: string }, target: string) {
   return {
     status: 404 as const,
     body: problem(404, "why.nothing_to_explain", caller.requestId, {
-      detail: `No active decision in your project explains ${target}.`,
+      detail: `No active decision in the project explains ${target}.`,
       nextActions: [
         {
           kind: "read",
@@ -85,9 +87,9 @@ function whyOk(target: WhyTarget, chain: readonly WhyLink[]): WhyResult {
 }
 
 /**
- * `why`, read in the project the policy decided: the caller's own, never
- * one a parameter names. Its chain comes from the Projector's decision index
- * and read models.
+ * `why`, read in the project the policy decided: the one `project` names, or
+ * an agent's own, never one the handler reads from the input. Its chain comes
+ * from the Projector's decision index and read models, in one read.
  */
 export function whyHandlers(run: Runner) {
   return {

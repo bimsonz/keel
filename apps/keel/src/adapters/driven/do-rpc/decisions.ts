@@ -7,6 +7,7 @@ import {
   type PathDecisionsRead,
   ProjectorCodecs,
   type SubjectDecisionsRead,
+  type WhyRead,
 } from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
 
@@ -17,6 +18,7 @@ export interface DecisionIndexStub {
   guardDecisions(request: typeof GuardDecisionsRead.Encoded): Promise<unknown>;
   subjectDecisions(request: typeof SubjectDecisionsRead.Encoded): Promise<unknown>;
   pathDecisions(request: typeof PathDecisionsRead.Encoded): Promise<unknown>;
+  explaining(request: typeof WhyRead.Encoded): Promise<unknown>;
 }
 
 /** `Decisions` over the Projector's decision index. */
@@ -41,6 +43,13 @@ export function DecisionsRpc(projector: () => DecisionIndexStub): Layer.Layer<De
       atPath: (project, path) =>
         callObject(ProjectorCodecs.pathDecisions, () =>
           projector().pathDecisions({ project, path }),
+        ),
+      explaining: (project, target) =>
+        callObject(ProjectorCodecs.explaining, () =>
+          projector().explaining({
+            project,
+            target: target.kind === "subject" ? target : { kind: "path", path: target.path },
+          }),
         ),
     }),
   );

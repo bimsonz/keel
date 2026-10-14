@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { why, whyChain, whySources, type WhyTarget } from "@keeltown/core/application/memory";
+import { why, whyChain } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import type { WhyLink } from "@keeltown/core/domain/memory";
 import {
@@ -11,11 +11,11 @@ import {
   makeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { Decisions } from "@keeltown/core/ports";
-import { makeProjectorMemory, projectEvents, ruledConflict } from "@keeltown/testing";
+import { Decisions, type WhySource, type WhyTarget } from "@keeltown/core/ports";
+import { makeDecisionsMemory, projectEvents, ruledConflict } from "@keeltown/testing";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
 import { ulid } from "ulid";
 
 const SUBJECT = Schema.decodeUnknownSync(SubjectKey)("authz.permission-evaluation");
@@ -27,10 +27,14 @@ type Side = "holder" | "other";
 /**
  * A conflict ruled over two changes, as the Projector hears it: both parties
  * declared by their agents and started, the conflict to its guard and
- * escalation, the ruling and its resolution, and each side in `landed`
- * landed on trunk afterwards.
+ * escalation, the ruling and its resolution, each side in `early` landed on
+ * trunk before the ruling, and each in `landed` afterwards.
  */
-function ruled(option: "premise-holds" | "effect-stands", landed: readonly Side[] = []) {
+function ruled(
+  option: "premise-holds" | "effect-stands",
+  landed: readonly Side[] = [],
+  early: readonly Side[] = [],
+) {
   const events = projectEvents();
   const conflict = ruledConflict(events);
   const agents = { holder: makeId("agt", ulid()), other: makeId("agt", ulid()) };
@@ -42,6 +46,7 @@ function ruled(option: "premise-holds" | "effect-stands", landed: readonly Side[
     events.started(conflict.holder),
     events.started(conflict.other),
     ...conflict.conflict,
+    ...early.flatMap((side) => events.landing(conflict[side], commits[side])),
     conflict.recorded(option),
     conflict.resolved([against]),
     ...landed.flatMap((side) => events.landing(conflict[side], commits[side])),
@@ -49,9 +54,18 @@ function ruled(option: "premise-holds" | "effect-stands", landed: readonly Side[
   return { events, conflict, agents, commits, against, arrivals };
 }
 
+/** The ChangeLanded among these arrivals of one change. */
+const landingOf = (arrivals: readonly EventEnvelope[], changeId: string) => {
+  const landing = arrivals.find(
+    (event) => event.type === "ChangeLanded" && event.entity.id === changeId,
+  );
+  if (landing === undefined) throw new Error(`${changeId} never landed`);
+  return landing;
+};
+
 /** What `why` answers in a project after these arrivals, over one in-memory Projector. */
 const whyAfter = (arrivals: readonly EventEnvelope[], project: ProjectId, target: WhyTarget) => {
-  const memory = makeProjectorMemory();
+  const memory = makeDecisionsMemory();
   return Effect.gen(function* () {
     for (const event of arrivals) yield* memory.arrive(event);
     return yield* Effect.result(why(project, target));
@@ -91,7 +105,7 @@ describe("why", () => {
           ["premise", premiseId],
           ["intent", intentId],
           ["observation", conflict.guardId],
-          ["verdict", `${conflict.holder}.landed`],
+          ["verdict", `${conflict.holder}.landed.${conflict.decisionId}`],
         ]);
         const [decision, premise, intent, guard, verdict] = chain.map((link) => link.record);
         expect(decision).toMatchObject({
@@ -141,8 +155,141 @@ describe("why", () => {
           ["decision", s.conflict.decisionId],
           ["premise", `${s.conflict.conflictId}.premise`],
           ["intent", `${s.conflict.other}.intent.1`],
-          ["verdict", `${s.conflict.other}.landed`],
+          ["verdict", `${s.conflict.other}.landed.${s.conflict.decisionId}`],
         ]);
+      }),
+  );
+
+  it.effect(
+    "[why.chain] a favoured party that landed before the ruling did not land under it; one that landed after did, at its ChangeLanded's time whatever arrived on the change since",
+    () =>
+      Effect.gen(function* () {
+        const bySubject: WhyTarget = { kind: "subject", subject: SUBJECT };
+        const before = ruled("premise-holds", [], ["holder"]);
+        const after = ruled("premise-holds", ["holder"]);
+        const { holder } = after.conflict;
+        const landing = landingOf(after.arrivals, holder);
+        // A conflict noted on the change after it landed arrives last, and is not when it landed.
+        const noted = after.events.of({ kind: "change", id: holder }, {
+          _tag: "ConflictNoted",
+          changeId: holder,
+          conflictId: after.conflict.conflictId,
+          predicate: "freshness",
+          policy: "annotate",
+        } as { _tag: string });
+        const early = Result.getOrThrow(
+          yield* whyAfter(before.arrivals, before.events.project, bySubject),
+        );
+        const late = Result.getOrThrow(
+          yield* whyAfter([...after.arrivals, noted], after.events.project, bySubject),
+        );
+
+        expect(landingOf(before.arrivals, before.conflict.holder).at).toBeLessThan(
+          before.arrivals.find((event) => event.type === "DecisionRecorded")?.at ?? 0,
+        );
+        expect(shape(early).map(([kind]) => kind)).toEqual([
+          "decision",
+          "premise",
+          "intent",
+          "observation",
+        ]);
+        expect(noted.at).toBeGreaterThan(landing.at);
+        const at = new Date(landing.at).toISOString();
+        expect(late.at(-1)?.record).toMatchObject({
+          kind: "verdict",
+          id: `${holder}.landed.${after.conflict.decisionId}`,
+          at,
+          payload: { reasons: [{ class: "proof", ref: after.commits.holder, at }] },
+        });
+      }),
+  );
+
+  it.effect(
+    "[why.chain] a party two decisions favoured landed under each, and each says so in a record of its own",
+    () =>
+      Effect.gen(function* () {
+        const events = projectEvents();
+        const first = ruledConflict(events);
+        const second = ruledConflict(events, undefined, undefined, { holder: first.holder });
+        const arrivals = [
+          events.declared(
+            first.holder,
+            makeId("agt", ulid()),
+            "Check permissions on every request",
+          ),
+          events.declared(first.other, makeId("agt", ulid()), "Cache sessions for an hour"),
+          events.declared(second.other, makeId("agt", ulid()), "Cache roles for a day"),
+          ...[first.holder, first.other, second.other].map((changeId) => events.started(changeId)),
+          ...[first, second].flatMap((ruling) => [
+            ...ruling.conflict,
+            ruling.recorded("premise-holds"),
+            ruling.resolved([ruling.other]),
+          ]),
+          ...events.landing(first.holder, commitOf(1)),
+        ];
+        const chain = Result.getOrThrow(
+          yield* whyAfter(arrivals, events.project, { kind: "subject", subject: SUBJECT }),
+        );
+        const ids = chain.map((link) => link.record.id);
+
+        expect(shape(chain).filter(([kind]) => kind === "verdict")).toEqual([
+          ["verdict", `${first.holder}.landed.${second.decisionId}`],
+          ["verdict", `${first.holder}.landed.${first.decisionId}`],
+        ]);
+        expect(new Set(ids).size).toBe(ids.length);
+      }),
+  );
+
+  it.effect(
+    "[why.chain] `why` reads the Projector once, through `Decisions.explaining` alone, however many decisions answer",
+    () =>
+      Effect.gen(function* () {
+        const s = ruled("premise-holds", ["holder"]);
+        const second = ruledConflict(s.events);
+        const memory = makeDecisionsMemory();
+        const calls: string[] = [];
+        const counted =
+          <A extends readonly unknown[], R>(name: string, read: (...args: A) => R) =>
+          (...args: A): R => {
+            calls.push(name);
+            return read(...args);
+          };
+        // The index alone, each of its reads counted: no read model is there to be asked.
+        const counting = Layer.effect(
+          Decisions,
+          Effect.map(Decisions, (inner) =>
+            Decisions.of({
+              get: counted("get", inner.get),
+              list: counted("list", inner.list),
+              ofGuards: counted("ofGuards", inner.ofGuards),
+              onSubjects: counted("onSubjects", inner.onSubjects),
+              atPath: counted("atPath", inner.atPath),
+              explaining: counted("explaining", inner.explaining),
+            }),
+          ),
+        ).pipe(Layer.provide(memory.layer));
+        for (const event of [
+          ...s.arrivals,
+          ...second.conflict,
+          second.recorded("premise-holds"),
+          second.resolved([second.other]),
+          s.conflict.minted([FILE]),
+        ])
+          yield* memory.arrive(event);
+        const bySubject = yield* why(s.events.project, { kind: "subject", subject: SUBJECT }).pipe(
+          Effect.provide(counting),
+        );
+        expect(calls).toEqual(["explaining"]);
+        const byPath = yield* why(s.events.project, { kind: "path", path: FILE }).pipe(
+          Effect.provide(counting),
+        );
+
+        expect(calls).toEqual(["explaining", "explaining"]);
+        expect(shape(bySubject).filter(([kind]) => kind === "decision")).toEqual([
+          ["decision", second.decisionId],
+          ["decision", s.conflict.decisionId],
+        ]);
+        expect(byPath).toEqual(bySubject);
       }),
   );
 
@@ -237,15 +384,18 @@ describe("why's MFP records", () => {
       Effect.gen(function* () {
         const guarded = ruled("premise-holds", ["holder", "other"]);
         const unguarded = ruled("effect-stands");
-        const memory = makeProjectorMemory();
+        const memory = makeDecisionsMemory();
         const chains = yield* Effect.gen(function* () {
           for (const event of [...guarded.arrivals, ...unguarded.arrivals])
             yield* memory.arrive(event);
           const decisions = yield* Decisions;
-          const plain = [];
+          const plain: WhySource[] = [];
           for (const s of [guarded, unguarded])
             plain.push(
-              yield* whySources(s.events.project, yield* decisions.get(s.conflict.decisionId)),
+              ...(yield* decisions.explaining(s.events.project, {
+                kind: "subject",
+                subject: SUBJECT,
+              })),
             );
           const [base] = plain;
           const record = base?.conflict;

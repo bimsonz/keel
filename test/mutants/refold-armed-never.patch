@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/refold.test.ts
+# kills: projector.refold
+# why: a Projector woken over a feed behind its re-fold marks where it ends and never arms the step, so the re-fold never runs
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 30789974..4a095e37 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -84,7 +84,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+     );
+     if (refolded >= until) return;
+     if (armedAlarms(this.ctx.storage).some((armed) => armed.reason === PROJECTOR_REFOLD)) return;
+-    await this.stepRefold();
+   }
+ 
+   private stepRefold(): Promise<void> {

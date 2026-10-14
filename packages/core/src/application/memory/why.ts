@@ -1,5 +1,5 @@
-import { Effect, Option, Schema } from "effect";
-import type { Change, Proposition, SubjectKey } from "../../domain/coordination/index.ts";
+import { Effect, Schema } from "effect";
+import type { Change, Proposition } from "../../domain/coordination/index.ts";
 import { type Anchor, ChangeId, type Citation, type ProjectId } from "../../domain/kernel/index.ts";
 import {
   type MfpAnchor,
@@ -12,30 +12,20 @@ import {
 } from "../../domain/memory/index.ts";
 import {
   type ChangeView,
-  type ConflictRecord,
   Decisions,
+  EntityStore,
   type IndexedDecision,
-  ProjectViews,
+  type WhySource,
+  type WhyTarget,
 } from "../ports/index.ts";
-
-/**
- * What `why` is asked about: a subject, or a file. A subject's anchors name a
- * file and no lines, so a line in the file narrows nothing; it is kept only to
- * say what was asked.
- */
-export type WhyTarget =
-  | { readonly kind: "subject"; readonly subject: SubjectKey }
-  | { readonly kind: "path"; readonly path: string; readonly line?: number | undefined };
+import { changeViewOf } from "./change-views.ts";
+import { conflictRecordOf } from "./conflict-views.ts";
+import { pathDecisionsOf, subjectDecisionsOf } from "./decision-index.ts";
 
 /** Keel, as the author of what it observed and concluded. */
 export const KEEL_AUTHOR: MfpAuthor = { kind: "platform", id: "keel" };
 
-/** What one decision's chain is read from: the decision, its conflict as folded, and each change the conflict names, by id, as folded. */
-export interface WhySources {
-  readonly decision: IndexedDecision;
-  readonly conflict?: ConflictRecord | undefined;
-  readonly changes: ReadonlyMap<string, ChangeView>;
-}
+type Store = (typeof EntityStore)["Service"];
 
 const iso = (ms: number) => new Date(ms).toISOString();
 const isChangeId = Schema.is(ChangeId);
@@ -120,14 +110,19 @@ function intentLink(change: Change, proposition: Proposition): WhyLink {
 /**
  * One active decision's chain, each link an MFP 0.1 record: the decision,
  * the premise its conflict was about, the intent of the change whose effect
- * met it, each guard that holds it, then each party the ruling did not go
- * against that has landed since its resolution was heard. The decision cites
- * the records after it but the landings, which cite the decision. A decision
- * with nothing to cite cannot be stated as MFP has a decision, so it explains
- * nothing.
+ * met it, each guard that holds it, then, once its resolution is heard, each
+ * party the ruling did not go against that landed at or after the ruling.
+ * The decision cites the records after it but the landings, which cite the
+ * decision. A decision with nothing to cite cannot be stated as MFP has a
+ * decision, so it explains nothing.
  */
-export function whyChain({ decision: indexed, conflict: record, changes }: WhySources): WhyLink[] {
+export function whyChain({
+  decision: indexed,
+  conflict: record,
+  changes: views,
+}: WhySource): WhyLink[] {
   const { decision, label } = indexed;
+  const changes = new Map<string, ChangeView>(views.map((view) => [view.change.id, view]));
   const conflict = record?.conflict;
   const grounds: WhyLink[] = [];
   const premise = conflict?.premise;
@@ -213,15 +208,18 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
   const landed = (resolved?.parties ?? []).flatMap((party): WhyLink[] => {
     const view = against.has(party) ? undefined : changes.get(party);
     const commit = view?.change.landedCommit;
-    if (view === undefined || commit === undefined) return [];
-    const at = iso(view.updatedAt);
+    const landedAt = view?.landedAt;
+    // A party that landed before the ruling did not land under it.
+    if (commit === undefined || landedAt === undefined || landedAt < decision.decidedAt) return [];
+    const at = iso(landedAt);
     return [
       {
         summary: `${party} landed as ${commit} under ${label}`,
         record: {
           mfp: "0.1",
           kind: "verdict",
-          id: `${party}.landed`,
+          // A party favoured by two decisions landed under each: one record apiece.
+          id: `${party}.landed.${decision.id}`,
           change: party,
           author: KEEL_AUTHOR,
           at,
@@ -234,16 +232,12 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
   return [decided, ...grounds, ...landed];
 }
 
-/** The decision's conflict and the changes it names, as the Projector folded them; what it has not folded is left out. */
-export const whySources = Effect.fn("memory/whySources")(function* (
-  project: ProjectId,
-  decision: IndexedDecision,
-) {
-  const views = yield* ProjectViews;
+/** One decision's conflict and the changes it names, as the Projector folded them, read in the caller's transaction; what it has not folded is left out. */
+function sourceOf(store: Store, project: ProjectId, decision: IndexedDecision): WhySource {
   const conflict =
     decision.conflictId === undefined
       ? undefined
-      : Option.getOrUndefined(yield* Effect.option(views.conflict(project, decision.conflictId)));
+      : conflictRecordOf(store, project, decision.conflictId);
   const named = new Set(
     [
       conflict?.conflict.premise?.holder,
@@ -251,15 +245,35 @@ export const whySources = Effect.fn("memory/whySources")(function* (
       ...(conflict?.conflict.parties ?? []),
     ].filter(isChangeId),
   );
-  const read = yield* Effect.forEach(
-    named,
-    (changeId) => Effect.option(views.change(project, changeId)),
-    { concurrency: "unbounded" },
-  );
-  const changes = new Map<string, ChangeView>();
-  for (const view of read) if (Option.isSome(view)) changes.set(view.value.change.id, view.value);
-  return { decision, conflict, changes } satisfies WhySources;
-});
+  return {
+    decision,
+    ...(conflict === undefined ? {} : { conflict }),
+    changes: [...named].flatMap((changeId) => changeViewOf(store, project, changeId) ?? []),
+  };
+}
+
+/**
+ * The project's active decisions on what was asked, newest first, each with
+ * its conflict and the changes it names, read in one transaction: what
+ * `Decisions.explaining` answers.
+ */
+export const explaining: (
+  project: ProjectId,
+  target: WhyTarget,
+) => Effect.Effect<readonly WhySource[], never, EntityStore> = Effect.fn("memory/explaining")(
+  function* (project: ProjectId, target: WhyTarget) {
+    const store = yield* EntityStore;
+    return store.transaction(() => {
+      const found =
+        target.kind === "subject"
+          ? subjectDecisionsOf(store, project, [target.subject])
+          : pathDecisionsOf(store, project, target.path);
+      return found
+        .filter((d) => d.decision.state === "active")
+        .map((decision) => sourceOf(store, project, decision));
+    });
+  },
+);
 
 /** What was asked, as an answer names it: the subject, or the path with its line. */
 export const whyAsked = (target: WhyTarget): string =>
@@ -277,19 +291,11 @@ export const whyAsked = (target: WhyTarget): string =>
 export const why: (
   project: ProjectId,
   target: WhyTarget,
-) => Effect.Effect<readonly WhyLink[], NothingToExplain, Decisions | ProjectViews> = Effect.fn(
-  "memory/why",
-)(function* (project: ProjectId, target: WhyTarget) {
-  const decisions = yield* Decisions;
-  const found =
-    target.kind === "subject"
-      ? yield* decisions.onSubjects(project, [target.subject])
-      : yield* decisions.atPath(project, target.path);
-  const active = found.filter((d) => d.decision.state === "active");
-  const sources = yield* Effect.forEach(active, (decision) => whySources(project, decision), {
-    concurrency: "unbounded",
-  });
-  const chain = sources.flatMap((read) => whyChain(read));
-  if (chain.length === 0) return yield* new NothingToExplain({ target: whyAsked(target) });
-  return chain;
-});
+) => Effect.Effect<readonly WhyLink[], NothingToExplain, Decisions> = Effect.fn("memory/why")(
+  function* (project: ProjectId, target: WhyTarget) {
+    // One read of the Projector: every active decision, with all its chain is built from.
+    const chain = (yield* (yield* Decisions).explaining(project, target)).flatMap(whyChain);
+    if (chain.length === 0) return yield* new NothingToExplain({ target: whyAsked(target) });
+    return chain;
+  },
+);

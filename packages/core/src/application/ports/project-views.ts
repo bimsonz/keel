@@ -1,10 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import {
-  Change,
-  type ChangeNotFound,
-  ChangeState,
-  ParkReason,
-} from "../../domain/coordination/index.ts";
+import { Change, ChangeState, ParkReason } from "../../domain/coordination/index.ts";
 import {
   AgentId,
   ChangeId,
@@ -48,11 +43,14 @@ export const ChangeSummary = Schema.Struct({
 export type ChangeSummary = typeof ChangeSummary.Type;
 
 /**
- * One change as the Projector folded it: the domain's Change, and when its
- * last event was folded. A landed change takes no event after ChangeLanded,
- * so for one that landed it is when it landed.
+ * One change as the Projector folded it: the domain's Change, and when it
+ * landed, by its ChangeLanded event's own time, once the Projector has heard
+ * it land. No other event on the change moves it.
  */
-export const ChangeView = Schema.Struct({ change: Change, updatedAt: InstantSchema });
+export const ChangeView = Schema.Struct({
+  change: Change,
+  landedAt: Schema.optional(InstantSchema),
+});
 export type ChangeView = typeof ChangeView.Type;
 
 /** Trunk's head and height: TrunkInitialized is height 0, and each advance adds 1. */
@@ -192,21 +190,16 @@ export interface ConflictListPage {
 
 /**
  * The Projector's read models of a project, for Mission Control: its changes
- * as a list (newest `#n` first, by state, cursor-paged) and one change whole,
- * a snapshot at the feed's head, from which the console folds the feed
- * forward, and its conflicts (newest `C-n` first) with one conflict's whole
- * record. Head only: there are no snapshots at past cursors.
+ * as a list (newest `#n` first, by state, cursor-paged), a snapshot at the
+ * feed's head, from which the console folds the feed forward, and its
+ * conflicts (newest `C-n` first) with one conflict's whole record. Head only:
+ * there are no snapshots at past cursors.
  */
 export class ProjectViews extends Context.Service<
   ProjectViews,
   {
     readonly changes: (read: ChangeListRead) => Effect.Effect<ChangeListPage>;
     readonly snapshot: (project: ProjectId) => Effect.Effect<ViewSnapshot>;
-    /** ChangeNotFound for a change the project's feed has not seen declared. */
-    readonly change: (
-      project: ProjectId,
-      changeId: ChangeId,
-    ) => Effect.Effect<ChangeView, ChangeNotFound>;
     readonly conflicts: (read: ConflictListRead) => Effect.Effect<ConflictListPage>;
     /** ConflictNotFound for a conflict the project's feed has not seen suspected. */
     readonly conflict: (

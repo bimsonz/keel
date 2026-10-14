@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refold.test.ts
+# kills: projector.refold
+# why: the re-fold runs on to the feed's head, re-folding what arrived after it began and was folded by its receipts
+diff --git a/packages/core/src/application/memory/refold.ts b/packages/core/src/application/memory/refold.ts
+index 89537639..ed81a14c 100644
+--- a/packages/core/src/application/memory/refold.ts
++++ b/packages/core/src/application/memory/refold.ts
+@@ -89,7 +89,7 @@ const refoldOf = (stored: Stored | undefined) => {
+ export function refoldFeed(store: Store, step: number = REFOLD_STEP): RefoldStep {
+   const from = markOf(store, REFOLD.refolded);
+   const until = markOf(store, REFOLD.until);
+-  const to = Math.min(until, from + step);
++  const to = Math.min(feedHead(store), from + step);
+   for (let at = from + 1; at <= to; at += 1) {
+     const stored = storedAt(store, at);
+     const fold = refoldOf(stored);

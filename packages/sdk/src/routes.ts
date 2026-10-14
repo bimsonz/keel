@@ -166,7 +166,7 @@ export const ROUTES = {
     path: "/conflicts/{conflictId}/resolution",
     headers: ["keel-lease", "idempotency-key"],
   },
-  why: { method: "GET", path: "/why", query: ["path", "line", "subject"] },
+  why: { method: "GET", path: "/why", query: ["project", "path", "line", "subject"] },
   Memory_listDecisions: {
     method: "GET",
     path: "/decisions",

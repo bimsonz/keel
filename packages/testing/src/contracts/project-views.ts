@@ -536,51 +536,6 @@ export function describeProjectViewsContract(adapter: string, make: () => Projec
     );
 
     it.live(
-      "[views.change] reads one change as its events left it, with when the last one was, in its own project only",
-      () => {
-        const harness = make();
-        const mine = projectEvents();
-        const theirs = projectEvents();
-        const [change, working, unknown] = [id("chg"), id("chg"), id("chg")];
-        const commit = sha(7);
-        const landing = mine.landing(change, commit);
-        return Effect.gen(function* () {
-          const views = yield* ProjectViews;
-          for (const event of [
-            mine.declared(change, id("agt"), "Cache sessions"),
-            mine.started(change),
-            ...landing,
-            mine.declared(working, id("agt"), "Revoke tokens"),
-            theirs.declared(id("chg"), id("agt"), "Another project's change"),
-          ])
-            yield* harness.arrive(event);
-          const landed = yield* views.change(mine.project, ChangeId.make(change));
-
-          expect(landed.change).toMatchObject({
-            id: change,
-            state: "landed",
-            intent: { revision: 1, goal: "Cache sessions" },
-            landedCommit: commit,
-          });
-          // A landed change takes no later event: its last is the landing.
-          expect(landed.updatedAt).toBe(landing.at(-1)?.at);
-          const declared = yield* views.change(mine.project, ChangeId.make(working));
-          expect([declared.change.state, declared.change.landedCommit]).toEqual([
-            "declared",
-            undefined,
-          ]);
-          // Another project's feed has not seen it, and this one has not seen an id it was never told of.
-          expect(
-            yield* Effect.flip(views.change(theirs.project, ChangeId.make(change))),
-          ).toMatchObject({ _tag: "ChangeNotFound", changeId: change });
-          expect(
-            yield* Effect.flip(views.change(mine.project, ChangeId.make(unknown))),
-          ).toMatchObject({ _tag: "ChangeNotFound", changeId: unknown });
-        }).pipe(Effect.provide(harness.layer));
-      },
-    );
-
-    it.live(
       "[b12.change-view-tolerant] leaves the views as they were for a change event that cannot apply",
       () => {
         const harness = make();

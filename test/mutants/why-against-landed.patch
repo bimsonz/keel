@@ -2,15 +2,15 @@
 # kills: why.chain
 # why: a change the ruling went against is said to have landed under it
 diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
-index 423d31a..ca3d143 100644
+index 093a2670..8b67dd96 100644
 --- a/packages/core/src/application/memory/why.ts
 +++ b/packages/core/src/application/memory/why.ts
-@@ -211,7 +211,7 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
+@@ -206,7 +206,7 @@ export function whyChain({
    const resolved = conflict?.decisionId === decision.id ? conflict : undefined;
    const against: ReadonlySet<string> = new Set(indexed.against ?? []);
    const landed = (resolved?.parties ?? []).flatMap((party): WhyLink[] => {
 -    const view = against.has(party) ? undefined : changes.get(party);
 +    const view = changes.get(party);
      const commit = view?.change.landedCommit;
-     if (view === undefined || commit === undefined) return [];
-     const at = iso(view.updatedAt);
+     const landedAt = view?.landedAt;
+     // A party that landed before the ruling did not land under it.

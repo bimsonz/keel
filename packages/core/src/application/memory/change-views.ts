@@ -1,8 +1,8 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import {
   Change,
   ChangeEvent,
-  ChangeNotFound,
+  ChangeLanded,
   evolveChange,
 } from "../../domain/coordination/index.ts";
 import { TrunkAdvanced, TrunkInitialized } from "../../domain/integration/index.ts";
@@ -10,6 +10,7 @@ import {
   type ChangeId,
   type EventEnvelope,
   IllegalTransition,
+  Instant,
   type ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -40,6 +41,8 @@ export const VIEWS = {
   summary: (project: ProjectId) => `change-summary:${project}`,
   /** A project's trunk head and height, by project id. */
   trunk: "trunk-view",
+  /** When a change landed, by change id: its ChangeLanded event's own time, in epoch milliseconds. */
+  landed: "change-landed",
 } as const;
 
 export const CHANGE_PAGE = 50;
@@ -48,6 +51,7 @@ export const CHANGE_PAGE_MAX = 100;
 type Store = (typeof EntityStore)["Service"];
 
 const decodeChangeEvent = Schema.decodeUnknownResult(ChangeEvent);
+const decodeLanded = Schema.decodeUnknownOption(ChangeLanded);
 const decodeTrunkEvent = Schema.decodeUnknownResult(
   Schema.Union([TrunkInitialized, TrunkAdvanced]),
 );
@@ -64,9 +68,23 @@ const numberOf = (store: Store, project: ProjectId, changeId: string): number | 
   return typeof label === "string" ? Number(label.slice(1)) : undefined;
 };
 
+/**
+ * Notes when a change landed: its ChangeLanded event's own time, which no
+ * later event on the change moves. It puts the same row however often it is
+ * folded, so the feed's re-fold may fold an event the receipt already did.
+ */
+export function foldLanding(store: Store, event: EventEnvelope): string | undefined {
+  const decoded = decodeLanded(event.payload);
+  if (Option.isNone(decoded)) return `${event.eventId}: an undecodable ${event.type}`;
+  store.put(VIEWS.landed, decoded.value.changeId, event.at);
+  return undefined;
+}
+
 function foldChange(store: Store, event: EventEnvelope): string | undefined {
   const decoded = decodeChangeEvent(event.payload);
   if (Result.isFailure(decoded)) return `${event.eventId} (${event.type}) is not a change event`;
+  // When it landed is the event's own time, kept whatever the machine makes of it, as the feed's re-fold keeps it.
+  if (decoded.success._tag === "ChangeLanded") foldLanding(store, event);
   const stored = store.get(VIEWS.change, event.entity.id);
   let change: Change;
   try {
@@ -166,26 +184,25 @@ export const listChanges: (
 });
 
 /**
- * One change of a project as folded, with when its last event was. The change
- * row is by id alone, so the project's summary of it is what places it there:
- * ChangeNotFound for a change the project's feed has not seen declared.
+ * One change of a project as folded, with when it landed once that is heard.
+ * The change row is by id alone, so the project's summary of it is what
+ * places it there: undefined for a change the project's feed has not seen
+ * declared.
  */
-export const changeView: (
+export function changeViewOf(
+  store: Store,
   project: ProjectId,
   changeId: ChangeId,
-) => Effect.Effect<ChangeView, ChangeNotFound, EntityStore> = Effect.fn("memory/changeView")(
-  function* (project: ProjectId, changeId: ChangeId) {
-    const store = yield* EntityStore;
-    const found = store.transaction(() => {
-      const summary = store.get(VIEWS.summary(project), changeId);
-      const change = store.get(VIEWS.change, changeId);
-      return summary === undefined || change === undefined
-        ? undefined
-        : { change: decodeChange(change), updatedAt: decodeSummary(summary).updatedAt };
-    });
-    return found ?? (yield* new ChangeNotFound({ changeId }));
-  },
-);
+): ChangeView | undefined {
+  const change = store.get(VIEWS.change, changeId);
+  if (store.get(VIEWS.summary(project), changeId) === undefined || change === undefined)
+    return undefined;
+  const landedAt = store.get(VIEWS.landed, changeId);
+  return {
+    change: decodeChange(change),
+    ...(typeof landedAt === "number" ? { landedAt: Instant(landedAt) } : {}),
+  };
+}
 
 /** The project's changes and trunk with the feed's head, read in one transaction. */
 export const viewSnapshot: (project: ProjectId) => Effect.Effect<ViewSnapshot, never, EntityStore> =

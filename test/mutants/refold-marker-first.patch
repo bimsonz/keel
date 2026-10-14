@@ -1,0 +1,27 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refold.test.ts
+# kills: projector.refold
+# why: the mark moves to the step's end before its folds run and a fold that throws is passed over, so an interrupted step's positions are never re-folded
+diff --git a/packages/core/src/application/memory/refold.ts b/packages/core/src/application/memory/refold.ts
+index 89537639..17f1e245 100644
+--- a/packages/core/src/application/memory/refold.ts
++++ b/packages/core/src/application/memory/refold.ts
+@@ -90,13 +90,17 @@ export function refoldFeed(store: Store, step: number = REFOLD_STEP): RefoldStep
+   const from = markOf(store, REFOLD.refolded);
+   const until = markOf(store, REFOLD.until);
+   const to = Math.min(until, from + step);
++  if (to > from) store.put(REFOLD.refolded.kind, REFOLD.refolded.id, to);
+   for (let at = from + 1; at <= to; at += 1) {
+     const stored = storedAt(store, at);
+     const fold = refoldOf(stored);
+     if (fold === undefined) continue;
+     const event = decodeEnvelope(stored);
+-    if (Option.isSome(event)) fold(store, event.value);
++    try {
++      if (Option.isSome(event)) fold(store, event.value);
++    } catch {
++      // The next position.
++    }
+   }
+-  if (to > from) store.put(REFOLD.refolded.kind, REFOLD.refolded.id, to);
+   return { from, to, level: to >= until };
+ }

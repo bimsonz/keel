@@ -9,6 +9,7 @@ import {
   SubjectId,
 } from "../../domain/kernel/index.ts";
 import { Decision, type DecisionNotFound } from "../../domain/memory/index.ts";
+import type { ChangeView, ConflictRecord } from "./project-views.ts";
 
 /**
  * A decision as Keel's memory holds it: the domain's `Decision` whole, with
@@ -54,6 +55,22 @@ export interface DecisionListPage {
 }
 
 /**
+ * What `why` is asked about: a subject, or a file. A subject's anchors name a
+ * file and no lines, so a line in the file narrows nothing; it is kept only to
+ * say what was asked.
+ */
+export type WhyTarget =
+  | { readonly kind: "subject"; readonly subject: SubjectKey }
+  | { readonly kind: "path"; readonly path: string; readonly line?: number | undefined };
+
+/** What one decision's chain is read from: the decision, its conflict as folded, and each change the conflict names, as folded. */
+export interface WhySource {
+  readonly decision: IndexedDecision;
+  readonly conflict?: ConflictRecord | undefined;
+  readonly changes: readonly ChangeView[];
+}
+
+/**
  * Keel's decisions, read from the Projector's index of the rulings' events
  * joined to the conflicts they ruled. Every state is read: a superseded or
  * overruled decision is still a decision, and the caller says what it scopes.
@@ -82,5 +99,16 @@ export class Decisions extends Context.Service<
       project: ProjectId,
       path: string,
     ) => Effect.Effect<readonly IndexedDecision[]>;
+    /**
+     * The project's active decisions on the subject, or on the subjects
+     * anchored at the path, newest first, each with its conflict and every
+     * change the conflict names (the premise's holder, the effect's change,
+     * the parties), read at once: what `why` explains them by. What the
+     * Projector has not folded is left out.
+     */
+    readonly explaining: (
+      project: ProjectId,
+      target: WhyTarget,
+    ) => Effect.Effect<readonly WhySource[]>;
   }
 >()("keel/Decisions") {}

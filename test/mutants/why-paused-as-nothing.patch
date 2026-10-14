@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/why.test.ts
+# kills: why.http
+# why: a paused agent asking why is answered the 404 of nothing to explain, so it is never told it is paused or what to do
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 8d2549b0..c829add5 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -394,7 +394,7 @@ export function refusalResult(
+   refusal: AuthorizationRefusal,
+ ): { readonly status: 401 | 403 | 404; readonly body: ProblemBody } {
+   // A project `why` may not read, named or the agent's own, has nothing to explain there.
+-  if (refusal._tag === "NotVisible" && action === "why")
++  if (refusal._tag !== "AuthenticationRequired" && action === "why")
+     return nothingToExplain({ requestId }, askedIn(input));
+   switch (refusal._tag) {
+     case "AuthenticationRequired":

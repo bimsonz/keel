@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { ProblemBody } from "../../src/adapters/driving/http/problems.ts";
 import {
   BASE,
+  drainAfter,
   OTHER_ORG,
   mcp,
   mcpResult,
@@ -39,6 +40,53 @@ const refusal = async (response: Response) => {
   return { status: response.status, code: body.code, detail: body.detail };
 };
 
+/** A POST through the doorway as `token`, with an idempotency key and a JSON body. */
+const post = (path: string, token: string, body: object) =>
+  worker(`${BASE}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "idempotency-key": `why-${ulid()}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+/**
+ * An agent of the project, enrolled over REST by a maintainer of its org on a
+ * fresh passkey sign-in, so the maintainer stands behind it and may pause it,
+ * with a token of the agent's own.
+ */
+async function enrolled(projectId: string) {
+  const maintainer = (
+    await seedUser(uniqueHandle("maintainer"), { role: "maintainer", signedInBy: "passkey" })
+  ).token;
+  const enrolment = await post("/v1/agents", maintainer, {
+    name: "why-agent",
+    kind: "interactive",
+    scopes: ["agent:read", "agent:work"],
+    projectId,
+  });
+  expect(enrolment.status).toBe(201);
+  const answer = await enrolment.json<{
+    agent: { id: string };
+    clientId: string;
+    clientSecret: string;
+  }>();
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${answer.agent.id}`)));
+  const exchanged = await worker(`${BASE}/v1/oauth/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: answer.clientId,
+      client_secret: answer.clientSecret,
+    }),
+  });
+  const token = (await exchanged.json<{ access_token: string }>()).access_token;
+  return { maintainer, agentId: answer.agent.id, token };
+}
+
 type Link = { readonly summary: string; readonly record: { readonly kind: string; id: string } };
 type WhyBody = {
   readonly summary: string;
@@ -50,22 +98,38 @@ const SUBJECT = "authz.permission-evaluation";
 const FILE = "src/authz/check.ts";
 const LANDED = "d".repeat(40);
 
+/**
+ * A private project with one conflict ruled for the premise, as the Projector
+ * hears it: both parties declared and started, the ruling and its resolution,
+ * the premise's holder landed after it, and the subject anchored in `FILE`.
+ */
+async function explained() {
+  const p = await project();
+  const ruled = ruledConflict(p.events);
+  const agents = [makeId("agt", ulid()), makeId("agt", ulid())] as const;
+  await arrive(
+    p.events.declared(ruled.holder, agents[0], "Check permissions on every request"),
+    p.events.declared(ruled.other, agents[1], "Cache sessions for an hour"),
+    p.events.started(ruled.holder),
+    p.events.started(ruled.other),
+    ...ruled.conflict,
+    ruled.recorded("premise-holds"),
+    ruled.resolved([ruled.other]),
+    ...p.events.landing(ruled.holder, LANDED),
+    ruled.minted([FILE]),
+  );
+  return { p, ruled };
+}
+
+/** The status and the chain an answer holds. */
+const chainOf = async (response: Response) => ({
+  status: response.status,
+  result: (await response.json<WhyBody>()).result,
+});
+
 describe("[why.http] why, over REST and MCP, from the Projector's decision index", () => {
   it("[why.http] the project's own agent is answered the chain of a subject and of a file anchored to it, the same over MCP; nothing to explain, another project's agent and a person all read the one 404", async () => {
-    const p = await project();
-    const ruled = ruledConflict(p.events);
-    const agents = [makeId("agt", ulid()), makeId("agt", ulid())] as const;
-    await arrive(
-      p.events.declared(ruled.holder, agents[0], "Check permissions on every request"),
-      p.events.declared(ruled.other, agents[1], "Cache sessions for an hour"),
-      p.events.started(ruled.holder),
-      p.events.started(ruled.other),
-      ...ruled.conflict,
-      ruled.recorded("premise-holds"),
-      ruled.resolved([ruled.other]),
-      ...p.events.landing(ruled.holder, LANDED),
-      ruled.minted([FILE]),
-    );
+    const { p, ruled } = await explained();
     const own = await tokenFor(await seedAgent({ projectId: p.projectId }));
     const neighbour = await tokenFor(await seedAgent({ projectId: makeId("prj", ulid()) }));
     const member = (await seedUser(uniqueHandle("member"))).token;
@@ -79,7 +143,7 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
       ["premise", `${ruled.conflictId}.premise`],
       ["intent", `${ruled.other}.intent.1`],
       ["observation", ruled.guardId],
-      ["verdict", `${ruled.holder}.landed`],
+      ["verdict", `${ruled.holder}.landed.${ruled.decisionId}`],
     ]);
     expect(body).toMatchObject({
       ok: true,
@@ -106,7 +170,7 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
     expect(nothing).toEqual({
       status: 404,
       code: "why.nothing_to_explain",
-      detail: "No active decision in your project explains billing.invoices.",
+      detail: "No active decision in the project explains billing.invoices.",
     });
     expect(await refusal(await get("/v1/why?path=src/billing.ts", own))).toMatchObject({
       status: 404,
@@ -116,7 +180,7 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
     const hidden = {
       status: 404,
       code: "why.nothing_to_explain",
-      detail: `No active decision in your project explains ${SUBJECT}.`,
+      detail: `No active decision in the project explains ${SUBJECT}.`,
     };
     expect([
       await refusal(await get(`/v1/why?subject=${SUBJECT}`, neighbour)),
@@ -138,5 +202,71 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
       [400, "request.invalid", [["subject"]]],
       [400, "request.invalid", [["line"]]],
     ]);
+  });
+
+  it("[why.http] `project` names the project read, as the decisions list's does: an agent naming none reads its own, a member reads a private one, anyone reads a public one without a token, and a private or unknown one is the 404 of nothing to explain", async () => {
+    const { p } = await explained();
+    const own = await tokenFor(await seedAgent({ projectId: p.projectId }));
+    const member = (await seedUser(uniqueHandle("member"))).token;
+    const visitor = (await seedUser(uniqueHandle("visitor"), { org: OTHER_ORG })).token;
+    const named = `/v1/why?subject=${SUBJECT}&project=${p.projectId}`;
+    const unknown = `/v1/why?subject=${SUBJECT}&project=${makeId("prj", ulid())}`;
+
+    const mine = await chainOf(await get(`/v1/why?subject=${SUBJECT}`, own));
+    expect(mine.status).toBe(200);
+    expect(mine.result.chain).toHaveLength(5);
+    expect(await chainOf(await get(named, own))).toEqual(mine);
+    expect(await chainOf(await get(named, member))).toEqual(mine);
+    const hidden = {
+      status: 404,
+      code: "why.nothing_to_explain",
+      detail: `No active decision in the project explains ${SUBJECT}.`,
+    };
+    expect([
+      await refusal(await get(named)),
+      await refusal(await get(named, visitor)),
+      await refusal(await get(unknown)),
+      await refusal(await get(unknown, member)),
+    ]).toEqual([hidden, hidden, hidden, hidden]);
+
+    await p.open();
+    expect(await chainOf(await get(named))).toEqual(mine);
+    expect(await chainOf(await get(named, visitor))).toEqual(mine);
+    // Public, it is no one's own: a caller without a token who names none reads nothing.
+    expect(await refusal(await get(`/v1/why?subject=${SUBJECT}`))).toEqual(hidden);
+  });
+
+  it("[why.http] a paused agent is refused about itself, 403 agent-paused with what to do next, and never read the 404 of a project with nothing to explain", async () => {
+    const p = await project();
+    const ruled = ruledConflict(p.events);
+    await arrive(...ruled.conflict, ruled.recorded("premise-holds"), ruled.resolved([ruled.other]));
+    const { maintainer, agentId, token } = await enrolled(p.projectId);
+    const asked = `/v1/why?subject=${SUBJECT}`;
+    expect((await get(asked, token)).status).toBe(200);
+
+    const paused = await post(`/v1/agents/${agentId}/suspend`, maintainer, {
+      reason: "runaway retries",
+    });
+    expect([paused.status, (await paused.json<{ state: string }>()).state]).toEqual([
+      200,
+      "suspended",
+    ]);
+    const refused = await get(asked, token);
+    const body = await refused.json<ProblemBody>();
+
+    expect([refused.status, body.code, body.detail]).toEqual([
+      403,
+      "auth.forbidden",
+      "Refused: agent-paused.",
+    ]);
+    expect(body.nextActions).toMatchObject([
+      { kind: "escalate", title: "You are paused; ask your sponsor to reinstate you" },
+    ]);
+    // A path asked while paused is refused the same, about the agent and not the file.
+    expect(await refusal(await get(`/v1/why?path=${FILE}`, token))).toEqual({
+      status: 403,
+      code: "auth.forbidden",
+      detail: "Refused: agent-paused.",
+    });
   });
 });

@@ -2,15 +2,15 @@
 # kills: memory.decisions-http
 # why: a decision is decided on the caller's own project, so a member of the org and a visitor of a public project never read it
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 46f99cb8..c6b574de 100644
+index 8d2549b0..a7e3069c 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -348,7 +348,7 @@ export const RESOLVERS: Resolvers = {
+@@ -349,7 +349,7 @@ export const RESOLVERS: Resolvers = {
    Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
    Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
    Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
 -  Memory_getDecision: (input) => decisionProject(input.decisionId),
 +  Memory_getDecision: ownProject,
-   why: ownProject,
+   why: (input, caller) => projectOrOwn(input.project, caller),
  
    Operator_getSettings: (input) => projectNamed(input.projectId),

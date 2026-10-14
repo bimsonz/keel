@@ -9659,8 +9659,17 @@
       "get": {
         "operationId": "why",
         "summary": "Why is it like this?",
-        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.1 record. A subject's anchors name a file and\nno lines, so `line` does not narrow: a path with a line answers every\nsubject anchored in that file. Read in the caller's own project; nothing to\nexplain there is 404 `why.nothing_to_explain`.",
+        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.1 record. A subject's anchors name a file and\nno lines, so `line` does not narrow: a path with a line answers every\nsubject anchored in that file. An agent reads its own project unless it\nnames another; anyone else names one. Nothing to explain in the project\nread is 404 `why.nothing_to_explain`. Without a token only a public project\nis read, and a private or unknown one, like any the caller may not see, is\nthe same 404. A refusal about the caller itself (a token's scope, a\nsuspension, a paused agent) is 403 with its next action.",
         "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          },
           {
             "name": "path",
             "in": "query",
@@ -9798,6 +9807,7 @@
           "mcp"
         ],
         "security": [
+          {},
           {
             "OAuth2Auth": [
               "agent:read"

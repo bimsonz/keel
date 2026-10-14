@@ -34,16 +34,22 @@ interface Memory {
    * whose effect met it, each guard that holds it, and each change that landed
    * under it, every link an MFP 0.1 record. A subject's anchors name a file and
    * no lines, so `line` does not narrow: a path with a line answers every
-   * subject anchored in that file. Read in the caller's own project; nothing to
-   * explain there is 404 `why.nothing_to_explain`.
+   * subject anchored in that file. An agent reads its own project unless it
+   * names another; anyone else names one. Nothing to explain in the project
+   * read is 404 `why.nothing_to_explain`. Without a token only a public project
+   * is read, and a private or unknown one, like any the caller may not see, is
+   * the same 404. A refusal about the caller itself (a token's scope, a
+   * suspension, a paused agent) is 403 with its next action.
    */
   @summary("Why is it like this?")
   @tag("mcp")
   @operationId("why")
-  @useAuth(AgentRead | SessionAuth)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/why")
   @get
   why(
+    @query project?: ProjectId,
+
     /** A repository-relative path, as a subject's anchors name it. */
     @query path?: string,
 

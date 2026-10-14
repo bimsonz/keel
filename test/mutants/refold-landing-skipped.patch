@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refold.test.ts
+# kills: projector.refold
+# why: the re-fold looks for landings under a type no event has, so a change that landed before the deploy never reads as landed
+diff --git a/packages/core/src/application/memory/refold.ts b/packages/core/src/application/memory/refold.ts
+index 89537639..9d6c56fe 100644
+--- a/packages/core/src/application/memory/refold.ts
++++ b/packages/core/src/application/memory/refold.ts
+@@ -46,7 +46,7 @@ export interface RefoldStep {
+ const REFOLDS: ReadonlyMap<string, (store: Store, event: EventEnvelope) => string | undefined> =
+   new Map([
+     ["SubjectMinted", foldSubjectAnchors],
+-    ["ChangeLanded", foldLanding],
++    ["ChangeLanding", foldLanding],
+   ]);
+ 
+ const decodeEnvelope = Schema.decodeUnknownOption(EventEnvelope);

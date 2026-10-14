@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: decisions.contract
+# why: a change another project's feed declared is read as this project's when this project's conflict names it
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index abb29713..6a156174 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -195,8 +195,7 @@ export function changeViewOf(
+   changeId: ChangeId,
+ ): ChangeView | undefined {
+   const change = store.get(VIEWS.change, changeId);
+-  if (store.get(VIEWS.summary(project), changeId) === undefined || change === undefined)
+-    return undefined;
++  if (change === undefined) return undefined;
+   const landedAt = store.get(VIEWS.landed, changeId);
+   return {
+     change: decodeChange(change),

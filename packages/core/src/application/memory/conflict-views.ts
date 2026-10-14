@@ -387,6 +387,16 @@ export const listConflicts: (
   },
 );
 
+/** One conflict of a project as the feed has folded it, with its labels and what its parties were told; undefined for one it has not seen suspected. */
+export function conflictRecordOf(
+  store: Store,
+  project: ProjectId,
+  conflictId: ConflictId,
+): ConflictRecord | undefined {
+  const stored = store.get(CONFLICT_VIEWS.conflict(project), conflictId);
+  return stored === undefined ? undefined : recordOf(store, project, decodeFolded(stored));
+}
+
 /** One conflict of a project as the feed has folded it, with its labels and what its parties were told. */
 export const conflictRecord: (
   project: ProjectId,
@@ -395,9 +405,9 @@ export const conflictRecord: (
   "memory/conflictRecord",
 )(function* (project: ProjectId, conflictId: ConflictId) {
   const store = yield* EntityStore;
-  const stored = store.get(CONFLICT_VIEWS.conflict(project), conflictId);
-  if (stored === undefined) return yield* new ConflictNotFound({ conflictId });
-  return recordOf(store, project, decodeFolded(stored));
+  return (
+    conflictRecordOf(store, project, conflictId) ?? (yield* new ConflictNotFound({ conflictId }))
+  );
 });
 
 /**

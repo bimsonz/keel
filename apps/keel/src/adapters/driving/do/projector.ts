@@ -1,10 +1,10 @@
 import {
-  changeView,
   conflictRecord,
   decisionsAtPath,
   decisionsOfGuards,
   decisionsOnSubjects,
   escalationView,
+  explaining,
   foldViews,
   listChanges,
   listEscalations,
@@ -15,6 +15,8 @@ import {
   listDecisions,
   readFeed,
   recordFeed,
+  refoldFeed,
+  refoldUntil,
   viewSnapshot,
 } from "@keeltown/core/application/memory";
 import {
@@ -30,7 +32,6 @@ import { EscalationNotFound } from "@keeltown/core/domain/verification";
 import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
-  ChangeRead,
   ChangesRead,
   ConflictRead,
   ConflictsRead,
@@ -46,23 +47,71 @@ import {
   type ProjectorRpc,
   SnapshotRead,
   SubjectDecisionsRead,
+  WhyRead,
 } from "../../../rpc/index.ts";
+import { armedAlarms, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** Where the Projector counts the nudges it has had. */
 export const NUDGES = { kind: "projector", id: "nudges" } as const;
+
+/** The Projector's own deadline: the next step of the feed's re-fold, due at once. */
+export const PROJECTOR_REFOLD = "projector re-folds the feed";
 
 /**
  * The Projector DO: every event Keel commits arrives here and joins the feed,
  * which the console reads. It drains the operation log into read models when
  * nudged; every outbox flush nudges it, the one sanctioned exception to
  * "nothing polls". Until the operation log exists a nudge only counts
- * itself. It does not deliver to itself.
+ * itself. It does not deliver to itself. Its one deadline of its own re-folds
+ * what its feed held before it folded anchors and landings.
  */
 export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements ProjectorRpc {
   constructor(ctx: DurableObjectState, env: Env) {
     // The directory and the places are for the repairs: the AgentSession and Project DOs write them inline, and this repeats it.
     super(ctx, env, projectorServices(env), { projected: false });
+    // A feed recorded before its anchors and landings were folded is re-folded from this object's own alarm, never from a receipt or a read.
+    void ctx.blockConcurrencyWhile(() => this.armRefold());
+  }
+
+  /**
+   * Fixes where the feed's re-fold ends the first time this object wakes with
+   * it, and arms its next step while it is behind, unless one is armed already.
+   */
+  private async armRefold(): Promise<void> {
+    const { refolded, until } = await this.runtime.runPromise(
+      Effect.map(EntityStore, (store) => store.transaction(() => refoldUntil(store))),
+    );
+    if (refolded >= until) return;
+    if (armedAlarms(this.ctx.storage).some((armed) => armed.reason === PROJECTOR_REFOLD)) return;
+    await this.stepRefold();
+  }
+
+  private stepRefold(): Promise<void> {
+    return scheduleAlarm(this.ctx.storage, {
+      kind: "deadline",
+      reason: PROJECTOR_REFOLD,
+      at: Date.now(),
+    });
+  }
+
+  /**
+   * One step of the feed's re-fold, in one transaction, logged with when it
+   * started (a Worker's clock stands still through synchronous work, so the
+   * time between steps is what one took); the next is armed until it is level. A step that died is run
+   * again from the mark its last committed step left. `why` answers from what
+   * is folded so far meanwhile.
+   */
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
+    if (request.reason !== PROJECTOR_REFOLD) return super.onDeadline(request);
+    const at = new Date().toISOString();
+    const step = await this.runtime.runPromise(
+      Effect.map(EntityStore, (store) => store.transaction(() => refoldFeed(store))),
+    );
+    const { from, to, level } = step;
+    console.log("projector re-fold step", JSON.stringify({ from, to, at, level }));
+    // This run's own request is on the table until it returns, so the next is armed whatever is there.
+    if (!level) await this.stepRefold();
   }
 
   async nudge() {
@@ -135,14 +184,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project }) => viewSnapshot(project)),
     );
     return this.answer(ProjectorCodecs.snapshot, program);
-  }
-
-  async change(request: typeof ChangeRead.Encoded) {
-    const program = Schema.decodeUnknownEffect(ChangeRead)(request).pipe(
-      Effect.orDie,
-      Effect.flatMap(({ project, changeId }) => changeView(project, changeId)),
-    );
-    return this.answer(ProjectorCodecs.change, program);
   }
 
   async conflicts(request: typeof ConflictsRead.Encoded) {
@@ -228,5 +269,13 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, path }) => decisionsAtPath(project, path)),
     );
     return this.answer(ProjectorCodecs.pathDecisions, program);
+  }
+
+  async explaining(request: typeof WhyRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(WhyRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, target }) => explaining(project, target)),
+    );
+    return this.answer(ProjectorCodecs.explaining, program);
   }
 }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/why.test.ts
+# kills: why.http
+# why: why reads only an agent's own project whatever project is named, so a public project is never read without a token
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 8d2549b0..b537a52d 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -350,7 +350,7 @@ export const RESOLVERS: Resolvers = {
+   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
+   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
+   Memory_getDecision: (input) => decisionProject(input.decisionId),
+-  why: (input, caller) => projectOrOwn(input.project, caller),
++  why: ownProject,
+ 
+   Operator_getSettings: (input) => projectNamed(input.projectId),
+   Operator_putSettings: (input) => projectNamed(input.projectId),

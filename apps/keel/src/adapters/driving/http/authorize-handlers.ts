@@ -356,7 +356,7 @@ export const RESOLVERS: Resolvers = {
   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
   Memory_getDecision: (input) => decisionProject(input.decisionId),
-  why: ownProject,
+  why: (input, caller) => projectOrOwn(input.project, caller),
 
   Operator_getSettings: (input) => projectNamed(input.projectId),
   Operator_putSettings: (input) => projectNamed(input.projectId),
@@ -399,7 +399,7 @@ export function refusalResult(
   requestId: string,
   refusal: AuthorizationRefusal,
 ): { readonly status: 401 | 403 | 404; readonly body: ProblemBody } {
-  // `why` reads the caller's own project alone: one it may not see has nothing to explain there.
+  // A project `why` may not read, named or the agent's own, has nothing to explain there.
   if (refusal._tag === "NotVisible" && action === "why")
     return nothingToExplain({ requestId }, askedIn(input));
   switch (refusal._tag) {

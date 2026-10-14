@@ -29,12 +29,14 @@ const ELSEWHERE = subject("billing.invoices");
  * One conflict of a project from its suspicion to its ruling, as its objects
  * commit it: the conflict's own events in the Subject object's order, and the
  * ruling's decision from the namespace object, which names the conflict among
- * what it concerns. `holder` holds the premise and `other` makes the effect.
+ * what it concerns. `holder` holds the premise and `other` makes the effect:
+ * new changes, unless `parties` names them.
  */
 export function ruledConflict(
   events: ReturnType<typeof projectEvents> = projectEvents(),
   guardId: string = id("grd"),
   subjectKey: string = SUBJECT,
+  parties: { readonly holder?: string; readonly other?: string } = {},
 ) {
   const [conflictId, probeId, escalationId, decisionId] = [
     id("cfl"),
@@ -42,7 +44,7 @@ export function ruledConflict(
     id("esc"),
     id("dec"),
   ];
-  const [holder, other] = [id("chg"), id("chg")];
+  const [holder, other] = [parties.holder ?? id("chg"), parties.other ?? id("chg")];
   const subjectId = id("sub");
   /** The conflict's events up to its escalation, the guard admitted from its proof among them. */
   const conflict: readonly EventEnvelope[] = [
@@ -301,6 +303,102 @@ export function describeDecisionsContract(adapter: string, make: () => Decisions
           expect(yield* decisions.atPath(events.project, "src/shared.ts")).toEqual(
             yield* decisions.onSubjects(events.project, [first.subjectKey, second.subjectKey]),
           );
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[decisions.contract] explaining reads a subject's active decisions, or a file's, newest first, each with its conflict and the changes it names as folded, landed when their ChangeLanded says, and nothing of another project",
+      () => {
+        const harness = make();
+        const events = projectEvents();
+        const theirs = projectEvents();
+        const [ended, older, newer] = [
+          ruledConflict(events),
+          ruledConflict(events),
+          ruledConflict(events),
+        ];
+        const elsewhere = ruledConflict(theirs);
+        const landing = events.landing(older.holder, "e".repeat(40));
+        const landed = landing.at(-1);
+        return Effect.gen(function* () {
+          for (const ruled of [ended, older, newer, elsewhere])
+            for (const event of [
+              ...ruled.conflict,
+              ruled.recorded("premise-holds"),
+              ruled.resolved([ruled.other]),
+            ])
+              yield* harness.arrive(event);
+          for (const event of [
+            ended.superseded(),
+            older.minted(["src/authz/check.ts"]),
+            events.declared(older.holder, id("agt"), "Check permissions on every request"),
+            events.declared(older.other, id("agt"), "Cache sessions for an hour"),
+            events.started(older.holder),
+            events.started(older.other),
+            ...landing,
+            // A conflict noted on the change after it landed arrives last, and is not when it landed.
+            events.of({ kind: "change", id: older.holder }, {
+              _tag: "ConflictNoted",
+              changeId: older.holder,
+              conflictId: older.conflictId,
+              predicate: "freshness",
+              policy: "annotate",
+            } as { _tag: string }),
+            // Another project's feed declares a change this project's conflict names.
+            theirs.declared(newer.holder, id("agt"), "Another project's change"),
+          ])
+            yield* harness.arrive(event);
+          const decisions = yield* Decisions;
+          const bySubject = yield* decisions.explaining(events.project, {
+            kind: "subject",
+            subject: ON_IT,
+          });
+
+          expect(bySubject.map((source) => source.decision)).toEqual([
+            yield* decisions.get(newer.decisionId),
+            yield* decisions.get(older.decisionId),
+          ]);
+          const [ofNewer, ofOlder] = bySubject;
+          expect(ofOlder?.conflict).toMatchObject({
+            conflict: {
+              id: older.conflictId,
+              parties: [older.holder, older.other],
+              decisionId: older.decisionId,
+            },
+            labels: { conflict: expect.stringMatching(/^C-[1-9]\d*$/) },
+          });
+          expect(
+            ofOlder?.changes.map((view) => [view.change.id, view.change.state, view.landedAt]),
+          ).toEqual([
+            [older.holder, "landed", landed?.at],
+            [older.other, "working", undefined],
+          ]);
+          expect(ofOlder?.changes[0]?.change.landedCommit).toBe("e".repeat(40));
+          expect(ofNewer?.conflict?.conflict.id).toBe(newer.conflictId);
+          expect(ofNewer?.changes).toEqual([]);
+          // By a file the subject is anchored in, the same; by any other, nothing.
+          expect(
+            yield* decisions.explaining(events.project, {
+              kind: "path",
+              path: "src/authz/check.ts",
+              line: 3,
+            }),
+          ).toEqual(bySubject);
+          expect(
+            yield* decisions.explaining(events.project, { kind: "path", path: "src/billing.ts" }),
+          ).toEqual([]);
+          expect(
+            (yield* decisions.explaining(theirs.project, { kind: "subject", subject: ON_IT })).map(
+              (source) => [source.decision.decision.id, source.changes],
+            ),
+          ).toEqual([[elsewhere.decisionId, []]]);
+          expect(
+            yield* decisions.explaining(theirs.project, {
+              kind: "path",
+              path: "src/authz/check.ts",
+            }),
+          ).toEqual([]);
         }).pipe(Effect.provide(harness.layer));
       },
     );

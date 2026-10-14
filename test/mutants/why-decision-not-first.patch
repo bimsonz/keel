@@ -2,10 +2,10 @@
 # kills: why.chain
 # why: a chain opens with what the decision rests on, so a reader cannot tell which decision each run of links belongs to
 diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
-index 423d31a..7bc0af0 100644
+index 093a2670..41afcc11 100644
 --- a/packages/core/src/application/memory/why.ts
 +++ b/packages/core/src/application/memory/why.ts
-@@ -231,7 +231,7 @@ export function whyChain({ decision: indexed, conflict: record, changes }: WhySo
+@@ -229,7 +229,7 @@ export function whyChain({
        },
      ];
    });
@@ -13,4 +13,4 @@ index 423d31a..7bc0af0 100644
 +  return [...grounds, decided, ...landed];
  }
  
- /** The decision's conflict and the changes it names, as the Projector folded them; what it has not folded is left out. */
+ /** One decision's conflict and the changes it names, as the Projector folded them, read in the caller's transaction; what it has not folded is left out. */

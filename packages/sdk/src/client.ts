@@ -716,14 +716,22 @@ export class KeelClient {
     );
   }
 
-  /** Why a line, a path or a subject is as it is: the decisions and premises behind it. */
+  /**
+   * Why a line, a path or a subject is as it is: the decisions and premises
+   * behind it, in an agent's own project unless `project` names another.
+   */
   why(
-    about: { readonly path?: string; readonly line?: number; readonly subject?: string },
+    about: {
+      readonly path?: string;
+      readonly line?: number;
+      readonly subject?: string;
+      readonly project?: string;
+    },
     options?: CallOptions,
   ): Promise<WireOutputs["why"]> {
     return this.call(
       "why",
-      { path: about.path, line: about.line, subject: about.subject },
+      { path: about.path, line: about.line, subject: about.subject, project: about.project },
       options,
     );
   }

@@ -258,6 +258,28 @@ export const decisionsOfGuards: (
   );
 });
 
+/** A project's decisions on any of these subjects, newest first, read in the caller's transaction. */
+export function subjectDecisionsOf(
+  store: Store,
+  project: ProjectId,
+  subjects: readonly SubjectKey[],
+): readonly IndexedDecision[] {
+  const wanted: ReadonlySet<string> = new Set(subjects);
+  return decisionsOf(store, project).filter(
+    (d) => d.subjectKey !== undefined && wanted.has(d.subjectKey),
+  );
+}
+
+/** A project's decisions on the subjects anchored at a path, newest first, read in the caller's transaction; none where no subject is anchored. */
+export function pathDecisionsOf(
+  store: Store,
+  project: ProjectId,
+  path: string,
+): readonly IndexedDecision[] {
+  const anchored = keysAt(store, project, path);
+  return anchored.length === 0 ? [] : subjectDecisionsOf(store, project, anchored);
+}
+
 /** A project's decisions on any of these subjects, newest first. */
 export const decisionsOnSubjects: (
   project: ProjectId,
@@ -266,10 +288,7 @@ export const decisionsOnSubjects: (
   "memory/decisionsOnSubjects",
 )(function* (project: ProjectId, subjects: readonly SubjectKey[]) {
   const store = yield* EntityStore;
-  const wanted: ReadonlySet<string> = new Set(subjects);
-  return store
-    .transaction(() => decisionsOf(store, project))
-    .filter((d) => d.subjectKey !== undefined && wanted.has(d.subjectKey));
+  return store.transaction(() => subjectDecisionsOf(store, project, subjects));
 });
 
 /** A project's decisions on the subjects anchored at a path, newest first; none where no subject is anchored. */
@@ -280,12 +299,5 @@ export const decisionsAtPath: (
   "memory/decisionsAtPath",
 )(function* (project: ProjectId, path: string) {
   const store = yield* EntityStore;
-  return store.transaction(() => {
-    const anchored: ReadonlySet<string> = new Set(keysAt(store, project, path));
-    return anchored.size === 0
-      ? []
-      : decisionsOf(store, project).filter(
-          (d) => d.subjectKey !== undefined && anchored.has(d.subjectKey),
-        );
-  });
+  return store.transaction(() => pathDecisionsOf(store, project, path));
 });

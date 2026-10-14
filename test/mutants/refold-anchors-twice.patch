@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/refold.test.ts
+# kills: projector.refold
+# why: a subject's anchors are listed again each time they are folded, so re-folding a position its receipt folded lists the subject twice
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index f7322a01..dcb54719 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -143,7 +143,7 @@ export function foldSubjectAnchors(store: Store, event: EventEnvelope): string |
+   if (project === undefined) return `${subjectId} was minted with no project`;
+   for (const path of new Set(anchors.map((anchor) => anchor.path))) {
+     const keys = keysAt(store, project, path);
+-    if (!keys.includes(key)) store.put(DECISION_INDEX.anchor(project), path, [...keys, key]);
++    store.put(DECISION_INDEX.anchor(project), path, [...keys, key]);
+   }
+   return undefined;
+ }

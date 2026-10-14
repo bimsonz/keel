@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/why.test.ts packages/testing/test/ports.test.ts
+# kills: why.chain, decisions.contract
+# why: the landing row is put for every event on the change, so it reads as landed when the last event arrived, or when a change still working last moved
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index abb29713..ecd2e834 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -84,7 +84,7 @@ function foldChange(store: Store, event: EventEnvelope): string | undefined {
+   const decoded = decodeChangeEvent(event.payload);
+   if (Result.isFailure(decoded)) return `${event.eventId} (${event.type}) is not a change event`;
+   // When it landed is the event's own time, kept whatever the machine makes of it, as the feed's re-fold keeps it.
+-  if (decoded.success._tag === "ChangeLanded") foldLanding(store, event);
++  store.put(VIEWS.landed, decoded.success.changeId, event.at);
+   const stored = store.get(VIEWS.change, event.entity.id);
+   let change: Change;
+   try {

@@ -96,6 +96,13 @@ const headOf = (store: Store): number => {
 /** The feed's head as a cursor: a read from it returns only what arrives after. */
 export const feedCursor = (store: Store): string => position(headOf(store));
 
+/** The feed's head: the position of its last entry, 0 while it is empty. */
+export const feedHead = (store: Store): number => headOf(store);
+
+/** The event the feed holds at a position, as stored: undecoded, so a reader can look at its `type` first. */
+export const storedAt = (store: Store, at: number): Stored | undefined =>
+  store.get(FEED.kind, position(at));
+
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
