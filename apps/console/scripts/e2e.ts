@@ -71,6 +71,27 @@ const shot = async (shown: Page, name: string): Promise<void> => {
 };
 /** The frame's tabs: the places a project has. */
 const tabsOf = (page: Page) => page.getByRole("navigation", { name: "Project" }).getByRole("link");
+/**
+ * The header's links before the project's tabs, in order, as `name → path`: a link that holds Keel's mark is
+ * marked so, and the header's text up to its first link that is not a name is given after them.
+ */
+const headerOf = async (page: Page) =>
+  page
+    .locator("header")
+    .first()
+    .evaluate((header) => {
+      const links = [...header.querySelectorAll("a")]
+        .filter((a) => a.closest("nav") === null)
+        .map(
+          (a) =>
+            `${a.getAttribute("aria-label") ?? a.textContent?.trim() ?? ""}${a.querySelector("svg") === null ? "" : " (mark)"} → ${new URL(a.href).pathname}`,
+        );
+      const group = header.querySelector("div")?.firstElementChild;
+      const text = (group instanceof HTMLElement ? group.innerText : "")
+        .replaceAll(/\s+/g, " ")
+        .trim();
+      return `${links.join(" | ")} || ${text}`;
+    });
 const qrOn = (page: Page) =>
   page.locator("svg", { has: page.locator("title", { hasText: "QR code" }) });
 /** The review funnel's three tables: the changes, the conflicts, and the comparisons where a source reports them. */
@@ -2998,7 +3019,12 @@ expectEqual(
     .getByRole("main")
     .getByText(/\borg\b/i)
     .count()} mentions of an org`,
-  "Keel / ada ada | Your projects ada | 0 org tabs | 0 mentions of an org",
+  "ada ada | Your projects ada | 0 org tabs | 0 mentions of an org",
+);
+expectEqual(
+  "account: a namespace's header is Keel's mark home and the namespace's name, a link to its own page",
+  await headerOf(person),
+  "Keel (mark) → / | ada → /ada | ada → /settings || ada",
 );
 for (const tab of ["members", "settings"]) {
   // oxlint-disable-next-line no-await-in-loop -- one page after the other
@@ -3327,9 +3353,14 @@ expectEqual(
   `/ada/demo | src | package.json | README.md | ${OPEN_ON_TABS} | Settings`,
 );
 expectEqual(
+  "member: the header leads with Keel's mark home, then the namespace and the project, each a link to its own page",
+  await headerOf(person),
+  "Keel (mark) → / | ada → /ada | demo → /ada/demo | Fork → /ada/demo/fork | ada → /settings || ada / demo private",
+);
+expectEqual(
   "member: the frame names the org, the project and who is reading",
   squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "",
-  "Keel / ada / demo private Fork Live ada",
+  "ada / demo private Fork Live ada",
 );
 // Beside the project's name, the org's projects; beside the org's, the reader's orgs: a code host's frame.
 await person.getByRole("button", { name: "Switch project" }).click();
@@ -3616,7 +3647,7 @@ await person
 expectEqual(
   "settings: made public, the page and the frame say what Keel answered",
   `${await readersSaid()} | ${await frameSaid()}`,
-  "public Anyone reads its code and its log, signed in or not. | Keel / ada / demo public Fork Live ada",
+  "public Anyone reads its code and its log, signed in or not. | ada / demo public Fork Live ada",
 );
 const replaced = shut.calls.filter((call) => call.method === "PUT");
 expectEqual(
@@ -3662,7 +3693,7 @@ await publishing.waitFor();
 expectEqual(
   "settings: one click makes it private again",
   `${await readersSaid()} | ${await frameSaid()} | ${shut.calls.filter((call) => call.method === "PUT").length}`,
-  "private Only ada reads it. | Keel / ada / demo private Fork Live ada | 2",
+  "private Only ada reads it. | ada / demo private Fork Live ada | 2",
 );
 expectEqual(
   "settings: and a visitor is told of it what they are told of a project that is not there",

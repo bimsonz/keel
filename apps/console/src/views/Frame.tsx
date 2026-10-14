@@ -21,6 +21,7 @@ import { hrefOf } from "../places.ts";
 import { type Route, TRUNK, href } from "../route.ts";
 import { Link, carriedParams, useWhere } from "../router.tsx";
 import { Footer } from "./Footer.tsx";
+import { HomeLink } from "./HomeLink.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
 
 export type { Sibling } from "./Switch.tsx";
@@ -213,15 +214,10 @@ export function Frame({
         {/* On a narrow screen the row wraps: who is reading goes under where they are, and nothing is cut off. */}
         <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-1.5 sm:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
-              <path d="M2.5 5h15L10 17.5Z" fill="var(--text-color-kumo-strong)" />
-            </svg>
-            <a href="/" className="text-base text-kumo-default hover:underline">
-              Keel
-            </a>
+            {/* A code host's frame: its mark home, then whose the project is and the project, each a link to its own page. */}
+            <HomeLink named={project === ""} />
             {project !== "" && (
               <>
-                <span className="text-kumo-inactive">/</span>
                 {/* The namespace's own page is above every project: a plain link, which loads it. */}
                 <a
                   href={hrefOf({ at: "namespace", handle: namespace })}

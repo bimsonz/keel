@@ -21,6 +21,7 @@ import {
 } from "../source/http.ts";
 import type { KeelCredentials, KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
+import { HomeLink } from "../views/HomeLink.tsx";
 import { Switch } from "../views/Switch.tsx";
 import {
   type Account,
@@ -780,20 +781,16 @@ function Shell({
   orgs: Org[] | null;
   children: ReactNode;
 }) {
+  const namesHandle = handle !== undefined && (reader.is === "user" || reader.is === "visitor");
   return (
     <div className="a-root flex min-h-screen w-screen flex-col bg-kumo-canvas text-base text-kumo-default">
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
         <div className="flex h-12 items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
-            <a href="/" className="flex items-center gap-2.5">
-              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
-                <path d="M2.5 5h15L10 17.5Z" fill="var(--text-color-kumo-strong)" />
-              </svg>
-              <span className="text-base text-kumo-default">Keel</span>
-            </a>
-            {handle !== undefined && (reader.is === "user" || reader.is === "visitor") && (
+            {/* On a namespace's page its handle leads, beside Keel's mark home, as a code host names an owner. */}
+            <HomeLink named={!namesHandle} />
+            {namesHandle && (
               <>
-                <span className="text-kumo-inactive">/</span>
                 <a
                   href={hrefOf({ at: "namespace", handle })}
                   className="text-base font-semibold text-kumo-strong hover:underline"

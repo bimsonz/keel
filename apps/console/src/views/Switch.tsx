@@ -1,5 +1,5 @@
-// Beside a name in the frame, the others of its kind: the frame is a code host's, `Keel / <namespace> / <project>`,
-// where each name is a link and has a dropdown beside it.
+// Beside a name in the frame, the others of its kind: the frame is a code host's, Keel's mark home and then
+// `<namespace> / <project>`, where each name is a link and has a dropdown beside it.
 
 import { DropdownMenu } from "@cloudflare/kumo";
 import { CaretUpDownIcon } from "@phosphor-icons/react";
