@@ -31,7 +31,13 @@ export function swarmAdmin(): <S extends v.GenericSchema>(
 }
 
 const Member = v.looseObject({ handle: v.string(), keyring: v.string() });
-export const Roster = v.looseObject({ one: v.optional(Member), many: v.array(Member) });
+export const Roster = v.looseObject({
+  one: v.optional(Member),
+  many: v.array(Member),
+  wanted: v.number(),
+});
+/** `/admin/accept`'s answer: the one account's invitation state, or the roster accepting. */
+export const Accepted = v.object({ accepted: v.unknown() });
 export const Started = v.looseObject({ id: v.string() });
 const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;
 /** The run's report as the Worker answers it; its numbers are the Worker's own `Report`. */

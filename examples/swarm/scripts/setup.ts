@@ -1,19 +1,22 @@
 // Sets a swarm up on Keel as the person signed in under a keeltown profile:
 // makes the project from the fixture's template in their namespace (or takes
 // the one --project names), invites the swarm's accounts to it, and has each
-// accept. Run it within ten minutes of `keeltown --profile <name> login`
-// approved with a passkey: inviting an agent needs a fresh passkey sign-in.
+// accept. Inviting an agent needs a passkey sign-in under ten minutes old, and
+// the clock starts at the browser's sign-in that approves `keeltown --profile
+// <name> login`, not at the login: sign in again with your passkey in the
+// browser just before you approve the code, then run this straight away.
 //
 //   SWARM_URL=… SWARM_ADMIN_TOKEN=… node examples/swarm/scripts/setup.ts \
 //     --shape one --namespace <handle> [--name swarm] [--project prj_…] [--profile swarm]
 //
 // Every Keel call is the CLI's, from this checkout, under the profile: this
 // script reads no sign-in, cookie or token. Use a profile that holds no agent
-// key, so the CLI acts as the person.
+// key, so the CLI acts as the person; the CLI is given none of the credential
+// variables that would make it act as something else.
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { Anything, Roster, swarmAdmin } from "./admin.ts";
+import { Accepted, Roster, swarmAdmin } from "./admin.ts";
 
 const { values } = parseArgs({
   options: {
@@ -37,7 +40,17 @@ function keeltown(args: readonly string[]): unknown {
     process.execPath,
     ["--no-warnings", cli, ...args, "--profile", values.profile, "--json"],
     {
-      env: { ...process.env, KEEL_URL: keel },
+      // An undefined variable is left out of the CLI's environment: none of these may
+      // have it act as a client, a session or an agent instead of the profile's person.
+      env: {
+        ...process.env,
+        KEEL_URL: keel,
+        KEEL_CLIENT_ID: undefined,
+        KEEL_CLIENT_SECRET: undefined,
+        KEEL_SESSION: undefined,
+        KEEL_AGENT_KEY: undefined,
+        KEEL_AGENT_ID: undefined,
+      },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "inherit"],
     },
@@ -52,6 +65,10 @@ const roster =
 const handles = shape === "one" ? [roster.one?.handle] : roster.many.map((m) => m.handle);
 if (handles.length === 0 || handles.some((h) => h === undefined))
   throw new Error(`The swarm has no ${shape} accounts signed up yet: POST /admin/agents first.`);
+if (shape === "many" && handles.length < roster.wanted)
+  throw new Error(
+    `Only ${handles.length} of the ${roster.wanted} accounts asked for are signed up: wait for the rest (GET /admin/agents).`,
+  );
 
 let project = values.project;
 if (project === undefined) {
@@ -78,5 +95,14 @@ for (const handle of handles) {
   keeltown(["project", "invite", "--project", project, "--agent", String(handle)]);
   console.log(`invited ${String(handle)}`);
 }
-console.log(JSON.stringify(await admin(Anything, "POST", "/admin/accept", { shape, project })));
+const { accepted } = await admin(Accepted, "POST", "/admin/accept", { shape, project });
+if (shape === "one" && accepted !== "joined")
+  throw new Error(
+    `swarm-one did not join ${project}: its invitation is ${JSON.stringify(accepted)}`,
+  );
+console.log(
+  shape === "one"
+    ? `swarm-one joined ${project}`
+    : "the accounts accept from the swarm's alarm, one every 1.5 s: GET /admin/agents shows each",
+);
 console.log(`\nset up: project ${project}, ${handles.length} account(s) of shape ${shape}`);
