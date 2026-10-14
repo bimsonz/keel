@@ -1,0 +1,8 @@
+{
+  "target": "production",
+  "worker": "worker-lite",
+  "smoke": [
+    { "path": "/health", "status": 200, "contains": "ok" },
+    { "path": "/", "status": 200, "contains": "hello from worker-lite" }
+  ]
+}
