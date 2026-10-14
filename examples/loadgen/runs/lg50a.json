@@ -1,0 +1,456 @@
+{
+  "run": "lg50a",
+  "seed": 50,
+  "keel": "https://keel.town",
+  "project": "agent-0m08rafzfr0zbf0j/loadgen",
+  "projectId": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+  "verification": "off, the owner's setting; no suite, no guards; this measures coordination and the Trunk, not CI",
+  "maxBatchSize": 16,
+  "keySha256": "c18f37ccb963b455f177ca73b13fb5df034be20e79ae9dc3b752d1d4e868f1e0",
+  "baseCommit": "d82036b729bd5b256223d9b946c954f59a3555ba",
+  "trunkHead": "e93f991e54f844cd0d0507bf6bef586fbd303ba2",
+  "endedAt": "2026-10-14T17:00:30.098Z",
+  "timedOut": false,
+  "tokenRefusals": 0,
+  "outcomes": {
+    "landed": 50,
+    "gaveUp": 0,
+    "failed": 0,
+    "reasons": []
+  },
+  "report": {
+    "agents": 50,
+    "declared": 50,
+    "landed": 50,
+    "bounces": 1,
+    "notLanded": 0,
+    "contentionDensity": 0.3,
+    "reworkRate": 0.02,
+    "queueMs": {
+      "p50": 360112,
+      "p95": 764577
+    },
+    "preflightMs": {
+      "p50": 1125,
+      "p99": 37519
+    },
+    "trunk": {
+      "promotions": 50,
+      "promotionsPerSecond": 0.046802762860697185,
+      "changesPerGroupCommit": {
+        "mean": 1,
+        "max": 1
+      },
+      "promotionMs": {
+        "p50": 16207,
+        "p95": 19865
+      }
+    }
+  },
+  "trunkBreaks": 0,
+  "breaks": [],
+  "bench": {
+    "byKind": {
+      "premise": {
+        "planted": 1,
+        "recalled": 1,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "effect": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "textual": {
+        "planted": 1,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "interaction": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      }
+    },
+    "unrun": 0,
+    "recall": 0.3333333333333333,
+    "falsePositiveRate": null,
+    "passes": {
+      "recall": false,
+      "decoys": false
+    }
+  },
+  "bothLanded": [
+    {
+      "pair": 0,
+      "kind": "textual",
+      "planted": true
+    },
+    {
+      "pair": 1,
+      "kind": "premise",
+      "planted": true
+    },
+    {
+      "pair": 2,
+      "kind": "effect",
+      "planted": true
+    }
+  ],
+  "agents": [
+    {
+      "index": 0,
+      "changeId": "chg_01M4XMNV3S3APAA6PR545AQPXK",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 884
+    },
+    {
+      "index": 1,
+      "changeId": "chg_01M4XMNWQSW2RTZKABQ7WFH00B",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 930
+    },
+    {
+      "index": 2,
+      "changeId": "chg_01M4XMNWGVP9AZRVT1ZJ0PM2A8",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1161
+    },
+    {
+      "index": 3,
+      "changeId": "chg_01M4XMNVZSV3E9C7EDR2TPVJJJ",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3216
+    },
+    {
+      "index": 4,
+      "changeId": "chg_01M4XMNW99PRDQFTYCA7HV7MCN",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1427
+    },
+    {
+      "index": 5,
+      "changeId": "chg_01M4XMNVRQHYFK8RPMNQ5B27JF",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2301
+    },
+    {
+      "index": 6,
+      "changeId": "chg_01M4XMNWCFH2S6DA0QX9FSMYB9",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1058
+    },
+    {
+      "index": 7,
+      "changeId": "chg_01M4XMNW2SC9QYBQ1KEZJYN2BR",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1243
+    },
+    {
+      "index": 8,
+      "changeId": "chg_01M4XMNVX3R9ZZ3MRMAREKXV8H",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3229
+    },
+    {
+      "index": 9,
+      "changeId": "chg_01M4XMNX7K80CTG9TD4Q4M1MKR",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2155
+    },
+    {
+      "index": 10,
+      "changeId": "chg_01M4XMPJNKRZ3634TTH1TFGFBV",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 37519
+    },
+    {
+      "index": 11,
+      "changeId": "chg_01M4XMNVY4N7DM5BEW37R6ANFY",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1067
+    },
+    {
+      "index": 12,
+      "changeId": "chg_01M4XMNWY1BCTQ66N3BRCH9Z90",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1139
+    },
+    {
+      "index": 13,
+      "changeId": "chg_01M4XMNWGNBX38YB256MB52KEV",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2362
+    },
+    {
+      "index": 14,
+      "changeId": "chg_01M4XMPXM9XRQHYCNVS5RP1Z4G",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2278
+    },
+    {
+      "index": 15,
+      "changeId": "chg_01M4XMNVWGAJRXHJCYCQB3MGNY",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 940
+    },
+    {
+      "index": 16,
+      "changeId": "chg_01M4XMNW5VER1XM0GXDMBAEREK",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1108
+    },
+    {
+      "index": 17,
+      "changeId": "chg_01M4XMNV63EGGY7EW5NCZX7R3R",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1031
+    },
+    {
+      "index": 18,
+      "changeId": "chg_01M4XMNX2AD6ZZY6YY57S2KVDA",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2286
+    },
+    {
+      "index": 19,
+      "changeId": "chg_01M4XMNVQH2Z3T1GHJRYJ3B57K",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 4734
+    },
+    {
+      "index": 20,
+      "changeId": "chg_01M4XMNWG5Z982ZDWA7NHVSZGJ",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 920
+    },
+    {
+      "index": 21,
+      "changeId": "chg_01M4XMPF5WTAJ8REZWX6543QP6",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 915
+    },
+    {
+      "index": 22,
+      "changeId": "chg_01M4XMNWN9440MZ8RW4FB80XD4",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 944
+    },
+    {
+      "index": 23,
+      "changeId": "chg_01M4XMNVRQHYFK8RPMNQ5B27JE",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2232
+    },
+    {
+      "index": 24,
+      "changeId": "chg_01M4XMNWJC1HK8EFMR17S9GC13",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 4394
+    },
+    {
+      "index": 25,
+      "changeId": "chg_01M4XMNXZX4ETA51SZPFC35Y3A",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 970
+    },
+    {
+      "index": 26,
+      "changeId": "chg_01M4XMNWAC2F33X5MBN496P2KQ",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1026
+    },
+    {
+      "index": 27,
+      "changeId": "chg_01M4XMNW482X3KBGPDC8954N5C",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1291
+    },
+    {
+      "index": 28,
+      "changeId": "chg_01M4XMNW62N83H0961T5Y7N9EV",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 901
+    },
+    {
+      "index": 29,
+      "changeId": "chg_01M4XMNVPY14RA9JK2YZCGSHC4",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 894
+    },
+    {
+      "index": 30,
+      "changeId": "chg_01M4XMNWBP1Z07WGF9FKA9ANVR",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1976
+    },
+    {
+      "index": 31,
+      "changeId": "chg_01M4XMNWHPR6RGWMK4K8251V1M",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1229
+    },
+    {
+      "index": 32,
+      "changeId": "chg_01M4XMNW4G0Y6WDMATHW1W56B8",
+      "outcome": "landed",
+      "submissions": 2,
+      "declareMs": 1050
+    },
+    {
+      "index": 33,
+      "changeId": "chg_01M4XMNVYDVGNA3QHE7Q4GY3NC",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 848
+    },
+    {
+      "index": 34,
+      "changeId": "chg_01M4XMNW5MGKK4FDVHMV1N79C4",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 921
+    },
+    {
+      "index": 35,
+      "changeId": "chg_01M4XMPXM9XRQHYCNVS5RP1Z42",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2216
+    },
+    {
+      "index": 36,
+      "changeId": "chg_01M4XMNV93PJTYK7KRYE7C8HV4",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3581
+    },
+    {
+      "index": 37,
+      "changeId": "chg_01M4XMNWVENFGJPZS3TBTKTQ83",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1014
+    },
+    {
+      "index": 38,
+      "changeId": "chg_01M4XMNVWT98FV0HCDXE4WPWGN",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 982
+    },
+    {
+      "index": 39,
+      "changeId": "chg_01M4XMNWB70FHNN5YWD6THHDQJ",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1133
+    },
+    {
+      "index": 40,
+      "changeId": "chg_01M4XMNWH8APMTN6R2RB1TY7Q1",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 895
+    },
+    {
+      "index": 41,
+      "changeId": "chg_01M4XMNX6M0JRSTAWERND1H7KR",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 8592
+    },
+    {
+      "index": 42,
+      "changeId": "chg_01M4XMNW02MZRFN36GMWFSK1Y3",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 2427
+    },
+    {
+      "index": 43,
+      "changeId": "chg_01M4XMNWSD0ATAHAZ6AR0N0Q14",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1154
+    },
+    {
+      "index": 44,
+      "changeId": "chg_01M4XMNWBM4ZB91KAF9XJJBEP2",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3123
+    },
+    {
+      "index": 45,
+      "changeId": "chg_01M4XMNWTJ4R30GHBC4ER0GTF5",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 864
+    },
+    {
+      "index": 46,
+      "changeId": "chg_01M4XMNVTVWTH0E2VACT6DJZKQ",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 862
+    },
+    {
+      "index": 47,
+      "changeId": "chg_01M4XMNW5MGKK4FDVHMV1N79C5",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1125
+    },
+    {
+      "index": 48,
+      "changeId": "chg_01M4XMNWRASEAVPD2VSH9A2E9Z",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 992
+    },
+    {
+      "index": 49,
+      "changeId": "chg_01M4XMNWQSW2RTZKABQ7WFH00A",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 830
+    }
+  ]
+}
