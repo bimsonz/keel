@@ -1,8 +1,10 @@
 // The suite command's stdout for a forge-lite-shaped run, for tests that stand
 // in for a Tier 2 runner (unit and pool): markers, a base64 tail, and vitest's
 // JSON report gzipped and base64'd, exactly as the command prints them. Also
-// the typecheck command's, with tsc's output gzipped and base64'd.
+// the typecheck command's, with tsc's output gzipped and base64'd, and the
+// worker-app build's, with its wrangler config base64'd and its module gzipped.
 import {
+  BUILD_PROTOCOL,
   COMMAND_PROTOCOL,
   SUITE_PROTOCOL,
   TYPECHECK_PROTOCOL,
@@ -86,3 +88,25 @@ export const commandStdout = (exit: number, tail = ""): string =>
     "KEEL_END",
     "",
   ].join("\n");
+
+/**
+ * The worker-app build's stdout for a run that read `config` as the Worker's
+ * wrangler.jsonc, exited `exit` and made `module`, gzipped and base64'd as the
+ * command prints it, so a preview can upload it.
+ */
+export const buildStdout = async (config: string, module: string, exit = 0): Promise<string> => {
+  const text = new TextEncoder().encode(config);
+  return [
+    BUILD_PROTOCOL,
+    "KEEL_HYDRATION ok",
+    "KEEL_DEPS ok",
+    `KEEL_CONFIG wrangler.jsonc ${text.length} ${b64(text)}`,
+    "KEEL_BUNDLER ok",
+    `KEEL_EXIT ${exit}`,
+    "KEEL_DURATION_MS 900",
+    "KEEL_TAIL none",
+    `KEEL_BUNDLE ${b64(await gzip(module))}`,
+    "KEEL_END",
+    "",
+  ].join("\n");
+};

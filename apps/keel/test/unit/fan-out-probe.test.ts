@@ -130,14 +130,14 @@ describe("the fan-out's Probe cases", () => {
       candidateId,
       proofId: "proof",
     });
-    const advanced = (to: string) =>
+    const advanced = (sha: string) =>
       envelope(
         "TrunkAdvanced",
         {
           _tag: "TrunkAdvanced",
           projectId,
           from: "a".repeat(40),
-          to,
+          to: sha,
           groupId: "grp",
           landings: [landing(first), landing(first), landing(second)],
         },

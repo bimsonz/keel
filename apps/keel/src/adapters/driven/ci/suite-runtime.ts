@@ -455,13 +455,15 @@ export const judgeBuildOutput = (
     const credentialScan = { ...logged, literal: logged.literal + inModule };
     const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
     const { bundle, ...evidence } = judged.evidence;
-    const redacted = redactJson({ ...evidence }, literals);
+    const redacted = Object.entries(evidence).map(([key, value]) => [
+      key,
+      redactJson(value, literals),
+    ]);
     return {
       ...judged,
-      document:
-        bundle === undefined || redacted === null || typeof redacted !== "object"
-          ? redacted
-          : { ...redacted, bundle },
+      document: Object.fromEntries(
+        bundle === undefined ? redacted : [...redacted, ["bundle", bundle]],
+      ),
     };
   });
 
