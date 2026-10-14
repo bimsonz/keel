@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { Predicate } from "../coordination/index.ts";
+import { DeploySpec } from "../delivery/index.ts";
 import {
   PredicatePolicy,
   ContentHash,
@@ -78,6 +79,8 @@ export const PlanStep = Schema.Struct({
   ),
   /** Set when the project's flow gives the step a command of its own: the verifier runs it and judges its exit. */
   run: Schema.optional(StepRun),
+  /** Set on a step that builds, previews or smokes the project's Worker: the base's deploy spec, so the plan's hash covers it. */
+  deploy: Schema.optional(DeploySpec),
 });
 export type PlanStep = typeof PlanStep.Type;
 

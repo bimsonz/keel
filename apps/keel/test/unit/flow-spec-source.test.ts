@@ -80,16 +80,24 @@ describeFlowSpecSourceContract("CodeHost", harness);
 
 describe("FlowSpecSourceCodeHost", () => {
   it.effect(
-    "[flow-source.base-not-head] reads the commit it is given, not the ref's newer head",
+    "[flow-source.base-not-head] reads the commit it is given, not the ref's newer head: its flow and its deploy spec",
     () => {
       const h = harness();
       return Effect.gen(function* () {
-        const { repo, base } = yield* h.commit({ ".keel/flow.json": "base", "package.json": "{}" });
+        const { repo, base } = yield* h.commit({
+          ".keel/flow.json": "base",
+          ".keel/deploy.json": "base deploy",
+          "package.json": "{}",
+        });
         yield* h.host.fixture
-          .commit(repo, MAIN, { ".keel/flow.json": "head", "package.json": "{}" })
+          .commit(repo, MAIN, {
+            ".keel/flow.json": "head",
+            ".keel/deploy.json": "head deploy",
+            "package.json": "{}",
+          })
           .pipe(Effect.provide(h.host.layer), Effect.orDie);
         const sources = yield* (yield* FlowSpecSource).read(repo, base);
-        expect(sources.flowJson).toBe("base");
+        expect([sources.flowJson, sources.deployJson]).toEqual(["base", "base deploy"]);
       }).pipe(Effect.provide(h.layer));
     },
   );
@@ -103,12 +111,14 @@ describe("FlowSpecSourceCodeHost", () => {
         const base = yield* h.host.fixture.commit(repo, MAIN, {
           "package.json": { mode: "120000", data: "../elsewhere/package.json" },
           ".keel/flow.json": { mode: "120000", data: "../../flow.json" },
+          ".keel/deploy.json": { mode: "120000", data: "../../deploy.json" },
         });
         const sources = yield* Effect.gen(function* () {
           return yield* (yield* FlowSpecSource).read(repo, base);
         }).pipe(Effect.provide(h.layer));
         expect(sources.packageJson).toBeUndefined();
         expect(sources.flowJson).toBeUndefined();
+        expect(sources.deployJson).toBeUndefined();
       }).pipe(Effect.provide(h.host.layer), Effect.orDie);
     },
   );

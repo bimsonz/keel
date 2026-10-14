@@ -4,13 +4,14 @@ import type { ObjectNotFound, RepoNotFound, RepoRef } from "./code-host.ts";
 
 /**
  * What a commit holds that decides its checks: the paths at its tree's root
- * (for pack detection), and `.keel/flow.json` and the root package.json as
- * text, each absent when the commit has none.
+ * (for pack detection), and `.keel/flow.json`, the root package.json and
+ * `.keel/deploy.json` as text, each absent when the commit has none.
  */
 export interface FlowSources {
   readonly rootPaths: readonly string[];
   readonly flowJson?: string;
   readonly packageJson?: string;
+  readonly deployJson?: string;
 }
 
 /** Reads a change's flow sources from its **base** commit, so a change cannot edit its own checks. */

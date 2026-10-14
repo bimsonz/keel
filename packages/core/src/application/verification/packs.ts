@@ -1,3 +1,5 @@
+import { Result } from "effect";
+import { DEPLOY_SPEC_PATH, type DeploySpec, parseDeploySpec } from "../../domain/delivery/index.ts";
 import { contentHashOf } from "../../domain/kernel/index.ts";
 import {
   type FlowDefaults,
@@ -66,6 +68,101 @@ export const WORKER_APP_PACK: FlowDefaults = {
   steps: [JS_TS_SUITE, WORKER_APP_TYPECHECK],
 };
 
+/**
+ * The worker-app pack's build: the Worker bundled from its wrangler config's
+ * entry, in Tier 2 where the project's dependencies are. Proof: it passes with
+ * the bundle Keel will upload, fails when the change's config or code cannot
+ * make one, and abstains where Keel cannot carry the config yet.
+ */
+export const WORKER_APP_BUILD: StepSpec = {
+  id: "worker-app.build",
+  version: contentHashOf({ pack: "worker-app", step: "build", runner: "keel-build/1" }),
+  kind: "deterministic",
+  evidenceCeiling: "proof",
+  appliesTo: { paths: [], subjects: [] },
+  reads: [],
+  outcomes: ["pass", "fail", "abstain"],
+  mayskip: [],
+  overrides: [],
+  budget: { usd: 0.01, cpuMs: 300_000, tokens: 0 },
+  determinism: "deterministic",
+  suite: false,
+  tier: 2,
+  optional: false,
+};
+
+/**
+ * Uploads the build to the project's connected Cloudflare account as a
+ * preview: a version of its Worker that is not deployed. Keel makes the call
+ * itself, in Tier 0, so the token never enters a container. With no account
+ * connected for the spec's target it annotates, and the change goes on.
+ */
+export const DEPLOY_PREVIEW: StepSpec = {
+  id: "deploy.preview",
+  version: contentHashOf({ pack: "worker-app", step: "preview", runner: "cloudflare-version/1" }),
+  kind: "deploy",
+  evidenceCeiling: "proof",
+  appliesTo: { paths: [], subjects: [] },
+  reads: [],
+  outcomes: ["pass", "fail", "abstain", "annotate"],
+  mayskip: [],
+  overrides: [],
+  budget: { usd: 0, cpuMs: 60_000, tokens: 0 },
+  determinism: "nondeterministic",
+  suite: false,
+  tier: 0,
+  optional: false,
+};
+
+/** Asks the preview each request the deploy spec's smoke checks name, from Keel, and judges the answers. */
+export const DEPLOY_SMOKE: StepSpec = {
+  id: "deploy.smoke",
+  version: contentHashOf({ pack: "worker-app", step: "smoke", runner: "smoke/1" }),
+  kind: "deploy",
+  evidenceCeiling: "proof",
+  appliesTo: { paths: [], subjects: [] },
+  reads: [],
+  outcomes: ["pass", "fail", "abstain", "annotate"],
+  mayskip: [],
+  overrides: [],
+  budget: { usd: 0, cpuMs: 120_000, tokens: 0 },
+  determinism: "nondeterministic",
+  suite: false,
+  tier: 0,
+  optional: false,
+};
+
+/** The steps Keel runs itself, in Tier 0, for a project's deploy spec. */
+export const DEPLOY_STEP_IDS: readonly string[] = [DEPLOY_PREVIEW.id, DEPLOY_SMOKE.id];
+
+/**
+ * The worker-app pack for a project whose base has a deploy spec: the suite
+ * and the typecheck beside the build, then its preview, then the smoke checks
+ * against it. Each of the three carries the spec, so the plan's hash covers it.
+ */
+export const workerAppDeployPack = (deploy: DeploySpec): FlowDefaults => ({
+  flow: {
+    _tag: "par",
+    items: [
+      ...(WORKER_APP_PACK.flow._tag === "par"
+        ? WORKER_APP_PACK.flow.items
+        : [WORKER_APP_PACK.flow]),
+      {
+        _tag: "seq",
+        exitOn: "fail",
+        items: [WORKER_APP_BUILD, DEPLOY_PREVIEW, DEPLOY_SMOKE].map((step) => ({
+          _tag: "step" as const,
+          step: step.id,
+        })),
+      },
+    ],
+  },
+  steps: [
+    ...WORKER_APP_PACK.steps,
+    ...[WORKER_APP_BUILD, DEPLOY_PREVIEW, DEPLOY_SMOKE].map((step) => ({ ...step, deploy })),
+  ],
+});
+
 /** The defaults detection chose for a project, and why. */
 export interface VerifierPack {
   readonly name: "worker-app" | "js-ts";
@@ -96,11 +193,28 @@ const dependencyNames = (packageJson: string): readonly string[] => {
  * dependencies, makes a worker app; any other package is js-ts. With no
  * package at all the js-ts suite still runs: it abstains, so the change parks
  * rather than landing unverified.
+ *
+ * A deploy spec (`deployJson`, the base's `.keel/deploy.json`) that reads
+ * makes a worker app that is built, previewed and smoked. One that does not
+ * read adds no deploy steps, saying why in the reason: nothing is previewed,
+ * so nothing can be deployed, and the change that mends the spec still lands.
  */
 export const detectPack = (
   rootPaths: readonly string[],
   packageJson: string | undefined,
+  deployJson?: string,
 ): VerifierPack => {
+  if (deployJson !== undefined) {
+    const deploy = parseDeploySpec(deployJson);
+    if (Result.isSuccess(deploy))
+      return {
+        name: "worker-app",
+        reason: `worker-app: ${DEPLOY_SPEC_PATH}`,
+        defaults: workerAppDeployPack(deploy.success),
+      };
+    const pack = detectPack(rootPaths, packageJson);
+    return { ...pack, reason: `${pack.reason}; no deploy steps: ${deploy.failure.detail}` };
+  }
   const config = WRANGLER_CONFIGS.find((name) => rootPaths.includes(name));
   if (config !== undefined)
     return { name: "worker-app", reason: `worker-app: ${config}`, defaults: WORKER_APP_PACK };
@@ -119,16 +233,25 @@ export const detectPack = (
 };
 
 /** The Tier 2 steps KeelVerify has a runner for, by id. Its runner table is keyed by exactly these. */
-export const TIER2_STEP_IDS: readonly string[] = [JS_TS_SUITE.id, WORKER_APP_TYPECHECK.id];
+export const TIER2_STEP_IDS: readonly string[] = [
+  JS_TS_SUITE.id,
+  WORKER_APP_TYPECHECK.id,
+  WORKER_APP_BUILD.id,
+];
 
 /**
  * Whether KeelVerify can run the step on a candidate: a guard step (its
  * pinned probe, on a VerifierDO), a Tier 2 step it has a runner for, or a
- * Tier 2 step carrying a command of the project's own (`run`).
+ * Tier 2 step carrying a command of the project's own (`run`), or a deploy
+ * step Keel runs itself in Tier 0 on the deploy spec it carries.
  * Nothing else runs yet: not a human step, until rulings reach a running
  * plan, and not any other Tier 0 or Tier 1 step. Precheck refuses a
  * plan holding such a step, so no change parks by design.
  */
 export const executable = (step: PlanStep): boolean =>
   step.guards !== undefined ||
-  (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id)));
+  (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id))) ||
+  (step.tier.tier === 0 &&
+    step.kind === "deploy" &&
+    step.deploy !== undefined &&
+    DEPLOY_STEP_IDS.includes(step.id));

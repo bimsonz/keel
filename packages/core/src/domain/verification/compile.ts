@@ -502,6 +502,7 @@ export const compile = (
                 timeoutMs: s.run.timeoutMs ?? STEP_RUN_TIMEOUT_MS,
               },
             }),
+        ...(s.deploy === undefined ? {} : { deploy: s.deploy }),
         ...(s.guards === undefined
           ? {}
           : {

@@ -127,7 +127,7 @@ export const flowSetup = (
   sources: FlowSources,
   base: CommitSha,
 ): Result.Result<FlowSetup, FlowSpecInvalid> => {
-  const pack = detectPack(sources.rootPaths, sources.packageJson);
+  const pack = detectPack(sources.rootPaths, sources.packageJson, sources.deployJson);
   if (sources.flowJson === undefined)
     return Result.succeed({ definition: undefined, predicatePolicy: {}, pack });
   return Result.map(parseFlow(sources.flowJson, base), (read) => ({ ...read, pack }));

@@ -1,6 +1,7 @@
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
+import { DeploySpec } from "../../../src/domain/delivery/index.ts";
 import {
   contentHashOf,
   type EvidenceClass,
@@ -668,6 +669,63 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
       ]),
     ).toEqual([[{ command: "pnpm test", timeoutMs: 240_000 }, 2]]);
     expect(ok(single([suiteStep("check")])).steps[0]).not.toHaveProperty("run");
+  });
+
+  it("[flow.step-deploy] a step's deploy spec rides on its plan step, and the plan's hash covers it", () => {
+    const deploy = Schema.decodeUnknownSync(DeploySpec)({
+      target: "production",
+      worker: "worker-lite",
+      smoke: [{ path: "/health", status: 200 }],
+    });
+    const preview = suiteStep("deploy.preview", { suite: false, kind: "deploy", tier: 0, deploy });
+    const plan = ok(single([preview]));
+    expect(plan.steps.map((s) => [s.id, s.deploy, s.tier.tier])).toEqual([
+      ["deploy.preview", deploy, 0],
+    ]);
+    expect(
+      ok(single([{ ...preview, deploy: { ...deploy, worker: deploy.worker } }])).planHash,
+    ).toBe(plan.planHash);
+    const renamed = Schema.decodeUnknownSync(DeploySpec)({ ...deploy, worker: "billing-api" });
+    expect(ok(single([{ ...preview, deploy: renamed }])).planHash).not.toBe(plan.planHash);
+    expect(ok(single([suiteStep("check")])).steps[0]).not.toHaveProperty("deploy");
+  });
+
+  const deployArb = fc
+    .record({
+      target: fc.constantFrom("production", "staging"),
+      worker: fc.constantFrom("worker-lite", "billing-api"),
+      smoke: fc.constantFrom(
+        [{ path: "/health", status: 200 }],
+        [{ path: "/", status: 200, contains: "hello" }],
+      ),
+    })
+    .map((spec) => Schema.decodeUnknownSync(DeploySpec)(spec));
+
+  it("[flow.step-deploy-only-carried] a plan step carries a deploy spec exactly when its step does, unchanged", () => {
+    fc.assert(
+      fc.property(flowCaseArb(), fc.nat(), deployArb, (c, i, deploy) => {
+        const id = c.spec.steps[i % c.spec.steps.length]?.id;
+        const plan = ok(withStep(c, i, (s) => ({ ...s, deploy })));
+        expect(
+          plan.steps.filter((s) => s.deploy !== undefined).map((s) => [s.id, s.deploy]),
+        ).toEqual(plan.steps.some((s) => s.id === id) ? [[id, deploy]] : []);
+        expect(ok(c).steps.filter((s) => s.deploy !== undefined)).toEqual([]);
+      }),
+    );
+  });
+
+  it("[flow.step-deploy-hash] two plans that differ only in a step's deploy spec have different hashes", () => {
+    fc.assert(
+      fc.property(flowCaseArb(), fc.nat(), deployArb, deployArb, (c, i, a, b) => {
+        const id = c.spec.steps[i % c.spec.steps.length]?.id;
+        const withA = ok(withStep(c, i, (s) => ({ ...s, deploy: a })));
+        const withB = ok(withStep(c, i, (s) => ({ ...s, deploy: b })));
+        const planned = withA.steps.some((s) => s.id === id);
+        expect(withA.planHash === withB.planHash).toBe(
+          !planned || JSON.stringify(a) === JSON.stringify(b),
+        );
+      }),
+    );
   });
 
   it("[flow.guard-policy] a guard step carries its predicate's policy, and a predicate the change's policy leaves out is advise", () => {

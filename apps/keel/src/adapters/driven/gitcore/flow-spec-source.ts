@@ -1,4 +1,5 @@
 import { FLOW_SPEC_PATH } from "@keeltown/core/application/verification";
+import { DEPLOY_SPEC_PATH } from "@keeltown/core/domain/delivery";
 import { CodeHost, FlowSpecSource, type RepoRef, type TreeEntry } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 
@@ -9,9 +10,9 @@ const utf8 = new TextDecoder("utf-8");
 /**
  * FlowSpecSource over CodeHost: the base commit's root listing gives the
  * root's paths and the root package.json, and `.keel`'s listing, read only
- * when the root holds `.keel` as a directory, gives `.keel/flow.json`. Each
- * file is read as UTF-8 text when the commit holds it as a plain file (a
- * symlink is not followed). Nothing else of the tree is read, so a read costs
+ * when the root holds `.keel` as a directory, gives `.keel/flow.json` and
+ * `.keel/deploy.json`. Each file is read as UTF-8 text when the commit holds
+ * it as a plain file (a symlink is not followed). Nothing else of the tree is read, so a read costs
  * the same whatever the repo's size. A missing repo or commit fails as
  * CodeHost does.
  */
@@ -34,10 +35,12 @@ export const FlowSpecSourceCodeHost = Layer.effect(
             : [];
           const flowJson = yield* textAt(repo, keel, FLOW_SPEC_PATH);
           const packageJson = yield* textAt(repo, root, "package.json");
+          const deployJson = yield* textAt(repo, keel, DEPLOY_SPEC_PATH);
           return {
             rootPaths: root.map((e) => e.path),
             ...(flowJson === undefined ? {} : { flowJson }),
             ...(packageJson === undefined ? {} : { packageJson }),
+            ...(deployJson === undefined ? {} : { deployJson }),
           };
           // The root is always a directory, and `.keel` is listed only once the root shows it as one.
         }).pipe(Effect.catchTag("PathNotFound", Effect.die)),

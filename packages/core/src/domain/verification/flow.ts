@@ -14,6 +14,7 @@ import type {
   Proposition,
   SubjectKey,
 } from "../coordination/index.ts";
+import type { DeploySpec } from "../delivery/index.ts";
 import type { FlowWorld } from "./conflict.ts";
 import type { PlanStep, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
 
@@ -104,6 +105,12 @@ export type StepSpec = {
    * status; the timeout, when left out, is the suite's (STEP_RUN_TIMEOUT_MS).
    */
   readonly run?: { readonly command: string; readonly timeoutMs?: number };
+  /**
+   * The project's deploy spec, as its base's `.keel/deploy.json` says, for a
+   * step that builds, previews or smokes its Worker: it rides on the plan, so
+   * the candidate's own deploy spec is never what runs.
+   */
+  readonly deploy?: DeploySpec;
 };
 
 /** A step command's timeout when the flow leaves it out: the suite's own. */
