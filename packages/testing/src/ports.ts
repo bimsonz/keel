@@ -194,7 +194,7 @@ import type {
 import { Effect, Layer, Schema } from "effect";
 
 /**
- * Every port, with its in-memory
+ * Every port of Keel's application layer, with its in-memory
  * adapter and its contract suite. `contract(adapter, make)` registers the
  * suite against any adapter's Layer factory; `verifyMemory()` registers it
  * against the in-memory adapter.

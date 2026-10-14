@@ -9,7 +9,7 @@
 // what is not there. Its answers are typed by Keel's own generated
 // wire types, but for the project, whose shape is the console's read of it
 // (source/types.ts). An event's payload it serves as Keel commits it. Nothing
-// commits it. Nothing in the built console imports this.
+// in the built console imports this.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
@@ -51,7 +51,7 @@ import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
 import { generateS2 } from "./s2.ts";
 
 /**
- * Keel records no cost yet (QUESTIONS B4), so this stand-in publishes none: what a fixture prices is the
+ * Keel records no cost yet, so this stand-in publishes none: what a fixture prices is the
  * fixture's own, and a console that showed a cost here would be showing one Keel never gave.
  */
 function unpriced(payload: AnyEvent["payload"]): AnyEvent["payload"] {

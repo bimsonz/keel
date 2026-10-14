@@ -2,7 +2,7 @@
 # kills: authz.invitation-rows
 # why: a person leaves a project as though it were their own record: the row asks `self`, which any account meets
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 12bab933..e8ecfc90 100644
+index 8415a3e..158d058 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
 @@ -172,7 +172,7 @@ export const SPEC_ACTIONS = {

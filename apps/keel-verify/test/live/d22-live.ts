@@ -3,8 +3,8 @@
 //
 //   KEEL_SESSION=<token> [KEEL_ORG=<org>] KEEL_NAMESPACE_ID=<id> node apps/keel-verify/test/live/d22-live.ts <run>
 //
-// KEEL_SESSION is the maintainer's bearer session (a maintainer of KEEL_ORG,
-// `keel` by default); it is read, never printed. KEEL_NAMESPACE_ID is the id
+// KEEL_SESSION is the bearer session of a maintainer of KEEL_ORG
+// (`keel` by default); it is read, never printed. KEEL_NAMESPACE_ID is the id
 // of the namespace KEEL_ORG names: the stored plan is read from R2 under it. In a project of its own
 // (d22-live-<run>, forked from the seeded fixture repo):
 //   A relies on permission evaluation being fresh at most per-request, and adds
@@ -445,7 +445,7 @@ try {
   const C = c.result.change.id;
   open.push(C);
   await work(agentA, c, "d22-c", (dir) => {
-    appendFileSync(join(dir, ANCHORED), `// D2.2 live ${run}\n`);
+    appendFileSync(join(dir, ANCHORED), `// probe ${run}\n`);
   });
   await feed.until(
     () => about(C, "PlanCompiled") !== undefined || about(C, "ChangeBounced") !== undefined,
@@ -667,5 +667,5 @@ try {
     if (after !== before) console.log(`     ${worker} now: ${after}`);
   }
 }
-console.log(failures === 0 ? "\nall D2.2 live checks hold" : `\n${failures} check(s) failed`);
+console.log(failures === 0 ? "\nall probe checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

@@ -12,7 +12,7 @@ async function sameSecret(a: string, b: string): Promise<boolean> {
 /**
  * Whether a request carries the swarm's admin bearer. Every route but the
  * root needs it, the agents' own among them: an open route would let anyone
- * spend the shared account's model calls. With no secret set, nothing is
+ * spend the account's model calls. With no secret set, nothing is
  * admitted.
  */
 export async function admitted(

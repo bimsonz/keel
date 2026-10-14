@@ -275,7 +275,7 @@ export interface LaneBatch {
  * `recordVerdict` does, so KeelVerify can be driven before it exists. One
  * commit per instance (cause `<instanceId>:recordVerdict`) appends
  * VerdictIssued and BatchVerified for a land, or BatchFailed otherwise. A
- * failure is attributed as the lane does at L1: a batch of one to its change,
+ * failure is attributed as the lane does: a batch of one to its change,
  * a larger one `unattributed`; a verdict that is not a bounce (an abstaining
  * runner parks) is `infra`, which requeues without blame.
  */
@@ -348,7 +348,7 @@ interface PrecheckedChange {
  * The Change DO's side of `ChangePrecheck`, in memory: the transitions its
  * machine takes (submitted → deriving on `started`, there one derivation a
  * pass on `derived`, then bounced on `refused`, or on `compiled` verifying
- * and, with no step before the queue at L1, queued in the same commit),
+ * and, with no step before the queue, queued in the same commit),
  * idempotent by instance, and ChangeStateRefused for a stale revision or a
  * step the state does not allow.
  * `submit` seeds a change; `calls` lists the writes that took effect.

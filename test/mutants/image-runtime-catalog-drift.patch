@@ -2,10 +2,10 @@
 # kills: image.runtime
 # why: The catalog names another SDK than the one installed and the image's server
 diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
-index 8217fb04..565aab1a 100644
+index 4ac66ba..ce4668e 100644
 --- a/pnpm-workspace.yaml
 +++ b/pnpm-workspace.yaml
-@@ -31,7 +31,7 @@ catalog:
+@@ -35,7 +35,7 @@ catalog:
    # sandbox 0.12.1; the override below holds it to this one, the newest 0.x, which
    # keel-verify's image runs the server of (containers/sandbox/Dockerfile).
    "@cloudflare/ci": 0.2.0

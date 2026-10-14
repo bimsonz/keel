@@ -4,7 +4,7 @@
   "semi": true,
   "singleQuote": false,
   "ignorePatterns": [
-    // Another lane's workspaces, outside the pnpm workspace.
+    // Separate workspaces, outside the pnpm workspace.
     "spikes/**",
     "fixtures/**",
     "docs/spikes/**",

@@ -474,13 +474,13 @@ const eventForms = (epoch: number): readonly AgentEvent[] =>
     },
     { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY },
     { _tag: "AgentSignedUp", agentId, handle: HANDLE, key: KEY, name: "builder" },
-    { _tag: "AgentSuspended", agentId, reason: "runaway retries", by: "operator:zb" },
-    { _tag: "AgentReinstated", agentId, by: "operator:zb" },
+    { _tag: "AgentSuspended", agentId, reason: "runaway retries", by: "operator:ops" },
+    { _tag: "AgentReinstated", agentId, by: "operator:ops" },
     ...[epoch, epoch + 1, epoch + 2].map((revocationEpoch): AgentEvent => ({
       _tag: "AgentRevoked",
       agentId,
       revocationEpoch,
-      by: "operator:zb",
+      by: "operator:ops",
     })),
     ...[SPONSOR, OTHER].flatMap((sponsor): AgentEvent[] => [
       { _tag: "AgentSponsored", agentId, sponsor },
@@ -771,7 +771,7 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
       { _tag: "EndSponsorship", by: userActor(OTHER) },
       { _tag: "EndSponsorship", by: agentActor(ELSEWHERE) },
       // @ts-expect-error a command is by an agent or a user: `operator:` is read on stored events and written by none
-      { _tag: "EndSponsorship", by: "operator:zb" },
+      { _tag: "EndSponsorship", by: "operator:ops" },
     ];
     for (const end of outsiders) {
       const tried = drive([build("Enroll"), sponsor, end]);

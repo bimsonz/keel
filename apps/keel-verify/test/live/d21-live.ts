@@ -1,10 +1,10 @@
 // The live check that a change verifies under the plan Precheck compiled
-// Precheck compiled for it, through the deployed Keel.
+// for it, through the deployed Keel.
 //
 //   KEEL_SESSION=<token> [KEEL_ORG=<org>] node apps/keel-verify/test/live/d21-live.ts <run>
 //
-// KEEL_SESSION is the maintainer's bearer session (a maintainer of KEEL_ORG,
-// `keel` by default), which governs the project; it is read, never printed. In a project of its own (d21-live,
+// KEEL_SESSION is the bearer session of a maintainer of KEEL_ORG
+// (`keel` by default), which governs the project; it is read, never printed. In a project of its own (d21-live,
 // forked from the seeded fixture repo), one agent declares, pushes and submits:
 //   land:   a new file under src/ → Precheck compiles a plan, ChangeQueued
 //           carries its hash, KeelVerify's verdict is `land` under that hash,
@@ -359,5 +359,5 @@ try {
     if (after !== before) console.log(`     ${worker} now: ${after}`);
   }
 }
-console.log(failures === 0 ? "\nall D2.1 live checks hold" : `\n${failures} check(s) failed`);
+console.log(failures === 0 ? "\nall verify checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

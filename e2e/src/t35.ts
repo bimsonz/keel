@@ -200,7 +200,7 @@ try {
       },
       (dir) => {
         mkdirSync(join(dir, "notes"), { recursive: true });
-        writeFileSync(join(dir, path), `Holds the lane in T3.5 live run ${run}.\n`);
+        writeFileSync(join(dir, path), `Holds the lane in escalation run ${run}.\n`);
       },
     );
     return declared;
@@ -529,5 +529,5 @@ else if (byKeel)
   console.log(
     "\nthe ruling, the bounce and the resume hold on Keel's own escalation; no conflict was proven, so no party's escalate ran",
   );
-else console.log("\nall T3.5 live checks hold");
+else console.log("\nall escalation checks hold");
 process.exit(failures > 0 ? 1 : byKeel ? 3 : 0);

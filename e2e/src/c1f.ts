@@ -1,4 +1,4 @@
-// C1.F's live proof of MergeBox against a deployed Keel:
+// The live proof of MergeBox against a deployed Keel:
 //   KEEL_URL=<keel> KEEL_SESSION=<token> KEEL_NAMESPACE=<handle> node e2e/src/c1f.ts <run>
 //
 // KEEL_SESSION is a user's bearer session, read and never printed. It runs in

@@ -1,6 +1,6 @@
 // An automation account on a Keel: signed up, and signed in to again, by a
 // passkey through the routes any visitor uses. No route makes a user for it,
-// so whoever runs the seed or a lane's harness holds the passkey's key.
+// so whoever runs the seed or a live harness holds the passkey's key.
 import {
   type Answer,
   Authenticator,

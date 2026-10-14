@@ -208,8 +208,8 @@ export const trunkCheckPlan = (namespace: NamespaceId, staging: RepoRef, commit:
   });
 
 /**
- * Records one check in the conflict's ledger: run 1, as each check runs once
- *. The ledger takes it while the conflict is probing and after its
+ * Records one check in the conflict's ledger: run 1, as each check runs once.
+ * The ledger takes it while the conflict is probing and after its probe has
  * decided; a refusal means the conflict has
  * moved on, and is answered with its reason.
  */

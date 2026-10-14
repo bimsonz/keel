@@ -17,8 +17,8 @@ const ulid = (n: number): string => String(n).padStart(26, "0");
 const CHANGE = makeId("chg", ulid(1));
 const AGENT = makeId("agt", ulid(1));
 const run = Schema.decodeUnknownSync(RunRef);
-const LANE_B = run({ id: makeId("run", ulid(1)), label: "run-b" });
-const LANE_C = run({ id: makeId("run", ulid(2)), label: "run-c" });
+const RUN_B = run({ id: makeId("run", ulid(1)), label: "run-b" });
+const RUN_C = run({ id: makeId("run", ulid(2)), label: "run-c" });
 const UNLABELLED = run({ id: makeId("run", ulid(3)) });
 
 const preflight: Preflight = {
@@ -72,9 +72,9 @@ const named = (log: readonly ChangeEvent[], tag: ChangeEvent["_tag"]) =>
 
 describe("the run that holds a change", () => {
   it("[run.change] a declared change says which run declared it, on its event and in its state, and one declared by no run says none", () => {
-    const { state, log } = play([declaring(LANE_C)]);
-    expect(named(log, "IntentDeclared")).toMatchObject([{ agentId: AGENT, run: LANE_C }]);
-    expect(state).toMatchObject({ agentId: AGENT, run: LANE_C });
+    const { state, log } = play([declaring(RUN_C)]);
+    expect(named(log, "IntentDeclared")).toMatchObject([{ agentId: AGENT, run: RUN_C }]);
+    expect(state).toMatchObject({ agentId: AGENT, run: RUN_C });
     const unlabelled = play([declaring(UNLABELLED)]);
     expect(unlabelled.state?.run).toEqual(UNLABELLED);
     const none = play([declaring(undefined)]);
@@ -83,18 +83,18 @@ describe("the run that holds a change", () => {
   });
 
   it("[run.change] an adopted change is held by the adopter's run: another run's, or none when the adopter names none, never the run that held it before", () => {
-    const moved = play([declaring(LANE_C), adopting(LANE_B, 2)]);
-    expect(named(moved.log, "ChangeAdopted")).toMatchObject([{ agentId: AGENT, run: LANE_B }]);
-    expect(moved.state?.run).toEqual(LANE_B);
-    const dropped = play([declaring(LANE_C), adopting(undefined, 2)]);
+    const moved = play([declaring(RUN_C), adopting(RUN_B, 2)]);
+    expect(named(moved.log, "ChangeAdopted")).toMatchObject([{ agentId: AGENT, run: RUN_B }]);
+    expect(moved.state?.run).toEqual(RUN_B);
+    const dropped = play([declaring(RUN_C), adopting(undefined, 2)]);
     expect(named(dropped.log, "ChangeAdopted").map((event) => "run" in event)).toEqual([false]);
     expect(dropped.state !== undefined && "run" in dropped.state).toBe(false);
-    const taken = play([declaring(undefined), adopting(LANE_B, 2), adopting(LANE_C, 3)]);
-    expect(taken.state?.run).toEqual(LANE_C);
+    const taken = play([declaring(undefined), adopting(RUN_B, 2), adopting(RUN_C, 3)]);
+    expect(taken.state?.run).toEqual(RUN_C);
   });
 
   it("[run.change] the run survives the wire: a change replayed from its encoded events is held by the same run", () => {
-    const { state, committed } = play([declaring(LANE_C), adopting(LANE_B, 2)]);
+    const { state, committed } = play([declaring(RUN_C), adopting(RUN_B, 2)]);
     const encode = Schema.encodeSync(ChangeEvent);
     const decode = Schema.decodeUnknownSync(ChangeEvent);
     const replayed = replayChange(
@@ -104,6 +104,6 @@ describe("the run that holds a change", () => {
       })),
     );
     expect(replayed).toEqual(state);
-    expect(replayed?.run).toEqual(LANE_B);
+    expect(replayed?.run).toEqual(RUN_B);
   });
 });

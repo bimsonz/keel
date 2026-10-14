@@ -3,8 +3,8 @@ packages:
   - packages/*
   - examples/*
   - e2e
-  # fixtures/ and spikes/ are deliberately outside the workspace: they belong
-  # to the spikes lane and carry their own package.json and lockfile.
+  # fixtures/ and spikes/ are deliberately outside the workspace: each carries
+  # its own package.json and lockfile.
   - "!fixtures/**"
   - "!spikes/**"
 

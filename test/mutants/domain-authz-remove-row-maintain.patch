@@ -2,10 +2,10 @@
 # kills: authz.invitation-rows
 # why: the member who invited an agent cannot take it out again unless they maintain the org
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..380f7522 100644
+index 79da9fe..318bbdf 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -113,7 +113,7 @@ export const SPEC_ACTIONS = {
+@@ -116,7 +116,7 @@ export const SPEC_ACTIONS = {
    Namespaces_listAgents: rule("Namespace", "read"),
    // An agent is invited into an org, never into a person's own namespace, and by a person.
    Namespaces_inviteAgent: rule("Org", "invite"),

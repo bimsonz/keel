@@ -42,8 +42,8 @@ const laneIdOf = (name: string | undefined): string => {
 };
 
 /**
- * The Lane DO (`lane:<projectId>:<name>`; L1's is `lane:<projectId>:main`):
- * the queue, and at L1 one batch of one in flight, decided by the domain's
+ * The Lane DO (`lane:<projectId>:<name>`; a project's one lane is `lane:<projectId>:main`):
+ * the queue, and one batch of one in flight, decided by the domain's
  * Candidate machine. It hears ChangeQueued and ChangeRequeued from its
  * changes and TrunkAdvanced and PromotionDeclined from the Trunk; each
  * delivery only records state, and the debounced `lane step` commits what

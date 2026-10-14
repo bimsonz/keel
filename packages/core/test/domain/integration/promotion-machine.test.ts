@@ -488,7 +488,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    // L1: one batch of one change, FIFO: verified → debounce → WAL → composed → read back new → advanced.
+    // One batch of one change, FIFO: verified → debounce → WAL → composed → read back new → advanced.
     const l1 = drive([...l1Path, readBack(NEW)]);
     expect(l1.tags).toEqual([
       ["TrunkInitialized"],

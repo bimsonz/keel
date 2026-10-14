@@ -191,7 +191,7 @@ export const intentSubjects = (
   ),
 ];
 
-/** The lane a project's changes queue on: at L1, one lane per project, for trunk's `main`. */
+/** The lane a project's changes queue on: one lane per project, for trunk's `main`. */
 export const laneOf = (projectId: ProjectId): string => `lane:${projectId}:main`;
 
 /** Precheck starts once per ChangeSubmitted, as `precheck-<eventId>`. */
@@ -1353,7 +1353,7 @@ export const adopt: (
             agentId: command.agentId,
             ...(command.run === undefined ? {} : { run: command.run }),
             leaseId,
-            // L1's brief is the change itself, as the adopter reads it.
+            // The brief is the change itself, as the adopter reads it.
             briefRef: `change:${changeId}@r${before?.intent.revision ?? 0}`,
           },
         ],
@@ -1825,7 +1825,7 @@ const conflictBounce = (blocking: readonly ConflictId[]): ChangeCommand | undefi
 
 /**
  * Precheck passed and compiled the Verification Plan: commits PlanCompiled,
- * which keeps the plan's predicate policy on the change, then, since L1 has
+ * which keeps the plan's predicate policy on the change, then, since there is
  * no step between the plan and the queue, ChangeQueued on the project's lane
  * in the same transaction. A conflict proven against the change under the
  * plan's `block` policy bounces it instead, citing the conflict. A conflict

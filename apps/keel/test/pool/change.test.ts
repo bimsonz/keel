@@ -490,7 +490,7 @@ const MAIN = "refs/heads/main";
 
 /**
  * The project's real Lane DO, on in-memory driven adapters as the Lane DO's
- * C's own pool test runs it, reading its members from their real Change DOs.
+ * own pool test runs it, reading its members from their real Change DOs.
  * Staging holds one commit, `base`, and its writer moves the code host's own
  * main, so the lane follows trunk in the same staging the Trunk reads.
  * KeelVerify is the in-memory verification, whose started jobs the test

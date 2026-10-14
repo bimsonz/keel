@@ -1,6 +1,6 @@
 # expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
 # kills: change.plan-policy
-# why: the compiled predicate policy must reach PlanCompiled, where Keel reads it for a proven conflict
+# why: the compiled predicate policy must reach PlanCompiled, where the Change DO reads it for a proven conflict
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
 index 1f891e1..a3b8f41 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts

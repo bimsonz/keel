@@ -61,8 +61,8 @@ const other = makeId("agt", ulidOf(2));
 const sponsor = makeId("usr", ulidOf(3));
 
 /** Two runs of the agent, as two of Keel's lanes would be, and a run of the other agent. */
-const LANE_B: RunRef = { id: makeId("run", ulidOf(21)), label: RunLabel.make("run-b") };
-const LANE_C: RunRef = { id: makeId("run", ulidOf(22)), label: RunLabel.make("run-c") };
+const RUN_B: RunRef = { id: makeId("run", ulidOf(21)), label: RunLabel.make("run-b") };
+const RUN_C: RunRef = { id: makeId("run", ulidOf(22)), label: RunLabel.make("run-c") };
 const THEIRS: RunRef = { id: makeId("run", ulidOf(23)), label: RunLabel.make("run-b") };
 
 /** One AgentSession DO's state, in memory: its outbox and store, ids and a clock. */
@@ -383,7 +383,7 @@ function replay(steps: readonly Step[]): {
     const change = changes.get(changeId);
     const by = step.byMe ? agentId : other;
     const actor = actorOf(step.kind, change, by);
-    const mine = step.run === "b" ? LANE_B : LANE_C;
+    const mine = step.run === "b" ? RUN_B : RUN_C;
     const run =
       actor === undefined || step.run === undefined ? undefined : actor === agentId ? mine : THEIRS;
     const sent = run === undefined ? {} : { run };
@@ -530,9 +530,9 @@ describe("an agent's runs", () => {
     ]);
     const withdrawn = heard.filter(({ event }) => event.type === "ChangeWithdrawn");
     expect(withdrawn).toHaveLength(1);
-    expect(withdrawn[0]?.event.run).toEqual(LANE_B);
-    expect(readAll(store, LANE_C.id)).toEqual(idsOf(withdrawn.map(({ event }) => event)));
-    expect(readAll(store, LANE_B.id)).toEqual([]);
+    expect(withdrawn[0]?.event.run).toEqual(RUN_B);
+    expect(readAll(store, RUN_C.id)).toEqual(idsOf(withdrawn.map(({ event }) => event)));
+    expect(readAll(store, RUN_B.id)).toEqual([]);
 
     // The same when it takes the change over: the run that held it is told, and what follows is the adopter's.
     const taken = replay([
@@ -541,12 +541,12 @@ describe("an agent's runs", () => {
     ]);
     const adopted = taken.heard.filter(({ event }) => event.type === "ChangeAdopted");
     expect(adopted).toHaveLength(1);
-    expect(readAll(taken.store, LANE_C.id)).toEqual(idsOf(adopted.map(({ event }) => event)));
-    expect(readAll(taken.store, LANE_B.id)).toEqual([]);
+    expect(readAll(taken.store, RUN_C.id)).toEqual(idsOf(adopted.map(({ event }) => event)));
+    expect(readAll(taken.store, RUN_B.id)).toEqual([]);
     const bounced = envelope(changeIdOf(1), 900, "ChangeBounced", { _tag: "ChangeBounced" });
     hear(taken.store, bounced);
-    expect(readAll(taken.store, LANE_B.id)).toEqual(idsOf([bounced]));
-    expect(readAll(taken.store, LANE_C.id)).toEqual(idsOf(adopted.map(({ event }) => event)));
+    expect(readAll(taken.store, RUN_B.id)).toEqual(idsOf([bounced]));
+    expect(readAll(taken.store, RUN_C.id)).toEqual(idsOf(adopted.map(({ event }) => event)));
   });
 
   it("[run.inbox-own] a run never reads what it caused, by a read or on a tool result, and what it does to a change it holds is not kept at all", () => {
@@ -557,16 +557,16 @@ describe("an agent's runs", () => {
     expect(store.list(INBOX.kind)).toEqual([]);
 
     // An event about no change is every run's but the one that caused it.
-    const ended = ofTheAgent(901, agentId, LANE_B);
+    const ended = ofTheAgent(901, agentId, RUN_B);
     hear(store, ended);
     const take = (run?: RunId) =>
       Effect.runSync(takeNotices(3, run).pipe(Effect.provideService(EntityStore, store))).map(
         (notice) => notice.id,
       );
-    expect(take(LANE_B.id)).toEqual([]);
-    expect(take(LANE_C.id)).toEqual(idsOf([ended]));
-    expect(readAll(store, LANE_B.id)).toEqual([]);
-    expect(readAll(store, LANE_C.id)).toEqual(idsOf([ended]));
+    expect(take(RUN_B.id)).toEqual([]);
+    expect(take(RUN_C.id)).toEqual(idsOf([ended]));
+    expect(readAll(store, RUN_B.id)).toEqual([]);
+    expect(readAll(store, RUN_C.id)).toEqual(idsOf([ended]));
     expect(readAll(store)).toEqual(idsOf([ended]));
   });
 
@@ -619,20 +619,20 @@ describe("an agent's runs", () => {
     const ofAgent = ofTheAgent(907);
     const all = [onC, onB, named, verdict, escalated, between, onNone, ofAgent];
     for (const event of all) hear(store, event);
-    expect(readAll(store, LANE_C.id)).toEqual(
+    expect(readAll(store, RUN_C.id)).toEqual(
       idsOf([onC, named, escalated, between, onNone, ofAgent]),
     );
-    expect(readAll(store, LANE_B.id)).toEqual(idsOf([onB, verdict, between, onNone, ofAgent]));
+    expect(readAll(store, RUN_B.id)).toEqual(idsOf([onB, verdict, between, onNone, ofAgent]));
     expect(readAll(store)).toEqual(idsOf([between, onNone, ofAgent]));
     const entries = store
       .list(INBOX.kind)
       .map((row) => Schema.decodeUnknownSync(InboxEntry)(row.value));
     expect(entries.map((entry) => [entry.for, entry.by])).toEqual([
-      [LANE_C.id, undefined],
-      [LANE_B.id, THEIRS.id],
-      [LANE_C.id, undefined],
-      [LANE_B.id, undefined],
-      [LANE_C.id, undefined],
+      [RUN_C.id, undefined],
+      [RUN_B.id, THEIRS.id],
+      [RUN_C.id, undefined],
+      [RUN_B.id, undefined],
+      [RUN_C.id, undefined],
       [undefined, undefined],
       [undefined, undefined],
       [undefined, undefined],
@@ -647,7 +647,7 @@ describe("an agent's runs", () => {
         const told = heard.filter(
           ({ event }) => !(event.actor === agentActor(agentId) && event.run === undefined),
         );
-        const readers = [LANE_B.id, LANE_C.id, undefined];
+        const readers = [RUN_B.id, RUN_C.id, undefined];
         const read = readers.map((reader) => readAll(store, reader));
         readers.forEach((reader, at) => {
           const expected = told.filter(
@@ -685,31 +685,31 @@ describe("an agent's runs", () => {
           envelope(changeIdOf(n), n, "ChangeBounced", { _tag: "ChangeBounced" }),
         );
         for (const event of events) recordDelivery(store, event);
-        expect(ids(yield* takeNotices(3, LANE_B.id))).toEqual(idsOf(events.slice(0, 3)));
-        expect(ids(yield* takeNotices(3, LANE_C.id))).toEqual(idsOf(events.slice(0, 3)));
-        expect(ids(yield* takeNotices(3, LANE_B.id))).toEqual(idsOf(events.slice(3)));
-        expect(ids(yield* takeNotices(3, LANE_B.id))).toEqual([]);
+        expect(ids(yield* takeNotices(3, RUN_B.id))).toEqual(idsOf(events.slice(0, 3)));
+        expect(ids(yield* takeNotices(3, RUN_C.id))).toEqual(idsOf(events.slice(0, 3)));
+        expect(ids(yield* takeNotices(3, RUN_B.id))).toEqual(idsOf(events.slice(3)));
+        expect(ids(yield* takeNotices(3, RUN_B.id))).toEqual([]);
         expect(ids(yield* takeNotices(3))).toEqual(idsOf(events.slice(0, 3)));
-        expect((yield* viewSession(agentId, LANE_B.id)).inboxDepth).toBe(0);
-        expect((yield* viewSession(agentId, LANE_C.id)).inboxDepth).toBe(1);
+        expect((yield* viewSession(agentId, RUN_B.id)).inboxDepth).toBe(0);
+        expect((yield* viewSession(agentId, RUN_C.id)).inboxDepth).toBe(1);
         expect((yield* viewSession(agentId)).inboxDepth).toBe(1);
         // A read marks for the run that read, and for no other.
-        yield* readInbox(undefined, LANE_C.id);
-        expect((yield* viewSession(agentId, LANE_C.id)).inboxDepth).toBe(0);
+        yield* readInbox(undefined, RUN_C.id);
+        expect((yield* viewSession(agentId, RUN_C.id)).inboxDepth).toBe(0);
         expect((yield* viewSession(agentId)).inboxDepth).toBe(1);
         // Three notices for one run alone and then one for the other: none counts for a run it is
         // not for, and the other's tool result reaches past the three to its own.
         const alone = [5, 6, 7, 8].map((n) =>
           envelope(changeIdOf(n), n, "ChangeBounced", { _tag: "ChangeBounced" }),
         );
-        alone.forEach((event, at) => recordDelivery(store, event, at < 3 ? LANE_B.id : LANE_C.id));
-        expect((yield* viewSession(agentId, LANE_B.id)).inboxDepth).toBe(3);
-        expect((yield* viewSession(agentId, LANE_C.id)).inboxDepth).toBe(1);
+        alone.forEach((event, at) => recordDelivery(store, event, at < 3 ? RUN_B.id : RUN_C.id));
+        expect((yield* viewSession(agentId, RUN_B.id)).inboxDepth).toBe(3);
+        expect((yield* viewSession(agentId, RUN_C.id)).inboxDepth).toBe(1);
         expect((yield* viewSession(agentId)).inboxDepth).toBe(1);
-        expect(ids(yield* takeNotices(3, LANE_C.id))).toEqual(idsOf(alone.slice(3)));
-        expect(ids(yield* takeNotices(3, LANE_B.id))).toEqual(idsOf(alone.slice(0, 3)));
-        expect((yield* viewSession(agentId, LANE_B.id)).inboxDepth).toBe(0);
-        expect((yield* viewSession(agentId, LANE_C.id)).inboxDepth).toBe(0);
+        expect(ids(yield* takeNotices(3, RUN_C.id))).toEqual(idsOf(alone.slice(3)));
+        expect(ids(yield* takeNotices(3, RUN_B.id))).toEqual(idsOf(alone.slice(0, 3)));
+        expect((yield* viewSession(agentId, RUN_B.id)).inboxDepth).toBe(0);
+        expect((yield* viewSession(agentId, RUN_C.id)).inboxDepth).toBe(0);
       }).pipe(Effect.provide(layer())),
   );
 
@@ -720,24 +720,24 @@ describe("an agent's runs", () => {
         yield* enrolled(sponsor);
         const store = yield* EntityStore;
         const outbox = yield* EventOutbox;
-        const b = yield* openSession(agentId, opening("key-b", "body-b", { run: LANE_B }));
-        const c = yield* openSession(agentId, opening("key-c", "body-c", { run: LANE_C }));
-        expect(b.run).toEqual(LANE_B);
-        expect(c.run).toEqual(LANE_C);
-        expect(currentSession(store, LANE_B.id)).toEqual(b);
-        expect(currentSession(store, LANE_C.id)).toEqual(c);
+        const b = yield* openSession(agentId, opening("key-b", "body-b", { run: RUN_B }));
+        const c = yield* openSession(agentId, opening("key-c", "body-c", { run: RUN_C }));
+        expect(b.run).toEqual(RUN_B);
+        expect(c.run).toEqual(RUN_C);
+        expect(currentSession(store, RUN_B.id)).toEqual(b);
+        expect(currentSession(store, RUN_C.id)).toEqual(c);
         expect(currentSession(store)).toBeNull();
-        expect((yield* viewSession(agentId, LANE_B.id)).session).toEqual(b);
-        expect((yield* viewSession(agentId, LANE_C.id)).session).toEqual(c);
+        expect((yield* viewSession(agentId, RUN_B.id)).session).toEqual(b);
+        expect((yield* viewSession(agentId, RUN_C.id)).session).toEqual(c);
         expect((yield* viewSession(agentId)).session).toBeNull();
-        expect(outbox.log({ kind: "session", id: b.id })[0]).toMatchObject({ run: LANE_B });
+        expect(outbox.log({ kind: "session", id: b.id })[0]).toMatchObject({ run: RUN_B });
 
         // A run's next session replaces its own, and one opened under no run is no run's.
-        const again = yield* openSession(agentId, opening("key-b2", "body-b2", { run: LANE_B }));
+        const again = yield* openSession(agentId, opening("key-b2", "body-b2", { run: RUN_B }));
         const plain = yield* openSession(agentId, opening("key-plain", "body-plain"));
         expect(plain).not.toHaveProperty("run");
-        expect(currentSession(store, LANE_B.id)).toEqual(again);
-        expect(currentSession(store, LANE_C.id)).toEqual(c);
+        expect(currentSession(store, RUN_B.id)).toEqual(again);
+        expect(currentSession(store, RUN_C.id)).toEqual(c);
         expect(currentSession(store)).toEqual(plain);
       }).pipe(Effect.provide(layer())),
   );

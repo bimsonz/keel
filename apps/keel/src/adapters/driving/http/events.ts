@@ -14,8 +14,8 @@ import type { Input } from "./work-loop.ts";
 
 /**
  * Pure mappers for `GET /v1/events`: the Projector's feed entries as the
- * spec's EventRecord, and the page's cursor as `nextCursor` on every page
- *, the last and an empty one included.
+ * spec's EventRecord, and the page's cursor as `nextCursor` on every page,
+ * the last and an empty one included.
  */
 
 type Issues = NonNullable<ProblemBody["issues"]>;

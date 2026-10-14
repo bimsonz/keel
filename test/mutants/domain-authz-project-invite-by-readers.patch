@@ -2,10 +2,10 @@
 # kills: authz.personal-project
 # why: anyone who reads a person's public project invites an agent to it
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index ab00e909..aa25402b 100644
+index 79da9fe..6383137 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -112,7 +112,7 @@ export const SPEC_ACTIONS = {
+@@ -118,7 +118,7 @@ export const SPEC_ACTIONS = {
    Namespaces_inviteAgent: rule("Org", "invite"),
    Namespaces_removeAgent: rule("Org", "inviterOrMaintain"),
    // In a person's own namespace an agent is invited to one project, never to the whole of it.

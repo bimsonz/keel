@@ -16,7 +16,7 @@ body {
 
 /*
  * Roles every direction shares. A direction may restate a value for its own
- * surfaces, but never the meaning: see docs/brief.md, "Encodings".
+ * surfaces, but never the meaning.
  */
 :root {
   /* A person is being asked something. Reserved: nothing else is this colour. */

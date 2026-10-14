@@ -31,9 +31,9 @@ import { visibilityOf } from "./project-visibility.ts";
 export const PROJECT_SETTINGS = "project-settings";
 
 /**
- * A project's settings before any PUT. `maxBatchSize` is 1 because the L1
- * lane forms batches of one, and the console must not show a setting the lane
- * does not honour; C4.1 sets the real default.
+ * A project's settings before any PUT. `maxBatchSize` is 1 because the lane
+ * forms batches of one, and the console must not show a setting the lane does
+ * not honour.
  */
 export const DEFAULT_SETTINGS: ProjectSettings = {
   protectedPaths: [],

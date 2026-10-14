@@ -1,4 +1,4 @@
-// Step 6b's live proof against a deployed Keel: where a project starts.
+// The live proof against a deployed Keel of where a project starts.
 //   KEEL_URL=<keel> KEEL_SESSION=<token> KEEL_NAMESPACE=<handle> node e2e/src/c6b.ts <run> [<name> <url>]
 //
 // KEEL_SESSION is a user's bearer session, read and never printed. That user

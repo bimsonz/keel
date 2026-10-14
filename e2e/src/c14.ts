@@ -521,5 +521,5 @@ try {
 } finally {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 }
-console.log(failures === 0 ? "\nall C1.4 checks hold" : `\n${failures} check(s) failed`);
+console.log(failures === 0 ? "\nall rebase checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

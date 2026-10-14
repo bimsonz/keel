@@ -1,7 +1,7 @@
 // PROVISIONAL. Timed facts the console shows that are not catalogue events:
 // the review funnel's cheaper levels and aggregate metrics. They form a second
 // log beside the events, addressable by time in the same way, so a deep link
-// can show "the funnel as of 2:10". See QUESTIONS.md, section B.
+// can show "the funnel as of 2:10".
 
 import type { Predicate } from "./mfp.ts";
 

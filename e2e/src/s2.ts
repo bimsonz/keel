@@ -160,7 +160,7 @@ const applies = (dir: string, patch: string): boolean => {
  * it under the change's lease. A workspace the pool granted before trunk last
  * moved holds an older trunk, where the patch does not apply: the change is
  * then first rebased onto trunk and its clone fast-forwarded there, as the
- * first change is.
+ * first change in c14.ts is.
  */
 async function submitOnTrunk(
   agent: KeelClient,

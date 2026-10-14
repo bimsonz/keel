@@ -2,7 +2,7 @@
 # kills: authz.org-rows
 # why: making an owner is asked of any namespace, so a person's own takes it from its owner.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 64994aa5..7ae7715d 100644
+index 79da9fe..0175b25 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
 @@ -195,7 +195,7 @@ export const NON_SPEC_ACTIONS = {

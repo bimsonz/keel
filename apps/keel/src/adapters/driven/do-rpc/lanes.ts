@@ -15,7 +15,7 @@ export interface DestroyableLanes {
 
 /**
  * The Lanes port over the Lane DO's RPC, placed by `locationHint` like every
- * repo-touching object. A project has one lane at L1, `lane:<projectId>:main`.
+ * repo-touching object. A project has one lane today, `lane:<projectId>:main`.
  */
 export function LanesRpc(
   lanes: DestroyableLanes,

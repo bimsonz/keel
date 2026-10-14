@@ -2,7 +2,7 @@
 # kills: pool.token-ttl
 # why: A grant's write token lives a day instead of at most two hours
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 5d3cef4..4daf4c2 100644
+index e66d509..282c132 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
 @@ -51,7 +51,7 @@ import {

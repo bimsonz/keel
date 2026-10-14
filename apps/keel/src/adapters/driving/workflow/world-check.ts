@@ -28,7 +28,7 @@ const RECORD_RETRIES = {
 /**
  * KeelWorldCheck, started by a conflict's Probe once its probe is drafted:
  * the changes' existing suites in one world of the conflict's matrix,
- * Q-E), each check's outcome recorded to the conflict's Subject DO as a
+ * each check's outcome recorded to the conflict's Subject DO as a
  * WorldCheckRan. They are evidence for people, not for admission. A subclass
  * of @cloudflare/ci's CIWorkflow, as KeelVerify is: Tier 2 steps are
  * `ci.runner`s on keel-verify's KeelSandbox, hydrated from the world's

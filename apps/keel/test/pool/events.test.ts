@@ -132,7 +132,7 @@ describe("GET /v1/events", () => {
       payload: { _tag: "IntentDeclared" },
     });
     expect(page.body.nextCursor > from).toBe(true);
-    // D8: the last page still answers its cursor, the one it was read from.
+    // The last page still answers its cursor, the one it was read from.
     const after = await events(member, `?cursor=${page.body.nextCursor}`);
     expect(after.body).toEqual({ items: [], nextCursor: page.body.nextCursor });
   });

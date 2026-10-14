@@ -73,7 +73,7 @@ const failed = (conflictId: ConflictId) =>
   ({ conflictId, attempts: 3, reason: "worlds-unbuildable" }) as const;
 
 /** The run that makes the move: one of an agent's, named on what it commits. */
-const LANE = Schema.decodeUnknownSync(RunRef)({ id: makeId("run", ulid()), label: "run-c" });
+const RUN = Schema.decodeUnknownSync(RunRef)({ id: makeId("run", ulid()), label: "run-c" });
 
 const escalated = (log: readonly EventEnvelope[]) =>
   log.filter((event) => event.type === "ConflictEscalated");
@@ -97,7 +97,7 @@ export function describeConflictMovesContract(
           changeId: holder,
           agentId: agent,
           sponsor,
-          run: LANE,
+          run: RUN,
           move: "escalate",
           note: "the two cannot both ship",
           idempotencyKey: "resolve-1",
@@ -130,7 +130,7 @@ export function describeConflictMovesContract(
           expect(escalated(log)[0]).toMatchObject({
             actor: `agent:${agent}`,
             // The move is the run's that made it: one agent's lanes are told apart by it.
-            run: LANE,
+            run: RUN,
             project: at.projectId,
             payload: { conflictId, escalationId, reason: "human-class" },
             affected: [

@@ -508,7 +508,7 @@ export const compile = (
           : {
               guards: {
                 predicate: s.guards.predicate,
-                // A ruled guard blocks whatever the predicate's policy; an unruled proof takes the project's (ADR 0005, decided 13 Oct).
+                // A ruled guard blocks whatever the predicate's policy; an unruled proof takes the project's (ADR 0005).
                 policy:
                   s.guards.decision === undefined
                     ? (facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY)

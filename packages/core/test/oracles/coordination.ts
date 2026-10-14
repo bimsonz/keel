@@ -1,6 +1,6 @@
 /**
  * Independent oracles for the predicate lattices, written from the specified
- * rulings rather than from the implementation: each order is a table, and a
+ * orders rather than from the implementation: each order is a table, and a
  * claim's region is decided point by point over a dense sample of values.
  */
 import type {

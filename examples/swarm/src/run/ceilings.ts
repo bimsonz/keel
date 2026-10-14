@@ -1,5 +1,5 @@
 /**
- * The model's ceilings on the shared account: how many calls may be in flight
+ * The model's ceilings on the account: how many calls may be in flight
  * at once, how many may start in any minute, and how many a run may make. A
  * call holds a slot until it ends; a slot whose holder never gave it back
  * lapses after `holdMs`, so a worker that died mid-call cannot hold the

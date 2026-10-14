@@ -21,7 +21,7 @@ export type Subscriber = string;
 /** Subscribe to every event type the entity emits. */
 export const EVERY_TYPE = "*";
 
-/** The Projector's address. At L1 it hears every event every other object commits. */
+/** The Projector's address. It hears every event every other object commits. */
 export const PROJECTOR: Subscriber = "projector";
 
 /** An entity as a subscription's scope names it: `<kind>:<id>`. */

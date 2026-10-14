@@ -144,7 +144,7 @@ export type AdmittedGuard = {
    * id may be absent while selection already works from the proposition.
    */
   readonly tenet: { readonly id?: TenetId; readonly proposition: Proposition };
-  /** The active decision the guard holds, once a ruling upheld its proposition (ADR 0005, decided 13 Oct). */
+  /** The active decision the guard holds, once a ruling upheld its proposition (ADR 0005). */
   readonly decision?: HeldDecision;
 };
 
@@ -159,7 +159,7 @@ export type ChangeFacts = {
   /**
    * The project's predicate policy, composed for the change from its base
    * commit: per predicate, what a guard's proven fail does. A predicate it
-   * leaves out is `advise` (ADR 0005, decided 11 Oct).
+   * leaves out is `advise` (ADR 0005).
    */
   readonly predicatePolicy?: PredicatePolicies;
   /**

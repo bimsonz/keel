@@ -97,7 +97,7 @@ describe("what a token says of its run", () => {
   });
 
   it("[token.run] a label Keel cannot show as one word is refused", () => {
-    for (const bad of ["", "Lane-C", "lane c", "-lane", "a".repeat(65), "lane/c", "läne"])
+    for (const bad of ["", "Run-C", "run c", "-run", "a".repeat(65), "run/c", "rün"])
       expect(refusal({ run: bad, runKey: RUN_KEY })).toBe("RunLabelRefused");
   });
 

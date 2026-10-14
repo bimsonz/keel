@@ -58,7 +58,7 @@ const projectIdOf = (name: string | undefined) =>
  * The Project DO (`project:<id>`): the project, its settings and the subject
  * registry. It holds the agents invited to it alone, one row an agent, and
  * writes the row the request gate reads after each move. Its RPC methods are
- * methods here, against the contract in src/rpc.
+ * built here, against the contract in src/rpc.
  */
 export class ProjectDO
   extends KeelObjectWith<ProjectServices>

@@ -1,8 +1,8 @@
 // The one authorization policy as the doorway answers it, through the real
-// identity), through the real gate, handlers and DOs, over REST and MCP: who
-// sees a project, what each audience reads, what agents and users may each do,
-// and how a refusal reads. Projects are real Project DOs placed in an org; the
-// repo reads and project creation run over in-memory code and projects.
+// gate, handlers and DOs, over REST and MCP: who sees a project, what each
+// audience reads, what agents and users may each do, and how a refusal reads.
+// Projects are real Project DOs placed in an org; the repo reads and project
+// creation run over in-memory code and projects.
 import { env } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
 import {

@@ -34,7 +34,7 @@ import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { RepoRef } from "./workspace-pool.ts";
 
-/** Whether the project's lane verifies each batch: `off` only on S-0's control project. */
+/** Whether the project's lane verifies each batch: `off` passes each batch unverified. */
 export const Verification = Schema.Literals(["required", "off"]);
 
 /** Who may read the project: `public` lets anonymous readers in; `private` is the default. */

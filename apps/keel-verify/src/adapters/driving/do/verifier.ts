@@ -24,7 +24,7 @@ const decodeProbeRun = Schema.decodeUnknownExit(ProbeRunRequest);
  * throwaway isolates with no outbound network, at most PROBE_SLOTS at once
  * (the rest wait), each run reusing the one bundle built for the pair. Plan
  * jobs (`run`) still answer VerifierUnavailable until Tier 1 steps are
- * gives Tier 1 steps to this DO.
+ * given to this DO.
  */
 export class VerifierDO extends DurableObject<Env> implements VerifierRpc {
   private readonly runtime: ReturnType<typeof verifierRuntime>;

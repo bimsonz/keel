@@ -1,5 +1,5 @@
-// Small pieces every frame of direction A shares: the encodings from the
-// brief, drawn one way everywhere.
+// Small pieces every frame of direction A shares: the console's encodings,
+// drawn one way everywhere.
 
 import { CheckIcon, CircleNotchIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";

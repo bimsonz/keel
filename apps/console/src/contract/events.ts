@@ -5,8 +5,7 @@
 // published payload is written here. One thing is laid over them.
 //
 //   x       What the console needs that nobody has decided yet. Declared in
-//           provisional.ts, listed in QUESTIONS.md, and never read without a
-//           fallback.
+//           provisional.ts, and never read without a fallback.
 
 import type { EventType, KeelEvent } from "./envelope.ts";
 import type * as Keel from "./keel/index.ts";

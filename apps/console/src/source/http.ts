@@ -12,8 +12,8 @@
 // give it.
 //
 // What the API does not offer yet is absent here too, honestly: there are no
-// observations, and a change's diff is refused (QUESTIONS.md, B and D). The
-// console's views show their empty states for those.
+// observations, and a change's diff is refused. The console's views show
+// their empty states for those.
 
 import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";

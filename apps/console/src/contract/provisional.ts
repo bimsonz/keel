@@ -1,9 +1,9 @@
 // PROVISIONAL. Nothing in this file is in Keel's catalogue or API yet.
 //
-// Each shape here answers a question in QUESTIONS.md with the console's best
-// guess, so the views can be built before the contract settles. The mock is
+// Each shape here answers an open question about Keel's contract with the
+// console's best guess, so the views can be built before the contract settles.
 // The mock is the only producer. When Keel settles a question, the shape
-// moves into events.ts (or is deleted) and its QUESTIONS.md entry closes.
+// moves into events.ts (or is deleted).
 
 import type { EvidenceClass } from "./mfp.ts";
 
@@ -72,7 +72,7 @@ export interface ProvisionalFields {
   };
 }
 
-/** QUESTIONS R5: why a line is as it is. It waits on `why`, which Keel does not serve yet. */
+/** Why a line is as it is. It waits on `why`, which Keel does not serve yet. */
 export interface RepoNote {
   /** The lines it is about, first and last, counted from 1. */
   from: number;

@@ -41,8 +41,8 @@ const UNREACHABLE_SPACING = "2 seconds";
  * target's account, and the project commits `DeploymentPromoted`.
  *
  * It promotes only when trunk's new commit is the candidate's own commit, the
- * one whose build was previewed. That is right at L1, where a group is one
- * batch and trunk is pushed to the candidate's tip. A group that composes new
+ * one whose build was previewed. That is right while a group is one batch
+ * and trunk is pushed to the candidate's tip. A group that composes new
  * commits moves trunk to a commit no preview was built from, so it is
  * refused `commit-differs` and nothing is deployed: fail-safe, never a deploy
  * of a tree nobody previewed.

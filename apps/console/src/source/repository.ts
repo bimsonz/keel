@@ -5,7 +5,7 @@
 // anyone where it is public.
 //
 // One thing the code's page can show is not Keel's to give yet, and only a
-// test fixture answers it: the reasons beside a file's lines (R5). Its shape
+// test fixture answers it: the reasons beside a file's lines. Its shape
 // is in contract/provisional.ts, and Keel's source has no such method.
 
 import type { RepoBlob, RepoCommitDiff, RepoCommitPage, RepoTree } from "../contract/keel/index.ts";
@@ -42,6 +42,6 @@ export interface KeelRepository {
   ): Promise<RepoCommitPage>;
   /** A commit, and each file it changed, before and after. */
   getCommit(projectId: string, sha: string, signal?: AbortSignal): Promise<RepoCommitDiff>;
-  /** R5, not Keel's yet: the reasons beside a file's lines. */
+  /** Not Keel's yet: the reasons beside a file's lines. */
   getNotes?(at: RepoAt, signal?: AbortSignal): Promise<RepoNotes>;
 }

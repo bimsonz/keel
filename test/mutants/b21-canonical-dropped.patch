@@ -1,6 +1,6 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preflight.test.ts
 # kills: b21.canonical
-# why: Keel preflights and subscribes the propositions as written, so an ordering written from its other event is compared, and its subject subscribed, under the wrong key
+# why: the Change preflights and subscribes the propositions as written, so an ordering written from its other event is compared, and its subject subscribed, under the wrong key
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
 index d0a560f..30c5228 100644
 --- a/packages/core/src/application/coordination/change.ts

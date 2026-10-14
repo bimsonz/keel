@@ -46,7 +46,7 @@ export function agentProfile(agent: Agent) {
   };
 }
 
-/** Every predicate's lattice, as the domain publishes it (`LATTICES`). The same for every project at L1. */
+/** Every predicate's lattice, as the domain publishes it (`LATTICES`). The same for every project. */
 export function latticesOk(): Lattices_listLatticesResult {
   return {
     status: 200,

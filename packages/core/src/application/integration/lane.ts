@@ -143,7 +143,7 @@ const ActiveBatch = Schema.Struct({
 });
 type ActiveBatch = typeof ActiveBatch.Type;
 
-/** A lane: its FIFO queue, the one batch in flight at L1, trunk advances staging has yet to follow. */
+/** A lane: its FIFO queue, its one batch in flight, trunk advances staging has yet to follow. */
 export const Lane = Schema.Struct({
   laneId: Schema.String,
   projectId: ProjectId,
@@ -175,7 +175,7 @@ const decodeProject = Schema.decodeUnknownSync(ProjectId);
 
 type Store = (typeof EntityStore)["Service"];
 
-/** A lane is addressed `lane:<projectId>:<name>`; the L1 lane of a project is `lane:<projectId>:main`. */
+/** A lane is addressed `lane:<projectId>:<name>`; a project's one lane is `lane:<projectId>:main`. */
 export const laneProject = (laneId: string): ProjectId => {
   const match = /^lane:([^:]+):[^:]+$/.exec(laneId);
   if (match?.[1] === undefined)

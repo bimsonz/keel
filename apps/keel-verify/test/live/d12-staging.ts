@@ -12,7 +12,7 @@
 // Each case is judged from the project's event feed (ChangeSubmitted's eventId
 // names the instance, precheck-<eventId>), and the Precheck instance's steps
 // are read back with wrangler. The bootstrap secret comes from Terraform's
-// output; no credential is printed. KEEL_URL overrides the workers.dev URL.
+// output; no credential is printed. KEEL_STAGING_URL names the staging Keel.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,6 +29,8 @@ const SETTLE_MS = 5 * 60_000;
 const run = process.argv[2];
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
   throw new Error("usage: d12-staging.ts <run>, the run a lower-case slug");
+if (KEEL_URL === undefined || KEEL_URL === "")
+  throw new Error("set KEEL_STAGING_URL to the staging Keel's base URL");
 const key = (role: string) => `d12:staging:${role}`;
 
 const wrangler = (...args: string[]) =>
@@ -213,7 +215,7 @@ try {
     try {
       git(dir, ["clone", "-q", workspace.remote, "."], workspace.token);
       mkdirSync(join(dir, dirname(c.path)), { recursive: true });
-      writeFileSync(join(dir, c.path), `// D1.2 staging run ${run}, case ${c.name}\n`);
+      writeFileSync(join(dir, c.path), `// staging run ${run}, case ${c.name}\n`);
       const identity = [
         "-c",
         "user.name=d12-agent",
@@ -285,5 +287,5 @@ try {
   } else console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
-console.log(failures === 0 ? "\nall D1.2 staging checks hold" : `\n${failures} check(s) failed`);
+console.log(failures === 0 ? "\nall staging checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

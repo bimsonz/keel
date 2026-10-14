@@ -664,7 +664,7 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     expect(hashWith({ command: "pnpm test", timeoutMs: 300_000 })).not.toBe(plan.planHash);
     // At compile the default written out is the same plan; through parseFlow it is not, since the step's version is the hash of the step as written.
     expect(hashWith({ command: "pnpm test", timeoutMs: 240_000 })).toBe(plan.planHash);
-    // A suite step may carry a command of its own (ruled 14 Oct): it rides, in a container.
+    // A suite step may carry a command of its own: it rides, in a container.
     expect(
       ok(single([suiteStep("check", { run: { command: "pnpm test" } })])).steps.map((s) => [
         s.run,

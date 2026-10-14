@@ -20819,7 +20819,7 @@
           "deploy_target.unreachable",
           "deploy_target.no_workers_dev"
         ],
-        "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
+        "description": "Machine-readable reason for a problem. Dotted, area first."
       },
       "ProblemDetails": {
         "type": "object",
@@ -21124,7 +21124,7 @@
               "required",
               "off"
             ],
-            "description": "Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;\nKeel always answers it. `off` is for a negative-control project only: the lane then skips verification\nand marks what lands unverified. Every change is audited by ProjectSettingsChanged."
+            "description": "Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;\nKeel always answers it. With `off` the lane skips verification and marks what lands\nunverified. Every change is audited by ProjectSettingsChanged."
           },
           "visibility": {
             "type": "string",
@@ -23063,7 +23063,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "A template, by name. An interim start: it leaves the API once Keel's fixture is a public repository to import."
+        "description": "A template, by name: one of the starting repositories Keel lists, such as `fixture-forge-lite`."
       },
       "TenetContested": {
         "type": "object",

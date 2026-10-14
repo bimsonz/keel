@@ -12,7 +12,7 @@
 
   /*
    * Suspected. Kumo's warning token sits on the same hue as Cloudflare orange,
-   * which the brief reserves for "a person is being asked". So this direction
+   * which the console reserves for "a person is being asked". So this direction
    * moves suspected to yellow; the meaning is unchanged.
    */
   --a-suspected: light-dark(oklch(76% 0.16 88), oklch(82% 0.16 92));

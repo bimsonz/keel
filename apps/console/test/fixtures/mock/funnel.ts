@@ -1,5 +1,5 @@
 // The counters Keel's platform would keep for the review funnel's first four
-// stages, which no catalogue event carries (QUESTIONS.md, B5). The mock reads
+// stages, which no catalogue event carries. The mock reads
 // them off the log it has just written, so they can never disagree with it.
 //
 // A comparison is one derived effect on a (subject, predicate), checked against

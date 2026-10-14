@@ -2,7 +2,7 @@
 # kills: run.pool-settings
 # why: replacing a project's settings asks only for a read, so an agent replaces the settings of another agent's public project
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 12bab933..4d6bc05c 100644
+index 8415a3e..6cb3147 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
 @@ -173,7 +173,7 @@ export const SPEC_ACTIONS = {

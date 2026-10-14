@@ -19,8 +19,8 @@ export type Predicate = typeof Predicate.Type;
 
 const policyOf = Schema.optional(PredicatePolicy);
 /**
- * A project's predicate policy as composed for one change (ADR 0005, decided
- * 11 Oct): per predicate, what a proven conflict or a failing guard does. A
+ * A project's predicate policy as composed for one change (ADR 0005): per
+ * predicate, what a proven conflict or a failing guard does. A
  * predicate it leaves out is `advise`. Every predicate has its key: a new
  * predicate fails to compile here until it does.
  */

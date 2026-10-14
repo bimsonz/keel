@@ -497,7 +497,7 @@ export const decideFork = (
 
 /**
  * The one authorization policy, in front of every operation: each operation's
- * identity; R11): each operation's resource is resolved, `authorize` decides,
+ * resource is resolved, `authorize` decides,
  * and only a granted call reaches its handler, with the audience a read was
  * granted. No handler holds a check of its own. REST and MCP dispatch into the
  * same wrapped object.

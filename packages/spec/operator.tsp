@@ -80,7 +80,7 @@ model ForkSource {
   project: ProjectId;
 }
 
-/** A template, by name. An interim start: it leaves the API once Keel's fixture is a public repository to import. */
+/** A template, by name: one of the starting repositories Keel lists, such as `fixture-forge-lite`. */
 model TemplateSource {
   kind: "template";
 
@@ -107,8 +107,8 @@ model ProjectSettings {
 
   /**
    * Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;
-   * Keel always answers it. `off` is for a negative-control project only: the lane then skips verification
-   * and marks what lands unverified. Every change is audited by ProjectSettingsChanged.
+   * Keel always answers it. With `off` the lane skips verification and marks what lands
+   * unverified. Every change is audited by ProjectSettingsChanged.
    */
   verification?: "required" | "off";
 

@@ -1,4 +1,4 @@
-# Keel's staging resources on a shared account: every name starts with keel-.
+# Keel's staging resources, on an account that may hold others: every name starts with keel-.
 # Workers, Durable Objects, Workflows and containers are created by wrangler
 # deploy; this module owns the stores and queues they bind to.
 

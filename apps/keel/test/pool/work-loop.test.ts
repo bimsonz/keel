@@ -12,8 +12,7 @@ import { BASE, type Fetch, mcp, mcpResult, seedAgent, tokenFor } from "./helpers
 /**
  * The work loop end to end through the real HTTP and MCP doorways, the real
  * auth gate and the one handler object, over in-memory Changes, Inbox and
- * WorkspacePool here (then these run over
- * `exports.default.fetch`).
+ * WorkspacePool.
  */
 function loop(options: { readonly capacity?: number } = {}) {
   const changes = makeChangesMemory(options);

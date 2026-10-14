@@ -1289,7 +1289,7 @@ describe("a conflict of the change put to a person", () => {
 });
 
 describe("the run an agent's command names", () => {
-  const LANE = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0", label: "run-c" };
+  const RUN = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0", label: "run-c" };
   const OTHER = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V1", label: "run-b" };
 
   /** Each event on the change, as who caused it and under which run. */
@@ -1306,14 +1306,14 @@ describe("the run an agent's command names", () => {
     () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
-        const declared = yield* declare(declaring({ run: LANE }));
+        const declared = yield* declare(declaring({ run: RUN }));
         const leaseId = declared.change.lease.id;
-        expect(declared.change.run).toEqual(LANE);
+        expect(declared.change.run).toEqual(RUN);
         yield* revise(
           changeId,
           Schema.decodeUnknownSync(ReviseCommand)({
             agentId,
-            run: LANE,
+            run: RUN,
             leaseId,
             ifMatchRevision: 1,
             goal: "Revised by the same run",
@@ -1326,7 +1326,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(RelyCommand)({
             agentId,
-            run: LANE,
+            run: RUN,
             leaseId,
             premise: {
               subject: "migrate",
@@ -1342,7 +1342,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(SubmitCommand)({
             agentId,
-            run: LANE,
+            run: RUN,
             leaseId,
             commitSha: sha,
             idempotencyKey: "submit-1",
@@ -1351,7 +1351,7 @@ describe("the run an agent's command names", () => {
         yield* abandon(
           changeId,
           Schema.decodeUnknownSync(AbandonCommand)({
-            authority: { _tag: "Lease", leaseId, agentId, run: LANE },
+            authority: { _tag: "Lease", leaseId, agentId, run: RUN },
             idempotencyKey: "abandon-1",
           }),
         );
@@ -1370,7 +1370,7 @@ describe("the run an agent's command names", () => {
         // The revision and the rely each commit an IntentRevised of the agent's.
         expect(agents.filter((event) => event.type === "IntentRevised")).toHaveLength(2);
         expect(agents.filter((event) => event.run?.label !== "run-c")).toEqual([]);
-        expect(agents.every((event) => event.run?.id === LANE.id)).toBe(true);
+        expect(agents.every((event) => event.run?.id === RUN.id)).toBe(true);
         expect(
           events.filter((event) => event.actor === undefined && event.run !== undefined),
         ).toEqual([]);

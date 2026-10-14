@@ -2,7 +2,7 @@
 # kills: gate.quorum
 # why: Two of three takes the minimum mass over the asks, so it needs all three votes
 diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
-index e8fc437..621f5b2 100644
+index 0d0dc0f..b4d1c1e 100644
 --- a/packages/core/src/domain/verification/opinion-gate.ts
 +++ b/packages/core/src/domain/verification/opinion-gate.ts
 @@ -56,7 +56,7 @@ type Vote = "contradiction" | "compatible" | "abstain";
@@ -13,4 +13,4 @@ index e8fc437..621f5b2 100644
 +const quorumOf = (t: GateThreshold): number => (t.quorum === "all" ? ASKS : ASKS);
  
  /**
-  * Routes a decision model's answer to one premise question
+  * Routes a decision model's answer to one premise question (ADR 0012). A quorum of contradiction votes suspects, a quorum of compatible

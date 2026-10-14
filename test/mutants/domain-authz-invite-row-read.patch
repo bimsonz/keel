@@ -2,10 +2,10 @@
 # kills: authz.invitation-rows
 # why: whoever reads an org invites an agent into it
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..25b0cf08 100644
+index 79da9fe..fe33ce4 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -112,7 +112,7 @@ export const SPEC_ACTIONS = {
+@@ -115,7 +115,7 @@ export const SPEC_ACTIONS = {
    Namespaces_getProject: rule("Project", "read"),
    Namespaces_listAgents: rule("Namespace", "read"),
    // An agent is invited into an org, never into a person's own namespace, and by a person.

@@ -461,7 +461,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    // L1's path: a batch of one, formed, assembled by GitCore, verified green, promoted when trunk advances.
+    // The plain path: a batch of one, formed, assembled by GitCore, verified green, promoted when trunk advances.
     const l1 = drive([form([A]), assemble, start, verified, { _tag: "Promote", trunkSha: SHA }]);
     expect(l1.state?.state).toBe("promoted");
     expect(drive([form([A]), refuseComposition]).state?.state).toBe("red");

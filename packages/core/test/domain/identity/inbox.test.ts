@@ -18,8 +18,8 @@ const OTHER = makeId("agt", ulid(2));
 /** A user whose id has the agent's own ULID: an event they cause is not the agent's own. */
 const USER = makeId("usr", ulid(1));
 const CHANGE = makeId("chg", ulid(3));
-const LANE_B = makeId("run", ulid(6));
-const LANE_C = makeId("run", ulid(7));
+const RUN_B = makeId("run", ulid(6));
+const RUN_C = makeId("run", ulid(7));
 
 const envelope = (payload: object, actor?: EventEnvelope["actor"]): EventEnvelope => ({
   eventId: makeId("evt", ulid(4)),
@@ -163,39 +163,39 @@ describe("the inbox", () => {
     const bounced = { _tag: "ChangeBounced", changeId: CHANGE };
     const own = envelope(bounced, agentActor(AGENT));
     expect(notifies(AGENT, own)).toBe(false);
-    expect(notifies(AGENT, { ...own, run: { id: LANE_B } })).toBe(true);
-    expect(notifies(AGENT, { ...own, run: { id: LANE_B, label: RunLabel.make("run-b") } })).toBe(
+    expect(notifies(AGENT, { ...own, run: { id: RUN_B } })).toBe(true);
+    expect(notifies(AGENT, { ...own, run: { id: RUN_B, label: RunLabel.make("run-b") } })).toBe(
       true,
     );
     // Another agent's event notifies with or without a run, and annotate stays silent whoever caused it.
-    expect(notifies(AGENT, { ...envelope(bounced, agentActor(OTHER)), run: { id: LANE_C } })).toBe(
+    expect(notifies(AGENT, { ...envelope(bounced, agentActor(OTHER)), run: { id: RUN_C } })).toBe(
       true,
     );
     expect(
-      notifies(AGENT, { ...envelope(noted("annotate"), agentActor(AGENT)), run: { id: LANE_B } }),
+      notifies(AGENT, { ...envelope(noted("annotate"), agentActor(AGENT)), run: { id: RUN_B } }),
     ).toBe(false);
   });
 
   it("[run.inbox-own] a run is never shown an entry it caused, whoever the entry is for", () => {
-    expect(shownTo({ ...bare, by: LANE_B }, LANE_B)).toBe(false);
-    expect(shownTo({ ...bare, by: LANE_B, for: LANE_B }, LANE_B)).toBe(false);
+    expect(shownTo({ ...bare, by: RUN_B }, RUN_B)).toBe(false);
+    expect(shownTo({ ...bare, by: RUN_B, for: RUN_B }, RUN_B)).toBe(false);
     // The agent's other runs, and a reader with no run, are shown it.
-    expect(shownTo({ ...bare, by: LANE_B }, LANE_C)).toBe(true);
-    expect(shownTo({ ...bare, by: LANE_B }, undefined)).toBe(true);
-    expect(shownTo({ ...bare, by: LANE_B, for: LANE_C }, LANE_C)).toBe(true);
+    expect(shownTo({ ...bare, by: RUN_B }, RUN_C)).toBe(true);
+    expect(shownTo({ ...bare, by: RUN_B }, undefined)).toBe(true);
+    expect(shownTo({ ...bare, by: RUN_B, for: RUN_C }, RUN_C)).toBe(true);
   });
 
   it("[run.inbox-for] an entry for one run is that run's alone; an entry for no run is every run's, and all a reader with no run is shown", () => {
-    expect(shownTo({ ...bare, for: LANE_C }, LANE_C)).toBe(true);
-    expect(shownTo({ ...bare, for: LANE_C }, LANE_B)).toBe(false);
-    expect(shownTo({ ...bare, for: LANE_C }, undefined)).toBe(false);
-    expect(shownTo(bare, LANE_B)).toBe(true);
-    expect(shownTo(bare, LANE_C)).toBe(true);
+    expect(shownTo({ ...bare, for: RUN_C }, RUN_C)).toBe(true);
+    expect(shownTo({ ...bare, for: RUN_C }, RUN_B)).toBe(false);
+    expect(shownTo({ ...bare, for: RUN_C }, undefined)).toBe(false);
+    expect(shownTo(bare, RUN_B)).toBe(true);
+    expect(shownTo(bare, RUN_C)).toBe(true);
     expect(shownTo(bare, undefined)).toBe(true);
     // Both survive the entry being stored and read back.
-    const kept = stored({ ...bare, by: LANE_B, for: LANE_C });
-    expect(kept.by).toBe(LANE_B);
-    expect(kept.for).toBe(LANE_C);
+    const kept = stored({ ...bare, by: RUN_B, for: RUN_C });
+    expect(kept.by).toBe(RUN_B);
+    expect(kept.for).toBe(RUN_C);
     expect(stored(bare)).not.toHaveProperty("by");
     expect(stored(bare)).not.toHaveProperty("for");
   });

@@ -2,10 +2,10 @@
 # kills: authz.member-management
 # why: a maintainer can't remove a member: managing members is kept to owners
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..e0e7fa49 100644
+index 79da9fe..bdb9dfd 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -124,7 +124,7 @@ export const NON_SPEC_ACTIONS = {
+@@ -193,7 +193,7 @@ export const NON_SPEC_ACTIONS = {
    SetHandle: rule("Self", "handle"),
    CreateOrg: rule("Instance", "account"),
    /** Invite, remove, or move a member between member and maintainer. */

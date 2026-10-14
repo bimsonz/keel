@@ -454,7 +454,7 @@ export const deleteProjectRepos = Effect.fn("integration/deleteProjectRepos")(fu
   return { deleted, pending: repos.length - deleted } satisfies DestroyReport;
 });
 
-/** The one lane of a project at L1 (`lane:<projectId>:main`), until BatchVerified carries its lane. */
+/** The one lane of a project (`lane:<projectId>:main`), until BatchVerified carries its lane. */
 export const mainLane = (projectId: ProjectId): string => `lane:${projectId}:main`;
 
 /**
@@ -531,8 +531,8 @@ const candidateTip = (projectId: ProjectId, candidateId: CandidateId) =>
 const NONE: Footprints = { changes: [], paths: [], affected: [], subjects: [] };
 
 /**
- * What the commutation rule decides one queued batch on, at L1. The batch's
- * own paths come from its candidate in staging. L1 computes neither a
+ * What the commutation rule decides one queued batch on. The batch's own
+ * paths come from its candidate in staging. Trunk computes neither a
  * merge-tree of the batch onto a moved head nor the Affected closure, so only
  * a batch whose base is trunk's head can commute (nothing intervened); on a
  * moved head the merge is never proven clean, and the batch is declined to be
@@ -554,7 +554,7 @@ const factsOf = (projectId: ProjectId, head: CommitSha, batch: QueuedBatch) =>
 
 /**
  * The debounce deadline: reads trunk's head and the front batch's facts, then
- * decides the group in one commit. FIFO with one batch per group at L1, so
+ * decides the group in one commit. FIFO with one batch per group, so
  * only the front batch's facts are looked up and the queue stops behind it. A
  * head trunk does not know freezes promotion. Answers the trunk's phase. A
  * destroyed trunk decides nothing: what it had queued stays queued.
@@ -594,7 +594,7 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
   trunk?.phase === "frozen" ? "frozen" : "idle";
 
 /**
- * Pushes the open group and reads trunk back (ADR 0003). At L1 a group is one
+ * Pushes the open group and reads trunk back (ADR 0003). A group is one
  * batch of one change, pushed as its candidate was composed: the WAL records
  * the candidate's commit once, before the first push, and every retry pushes
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA

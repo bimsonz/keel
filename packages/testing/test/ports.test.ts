@@ -2,7 +2,7 @@ import * as ports from "@keeltown/core/ports";
 import { describe, expect, it } from "vitest";
 import { PORTS } from "../src/ports.ts";
 
-/** The ports, one row each. */
+/** The ports of Keel's application layer, one row each. */
 const CONTRACT_PORTS = [
   "Clock",
   "Ids",
@@ -96,7 +96,7 @@ const declared = Object.entries(ports)
   .map(([name]) => name);
 
 describe("ports", () => {
-  it("declares exactly the ports in the engineering contract", () => {
+  it("declares exactly the ports of the application layer", () => {
     expect(declared.toSorted()).toEqual(CONTRACT_PORTS.toSorted());
   });
 

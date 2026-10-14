@@ -14,7 +14,7 @@ export interface ProjectRepos {
 }
 
 /**
- * A project's repos, by convention. At L1 the namespaces belong to the
+ * A project's repos, by convention. The namespaces belong to the
  * deployment: trunk and staging in `keel-core`, the mirror in the workspace
  * shard `keel-ws-00`, beside the workspaces forked from it; the guard repo
  * beside trunk. Names are the

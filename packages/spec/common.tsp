@@ -176,7 +176,7 @@ model Viewer {
 
 // ─── Problems ───────────────────────────────────────────────────────────────
 
-/** Machine-readable reason for a problem. Dotted; lanes add codes as they build. */
+/** Machine-readable reason for a problem. Dotted, area first. */
 union ProblemCode {
   authInvalidToken: "auth.invalid_token",
   authRequired: "auth.required",

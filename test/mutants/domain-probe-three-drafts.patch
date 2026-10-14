@@ -2,7 +2,7 @@
 # kills: probe.draft-budget
 # why: a probe gets three drafts, so the drafter's last repair is refused
 diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
-index c26be51..8282dc7 100644
+index 0c760f0..00b0220 100644
 --- a/packages/core/src/domain/verification/probe.ts
 +++ b/packages/core/src/domain/verification/probe.ts
 @@ -28,7 +28,7 @@ export const ADMISSION_RUNS = 3;

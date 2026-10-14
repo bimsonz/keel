@@ -330,7 +330,7 @@ export const ProjectorCodecs = {
 };
 
 /**
- * The Projector DO (`projector`). At L1 every Keel object delivers every event
+ * The Projector DO (`projector`). Every Keel object delivers every event
  * it commits here, and the Projector keeps them as one feed for the console.
  * Positions are arrival order: each emitter's events keep their commit order,
  * but there is no total causal order across emitters. It drains the operation
@@ -340,9 +340,9 @@ export interface ProjectorRpc extends EventReceiverRpc {
   nudge(): Promise<ExitJson>;
   /** The events after `cursor`; with `waitMs` above 0 and none yet, the first page an arrival brings, or an empty one at the deadline. */
   read(request: typeof ProjectorRead.Encoded): Promise<ExitJson>;
-  /** A project's changes as the console lists them (Mission Control's D6). */
+  /** A project's changes as the console lists them. */
   changes(request: typeof ChangesRead.Encoded): Promise<ExitJson>;
-  /** A project's changes and trunk with the feed's head, read in one turn (Mission Control's D7). */
+  /** A project's changes and trunk with the feed's head, read in one turn. */
   snapshot(request: typeof SnapshotRead.Encoded): Promise<ExitJson>;
   /** A project's conflicts as the console lists them, with the open and settled totals. */
   conflicts(request: typeof ConflictsRead.Encoded): Promise<ExitJson>;
