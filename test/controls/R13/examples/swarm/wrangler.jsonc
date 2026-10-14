@@ -1,7 +1,8 @@
-// Control for R13's scan of the examples: an example's Worker that leaves preview_urls unset.
+// Control for R13's scan of the examples: an example's Worker whose test adds a binding it lacks.
 {
   "name": "keel-swarm",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
+  "preview_urls": false,
   "vars": { "KEEL_HOST": "keel.localhost" },
 }
