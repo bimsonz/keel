@@ -26,7 +26,7 @@ async function readyIn(projectId: ProjectId): Promise<number> {
   return Exit.isSuccess(exit) ? exit.value.ready : 0;
 }
 
-/** An agent in a project of its own, whose pool holds ready workspaces, as createProject leaves it. */
+/** An agent in a project of its own, whose pool holds ready workspaces, as the project's finish leaves it. */
 async function stockedCaller(): Promise<AgentToken> {
   if (env.TEST_ARTIFACTS === undefined) throw new Error("vitest.config.ts binds TEST_ARTIFACTS");
   const projectId: ProjectId = makeId("prj", ulid());
@@ -34,7 +34,7 @@ async function stockedCaller(): Promise<AgentToken> {
   await env.TEST_ARTIFACTS.create(mirror);
   const pool = poolStub(projectId);
   const source = { namespace: "keel-ws-00", name: mirror };
-  // createProject initializes trunk before it configures the pool; this project has none.
+  // A project's trunk is initialized before its finish configures the pool; this project has none.
   await followTrunk(projectId, source);
   await pool.configure({ source, target: 3 });
   // The refill is a deadline armed for now; the platform may run it before this line does.

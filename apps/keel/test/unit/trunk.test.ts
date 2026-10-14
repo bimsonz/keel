@@ -384,6 +384,35 @@ describe("the Trunk's count at create", () => {
   );
 
   it.effect(
+    "[trunk.create-counted-fork] a fork's history is counted at initialize from the pack its take sent, and never weighed again; a retried take keeps what the first sent; a fork no take sent for is weighed",
+    () => {
+      const source = projectRepos(PARENT).trunk;
+      const forked: TrunkOrigin = { kind: "forked", project: PARENT, commit: sha("b") };
+      const taking = ports();
+      taking.writer.offers(source, sha("b"), 7_000);
+      taking.writer.holds(sha("b"), 9_000);
+      const weighing = ports();
+      weighing.writer.holds(sha("b"), 9_000);
+      return Effect.gen(function* () {
+        yield* Effect.gen(function* () {
+          expect(yield* takeTrunk(PROJECT, PARENT)).toBe(sha("b"));
+          // A bootstrap retried after its take: the second take sends nothing.
+          expect(yield* takeTrunk(PROJECT, PARENT)).toBe(sha("b"));
+          yield* initializeTrunk(PROJECT, sha("b"), "seed", forked);
+          yield* initializeTrunk(PROJECT, sha("b"), "seed", forked);
+          expect(yield* counted).toBe(7_000);
+          expect(taking.writer.historiesWeighed()).toEqual([]);
+        }).pipe(Effect.provide(taking.layer));
+        yield* Effect.gen(function* () {
+          yield* initializeTrunk(PROJECT, sha("b"), "seed", forked);
+          expect(yield* counted).toBe(9_000);
+          expect(weighing.writer.historiesWeighed()).toEqual([sha("b")]);
+        }).pipe(Effect.provide(weighing.layer));
+      });
+    },
+  );
+
+  it.effect(
     "[trunk.unplaced-init] a project with no place is a defect that names it: it is given no trunk, and nothing is counted",
     () => {
       const w = ports();

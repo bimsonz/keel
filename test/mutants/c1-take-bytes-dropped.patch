@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.create-counted-fork"
+# kills: trunk.create-counted-fork
+# why: A fork's history is weighed again at initialize though its take just carried it, a second full stream of the trunk before the project can answer
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 33c9222b..a59d2912 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -301,7 +301,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+     yield* usage.record(
+       namespace,
+       REPO_BYTES,
+-      takenBytes(yield* EntityStore, projectId, head) ?? (yield* writer.historyBytes(head)),
++      yield* writer.historyBytes(head),
+       `create:${projectId}`,
+     );
+   return trunk;

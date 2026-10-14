@@ -2,13 +2,13 @@
 # kills: trunk.take
 # why: the writer is told to take the history of the project's own trunk, which is empty, and not of the project it forks
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 7f5b470d..e814967e 100644
+index 33c9222b..ea8ebe6e 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -342,7 +342,7 @@ export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
+@@ -371,7 +371,7 @@ export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
  ) {
    yield* beforeItsHead(projectId, "take");
-   return yield* (yield* TrunkWriter)
+   const taken = yield* (yield* TrunkWriter)
 -    .take(projectRepos(source).trunk)
 +    .take(projectRepos(projectId).trunk)
      .pipe(

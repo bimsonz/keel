@@ -4,6 +4,7 @@ import { ProjectCreated, type TrunkOrigin } from "../../domain/integration/index
 import {
   type CommandActor,
   type EntityRef,
+  type Instant,
   InstantSchema,
   ProjectId,
   type RunRef,
@@ -183,31 +184,28 @@ const startTrunk = Effect.fn("integration/startTrunk")(function* (
 });
 
 /**
- * Bootstraps a project, each step idempotent, so a retry after a crash
- * finishes the job:
+ * Creates a project and answers once its trunk has its first head, each step
+ * idempotent, so a retry after a crash finishes the job:
  * 1. trunk is made by the project's start (`startTrunk`) in keel-core;
  * 2. trunk is initialized at its first head, with where it came from. An
  *    imported history is admitted there: over what its namespace has left,
  *    or over what one relay carries, trunk's repo is deleted and the create
  *    is refused with nothing else made (a fork over what one relay carries
  *    was refused the same way in step 1, where its history is taken);
- * 3. staging is forked from trunk, and the mirror is created empty in the
- *    workspaces namespace (a fork cannot cross namespaces);
- * 4. trunk is synced, which brings staging and the mirror to its head;
- * 5. the pool is configured last, so it never forks an empty mirror;
- * 6. ProjectCreated commits, keyed by the creator's Idempotency-Key.
- * A replay of a finished bootstrap answers from what it committed. A start
- * the code host refuses (a missing template or project, an import it takes
- * nothing from) fails as the host said it, and leaves no repo.
+ * 3. ProjectCreated commits, keyed by the creator's Idempotency-Key.
+ * Staging, the mirror and the pool come after, by `finishProject`: a project
+ * is answered as soon as its trunk can be read and cloned. A replay of a
+ * created project answers from what it committed. A start the code host
+ * refuses (a missing template or project, an import it takes nothing from)
+ * fails as the host said it, and leaves no repo.
  */
 export const createProject: (
   command: CreateProject,
-  poolTarget: number,
 ) => Effect.Effect<
   ProjectRecord,
   IdempotencyConflict | ProjectStartRefused,
-  Clock | EntityStore | EventOutbox | CodeHost | Trunks | WorkspacePool
-> = Effect.fn("integration/createProject")(function* (command: CreateProject, poolTarget: number) {
+  Clock | EntityStore | EventOutbox | CodeHost | Trunks
+> = Effect.fn("integration/createProject")(function* (command: CreateProject) {
   const { projectId } = command;
   const entity: EntityRef = { kind: "project", id: projectId };
   const prior = (yield* EventOutbox).committed(entity, command.idempotencyKey);
@@ -221,21 +219,12 @@ export const createProject: (
   const repos = projectRepos(projectId);
   const host = yield* CodeHost;
   const { head, origin } = yield* startTrunk(command, entity);
-  const trunks = yield* Trunks;
   // A retry names the same head (trunk was made once), so only a trunk moved by someone else refuses.
-  yield* trunks.initialize(projectId, head, command.by, origin).pipe(
+  yield* (yield* Trunks).initialize(projectId, head, command.by, origin).pipe(
     Effect.catchTag("PromotionStateRefused", Effect.die),
     // The history is no project's: its repo goes, so the namespace holds nothing it was refused.
     Effect.tapError(() => host.delete(repos.trunk)),
   );
-  if (!(yield* exists(repos.staging)))
-    yield* host
-      .fork(repos.trunk, repos.staging)
-      .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
-  if (!(yield* exists(repos.mirror)))
-    yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
-  yield* trunks.sync(projectId);
-  yield* (yield* WorkspacePool).configure(projectId, { source: repos.mirror, target: poolTarget });
 
   const committed: Committed<ProjectRecord> = yield* commit(
     {
@@ -259,4 +248,155 @@ export const createProject: (
   return committed.duplicate
     ? yield* replayed(projectId, command.idempotencyKey, committed.sameCommand)
     : committed.value;
+});
+
+/** What a project's finish makes, in order, after it is created. */
+export const FINISH_STEPS = ["staging", "mirror", "sync", "pool"] as const;
+export type FinishStep = (typeof FINISH_STEPS)[number];
+
+/** Where the Project DO keeps how far its finish has come, keyed by the project id. */
+const PROJECT_FINISH = "project-finish";
+const FinishRecord = Schema.Struct({
+  done: Schema.Array(Schema.Literals(FINISH_STEPS)),
+  /** The step that failed last, and how many times in a row. */
+  failing: Schema.optionalKey(
+    Schema.Struct({ step: Schema.Literals(FINISH_STEPS), times: Schema.Int }),
+  ),
+});
+export type FinishRecord = typeof FinishRecord.Type;
+const decodeFinish = Schema.decodeUnknownSync(FinishRecord);
+const encodeFinish = Schema.encodeSync(FinishRecord);
+
+/** How far the project's finish has come: no step done before it begins. */
+export const finishOf = (
+  store: (typeof EntityStore)["Service"],
+  projectId: ProjectId,
+): FinishRecord => {
+  const stored = store.get(PROJECT_FINISH, projectId);
+  return stored === undefined ? { done: [] } : decodeFinish(stored);
+};
+
+/** The first step the finish has still to make, or none once it is finished. */
+const nextStep = (finish: FinishRecord): FinishStep | undefined =>
+  FINISH_STEPS.find((step) => !finish.done.includes(step));
+
+const putFinish = (projectId: ProjectId, change: (finish: FinishRecord) => FinishRecord) =>
+  commit(
+    {
+      entity: { kind: "project", id: projectId },
+      cause: `finish:${projectId}`,
+      project: projectId,
+    },
+    (tx) => {
+      const after = change(finishOf(tx.store, projectId));
+      tx.store.put(PROJECT_FINISH, projectId, asStored(encodeFinish(after)));
+      return Result.succeed({ value: after, drafts: [] });
+    },
+  ).pipe(
+    Effect.andThen(EntityStore),
+    Effect.map((store) => finishOf(store, projectId)),
+  );
+
+/** Whether ProjectDeleted was committed for the project: its finish then makes nothing. */
+const deleted = (projectId: ProjectId) =>
+  Effect.map(EventOutbox, (outbox) =>
+    outbox.log({ kind: "project", id: projectId }).some((event) => event.type === "ProjectDeleted"),
+  );
+
+/** What `finishProject` found: it made what was left, there was no project to finish, or the project was deleted. */
+export type FinishOutcome = "finished" | "absent" | "deleted";
+
+/**
+ * Makes what a project needs beyond its trunk, after ProjectCreated, each
+ * step idempotent and recorded once done, so a retried pass makes only what
+ * is left:
+ * 1. staging is forked from trunk;
+ * 2. the mirror is created empty in the workspaces namespace (a fork cannot
+ *    cross namespaces);
+ * 3. trunk is synced, which brings staging and the mirror to its head;
+ * 4. the pool is configured last, so it never forks an empty mirror.
+ * Nothing is made for a project that was never created, and nothing more
+ * once it is deleted. A step's failure fails the pass, and the step stays
+ * the next to make.
+ */
+export const finishProject = Effect.fn("integration/finishProject")(function* (
+  projectId: ProjectId,
+  poolTarget: number,
+) {
+  if ((yield* EntityStore).get(PROJECT, projectId) === undefined)
+    return "absent" satisfies FinishOutcome;
+  const repos = projectRepos(projectId);
+  const host = yield* CodeHost;
+  for (;;) {
+    if (yield* deleted(projectId)) return "deleted" satisfies FinishOutcome;
+    const step = nextStep(finishOf(yield* EntityStore, projectId));
+    if (step === undefined) return "finished" satisfies FinishOutcome;
+    if (step === "staging" && !(yield* exists(repos.staging)))
+      yield* host
+        .fork(repos.trunk, repos.staging)
+        .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
+    if (step === "mirror" && !(yield* exists(repos.mirror)))
+      yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+    if (step === "sync") yield* (yield* Trunks).sync(projectId);
+    if (step === "pool")
+      yield* (yield* WorkspacePool).configure(projectId, {
+        source: repos.mirror,
+        target: poolTarget,
+      });
+    yield* putFinish(projectId, (finish) => ({ done: [...finish.done, step] }));
+  }
+});
+
+/** The longest a failing finish waits before it tries again. */
+export const FINISH_RETRY_CAP_MS = 5 * 60_000;
+
+/** From this many failures in a row of one step, each is a defect: a finish step should not keep failing. */
+export const FINISH_DEFECT_AFTER = 5;
+
+/** A failed pass of the finish, and when it tries again. */
+export interface FinishRetry {
+  readonly step: FinishStep;
+  /** How many times in a row the step has failed. */
+  readonly times: number;
+  /** 1 s·2ⁿ⁻¹ after the n-th failure in a row, up to five minutes. */
+  readonly delayMs: number;
+  readonly defect: boolean;
+}
+
+/**
+ * Counts one more failure of the step the finish has still to make, and
+ * answers how many times in a row it has failed and when the finish tries
+ * again; none once the finish is done.
+ */
+export const finishFailed = Effect.fn("integration/finishFailed")(function* (projectId: ProjectId) {
+  const step = nextStep(finishOf(yield* EntityStore, projectId));
+  if (step === undefined) return undefined;
+  const after = yield* putFinish(projectId, (finish) => ({
+    done: finish.done,
+    failing: { step, times: finish.failing?.step === step ? finish.failing.times + 1 : 1 },
+  }));
+  const times = after.failing?.times ?? 1;
+  return {
+    step,
+    times,
+    delayMs: Math.min(1_000 * 2 ** (times - 1), FINISH_RETRY_CAP_MS),
+    defect: times >= FINISH_DEFECT_AFTER,
+  } satisfies FinishRetry;
+});
+
+/**
+ * Tells the project's pool, while it has no workspace and none can be made
+ * before `at` (when the finish next tries), so a grant is told to come back
+ * no sooner. Once the finish has configured the pool, nothing is told.
+ */
+export const holdPool = Effect.fn("integration/holdPool")(function* (
+  projectId: ProjectId,
+  at: Instant,
+) {
+  if (finishOf(yield* EntityStore, projectId).done.includes("pool")) return;
+  yield* (yield* WorkspacePool).configure(projectId, {
+    source: projectRepos(projectId).mirror,
+    target: 0,
+    readyAt: at,
+  });
 });

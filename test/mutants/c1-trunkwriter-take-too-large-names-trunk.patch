@@ -2,15 +2,15 @@
 # kills: trunkwriter.take-refused
 # why: a source over the cap is reported as trunk's own repo being too large, though trunk is empty and nothing was sent to it
 diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
-index 8d31a33f..9809e782 100644
+index 4a5c9830..8744d712 100644
 --- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
-@@ -177,7 +177,7 @@ export const TrunkWriterGitCore = (
-             const outcome = yield* Effect.tryPromise({
-               try: () => relay(from, target, { ref: MAIN, from: null, to: tip }),
+@@ -176,7 +176,7 @@ export const TrunkWriterGitCore = (
+             const pack = yield* Effect.tryPromise({
+               try: () => relayPack(from, move),
                catch: (cause) => cause,
 -            }).pipe(Effect.catch(tooLarge(source)));
 +            }).pipe(Effect.catch(tooLarge(trunk)));
-             if (outcome.kind !== "rejected") return tip;
-             // A racing attempt of the same bootstrap made main first: what trunk holds is the answer.
-             const raced = yield* ownHead;
+             const target = yield* remoteOf(trunk, "write").pipe(
+               Effect.catchTag("RepoNotFound", Effect.die),
+             );

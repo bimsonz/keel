@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectIdFor } from "@keeltown/core/application/coordination";
-import { createProject as bootstrap, projectRepos } from "@keeltown/core/application/integration";
+import {
+  createProject as bootstrap,
+  finishProject,
+  projectRepos,
+} from "@keeltown/core/application/integration";
 import { type Actor, actorId, eventActorOf } from "@keeltown/core/domain/identity";
 import { isId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
@@ -41,9 +45,11 @@ const SOURCE = { namespace: "keel-core", name: "seed-app" };
  * A project's creation end to end in memory: its places, and `Projects` over
  * the Project DO's own bootstrap, whose Trunk notes the place it sees as it is
  * initialized. `journal` orders the place's assignment against the DO's steps.
- * `failSyncOnce` crashes the first bootstrap after trunk is initialized.
+ * `failInitializeOnce` crashes the first create as its trunk is initialized,
+ * after its place was taken.
  */
-function world(options: { readonly failSyncOnce?: boolean } = {}) {
+function world(options: { readonly failInitializeOnce?: boolean } = {}) {
+  let initializesToFail = options.failInitializeOnce === true ? 1 : 0;
   const journal: string[] = [];
   const places = makeProjectNamespacesMemory();
   const seen = new Map<ProjectId, Option.Option<ProjectPlace>>();
@@ -71,13 +77,15 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
         initialize: (projectId, head, by, origin) =>
           Effect.flatMap(orgs.byId(projectId), (place) => {
             seen.set(projectId, place);
+            if (initializesToFail > 0) {
+              initializesToFail -= 1;
+              return Effect.die(new Error("the Project DO was evicted mid-create"));
+            }
             return inner.initialize(projectId, head, by, origin);
           }),
       });
     }),
-  ).pipe(
-    Layer.provide([makeTrunksMemory({ journal, host: code, ...options }).layer, places.layer]),
-  );
+  ).pipe(Layer.provide([makeTrunksMemory({ journal, host: code }).layer, places.layer]));
   const projectObject = Layer.effect(
     Projects,
     Effect.gen(function* () {
@@ -87,15 +95,13 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
       return Projects.of({
         create: (actor, input) =>
           Effect.provide(
-            bootstrap(
-              {
-                ...input,
-                by: actorId(actor),
-                actor: eventActorOf(actor),
-                fingerprint: JSON.stringify([input.name, input.source]),
-              },
-              2,
-            ),
+            // The create, then the finish the Project DO's deadline runs after it answers.
+            bootstrap({
+              ...input,
+              by: actorId(actor),
+              actor: eventActorOf(actor),
+              fingerprint: JSON.stringify([input.name, input.source]),
+            }).pipe(Effect.tap(() => finishProject(input.projectId, 2))),
             services,
           ),
         settings: (projectId) => Effect.die(`settings of ${projectId} is not asked here`),
@@ -171,7 +177,7 @@ describe("createProject", () => {
   it.effect(
     "[project.create-heals] a retry with the same key finishes a project whose Project DO failed after its place was taken: one project, one id",
     () => {
-      const { places, layer } = world({ failSyncOnce: true });
+      const { places, layer } = world({ failInitializeOnce: true });
       return Effect.gen(function* () {
         yield* seedSource;
         const id = projectIdFor(alice, "create-1");

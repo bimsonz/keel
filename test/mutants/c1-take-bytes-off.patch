@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.take"
+# kills: trunkwriter.take
+# why: The take answers its pack less a pack's header and trailer, so a fork is counted 32 bytes short of what its history weighs
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 4a5c9830..a8d3e5d2 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -185,7 +185,7 @@ export const TrunkWriterGitCore = (
+               catch: (cause) => cause,
+             }).pipe(Effect.orDie);
+             if (outcome.kind !== "rejected")
+-              return { head: tip, bytes: pack.length } satisfies TakenTrunk;
++              return { head: tip, bytes: pack.length - 32 } satisfies TakenTrunk;
+             // A racing attempt of the same bootstrap made main first: what trunk holds is the answer.
+             const raced = yield* ownHead;
+             if (raced === null)

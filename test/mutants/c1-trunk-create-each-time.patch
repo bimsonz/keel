@@ -2,13 +2,13 @@
 # kills: trunk.create-counted
 # why: Every initialize counts the history under a key of its own, so a retried create is charged twice
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 206f1740..0243f573 100644
+index 33c9222b..6c2a91bf 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -297,7 +297,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -302,7 +302,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
        namespace,
        REPO_BYTES,
-       yield* writer.historyBytes(head),
+       takenBytes(yield* EntityStore, projectId, head) ?? (yield* writer.historyBytes(head)),
 -      `create:${projectId}`,
 +      `create:${projectId}:${Math.random()}`,
      );

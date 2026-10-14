@@ -35,6 +35,7 @@ import {
   type Fetch,
   OTHER_ORG,
   OTHER_SPONSOR,
+  projectFinished,
   seedOrg,
   seedUser,
   uniqueHandle,
@@ -263,8 +264,8 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
     },
     /**
      * A project of org `pool`, made from the template by `token` and private
-     * as made, whose trunk has since moved on: its head is its own, not the
-     * template's.
+     * as made, finished behind its answer, whose trunk has since moved on: its
+     * head is its own, not the template's.
      */
     source: async (token: string) => {
       const made = await create(token, {
@@ -273,6 +274,10 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
         source: FROM_TEMPLATE,
       });
       expect(made.status).toBe(201);
+      await projectFinished(
+        env.PROJECT.get(env.PROJECT.idFromName(`project:${made.body.id}`)),
+        made.body.id,
+      );
       const { trunk } = projectRepos(made.body.id);
       const moved = await onHost(code.fixture.commit(trunk, MAIN, { "PLAN.md": "ours alone" }));
       return { id: made.body.id, name: made.body.name, trunk: trunk.name, head: moved };

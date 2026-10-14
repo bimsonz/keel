@@ -35,6 +35,7 @@ import {
   makeWorkspaceRefresherMemory,
 } from "@keeltown/testing";
 import { Clock as EffectClock, Deferred, Effect, Fiber, Layer, Schema } from "effect";
+import { TestClock } from "effect/testing";
 
 const MIRROR = { namespace: "keel-ws-00", name: "mirror" };
 const PROJECT = Schema.decodeUnknownSync(ProjectId)("prj_00000000000000000000000001");
@@ -254,6 +255,32 @@ describe("WorkspacePool", () => {
       expect(refused._tag).toBe("PoolExhausted");
       expect(refused.retryAfterMs).toBeGreaterThan(0);
     }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.ready-at] a pool told when its first workspace can be made sends a grant back no sooner, and one told nothing answers as it always has",
+    () =>
+      Effect.gen(function* () {
+        const refusedAfter = Effect.map(
+          Effect.flip(grantWorkspace(PROJECT, holder(1))),
+          (refused) => refused.retryAfterMs,
+        );
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 0, readyAt: Instant(120_000) });
+        expect(yield* refusedAfter).toBe(120_000);
+        yield* TestClock.adjust("100 seconds");
+        expect(yield* refusedAfter).toBe(20_000);
+        // Within the usual wait of it, or past it, the usual wait stands.
+        yield* TestClock.adjust("10 seconds");
+        expect(yield* refusedAfter).toBe(15_000);
+        yield* TestClock.adjust("1 hour");
+        expect(yield* refusedAfter).toBe(15_000);
+
+        // Configured again without one, the pool keeps none.
+        yield* configurePool(PROJECT, { source: MIRROR, target: 0, readyAt: Instant(7_200_000) });
+        yield* configurePool(PROJECT, { source: MIRROR, target: 0 });
+        expect(yield* refusedAfter).toBe(15_000);
+      }).pipe(Effect.provide(pool())),
   );
 
   it.effect(

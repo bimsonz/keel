@@ -130,13 +130,12 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
       } satisfies WorkspaceGrant;
     }
     if (oldestReady(store, tried) === undefined) {
-      return yield* new PoolExhausted({
-        // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
-        retryAfterMs:
-          countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0
-            ? 5_000
-            : 15_000,
-      });
+      // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
+      const soonest =
+        countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0 ? 5_000 : 15_000;
+      const { readyAt } = settingsOf(store);
+      const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+      return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
     }
     const head = yield* trunks.head(project);
     // Chosen after the read: what was ready before it may have been taken since.

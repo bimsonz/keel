@@ -30,6 +30,7 @@ import {
   type RepoRef,
   StagingWriter,
   type SyncOutcome,
+  type TakenTrunk,
   TrunkWriter,
   Trunks,
   type InstanceStanding,
@@ -123,6 +124,7 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
   let dropping = 0;
   const weights = new Map<CommitSha, number>();
   const histories = new Map<CommitSha, number>();
+  const historiesWeighed: CommitSha[] = [];
   const weighed: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   const targets = new Map<string, CommitSha>();
   const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
@@ -135,8 +137,9 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     /**
      * `source` is a repo whose main is at `commit` and whose whole history
      * weighs `bytes` (an empty pack's 32 when not said): what `take` relays
-     * from it. Over the receive-pack cap the take is PackTooLarge and moves
-     * nothing; a source never offered is RepoNotFound.
+     * from it, and answers. Over the receive-pack cap the take is PackTooLarge
+     * and moves nothing; a source never offered is RepoNotFound. A take after
+     * one that took is a retry: it answers trunk's head and sends nothing.
      */
     offers: (source: RepoRef, commit: CommitSha, bytes: number = EMPTY_PACK_BYTES) => {
       sources.set(repoKey(source), { commit, bytes });
@@ -165,6 +168,8 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     },
     /** Every pack weighed apart with `packBytes`, in order: a push weighs its own and is not here. */
     weighed: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...weighed],
+    /** Every commit whose whole history was weighed with `historyBytes`, in order. */
+    historiesWeighed: (): readonly CommitSha[] => [...historiesWeighed],
     /** Trunk's whole history at `at` weighs `bytes`, which is what `historyBytes` answers for it (an empty pack's 32 otherwise). */
     holds: (at: CommitSha, bytes: number) => {
       histories.set(at, bytes);
@@ -185,14 +190,15 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             return MEMORY_SEED;
           }),
         take: (source) =>
-          Effect.suspend((): Effect.Effect<CommitSha, RepoNotFound | PackTooLarge> => {
+          Effect.suspend((): Effect.Effect<TakenTrunk, RepoNotFound | PackTooLarge> => {
+            if (taken.length > 0) return Effect.succeed({ head: current });
             const offered = sources.get(repoKey(source));
             if (offered === undefined) return Effect.fail(new RepoNotFound({ repo: source }));
             if (offered.bytes > RECEIVE_PACK_CAP_BYTES)
               return Effect.fail(overTheCap(offered.bytes));
             taken.push(source);
             current = offered.commit;
-            return Effect.succeed(offered.commit);
+            return Effect.succeed({ head: offered.commit, bytes: offered.bytes });
           }),
         push: (from, to, admit) =>
           Effect.gen(function* () {
@@ -206,7 +212,11 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             else current = to;
             return undefined;
           }),
-        historyBytes: (at) => Effect.sync(() => histories.get(at) ?? EMPTY_PACK_BYTES),
+        historyBytes: (at) =>
+          Effect.sync(() => {
+            historiesWeighed.push(at);
+            return histories.get(at) ?? EMPTY_PACK_BYTES;
+          }),
         packBytes: (from, to) =>
           Effect.suspend((): Effect.Effect<number, PackTooLarge> => {
             weighed.push({ from, to });

@@ -1,8 +1,13 @@
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { env } from "cloudflare:workers";
 import { type Agent, type Role, type Scope } from "@keeltown/core/domain/identity";
-import { PROJECT, ProjectRecord } from "@keeltown/core/application/integration";
+import {
+  FINISH_STEPS,
+  finishOf,
+  PROJECT,
+  ProjectRecord,
+} from "@keeltown/core/application/integration";
 import { Instant, makeId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
@@ -94,6 +99,31 @@ export async function establishProject(projectId: ProjectId): Promise<void> {
         }),
       ),
     ),
+  );
+}
+
+/**
+ * Runs a Project DO's alarms until its finish has made what a created
+ * project needs beyond its trunk: staging, the mirror, the sync and the
+ * pool. The platform may run the alarm before this does, so it waits on
+ * what the alarm stores.
+ */
+export async function projectFinished(
+  stub: DurableObjectStub<ProjectDO>,
+  projectId: ProjectId,
+  timeout = 15_000,
+): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      await runDurableObjectAlarm(stub);
+      const finish = await runInDurableObject(stub, (instance: ProjectDO) =>
+        instance["runtime"].runPromise(
+          Effect.map(EntityStore, (store) => finishOf(store, projectId)),
+        ),
+      );
+      expect(finish.done).toEqual(FINISH_STEPS);
+    },
+    { timeout, interval: 25 },
   );
 }
 

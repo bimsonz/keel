@@ -32,6 +32,11 @@ export interface WorkspaceGrant {
 export interface PoolConfig {
   readonly source: RepoRef;
   readonly target: number;
+  /**
+   * Before this, no workspace can be made: the project's finish next tries
+   * then. A grant that finds none ready is told to come back no sooner.
+   */
+  readonly readyAt?: Instant;
 }
 
 /** A push to a workspace's branch, as Artifacts reported it. */

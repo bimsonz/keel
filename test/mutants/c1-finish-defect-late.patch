@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "project.finish-backoff"
+# kills: project.finish-backoff
+# why: A step's fifth failure in a row is logged as a warning, and the defect line comes one failure late
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 1f102ce6..7b5aba05 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -380,7 +380,7 @@ export const finishFailed = Effect.fn("integration/finishFailed")(function* (pro
+     step,
+     times,
+     delayMs: Math.min(1_000 * 2 ** (times - 1), FINISH_RETRY_CAP_MS),
+-    defect: times >= FINISH_DEFECT_AFTER,
++    defect: times > FINISH_DEFECT_AFTER,
+   } satisfies FinishRetry;
+ });
+ 

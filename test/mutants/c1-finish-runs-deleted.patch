@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "project.finishes-behind"
+# kills: project.finishes-behind
+# why: The finish never reads the project's log, so a project deleted while its finish is pending gets staging, a mirror and a pool
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 1f102ce6..157e5589 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -328,7 +328,6 @@ export const finishProject = Effect.fn("integration/finishProject")(function* (
+   const repos = projectRepos(projectId);
+   const host = yield* CodeHost;
+   for (;;) {
+-    if (yield* deleted(projectId)) return "deleted" satisfies FinishOutcome;
+     const step = nextStep(finishOf(yield* EntityStore, projectId));
+     if (step === undefined) return "finished" satisfies FinishOutcome;
+     if (step === "staging" && !(yield* exists(repos.staging)))

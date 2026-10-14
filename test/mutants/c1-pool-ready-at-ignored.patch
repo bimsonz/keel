@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.ready-at"
+# kills: pool.ready-at
+# why: A grant while the project's finish has made no workspace is told to come back in 15 s, however far off the finish's next try is
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index c2c78b5d..e301e545 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -134,7 +134,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+       const soonest =
+         countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0 ? 5_000 : 15_000;
+       const { readyAt } = settingsOf(store);
+-      const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
++      const untilReady = readyAt === undefined ? 0 : 0;
+       return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
+     }
+     const head = yield* trunks.head(project);

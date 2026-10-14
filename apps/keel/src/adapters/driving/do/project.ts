@@ -9,10 +9,17 @@ import {
   commitDeployTargetClear,
   deployTargetsOf,
 } from "@keeltown/core/application/delivery";
-import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
-import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
+import {
+  changeSettings,
+  createProject,
+  finishFailed,
+  finishProject,
+  holdPool,
+  settingsOf,
+} from "@keeltown/core/application/integration";
+import { type EventEnvelope, Instant, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
-import { Effect, Schema } from "effect";
+import { Cause, Effect, Exit, Schema } from "effect";
 import {
   DEFAULT_POOL_TARGET,
   type ProjectServices,
@@ -29,7 +36,11 @@ import {
   PutSettingsCommand,
   SetDeployTargetCommand,
 } from "../../../rpc/index.ts";
+import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
+
+/** The project's own deadline: what it needs beyond its trunk, made after it is answered. */
+export const PROJECT_FINISH = "project finish";
 
 /** The Project DO is named `project:<projectId>`. */
 const projectIdOf = (name: string | undefined) =>
@@ -103,18 +114,50 @@ export class ProjectDO
     );
   }
 
-  /** Bootstraps the project: its repos, trunk and pool, then ProjectCreated. Idempotent by the operator's key. */
+  /**
+   * Creates the project and answers once its trunk is initialized, then
+   * makes the rest (staging, the mirror, the pool) on its own deadline.
+   * Idempotent by the operator's key; a replay arms the finish again, which
+   * makes only what is left, and nothing for a project that was not created.
+   */
   async createProject(command: typeof CreateProjectCommand.Encoded) {
     const projectId = projectIdOf(this.ctx.id.name);
     const program = Schema.decodeUnknownEffect(CreateProjectCommand)(command).pipe(
       Effect.orDie,
       Effect.flatMap((creating) =>
         creating.projectId === projectId
-          ? createProject(creating, DEFAULT_POOL_TARGET)
+          ? createProject(creating)
           : Effect.die(`a createProject for ${creating.projectId} reached ${projectId}`),
       ),
     );
-    return this.answer(ProjectCodecs.createProject, program);
+    const answer = await this.answer(ProjectCodecs.createProject, program);
+    await scheduleAlarm(this.ctx.storage, {
+      kind: "deadline",
+      reason: PROJECT_FINISH,
+      at: Date.now(),
+    });
+    return answer;
+  }
+
+  protected override async onDeadline(request: StartedAlarm): Promise<void> {
+    if (request.reason !== PROJECT_FINISH) return super.onDeadline(request);
+    const projectId = projectIdOf(this.ctx.id.name);
+    const exit = await this.runtime.runPromiseExit(finishProject(projectId, DEFAULT_POOL_TARGET));
+    if (Exit.isSuccess(exit)) return;
+    const failing = await this.runtime.runPromise(finishFailed(projectId));
+    if (failing === undefined) return;
+    const at = Date.now() + failing.delayMs;
+    const why = Cause.pretty(exit.cause);
+    const line = `project ${projectId}: finish step ${failing.step} failed ${failing.times}x, next in ${failing.delayMs} ms: ${why}`;
+    if (failing.defect) console.error(`DEFECT ${line} (a finish step should not keep failing)`);
+    else console.warn(line);
+    // A grant while no workspace can exist is told to come back no sooner than the next try.
+    const told = await this.runtime.runPromiseExit(holdPool(projectId, Instant(at)));
+    if (Exit.isFailure(told))
+      console.warn(
+        `project ${projectId}: the pool was not told the finish's next try: ${Cause.pretty(told.cause)}`,
+      );
+    await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: PROJECT_FINISH, at });
   }
 
   /**

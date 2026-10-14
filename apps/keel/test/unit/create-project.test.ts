@@ -1,11 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
-import { createProject, projectRepos } from "@keeltown/core/application/integration";
+import {
+  createProject,
+  finishFailed,
+  finishOf,
+  finishProject,
+  holdPool,
+  projectRepos,
+} from "@keeltown/core/application/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
   AgentId,
   agentActor,
   type CommitSha,
-  type Instant,
+  Instant,
   ProjectId,
   RunRef,
   userActor,
@@ -13,6 +20,8 @@ import {
 } from "@keeltown/core/kernel";
 import {
   CodeHost,
+  commit,
+  EntityStore,
   EventOutbox,
   ImportTooLarge,
   type ProjectSource,
@@ -28,7 +37,7 @@ import {
   makeTrunksMemory,
   makeWorkspacePoolMemory,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, Result, Schema } from "effect";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const parentId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
@@ -39,6 +48,10 @@ const TEMPLATE: ProjectSource = { _tag: "Template", repo: SOURCE.name };
 const MAIN = "refs/heads/main";
 const POOL_TARGET = 2;
 
+/** The whole bootstrap: the create, then the finish the Project DO's deadline runs after it answers. */
+const bootstrapped = (command: Parameters<typeof createProject>[0]) =>
+  createProject(command).pipe(Effect.tap(() => finishProject(command.projectId, POOL_TARGET)));
+
 /**
  * A Project DO's state in memory, beside a code host holding the source, a
  * trunk and a pool that journal their calls. The memory trunk's first writes
@@ -47,7 +60,8 @@ const POOL_TARGET = 2;
  * source trunk's objects and makes main at its head (the memory trunks do
  * that themselves, given the host). `loseSeedOnce` makes
  * the first seed die before it writes, as a push whose answer and effect
- * were both lost, and `loseTakeOnce` the first take. `hostCalls` is every
+ * were both lost, and `loseTakeOnce` the first take. `failMirrorTimes`
+ * makes the mirror's create die that many times. `hostCalls` is every
  * repo the code host was asked to make or delete, and how.
  */
 function bootstrap(
@@ -55,11 +69,13 @@ function bootstrap(
     readonly failSyncOnce?: boolean;
     readonly loseSeedOnce?: boolean;
     readonly loseTakeOnce?: boolean;
+    readonly failMirrorTimes?: number;
   } = {},
 ) {
   const journal: string[] = [];
   const code = makeCodeHostMemory();
   const hostCalls: string[] = [];
+  let mirrorFailures = options.failMirrorTimes ?? 0;
   const host = Layer.effect(
     CodeHost,
     Effect.map(CodeHost, (inner) =>
@@ -67,6 +83,10 @@ function bootstrap(
         ...inner,
         create: (repo) => {
           hostCalls.push(`create ${nameOf(repo)}`);
+          if (mirrorFailures > 0 && nameOf(repo) === nameOf(projectRepos(projectId).mirror)) {
+            mirrorFailures -= 1;
+            return Effect.die(new Error("the mirror's create failed"));
+          }
           return inner.create(repo);
         },
         fork: (source, target) => {
@@ -97,9 +117,9 @@ function bootstrap(
     Effect.map(Trunks, (inner) =>
       Trunks.of({
         ...inner,
-        adopt: (id, commit) =>
-          Effect.tap(inner.adopt(id, commit), () =>
-            Effect.sync(() => void refsOf(projectRepos(id).trunk)?.set(MAIN, commit)),
+        adopt: (id, sha) =>
+          Effect.tap(inner.adopt(id, sha), () =>
+            Effect.sync(() => void refsOf(projectRepos(id).trunk)?.set(MAIN, sha)),
           ),
         seed: (id, name, at) =>
           Effect.suspend(() => {
@@ -183,7 +203,7 @@ const creating = (
 const starting = (source: ProjectSource) => creating("create-1", "body-1", source);
 
 const createProjectOf = (source: ProjectSource) =>
-  Effect.suspend(() => createProject(starting(source), POOL_TARGET));
+  Effect.suspend(() => bootstrapped(starting(source)));
 
 /** The project, started as a fork of the parent. */
 const forking = createProjectOf({ _tag: "Project", projectId: parentId });
@@ -207,12 +227,12 @@ const failureOf = (exit: Exit.Exit<unknown, unknown>) =>
 
 describe("createProject", () => {
   it.effect(
-    "[b11.bootstrap-order] forks trunk and staging, creates the mirror, initializes and syncs trunk, configures the pool last, then commits ProjectCreated",
+    "[b11.bootstrap-order] makes trunk, initializes it and commits ProjectCreated; the finish then forks staging, creates the mirror, syncs trunk and configures the pool last",
     () => {
       const { journal, trunks, pool, layer } = bootstrap();
       return Effect.gen(function* () {
         const head = yield* seedSource;
-        const project = yield* createProject(creating(), POOL_TARGET);
+        const project = yield* bootstrapped(creating());
         const repos = projectRepos(projectId);
         const host = yield* CodeHost;
 
@@ -254,7 +274,7 @@ describe("createProject", () => {
       const byAgent = { ...creating(), by: agentId, actor: agentActor(agentId) };
       return Effect.gen(function* () {
         yield* seedSource;
-        const project = yield* createProject({ ...byAgent, run }, POOL_TARGET);
+        const project = yield* bootstrapped({ ...byAgent, run });
         const [created, ...others] = (yield* EventOutbox).log({ kind: "project", id: projectId });
         expect(created).toMatchObject({
           actor: `agent:${agentId}`,
@@ -262,7 +282,7 @@ describe("createProject", () => {
           payload: { _tag: "ProjectCreated", by: agentId },
         });
         expect(others).toEqual([]);
-        expect(yield* createProject({ ...byAgent, run }, POOL_TARGET)).toEqual(project);
+        expect(yield* bootstrapped({ ...byAgent, run })).toEqual(project);
         expect((yield* EventOutbox).log({ kind: "project", id: projectId })).toHaveLength(1);
       }).pipe(Effect.provide(layer));
     },
@@ -275,10 +295,7 @@ describe("createProject", () => {
       const agentId = Schema.decodeUnknownSync(AgentId)("agt_01M4A00000000000000000000A");
       return Effect.gen(function* () {
         yield* seedSource;
-        yield* createProject(
-          { ...creating(), by: agentId, actor: agentActor(agentId) },
-          POOL_TARGET,
-        );
+        yield* bootstrapped({ ...creating(), by: agentId, actor: agentActor(agentId) });
         const [created] = (yield* EventOutbox).log({ kind: "project", id: projectId });
         expect(created).toMatchObject({ actor: `agent:${agentId}`, payload: { by: agentId } });
         expect(created).not.toHaveProperty("run");
@@ -292,12 +309,10 @@ describe("createProject", () => {
       const { journal, layer } = bootstrap();
       return Effect.gen(function* () {
         yield* seedSource;
-        const first = yield* createProject(creating(), POOL_TARGET);
+        const first = yield* bootstrapped(creating());
         const calls = journal.length;
-        const replayed = yield* createProject(creating(), POOL_TARGET);
-        const reused = yield* Effect.exit(
-          createProject(creating("create-1", "body-2"), POOL_TARGET),
-        );
+        const replayed = yield* bootstrapped(creating());
+        const reused = yield* Effect.exit(bootstrapped(creating("create-1", "body-2")));
 
         expect(replayed).toEqual(first);
         expect(journal).toHaveLength(calls);
@@ -313,9 +328,9 @@ describe("createProject", () => {
       const { journal, pool, layer } = bootstrap({ failSyncOnce: true });
       return Effect.gen(function* () {
         const head = yield* seedSource;
-        const crashed = yield* Effect.exit(createProject(creating(), POOL_TARGET));
+        const crashed = yield* Effect.exit(bootstrapped(creating()));
         const configuredAfterCrash = pool.configured.size;
-        const project = yield* createProject(creating(), POOL_TARGET);
+        const project = yield* bootstrapped(creating());
         const repos = projectRepos(projectId);
 
         expect(Exit.isFailure(crashed)).toBe(true);
@@ -332,7 +347,7 @@ describe("createProject", () => {
     const { pool, layer } = bootstrap();
     return Effect.gen(function* () {
       const missing = yield* Effect.exit(
-        createProject(starting({ _tag: "Template", repo: "no-such-repo" }), POOL_TARGET),
+        bootstrapped(starting({ _tag: "Template", repo: "no-such-repo" })),
       );
 
       expect(failureOf(missing)).toContain("RepoNotFound");
@@ -477,10 +492,10 @@ describe("createProject by start", () => {
       const { journal, clock, trunks, seedsAsked, layer } = bootstrap({ failSyncOnce: true });
       return Effect.gen(function* () {
         const began = clock.now();
-        const crashed = yield* Effect.exit(createProject(starting({ _tag: "Empty" }), POOL_TARGET));
+        const crashed = yield* Effect.exit(bootstrapped(starting({ _tag: "Empty" })));
         expect(Exit.isFailure(crashed)).toBe(true);
         clock.advance(60_000);
-        const project = yield* createProject(starting({ _tag: "Empty" }), POOL_TARGET);
+        const project = yield* bootstrapped(starting({ _tag: "Empty" }));
         const repos = projectRepos(projectId);
         const host = yield* CodeHost;
         const seed = yield* host.head(repos.trunk, MAIN);
@@ -492,7 +507,6 @@ describe("createProject by start", () => {
         expect(yield* host.head(repos.staging, MAIN)).toBe(seed);
         expect(journal).toEqual([
           `seed ${projectId}`,
-          `initialize ${projectId}`,
           `initialize ${projectId}`,
           `sync ${projectId}`,
           `configure ${projectId}`,
@@ -508,10 +522,10 @@ describe("createProject by start", () => {
       const { clock, seedsAsked, layer } = bootstrap({ loseSeedOnce: true });
       return Effect.gen(function* () {
         const began = clock.now();
-        const lost = yield* Effect.exit(createProject(starting({ _tag: "Empty" }), POOL_TARGET));
+        const lost = yield* Effect.exit(bootstrapped(starting({ _tag: "Empty" })));
         expect(Exit.isFailure(lost)).toBe(true);
         clock.advance(60_000);
-        yield* createProject(starting({ _tag: "Empty" }), POOL_TARGET);
+        yield* bootstrapped(starting({ _tag: "Empty" }));
         expect(seedsAsked).toEqual([
           { name: "Seed app", at: began },
           { name: "Seed app", at: began },
@@ -527,9 +541,9 @@ describe("createProject by start", () => {
       return Effect.gen(function* () {
         const upstream = yield* (yield* CodeHostFixture).upstreams;
         const source: ProjectSource = { _tag: "Import", url: upstream.url };
-        const crashed = yield* Effect.exit(createProject(starting(source), POOL_TARGET));
+        const crashed = yield* Effect.exit(bootstrapped(starting(source)));
         expect(Exit.isFailure(crashed)).toBe(true);
-        yield* createProject(starting(source), POOL_TARGET);
+        yield* bootstrapped(starting(source));
         const repos = projectRepos(projectId);
         const host = yield* CodeHost;
         const came = upstream.byDefault;
@@ -550,7 +564,6 @@ describe("createProject by start", () => {
         expect(journal).toEqual([
           `adopt ${projectId}`,
           `initialize ${projectId}`,
-          `initialize ${projectId}`,
           `sync ${projectId}`,
           `configure ${projectId}`,
         ]);
@@ -569,9 +582,8 @@ describe("createProject by start", () => {
           Effect.flatMap(CodeHostFixture, (fixture) => fixture.upstreams),
           named.layer,
         );
-        yield* createProject(
+        yield* bootstrapped(
           starting({ _tag: "Import", url: upstream.url, ref: upstream.other.name }),
-          POOL_TARGET,
         ).pipe(Effect.provide(named.layer));
         expect(named.trunks.adopted.get(projectId)).toBe(upstream.other.commit);
         expect(named.trunks.origins.get(projectId)).toEqual({
@@ -586,10 +598,7 @@ describe("createProject by start", () => {
           const trunk = projectRepos(projectId).trunk;
           yield* (yield* CodeHost).create(trunk);
           const at = yield* (yield* CodeHostFixture).commit(trunk, MAIN, { "README.md": "main" });
-          yield* createProject(
-            starting({ _tag: "Import", url: "https://git.example/team/app" }),
-            POOL_TARGET,
-          );
+          yield* bootstrapped(starting({ _tag: "Import", url: "https://git.example/team/app" }));
           return at;
         }).pipe(Effect.provide(asMain.layer));
         expect(asMain.journal).not.toContain(`adopt ${projectId}`);
@@ -615,7 +624,7 @@ describe("createProject by start", () => {
             { _tag: "Import", url: upstream.notGit },
             { _tag: "Import", url: upstream.url, ref: "no-such-branch" },
           ] satisfies ProjectSource[],
-          (source) => Effect.flip(createProject(starting(source), POOL_TARGET)),
+          (source) => Effect.flip(bootstrapped(starting(source))),
         );
         expect(refusals).toMatchObject([
           { _tag: "ImportRefused", reason: "not-found" },
@@ -653,7 +662,7 @@ describe("createProject by start", () => {
         return Effect.gen(function* () {
           const upstream = yield* (yield* CodeHostFixture).upstreams;
           const refused = yield* Effect.flip(
-            createProject(starting({ _tag: "Import", url: upstream.url }), POOL_TARGET),
+            bootstrapped(starting({ _tag: "Import", url: upstream.url })),
           );
           const repos = projectRepos(projectId);
           expect(refused).toEqual(refusal);
@@ -669,4 +678,151 @@ describe("createProject by start", () => {
         }).pipe(Effect.provide(layer));
       },
     );
+});
+
+describe("a project's finish", () => {
+  it.effect(
+    "[project.answers-at-trunk] a create answers once trunk is initialized, with ProjectCreated and no staging, mirror or pool yet; the finish then makes them, each once, and a second finish makes nothing",
+    () => {
+      const { journal, pool, layer } = bootstrap();
+      return Effect.gen(function* () {
+        const head = yield* seedSource;
+        const repos = projectRepos(projectId);
+        const project = yield* createProject(creating());
+        expect(project).toMatchObject({ id: projectId, name: "Seed app" });
+        expect(yield* projectEvents).toEqual(["ProjectCreated"]);
+        expect(yield* (yield* CodeHost).head(repos.trunk, MAIN)).toBe(head);
+        expect([yield* held(repos.staging), yield* held(repos.mirror)]).toEqual([false, false]);
+        expect(pool.configured.get(projectId)).toBeUndefined();
+        expect(journal).toEqual([`initialize ${projectId}`]);
+
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("finished");
+        expect(yield* (yield* CodeHost).head(repos.staging, MAIN)).toBe(head);
+        expect(yield* held(repos.mirror)).toBe(true);
+        expect(pool.configured.get(projectId)).toEqual({
+          source: repos.mirror,
+          target: POOL_TARGET,
+        });
+        expect(finishOf(yield* EntityStore, projectId)).toEqual({
+          done: ["staging", "mirror", "sync", "pool"],
+        });
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("finished");
+        expect(journal).toEqual([
+          `initialize ${projectId}`,
+          `sync ${projectId}`,
+          `configure ${projectId}`,
+        ]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[project.finishes-behind] a failing step fails the pass and stays the next to make: its failures are counted in a row, the pool is told when the next try comes, and the next pass makes only what is left",
+    () => {
+      const { journal, pool, layer } = bootstrap({ failSyncOnce: true });
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const repos = projectRepos(projectId);
+        yield* createProject(creating());
+        const failed = yield* Effect.exit(finishProject(projectId, POOL_TARGET));
+        expect(Exit.isFailure(failed)).toBe(true);
+        expect(finishOf(yield* EntityStore, projectId).done).toEqual(["staging", "mirror"]);
+        expect(yield* finishFailed(projectId)).toMatchObject({ step: "sync", times: 1 });
+        expect(yield* finishFailed(projectId)).toMatchObject({ step: "sync", times: 2 });
+        const nextTry = Instant(1_700_000_120_000);
+        yield* holdPool(projectId, nextTry);
+        expect(pool.configured.get(projectId)).toEqual({
+          source: repos.mirror,
+          target: 0,
+          readyAt: nextTry,
+        });
+
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("finished");
+        // The memory trunks journal a sync once it succeeds: the failed one is not there.
+        expect(journal.filter((line) => line.startsWith("sync"))).toHaveLength(1);
+        expect(pool.configured.get(projectId)).toEqual({
+          source: repos.mirror,
+          target: POOL_TARGET,
+        });
+        // Once the pool is configured nothing more is told, and a finished finish counts no failure.
+        yield* holdPool(projectId, nextTry);
+        expect(pool.configured.get(projectId)).toEqual({
+          source: repos.mirror,
+          target: POOL_TARGET,
+        });
+        expect(yield* finishFailed(projectId)).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[project.finish-backoff] a step failing again and again waits twice as long each time up to five minutes, is a defect from its fifth failure in a row, and the next step to fail starts again at one",
+    () => {
+      const { layer } = bootstrap({ failMirrorTimes: 10, failSyncOnce: true });
+      return Effect.gen(function* () {
+        yield* seedSource;
+        yield* createProject(creating());
+        const retries = [];
+        for (let pass = 0; pass < 10; pass += 1) {
+          expect(Exit.isFailure(yield* Effect.exit(finishProject(projectId, POOL_TARGET)))).toBe(
+            true,
+          );
+          retries.push(yield* finishFailed(projectId));
+        }
+        expect(retries.map((retry) => [retry?.step, retry?.times])).toEqual(
+          Array.from({ length: 10 }, (_, n) => ["mirror", n + 1]),
+        );
+        expect(retries.map((retry) => retry?.delayMs)).toEqual([
+          1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000,
+        ]);
+        expect(retries.map((retry) => retry?.defect)).toEqual([
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+        ]);
+
+        expect(Exit.isFailure(yield* Effect.exit(finishProject(projectId, POOL_TARGET)))).toBe(
+          true,
+        );
+        expect(yield* finishFailed(projectId)).toEqual({
+          step: "sync",
+          times: 1,
+          delayMs: 1_000,
+          defect: false,
+        });
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("finished");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[project.finishes-behind] a project that was never created is not finished, and a deleted one is finished no further: nothing more is made",
+    () => {
+      const { journal, layer } = bootstrap();
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const repos = projectRepos(projectId);
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("absent");
+        expect(yield* held(repos.staging)).toBe(false);
+
+        yield* createProject(creating());
+        yield* commit({ entity: { kind: "project", id: projectId }, cause: "delete" }, () =>
+          Result.succeed({
+            value: undefined,
+            drafts: [{ payload: { _tag: "ProjectDeleted", projectId, by: creator } }],
+          }),
+        );
+        expect(yield* finishProject(projectId, POOL_TARGET)).toBe("deleted");
+        expect([yield* held(repos.staging), yield* held(repos.mirror)]).toEqual([false, false]);
+        expect(journal).toEqual([`initialize ${projectId}`]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
 });

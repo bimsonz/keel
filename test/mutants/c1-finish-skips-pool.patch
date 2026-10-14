@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "project.answers-at-trunk"
+# kills: project.answers-at-trunk
+# why: The finish records its pool step done without configuring the pool, so the project never gets a workspace
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 1f102ce6..c2f0ed47 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -338,7 +338,7 @@ export const finishProject = Effect.fn("integration/finishProject")(function* (
+     if (step === "mirror" && !(yield* exists(repos.mirror)))
+       yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+     if (step === "sync") yield* (yield* Trunks).sync(projectId);
+-    if (step === "pool")
++    if (step === "pool" && poolTarget < 0)
+       yield* (yield* WorkspacePool).configure(projectId, {
+         source: repos.mirror,
+         target: poolTarget,

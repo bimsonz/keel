@@ -100,7 +100,7 @@ async function poolStatus(projectId: ProjectId) {
 
 /**
  * `projectId`'s real pool with one workspace forked from a fresh mirror, as
- * createProject leaves it, then held at that: it forks no more, so what it
+ * the project's finish leaves it, then held at that: it forks no more, so what it
  * collects is all that moves.
  */
 async function stockedPool(projectId: ProjectId) {
@@ -109,7 +109,7 @@ async function stockedPool(projectId: ProjectId) {
   await env.TEST_ARTIFACTS.create(mirror);
   const source = { namespace: "keel-ws-00", name: mirror };
   const pool = poolStub(projectId);
-  // createProject initializes trunk before it configures the pool; this project has none.
+  // A project's trunk is initialized before its finish configures the pool; this project has none.
   await followTrunk(projectId, source);
   await pool.configure({ source, target: 1 });
   // The refill is a deadline armed for now; the platform may run it before this line does.

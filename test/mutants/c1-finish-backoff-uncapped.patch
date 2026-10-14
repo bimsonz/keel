@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "project.finish-backoff"
+# kills: project.finish-backoff
+# why: A failing step's wait doubles without a cap, so a project's tenth failure waits more than eight minutes
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 1f102ce6..8ba83c60 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -379,7 +379,7 @@ export const finishFailed = Effect.fn("integration/finishFailed")(function* (pro
+   return {
+     step,
+     times,
+-    delayMs: Math.min(1_000 * 2 ** (times - 1), FINISH_RETRY_CAP_MS),
++    delayMs: 1_000 * 2 ** (times - 1),
+     defect: times >= FINISH_DEFECT_AFTER,
+   } satisfies FinishRetry;
+ });

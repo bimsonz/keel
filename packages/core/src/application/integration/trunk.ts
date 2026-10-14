@@ -45,6 +45,11 @@ import { projectRepos } from "./project-repos.ts";
 const TRUNK = "trunk";
 /** The EntityStore kind marking a trunk destroyed, keyed by its project. */
 const DESTROYED = "trunk-destroyed";
+/** The EntityStore kind holding what a fork's take sent, keyed by its project: the head it made, and the pack's length. */
+const TAKEN = "trunk-taken";
+
+const Taken = Schema.Struct({ head: Schema.String, bytes: Schema.Number });
+const decodeTaken = Schema.decodeUnknownSync(Taken);
 
 // JSON codecs: the domain's optional fields encode as absent keys, which is what EntityStore and the outbox hold.
 const decodeTrunk = Schema.decodeUnknownSync(Schema.toCodecJson(Trunk));
@@ -296,7 +301,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
     yield* usage.record(
       namespace,
       REPO_BYTES,
-      yield* writer.historyBytes(head),
+      takenBytes(yield* EntityStore, projectId, head) ?? (yield* writer.historyBytes(head)),
       `create:${projectId}`,
     );
   return trunk;
@@ -338,9 +343,26 @@ export const seedTrunk = Effect.fn("integration/seedTrunk")(function* (
 });
 
 /**
+ * What a fork's take sent to make trunk's head at `head`, which is what its
+ * whole history weighs there; undefined when no take sent it (a retry, or
+ * any other start), and the history is then weighed.
+ */
+const takenBytes = (
+  store: (typeof EntityStore)["Service"],
+  projectId: ProjectId,
+  head: CommitSha,
+): number | undefined => {
+  const stored = store.get(TAKEN, projectId);
+  const taken = stored === undefined ? undefined : decodeTaken(stored);
+  return taken?.head === head ? taken.bytes : undefined;
+};
+
+/**
  * Brings an empty trunk the whole history of its source project's trunk and
- * answers the head it now has: a fork's start. A source over what one relay
- * carries is refused as an import of that size is. A defect once trunk is
+ * answers the head it now has: a fork's start. The pack it sent is kept
+ * beside the trunk, so the history is counted at initialize from what was
+ * carried, never weighed a second time. A source over what one relay carries
+ * is refused as an import of that size is. A defect once trunk is
  * initialized.
  */
 export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
@@ -348,13 +370,23 @@ export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
   source: ProjectId,
 ) {
   yield* beforeItsHead(projectId, "take");
-  return yield* (yield* TrunkWriter)
+  const taken = yield* (yield* TrunkWriter)
     .take(projectRepos(source).trunk)
     .pipe(
       Effect.catchTag("PackTooLarge", (large) =>
         Effect.fail(new ImportTooLarge({ projectId, bytes: large.bytes, limit: large.limit })),
       ),
     );
+  const { bytes } = taken;
+  if (bytes !== undefined)
+    yield* commit(
+      { entity: { kind: "trunk", id: projectId }, cause: "take", project: projectId },
+      (tx) => {
+        tx.store.put(TAKEN, projectId, { head: taken.head, bytes });
+        return Result.succeed({ value: undefined, drafts: [] });
+      },
+    );
+  return taken.head;
 });
 
 /**

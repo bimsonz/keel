@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { CommitSha, WorkspaceId } from "../../../domain/kernel/index.ts";
+import { CommitSha, InstantSchema, WorkspaceId } from "../../../domain/kernel/index.ts";
 import type { Transaction } from "../../ports/index.ts";
 
 /**
@@ -17,6 +17,8 @@ export const PoolSettings = Schema.Struct({
   target: Schema.Int,
   /** Set when the project is destroyed, and never unset: the pool then forks and grants nothing. */
   destroyed: Schema.optionalKey(Schema.Boolean),
+  /** Before this no workspace can be made, and a grant that finds none ready is told to come back no sooner. */
+  readyAt: Schema.optionalKey(InstantSchema),
 });
 export type PoolSettings = typeof PoolSettings.Type;
 
@@ -70,6 +72,7 @@ export const putSettings = (store: Store, settings: PoolSettings): void =>
     source: settings.source,
     target: settings.target,
     ...(settings.destroyed === true ? { destroyed: true } : {}),
+    ...(settings.readyAt === undefined ? {} : { readyAt: settings.readyAt }),
   });
 
 /** Whether the project was destroyed: its pool forks and grants nothing, whatever it is configured to. */

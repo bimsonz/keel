@@ -524,12 +524,12 @@ describe("TrunkWriter.take", () => {
   const take = Effect.flatMap(TrunkWriter, (w) => w.take(SOURCE));
 
   it.effect(
-    "[trunkwriter.take] brings an empty trunk its source's whole history: one pack asked of the source at its head with no have, pushed to trunk with no old value, and the head answered",
+    "[trunkwriter.take] brings an empty trunk its source's whole history: one pack asked of the source at its head with no have, pushed to trunk with no old value, and the head answered with the length of the pack sent",
     () =>
       Effect.gen(function* () {
         const { server, layer, sourced } = yield* emptyTrunk(["ok"]);
         const tip = yield* sourced;
-        expect(yield* take.pipe(Effect.provide(layer))).toBe(tip);
+        expect(yield* take.pipe(Effect.provide(layer))).toEqual({ head: tip, bytes: PACK.length });
         expect(
           server.requests.map(({ auth, ...r }) => ({ ...r, auth: auth?.replace(/_\d+$/, "") })),
         ).toEqual([
@@ -564,11 +564,11 @@ describe("TrunkWriter.take", () => {
           if (url.endsWith("/git-receive-pack")) setMain(TO);
           return server.fetch(...asked);
         });
-        expect(yield* take.pipe(Effect.provide(layer))).toBe(TO);
+        expect(yield* take.pipe(Effect.provide(layer))).toEqual({ head: TO });
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack", "receive-pack"]);
         // From here trunk has its main: a retry asks nothing and answers it.
         expect(TO).not.toBe(tip);
-        expect(yield* take.pipe(Effect.provide(layer))).toBe(TO);
+        expect(yield* take.pipe(Effect.provide(layer))).toEqual({ head: TO });
         expect(server.requests).toHaveLength(2);
       }),
   );

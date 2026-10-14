@@ -2,14 +2,14 @@
 # kills: trunk.take
 # why: a take asked of a trunk that is initialized reaches the writer, where only promotion may move main from then on
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 7f5b470d..86034c33 100644
+index 33c9222b..0aac59df 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -340,7 +340,6 @@ export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
+@@ -369,7 +369,6 @@ export const takeTrunk = Effect.fn("integration/takeTrunk")(function* (
    projectId: ProjectId,
    source: ProjectId,
  ) {
 -  yield* beforeItsHead(projectId, "take");
-   return yield* (yield* TrunkWriter)
+   const taken = yield* (yield* TrunkWriter)
      .take(projectRepos(source).trunk)
      .pipe(

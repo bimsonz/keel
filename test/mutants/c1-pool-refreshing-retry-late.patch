@@ -2,15 +2,15 @@
 # kills: pool.refresh-exhausted-soon
 # why: a pool whose workspaces are all mid-relay tells a caller to come back in fifteen seconds, as if it had none
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 4128ad30..3039a827 100644
+index c2c78b5d..a77a287d 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -133,7 +133,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
-       return yield* new PoolExhausted({
-         // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
-         retryAfterMs:
--          countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0
-+          countIn(store, "forking") + tried.size > 0
-             ? 5_000
-             : 15_000,
-       });
+@@ -132,7 +132,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     if (oldestReady(store, tried) === undefined) {
+       // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
+       const soonest =
+-        countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0 ? 5_000 : 15_000;
++        countIn(store, "forking") + tried.size > 0 ? 5_000 : 15_000;
+       const { readyAt } = settingsOf(store);
+       const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+       return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });

@@ -2,7 +2,7 @@
 # kills: pool.claim-held
 # why: a holder asking again waits on trunk for a head its own workspace has no use for, and fails when trunk does not answer
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 4128ad30..229e9826 100644
+index c2c78b5d..c76c4699 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
 @@ -115,6 +115,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
@@ -13,9 +13,9 @@ index 4128ad30..229e9826 100644
      const held = heldBy(store, holder);
      const slot = held === undefined ? undefined : slotOf(store, held);
      if (slot !== undefined) {
-@@ -138,7 +139,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
-             : 15_000,
-       });
+@@ -137,7 +138,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+       const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+       return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
      }
 -    const head = yield* trunks.head(project);
      // Chosen after the read: what was ready before it may have been taken since.

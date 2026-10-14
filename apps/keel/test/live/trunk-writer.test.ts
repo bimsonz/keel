@@ -233,7 +233,7 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
   expect(report.landed).toBe(report.second);
 });
 
-it("[take.live] brings an empty repo its source's whole history in one fetch and one push, keeping commit ids; a retry, and one after the source moved on, asks nothing and answers the main it has; a source that is gone is RepoNotFound", async () => {
+it("[take.live] brings an empty repo its source's whole history in one fetch and one push, keeping commit ids, and answers the length of the pack it sent, which is what the history weighs there; a retry, and one after the source moved on, asks nothing and answers the main it has; a source that is gone is RepoNotFound", async () => {
   const source = fixture.fixture.scratch();
   const trunk = fixture.fixture.scratch();
   const missing = fixture.fixture.scratch();
@@ -275,6 +275,7 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
       const forTake = [...asked];
       const main = yield* codeHost.head(trunk, MAIN);
       const parents = (yield* codeHost.readCommit(trunk, main)).parents;
+      const weighs = yield* writer.historyBytes(main);
       asked.length = 0;
       const again = yield* writer.take(source);
       const forAgain = [...asked];
@@ -293,6 +294,7 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
         forTake,
         main,
         parents,
+        weighs,
         again,
         forAgain,
         later,
@@ -303,18 +305,19 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
     }),
   );
   console.log(
-    `LIVE take: gone ${report.gone._tag} (asked ${JSON.stringify(report.beforeTake)}); took ${report.taken === report.first ? "the source's head" : "another commit"} with ${JSON.stringify(report.forTake)}, its parent ${report.parents[0] === report.root ? "==" : "!="} the source's root; again ${report.again === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAgain)}; after the source moved on ${report.afterMove === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAfterMove)}, main ${report.still === report.first ? "unmoved" : "moved"}`,
+    `LIVE take: gone ${report.gone._tag} (asked ${JSON.stringify(report.beforeTake)}); took ${report.taken.head === report.first ? "the source's head" : "another commit"} (its pack ${report.taken.bytes} B, the history there ${report.weighs} B) with ${JSON.stringify(report.forTake)}, its parent ${report.parents[0] === report.root ? "==" : "!="} the source's root; again ${report.again.head === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAgain)}; after the source moved on ${report.afterMove.head === report.first ? "the same" : "moved"} with ${JSON.stringify(report.forAfterMove)}, main ${report.still === report.first ? "unmoved" : "moved"}`,
   );
   expect(report.gone).toMatchObject({ _tag: "RepoNotFound" });
   expect(report.beforeTake).toEqual([]);
-  expect(report.taken).toBe(report.first);
+  expect(report.taken.head).toBe(report.first);
+  expect(report.taken.bytes).toBe(report.weighs);
   expect(report.forTake).toEqual(["upload", "receive"]);
   expect(report.main).toBe(report.first);
   expect(report.parents).toEqual([report.root]);
   expect(report.later).not.toBe(report.first);
-  expect(report.again).toBe(report.first);
+  expect(report.again).toEqual({ head: report.first });
   expect(report.forAgain).toEqual([]);
-  expect(report.afterMove).toBe(report.first);
+  expect(report.afterMove).toEqual({ head: report.first });
   expect(report.forAfterMove).toEqual([]);
   expect(report.still).toBe(report.first);
 });

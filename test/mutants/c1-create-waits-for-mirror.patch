@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/create-project.test.ts -t "project.answers-at-trunk"
+# kills: project.answers-at-trunk
+# why: The create makes the mirror before it answers, so a project waits for a repo it does not need to be read or cloned
+diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
+index 1f102ce6..a01bab5e 100644
+--- a/packages/core/src/application/integration/create-project.ts
++++ b/packages/core/src/application/integration/create-project.ts
+@@ -225,6 +225,7 @@ export const createProject: (
+     // The history is no project's: its repo goes, so the namespace holds nothing it was refused.
+     Effect.tapError(() => host.delete(repos.trunk)),
+   );
++  yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+ 
+   const committed: Committed<ProjectRecord> = yield* commit(
+     {

@@ -22,6 +22,12 @@ export class PackTooLarge extends Schema.TaggedError<PackTooLarge>()("PackTooLar
  */
 export const RELAY_PACK_CAP_BYTES = 60 * 1024 * 1024;
 
+/** What `take` brought: trunk's head, and the pack that carried it there when this take sent one. */
+export interface TakenTrunk {
+  readonly head: CommitSha;
+  readonly bytes?: number;
+}
+
 /** What one sync did to a target: it already held trunk's head, or its main moved there. */
 export type SyncOutcome = "unchanged" | "advanced";
 
@@ -49,15 +55,17 @@ export class TrunkWriter extends Context.Service<
     /**
      * Brings an empty trunk the whole history of `source`'s main and makes
      * trunk's main at its head, relaying the source's own pack so commit ids
-     * survive: how a forked project's trunk starts. Answers the commit. The
-     * pack is fetched once and sent with no old value, so a main that exists
-     * is never moved: a trunk that has one is a retry, and its main is
-     * answered as it is, whatever the source's has moved to since. A source
-     * that is gone is RepoNotFound. A history over the receive-pack cap is
-     * PackTooLarge with nothing sent, and its `bytes` are what had been read
-     * when the read stopped, not what the history weighs.
+     * survive: how a forked project's trunk starts. Answers the commit, and
+     * the length of the pack it sent, which is what `historyBytes` weighs at
+     * that commit: the same want and no have. The pack is fetched once and
+     * sent with no old value, so a main that exists is never moved: a trunk
+     * that has one is a retry, and its main is answered as it is, whatever
+     * the source's has moved to since, with no `bytes`, since nothing was
+     * sent. A source that is gone is RepoNotFound. A history over the
+     * receive-pack cap is PackTooLarge with nothing sent, and its `bytes` are
+     * what had been read when the read stopped, not what the history weighs.
      */
-    readonly take: (source: RepoRef) => Effect.Effect<CommitSha, RepoNotFound | PackTooLarge>;
+    readonly take: (source: RepoRef) => Effect.Effect<TakenTrunk, RepoNotFound | PackTooLarge>;
     /**
      * Moves trunk's main `from → to`, `from` being the WAL's old value, sent
      * explicitly whatever trunk's head reads now. `to` is a commit in staging

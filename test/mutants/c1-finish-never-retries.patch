@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t "project.do.finishes"
+# kills: project.do.finishes
+# why: A failed finish is logged and never tried again, so a project whose sync failed once never gets a pool
+diff --git a/apps/keel/src/adapters/driving/do/project.ts b/apps/keel/src/adapters/driving/do/project.ts
+index 2ca65248..782dc916 100644
+--- a/apps/keel/src/adapters/driving/do/project.ts
++++ b/apps/keel/src/adapters/driving/do/project.ts
+@@ -147,7 +147,6 @@ export class ProjectDO
+       console.warn(
+         `project ${projectId}: the pool was not told the finish's next try: ${Cause.pretty(told.cause)}`,
+       );
+-    await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: PROJECT_FINISH, at });
+   }
+ 
+   /**

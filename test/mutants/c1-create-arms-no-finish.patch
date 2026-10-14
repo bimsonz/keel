@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t "b11.bootstrap-order|project.do.finishes"
+# kills: b11.bootstrap-order, project.do.finishes
+# why: A create answers and arms nothing, so the project never gets staging, a mirror or a pool
+diff --git a/apps/keel/src/adapters/driving/do/project.ts b/apps/keel/src/adapters/driving/do/project.ts
+index 2ca65248..a742de60 100644
+--- a/apps/keel/src/adapters/driving/do/project.ts
++++ b/apps/keel/src/adapters/driving/do/project.ts
+@@ -121,11 +121,6 @@ export class ProjectDO
+       ),
+     );
+     const answer = await this.answer(ProjectCodecs.createProject, program);
+-    await scheduleAlarm(this.ctx.storage, {
+-      kind: "deadline",
+-      reason: PROJECT_FINISH,
+-      at: Date.now(),
+-    });
+     return answer;
+   }
+ 

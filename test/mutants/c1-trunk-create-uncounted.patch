@@ -2,10 +2,10 @@
 # kills: trunk.create-counted
 # why: A new project's history is never counted, so a namespace's repos start free whatever their size
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 206f1740..e0313edb 100644
+index 33c9222b..d4bafcd9 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -292,13 +292,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+@@ -297,13 +297,6 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
        command: "Initialize",
      });
    // An import was admitted before trunk had its head; counting it here too would count it twice.
@@ -13,7 +13,7 @@ index 206f1740..e0313edb 100644
 -    yield* usage.record(
 -      namespace,
 -      REPO_BYTES,
--      yield* writer.historyBytes(head),
+-      takenBytes(yield* EntityStore, projectId, head) ?? (yield* writer.historyBytes(head)),
 -      `create:${projectId}`,
 -    );
    return trunk;

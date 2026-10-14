@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { type AgentId, makeId, type ProjectId, type UserId } from "@keeltown/core/kernel";
-import { PROJECT_SETTINGS } from "@keeltown/core/application/integration";
+import { PROJECT_SETTINGS, projectRepos } from "@keeltown/core/application/integration";
 import { type Actor, QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
   CodeHost,
@@ -9,8 +9,10 @@ import {
   EventOutbox,
   ImportRefused,
   ImportTooLarge,
+  type PoolConfig,
   Projects,
   RELAY_PACK_CAP_BYTES,
+  WorkspacePool,
 } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -26,13 +28,14 @@ import { describe, expect, it } from "vitest";
 import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
 import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
-import { backbone } from "../../src/composition/do.ts";
+import { backbone, DEFAULT_POOL_TARGET } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
 import { ok, refusal } from "./change-harness.ts";
 import {
   BASE,
   drainAfter,
   placeProject,
+  projectFinished,
   seedAgent,
   seedUser,
   tokenFor,
@@ -45,9 +48,11 @@ const SOURCE = { namespace: "keel-core", name: "seed-app" };
 /**
  * A Project DO reached over real RPC, running on an in-memory code host
  * (holding the source), trunk and pool instead of its composition's. Test-only:
- * the runtime is replaced from inside the object.
+ * the runtime is replaced from inside the object. `failSyncOnce` makes the
+ * first sync of trunk fail; `configs` is every configuration the pool was
+ * given, in order.
  */
-async function projectUnderTest() {
+async function projectUnderTest(options: { readonly failSyncOnce?: boolean } = {}) {
   const projectId: ProjectId = makeId("prj", ulid());
   const operator: AgentId = makeId("agt", ulid());
   /** Who replaces the settings: a person, by id. */
@@ -55,8 +60,21 @@ async function projectUnderTest() {
   const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
   const journal: string[] = [];
   const code = makeCodeHostMemory();
-  const trunks = makeTrunksMemory({ journal });
+  const trunks = makeTrunksMemory({ journal, failSyncOnce: options.failSyncOnce === true });
   const pool = makeWorkspacePoolMemory({ journal });
+  const configs: PoolConfig[] = [];
+  const recordedPool = Layer.effect(
+    WorkspacePool,
+    Effect.map(WorkspacePool, (inner) =>
+      WorkspacePool.of({
+        ...inner,
+        configure: (id, config) =>
+          Effect.tap(inner.configure(id, config), () =>
+            Effect.sync(() => void configs.push(config)),
+          ),
+      }),
+    ),
+  ).pipe(Layer.provide(pool.layer));
   await runInDurableObject(stub, (instance: ProjectDO, state) => {
     Reflect.set(
       instance,
@@ -66,7 +84,7 @@ async function projectUnderTest() {
           backbone(state.storage),
           code.layer,
           trunks.layer,
-          pool.layer,
+          recordedPool,
           ProjectNamespacesD1(env.DB),
         ),
       ),
@@ -118,6 +136,15 @@ async function projectUnderTest() {
         Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "project", id: projectId })),
       ),
     );
+  /** Whether the code host holds `repo`. */
+  const holds = (repo: { readonly namespace: string; readonly name: string }) =>
+    Effect.runPromise(
+      CodeHost.use((host) => host.info(repo)).pipe(
+        Effect.as(true),
+        Effect.catchTag("RepoNotFound", () => Effect.succeed(false)),
+        Effect.provide(code.layer),
+      ),
+    );
   /** Who creates the project, as the port takes them. */
   const creator: Actor = { _tag: "User", userId: maintainer };
   /** Runs a program against the Projects port over this object's RPC. */
@@ -138,7 +165,11 @@ async function projectUnderTest() {
     journal,
     trunks,
     pool,
+    configs,
     head,
+    holds,
+    /** Runs the object's alarms until its finish has made staging, the mirror and the pool. */
+    finished: () => projectFinished(stub, projectId),
     create,
     settings,
     putSettings,
@@ -150,10 +181,11 @@ const settingsChanges = async (p: Awaited<ReturnType<typeof projectUnderTest>>) 
   (await p.log()).filter((event) => event.type === "ProjectSettingsChanged");
 
 describe("the Project DO over real RPC", () => {
-  it("[b11.bootstrap-order] bootstraps the project once, configuring its pool after trunk is synced", async () => {
+  it("[b11.bootstrap-order] bootstraps the project once, its finish configuring the pool after trunk is synced", async () => {
     const p = await projectUnderTest();
     const view = ok(await p.create());
     const replayed = ok(await p.create());
+    await p.finished();
 
     expect(view).toMatchObject({ id: p.projectId, name: "Seed app" });
     expect(replayed).toEqual(view);
@@ -163,6 +195,34 @@ describe("the Project DO over real RPC", () => {
       `sync ${p.projectId}`,
       `configure ${p.projectId}`,
     ]);
+  });
+
+  it("[project.do.finishes] a create answers at trunk and the object's own alarm makes staging, the mirror and the pool; a failed step tells the pool when it next tries, and that try finishes", async () => {
+    const p = await projectUnderTest({ failSyncOnce: true });
+    const repos = projectRepos(p.projectId);
+    const before = Date.now();
+    ok(await p.create());
+    expect(p.journal[0]).toBe(`initialize ${p.projectId}`);
+
+    await p.finished();
+    const failedBy = Date.now();
+    // The memory trunk's sync writes nothing to the code host: what the finish made is held.
+    expect([await p.holds(repos.staging), await p.holds(repos.mirror)]).toEqual([true, true]);
+    // The first sync failed and is not journalled: the pool was held until the next try, then configured.
+    expect(p.journal).toEqual([
+      `initialize ${p.projectId}`,
+      `configure ${p.projectId}`,
+      `sync ${p.projectId}`,
+      `configure ${p.projectId}`,
+    ]);
+    expect(p.configs).toEqual([
+      { source: repos.mirror, target: 0, readyAt: expect.any(Number) },
+      { source: repos.mirror, target: DEFAULT_POOL_TARGET },
+    ]);
+    const readyAt = p.configs[0]?.readyAt ?? 0;
+    expect(readyAt).toBeGreaterThanOrEqual(before + 1_000);
+    expect(readyAt).toBeLessThanOrEqual(failedBy + 1_000);
+    expect((await p.log()).map((event) => event.type)).toEqual(["ProjectCreated"]);
   });
 
   it("answers the code host's RepoNotFound for a missing source, and configures nothing", async () => {

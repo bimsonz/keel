@@ -31,6 +31,7 @@ export const PushObservation = Schema.Literals(["recorded", "ignored"]);
 export const PoolConfig = Schema.Struct({
   source: RepoRef,
   target: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  readyAt: Schema.optionalKey(InstantSchema),
 });
 
 /** Workspaces by state. `forking` are not yet grantable, and nor are `refreshing` ones, ready workspaces that trunk is being relayed into; `collecting` are released and awaiting their repo's deletion. A `destroyed` pool with none collecting has no repo left. */

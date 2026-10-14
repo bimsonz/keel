@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t "project.do.finishes"
+# kills: project.do.finishes
+# why: A failed finish never tells the pool its next try, so a grant before it is told to come back in 15 s whenever that is
+diff --git a/apps/keel/src/adapters/driving/do/project.ts b/apps/keel/src/adapters/driving/do/project.ts
+index 2ca65248..f3eb76f8 100644
+--- a/apps/keel/src/adapters/driving/do/project.ts
++++ b/apps/keel/src/adapters/driving/do/project.ts
+@@ -142,7 +142,7 @@ export class ProjectDO
+     if (failing.defect) console.error(`DEFECT ${line} (a finish step should not keep failing)`);
+     else console.warn(line);
+     // A grant while no workspace can exist is told to come back no sooner than the next try.
+-    const told = await this.runtime.runPromiseExit(holdPool(projectId, Instant(at)));
++    const told = Exit.void;
+     if (Exit.isFailure(told))
+       console.warn(
+         `project ${projectId}: the pool was not told the finish's next try: ${Cause.pretty(told.cause)}`,

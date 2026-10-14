@@ -5,6 +5,7 @@ import {
   PackTooLarge,
   type RepoRef,
   type SyncOutcome,
+  type TakenTrunk,
   TrunkWriter,
 } from "@keeltown/core/ports";
 import {
@@ -166,24 +167,30 @@ export const TrunkWriterGitCore = (
           Effect.gen(function* () {
             // A main that exists is never moved: a retry answers it, whatever the source holds now.
             const held = yield* ownHead;
-            if (held !== null) return held;
+            if (held !== null) return { head: held } satisfies TakenTrunk;
             const tip = yield* host
               .head(source, MAIN)
               .pipe(Effect.catchTag("RefNotFound", Effect.die));
             const from = yield* remoteOf(source, "read");
+            const move = { ref: MAIN, from: null, to: tip };
+            const pack = yield* Effect.tryPromise({
+              try: () => relayPack(from, move),
+              catch: (cause) => cause,
+            }).pipe(Effect.catch(tooLarge(source)));
             const target = yield* remoteOf(trunk, "write").pipe(
               Effect.catchTag("RepoNotFound", Effect.die),
             );
             const outcome = yield* Effect.tryPromise({
-              try: () => relay(from, target, { ref: MAIN, from: null, to: tip }),
+              try: () => relaySend(target, move, pack),
               catch: (cause) => cause,
-            }).pipe(Effect.catch(tooLarge(source)));
-            if (outcome.kind !== "rejected") return tip;
+            }).pipe(Effect.orDie);
+            if (outcome.kind !== "rejected")
+              return { head: tip, bytes: pack.length } satisfies TakenTrunk;
             // A racing attempt of the same bootstrap made main first: what trunk holds is the answer.
             const raced = yield* ownHead;
             if (raced === null)
               return yield* Effect.die(new Error("trunk refused its source's history"));
-            return raced;
+            return { head: raced } satisfies TakenTrunk;
           }),
         push: (from, to, admit) =>
           Effect.gen(function* () {
