@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/landed-on.test.ts
+# kills: why.landed-on
+# why: Every landing on a path is kept, so a busy path's row grows without bound
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 6f0079e6..d12918d2 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -110,7 +110,7 @@ function foldLandedPaths(store: Store, project: ProjectId, changeId: ChangeId, a
+       ...landingsAt(store, project, path).filter((l) => l.changeId !== changeId),
+     ]
+       .toSorted((a, b) => b.at - a.at || (a.changeId < b.changeId ? 1 : -1))
+-      .slice(0, LANDINGS_KEPT);
++;
+     store.put(VIEWS.landedOn(project), path, asStored(kept));
+   }
+ }

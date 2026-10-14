@@ -239,6 +239,44 @@ describe("[why.http] why, over REST and MCP, from the Projector's decision index
     expect(await refusal(await get(`/v1/why?subject=${SUBJECT}`))).toEqual(hidden);
   });
 
+  it("[why.http.landings] a file no decision explains is answered 200 with the changes that landed on it most recently, each its intent saying no decision is recorded there, and a way to read each", async () => {
+    const p = await project();
+    const { token } = await enrolled(p.projectId);
+    const changeId = makeId("chg", ulid());
+    await arrive(
+      p.events.declared(changeId, makeId("agt", ulid()), "Price at four times the count"),
+      p.events.started(changeId),
+      ...p.events.landing(changeId, LANDED, ["bench/p2.ts"]),
+    );
+    const response = await get("/v1/why?path=bench/p2.ts", token);
+    expect(response.status).toBe(200);
+    const body = await response.json<WhyBody>();
+    expect(body.summary).toBe(
+      "No decision is recorded on bench/p2.ts; the 1 change that landed there most recently says why it is as it is, newest first.",
+    );
+    expect(
+      body.result.chain.map((link) => [link.record.id, link.record.message.kind, link.summary]),
+    ).toEqual([
+      [
+        `${changeId}.intent.1`,
+        "intent",
+        `No decision is recorded on bench/p2.ts: ${changeId} landed it as ${LANDED.slice(0, 12)}, intending "Price at four times the count"`,
+      ],
+    ]);
+    expect(body.next).toEqual([
+      {
+        kind: "read",
+        title: `Read change ${changeId}, which landed on bench/p2.ts`,
+        operationId: "change",
+        args: { changeId },
+      },
+    ]);
+    // A file nothing landed on is still nothing to explain.
+    expect(await refusal(await get("/v1/why?path=bench/none.ts", token))).toMatchObject({
+      status: 404,
+    });
+  });
+
   it("[why.http] a paused agent is refused about itself, 403 agent-paused with what to do next, and never read the 404 of a project with nothing to explain", async () => {
     const p = await project();
     const ruled = ruledConflict(p.events);

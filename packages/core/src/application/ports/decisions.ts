@@ -110,5 +110,12 @@ export class Decisions extends Context.Service<
       project: ProjectId,
       target: WhyTarget,
     ) => Effect.Effect<readonly WhySource[]>;
+    /**
+     * The changes that landed on the path most recently, newest first, each
+     * as folded: under every path its last derivation said its diff touched.
+     * What `why` explains a path by when no decision does. A landing whose
+     * derivation kept no paths is not among them.
+     */
+    readonly landedOn: (project: ProjectId, path: string) => Effect.Effect<readonly ChangeView[]>;
   }
 >()("keel/Decisions") {}

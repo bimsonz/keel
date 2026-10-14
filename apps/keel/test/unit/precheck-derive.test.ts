@@ -378,7 +378,13 @@ describe("Precheck's derivation", () => {
         });
         yield* world.commitKept(submission, answer.derivationRef);
         expect(world.committed).toEqual([
-          { revision: 1, instanceId: INSTANCE, effects: [], derivationRef: answer.derivationRef },
+          {
+            revision: 1,
+            instanceId: INSTANCE,
+            effects: [],
+            derivationRef: answer.derivationRef,
+            paths: [CACHE],
+          },
         ]);
         expect(world.changes.calls.map((c) => c.method)).toEqual([
           "precheckStarted",
@@ -484,6 +490,8 @@ describe("Precheck's derivation", () => {
           base: base.sha,
           head: head.sha,
           seeds: ["README.md", "src/authz/cache.ts", "src/authz/require-permission.ts"],
+          // What the diff touched, sorted, whatever order it was named in.
+          paths: ["README.md", CACHE, GUARD],
           anchors: [
             {
               subject: "authz.permission-evaluation",
@@ -639,6 +647,8 @@ describe("Precheck's derivation", () => {
               },
             },
           ],
+          // And every path the diff touched, sorted: what the landing is indexed under.
+          paths: [CACHE, GUARD].toSorted(),
         };
         expect(world.committed).toEqual([payload, payload]);
         expect([...world.evidence.documents.keys()]).toEqual([keptAt(answer.derivationRef)]);

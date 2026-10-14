@@ -65,6 +65,8 @@ export interface PrecheckDerived extends PrecheckCall {
   readonly derivationRef: string;
   /** The live anchors the submitted diff touches: each such subject hears the derivation too. */
   readonly touched?: readonly TouchedAnchor[] | undefined;
+  /** The paths the submitted diff touches, sorted, at most DERIVED_PATHS_MAX: what the Projector indexes the change's landing under. */
+  readonly paths?: readonly string[] | undefined;
 }
 
 type Refusal = ChangeNotFound | ChangeStateRefused;

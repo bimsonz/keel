@@ -19,6 +19,7 @@ export interface DecisionIndexStub {
   subjectDecisions(request: typeof SubjectDecisionsRead.Encoded): Promise<unknown>;
   pathDecisions(request: typeof PathDecisionsRead.Encoded): Promise<unknown>;
   explaining(request: typeof WhyRead.Encoded): Promise<unknown>;
+  landedOn(request: typeof PathDecisionsRead.Encoded): Promise<unknown>;
 }
 
 /** `Decisions` over the Projector's decision index. */
@@ -51,6 +52,8 @@ export function DecisionsRpc(projector: () => DecisionIndexStub): Layer.Layer<De
             target: target.kind === "subject" ? target : { kind: "path", path: target.path },
           }),
         ),
+      landedOn: (project, path) =>
+        callObject(ProjectorCodecs.landedOn, () => projector().landedOn({ project, path })),
     }),
   );
 }

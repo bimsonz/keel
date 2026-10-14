@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { DecisionId, type EventEnvelope, GuardId } from "@keeltown/core/kernel";
+import { DecisionId, type EventEnvelope, GuardId, type ProjectId } from "@keeltown/core/kernel";
 import { Decisions } from "@keeltown/core/ports";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { Effect, type Layer, Result, Schema } from "effect";
@@ -399,6 +399,48 @@ export function describeDecisionsContract(adapter: string, make: () => Decisions
               path: "src/authz/check.ts",
             }),
           ).toEqual([]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[decisions.contract] landedOn reads the changes that landed on a path most recently, newest first, as folded, under the paths their last derivation touched, and nothing of another project",
+      () => {
+        const harness = make();
+        const events = projectEvents();
+        const theirs = projectEvents();
+        const [first, second, elsewhere] = [`chg_${ulid()}`, `chg_${ulid()}`, `chg_${ulid()}`];
+        const firstLanding = events.landing(first, "a".repeat(40), ["src/a.ts"]);
+        const secondLanding = events.landing(second, "b".repeat(40), ["src/a.ts", "src/b.ts"]);
+        return Effect.gen(function* () {
+          for (const event of [
+            events.declared(first, `agt_${ulid()}`, "Rewrite a"),
+            events.started(first),
+            ...firstLanding,
+            events.declared(second, `agt_${ulid()}`, "Rewrite a and b"),
+            events.started(second),
+            ...secondLanding,
+            theirs.declared(elsewhere, `agt_${ulid()}`, "Rewrite their a"),
+            theirs.started(elsewhere),
+            ...theirs.landing(elsewhere, "c".repeat(40), ["src/a.ts"]),
+          ])
+            yield* harness.arrive(event);
+          const decisions = yield* Decisions;
+          const read = (project: ProjectId, path: string) =>
+            Effect.map(decisions.landedOn(project, path), (views) =>
+              views.map((view) => [view.change.id, view.change.landedCommit, view.landedAt]),
+            );
+          expect(yield* read(events.project, "src/a.ts")).toEqual([
+            [second, "b".repeat(40), secondLanding.at(-1)?.at],
+            [first, "a".repeat(40), firstLanding.at(-1)?.at],
+          ]);
+          expect(yield* read(events.project, "src/b.ts")).toEqual([
+            [second, "b".repeat(40), secondLanding.at(-1)?.at],
+          ]);
+          expect(yield* read(events.project, "src/none.ts")).toEqual([]);
+          expect((yield* read(theirs.project, "src/a.ts")).map(([changeId]) => changeId)).toEqual([
+            elsewhere,
+          ]);
         }).pipe(Effect.provide(harness.layer));
       },
     );

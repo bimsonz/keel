@@ -7,7 +7,7 @@ import {
 } from "../../domain/coordination/index.ts";
 import { TrunkAdvanced, TrunkInitialized } from "../../domain/integration/index.ts";
 import {
-  type ChangeId,
+  ChangeId,
   type EventEnvelope,
   IllegalTransition,
   Instant,
@@ -43,7 +43,14 @@ export const VIEWS = {
   trunk: "trunk-view",
   /** When a change landed, by change id: its ChangeLanded event's own time, in epoch milliseconds. */
   landed: "change-landed",
+  /** The paths a change's last derivation says its diff touched, by change id. */
+  paths: "change-paths",
+  /** A project's landings by each path the landing touched: the newest LANDINGS_KEPT per path, newest first. */
+  landedOn: (project: ProjectId) => `landed-on:${project}`,
 } as const;
+
+/** How many landings the Projector keeps for each path: the newest. */
+export const LANDINGS_KEPT = 5;
 
 export const CHANGE_PAGE = 50;
 export const CHANGE_PAGE_MAX = 100;
@@ -60,6 +67,9 @@ const encodeChange = Schema.encodeSync(Change);
 const decodeSummary = Schema.decodeUnknownSync(ChangeSummary);
 const encodeSummary = Schema.encodeSync(ChangeSummary);
 const decodeTrunk = Schema.decodeUnknownSync(TrunkView);
+const Landings = Schema.Array(Schema.Struct({ changeId: ChangeId, at: Schema.Finite }));
+const decodeLandings = Schema.decodeUnknownSync(Landings);
+const decodePaths = Schema.decodeUnknownSync(Schema.Array(Schema.String));
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
 /** The `#n` the feed gave the change when its IntentDeclared arrived. */
@@ -80,11 +90,43 @@ export function foldLanding(store: Store, event: EventEnvelope): string | undefi
   return undefined;
 }
 
+/** The landings kept on one path of a project, newest first. */
+const landingsAt = (store: Store, project: ProjectId, path: string) => {
+  const stored = store.get(VIEWS.landedOn(project), path);
+  return stored === undefined ? [] : decodeLandings(stored);
+};
+
+/**
+ * Indexes a landing under each path its change's last derivation touched,
+ * keeping the newest LANDINGS_KEPT per path. A change landed again (a re-fold)
+ * replaces its own entry, so the rows read as they did.
+ */
+function foldLandedPaths(store: Store, project: ProjectId, changeId: ChangeId, at: number): void {
+  const stored = store.get(VIEWS.paths, changeId);
+  if (stored === undefined) return;
+  for (const path of decodePaths(stored)) {
+    const kept = [
+      { changeId, at },
+      ...landingsAt(store, project, path).filter((l) => l.changeId !== changeId),
+    ]
+      .toSorted((a, b) => b.at - a.at || (a.changeId < b.changeId ? 1 : -1))
+      .slice(0, LANDINGS_KEPT);
+    store.put(VIEWS.landedOn(project), path, asStored(kept));
+  }
+}
+
 function foldChange(store: Store, event: EventEnvelope): string | undefined {
   const decoded = decodeChangeEvent(event.payload);
   if (Result.isFailure(decoded)) return `${event.eventId} (${event.type}) is not a change event`;
   // When it landed is the event's own time, kept whatever the machine makes of it, as the feed's re-fold keeps it.
-  if (decoded.success._tag === "ChangeLanded") foldLanding(store, event);
+  if (decoded.success._tag === "ChangeLanded") {
+    foldLanding(store, event);
+    if (event.project !== undefined)
+      foldLandedPaths(store, event.project, decoded.success.changeId, event.at);
+  }
+  // A resubmission derives again: the paths of the last derivation are what lands.
+  if (decoded.success._tag === "EffectsDerived" && decoded.success.paths !== undefined)
+    store.put(VIEWS.paths, decoded.success.changeId, asStored(decoded.success.paths));
   const stored = store.get(VIEWS.change, event.entity.id);
   let change: Change;
   try {
@@ -203,6 +245,29 @@ export function changeViewOf(
     ...(typeof landedAt === "number" ? { landedAt: Instant(landedAt) } : {}),
   };
 }
+
+/** The changes that landed on `path` in the project, newest first, at most `limit`, each as folded. */
+export function landedOnPath(
+  store: Store,
+  project: ProjectId,
+  path: string,
+  limit: number,
+): ChangeView[] {
+  return landingsAt(store, project, path)
+    .slice(0, limit)
+    .flatMap(({ changeId }) => changeViewOf(store, project, changeId) ?? []);
+}
+
+/** The changes that landed on `path` in the project, newest first, as many as the Projector keeps: what `Decisions.landedOn` answers. */
+export const landingsOn: (
+  project: ProjectId,
+  path: string,
+) => Effect.Effect<readonly ChangeView[], never, EntityStore> = Effect.fn("memory/landingsOn")(
+  function* (project: ProjectId, path: string) {
+    const store = yield* EntityStore;
+    return store.transaction(() => landedOnPath(store, project, path, LANDINGS_KEPT));
+  },
+);
 
 /** The project's changes and trunk with the feed's head, read in one transaction. */
 export const viewSnapshot: (project: ProjectId) => Effect.Effect<ViewSnapshot, never, EntityStore> =

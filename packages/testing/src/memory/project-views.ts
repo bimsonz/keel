@@ -4,6 +4,7 @@ import {
   decisionsOfGuards,
   decisionsOnSubjects,
   explaining,
+  landingsOn,
   foldViews,
   getDecision,
   listDecisions,
@@ -61,6 +62,7 @@ const decisionsOver = (provided: Provided) =>
     onSubjects: (project, subjects) => provided(decisionsOnSubjects(project, subjects)),
     atPath: (project, path) => provided(decisionsAtPath(project, path)),
     explaining: (project, target) => provided(explaining(project, target)),
+    landedOn: (project, path) => provided(landingsOn(project, path)),
   });
 
 /** The Projector's read models over an in-memory store, folded by the same core functions the Projector DO runs. */

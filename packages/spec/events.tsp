@@ -400,6 +400,9 @@ model EffectsDerived {
 
   /** The live anchors the submitted diff touches; absent when there are none. */
   touched?: EventTouchedAnchor[];
+
+  /** The paths the submitted diff touches, sorted, at most 500: what the change's landing is indexed under for `why`. Absent on a derivation from before they were kept. */
+  paths?: string[];
 }
 
 model DriftDetected {

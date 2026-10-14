@@ -89,6 +89,8 @@ export const DerivationRecord = Schema.Struct({
   undecided: Schema.Array(UndecidedJson),
   /** The live anchors the diff touches; absent from a record kept before they were. */
   touched: Schema.optional(Schema.Array(TouchedAnchor)),
+  /** The paths the diff touches, sorted, at most DERIVED_PATHS_MAX; absent from a record kept before they were. */
+  paths: Schema.optional(Schema.Array(Schema.String)),
 });
 export type DerivationRecord = typeof DerivationRecord.Type;
 
@@ -105,6 +107,9 @@ export interface DerivationKept {
   readonly derivationRef: ContentHash;
   readonly subjects: readonly SubjectKey[];
 }
+
+/** The most paths a derivation keeps of what the diff touches: the paths a landing is indexed under. */
+export const DERIVED_PATHS_MAX = 500;
 
 /** The paths a subject's anchors pin. */
 const pathsOf = (row: SubjectAnchors): readonly string[] => row.anchors.map((a) => a.path);
@@ -260,6 +265,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
       effects: derivation.effects,
       undecided: derivation.undecided,
       ...(touchedHere.length === 0 ? {} : { touched: touchedHere }),
+      paths: [...new Set(touched)].toSorted().slice(0, DERIVED_PATHS_MAX),
     }),
   );
   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();
@@ -289,5 +295,6 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
     effects: record.success.effects,
     derivationRef,
     ...(record.success.touched === undefined ? {} : { touched: record.success.touched }),
+    ...(record.success.paths === undefined ? {} : { paths: record.success.paths }),
   });
 });

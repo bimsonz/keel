@@ -10203,7 +10203,7 @@
       "get": {
         "operationId": "why",
         "summary": "Why is it like this?",
-        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.2 message in Keel's record. A subject's\nanchors name a file and no lines, so `line` does not narrow: a path with a\nline answers every subject anchored in that file. An agent reads its own\nproject unless it names another; anyone else names one. Nothing to explain\nin the project read is 404 `why.nothing_to_explain`. Without a token only a\npublic project is read, and a private or unknown one, like any the caller\nmay not see, is the same 404. A refusal about the caller itself (a token's\nscope, a suspension, a paused agent) is 403 with its next action.",
+        "description": "Why is this file, or this subject, the way it is? Name a `path` or a\n`subject`, not both. Each active decision on the subject, or on a subject\nanchored in the file, answers with its chain, newest decision first: the\ndecision, the premise its conflict was about, the intent of the change\nwhose effect met it, each guard that holds it, and each change that landed\nunder it, every link an MFP 0.2 message in Keel's record. A subject's\nanchors name a file and no lines, so `line` does not narrow: a path with a\nline answers every subject anchored in that file. An agent reads its own\nproject unless it names another; anyone else names one. A path no active\ndecision explains answers with the changes that landed on it most recently\n(up to three, newest first), each the intent its agent declared, saying no\ndecision is recorded there: Keel indexes a landing under the paths its\ndiff touched. Nothing to explain in the project read is 404\n`why.nothing_to_explain`. Without a token only a\npublic project is read, and a private or unknown one, like any the caller\nmay not see, is the same 404. A refusal about the caller itself (a token's\nscope, a suspension, a paused agent) is 403 with its next action.",
         "parameters": [
           {
             "name": "project",
@@ -15031,6 +15031,13 @@
               "$ref": "#/components/schemas/EventTouchedAnchor"
             },
             "description": "The live anchors the submitted diff touches; absent when there are none."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The paths the submitted diff touches, sorted, at most 500: what the change's landing is indexed under for `why`. Absent on a derivation from before they were kept."
           }
         },
         "additionalProperties": {

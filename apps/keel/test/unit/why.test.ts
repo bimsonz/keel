@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
-import { why, whyChain } from "@keeltown/core/application/memory";
+import { explainWhy, WHY_LANDINGS, why, whyChain } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { KEEL_MFP_PROFILE, type WhyLink } from "@keeltown/core/domain/memory";
 import {
@@ -290,6 +290,7 @@ describe("why", () => {
               onSubjects: counted("onSubjects", inner.onSubjects),
               atPath: counted("atPath", inner.atPath),
               explaining: counted("explaining", inner.explaining),
+              landedOn: counted("landedOn", inner.landedOn),
             }),
           ),
         ).pipe(Layer.provide(memory.layer));
@@ -602,5 +603,105 @@ describe("why's MFP records", () => {
         });
         expect(refusedOf(validate, chain)).toEqual([]);
       }),
+  );
+});
+
+/** What `why` answers with a path's landings, after these arrivals, over one in-memory Projector. */
+const explainAfter = (
+  arrivals: readonly EventEnvelope[],
+  project: ProjectId,
+  target: WhyTarget,
+) => {
+  const memory = makeDecisionsMemory();
+  return Effect.gen(function* () {
+    for (const event of arrivals) yield* memory.arrive(event);
+    return yield* Effect.result(explainWhy(project, target));
+  }).pipe(Effect.provide(memory.layer));
+};
+
+/** A change declared, started and landed as `commit`, its derivation touching `paths`. */
+const landedChange = (
+  events: ReturnType<typeof projectEvents>,
+  goal: string,
+  commit: string,
+  paths: readonly string[],
+) => {
+  const changeId = makeId("chg", ulid());
+  return {
+    changeId,
+    arrivals: [
+      events.declared(changeId, makeId("agt", ulid()), goal),
+      events.started(changeId),
+      ...events.landing(changeId, commit, paths),
+    ],
+  };
+};
+
+describe("why, where no decision explains a path", () => {
+  it.effect(
+    `[why.landings] a path no decision explains is explained by the ${WHY_LANDINGS} changes that landed on it most recently, newest first, each its intent as its agent declared it, saying no decision is recorded there; a line does not narrow it, and a path nothing landed on is nothing to explain`,
+    () => {
+      const events = projectEvents();
+      const takes = [1, 2, 3, 4].map((n) =>
+        landedChange(events, `Price it, take ${n}`, commitOf(10 + n), ["src/pay.ts"]),
+      );
+      const other = landedChange(events, "Elsewhere", commitOf(20), ["src/other.ts"]);
+      const arrivals = [...takes.flatMap((t) => t.arrivals), ...other.arrivals];
+      return Effect.gen(function* () {
+        const answer = Result.getOrThrow(
+          yield* explainAfter(arrivals, events.project, { kind: "path", path: "src/pay.ts" }),
+        );
+        const newest = takes.toReversed().slice(0, WHY_LANDINGS);
+        expect(answer.basis).toBe("landings");
+        expect(answer.chain.map((link) => link.summary)).toEqual(
+          newest.map(
+            ({ changeId }, i) =>
+              `No decision is recorded on src/pay.ts: ${changeId} landed it as ${commitOf(14 - i).slice(0, 12)}, intending "Price it, take ${4 - i}"`,
+          ),
+        );
+        expect(
+          answer.chain.map((link) => [
+            link.record.id,
+            link.record.change,
+            link.record.message.kind,
+          ]),
+        ).toEqual(newest.map(({ changeId }) => [`${changeId}.intent.1`, changeId, "intent"]));
+        const withLine = Result.getOrThrow(
+          yield* explainAfter(arrivals, events.project, {
+            kind: "path",
+            path: "src/pay.ts",
+            line: 3,
+          }),
+        );
+        expect(withLine).toEqual(answer);
+        const nothing = yield* explainAfter(arrivals, events.project, {
+          kind: "path",
+          path: "src/none.ts",
+        });
+        expect(Result.isFailure(nothing) && nothing.failure._tag).toBe("NothingToExplain");
+      });
+    },
+  );
+
+  it.effect(
+    "[why.landings.decided-first] a path a decision explains answers the decision alone, whatever landed there, and a subject no decision explains is nothing to explain, whatever landed",
+    () => {
+      const s = ruled("premise-holds");
+      const onFile = landedChange(s.events, "Edit the check", commitOf(30), [FILE]);
+      const arrivals = [...s.arrivals, s.conflict.minted([FILE]), ...onFile.arrivals];
+      return Effect.gen(function* () {
+        const byPath = Result.getOrThrow(
+          yield* explainAfter(arrivals, s.events.project, { kind: "path", path: FILE }),
+        );
+        expect(byPath.basis).toBe("decisions");
+        expect(byPath.chain.map((link) => link.record.message.kind)).toContain("decision");
+        expect(byPath.chain.some((link) => link.summary.startsWith("No decision"))).toBe(false);
+        const bySubject = yield* explainAfter(arrivals, s.events.project, {
+          kind: "subject",
+          subject: Schema.decodeUnknownSync(SubjectKey)("billing.invoices"),
+        });
+        expect(Result.isFailure(bySubject) && bySubject.failure._tag).toBe("NothingToExplain");
+      });
+    },
   );
 });

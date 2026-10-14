@@ -2,13 +2,14 @@
 # kills: d21.derive.committed
 # why: the derived step commits the effects without the anchors the kept record says the diff touched, so no subject hears the edit
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index 9403d38..3413ff0 100644
+index 9e4932de..b9bbf4c6 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -288,6 +288,5 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
+@@ -294,7 +294,6 @@ export const commitDerivation = Effect.fn("verification/commitDerivation")(funct
      instanceId: submission.instanceId,
      effects: record.success.effects,
      derivationRef,
 -    ...(record.success.touched === undefined ? {} : { touched: record.success.touched }),
+     ...(record.success.paths === undefined ? {} : { paths: record.success.paths }),
    });
  });

@@ -52,31 +52,36 @@ const cite = (record: KeelRecord): MfpCitation => ({ kind: "record", ref: record
 const authorOf = (change: Change): RecordAuthor =>
   change.origin === "agent" ? { kind: "agent", id: change.agentId } : KEEL_AUTHOR;
 
-/** The intent a change holds now, as its agent declared it. */
-function intentLink(change: Change, proposition: Proposition): WhyLink {
+/** The intent a change holds now, as its agent declared it, as Keel's record states it. */
+function intentRecord(change: Change): KeelRecord {
   const { intent } = change;
   return {
-    summary: `${change.id} intends "${intent.goal}", which makes ${said(proposition)}`,
-    record: {
-      id: `${change.id}.intent.${intent.revision}`,
-      change: change.id,
-      author: authorOf(change),
-      // The view keeps no time per revision: the change's own is when it was declared.
-      at: iso(change.createdAt),
-      message: {
-        ...stated("intent"),
-        goal: intent.goal,
-        footprint: intent.footprint.map((entry) => ({
-          path: entry.path,
-          ...(entry.symbol === undefined ? {} : { symbol: entry.symbol }),
-          op: entry.op,
-        })),
-        premises: intent.premises.flatMap((p) => told(premiseToMfp(p))),
-        ...(intent.declaredEffects === undefined
-          ? {}
-          : { declaredEffects: intent.declaredEffects.flatMap((p) => told(effectToMfp(p))) }),
-      },
+    id: `${change.id}.intent.${intent.revision}`,
+    change: change.id,
+    author: authorOf(change),
+    // The view keeps no time per revision: the change's own is when it was declared.
+    at: iso(change.createdAt),
+    message: {
+      ...stated("intent"),
+      goal: intent.goal,
+      footprint: intent.footprint.map((entry) => ({
+        path: entry.path,
+        ...(entry.symbol === undefined ? {} : { symbol: entry.symbol }),
+        op: entry.op,
+      })),
+      premises: intent.premises.flatMap((p) => told(premiseToMfp(p))),
+      ...(intent.declaredEffects === undefined
+        ? {}
+        : { declaredEffects: intent.declaredEffects.flatMap((p) => told(effectToMfp(p))) }),
     },
+  };
+}
+
+/** The intent of the change whose effect met a decision's premise. */
+function intentLink(change: Change, proposition: Proposition): WhyLink {
+  return {
+    summary: `${change.id} intends "${change.intent.goal}", which makes ${said(proposition)}`,
+    record: intentRecord(change),
   };
 }
 
@@ -272,5 +277,47 @@ export const why: (
     const chain = (yield* (yield* Decisions).explaining(project, target)).flatMap(whyChain);
     if (chain.length === 0) return yield* new NothingToExplain({ target: whyAsked(target) });
     return chain;
+  },
+);
+
+/** How many of a path's landings `why` names when no decision explains the path. */
+export const WHY_LANDINGS = 3;
+
+/**
+ * What `why` answers: the active decisions that explain what was asked, or,
+ * on a path no decision explains, the changes that landed there most
+ * recently, each a change and not a decision.
+ */
+export interface WhyAnswer {
+  readonly basis: "decisions" | "landings";
+  readonly chain: readonly WhyLink[];
+}
+
+/** A change that landed on the path, as the explanation of last resort: its intent, saying no decision is recorded there. */
+const landingLink = (path: string, { change }: ChangeView): WhyLink => ({
+  summary: `No decision is recorded on ${path}: ${change.id} landed it${change.landedCommit === undefined ? "" : ` as ${change.landedCommit.slice(0, 12)}`}, intending "${change.intent.goal}"`,
+  record: intentRecord(change),
+});
+
+/**
+ * `why`, with a path's landings when no active decision explains the path:
+ * the WHY_LANDINGS changes that landed on it most recently, newest first.
+ * NothingToExplain for a subject no decision explains, and for a path where
+ * neither a decision nor a landing Keel indexed does.
+ */
+export const explainWhy: (
+  project: ProjectId,
+  target: WhyTarget,
+) => Effect.Effect<WhyAnswer, NothingToExplain, Decisions> = Effect.fn("memory/explainWhy")(
+  function* (project: ProjectId, target: WhyTarget) {
+    const decided = yield* Effect.result(why(project, target));
+    if (Result.isSuccess(decided)) return { basis: "decisions", chain: decided.success };
+    if (target.kind !== "path") return yield* decided.failure;
+    const landed = yield* (yield* Decisions).landedOn(project, target.path);
+    if (landed.length === 0) return yield* decided.failure;
+    return {
+      basis: "landings",
+      chain: landed.slice(0, WHY_LANDINGS).map((view) => landingLink(target.path, view)),
+    };
   },
 );

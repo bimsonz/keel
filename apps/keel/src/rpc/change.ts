@@ -338,6 +338,8 @@ export const EffectsDerivedCommand = Schema.Struct({
   derivationRef: Schema.NonEmptyString,
   /** The live anchors the submitted diff touches; absent from a Precheck from before they were kept. */
   touched: Schema.optional(Schema.Array(TouchedAnchor)),
+  /** The paths the submitted diff touches; absent from a Precheck from before they were kept. */
+  paths: Schema.optional(Schema.Array(Schema.String)),
 });
 export type EffectsDerivedCommand = typeof EffectsDerivedCommand.Type;
 

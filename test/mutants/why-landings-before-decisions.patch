@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/why.test.ts -t why.landings
+# kills: why.landings.decided-first
+# why: A path's landings answer before its decisions, so a ruling on the code is hidden behind whatever landed there last
+diff --git a/packages/core/src/application/memory/why.ts b/packages/core/src/application/memory/why.ts
+index 2e96efa2..17ead079 100644
+--- a/packages/core/src/application/memory/why.ts
++++ b/packages/core/src/application/memory/why.ts
+@@ -311,10 +311,12 @@ export const explainWhy: (
+ ) => Effect.Effect<WhyAnswer, NothingToExplain, Decisions> = Effect.fn("memory/explainWhy")(
+   function* (project: ProjectId, target: WhyTarget) {
+     const decided = yield* Effect.result(why(project, target));
+-    if (Result.isSuccess(decided)) return { basis: "decisions", chain: decided.success };
+-    if (target.kind !== "path") return yield* decided.failure;
+-    const landed = yield* (yield* Decisions).landedOn(project, target.path);
+-    if (landed.length === 0) return yield* decided.failure;
++    const landed =
++      target.kind === "path" ? yield* (yield* Decisions).landedOn(project, target.path) : [];
++    if (Result.isSuccess(decided) && landed.length === 0)
++      return { basis: "decisions", chain: decided.success };
++    if (target.kind !== "path" || landed.length === 0)
++      return yield* Effect.fail(new NothingToExplain({ target: whyAsked(target) }));
+     return {
+       basis: "landings",
+       chain: landed.slice(0, WHY_LANDINGS).map((view) => landingLink(target.path, view)),

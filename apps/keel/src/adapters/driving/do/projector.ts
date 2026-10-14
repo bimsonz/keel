@@ -5,6 +5,7 @@ import {
   decisionsOnSubjects,
   escalationView,
   explaining,
+  landingsOn,
   foldViews,
   listChanges,
   listEscalations,
@@ -295,6 +296,14 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, target }) => explaining(project, target)),
     );
     return this.answer(ProjectorCodecs.explaining, program);
+  }
+
+  async landedOn(request: typeof PathDecisionsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(PathDecisionsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, path }) => landingsOn(project, path)),
+    );
+    return this.answer(ProjectorCodecs.landedOn, program);
   }
 
   async verdict(request: typeof VerdictRead.Encoded) {

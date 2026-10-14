@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/landed-on.test.ts
+# kills: why.landed-on
+# why: The Projector keeps no derivation's paths, so no landing is indexed and why never names what landed on a path
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 6f0079e6..1631b2a3 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -126,7 +126,7 @@ function foldChange(store: Store, event: EventEnvelope): string | undefined {
+   }
+   // A resubmission derives again: the paths of the last derivation are what lands.
+   if (decoded.success._tag === "EffectsDerived" && decoded.success.paths !== undefined)
+-    store.put(VIEWS.paths, decoded.success.changeId, asStored(decoded.success.paths));
++    void decoded.success.paths;
+   const stored = store.get(VIEWS.change, event.entity.id);
+   let change: Change;
+   try {

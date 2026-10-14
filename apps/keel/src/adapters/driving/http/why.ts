@@ -1,6 +1,6 @@
-import { why, whyAsked } from "@keeltown/core/application/memory";
+import { explainWhy, type WhyAnswer, whyAsked } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import type { KeelRecord, WhyLink } from "@keeltown/core/domain/memory";
+import type { KeelRecord } from "@keeltown/core/domain/memory";
 import type { WhyTarget } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations, WhyResult } from "../../../generated/http/app.gen.ts";
@@ -74,27 +74,46 @@ function recordView(record: KeelRecord) {
   }
 }
 
-/** The chain, with a summary naming the decisions behind it and a way to read each of the first three. */
-function whyOk(target: WhyTarget, chain: readonly WhyLink[]): WhyResult {
+/**
+ * The chain, with a summary naming what explains it and a way to read each
+ * of the first three: the decisions behind it, or, where none is recorded on
+ * a path, the changes that landed there most recently.
+ */
+function whyOk(target: WhyTarget, { basis, chain }: WhyAnswer): WhyResult {
+  const asked = whyAsked(target);
   const decisions = chain.flatMap((link) =>
     link.record.message.kind === "decision" ? [link.record.id] : [],
   );
-  const one = decisions.length === 1;
+  const changes = chain.flatMap((link) =>
+    link.record.change === undefined ? [] : [link.record.change],
+  );
+  const one = (basis === "decisions" ? decisions : changes).length === 1;
   return {
     status: 200,
     body: {
       ok: true,
-      summary: `${decisions.length} active decision${one ? "" : "s"} explain${one ? "s" : ""} ${whyAsked(target)}, newest first: ${chain.length} records.`,
+      summary:
+        basis === "decisions"
+          ? `${decisions.length} active decision${one ? "" : "s"} explain${one ? "s" : ""} ${asked}, newest first: ${chain.length} records.`
+          : `No decision is recorded on ${asked}; the ${changes.length} change${one ? "" : "s"} that landed there most recently say${one ? "s" : ""} why it is as it is, newest first.`,
       result: {
         chain: chain.map((link) => ({ summary: link.summary, record: recordView(link.record) })),
       },
       findings: [],
-      next: decisions.slice(0, 3).map((decisionId) => ({
-        kind: "read",
-        title: `Read decision ${decisionId}`,
-        operationId: "Memory_getDecision",
-        args: { decisionId },
-      })),
+      next:
+        basis === "decisions"
+          ? decisions.slice(0, 3).map((decisionId) => ({
+              kind: "read",
+              title: `Read decision ${decisionId}`,
+              operationId: "Memory_getDecision",
+              args: { decisionId },
+            }))
+          : changes.slice(0, 3).map((changeId) => ({
+              kind: "read",
+              title: `Read change ${changeId}, which landed on ${asked}`,
+              operationId: "change",
+              args: { changeId },
+            })),
       notices: [],
       cost: {},
     },
@@ -104,7 +123,8 @@ function whyOk(target: WhyTarget, chain: readonly WhyLink[]): WhyResult {
 /**
  * `why`, read in the project the policy decided: the one `project` names, or
  * an agent's own, never one the handler reads from the input. Its chain comes
- * from the Projector's decision index and read models, in one read.
+ * from the Projector's decision index and read models, in one read, and from
+ * its landings by path in one more when no decision explains a path.
  */
 export function whyHandlers(run: Runner) {
   return {
@@ -113,9 +133,9 @@ export function whyHandlers(run: Runner) {
       if (Result.isFailure(target)) return invalid(caller, target.failure);
       return run(
         caller,
-        why(projectIn(caller).projectId, target.success).pipe(
+        explainWhy(projectIn(caller).projectId, target.success).pipe(
           Effect.match({
-            onSuccess: (chain) => whyOk(target.success, chain),
+            onSuccess: (answer) => whyOk(target.success, answer),
             onFailure: (error): WhyResult => nothingToExplain(caller, error.target),
           }),
         ),

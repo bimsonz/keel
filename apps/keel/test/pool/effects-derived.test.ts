@@ -218,6 +218,26 @@ describe("[b21.fallout-derived] an effect Precheck derives, at a subject the cha
 });
 
 describe("[anchor.through-objects] a diff that touches code a premise rests on", () => {
+  it("[derive.paths-through-objects] the paths the diff touched reach EffectsDerived through the Precheck binding and the Change DO, as the derivation kept them", async () => {
+    await using held = await inertPrecheck();
+    const { change } = await project();
+    const b = await change();
+    await deriving(b, "p-1");
+    const withPaths: PrecheckDerived = {
+      ...derivation("p-1", []),
+      paths: ["bench/p2.ts", "src/authz/evaluate.ts"],
+    };
+    expect(outcomeOf(await precheck((p) => p.derived(b.changeId, withPaths)))).toBe("ok");
+    await drainOutbox(b.stub);
+    const [recorded] = await derivedIn(b);
+    expect(recorded?.payload).toMatchObject({
+      effects: [],
+      paths: ["bench/p2.ts", "src/authz/evaluate.ts"],
+    });
+    // The one Precheck the submission started stays held: the derivation is the binding's call above.
+    await vi.waitFor(async () => expect(await held.get()).toHaveLength(1), WAIT);
+  });
+
   it("[anchor.through-objects] the derivation names the touched subject, which hears it and puts the premise anchored there in doubt with the anchor as cause, opening no conflict; a premise anchored elsewhere is not told", async () => {
     await using held = await inertPrecheck();
     const { projectId, change } = await project();

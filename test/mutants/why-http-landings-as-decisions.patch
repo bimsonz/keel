@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/why.test.ts -t why.http.landings
+# kills: why.http.landings
+# why: A path's landings are summarised as zero active decisions, so an agent reads that nothing explains the path while the chain names the changes
+diff --git a/apps/keel/src/adapters/driving/http/why.ts b/apps/keel/src/adapters/driving/http/why.ts
+index 553d9688..2132711c 100644
+--- a/apps/keel/src/adapters/driving/http/why.ts
++++ b/apps/keel/src/adapters/driving/http/why.ts
+@@ -93,7 +93,7 @@ function whyOk(target: WhyTarget, { basis, chain }: WhyAnswer): WhyResult {
+     body: {
+       ok: true,
+       summary:
+-        basis === "decisions"
++        basis !== "landings" || chain.length >= 0
+           ? `${decisions.length} active decision${one ? "" : "s"} explain${one ? "s" : ""} ${asked}, newest first: ${chain.length} records.`
+           : `No decision is recorded on ${asked}; the ${changes.length} change${one ? "" : "s"} that landed there most recently say${one ? "s" : ""} why it is as it is, newest first.`,
+       result: {

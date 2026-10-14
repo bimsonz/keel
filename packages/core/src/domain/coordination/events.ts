@@ -121,6 +121,8 @@ export const EffectsDerived = Schema.TaggedStruct("EffectsDerived", {
   derivationRef: Schema.String,
   /** The live anchors the submitted diff touches; absent on a derivation from before they were kept, and when there are none. */
   touched: Schema.optional(Schema.Array(TouchedAnchor)),
+  /** The paths the submitted diff touches, sorted, at most DERIVED_PATHS_MAX; absent on a derivation from before they were kept. */
+  paths: Schema.optional(Schema.Array(Schema.String)),
 });
 export const DriftDetected = Schema.TaggedStruct("DriftDetected", {
   changeId: ChangeId,

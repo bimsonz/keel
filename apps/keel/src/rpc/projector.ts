@@ -327,6 +327,7 @@ export const ProjectorCodecs = {
   subjectDecisions: exitCodec(Schema.Array(IndexedDecision), Schema.Never),
   pathDecisions: exitCodec(Schema.Array(IndexedDecision), Schema.Never),
   explaining: exitCodec(Schema.Array(WhySource), Schema.Never),
+  landedOn: exitCodec(Schema.Array(ChangeView), Schema.Never),
 };
 
 /**
@@ -366,6 +367,8 @@ export interface ProjectorRpc extends EventReceiverRpc {
   pathDecisions(request: typeof PathDecisionsRead.Encoded): Promise<ExitJson>;
   /** A project's active decisions on a subject or at a path, newest first, each with its conflict and the changes it names, in one read. */
   explaining(request: typeof WhyRead.Encoded): Promise<ExitJson>;
+  /** The changes that landed on a path of a project most recently, newest first. */
+  landedOn(request: typeof PathDecisionsRead.Encoded): Promise<ExitJson>;
   /** One verdict, by its id alone. VerdictNotFound for one the feed does not hold. */
   verdict(request: typeof VerdictRead.Encoded): Promise<ExitJson>;
 }

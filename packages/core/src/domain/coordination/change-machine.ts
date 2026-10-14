@@ -180,6 +180,8 @@ export type ChangeCommand =
       readonly derivationRef: string;
       /** The live anchors the submitted diff touches. */
       readonly touched?: readonly TouchedAnchor[];
+      /** The paths the submitted diff touches. */
+      readonly paths?: readonly string[];
     }
   | { readonly _tag: "Drift"; readonly blocking: readonly Drift[] }
   | {
@@ -658,6 +660,7 @@ export const decideChange = (
               ...(command.touched === undefined || command.touched.length === 0
                 ? {}
                 : { touched: command.touched }),
+              ...(command.paths === undefined ? {} : { paths: command.paths }),
             }),
           ])
         : refuse(change, command);

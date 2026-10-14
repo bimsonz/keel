@@ -51,8 +51,19 @@ export function projectEvents(project: string = id("prj")) {
       payload,
     });
   };
+  /** Precheck's derivation of a change's diff, touching `paths`. */
+  const derived = (changeId: string, paths: readonly string[]) =>
+    envelope(changeRef(changeId), {
+      _tag: "EffectsDerived",
+      changeId,
+      revision: 1,
+      effects: [],
+      derivationRef: `sha256:${"d".repeat(64)}`,
+      paths,
+    } as { _tag: string });
   return {
     project: ProjectId.make(project),
+    derived,
     declared: (changeId: string, agentId: string, goal: string) =>
       envelope(changeRef(changeId), {
         _tag: "IntentDeclared",
@@ -72,8 +83,12 @@ export function projectEvents(project: string = id("prj")) {
         workspaceId: id("wsp"),
         baseSha: sha(1),
       } as { _tag: string }),
-    /** A started change's way from its submission to trunk, landing as `commit`, as its Change object commits it. */
-    landing: (changeId: string, commit: string) => [
+    /**
+     * A started change's way from its submission to trunk, landing as
+     * `commit`, as its Change object commits it; with `paths`, Precheck's
+     * derivation says its diff touched them.
+     */
+    landing: (changeId: string, commit: string, paths?: readonly string[]) => [
       envelope(changeRef(changeId), {
         _tag: "ChangeSubmitted",
         changeId,
@@ -87,6 +102,7 @@ export function projectEvents(project: string = id("prj")) {
         revision: 1,
         instanceId: id("wfi"),
       } as { _tag: string }),
+      ...(paths === undefined ? [] : [derived(changeId, paths)]),
       envelope(changeRef(changeId), {
         _tag: "PlanCompiled",
         changeId,

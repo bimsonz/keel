@@ -2,10 +2,10 @@
 # kills: anchor.through-objects
 # why: EffectsDerived leaves out the anchors the diff touched, so the subjects they belong to are named but cannot tell which code was edited
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f134035..d4f6e0b 100644
+index 24d252e2..d2636930 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -652,9 +652,7 @@ export const decideChange = (
+@@ -657,9 +657,7 @@ export const decideChange = (
                  proposition: canonicalProposition(effect.proposition),
                })),
                derivationRef: command.derivationRef,
@@ -13,6 +13,6 @@ index f134035..d4f6e0b 100644
 -                ? {}
 -                : { touched: command.touched }),
 +
+               ...(command.paths === undefined ? {} : { paths: command.paths }),
              }),
            ])
-         : refuse(change, command);

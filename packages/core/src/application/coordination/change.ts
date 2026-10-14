@@ -464,6 +464,8 @@ export interface DerivedEffects extends PrecheckStep {
   readonly derivationRef: string;
   /** The live anchors the submitted diff touches. */
   readonly touched?: readonly TouchedAnchor[] | undefined;
+  /** The paths the submitted diff touches. */
+  readonly paths?: readonly string[] | undefined;
 }
 
 type Store = Transaction["store"];
@@ -1854,6 +1856,7 @@ export const effectsDerived: (
           effects,
           derivationRef: derived.derivationRef,
           ...(touched.length === 0 ? {} : { touched }),
+          ...(derived.paths === undefined ? {} : { paths: derived.paths }),
         },
       ],
       {

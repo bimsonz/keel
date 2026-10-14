@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/landed-on.test.ts
+# kills: why.landed-on
+# why: A landing folded again (the feed's re-fold) is kept twice, so why names one change as two landings
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 6f0079e6..15536a52 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -107,7 +107,7 @@ function foldLandedPaths(store: Store, project: ProjectId, changeId: ChangeId, a
+   for (const path of decodePaths(stored)) {
+     const kept = [
+       { changeId, at },
+-      ...landingsAt(store, project, path).filter((l) => l.changeId !== changeId),
++      ...landingsAt(store, project, path),
+     ]
+       .toSorted((a, b) => b.at - a.at || (a.changeId < b.changeId ? 1 : -1))
+       .slice(0, LANDINGS_KEPT);

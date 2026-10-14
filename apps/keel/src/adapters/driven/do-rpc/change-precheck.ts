@@ -44,6 +44,7 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
               effects: derived.effects,
               derivationRef: derived.derivationRef,
               ...(derived.touched === undefined ? {} : { touched: derived.touched }),
+              ...(derived.paths === undefined ? {} : { paths: derived.paths }),
             }),
           ),
         ).pipe(Effect.asVoid),
