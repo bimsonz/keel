@@ -1,0 +1,26 @@
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      example-kit:
+        specifier: ^1.0.0
+        version: 1.0.0
+      is-number:
+        specifier: ^7.0.0
+        version: 7.0.0
+
+packages:
+
+  example-kit@1.0.0:
+    resolution: {tarball: https://registry.example.invalid/example-kit/-/example-kit-1.0.0.tgz}
+
+  is-number@7.0.0:
+    resolution: {integrity: sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==, tarball: https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz}
+
+snapshots:
+
+  example-kit@1.0.0: {}
+
+  is-number@7.0.0: {}

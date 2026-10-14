@@ -7,6 +7,7 @@ import { checkPatchesApply, PATCHES_APPLY } from "./guards/patches-apply.ts";
 import { checkPublicScrub, PUBLIC_SCRUB } from "./guards/public-scrub.ts";
 import { checkR2NamespaceKeys, R2_NAMESPACE_KEYS } from "./guards/r2-namespace-keys.ts";
 import { checkReadonlyBundles, READONLY_BUNDLES } from "./guards/readonly-bundles.ts";
+import { checkRegistryPublic, REGISTRY_PUBLIC } from "./guards/registry-public.ts";
 import { checkRunnerCredentials, RUNNER_CREDENTIALS } from "./guards/runner-credentials.ts";
 import { checkXstateTestOnly, XSTATE_TEST_ONLY } from "./guards/xstate-test-only.ts";
 import { checkR8, checkR11, checkR14 } from "./arch/code-rules.ts";

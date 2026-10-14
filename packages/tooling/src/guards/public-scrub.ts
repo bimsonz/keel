@@ -30,17 +30,19 @@ const FORBIDDEN_TERMS: ReadonlyMap<string, string> = new Map([
 ]);
 
 const LOCAL_PATH = /\/Users\/|\/home\/[a-z]/;
+// The same path flattened into one folder name, as tools that keep a folder per project write it.
+const LOCAL_PATH_FOLDER = /-Users-[A-Za-z0-9]/;
 
 const TEXT = (path: string): boolean =>
   /\.(md|ts|tsx|js|mjs|json|jsonc|ya?ml|tsp|sql|tf|sh|txt|html|css|toml)$/.test(path) ||
   /(^|\/)(\.npmrc|\.gitignore|LICENSE)$/.test(path);
 
-export function digest(term: string): string {
+function digest(term: string): string {
   return createHash("sha256").update(term).digest("hex").slice(0, 16);
 }
 
 /** Every run of one to three words in `line`, lower-cased and hyphen-joined. */
-export function termsOf(line: string): string[] {
+function termsOf(line: string): string[] {
   const words = line.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   const terms: string[] = [];
   words.forEach((word, start) => {
@@ -90,6 +92,14 @@ export function checkPublicScrub(root: string, options: GuardOptions = {}): Guar
         file,
         line: hit.line,
         message: "names a local filesystem path",
+      });
+    }
+    for (const hit of matchingLines(text, LOCAL_PATH_FOLDER)) {
+      violations.push({
+        rule: PUBLIC_SCRUB,
+        file,
+        line: hit.line,
+        message: "names a local filesystem path flattened into a folder name",
       });
     }
     text.split("\n").forEach((line, index) => {

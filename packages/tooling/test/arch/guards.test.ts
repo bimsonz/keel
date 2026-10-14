@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { checkPatchesApply } from "../../src/guards/patches-apply.ts";
+import { checkRegistryPublic } from "../../src/guards/registry-public.ts";
 import { allChecks } from "../../src/registry.ts";
 import { repoRoot } from "../../src/scan.ts";
 
@@ -17,7 +18,16 @@ afterAll(() => rmSync(empty, { recursive: true, force: true }));
  * Rules backed by ArchUnitTS must be caught by both engines.
  */
 const EXPECTED: Record<string, readonly RegExp[]> = {
-  "public-scrub": [/local filesystem path/, /planted name/],
+  "registry-public": [
+    /resolves a tarball outside https:\/\/registry\.npmjs\.org\/: https:\/\/registry\.example\.invalid\//,
+    /maps the @example scope to a registry of its own/,
+    /sets registry to https:\/\/registry\.example\.invalid\/, not https:\/\/registry\.npmjs\.org\//,
+  ],
+  "public-scrub": [
+    /local filesystem path$/,
+    /local filesystem path flattened into a folder name/,
+    /planted name/,
+  ],
   "event-names": [
     /PremiseSuspect is not a past-tense verb/,
     /catalogued twice/,
@@ -193,6 +203,20 @@ describe("patches-apply", () => {
     } finally {
       rmSync(broken, { recursive: true, force: true });
     }
+  });
+});
+
+describe("registry-public", () => {
+  it("[registry-public.control] names each planted line and passes the public ones beside them", () => {
+    const result = checkRegistryPublic(join(root, "test/controls/registry-public"), {
+      skip: [],
+      vacuity: { minFiles: 1, canary: "pnpm-lock.yaml" },
+    });
+    expect(result.violations.map((v) => `${v.file}:${v.line}`)).toEqual([
+      ".npmrc:1",
+      ".npmrc:2",
+      "pnpm-lock.yaml:17",
+    ]);
   });
 });
 

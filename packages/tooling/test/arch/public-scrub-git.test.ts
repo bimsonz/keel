@@ -64,7 +64,7 @@ describe("public-scrub reads what git would publish", () => {
     const planted = readFileSync(
       join(import.meta.dirname, "../../../../test/controls/public-scrub/README.md"),
       "utf8",
-    ).replace(/^.*\/(Users|home)\/.*$/gm, "");
+    ).replace(/^.*(\/(Users|home)\/|-Users-).*$/gm, "");
     const dir = tree("repeat", { "a.md": planted, "b.md": planted }, true);
     git(dir, "add", "a.md", "b.md");
     expect(leaks(dir)).toEqual([
