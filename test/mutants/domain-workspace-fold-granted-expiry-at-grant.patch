@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: a grant is folded as expiring the instant it was folded, whatever expiry its event names
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e66d67e2..56d557e4 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -141,7 +141,7 @@ export const evolveWorkspace = (
+             ...workspace,
+             state: "granted",
+             holder: event.holder,
+-            expiresAt: event.expiresAt,
++            expiresAt: committed.at,
+             baseSha: event.baseSha,
+           }
+         : illegal(workspace, event);

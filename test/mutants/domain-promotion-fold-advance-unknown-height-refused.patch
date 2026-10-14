@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: a trunk that does not know its height, as an older Trunk DO's advance leaves it, refuses every advance that names a height
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..1c692640 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -575,9 +575,7 @@ export const evolvePromotion = (
+         wal.old === event.from &&
+         wal.composed === event.to &&
+         event.landings.map((l) => l.changeId).join() === membersOf(wal).join() &&
+-        (event.height === undefined ||
+-          trunk.height === undefined ||
+-          event.height === trunk.height + 1)
++        (event.height === undefined || event.height - 1 === trunk.height)
+         ? {
+             // An advance without a height (an older Trunk DO's) leaves the height unknown.
+             // A push landed: grouping resumes.

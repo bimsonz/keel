@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: a batch is folded at chain epoch 0 whatever epoch BatchFormed names, so results fenced on a later epoch are taken against the wrong one
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 46ee4c8c..fb425b59 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -372,7 +372,7 @@ export const evolveCandidate = (
+       members: event.members,
+       base: event.base,
+       attempt: event.attempt,
+-      chainEpoch: event.chainEpoch,
++      chainEpoch: 0,
+       state: "forming",
+       predecessors: event.predecessors ?? [],
+     };

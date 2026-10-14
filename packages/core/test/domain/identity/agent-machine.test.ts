@@ -305,22 +305,23 @@ const namesItsEnder = (
   return event._tag === "AgentReinstated" && event.by === by;
 };
 
-/** What the fold's table is about: an agent's state, who stands behind it, and its revocation epoch. */
+/** What the fold's table is about: an agent's state, who stands behind it, its revocation epoch, and when it began. */
 interface Folded {
   readonly state: Agent["state"];
   readonly sponsor?: UserId;
   readonly epoch: number;
+  readonly createdAt: Instant;
 }
 
 /** The fold's from-table (state-machines.md § Agent), typed apart from `evolveAgent`. */
-const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" => {
+const folds = (from: Folded | undefined, event: AgentEvent, at: Instant): Folded | "illegal" => {
   if (from === undefined) {
-    // An agent begins one of two ways: a person enrols it, or it signs itself up with a key.
-    if (event._tag === "AgentSignedUp") return { state: "active", epoch: 0 };
+    // An agent begins one of two ways, a person enrols it or it signs itself up with a key, at the instant that commits.
+    if (event._tag === "AgentSignedUp") return { state: "active", epoch: 0, createdAt: at };
     if (event._tag !== "AgentEnrolled") return "illegal";
     return event.sponsor === undefined
-      ? { state: "active", epoch: 0 }
-      : { state: "active", sponsor: event.sponsor, epoch: 0 };
+      ? { state: "active", epoch: 0, createdAt: at }
+      : { state: "active", sponsor: event.sponsor, epoch: 0, createdAt: at };
   }
   if (event.agentId !== AGENT) return "illegal";
   switch (event._tag) {
@@ -342,7 +343,7 @@ const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" 
         : "illegal";
     case "AgentUnsponsored":
       return from.state === "active" && from.sponsor === event.sponsor
-        ? { state: "active", epoch: from.epoch }
+        ? { state: "active", epoch: from.epoch, createdAt: from.createdAt }
         : "illegal";
     default: {
       const unreachable: never = event;
@@ -354,7 +355,7 @@ const folds = (from: Folded | undefined, event: AgentEvent): Folded | "illegal" 
 const shown = (folded: Folded | "illegal" | undefined): string => {
   if (folded === undefined) return "none";
   if (folded === "illegal") return "illegal";
-  return `${folded.state}, ${folded.sponsor ?? "alone"}, epoch ${folded.epoch}`;
+  return `${folded.state}, ${folded.sponsor ?? "alone"}, epoch ${folded.epoch}, created ${folded.createdAt}`;
 };
 const seen = (agent: Agent | undefined): string =>
   shown(
@@ -363,28 +364,42 @@ const seen = (agent: Agent | undefined): string =>
       : {
           state: agent.state,
           epoch: agent.revocationEpoch,
+          createdAt: agent.createdAt,
           ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
         },
   );
 
-/** What the fold does with an event: where it lands, or that it refused it as illegal. */
-const foldOf = (agent: Agent | undefined, event: AgentEvent): string => {
+/** What the fold does with an event committed at `at`: where it lands, or that it refused it as illegal. */
+const foldOf = (agent: Agent | undefined, event: AgentEvent, at: Instant): string => {
   try {
-    return seen(evolveAgent(agent, { at: T0, payload: event }));
+    return seen(evolveAgent(agent, { at, payload: event }));
   } catch (error) {
     return error instanceof IllegalTransition ? "illegal" : `threw ${String(error)}`;
   }
 };
 
-/** Each state a run reaches, alone and with a sponsor: the commands that reach it, and what it is. */
+/**
+ * The instants each event is folded at. An agent is stamped with the instant
+ * it began, so a fold that stamped one fixed instant would agree with the
+ * table at that instant alone.
+ */
+const FOLDED_AT: readonly Instant[] = [T0, Instant(T0 + 3_600_000)];
+
+/** Each state a run reaches, alone and with a sponsor: the commands that reach it, and what it is. `drive` commits at T0. */
 const REACHED: readonly { readonly by: readonly Kind[]; readonly is: Folded | undefined }[] = [
   { by: [], is: undefined },
-  { by: ["Enroll"], is: { state: "active", epoch: 0 } },
-  { by: ["Enroll", "Sponsor"], is: { state: "active", sponsor: SPONSOR, epoch: 0 } },
-  { by: ["Enroll", "Suspend"], is: { state: "suspended", epoch: 0 } },
-  { by: ["Enroll", "Sponsor", "Suspend"], is: { state: "suspended", sponsor: SPONSOR, epoch: 0 } },
-  { by: ["Enroll", "Revoke"], is: { state: "revoked", epoch: 1 } },
-  { by: ["Enroll", "Sponsor", "Revoke"], is: { state: "revoked", sponsor: SPONSOR, epoch: 1 } },
+  { by: ["Enroll"], is: { state: "active", epoch: 0, createdAt: T0 } },
+  { by: ["Enroll", "Sponsor"], is: { state: "active", sponsor: SPONSOR, epoch: 0, createdAt: T0 } },
+  { by: ["Enroll", "Suspend"], is: { state: "suspended", epoch: 0, createdAt: T0 } },
+  {
+    by: ["Enroll", "Sponsor", "Suspend"],
+    is: { state: "suspended", sponsor: SPONSOR, epoch: 0, createdAt: T0 },
+  },
+  { by: ["Enroll", "Revoke"], is: { state: "revoked", epoch: 1, createdAt: T0 } },
+  {
+    by: ["Enroll", "Sponsor", "Revoke"],
+    is: { state: "revoked", sponsor: SPONSOR, epoch: 1, createdAt: T0 },
+  },
 ];
 
 /**
@@ -675,12 +690,12 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(reason(newcomer.results[2])).toBe("paused");
     expect(reason(newcomer.results[3])).toBe("not-sponsored");
-    expect(seen(newcomer.state)).toBe("suspended, alone, epoch 0");
+    expect(seen(newcomer.state)).toBe(`suspended, alone, epoch 0, created ${T0}`);
 
     // The sponsor it has may approve again while it is paused, as a replayed approval does: nothing is committed.
     const replayed = drive([build("Enroll"), sponsor, pause, sponsor]);
     expect(replayed.results[3]).toEqual(Result.succeed([]));
-    expect(seen(replayed.state)).toBe(`suspended, ${SPONSOR}, epoch 0`);
+    expect(seen(replayed.state)).toBe(`suspended, ${SPONSOR}, epoch 0, created ${T0}`);
   });
 
   it("[agent.link-parties] only the sponsor or the agent itself ends the link, and the record names who did", () => {
@@ -712,14 +727,14 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     for (const end of outsiders) {
       const tried = drive([build("Enroll"), sponsor, end]);
       expect(reason(tried.results[2])).toBe("not-a-party");
-      expect(seen(tried.state)).toBe(`active, ${SPONSOR}, epoch 0`);
+      expect(seen(tried.state)).toBe(`active, ${SPONSOR}, epoch 0, created ${T0}`);
     }
 
     // The sponsor ends it, or the agent leaves it, and the event says which.
     for (const by of [userActor(SPONSOR), agentActor(AGENT)]) {
       const done = drive([build("Enroll"), sponsor, { _tag: "EndSponsorship", by }]);
       expect(done.results[2]).toEqual(Result.succeed([{ ...ended, by }]));
-      expect(seen(done.state)).toBe("active, alone, epoch 0");
+      expect(seen(done.state)).toBe(`active, alone, epoch 0, created ${T0}`);
     }
 
     // Paused, only the sponsor ends it, and the reinstatement names the sponsor too.
@@ -741,19 +756,21 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[agent.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
     const cases = REACHED.flatMap(({ by, is }) => {
       const agent = drive(by.map(build)).state;
-      return eventForms(is?.epoch ?? 0).map((event) => {
-        const from = `${shown(is)} + ${event._tag} ${canonicalJson(asJson(event))}`;
-        return {
-          folded: `${from}: ${foldOf(agent, event)}`,
-          table: `${from}: ${shown(folds(is, event))}`,
-        };
-      });
+      return eventForms(is?.epoch ?? 0).flatMap((event) =>
+        FOLDED_AT.map((at) => {
+          const from = `${shown(is)} + ${event._tag} ${canonicalJson(asJson(event))} at ${at}`;
+          return {
+            folded: `${from}: ${foldOf(agent, event, at)}`,
+            table: `${from}: ${shown(folds(is, event, at))}`,
+          };
+        }),
+      );
     });
     expect(cases.map((c) => c.folded)).toEqual(cases.map((c) => c.table));
-    // Seven states by twenty-six events, a good share of them on each side of the table.
-    expect(cases).toHaveLength(182);
-    expect(cases.filter((c) => c.table.endsWith(": illegal")).length).toBeGreaterThan(100);
-    expect(cases.filter((c) => !c.table.endsWith(": illegal")).length).toBeGreaterThan(15);
+    // Seven states by twenty-six events at two instants, 7 × 26 × 2 = 364, a good share of them on each side of the table.
+    expect(cases).toHaveLength(364);
+    expect(cases.filter((c) => c.table.endsWith(": illegal")).length).toBeGreaterThan(200);
+    expect(cases.filter((c) => !c.table.endsWith(": illegal")).length).toBeGreaterThan(30);
 
     // Each of those states is the one the commands beside it reach.
     expect(REACHED.map(({ by }) => seen(drive(by.map(build)).state))).toEqual(

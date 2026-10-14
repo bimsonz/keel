@@ -751,6 +751,8 @@ const soloTour = (): readonly Fold<Batch, CandidateEvent>[] => {
 };
 
 const ANOTHER_BATCH = makeId("bat", ulid(2));
+const ANOTHER_LANE = "lane:another";
+const ANOTHER_CANDIDATE = makeId("cnd", ulid(999));
 const BLAMES: readonly BatchAttribution[] = [
   "textual",
   "interaction",
@@ -760,9 +762,15 @@ const BLAMES: readonly BatchAttribution[] = [
   B,
 ];
 
-/** What the fold's table is about: whose the batch is, its state, its members and who is blamed. */
+/**
+ * What the fold's table is about: whose the batch is, the lane, chain epoch and predecessors it
+ * was formed with, its state, its members and who is blamed.
+ */
 interface Folded {
   readonly id: Batch["id"];
+  readonly laneId: string;
+  readonly chainEpoch: number;
+  readonly predecessors?: readonly ChangeId[];
   readonly state: Batch["state"];
   readonly members: readonly ChangeId[];
   readonly attribution?: BatchAttribution;
@@ -781,7 +789,15 @@ const blamed = (from: Folded, blame: BatchAttribution): boolean => {
 const folds = (from: Folded | undefined, event: CandidateEvent): Folded | "illegal" => {
   if (from === undefined)
     return event._tag === "BatchFormed" && event.projectId !== undefined
-      ? { id: event.batchId, state: "forming", members: event.members }
+      ? {
+          id: event.batchId,
+          laneId: event.laneId,
+          chainEpoch: event.chainEpoch,
+          // A forming that names no predecessors (an older event) speculated on none.
+          predecessors: event.predecessors ?? [],
+          state: "forming",
+          members: event.members,
+        }
       : "illegal";
   if (event._tag === "BatchFormed" || event.batchId !== from.id) return "illegal";
   const moves = (state: Batch["state"], to: Batch["state"]): Folded | "illegal" =>
@@ -812,25 +828,68 @@ const folds = (from: Folded | undefined, event: CandidateEvent): Folded | "illeg
   }
 };
 
+/**
+ * One fold past the tours. Decide never blames a batch of one on nobody, so neither tour leaves
+ * one red and unattributed; the fold takes that blame from verifying all the same, and must still
+ * refuse to bisect what it left: one change has no halves.
+ */
+const unattributedSolo = (
+  walked: readonly Fold<Batch, CandidateEvent>[],
+): Fold<Batch, CandidateEvent> => {
+  const failing = walked.find(
+    (f) =>
+      f.before?.state === "verifying" &&
+      f.before.members.length === 1 &&
+      f.event._tag === "BatchFailed",
+  );
+  if (failing?.before === undefined || failing.event._tag !== "BatchFailed")
+    throw new Error("the solo tour fails no verifying batch of one");
+  return {
+    before: failing.before,
+    event: { ...failing.event, attribution: "unattributed" },
+    after: { ...failing.before, state: "red", attribution: "unattributed" },
+  };
+};
+
+/** The lane, chain epoch and predecessors every batch of the tours was formed with. */
+const HOME = ` in lane:default at epoch 0 after []`;
+
 describe("the Candidate fold", () => {
   it("[candidate.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const solo = soloTour();
     const cases = foldCases<Batch, CandidateEvent, Folded>({
       evolve: evolveCandidate,
-      walked: [...candidateTour(), ...soloTour()],
+      walked: [...candidateTour(), ...solo, unattributedSolo(solo)],
       summary: (b) => ({
         id: b.id,
+        laneId: b.laneId,
+        chainEpoch: b.chainEpoch,
+        ...(b.predecessors === undefined ? {} : { predecessors: b.predecessors }),
         state: b.state,
         members: b.members,
         ...(b.attribution === undefined ? {} : { attribution: b.attribution }),
       }),
       shown: (f) =>
-        `${f.id} ${f.state} of ${f.members.length}${f.attribution === undefined ? "" : `, blaming ${f.attribution}`}`,
-      // Each event as committed and as another batch's; a forming that names no project;
-      // and a failure with every blame there is.
+        `${f.id} ${f.state} of ${f.members.length}${f.attribution === undefined ? "" : `, blaming ${f.attribution}`}` +
+        ` in ${f.laneId} at epoch ${f.chainEpoch} after ${f.predecessors === undefined ? "nothing said" : `[${f.predecessors.join(" ")}]`}`,
+      // Each event as committed and as another batch's. A forming that names no project, another
+      // lane, a later chain epoch, a predecessor, or no predecessors at all (an older event). Every
+      // later event as another candidate's: the fold asks whose batch an event is, never whose
+      // candidate, so its table does not either. And a failure with every blame there is.
       forms: (event) => [
         event,
         { ...event, batchId: ANOTHER_BATCH },
-        ...(event._tag === "BatchFormed" ? [{ ...event, projectId: undefined }] : []),
+        ...(event._tag === "BatchFormed"
+          ? [
+              { ...event, projectId: undefined },
+              { ...event, laneId: ANOTHER_LANE },
+              { ...event, chainEpoch: event.chainEpoch + 1 },
+              { ...event, predecessors: [STRANGER] },
+              { ...event, predecessors: undefined },
+            ]
+          : event._tag === "CandidateAssembled"
+            ? []
+            : [{ ...event, candidateId: ANOTHER_CANDIDATE }]),
         ...(event._tag === "BatchFailed"
           ? BLAMES.map((attribution) => ({ ...event, attribution }))
           : []),
@@ -840,33 +899,40 @@ describe("the Candidate fold", () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Twenty-one rows, a batch of two and a batch of one in every state each reaches, by
-    // every event the two walks committed in each of its forms.
+    // Twenty-two rows: a batch of two and a batch of one in every state each reaches, and a batch
+    // of one red with nobody blamed. Each meets the same 355 forms of the events the walks
+    // committed: 2 formings in 7 forms (14); 12 assemblies in 2 (24); 12 starts and 12
+    // verifications in 3 (72); 6 bisections in 3 (18); 2 promotions and 2 invalidations in 3,
+    // the pair's forms as another candidate's one form (10); and 28 failures, 27 pairs of verdict
+    // and candidate in each of 6 blames (162), each failure as another batch's (28) and as
+    // another candidate's, where two that differ only in candidate meet (27). 22 × 355 = 7810
+    // folds, 768 of them taken and 7042 refused.
     expect(foldShape(cases)).toEqual({
-      folds: 6027,
-      refused: 5424,
+      folds: 7810,
+      refused: 7042,
       rows: [
         "none",
-        `${BATCH} forming of 2`,
-        `${BATCH} assembled of 2`,
-        `${BATCH} red of 2, blaming textual`,
-        `${BATCH} verifying of 2`,
-        `${BATCH} red of 2, blaming ${A}`,
-        `${BATCH} red of 2, blaming infra`,
-        `${BATCH} green of 2`,
-        `${BATCH} red of 2, blaming interaction`,
-        `${BATCH} red of 2, blaming unattributed`,
-        `${BATCH} promoted of 2`,
-        `${BATCH} invalidated of 2`,
-        `${BATCH} bisected of 2, blaming unattributed`,
-        `${BATCH} forming of 1`,
-        `${BATCH} assembled of 1`,
-        `${BATCH} red of 1, blaming ${A}`,
-        `${BATCH} verifying of 1`,
-        `${BATCH} red of 1, blaming infra`,
-        `${BATCH} green of 1`,
-        `${BATCH} promoted of 1`,
-        `${BATCH} invalidated of 1`,
+        `${BATCH} forming of 2${HOME}`,
+        `${BATCH} assembled of 2${HOME}`,
+        `${BATCH} red of 2, blaming textual${HOME}`,
+        `${BATCH} verifying of 2${HOME}`,
+        `${BATCH} red of 2, blaming ${A}${HOME}`,
+        `${BATCH} red of 2, blaming infra${HOME}`,
+        `${BATCH} green of 2${HOME}`,
+        `${BATCH} red of 2, blaming interaction${HOME}`,
+        `${BATCH} red of 2, blaming unattributed${HOME}`,
+        `${BATCH} promoted of 2${HOME}`,
+        `${BATCH} invalidated of 2${HOME}`,
+        `${BATCH} bisected of 2, blaming unattributed${HOME}`,
+        `${BATCH} forming of 1${HOME}`,
+        `${BATCH} assembled of 1${HOME}`,
+        `${BATCH} red of 1, blaming ${A}${HOME}`,
+        `${BATCH} verifying of 1${HOME}`,
+        `${BATCH} red of 1, blaming infra${HOME}`,
+        `${BATCH} green of 1${HOME}`,
+        `${BATCH} promoted of 1${HOME}`,
+        `${BATCH} invalidated of 1${HOME}`,
+        `${BATCH} red of 1, blaming unattributed${HOME}`,
       ],
     });
   });

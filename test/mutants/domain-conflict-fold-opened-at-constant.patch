@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: a conflict is opened at one fixed instant instead of the instant its suspicion was committed
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 830a88bb..9ca39013 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -370,7 +370,7 @@ export const evolveConflict = (
+           ...(event.origin === undefined ? {} : { origin: event.origin }),
+           ...(event.premise === undefined ? {} : { premise: event.premise }),
+           ...(event.effect === undefined ? {} : { effect: event.effect }),
+-          openedAt: committed.at,
++          openedAt: 0 as Instant,
+         }
+       : illegal(state, event);
+   }

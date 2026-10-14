@@ -32,6 +32,7 @@ const T0 = Instant(1_760_000_000_000);
 const TENET = makeId("tnt", "0".repeat(26));
 const NEXT = makeId("tnt", `${"0".repeat(25)}1`);
 const SUBJECT = makeId("sub", "0".repeat(26));
+const OTHER_SUBJECT = makeId("sub", `${"0".repeat(25)}1`);
 const CHANGE = makeId("chg", "0".repeat(26));
 const CHALLENGER = makeId("chg", `${"0".repeat(25)}1`);
 const STRANGER = makeId("chg", `${"0".repeat(25)}2`);
@@ -608,9 +609,12 @@ const tenetTour = (): readonly Fold<Tenet, TenetEvent>[] => {
   return walkedTour;
 };
 
-/** What the fold's table is about: whose the tenet is, its state, the conflict contesting it and what ended it. */
+/** What the fold's table is about: whose the tenet is, what it holds of which subject, its state, the conflict contesting it and what ended it. */
 interface Folded {
   readonly id: Tenet["id"];
+  readonly subjectId: Tenet["subjectId"];
+  readonly predicate: Tenet["predicate"];
+  readonly value: Tenet["value"];
   readonly state: Tenet["state"];
   readonly conflictId?: Tenet["conflictId"];
   readonly endedBy?: Tenet["endedBy"];
@@ -620,9 +624,22 @@ interface Folded {
 const folds = (from: Folded | undefined, event: TenetEvent): Folded | "illegal" => {
   if (from === undefined)
     return event._tag === "TenetEstablished" && event.guardIds.length > 0
-      ? { id: event.tenetId, state: "established" }
+      ? {
+          id: event.tenetId,
+          subjectId: event.subjectId,
+          predicate: event.predicate,
+          value: event.value,
+          state: "established",
+        }
       : "illegal";
   if (event.tenetId !== from.id) return "illegal";
+  // What the establishing said is held to the end: no later event restates it.
+  const held = {
+    id: from.id,
+    subjectId: from.subjectId,
+    predicate: from.predicate,
+    value: from.value,
+  };
   const contesting =
     from.state === "contested" && "conflictId" in event && event.conflictId === from.conflictId;
   switch (event._tag) {
@@ -630,15 +647,15 @@ const folds = (from: Folded | undefined, event: TenetEvent): Folded | "illegal" 
       return "illegal";
     case "TenetContested":
       return from.state === "established"
-        ? { id: from.id, state: "contested", conflictId: event.conflictId }
+        ? { ...held, state: "contested", conflictId: event.conflictId }
         : "illegal";
     case "TenetReaffirmed":
-      return contesting ? { id: from.id, state: "established" } : "illegal";
+      return contesting ? { ...held, state: "established" } : "illegal";
     case "TenetRetracted":
       return contesting ? { ...from, state: "retracted", endedBy: event.changeId } : "illegal";
     case "TenetSuperseded":
       return from.state === "established"
-        ? { id: from.id, state: "superseded", endedBy: event.by }
+        ? { ...held, state: "superseded", endedBy: event.by }
         : "illegal";
     default: {
       const unreachable: never = event;
@@ -654,40 +671,51 @@ describe("the Tenet fold", () => {
       walked: tenetTour(),
       summary: (t) => ({
         id: t.id,
+        subjectId: t.subjectId,
+        predicate: t.predicate,
+        value: t.value,
         state: t.state,
         ...(t.conflictId === undefined ? {} : { conflictId: t.conflictId }),
         ...(t.endedBy === undefined ? {} : { endedBy: t.endedBy }),
       }),
       shown: (f) =>
-        [
+        `${[
           `${f.id} ${f.state}`,
           ...(f.conflictId === undefined ? [] : [`over ${f.conflictId}`]),
           ...(f.endedBy === undefined ? [] : [`by ${f.endedBy}`]),
-        ].join(" "),
+        ].join(" ")}: ${f.predicate} of ${f.subjectId} is ${JSON.stringify(f.value)}`,
       // Each event as committed and as another tenet's; one that names a conflict, for
-      // another conflict too; and a tenet established with no guard.
+      // another conflict too; and a tenet established with no guard, and with another
+      // predicate of another subject held at a number, so a fold that wrote its own disagrees.
       forms: (event) => [
         event,
         { ...event, tenetId: NEXT },
         ...("conflictId" in event ? [{ ...event, conflictId: OTHER }] : []),
-        ...(event._tag === "TenetEstablished" ? [{ ...event, guardIds: [] }] : []),
+        ...(event._tag === "TenetEstablished"
+          ? [
+              { ...event, guardIds: [] },
+              { ...event, subjectId: OTHER_SUBJECT, predicate: "ordering" as const, value: 3 },
+            ]
+          : []),
       ],
       times: [T0],
       table: folds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Five rows by fourteen forms: the five events, each also as another tenet's, the three
-    // that name a conflict also for another one, and an establishing with no guard.
+    // Five rows by fifteen forms: the five events, each also as another tenet's, the three
+    // that name a conflict also for another one, and an establishing with no guard and one
+    // of another proposition, which lands from none as the committed one does.
+    const held = `freshness of ${SUBJECT} is "per-request"`;
     expect(foldShape(cases)).toEqual({
-      folds: 70,
-      refused: 63,
+      folds: 75,
+      refused: 67,
       rows: [
         "none",
-        `${TENET} established`,
-        `${TENET} contested over ${CONFLICT}`,
-        `${TENET} superseded by ${NEXT}`,
-        `${TENET} retracted over ${CONFLICT} by ${CHALLENGER}`,
+        `${TENET} established: ${held}`,
+        `${TENET} contested over ${CONFLICT}: ${held}`,
+        `${TENET} superseded by ${NEXT}: ${held}`,
+        `${TENET} retracted over ${CONFLICT} by ${CHALLENGER}: ${held}`,
       ],
     });
   });

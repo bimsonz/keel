@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.fold-table
+# why: a recorded decision is stamped with one fixed instant, the tests' T0, instead of the instant its record committed, which a table folded at T0 alone would agree with
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858faa..1ad93076 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -163,7 +163,7 @@ export const evolveDecision = (
+           ...(event.scope === undefined ? {} : { scope: event.scope }),
+           evidence: event.evidence,
+           alternatives: event.alternatives,
+-          decidedAt: committed.at,
++          decidedAt: 1_760_000_000_000 as Instant,
+           state: "active",
+         }
+       : illegal(state, event);

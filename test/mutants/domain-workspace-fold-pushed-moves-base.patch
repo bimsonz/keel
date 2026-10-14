@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: a push is folded as moving the holder's base to the pushed commit, so the base no longer says where the holder started
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e66d67e2..8ca04e12 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -146,7 +146,7 @@ export const evolveWorkspace = (
+           }
+         : illegal(workspace, event);
+     case "WorkspacePushed":
+-      return workspace.state === "granted" ? workspace : illegal(workspace, event);
++      return workspace.state === "granted" ? { ...workspace, baseSha: event.sha } : illegal(workspace, event);
+     case "WorkspaceCollected":
+       return workspace.state === "ready" || workspace.state === "granted"
+         ? { ...workspace, state: "collected" }

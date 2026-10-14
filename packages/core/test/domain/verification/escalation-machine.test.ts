@@ -415,12 +415,16 @@ const escalationTour = (): readonly Fold<Escalation, EscalationEvent>[] => {
 };
 
 const ANOTHER = makeId("esc", `${"0".repeat(25)}1`);
+/** A second decision a raise can cite, beside `DECISION`. */
+const ANOTHER_DECISION = makeId("dec", `${"0".repeat(25)}1`);
 
-/** What the fold's table is about: whose the escalation is, its state, the options it offers, whether it has widened and how it ended. */
+/** What the fold's table is about: whose the escalation is, its state, the options it offers, the precedents it cites, whether it has widened and how it ended. */
 interface Folded {
   readonly id: Escalation["id"];
   readonly state: Escalation["state"];
   readonly options: readonly string[];
+  /** The decisions the raise cited, as it cited them. */
+  readonly precedents: readonly string[];
   readonly widened: boolean;
   readonly ended?: string;
 }
@@ -433,6 +437,7 @@ const folds = (from: Folded | undefined, event: EscalationEvent): Folded | "ille
           id: event.escalationId,
           state: "open",
           options: event.options.map((o) => o.id),
+          precedents: event.precedents,
           widened: false,
         }
       : "illegal";
@@ -464,16 +469,24 @@ describe("the Escalation fold", () => {
         id: e.id,
         state: e.state,
         options: e.options.map((o) => o.id),
+        precedents: e.precedents,
         widened: e.widenedAt !== undefined,
         ...(e.ruling === undefined ? {} : { ended: e.ruling.option }),
         ...(e.withdrawnReason === undefined ? {} : { ended: e.withdrawnReason }),
       }),
       shown: (f) =>
-        `${f.id} ${f.state}${f.widened ? " and widened" : ""} of ${f.options.join("/")}${f.ended === undefined ? "" : `, ${f.ended}`}`,
-      // Each event as committed and as another escalation's, and a ruling for an option never offered.
+        `${f.id} ${f.state}${f.widened ? " and widened" : ""} of ${f.options.join("/")} citing ${f.precedents.length === 0 ? "nothing" : f.precedents.join(" and ")}${f.ended === undefined ? "" : `, ${f.ended}`}`,
+      // Each event as committed and as another escalation's, a raise citing no precedent and
+      // citing two, and a ruling for an option never offered.
       forms: (event) => [
         event,
         { ...event, escalationId: ANOTHER },
+        ...(event._tag === "EscalationRaised"
+          ? [
+              { ...event, precedents: [] },
+              { ...event, precedents: [DECISION, ANOTHER_DECISION] },
+            ]
+          : []),
         ...(event._tag === "RulingGiven" ? [{ ...event, option: UNKNOWN }] : []),
       ],
       times: [T0],
@@ -481,22 +494,23 @@ describe("the Escalation fold", () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Eight rows by thirteen forms: three raises, a ruling, a withdrawal and a widening, each
-    // as this escalation's and as another's, and the ruling for an option never offered.
-    // Fourteen are taken: a raise from nothing (six), an open escalation's ruling, withdrawal
-    // and widening (three, on each of two), and a widened one's ruling and withdrawal.
+    // Eight rows by nineteen forms: three raises, a ruling, a withdrawal and a widening, each
+    // as this escalation's and as another's (twelve), each raise citing nothing and citing two
+    // (six), and the ruling for an option never offered. Twenty are taken: a raise from nothing
+    // (twelve), an open escalation's ruling, withdrawal and widening (three, on each of two),
+    // and a widened one's ruling and withdrawal; 8 x 19 = 152 folds, 132 refused.
     expect(foldShape(cases)).toEqual({
-      folds: 104,
-      refused: 90,
+      folds: 152,
+      refused: 132,
       rows: [
         "none",
-        `${ESCALATION} open of keep/revert`,
-        `${ESCALATION} open of keep/revert/overrule`,
-        `${ESCALATION} ruled of keep/revert, keep`,
-        `${ESCALATION} withdrawn of keep/revert, the conflict was dismissed`,
-        `${ESCALATION} open and widened of keep/revert`,
-        `${ESCALATION} ruled and widened of keep/revert, keep`,
-        `${ESCALATION} withdrawn and widened of keep/revert, the conflict was dismissed`,
+        `${ESCALATION} open of keep/revert citing ${DECISION}`,
+        `${ESCALATION} open of keep/revert/overrule citing ${DECISION}`,
+        `${ESCALATION} ruled of keep/revert citing ${DECISION}, keep`,
+        `${ESCALATION} withdrawn of keep/revert citing ${DECISION}, the conflict was dismissed`,
+        `${ESCALATION} open and widened of keep/revert citing ${DECISION}`,
+        `${ESCALATION} ruled and widened of keep/revert citing ${DECISION}, keep`,
+        `${ESCALATION} withdrawn and widened of keep/revert citing ${DECISION}, the conflict was dismissed`,
       ],
     });
   });

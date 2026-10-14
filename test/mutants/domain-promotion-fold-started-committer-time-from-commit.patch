@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the group's committer time is folded from the instant PromotionStarted was committed instead of the one it names, so a replay composes with another time than the flush chose
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..210b46e8 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -554,7 +554,7 @@ export const evolvePromotion = (
+           old: event.old,
+           batches: front,
+           proofIds: event.proofIds,
+-          committerTime: event.committerTime,
++          committerTime: committed.at,
+         },
+       };
+     }

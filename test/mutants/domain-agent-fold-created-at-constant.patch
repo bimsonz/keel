@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: an enrolled agent is stamped with one fixed instant, the tests' T0, instead of the instant its enrolment committed, which a table folded at T0 alone would agree with
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index ba4a6997..07bd839c 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -203,7 +203,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+           ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
+           state: "active",
+           revocationEpoch: 0,
+-          createdAt: committed.at,
++          createdAt: 1_760_000_000_000 as Instant,
+         };
+       case "AgentSignedUp":
+         return {

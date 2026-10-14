@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fold-table
+# why: the fold advances trunk on as many landings as the group has members, so an advance that lands another change, or the group's own out of order, is taken
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..155f7ae6 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -574,7 +574,7 @@ export const evolvePromotion = (
+         wal.groupId === event.groupId &&
+         wal.old === event.from &&
+         wal.composed === event.to &&
+-        event.landings.map((l) => l.changeId).join() === membersOf(wal).join() &&
++        event.landings.length === membersOf(wal).length &&
+         (event.height === undefined ||
+           trunk.height === undefined ||
+           event.height === trunk.height + 1)

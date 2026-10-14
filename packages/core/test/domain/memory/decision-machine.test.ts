@@ -374,18 +374,20 @@ const decisionTour = (): readonly Fold<Decision, DecisionEvent>[] => {
   return walkedTour;
 };
 
-/** What the fold's table is about: whose the decision is, its state, and what ended it. */
+/** What the fold's table is about: whose the decision is, its state, what ended it, and when it was decided. */
 interface Folded {
   readonly id: Decision["id"];
   readonly state: Decision["state"];
   readonly endedBy?: Decision["endedBy"];
+  readonly decidedAt: Instant;
 }
 
 /** The fold's from-table (state-machines.md § Decision), typed apart from `evolveDecision`. */
-const folds = (from: Folded | undefined, event: DecisionEvent): Folded | "illegal" => {
+const folds = (from: Folded | undefined, event: DecisionEvent, at: Instant): Folded | "illegal" => {
+  // A decision is decided at the instant its record commits, and keeps that instant when it ends.
   if (from === undefined)
     return event._tag === "DecisionRecorded"
-      ? { id: event.decisionId, state: "active" }
+      ? { id: event.decisionId, state: "active", decidedAt: at }
       : "illegal";
   if (event.decisionId !== from.id || event._tag === "DecisionRecorded") return "illegal";
   if (from.state !== "active") return "illegal";
@@ -393,6 +395,7 @@ const folds = (from: Folded | undefined, event: DecisionEvent): Folded | "illega
     id: from.id,
     state: event._tag === "DecisionSuperseded" ? "superseded" : "overruled",
     endedBy: event.by,
+    decidedAt: from.decidedAt,
   };
 };
 
@@ -405,24 +408,30 @@ describe("the Decision fold", () => {
         id: d.id,
         state: d.state,
         ...(d.endedBy === undefined ? {} : { endedBy: d.endedBy }),
+        decidedAt: d.decidedAt,
       }),
-      shown: (f) => `${f.id} ${f.state}${f.endedBy === undefined ? "" : ` by ${f.endedBy}`}`,
+      shown: (f) =>
+        `${f.id} ${f.state}${f.endedBy === undefined ? "" : ` by ${f.endedBy}`}, decided ${f.decidedAt}`,
       // Each event as committed, and as another decision's.
       forms: (event) => [event, { ...event, decisionId: LATER }],
-      times: [T0],
+      // Two instants: a fold that stamped one fixed instant would agree with the table at that one alone.
+      times: [T0, Instant(T0 + 3_600_000)],
       table: folds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Four rows by three events, each as this decision's and as another's.
+    // Four rows by three events, each as this decision's and as another's, at two instants:
+    // 4 × 6 × 2 = 48 folds. A record lands from none in both forms, and a supersede or an
+    // overrule from active as this decision's, so 4 of each instant's 24 land and 2 × 20 = 40
+    // are refused. The tour records the decision one tick after T0, and ending it keeps that instant.
     expect(foldShape(cases)).toEqual({
-      folds: 24,
-      refused: 20,
+      folds: 48,
+      refused: 40,
       rows: [
         "none",
-        `${DECISION} active`,
-        `${DECISION} superseded by ${LATER}`,
-        `${DECISION} overruled by ${LATER}`,
+        `${DECISION} active, decided ${T0 + 1}`,
+        `${DECISION} superseded by ${LATER}, decided ${T0 + 1}`,
+        `${DECISION} overruled by ${LATER}, decided ${T0 + 1}`,
       ],
     });
   });

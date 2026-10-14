@@ -297,11 +297,13 @@ const probeTour = (): readonly Fold<Probe, ProbeEvent>[] =>
       : [],
   );
 
-/** What the fold's table is about: whose the probe is, its conflict, its state, the cells of its matrix recorded and how it ended. */
+/** What the fold's table is about: whose the probe is, its conflict, its state, when it was made, the cells of its matrix recorded and how it ended. */
 interface Folded {
   readonly id: Probe["id"];
   readonly conflict: Probe["conflictId"];
   readonly state: Probe["state"];
+  /** The instant the probe's first event, its draft or a failed draft's discard, was folded at. */
+  readonly createdAt: Instant;
   readonly cells: readonly ProbeCell[];
   readonly ended?: string;
 }
@@ -318,10 +320,16 @@ const matrixSays = (cells: readonly ProbeCell[]): string => {
  * with the probe's and an admission's and a discard's with nothing: those two
  * name the probe, and the owning object folds only its own conflict's log.
  */
-const folds = (from: Folded | undefined, event: ProbeEvent): Folded | "illegal" => {
+const folds = (from: Folded | undefined, event: ProbeEvent, at: Instant): Folded | "illegal" => {
   if (from === undefined) {
     if (event._tag === "ProbeDrafted")
-      return { id: event.probeId, conflict: event.conflictId, state: "calibrating", cells: [] };
+      return {
+        id: event.probeId,
+        conflict: event.conflictId,
+        state: "calibrating",
+        createdAt: at,
+        cells: [],
+      };
     // Every draft failed: the probe begins discarded, by the one event that names its conflict.
     return event._tag === "ProbeDiscarded" &&
       event.reason === "draft-failed" &&
@@ -330,6 +338,7 @@ const folds = (from: Folded | undefined, event: ProbeEvent): Folded | "illegal" 
           id: event.probeId,
           conflict: event.conflictId,
           state: "discarded",
+          createdAt: at,
           cells: [],
           ended: "draft-failed",
         }
@@ -426,6 +435,7 @@ describe("the Probe → Guard fold", { timeout: PROPERTY_TIMEOUT }, () => {
         id: p.id,
         conflict: p.conflictId,
         state: p.state,
+        createdAt: p.createdAt,
         cells: p.cells,
         ...(p.discarded === undefined ? {} : { ended: p.discarded }),
         ...(p.guardId === undefined
@@ -434,18 +444,21 @@ describe("the Probe → Guard fold", { timeout: PROPERTY_TIMEOUT }, () => {
       }),
       shown: (f) =>
         [
-          `${f.id} of ${f.conflict} ${f.state}`,
+          `${f.id} of ${f.conflict} ${f.state}, made at ${f.createdAt}`,
           ...f.cells.map((c) => `${c.world} run ${c.run} ${c.outcome}`),
           ...(f.ended === undefined ? [] : [f.ended]),
         ].join(", "),
       forms: probeForms,
-      times: [T0],
+      // Two instants an hour apart: what the fold dates, it dates by its own, so a constant disagrees with one.
+      times: [T0, Instant(T0 + 3_600_000)],
       table: folds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
+    // Forty-one rows, every form tried at both instants: 3731 folds at each, 334 of them taken
+    // and 3397 refused, twice over.
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 3731, refused: 3397, rows: 41 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 7462, refused: 6794, rows: 41 });
   });
 });
 

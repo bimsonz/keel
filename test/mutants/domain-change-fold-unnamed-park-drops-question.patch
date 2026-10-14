@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.fold-table
+# why: a change at Verifying or Queued that parks for a ruling naming no question drops the question it already holds instead of keeping it
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49027283..2aa574a3 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1077,7 +1077,7 @@ export const evolveChange = (
+         // It keeps its lane and its plan: the ruling puts it back where it waited.
+         return change.state === "verifying" || change.state === "queued"
+           ? {
+-              ...moveTo(change, "parked"),
++              ...moveTo(change, "parked", ["escalationId"]),
+               parkReason: "awaiting-ruling",
+               parkedFrom: change.state,
+               ...(event.escalationId === undefined ? {} : { escalationId: event.escalationId }),

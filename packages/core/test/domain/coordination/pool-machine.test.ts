@@ -48,6 +48,7 @@ const CHANGE_B = makeId("chg", ulid(2));
 const CHANGE_C = makeId("chg", ulid(3));
 const AGENT = makeId("agt", ulid(1));
 const BASE = CommitSha.make("b".repeat(40));
+const OTHER_BASE = CommitSha.make("d".repeat(40));
 const TTL = 60 * 60 * 1000;
 
 const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
@@ -340,11 +341,18 @@ const workspaceTour = (): readonly Fold<Workspace, WorkspaceEvent>[] => {
   return workspaceWalk;
 };
 
-/** What the Workspace fold's table is about: whose it is, its state and who holds it. */
+/**
+ * What the Workspace fold's table is about: whose it is, the repo it is and the
+ * one it was forked from, its state, and who holds it until when on which base.
+ */
 interface FoldedWorkspace {
   readonly id: Workspace["id"];
+  readonly repo: Workspace["repo"];
+  readonly sourceRepo: Workspace["sourceRepo"];
   readonly state: Workspace["state"];
   readonly holder?: Workspace["holder"];
+  readonly expiresAt?: Workspace["expiresAt"];
+  readonly baseSha?: Workspace["baseSha"];
 }
 
 /** The fold's from-table (state-machines.md § Workspace), typed apart from `evolveWorkspace`. */
@@ -353,15 +361,24 @@ const workspaceFolds = (
   event: WorkspaceEvent,
 ): FoldedWorkspace | "illegal" => {
   if (from === undefined)
-    return event._tag === "WorkspaceForked" ? { id: event.workspaceId, state: "ready" } : "illegal";
+    return event._tag === "WorkspaceForked"
+      ? { id: event.workspaceId, repo: event.repo, sourceRepo: event.sourceRepo, state: "ready" }
+      : "illegal";
   if (event.workspaceId !== from.id) return "illegal";
   switch (event._tag) {
     case "WorkspaceForked":
       return "illegal";
     case "WorkspaceGranted":
       return from.state === "ready"
-        ? { ...from, state: "granted", holder: event.holder }
+        ? {
+            ...from,
+            state: "granted",
+            holder: event.holder,
+            expiresAt: event.expiresAt,
+            baseSha: event.baseSha,
+          }
         : "illegal";
+    // A push moves neither the holder's base nor its expiry, and collecting keeps both.
     case "WorkspacePushed":
       return from.state === "granted" ? from : "illegal";
     case "WorkspaceCollected":
@@ -382,32 +399,55 @@ describe("the Workspace fold", () => {
       walked: workspaceTour(),
       summary: (w) => ({
         id: w.id,
+        repo: w.repo,
+        sourceRepo: w.sourceRepo,
         state: w.state,
         ...(w.holder === undefined ? {} : { holder: w.holder }),
+        ...(w.expiresAt === undefined ? {} : { expiresAt: w.expiresAt }),
+        ...(w.baseSha === undefined ? {} : { baseSha: w.baseSha }),
       }),
-      shown: (f) => `${f.id} ${f.state}${f.holder === undefined ? "" : ` held by ${f.holder}`}`,
-      // Each event as committed and as another workspace's.
-      forms: (event) => [event, { ...event, workspaceId: OTHER_WORKSPACE }],
+      shown: (f) =>
+        [
+          `${f.id} ${f.state}, ${f.repo} from ${f.sourceRepo}`,
+          ...(f.holder === undefined ? [] : [`held by ${f.holder}`]),
+          ...(f.expiresAt === undefined ? [] : [`until ${f.expiresAt}`]),
+          ...(f.baseSha === undefined ? [] : [`on ${f.baseSha}`]),
+        ].join(", "),
+      // Each event as committed and as another workspace's; a fork of other repos, and a
+      // grant until another instant on another base, so a fold that wrote its own disagrees.
+      forms: (event) => [
+        event,
+        { ...event, workspaceId: OTHER_WORKSPACE },
+        ...(event._tag === "WorkspaceForked"
+          ? [{ ...event, repo: "keel-ws-2", sourceRepo: "keel-mirror" }]
+          : []),
+        ...(event._tag === "WorkspaceGranted"
+          ? [{ ...event, expiresAt: Instant(T0 + 2 * TTL), baseSha: OTHER_BASE }]
+          : []),
+      ],
       times: [T0],
       table: workspaceFolds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Nine rows by sixteen forms: every event the tour committed, for each holder, as this
-    // workspace's and as another's.
+    // Nine rows by twenty forms: every event the tour committed, for each holder, as this
+    // workspace's and as another's, and the fork and the three grants varied too. Each varied
+    // one lands where its committed form does: the fork from none, a grant from ready.
+    const forked = "keel-ws-1 from keel-trunk";
+    const held = (holder: string) => `held by ${holder}, until ${T0 + TTL}, on ${BASE}`;
     expect(foldShape(cases)).toEqual({
-      folds: 144,
-      refused: 124,
+      folds: 180,
+      refused: 156,
       rows: [
         "none",
-        `${WORKSPACE} ready`,
-        `${WORKSPACE} granted held by ${CHANGE_A}`,
-        `${WORKSPACE} granted held by ${CHANGE_C}`,
-        `${WORKSPACE} granted held by ${CHANGE_B}`,
-        `${WORKSPACE} collected`,
-        `${WORKSPACE} collected held by ${CHANGE_A}`,
-        `${WORKSPACE} collected held by ${CHANGE_C}`,
-        `${WORKSPACE} collected held by ${CHANGE_B}`,
+        `${WORKSPACE} ready, ${forked}`,
+        `${WORKSPACE} granted, ${forked}, ${held(CHANGE_A)}`,
+        `${WORKSPACE} granted, ${forked}, ${held(CHANGE_C)}`,
+        `${WORKSPACE} granted, ${forked}, ${held(CHANGE_B)}`,
+        `${WORKSPACE} collected, ${forked}`,
+        `${WORKSPACE} collected, ${forked}, ${held(CHANGE_A)}`,
+        `${WORKSPACE} collected, ${forked}, ${held(CHANGE_C)}`,
+        `${WORKSPACE} collected, ${forked}, ${held(CHANGE_B)}`,
       ],
     });
   });

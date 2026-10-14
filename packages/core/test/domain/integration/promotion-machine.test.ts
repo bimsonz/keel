@@ -1443,6 +1443,8 @@ interface FoldedTrunk {
     readonly id: string;
     readonly old: CommitSha;
     readonly batches: readonly Slot[];
+    readonly proofIds: readonly string[];
+    readonly committerTime: Instant;
     readonly composed?: CommitSha;
   };
   readonly solo: boolean;
@@ -1457,10 +1459,14 @@ const holds = (slots: readonly Slot[], batchId: BatchId): boolean =>
   slots.some((s) => s.batchId === batchId);
 const less = (slots: readonly Slot[], batchId: BatchId): readonly Slot[] =>
   slots.filter((s) => s.batchId !== batchId);
-/** The phase a trunk rests in once nothing is being pushed. */
-/** The instant the table folds each event at: before the tour began, so no trunk of it has it as its own. */
-const FOLDED_AT = Instant(T0 - 1);
+/**
+ * The instants the table folds each event at: before the tour began, so no trunk or event of it
+ * has either as its own, and an hour apart, so a fold that took the instant it folds at for a
+ * time the event carries is wrong at one of them at least.
+ */
+const FOLDED_AT = [Instant(T0 - 1), Instant(T0 - 1 + 60 * 60 * 1000)];
 
+/** The phase a trunk rests in once nothing is being pushed. */
 const rests = (queue: readonly Slot[]): Trunk["phase"] =>
   queue.length === 0 ? "idle" : "debouncing";
 
@@ -1527,7 +1533,15 @@ const trunkFolds = (
             ...from,
             phase: "promoting",
             queue: from.queue.slice(front.length),
-            group: { id: event.groupId, old: event.old, batches: front },
+            // The group's proofs and committer time are the event's as it names them; its
+            // members are its batches', and the event's own list of them is not read.
+            group: {
+              id: event.groupId,
+              old: event.old,
+              batches: front,
+              proofIds: event.proofIds,
+              committerTime: event.committerTime,
+            },
           }
         : "illegal";
     }
@@ -1592,6 +1606,8 @@ const trunkFolds = (
 const DECLINES = ["commutation-failed", "frozen", "pack-too-large", "repo-bytes-quota"] as const;
 /** A batch no trunk of the tour ever holds. */
 const STRAY_BATCH = makeId("bat", ulid(999_999));
+/** A change no batch of the tour holds. */
+const STRAY_CHANGE = makeId("chg", ulid(999_999));
 
 /** An event in every form the trunk's fold could tell apart. */
 const trunkForms = (event: TrunkEvent): readonly TrunkEvent[] => {
@@ -1612,6 +1628,9 @@ const trunkForms = (event: TrunkEvent): readonly TrunkEvent[] => {
         { ...event, batches: event.batches.toReversed() },
         { ...event, batches: event.batches.slice(1) },
         { ...event, batches: [...event.batches, STRAY_BATCH] },
+        // Members and proofs the queue does not hold: the fold takes them as the event names them.
+        { ...event, members: [...event.members, STRAY_CHANGE] },
+        { ...event, proofIds: [...event.proofIds, "another-proof"] },
       ];
     case "PromotionComposed":
       return [
@@ -1627,6 +1646,12 @@ const trunkForms = (event: TrunkEvent): readonly TrunkEvent[] => {
         { ...event, from: STRAY },
         { ...event, to: STRAY },
         { ...event, landings: event.landings.slice(1) },
+        // As many landings, one of them another change's, and the group's own out of order.
+        {
+          ...event,
+          landings: event.landings.map((l, i) => (i === 0 ? { ...l, changeId: STRAY_CHANGE } : l)),
+        },
+        { ...event, landings: event.landings.toReversed() },
         { ...event, height: undefined },
         { ...event, height: (event.height ?? 1) + 1 },
       ];
@@ -1679,14 +1704,16 @@ const concerns = (trunk: Trunk, event: TrunkEvent): string | false => {
 };
 
 /**
- * One state stands for each shape a trunk takes: its phase, how many wait, how far the group
- * got and how many batches it holds, and whether it is solo and frozen.
+ * One state stands for each shape a trunk takes: its phase, whether it knows its height, how
+ * many wait, how far the group got and how many batches it holds, and whether it is solo and
+ * frozen.
  */
 const shapeOf = (t: Trunk | undefined): string =>
   t === undefined
     ? "none"
     : [
         t.phase,
+        t.height !== undefined,
         Math.min(t.queue.length, 2),
         t.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
         Math.min(t.wal?.batches.length ?? 0, 2),
@@ -1718,10 +1745,30 @@ const frozenUncomposed = (
   });
 };
 
+/**
+ * One fold past the tour. A trunk an older Trunk DO advanced without a height does not know its
+ * height, and its next advance lands at whatever height it names; every trunk of the tour knows
+ * its height. So the trunk the tour first advanced from is built without one, from the group it
+ * started, and composed as the tour composed it.
+ */
+const heightUnknown = (walked: readonly Fold<Trunk, TrunkEvent>[]): Fold<Trunk, TrunkEvent> => {
+  const advanced = walked.find((f) => f.event._tag === "TrunkAdvanced");
+  const composing = walked.find(
+    (f) => f.after === advanced?.before && f.event._tag === "PromotionComposed",
+  );
+  if (composing?.before === undefined) throw new Error("the tour advances no group it composed");
+  const { height: _unknown, ...before } = composing.before;
+  return {
+    before,
+    event: composing.event,
+    after: evolvePromotion(before, { at: T0, payload: composing.event }),
+  };
+};
+
 describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
     const toured = promotionTour();
-    const walked = [...toured, ...frozenUncomposed(toured)];
+    const walked = [...toured, ...frozenUncomposed(toured), heightUnknown(toured)];
     const kinds = new Map<string, TrunkEvent>();
     for (const { event } of walked) if (!kinds.has(event._tag)) kinds.set(event._tag, event);
     // By content: the kit keeps one object for each event's content, the last committed, and
@@ -1742,6 +1789,8 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
                 id: t.wal.groupId,
                 old: t.wal.old,
                 batches: t.wal.batches.map(slotOf),
+                proofIds: t.wal.proofIds,
+                committerTime: t.wal.committerTime,
                 ...(t.wal.composed === undefined ? {} : { composed: t.wal.composed }),
               },
             }),
@@ -1760,18 +1809,23 @@ describe("the Promotion fold", { timeout: PROPERTY_TIMEOUT }, () => {
         (firsts.has(canonicalJson(asJson(event))) && "the first of its kind"),
       most: 8,
       forms: trunkForms,
-      times: [FOLDED_AT],
+      times: FOLDED_AT,
       table: trunkFolds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Fifty-three shapes of trunk, nine of them one fold past the tour, each meeting at most
-    // eight events of a kind for each reason, in every form.
+    // Fifty-five shapes of trunk, eleven of them past the tour: nine frozen on a group never
+    // composed, and a group started and composed on a trunk that does not know its height. Each
+    // meets at most eight events of a kind for each reason, in every form: 12967 cases at each
+    // instant. 528 are the two heightless shapes'; 1470 are forms that vary a start's members or
+    // its proofs (413 each, 64 of the 826 taken) or an advance's landings (356 with another
+    // change's, 288 reordered, none taken); 10969 are the rest. Twice over, 25934 folds, 2 × 11885
+    // of them refused.
     const shape = foldShape(cases);
     expect({ ...shape, rows: shape.rows.length }).toEqual({
-      folds: 10969,
-      refused: 10010,
-      rows: 53,
+      folds: 25934,
+      refused: 23770,
+      rows: 55,
     });
   });
 });

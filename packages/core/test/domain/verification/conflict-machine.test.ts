@@ -536,13 +536,15 @@ const conflictTour = (): readonly Fold<Conflict, ConflictEvent>[] =>
       : [],
   );
 
-/** What the fold's table is about: whose the conflict is, its kind and state, the probe drafted for it, the suite cells recorded and how it ended. */
+/** What the fold's table is about: whose the conflict is, its kind and state, when it was opened, the probe drafted for it, the suite cells recorded and how it ended. */
 interface Folded {
   readonly id: Conflict["id"];
   readonly kind: ConflictKind;
   readonly state: Conflict["state"];
   /** Who the conflict is between: a ruling goes against none but these. */
   readonly parties: readonly string[];
+  /** The instant the suspicion was folded at. */
+  readonly openedAt: Instant;
   readonly probe?: string;
   /** Each suite cell recorded, by world, check and run, with its answer. */
   readonly cells: Readonly<Record<string, string>>;
@@ -570,7 +572,7 @@ const resolvedBy = (
   ].join(" ");
 
 /** The fold's from-table (state-machines.md § Conflict), typed apart from `evolveConflict`. */
-const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illegal" => {
+const folds = (from: Folded | undefined, event: ConflictEvent, at: Instant): Folded | "illegal" => {
   if (from === undefined)
     return event._tag === "ConflictSuspected"
       ? {
@@ -578,6 +580,7 @@ const folds = (from: Folded | undefined, event: ConflictEvent): Folded | "illega
           kind: event.kind,
           state: "suspected",
           parties: event.parties,
+          openedAt: at,
           cells: {},
         }
       : "illegal";
@@ -698,6 +701,7 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
         kind: c.kind,
         state: c.state,
         parties: c.parties,
+        openedAt: c.openedAt,
         ...(c.probeId === undefined ? {} : { probe: c.probeId }),
         cells: Object.fromEntries(
           (c.checks ?? []).map((k) => [`${k.world} ${k.check} run ${k.run}`, k.outcome]),
@@ -707,20 +711,27 @@ describe("the Conflict fold", { timeout: PROPERTY_TIMEOUT }, () => {
       }),
       shown: (f) =>
         [
-          `${f.id} ${f.kind} ${f.state}`,
+          `${f.id} ${f.kind} ${f.state}, opened at ${f.openedAt}`,
           ...(f.probe === undefined ? [] : [`probe ${f.probe}`]),
           ...Object.entries(f.cells).map(([cell, outcome]) => `${cell} ${outcome}`),
           ...(f.escalation === undefined ? [] : [`escalated as ${f.escalation}`]),
           ...(f.resolved === undefined ? [] : [f.resolved]),
         ].join(", "),
       forms: conflictForms,
-      times: [T0],
+      // Two instants an hour apart: what the fold dates, it dates by its own, so a constant disagrees with one.
+      times: [T0, Instant(T0 + 3_600_000)],
       table: folds,
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
+    // Seventy-six rows, every form tried at both instants: 9424 folds at each, 499 of them
+    // taken and 8925 refused, twice over.
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9424, refused: 8925, rows: 76 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({
+      folds: 18848,
+      refused: 17850,
+      rows: 76,
+    });
   });
 });
 

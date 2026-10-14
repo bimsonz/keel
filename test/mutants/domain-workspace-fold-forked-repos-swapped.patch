@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.fold-table
+# why: a fork is folded with its repo and the repo it was forked from swapped, so the workspace names the source as its own
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e66d67e2..a4e459b6 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -127,7 +127,7 @@ export const evolveWorkspace = (
+   const event = committed.payload;
+   if (state === undefined) {
+     return event._tag === "WorkspaceForked"
+-      ? { id: event.workspaceId, repo: event.repo, sourceRepo: event.sourceRepo, state: "ready" }
++      ? { id: event.workspaceId, repo: event.sourceRepo, sourceRepo: event.repo, state: "ready" }
+       : illegal(state, event);
+   }
+   const workspace = state;

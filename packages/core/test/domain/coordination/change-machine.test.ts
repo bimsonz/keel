@@ -2586,11 +2586,14 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
  * A change as its fold's table reads it: where it is, who holds it and under
  * which lease, and every field a transition sets or drops. Its intent is the
  * revision alone: what a revision does to the goal and the premises is
- * `reviseIntent`'s. What only its declaration sets (its id, its origin) is
- * left out: no later event moves it.
+ * `reviseIntent`'s. Its origin only the declaration sets, but the fold must
+ * copy it from the event rather than write one of its own, so it is read too.
+ * Its id, which only the declaration sets too, is left out: no later event
+ * moves it.
  */
 interface FoldedChange {
   readonly state: Change["state"];
+  readonly origin: Change["origin"];
   readonly agent: Change["agentId"];
   readonly run: Change["run"];
   readonly revision: number;
@@ -2616,6 +2619,7 @@ interface FoldedChange {
 
 const foldedChange = (c: Change): FoldedChange => ({
   state: c.state,
+  origin: c.origin,
   agent: c.agentId,
   run: c.run,
   revision: c.intent.revision,
@@ -2662,6 +2666,7 @@ const changeFolds = (
     return event._tag === "IntentDeclared"
       ? {
           state: "declared",
+          origin: event.origin,
           agent: event.agentId,
           run: event.run,
           revision: event.revision,
@@ -2780,25 +2785,25 @@ const changeFolds = (
           event.escalationId !== undefined && event.escalationId !== f.escalation,
           () => ({ ...f, escalation: event.escalationId }),
         );
+      // A park that names no question keeps the one the change holds.
       return f.state === "verifying" || f.state === "queued"
         ? {
             ...f,
             state: "parked",
             park: "awaiting-ruling",
             parkedFrom: f.state,
-            escalation: event.escalationId,
+            escalation: event.escalationId ?? f.escalation,
           }
         : "illegal";
     case "ChangeResumed":
-      return awaitsRuling && f.parkedFrom !== undefined
-        ? {
-            ...f,
-            state: f.parkedFrom,
-            park: undefined,
-            escalation: undefined,
-            parkedFrom: undefined,
-          }
-        : "illegal";
+      // A park committed before `parkedFrom` was recorded resumes to Verifying, as it always did.
+      return when(awaitsRuling, () => ({
+        ...f,
+        state: f.parkedFrom ?? "verifying",
+        park: undefined,
+        escalation: undefined,
+        parkedFrom: undefined,
+      }));
     case "ChangeAdopted": {
       if (!leaseLapsed) return "illegal";
       const adopted: FoldedChange = {
@@ -2857,6 +2862,41 @@ const driftedRun = (): readonly Fold<Change, ChangeEvent>[] => {
   return folds;
 };
 
+/**
+ * Two changes no run reaches, one fold each past the tour, met by its events
+ * like any other row. A park committed before `parkedFrom` was recorded waits
+ * for a ruling with nowhere named to go back to: the fold resumes it to
+ * Verifying. A change at Verifying that holds a question parks for a ruling
+ * that names none: the fold keeps the question it holds.
+ */
+const pastTheTour = (
+  toured: readonly Fold<Change, ChangeEvent>[],
+): readonly Fold<Change, ChangeEvent>[] => {
+  const park = toured.find(
+    (f) => f.before?.state === "verifying" && f.event._tag === "ChangeParked",
+  );
+  const resume = toured.find((f) => f.event._tag === "ChangeResumed");
+  const question = park?.after.escalationId;
+  if (
+    park?.before === undefined ||
+    park.event._tag !== "ChangeParked" ||
+    question === undefined ||
+    resume === undefined
+  )
+    throw new Error("the tour parks no change at Verifying for a question, or resumes none");
+  const { parkedFrom: _unrecorded, ...unrecorded } = park.after;
+  const holding: Change = { ...park.before, escalationId: question };
+  const { escalationId: _named, ...unnamed } = park.event;
+  return [
+    {
+      before: unrecorded,
+      event: resume.event,
+      after: evolveChange(unrecorded, { at: T0, payload: resume.event }),
+    },
+    { before: holding, event: unnamed, after: evolveChange(holding, { at: T0, payload: unnamed }) },
+  ];
+};
+
 /** A row of the fold's table: a change's place on the chart and which of its optional fields it holds. */
 const changeShape = (c: Change | undefined): string =>
   c === undefined
@@ -2889,7 +2929,9 @@ const A_CONFLICT = makeId("cfl", ulid(94));
  * or a base is tried under each one a row holds and under one no row does: a
  * revision one behind, level and one ahead; a rebase from each base; a requeue
  * and a declined batch for each batch; a bounce for each cause; a park for the
- * lapse, for a ruling unnamed and for each question; a lapse of each lease.
+ * lapse, for a ruling unnamed and for each question; a lapse of each lease. A
+ * declaration is tried as an auditor's too: every change the tour declares is
+ * an agent's.
  */
 const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
   const rows = new Map<string, Change>();
@@ -2906,6 +2948,8 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
 
   return (event: ChangeEvent): readonly ChangeEvent[] => {
     switch (event._tag) {
+      case "IntentDeclared":
+        return [event, { ...event, origin: "auditor" }];
       case "PreflightIssued":
       case "IntentRevised":
       case "EffectsDerived":
@@ -2966,7 +3010,8 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
 
 describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
-    const walked = [...changeTour(), ...driftedRun()];
+    const toured = changeTour();
+    const walked = [...toured, ...driftedRun(), ...pastTheTour(toured)];
     // The first lease of the tour lapses a TTL after the change is declared: every event is
     // folded long before, the instant before, at that instant and long after.
     const lapses = (walked[0]?.after.lease.renewedAt ?? T0) + TTL;
@@ -2986,9 +3031,10 @@ describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Thirty-nine shapes of change, nothing among them, each meeting the first two events of
-    // a kind at each revision, in every form, at four instants.
+    // Forty-one shapes of change, nothing among them and two of them one fold past the tour, each
+    // meeting the first two events of a kind at each revision, sixty in all their forms, at four
+    // instants: 41 × 60 × 4 = 9840 folds. The table takes 1716 of them and refuses the rest.
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9048, refused: 7452, rows: 39 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9840, refused: 8124, rows: 41 });
   });
 });

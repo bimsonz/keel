@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: a probe discarded by a failed draft is made at one fixed instant instead of the instant it was committed
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 81f4fe6d..872973d1 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -312,7 +312,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+           state: "discarded",
+           cells: [],
+           discarded: "draft-failed",
+-          createdAt: committed.at,
++          createdAt: 0 as Instant,
+         }
+       : illegal(state, event);
+   }
