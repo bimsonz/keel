@@ -426,7 +426,8 @@ const INSTALL_FAILED = /^install-failed exit [0-9]+ (ERR_PNPM_[A-Z0-9_]+)$/;
 /**
  * The deps box's refusals that only a change to the candidate ends, by their
  * first word, with what to do about each. `no-lockfile` and
- * `install-inputs-too-large` are also `depsNeedFrom`'s, before any box.
+ * `install-inputs-too-large` are also `depsNeedFrom`'s, before any box, and
+ * `no-vitest` is the js-ts suite's, once the deps are in place.
  */
 const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
   "no-lockfile": `commit a ${LOCKFILE} at the repository's root (run pnpm install): dependencies are installed only from a frozen lockfile`,
@@ -437,6 +438,7 @@ const REFUSALS_OF_THE_CANDIDATE: Readonly<Record<string, string>> = {
   "toolchain-switched": `the repository made another pnpm run the install: name ${DEPS_TOOLCHAIN.replace(/^.*\bpnpm (\S+).*$/, "pnpm@$1")} as its packageManager, or none`,
   "too-large": `the installed dependencies come to more than ${DEPS_MAX_BYTES / 1024 ** 3} GiB gzipped: depend on less`,
   "no-node-modules": `the install made no node_modules: add the dependencies the suite and the typecheck run with, and commit the ${LOCKFILE}`,
+  "no-vitest": `the js-ts suite runs vitest from the repository's own dependencies, and they have none: add vitest as a devDependency, with at least one test, and commit the ${LOCKFILE}`,
 };
 
 /** The first word of a reason: up to its first space or colon. */

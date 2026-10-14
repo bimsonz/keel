@@ -7,6 +7,9 @@ import {
   TYPECHECK_PROTOCOL,
 } from "@keeltown/core/application/verification";
 import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { commandStdout, suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
@@ -210,6 +213,34 @@ describe("the Tier 2 suite runtime", () => {
     );
     expect(hydrate).toBeGreaterThan(-1);
     expect(hydrate).toBeLessThan(lines.findIndex((l) => l.includes("vitest")));
+  });
+
+  it("[suite.no-vitest-command] with no vitest among the deps put in place, says so, drops them and ends; with vitest it goes on to run it", () => {
+    const lines = JS_TS_SUITE_COMMAND.split("\n");
+    const check = lines.findIndex((l) => l.includes("KEEL_VITEST none"));
+    expect(check).toBeGreaterThan(lines.indexOf("echo KEEL_DEPS ok"));
+    expect(check).toBeLessThan(lines.findIndex((l) => l.startsWith("node node_modules/vitest")));
+    // The check as the box's sh runs it, from the candidate's root, with the drop recorded.
+    const run = (withVitest: boolean) => {
+      const root = mkdtempSync(join(tmpdir(), "keel-no-vitest-"));
+      try {
+        if (withVitest) {
+          mkdirSync(join(root, "node_modules/vitest"), { recursive: true });
+          writeFileSync(join(root, "node_modules/vitest/vitest.mjs"), "");
+        }
+        const script = [
+          'keel_deps_drop() { echo "dropped $1"; }',
+          `cd ${root}`,
+          ...lines.slice(check, check + 2),
+          "echo went-on",
+        ].join("\n");
+        return execFileSync("sh", ["-c", script], { encoding: "utf8" });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    expect(run(false)).toBe("dropped /workspace\nKEEL_VITEST none\nKEEL_END\n");
+    expect(run(true)).toBe("KEEL_VITEST ok\nwent-on\n");
   });
 
   it.effect("passes a green run, storing its evidence durably before citing it", () =>

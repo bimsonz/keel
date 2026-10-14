@@ -23,7 +23,12 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { evidenceKey, EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
 import { PlanStoreR2, planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { type KeelVerifyJob, keelVerifyParams } from "../../src/rpc/index.ts";
-import { commandStdout, suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import {
+  commandStdout,
+  noVitestStdout,
+  suiteStdout,
+  typecheckStdout,
+} from "../support-suite-stdout.ts";
 import { bundled, mockDepsReady } from "./deps-ready.ts";
 import { OTHER_ORG, placeProject, POOL_ORG } from "./helpers.ts";
 
@@ -587,6 +592,31 @@ describe("KeelVerify ensuring a candidate's deps", () => {
         args: { depsRefused: [cited] },
       }),
     ]);
+  });
+
+  it("[deps.pool.steps-no-vitest] a candidate whose installed dependencies have no vitest bounces on its first round, citing that once with what to do, never as a red suite", async () => {
+    const bundle = await bundled({ "package.json": PACKAGE_JSON, "pnpm-lock.yaml": LOCK_YAML });
+    const ran = await runDeps("keel-verify-deps-no-vitest", bundle, noVitestStdout());
+    const cited =
+      "no-vitest: the js-ts suite runs vitest from the repository's own dependencies, and they have none: add vitest as a devDependency, with at least one test, and commit the pnpm-lock.yaml";
+    expect(ran.built).toMatchObject({ _tag: "DepsReady" });
+    expect(ran.verdict.outcome).toBe("bounce");
+    expect(ran.verdict.evidence.filter((line) => line.includes("refused"))).toEqual([
+      `dependencies refused: ${cited}`,
+    ]);
+    expect(ran.verdict.nextActions).toEqual([
+      expect.objectContaining({
+        kind: "call",
+        operationId: "submit",
+        args: { depsRefused: [cited] },
+      }),
+    ]);
+    expect(await storedEvidence(ran.verdict)).toMatchObject({
+      stepId: SUITE_STEP,
+      outcome: "fail",
+      why: "deps-refused: no-vitest",
+      failing: [],
+    });
   });
 
   it("[deps.pool.steps-unlocked] a candidate with no lockfile bounces without a build: keel-verify is never asked", async () => {

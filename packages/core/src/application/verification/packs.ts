@@ -191,8 +191,8 @@ const dependencyNames = (packageJson: string): readonly string[] => {
  * paths at the tree's root, `packageJson` the root package.json's text.
  * A wrangler config, or wrangler or an @cloudflare package among the
  * dependencies, makes a worker app; any other package is js-ts. With no
- * package at all the js-ts suite still runs: it abstains, so the change parks
- * rather than landing unverified.
+ * package at all the js-ts suite still runs: it fails with what to add (a
+ * lockfile, vitest), so the change bounces rather than landing unverified.
  *
  * A deploy spec (`deployJson`, the base's `.keel/deploy.json`) that reads
  * makes a worker app that is built, previewed and smoked. One that does not

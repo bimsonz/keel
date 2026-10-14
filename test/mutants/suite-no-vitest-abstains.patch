@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t "deps.pool.steps-no-vitest"
+# kills: deps.pool.steps-no-vitest
+# why: a candidate with no vitest abstains as if its deps were unavailable, so it parks and bounces as infrastructure with nothing to act on
+diff --git a/packages/core/src/application/verification/suite.ts b/packages/core/src/application/verification/suite.ts
+index 7b386139..ce87c994 100644
+--- a/packages/core/src/application/verification/suite.ts
++++ b/packages/core/src/application/verification/suite.ts
+@@ -185,7 +185,7 @@ const judgeRun = (
+     evidence: { stepId: step.id, outcome: "abstain", why, failing: [], tail },
+   });
+   if (output._tag === "no-vitest") {
+-    const { report, evidence } = depsStop(step, { _tag: "DepsRefused", reason: "no-vitest" });
++    const { report, evidence } = depsStop(step, { _tag: "DepsUnavailable", reason: "no-vitest" });
+     return { report: { ...base, ...report }, evidence: { ...evidence, failing: [] } };
+   }
+   if (output._tag !== "ran") {

@@ -34,6 +34,7 @@ const stdout = (fields: Record<string, string>, extra: readonly string[] = []) =
 const ran = (exit: number, report = "H4sI"): Record<string, string> => ({
   KEEL_HYDRATION: "ok",
   KEEL_DEPS: "ok",
+  KEEL_VITEST: "ok",
   KEEL_EXIT: String(exit),
   KEEL_DURATION_MS: "4321",
   KEEL_TAIL: b64("tail"),
@@ -260,5 +261,41 @@ describe("judging a suite run", () => {
     });
     expect(judged.report.outcome).toBe("pass");
     expect(judged.evidence).toMatchObject({ rehydrated: "hash-mismatch", diagnosis: "entry 3" });
+  });
+
+  it("[suite.no-vitest] fails a candidate with no vitest installed as its dependencies refused, with what to do, never as a red suite; a run with no report still abstains", () => {
+    const parsed = parseSuiteOutput(
+      stdout({ KEEL_HYDRATION: "ok", KEEL_DEPS: "ok", KEEL_VITEST: "none" }),
+    );
+    expect(parsed).toEqual({ _tag: "no-vitest" });
+    const withoutMarker = Object.fromEntries(
+      Object.entries(ran(0)).filter(([name]) => name !== "KEEL_VITEST"),
+    );
+    expect(parseSuiteOutput(stdout(withoutMarker))).toEqual({
+      _tag: "malformed",
+      reason: "no KEEL_VITEST",
+    });
+    const judged = judgeSuite(step, parsed, { report: undefined, tail: "" });
+    expect(judged.report).toEqual({
+      stepId: step.id,
+      outcome: "fail",
+      evidenceClass: step.evidenceCeiling,
+      tier: step.tier,
+      durationMs: 0,
+    });
+    expect(judged.evidence).toEqual({
+      stepId: step.id,
+      outcome: "fail",
+      why: "deps-refused: no-vitest",
+      failing: [],
+      tail: "",
+      deps: {
+        refused: "no-vitest",
+        remedy:
+          "the js-ts suite runs vitest from the repository's own dependencies, and they have none: add vitest as a devDependency, with at least one test, and commit the pnpm-lock.yaml",
+      },
+    });
+    // vitest was there and wrote no report (a crash mid-run): that is still nobody's to fix.
+    expect(judge(output(1), undefined).report.outcome).toBe("abstain");
   });
 });

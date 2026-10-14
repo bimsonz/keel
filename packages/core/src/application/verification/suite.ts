@@ -1,6 +1,7 @@
 import { Option, Schema } from "effect";
 import type { ContentHash } from "../../domain/kernel/index.ts";
 import type { InfraFailure, PlanStep } from "../../domain/verification/index.ts";
+import { depsStop } from "./deps.ts";
 import type { CredentialScan } from "./redact.ts";
 import {
   BASE64,
@@ -19,6 +20,10 @@ import {
  * shared runner protocol (`runner-output.ts`): after the hydration and deps
  * markers, between `KEEL_SUITE/1` and `KEEL_END`:
  *
+ *   KEEL_VITEST ok | none                    vitest is in the candidate's installed dependencies
+ *
+ * and, only after `ok`:
+ *
  *   KEEL_EXIT <n>                            the test runner's exit code
  *   KEEL_DURATION_MS <n>
  *   KEEL_TAIL <base64>                       the last bytes of the runner's console output
@@ -28,6 +33,7 @@ export const SUITE_PROTOCOL = "KEEL_SUITE/1";
 
 export type SuiteOutput =
   | RunnerStop
+  | { readonly _tag: "no-vitest" }
   | ({
       readonly _tag: "ran";
       readonly exit: number;
@@ -43,6 +49,9 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
   const opened = openRunnerOutput(stdout, SUITE_PROTOCOL, "suite");
   if (opened._tag !== "open") return opened;
   const { fields, hydrated } = opened;
+  const vitest = fields.get("KEEL_VITEST");
+  if (vitest === "none") return { _tag: "no-vitest" };
+  if (vitest !== "ok") return { _tag: "malformed", reason: "no KEEL_VITEST" };
   const ran = readExit(fields);
   if ("malformed" in ran) return { _tag: "malformed", reason: ran.malformed };
   const tail = fields.get("KEEL_TAIL") ?? "";
@@ -124,7 +133,9 @@ export type SuiteJudgement = RunnerJudgement<SuiteEvidence>;
  * Judges one suite run. Only a run that hydrated, ran tests, and agrees with
  * itself decides:
  * - `pass` needs exit 0, a successful report, at least one passing test and none failing (skips are allowed);
- * - `fail` needs a non-zero exit and a report that names a failure;
+ * - `fail` needs a non-zero exit and a report that names a failure, or a
+ *   candidate with no vitest installed: that fails as its dependencies
+ *   refused (`no-vitest`, with what to do), never as a red suite;
  * - everything else abstains: an infra failure (hydration, deps, a missing
  *   or unreadable report), no tests at all, or an exit code the report contradicts.
  *
@@ -173,6 +184,10 @@ const judgeRun = (
     report: { ...base, outcome: "abstain", failure, durationMs },
     evidence: { stepId: step.id, outcome: "abstain", why, failing: [], tail },
   });
+  if (output._tag === "no-vitest") {
+    const { report, evidence } = depsStop(step, { _tag: "DepsRefused", reason: "no-vitest" });
+    return { report: { ...base, ...report }, evidence: { ...evidence, failing: [] } };
+  }
   if (output._tag !== "ran") {
     const { failure, why } = stopped(output);
     return abstain(failure, why);

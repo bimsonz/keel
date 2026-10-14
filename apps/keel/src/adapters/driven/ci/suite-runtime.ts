@@ -83,9 +83,11 @@ export const NO_DEPS_CHECK = "export pnpm_config_verify_deps_before_run=false";
  * 2. the deps bundle built for the candidate's install digest is fetched
  *    part by part, each checked against the hash its URL names, and untarred
  *    into the workspace (DEPS_IN_PLACE);
- * 3. vitest runs with its JSON reporter; its console goes to a file, so test
+ * 3. vitest must be among them: with none the command says `KEEL_VITEST none`
+ *    and drops the deps, as it does after a run;
+ * 4. vitest runs with its JSON reporter; its console goes to a file, so test
  *    output can never forge a marker, and only a base64 tail is printed;
- * 4. the fetched deps are removed (`keel_deps_drop`): the engine snapshots
+ * 5. the fetched deps are removed (`keel_deps_drop`): the engine snapshots
  *    the workspace of a runner that exits 0, and they are not a run's to keep.
  */
 export const JS_TS_SUITE_COMMAND = [
@@ -100,6 +102,8 @@ export const JS_TS_SUITE_COMMAND = [
   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
   DEPS_IN_PLACE,
   NO_DEPS_CHECK,
+  "if [ ! -f node_modules/vitest/vitest.mjs ]; then keel_deps_drop /workspace; echo KEEL_VITEST none; echo KEEL_END; exit 0; fi",
+  "echo KEEL_VITEST ok",
   "start=$(date +%s%3N)",
   "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=$K/report.json >$K/console.log 2>&1",
   "code=$?",

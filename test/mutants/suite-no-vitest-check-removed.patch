@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "suite.no-vitest-command"
+# kills: suite.no-vitest-command
+# why: the suite command never checks for vitest, so a candidate without it runs node on a module that is not there and abstains for want of a report
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 25985897..22682d8c 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -102,7 +102,6 @@ export const JS_TS_SUITE_COMMAND = [
+   'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+   DEPS_IN_PLACE,
+   NO_DEPS_CHECK,
+-  "if [ ! -f node_modules/vitest/vitest.mjs ]; then keel_deps_drop /workspace; echo KEEL_VITEST none; echo KEEL_END; exit 0; fi",
+   "echo KEEL_VITEST ok",
+   "start=$(date +%s%3N)",
+   "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=$K/report.json >$K/console.log 2>&1",

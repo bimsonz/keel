@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/suite.test.ts -t "suite.no-vitest"
+# kills: suite.no-vitest
+# why: KEEL_VITEST none is not read as its own tag, so a candidate with no vitest reads as malformed and abstains
+diff --git a/packages/core/src/application/verification/suite.ts b/packages/core/src/application/verification/suite.ts
+index 7b386139..d58c1414 100644
+--- a/packages/core/src/application/verification/suite.ts
++++ b/packages/core/src/application/verification/suite.ts
+@@ -50,7 +50,6 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
+   if (opened._tag !== "open") return opened;
+   const { fields, hydrated } = opened;
+   const vitest = fields.get("KEEL_VITEST");
+-  if (vitest === "none") return { _tag: "no-vitest" };
+   if (vitest !== "ok") return { _tag: "malformed", reason: "no KEEL_VITEST" };
+   const ran = readExit(fields);
+   if ("malformed" in ran) return { _tag: "malformed", reason: ran.malformed };

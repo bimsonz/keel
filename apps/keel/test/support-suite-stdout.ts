@@ -52,6 +52,7 @@ export const suiteStdout = async (
     SUITE_PROTOCOL,
     "KEEL_HYDRATION ok",
     "KEEL_DEPS ok",
+    "KEEL_VITEST ok",
     `KEEL_EXIT ${failed > 0 ? 1 : 0}`,
     "KEEL_DURATION_MS 4600",
     `KEEL_TAIL ${b64(new TextEncoder().encode(options.tail ?? `${tests - failed} passed`))}`,
@@ -60,6 +61,12 @@ export const suiteStdout = async (
     "",
   ].join("\n");
 };
+
+/** The suite command's stdout for a candidate whose installed dependencies have no vitest. */
+export const noVitestStdout = (): string =>
+  [SUITE_PROTOCOL, "KEEL_HYDRATION ok", "KEEL_DEPS ok", "KEEL_VITEST none", "KEEL_END", ""].join(
+    "\n",
+  );
 
 /** The typecheck command's stdout for a run of tsc that exited `exit` and printed `output`. */
 export const typecheckStdout = async (exit: number, output: string): Promise<string> =>
