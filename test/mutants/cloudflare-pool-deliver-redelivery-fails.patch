@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.deliver-promotes
+# kills: cf.pool.deliver-promotes
+# why: a TrunkAdvanced delivered a second time, as an outbox may, fails for good because its Deliver already started, so the trunk's outbox retries it forever
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index eedd2877..4f5db4fb 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -216,8 +216,7 @@ function startKeyed(
+           try {
+             await workflow.create(start);
+           } catch (cause) {
+-            // Already started for this key: that is the delivery.
+-            if (!(await exists(workflow, start.id))) throw cause;
++            throw cause;
+           }
+         },
+         catch: (cause) => failed(subscriber, cause),

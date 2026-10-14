@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.deliver-commit-differs
+# kills: cf.pool.deliver-commit-differs
+# why: trunk moved to a commit nobody previewed is deployed as the landed candidate's version, so production runs a tree that is not trunk's
+diff --git a/packages/core/src/application/delivery/deliver.ts b/packages/core/src/application/delivery/deliver.ts
+index 59dffa48..00a05c95 100644
+--- a/packages/core/src/application/delivery/deliver.ts
++++ b/packages/core/src/application/delivery/deliver.ts
+@@ -95,14 +95,6 @@ export const deliverTrunk = (
+           });
+     if (deployment.promotedTo === to)
+       return { _tag: "AlreadyPromoted", deploymentId: deployment.id };
+-    if (deployment.candidateCommit !== to)
+-      return yield* refuse({
+-        reason: "commit-differs",
+-        detail:
+-          deployment.candidateCommit === undefined
+-            ? `the preview of ${deployment.candidateId} names no commit, so it is not known to be trunk's ${to}`
+-            : `trunk moved to ${to}, not to ${deployment.candidateCommit}, the commit ${deployment.candidateId}'s preview was built from`,
+-      });
+     const found = held.find((h) => h.target.name === deployment.target);
+     if (found === undefined || found.workersDev === undefined)
+       return yield* refuse({

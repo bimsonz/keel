@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.preview-smoke-land
+# kills: cf.pool.preview-smoke-land
+# why: KeelVerify gives the plan's runner no way to run a deploy step, so a candidate on a connected account is never previewed or smoked and parks instead of landing
+diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+index 118b2499..1dcac71e 100644
+--- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
++++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+@@ -120,7 +120,6 @@ export class KeelVerify extends CIWorkflow<Env> {
+                 await runtime.runPromise(
+                   ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
+                 ),
+-                deploy,
+               ),
+             ),
+           )

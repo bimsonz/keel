@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.deliver-promotes
+# kills: cf.pool.deliver-promotes
+# why: a TrunkAdvanced starts no Deliver, so a landed change is never deployed and the advance stays owed in the trunk's outbox
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index eedd2877..158aa998 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -50,8 +50,6 @@ function workflowFor(env: Env, name: string): Workflow | undefined {
+       return env.PRECHECK;
+     case "Probe":
+       return env.PROBE;
+-    case "Deliver":
+-      return env.DELIVER;
+     default:
+       return undefined;
+   }

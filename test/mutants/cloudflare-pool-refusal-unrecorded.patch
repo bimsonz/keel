@@ -1,0 +1,27 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.deliver-commit-differs
+# kills: cf.pool.deliver-commit-differs
+# why: Deliver's refusal never reaches the Project DO, so the project's stream says nothing about why trunk was not deployed
+diff --git a/apps/keel/src/adapters/driven/do-rpc/deployments.ts b/apps/keel/src/adapters/driven/do-rpc/deployments.ts
+index 68616935..476e6da1 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/deployments.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/deployments.ts
+@@ -1,6 +1,6 @@
+ import type { ProjectId } from "@keeltown/core/kernel";
+ import { Deployments } from "@keeltown/core/ports";
+-import { Layer, Schema } from "effect";
++import { Effect, Layer, Schema } from "effect";
+ import {
+   DeliveryRefusedCommand,
+   DeploymentOfCommand,
+@@ -49,10 +49,7 @@ export function DeploymentsRpc(
+             encodePromoted({ projectId, deploymentId, trunkSha }),
+           ),
+         ),
+-      refused: (projectId, refusal) =>
+-        callObject(ProjectCodecs.deliveryRefused, () =>
+-          project(projectId).deliveryRefused(encodeRefused({ projectId, ...refusal })),
+-        ),
++      refused: () => Effect.void,
+     }),
+   );
+ }

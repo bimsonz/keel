@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.no-target-annotates
+# kills: cf.pool.no-target-annotates
+# why: a project with a deploy spec and no Cloudflare account connected parks every change instead of landing it unpreviewed
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..8bd98368 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -147,7 +147,7 @@ export const runDeployStep = (
+       const found = held.find((h) => h.target.name === spec.target);
+       if (found === undefined)
+         return yield* finish(
+-          "annotate",
++          "abstain",
+           `no-preview-account: no Cloudflare account is connected for the deploy target ${spec.target}, so nothing is previewed`,
+           { skipped: "no-preview-account" },
+         );

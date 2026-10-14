@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.preview-broken-bounces
+# kills: cf.pool.preview-broken-bounces
+# why: a preview that answers the status its smoke check names lands whatever its body says, so a Worker that serves an error page with a 200 reaches trunk
+diff --git a/packages/core/src/domain/delivery/smoke.ts b/packages/core/src/domain/delivery/smoke.ts
+index 23970f35..a75881af 100644
+--- a/packages/core/src/domain/delivery/smoke.ts
++++ b/packages/core/src/domain/delivery/smoke.ts
+@@ -26,12 +26,6 @@ export const judgeSmoke = (check: SmokeCheck, answer: SmokeAnswer): SmokeJudged
+       ok: false,
+       said: `${asked} answered ${answer.status}, not ${check.status}`,
+     };
+-  if (check.contains !== undefined && !answer.body.includes(check.contains))
+-    return {
+-      path: check.path,
+-      ok: false,
+-      said: `${asked} answered ${answer.status} without ${JSON.stringify(check.contains)}`,
+-    };
+   return { path: check.path, ok: true, said: `${asked} answered ${answer.status}` };
+ };
+ 

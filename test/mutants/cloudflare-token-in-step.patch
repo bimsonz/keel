@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/deploy-flow.test.ts -t cf.pool.token-nowhere
+# kills: cf.pool.token-nowhere
+# why: the owner's Cloudflare token is written in clear into the preview's evidence document in ARCHIVE, outside the sealed credential store, where it outlives the credential's removal
+diff --git a/packages/core/src/application/delivery/deploy-steps.ts b/packages/core/src/application/delivery/deploy-steps.ts
+index 1107280d..8c732017 100644
+--- a/packages/core/src/application/delivery/deploy-steps.ts
++++ b/packages/core/src/application/delivery/deploy-steps.ts
+@@ -1,4 +1,4 @@
+-import { Clock, Effect, Option, Result, Schema } from "effect";
++import { Clock, Effect, Option, Redacted, Result, Schema } from "effect";
+ import {
+   type Deployment,
+   judgeSmoke,
+@@ -220,6 +220,7 @@ export const runDeployStep = (
+           ...(made.success.aliasUrl === undefined ? {} : { aliasUrl: made.success.aliasUrl }),
+         });
+       return yield* finish("pass", `previewed ${spec.worker} at ${made.success.url}`, {
++        token: Redacted.value(token),
+         deploymentId,
+         target: spec.target,
+         worker: spec.worker,
