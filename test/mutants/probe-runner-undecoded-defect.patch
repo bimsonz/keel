@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-runner.test.ts -t probe-runner.rpc-not-an-answer
+# kills: probe-runner.rpc-not-an-answer
+# why: an answer that is no Exit at all throws in the decode, a defect of the Probe's step where the caller should be told keel-verify is unavailable and retry
+diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
+index 49952893..b2f24982 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
+@@ -47,10 +47,7 @@ const NOT_AN_ANSWER = "keel-verify's answer is not one";
+  * defect: a retry may change it.
+  */
+ const settle = <A, E extends { readonly reason: string }>(codec: ExitCodec<A, E>, raw: unknown) =>
+-  Effect.try({
+-    try: () => decodeExit(codec, raw),
+-    catch: () => new ProbeRunnerUnavailable({ reason: NOT_AN_ANSWER }),
+-  }).pipe(
++  Effect.sync(() => decodeExit(codec, raw)).pipe(
+     Effect.flatMap((exit) => {
+       if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
+       const failure = Cause.findErrorOption(exit.cause);
