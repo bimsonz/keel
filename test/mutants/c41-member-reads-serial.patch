@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.member-reads"
+# kills: c41.member-reads
+# why: a batch reads its members one after another before composing them, so a batch of many waits on every member's reads in turn
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index b93c2df..ac85436 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -975,7 +975,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+           },
+         } satisfies CandidateMember;
+       }).pipe(Effect.orDie),
+-    { concurrency: "unbounded" },
+   );
+   const formed = formedOf(yield* EventOutbox, batch.id);
+   const composed = yield* Effect.result(
