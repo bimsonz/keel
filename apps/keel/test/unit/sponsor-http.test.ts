@@ -272,7 +272,12 @@ describe("the sponsor link at the doorway", () => {
     expect(url).toBe(`https://keel.test/sponsor#agent=${bot}&code=${String(code)}`);
     expect(new URL(String(url)).search).toBe("");
     expect(Date.parse(String(expiresAt))).toBeGreaterThan(Date.now());
-    expect(given.body["next"]).toMatchObject([{ kind: "escalate" }, { operationId: "whoami" }]);
+    // Keel tells the agent the moment its sponsor approves, so it waits in its inbox rather than asking again.
+    expect(given.body["next"]).toMatchObject([
+      { kind: "escalate" },
+      { operationId: "inbox", args: { cursor: "end", wait: 600 } },
+      { operationId: "whoami" },
+    ]);
     // A person has no account of an agent's to ask for, and an agent approves nothing.
     expect(refusal(answer(await w.handlers.askSponsor(person(ANN))))).toEqual([
       403,

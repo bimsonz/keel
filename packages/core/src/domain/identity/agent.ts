@@ -105,6 +105,8 @@ export interface Identity {
   readonly session: SessionRef | null;
   /** The invitations that wait for the agent to accept them: an org's, and a project's. */
   readonly invitations: { readonly namespaces: number; readonly projects: number };
+  /** The invitations the agent has accepted, an org's and a project's: the places it stands beyond its own namespace. */
+  readonly joined: { readonly namespaces: number; readonly projects: number };
 }
 
 /** A principal may act only while its agent is active and its epoch is current. */

@@ -108,15 +108,61 @@ function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
   };
 }
 
+/** What `whoami` tells an agent nobody stands behind: that a person must, and the call that asks one. */
+function sponsorship(agent: Agent) {
+  return agent.sponsor !== undefined
+    ? { clause: "", next: [] }
+    : {
+        clause: " Nobody stands behind you yet: ask a person to sponsor you.",
+        next: [
+          {
+            kind: "call" as const,
+            title:
+              "Ask a person to sponsor you: askSponsor answers a link, and you show it to them",
+            operationId: "askSponsor",
+          },
+        ],
+      };
+}
+
+/**
+ * What `whoami` tells an agent that signed up by key and stands nowhere but its
+ * own namespace, with no invitation waiting: that a member of an org invites it
+ * by its handle, and that the inbox tells it the moment one does.
+ */
+function placement({ agent, invitations, joined }: Identity) {
+  const standing =
+    invitations.namespaces + invitations.projects + joined.namespaces + joined.projects;
+  if (agent.projectId !== undefined || standing > 0) return { clause: "", next: [] };
+  const handle = agent.handle ?? agent.id;
+  return {
+    clause: ` You work only in your own namespace, ${handle}: a member of an org invites you into theirs.`,
+    next: [
+      {
+        kind: "escalate" as const,
+        title: `To work on an org's projects, ask one of its members to invite you by your handle ${handle}, with read and work`,
+      },
+      {
+        kind: "call" as const,
+        title: "Wait in your inbox: Keel tells you the moment an invitation comes",
+        operationId: "inbox",
+        args: { cursor: "end", wait: 600 },
+      },
+    ],
+  };
+}
+
 export function whoamiOk(identity: Identity): WhoamiResult {
   const { agent, run, invitations } = identity;
   const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
+  const sponsor = sponsorship(agent);
   const waiting = waitingInvitations(invitations);
+  const placed = placement(identity);
   return {
     status: 200,
     body: {
       ok: true,
-      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${waiting.clause}`,
+      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${sponsor.clause}${waiting.clause}${placed.clause}`,
       result: {
         agent: agentProfile(agent),
         ...(run === undefined ? {} : { run: runView(run) }),
@@ -124,7 +170,7 @@ export function whoamiOk(identity: Identity): WhoamiResult {
         invitations,
       },
       findings: [],
-      next: waiting.next,
+      next: [...sponsor.next, ...waiting.next, ...placed.next],
       notices: [],
       cost: {},
     },

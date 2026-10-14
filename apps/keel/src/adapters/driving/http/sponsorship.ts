@@ -54,6 +54,12 @@ export function askOk(origin: string, agentId: AgentId, request: SponsorRequest)
         },
         {
           kind: "call",
+          title: "Wait in your inbox: Keel tells you the moment they approve",
+          operationId: "inbox",
+          args: { cursor: "end", wait: 600 },
+        },
+        {
+          kind: "call",
           title: "Read who you are: your profile names your sponsor once they approve",
           operationId: "whoami",
         },

@@ -41,7 +41,11 @@ import {
 const waiting = (invitations: readonly Invitation[]): number =>
   invitations.filter((invitation) => invitation.state === "invited").length;
 
-/** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, that run's current session, and how many invitations wait for its word. */
+/** How many invitations the agent has accepted: the places it stands. */
+const joined = (invitations: readonly Invitation[]): number =>
+  invitations.filter((invitation) => invitation.state === "joined").length;
+
+/** Who the caller is: its admitted agent, with its org and sponsor, the run its token names, that run's current session, how many invitations wait for its word and how many it has accepted. */
 export const whoami: (
   principal: AgentClaims,
 ) => Effect.Effect<
@@ -58,6 +62,7 @@ export const whoami: (
     ...(principal.run === undefined ? {} : { run: principal.run }),
     session: current === null ? null : { id: current.id },
     invitations: { namespaces: waiting(namespaces), projects: waiting(projects) },
+    joined: { namespaces: joined(namespaces), projects: joined(projects) },
   };
 });
 

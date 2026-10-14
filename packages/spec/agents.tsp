@@ -200,6 +200,7 @@ interface Agents {
 
   /** The namespaces you were invited into, the ones you have joined and the ones still asking, oldest first. */
   @summary("List the namespaces you were invited into")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/namespaces")
   @get
@@ -212,6 +213,7 @@ interface Agents {
    * found (404).
    */
   @summary("Accept an invitation into a namespace")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/namespaces/{namespace}")
   @put
@@ -222,6 +224,7 @@ interface Agents {
    * id. A namespace that has not invited you is not found (404).
    */
   @summary("Decline an invitation, or leave a namespace")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/namespaces/{namespace}")
   @delete
@@ -229,6 +232,7 @@ interface Agents {
 
   /** The projects you were invited to, one by one: the ones you have joined and the ones still asking, oldest first. */
   @summary("List the projects you were invited to")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/projects")
   @get
@@ -240,6 +244,7 @@ interface Agents {
    * namespace. A project that has not invited you is not found (404).
    */
   @summary("Accept an invitation to a project")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/projects/{projectId}")
   @put
@@ -247,6 +252,7 @@ interface Agents {
 
   /** Decline an invitation to a project you have not accepted, or leave one you joined. A project that has not invited you is not found (404). */
   @summary("Decline an invitation to a project, or leave it")
+  @tag("mcp")
   @useAuth(AgentRead)
   @route("/me/projects/{projectId}")
   @delete

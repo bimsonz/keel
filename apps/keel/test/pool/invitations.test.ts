@@ -33,6 +33,8 @@ import {
   BASE,
   drainAfter,
   establishProject,
+  mcp,
+  mcpResult,
   placeProject,
   seedOrg,
   seedUser,
@@ -129,13 +131,14 @@ async function keyAgent() {
   agentStub(agentId);
   const card = await http(null, "GET", `/agents/${agentId}`);
   const handle = String(card.body["handle"]);
-  /** A token of the agent's: for one project, or for none (its own account). */
-  const token = async (project?: ProjectId, scope?: string) =>
+  /** A token of the agent's: for one project, or for none (its own account); for Keel's MCP when `resource` names it. */
+  const token = async (project?: ProjectId, scope?: string, resource?: string) =>
     (
       await granted(
         await requestToken(agentId, account, {
           ...(project === undefined ? {} : { project }),
           ...(scope === undefined ? {} : { scope }),
+          ...(resource === undefined ? {} : { resource }),
         }),
       )
     ).access_token;
@@ -943,7 +946,11 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     const { person, projectId } = await aSoloPerson();
     const agent = await keyAgent();
     const own = await agent.token();
-    expect(await told(own)).toEqual({ invitations: { namespaces: 0, projects: 0 }, reads: [] });
+    // Nobody stands behind it, so `askSponsor` leads every answer; standing nowhere, it is told who invites it.
+    expect(await told(own)).toEqual({
+      invitations: { namespaces: 0, projects: 0 },
+      reads: ["askSponsor", undefined, "inbox"],
+    });
 
     expect(
       (await http(member.token, "POST", `/namespaces/${slug}/agents`, { agent: agent.handle }))
@@ -955,17 +962,85 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     ).toBe(201);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 1, projects: 1 },
-      reads: ["Agents_listNamespaces", "Agents_listProjects"],
+      reads: ["askSponsor", "Agents_listNamespaces", "Agents_listProjects"],
     });
 
     expect((await http(own, "PUT", `/agents/me/namespaces/${slug}`)).status).toBe(200);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 1 },
-      reads: ["Agents_listProjects"],
+      reads: ["askSponsor", "Agents_listProjects"],
     });
     expect(
       (await http(person.token, "DELETE", `/projects/${projectId}/agents/${agent.agentId}`)).status,
     ).toBe(200);
-    expect(await told(own)).toEqual({ invitations: { namespaces: 0, projects: 0 }, reads: [] });
+    expect(await told(own)).toEqual({
+      invitations: { namespaces: 0, projects: 0 },
+      reads: ["askSponsor"],
+    });
+  });
+});
+
+/** One tool of Keel's MCP, called as an agent's client calls it: its answer, refused or not. */
+const tool = async (token: string, name: string, args: Record<string, unknown> = {}) => {
+  const result = await mcpResult(await mcp(token, "tools/call", { name, arguments: args }, name));
+  return { refused: result["isError"] === true, body: Object(result["structuredContent"]) };
+};
+
+describe("an agent sets itself up through Keel's MCP alone", () => {
+  it("[mcp.set-up] signed up by key, it is told to ask a person to sponsor it and an org's member to invite it by its handle; invited, it reads the invitation and accepts it through Keel's tools", async () => {
+    const { slug, member } = await anOrg();
+    const agent = await keyAgent();
+    // Its client's token names a project of its own namespace, as a key agent's MCP token does before any org takes it in.
+    const ownProject: ProjectId = makeId("prj", ulid());
+    await placeProject(ownProject, agent.agentId);
+    await establishProject(ownProject);
+    const own = await agent.token(ownProject, undefined, `${BASE}/mcp`);
+
+    const first = await tool(own, "whoami");
+    expect(first.body["summary"]).toContain(
+      ` Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${agent.handle}: `,
+    );
+    expect(first.body["next"]).toMatchObject([
+      { kind: "call", operationId: "askSponsor" },
+      { kind: "escalate", title: expect.stringContaining(`by your handle ${agent.handle}`) },
+      { kind: "call", operationId: "inbox", args: { cursor: "end", wait: 600 } },
+    ]);
+    const asked = await tool(own, "askSponsor");
+    expect(asked.refused).toBe(false);
+    expect(String(Object(asked.body["result"])["url"])).toContain(
+      `/sponsor#agent=${agent.agentId}&code=`,
+    );
+    expect(asked.body["next"]).toMatchObject([
+      { kind: "escalate" },
+      { operationId: "inbox" },
+      { operationId: "whoami" },
+    ]);
+
+    expect(
+      (await http(member.token, "POST", `/namespaces/${slug}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    const invited = await tool(own, "whoami");
+    expect(invited.body["summary"]).not.toMatch(/own namespace/);
+    expect(invited.body["next"]).toMatchObject([
+      { operationId: "askSponsor" },
+      { operationId: "Agents_listNamespaces" },
+    ]);
+    expect(invited.body["next"]).toHaveLength(2);
+
+    const listed = await tool(own, "Agents_listNamespaces");
+    expect(listed.body["items"]).toMatchObject([
+      { namespace: { handle: slug }, state: "invited", scopes: ["agent:read", "agent:work"] },
+    ]);
+    const accepted = await tool(own, "Agents_acceptInvitation", {
+      namespace: slug,
+      "idempotency-key": `accept-${ulid()}`,
+    });
+    expect([accepted.refused, accepted.body["state"]]).toEqual([false, "joined"]);
+
+    const placed = await tool(own, "whoami");
+    expect(placed.body["summary"]).not.toMatch(/invitation|own namespace/);
+    expect(placed.body["next"]).toMatchObject([{ operationId: "askSponsor" }]);
+    expect(placed.body["next"]).toHaveLength(1);
   });
 });

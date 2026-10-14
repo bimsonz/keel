@@ -71,6 +71,7 @@ describe("identity/whoami", () => {
         agent,
         session: null,
         invitations: { namespaces: 0, projects: 0 },
+        joined: { namespaces: 0, projects: 0 },
       });
     }).pipe(Effect.provide(layers())),
   );
@@ -119,6 +120,7 @@ describe("identity/whoami", () => {
         agent,
         session: { id: opened.id },
         invitations: { namespaces: 0, projects: 0 },
+        joined: { namespaces: 0, projects: 0 },
       });
     }).pipe(Effect.provide(layers())),
   );

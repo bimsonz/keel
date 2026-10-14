@@ -407,7 +407,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -547,7 +548,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -685,7 +687,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -793,7 +796,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -933,7 +937,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -1071,7 +1076,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
