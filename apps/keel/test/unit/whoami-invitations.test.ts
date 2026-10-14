@@ -153,4 +153,50 @@ describe("whoami's answer", () => {
     const enrolled = answer({ agent, session: null, invitations: none, joined: none });
     expect(enrolled.next).toEqual([]);
   });
+
+  it("[whoami.declare-next] leads an agent whose token names a project it can work in with a declare there, ahead of a sponsor and an invitation, and sends it to no inbox wait, naming three steps at most; a read-only place or no project leads with nothing", () => {
+    const here = {
+      project: { id: sampleProjectId, namespace: keyAgent.handle ?? "", name: "app" },
+      declares: true,
+    };
+    const fresh = { agent: keyAgent, session: null, invitations: none, joined: none };
+    const working = whoamiOk(fresh, here);
+    if (working.status !== 200) throw new Error(`whoami answered ${working.status}`);
+    expect(working.body.summary).toBe(
+      `You are key-agent (${keyAgent.id}), holding agent:read, agent:work. This token is for ${keyAgent.handle}/app (${sampleProjectId}), where you can work: declare a change there, and ask why about a file before you change it. Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${keyAgent.handle}: a member of an org invites you into theirs.`,
+    );
+    expect(working.body.next).toEqual([
+      {
+        kind: "call",
+        title: `Declare a change on ${keyAgent.handle}/app before you write code: declare answers a workspace to push to and a lease`,
+        operationId: "declare",
+      },
+      expect.objectContaining({ operationId: "askSponsor" }),
+      expect.objectContaining({ kind: "escalate" }),
+    ]);
+    const reads = (declares: boolean | undefined) => {
+      const told = whoamiOk(fresh, declares === undefined ? undefined : { ...here, declares });
+      if (told.status !== 200) throw new Error(`whoami answered ${told.status}`);
+      return { summary: told.body.summary, next: told.body.next.map((a) => a.operationId) };
+    };
+    // Sponsored, it is named the declare and the invitation it may ask for, and no inbox wait.
+    const backed = whoamiOk({ ...fresh, agent: { ...keyAgent, sponsor: sampleSponsorId } }, here);
+    if (backed.status !== 200) throw new Error(`whoami answered ${backed.status}`);
+    expect(backed.body.next.map((action) => action.kind)).toEqual(["call", "escalate"]);
+    // Invited into an org and to a project as well, it is still named three steps, the declare first.
+    const crowded = whoamiOk(
+      { agent: keyAgent, session: null, invitations: { namespaces: 1, projects: 1 }, joined: none },
+      here,
+    );
+    if (crowded.status !== 200) throw new Error(`whoami answered ${crowded.status}`);
+    expect(crowded.body.next.map((action) => action.operationId)).toEqual([
+      "declare",
+      "askSponsor",
+      "Agents_listNamespaces",
+    ]);
+    for (const declares of [false, undefined]) {
+      expect(reads(declares).summary).not.toMatch(/This token is for/);
+      expect(reads(declares).next).toEqual(["askSponsor", undefined, "inbox"]);
+    }
+  });
 });

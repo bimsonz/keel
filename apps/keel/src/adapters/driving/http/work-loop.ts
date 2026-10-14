@@ -239,7 +239,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
   const fields = decodeWith(DeclareFields, {
     goal: input.goal,
     footprint: input.footprint ?? [],
-    premises: input.premises,
+    premises: input.premises ?? [],
     ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
   });
   const premises = Result.flatMap(fields, (f) =>
@@ -415,13 +415,40 @@ export const apiActions = (actions: readonly DomainNextAction[]): NextAction[] =
 /** The envelope's `next` holds at most three. */
 const MAX_NEXT = 3;
 
+/**
+ * What declare tells an agent whose change names no path: preflight finds a
+ * change's neighbours through its footprint, so it saw none, and a revise that
+ * names the paths lets it look.
+ */
+function unplaced(change: Change) {
+  if (change.intent.footprint.length > 0) return { clause: "", next: [] };
+  return {
+    clause:
+      " Its footprint is empty, so Keel cannot see which changes it would meet: revise it with the paths you will edit, create or delete.",
+    next: [
+      {
+        kind: "call" as const,
+        title:
+          "Revise the change with the paths it will touch, so preflight can find its neighbours",
+        operationId: "revise",
+        args: {
+          changeId: change.id,
+          "keel-lease": change.lease.id,
+          "if-match": `"${change.intent.revision}"`,
+        },
+      },
+    ],
+  };
+}
+
 export function declareOk(declared: Declared): DeclareResult {
   const { change, preflight, workspace } = declared;
   const tell = teller();
+  const footprint = unplaced(change);
   return {
     status: 201,
     body: envelope(
-      `Declared ${change.id} (${change.state}). Push your commits to the workspace remote with its token, then submit.`,
+      `Declared ${change.id} (${change.state}). Push your commits to the workspace remote with its token, then submit.${footprint.clause}`,
       {
         change: changeView(change, tell),
         preflight: preflightView(change.id, preflight, tell),
@@ -429,6 +456,7 @@ export function declareOk(declared: Declared): DeclareResult {
         lease: leaseView(change.lease),
       },
       [
+        ...footprint.next,
         {
           kind: "call",
           title: "Submit a commit once it is pushed to the workspace",

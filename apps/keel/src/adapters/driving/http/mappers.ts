@@ -128,9 +128,10 @@ function sponsorship(agent: Agent) {
 /**
  * What `whoami` tells an agent that signed up by key and stands nowhere but its
  * own namespace, with no invitation waiting: that a member of an org invites it
- * by its handle, and that the inbox tells it the moment one does.
+ * by its handle, and, unless it has work where its token points, that the inbox
+ * tells it the moment one does.
  */
-function placement({ agent, invitations, joined }: Identity) {
+function placement({ agent, invitations, joined }: Identity, working: boolean) {
   const standing =
     invitations.namespaces + invitations.projects + joined.namespaces + joined.projects;
   if (agent.projectId !== undefined || standing > 0) return { clause: "", next: [] };
@@ -142,11 +143,41 @@ function placement({ agent, invitations, joined }: Identity) {
         kind: "escalate" as const,
         title: `To work on an org's projects, ask one of its members to invite you by your handle ${handle}, with read and work`,
       },
+      ...(working
+        ? []
+        : [
+            {
+              kind: "call" as const,
+              title: "Wait in your inbox: Keel tells you the moment an invitation comes",
+              operationId: "inbox",
+              args: { cursor: "end", wait: 600 },
+            },
+          ]),
+    ],
+  };
+}
+
+/** The project a token names, as the agent reaches it now, and whether the policy grants it a declare there. */
+export interface TokenProject {
+  readonly project: { readonly id: string; readonly namespace: string; readonly name: string };
+  readonly declares: boolean;
+}
+
+/**
+ * What `whoami` tells an agent whose token names a project it can work in: the
+ * project, to declare a change there and to ask why about a file before changing
+ * it. The declare leads every other step.
+ */
+function work(here: TokenProject | undefined) {
+  if (here === undefined || !here.declares) return { clause: "", next: [] };
+  const name = `${here.project.namespace}/${here.project.name}`;
+  return {
+    clause: ` This token is for ${name} (${here.project.id}), where you can work: declare a change there, and ask why about a file before you change it.`,
+    next: [
       {
         kind: "call" as const,
-        title: "Wait in your inbox: Keel tells you the moment an invitation comes",
-        operationId: "inbox",
-        args: { cursor: "end", wait: 600 },
+        title: `Declare a change on ${name} before you write code: declare answers a workspace to push to and a lease`,
+        operationId: "declare",
       },
     ],
   };
@@ -170,17 +201,21 @@ function reach({ joined }: Identity) {
       };
 }
 
-export function whoamiOk(identity: Identity): WhoamiResult {
+/** The most steps `whoami` names (the envelope's `next`, `@maxItems(3)`): the first three, in order. */
+const MAX_NEXT = 3;
+
+export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult {
   const { agent, run, invitations } = identity;
   const inRun = run === undefined ? "" : `, in run ${run.label ?? run.id}`;
+  const working = work(here);
   const sponsor = sponsorship(agent);
   const waiting = waitingInvitations(invitations);
-  const placed = placement(identity);
+  const placed = placement(identity, working.next.length > 0);
   return {
     status: 200,
     body: {
       ok: true,
-      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${sponsor.clause}${waiting.clause}${placed.clause}`,
+      summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${working.clause}${sponsor.clause}${waiting.clause}${placed.clause}`,
       result: {
         agent: agentProfile(agent),
         ...(run === undefined ? {} : { run: runView(run) }),
@@ -188,7 +223,13 @@ export function whoamiOk(identity: Identity): WhoamiResult {
         invitations,
       },
       findings: [],
-      next: [...sponsor.next, ...waiting.next, ...placed.next, ...reach(identity).next],
+      next: [
+        ...working.next,
+        ...sponsor.next,
+        ...waiting.next,
+        ...placed.next,
+        ...reach(identity).next,
+      ].slice(0, MAX_NEXT),
       notices: [],
       cost: {},
     },

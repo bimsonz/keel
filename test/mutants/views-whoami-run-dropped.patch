@@ -2,11 +2,11 @@
 # kills: run.pool-views
 # why: whoami's body drops the run the use-case answered
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index d5fb419f..08c2549c 100644
+index 7c7a31d0..b925d30e 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -165,7 +165,6 @@ export function whoamiOk(identity: Identity): WhoamiResult {
-       summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${sponsor.clause}${waiting.clause}${placed.clause}`,
+@@ -218,7 +218,6 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+       summary: `You are ${agent.name} (${agent.id})${inRun}, holding ${agent.scopes.join(", ")}.${working.clause}${sponsor.clause}${waiting.clause}${placed.clause}`,
        result: {
          agent: agentProfile(agent),
 -        ...(run === undefined ? {} : { run: runView(run) }),

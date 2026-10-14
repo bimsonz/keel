@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t mcp.set-up
+# kills: mcp.set-up
+# why: a token that asked only to read is told to declare, because the agent's place there allows work
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 719f850a..11837bb3 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -595,7 +595,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                       const resource = yield* projectResource(claims.projectId);
+                       const declares =
+                         resource._tag === "Project" &&
+-                        Result.isSuccess(authorize(caller.principal, "declare", resource));
++                        Result.isSuccess(authorize({ ...caller.principal, scopes: ["agent:read", "agent:work"] }, "declare", resource));
+                       return { identity, here: { project, declares } };
+                     }),
+                   ),

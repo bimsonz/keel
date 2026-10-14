@@ -17,7 +17,7 @@ import type { KeelClient } from "@keeltown/sdk";
  */
 
 type Intent = Parameters<KeelClient["declare"]>[0];
-export type Premise = Intent["premises"][number];
+export type Premise = NonNullable<Intent["premises"]>[number];
 export type FootprintEntry = NonNullable<Intent["footprint"]>[number];
 
 /** The four kinds of conflict the benchmark plants, each with its decoy. */

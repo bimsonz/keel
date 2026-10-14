@@ -2,7 +2,7 @@
 # kills: run.pool-views
 # why: whoami's answer leaves out the run its token names
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index 217aba03..69a78bec 100644
+index 431a7ee3..c90adbec 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
 @@ -59,7 +59,6 @@ export const whoami: (

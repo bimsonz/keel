@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-no-premises
+# kills: a11.declare-no-premises
+# why: declare requires premises again, so an agent whose change relies on nothing must invent one to be let in
+# regen
+diff --git a/packages/spec/changes.tsp b/packages/spec/changes.tsp
+index d2692fa7..ea427427 100644
+--- a/packages/spec/changes.tsp
++++ b/packages/spec/changes.tsp
+@@ -19,7 +19,7 @@ model DeclareRequest {
+   footprint?: MFP.FootprintEntry[];
+ 
+   /** What it relies on, about code it does not own. Leave it out when the change relies on nothing. */
+-  premises?: MFP.PremiseProposition[];
++  premises: MFP.PremiseProposition[];
+ 
+   /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
+   declaredEffects?: MFP.EffectProposition[];

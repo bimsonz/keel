@@ -15,11 +15,14 @@ model DeclareRequest {
   @minLength(1)
   goal: string;
 
-  /** The paths and symbols it expects to edit, create or delete. */
+  /**
+   * The paths and symbols it expects to edit, create or delete. Preflight finds the changes this one
+   * would meet through them: a declare with none sees no neighbour.
+   */
   footprint?: MFP.FootprintEntry[];
 
-  /** What it relies on, about code it does not own. */
-  premises: MFP.PremiseProposition[];
+  /** What it relies on, about code it does not own. Leave it out when the change relies on nothing. */
+  premises?: MFP.PremiseProposition[];
 
   /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
   declaredEffects?: MFP.EffectProposition[];
@@ -212,6 +215,18 @@ interface Changes {
    * with the same Idempotency-Key answers the same change while it is live; once it has ended (landed,
    * withdrawn or superseded) it holds no workspace, and the retry is 409 `change.state_refused`, naming
    * the change and its state. The same key with a different body is 409 `request.idempotency_conflict`.
+   *
+   * `footprint` names the paths (and symbols) the change will edit, create or delete, such as
+   * `[{"path": "docs/quickstart.md", "op": "edit"}]`: preflight finds the changes this one would meet
+   * through it, so a declare without one sees no neighbour, and its answer asks for a revise.
+   *
+   * `premises` is optional: list only what the change relies on about code it does not own. Each
+   * premise is `{subject, predicate, relation, value}`. `subject` names a part of the code as lowercase
+   * segments joined by `.` or `-`, such as `authz.permission-cache`. `predicate` is one of `freshness`,
+   * `consistency`, `cardinality`, `bound`, `presence`, `purity`, `idempotent`, `authority`, `shape`,
+   * `ordering` and `invariant`, and each takes the `relation` and `value` the input schema gives it.
+   * For example:
+   * `{"subject": "authz.permission-cache", "predicate": "freshness", "relation": "at-most", "value": "ttl:60"}`.
    */
   @summary("Declare a change")
   @tag("mcp")
@@ -339,6 +354,12 @@ interface Changes {
    * nothing changed), 400 `commit.bad_edits` (a bad, duplicate or nested path), 404
    * `commit.parent_not_found`. A retry whose commit already sits at `main` answers that commit.
    * A commit records no event of the change's own: it is seen as a push to the workspace.
+   *
+   * `expectedHead` is your workspace's `main`: declare's `workspace.baseSha` before your first
+   * commit, then the last commit's `commitSha`. Each edit writes a file's whole `content`, or removes
+   * the file with `"delete": true` (leave `delete` out otherwise). For example, writing one file and
+   * removing another:
+   * `[{"path": "docs/notes.md", "content": "# Notes\n"}, {"path": "docs/old.md", "delete": true}]`.
    */
   @summary("Commit edits to your workspace")
   @tag("mcp")

@@ -2,12 +2,12 @@
 # kills: whoami.placement-next
 # why: an agent already in an org is told it works only in its own namespace and to ask for an invitation it has
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index d5fb419f..d35ab78f 100644
+index 7c7a31d0..7be67ab7 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -132,7 +132,7 @@ function sponsorship(agent: Agent) {
+@@ -133,7 +133,7 @@ function sponsorship(agent: Agent) {
   */
- function placement({ agent, invitations, joined }: Identity) {
+ function placement({ agent, invitations, joined }: Identity, working: boolean) {
    const standing =
 -    invitations.namespaces + invitations.projects + joined.namespaces + joined.projects;
 +    invitations.namespaces + invitations.projects;

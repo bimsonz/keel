@@ -1,6 +1,7 @@
 import {
   type Actor,
   type Agent,
+  type AgentClaims,
   answers,
   type Audience,
   type IdempotencyConflict,
@@ -220,6 +221,19 @@ export const reachableProjects = (agentId: AgentId) =>
           a.project.namespace.localeCompare(b.project.namespace) ||
           a.project.name.localeCompare(b.project.name),
       );
+  });
+
+/**
+ * The project a token names, as the agent reaches it now; none when the token
+ * names no project or the agent cannot reach it. What the agent may do there
+ * is the policy's to say.
+ */
+export const tokenProject = (claims: AgentClaims) =>
+  Effect.gen(function* () {
+    if (claims.projectId === undefined) return undefined;
+    return (yield* reachableProjects(claims.agentId)).find(
+      (item) => item.project.id === claims.projectId,
+    )?.project;
   });
 
 /**

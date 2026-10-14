@@ -2489,7 +2489,7 @@
       "post": {
         "operationId": "declare",
         "summary": "Declare a change",
-        "description": "Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. A retry\nwith the same Idempotency-Key answers the same change while it is live; once it has ended (landed,\nwithdrawn or superseded) it holds no workspace, and the retry is 409 `change.state_refused`, naming\nthe change and its state. The same key with a different body is 409 `request.idempotency_conflict`.",
+        "description": "Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. A retry\nwith the same Idempotency-Key answers the same change while it is live; once it has ended (landed,\nwithdrawn or superseded) it holds no workspace, and the retry is 409 `change.state_refused`, naming\nthe change and its state. The same key with a different body is 409 `request.idempotency_conflict`.\n\n`footprint` names the paths (and symbols) the change will edit, create or delete, such as\n`[{\"path\": \"docs/quickstart.md\", \"op\": \"edit\"}]`: preflight finds the changes this one would meet\nthrough it, so a declare without one sees no neighbour, and its answer asks for a revise.\n\n`premises` is optional: list only what the change relies on about code it does not own. Each\npremise is `{subject, predicate, relation, value}`. `subject` names a part of the code as lowercase\nsegments joined by `.` or `-`, such as `authz.permission-cache`. `predicate` is one of `freshness`,\n`consistency`, `cardinality`, `bound`, `presence`, `purity`, `idempotent`, `authority`, `shape`,\n`ordering` and `invariant`, and each takes the `relation` and `value` the input schema gives it.\nFor example:\n`{\"subject\": \"authz.permission-cache\", \"predicate\": \"freshness\", \"relation\": \"at-most\", \"value\": \"ttl:60\"}`.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -3053,7 +3053,7 @@
       "post": {
         "operationId": "commit",
         "summary": "Commit edits to your workspace",
-        "description": "Commit edits to your change's workspace without a clone: Keel applies them to `parent`\n(default `expectedHead`), makes one commit authored by you, and moves your workspace's\n`main` from `expectedHead` to it, renewing your lease. Then call `submit` with its\n`commitSha`. Only your own workspace is written, never trunk. Allowed while the change is\nworking or bounced, under your lease. Refusals: 409 `workspace.head_moved` (it names the\nhead now: read it and try again), 409 `commit.edits_refused` (an edit cannot apply, or\nnothing changed), 400 `commit.bad_edits` (a bad, duplicate or nested path), 404\n`commit.parent_not_found`. A retry whose commit already sits at `main` answers that commit.\nA commit records no event of the change's own: it is seen as a push to the workspace.",
+        "description": "Commit edits to your change's workspace without a clone: Keel applies them to `parent`\n(default `expectedHead`), makes one commit authored by you, and moves your workspace's\n`main` from `expectedHead` to it, renewing your lease. Then call `submit` with its\n`commitSha`. Only your own workspace is written, never trunk. Allowed while the change is\nworking or bounced, under your lease. Refusals: 409 `workspace.head_moved` (it names the\nhead now: read it and try again), 409 `commit.edits_refused` (an edit cannot apply, or\nnothing changed), 400 `commit.bad_edits` (a bad, duplicate or nested path), 404\n`commit.parent_not_found`. A retry whose commit already sits at `main` answers that commit.\nA commit records no event of the change's own: it is seen as a push to the workspace.\n\n`expectedHead` is your workspace's `main`: declare's `workspace.baseSha` before your first\ncommit, then the last commit's `commitSha`. Each edit writes a file's whole `content`, or removes\nthe file with `\"delete\": true` (leave `delete` out otherwise). For example, writing one file and\nremoving another:\n`[{\"path\": \"docs/notes.md\", \"content\": \"# Notes\\n\"}, {\"path\": \"docs/old.md\", \"delete\": true}]`.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ChangePath"
@@ -14519,8 +14519,7 @@
       "DeclareRequest": {
         "type": "object",
         "required": [
-          "goal",
-          "premises"
+          "goal"
         ],
         "properties": {
           "goal": {
@@ -14533,14 +14532,14 @@
             "items": {
               "$ref": "#/components/schemas/MFP.FootprintEntry"
             },
-            "description": "The paths and symbols it expects to edit, create or delete."
+            "description": "The paths and symbols it expects to edit, create or delete. Preflight finds the changes this one\nwould meet through them: a declare with none sees no neighbour."
           },
           "premises": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MFP.PremiseProposition"
             },
-            "description": "What it relies on, about code it does not own."
+            "description": "What it relies on, about code it does not own. Leave it out when the change relies on nothing."
           },
           "declaredEffects": {
             "type": "array",

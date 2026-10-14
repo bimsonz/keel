@@ -125,6 +125,56 @@ describe("the work loop over REST and MCP", () => {
     });
   });
 
+  it("[a11.declare-no-premises] a declare that leaves premises out, over MCP and over REST, is a change that relies on nothing", async () => {
+    const { via } = loop();
+    const token = await tokenFor(await seedAgent());
+    const { premises: _, ...bare } = declareBody;
+    const viaTool = await tool(via, token, "declare", {
+      "idempotency-key": "declare-key-bare-mcp",
+      ...bare,
+    });
+    expect(viaTool).toMatchObject({
+      ok: true,
+      result: { change: { state: "working", goal: declareBody.goal, premises: [] } },
+    });
+    const viaRest = await declare(via, token, "declare-key-bare-rest", bare);
+    expect(viaRest.status).toBe(201);
+    expect(viaRest.body.result).toMatchObject({ change: { premises: [] } });
+  });
+
+  it("[a11.declare-footprint-asks] a declare that names no path is told preflight saw no neighbour and asked to revise with its paths, and the revise it is handed is accepted; one that names a path is not", async () => {
+    const { via } = loop();
+    const token = await tokenFor(await seedAgent());
+    const bare = Object(
+      await tool(via, token, "declare", {
+        "idempotency-key": "declare-key-nopath",
+        ...declareBody,
+      }),
+    );
+    expect(bare.summary).toContain(
+      " Its footprint is empty, so Keel cannot see which changes it would meet: revise it with the paths you will edit, create or delete.",
+    );
+    expect(bare.next).toMatchObject([{ operationId: "revise" }, { operationId: "submit" }]);
+    const revised = await tool(via, token, "revise", {
+      ...bare.next[0].args,
+      "idempotency-key": "revise-key-nopath",
+      footprint: [{ path: "docs/quickstart.md", op: "edit" }],
+    });
+    expect(revised).toMatchObject({
+      ok: true,
+      result: { change: { revision: 2, footprint: [{ path: "docs/quickstart.md", op: "edit" }] } },
+    });
+
+    const placed = await declare(via, token, "declare-key-path", {
+      ...declareBody,
+      footprint: [{ path: "src/authz/cache.ts", op: "edit" }],
+    });
+    const answered = Object(placed.body);
+    expect(answered.summary).not.toMatch(/footprint is empty/);
+    expect(answered.next).toMatchObject([{ operationId: "submit" }]);
+    expect(answered.next).toHaveLength(1);
+  });
+
   it("[a11.submit] submits under the lease, and an MCP retry with the same key answers the same", async () => {
     const { via, changes } = loop();
     const token = await tokenFor(await seedAgent());

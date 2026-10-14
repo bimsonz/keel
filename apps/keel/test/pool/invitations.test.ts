@@ -1011,7 +1011,7 @@ const tool = async (token: string, name: string, args: Record<string, unknown> =
 };
 
 describe("an agent sets itself up through Keel's MCP alone", () => {
-  it("[mcp.set-up] signed up by key, it is told to ask a person to sponsor it and an org's member to invite it by its handle; invited, it reads the invitation and accepts it through Keel's tools, and is then pointed at the projects it can reach", async () => {
+  it("[mcp.set-up] signed up by key, it is told to declare a change on the project its token names, then to ask a person to sponsor it and an org's member to invite it by its handle; invited, it reads the invitation and accepts it through Keel's tools, and is then pointed at the projects it can reach", async () => {
     const { slug, member } = await anOrg();
     const agent = await keyAgent();
     // Its client's token names a project of its own namespace, as a key agent's MCP token does before any org takes it in.
@@ -1021,13 +1021,22 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
     const own = await agent.token(ownProject, undefined, `${BASE}/mcp`);
 
     const first = await tool(own, "whoami");
+    const named = `${agent.handle}/${ownProject.toLowerCase()}`;
     expect(first.body["summary"]).toContain(
-      ` Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${agent.handle}: `,
+      ` This token is for ${named} (${ownProject}), where you can work: declare a change there, and ask why about a file before you change it. Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${agent.handle}: `,
     );
     expect(first.body["next"]).toMatchObject([
+      { kind: "call", operationId: "declare", title: expect.stringContaining(named) },
       { kind: "call", operationId: "askSponsor" },
       { kind: "escalate", title: expect.stringContaining(`by your handle ${agent.handle}`) },
-      { kind: "call", operationId: "inbox", args: { cursor: "end", wait: 600 } },
+    ]);
+    // A token that asks only to read there is not sent to declare.
+    const reader = await tool(await agent.token(ownProject, "agent:read", `${BASE}/mcp`), "whoami");
+    expect(reader.body["summary"]).not.toMatch(/This token is for/);
+    expect(reader.body["next"]).toMatchObject([
+      { operationId: "askSponsor" },
+      { kind: "escalate" },
+      { operationId: "inbox" },
     ]);
     const asked = await tool(own, "askSponsor");
     expect(asked.refused).toBe(false);
@@ -1047,10 +1056,11 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
     const invited = await tool(own, "whoami");
     expect(invited.body["summary"]).not.toMatch(/own namespace/);
     expect(invited.body["next"]).toMatchObject([
+      { operationId: "declare" },
       { operationId: "askSponsor" },
       { operationId: "Agents_listNamespaces" },
     ]);
-    expect(invited.body["next"]).toHaveLength(2);
+    expect(invited.body["next"]).toHaveLength(3);
 
     const listed = await tool(own, "Agents_listNamespaces");
     expect(listed.body["items"]).toMatchObject([
@@ -1065,10 +1075,11 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
     const placed = await tool(own, "whoami");
     expect(placed.body["summary"]).not.toMatch(/invitation|own namespace/);
     expect(placed.body["next"]).toMatchObject([
+      { operationId: "declare" },
       { operationId: "askSponsor" },
       { operationId: "Agents_listReachableProjects" },
     ]);
-    expect(placed.body["next"]).toHaveLength(2);
+    expect(placed.body["next"]).toHaveLength(3);
   });
 });
 

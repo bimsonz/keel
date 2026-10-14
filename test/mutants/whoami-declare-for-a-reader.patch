@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.declare-next
+# kills: whoami.declare-next
+# why: an agent that may only read the project is told to declare a change there, which the gate then refuses
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 7ae0caf2..b8554826 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -169,7 +169,7 @@ export interface TokenProject {
+  * it. The declare leads every other step.
+  */
+ function work(here: TokenProject | undefined) {
+-  if (here === undefined || !here.declares) return { clause: "", next: [] };
++  if (here === undefined) return { clause: "", next: [] };
+   const name = `${here.project.namespace}/${here.project.name}`;
+   return {
+     clause: ` This token is for ${name} (${here.project.id}), where you can work: declare a change there, and ask why about a file before you change it.`,

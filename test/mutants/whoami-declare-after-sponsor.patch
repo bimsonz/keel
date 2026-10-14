@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.declare-next
+# kills: whoami.declare-next
+# why: whoami names declare after askSponsor, so an agent that follows its first step goes looking for a person before the work it can already do
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 7c7a31d0..a5fbff27 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -224,8 +224,8 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+       },
+       findings: [],
+       next: [
+-        ...working.next,
+         ...sponsor.next,
++        ...working.next,
+         ...waiting.next,
+         ...placed.next,
+         ...reach(identity).next,

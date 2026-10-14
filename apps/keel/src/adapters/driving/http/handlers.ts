@@ -171,7 +171,12 @@ import {
 import { decisionHandlers } from "./decisions.ts";
 import { verdictHandlers } from "./verdicts.ts";
 import { whyHandlers } from "./why.ts";
-import { invitationHandlers, joinedOrgs, projectInvitationHandlers } from "./invitations.ts";
+import {
+  invitationHandlers,
+  joinedOrgs,
+  projectInvitationHandlers,
+  tokenProject,
+} from "./invitations.ts";
 import { deliveryHandlers } from "./delivery.ts";
 import { problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -580,9 +585,22 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             : run(
                 caller,
                 claimsOf(caller).pipe(
-                  Effect.flatMap(whoami),
+                  Effect.flatMap((claims) =>
+                    Effect.gen(function* () {
+                      const identity = yield* whoami(claims);
+                      const project = yield* tokenProject(claims);
+                      if (project === undefined || claims.projectId === undefined)
+                        return { identity, here: undefined };
+                      // Whether the agent may declare there is the policy's to say, as the declare itself is.
+                      const resource = yield* projectResource(claims.projectId);
+                      const declares =
+                        resource._tag === "Project" &&
+                        Result.isSuccess(authorize(caller.principal, "declare", resource));
+                      return { identity, here: { project, declares } };
+                    }),
+                  ),
                   Effect.match({
-                    onSuccess: whoamiOk,
+                    onSuccess: ({ identity, here }) => whoamiOk(identity, here),
                     onFailure: (error) => whoamiError(caller, error),
                   }),
                 ),

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-footprint-asks
+# kills: a11.declare-footprint-asks
+# why: the revise declare hands over carries no lease, so following it as given is refused
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index b890fa31..bd487ab4 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -432,7 +432,6 @@ function unplaced(change: Change) {
+         operationId: "revise",
+         args: {
+           changeId: change.id,
+-          "keel-lease": change.lease.id,
+           "if-match": `"${change.intent.revision}"`,
+         },
+       },

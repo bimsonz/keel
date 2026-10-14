@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-footprint-asks
+# kills: a11.declare-footprint-asks
+# why: every declare is asked for its footprint, even one that named its paths
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index b890fa31..88f6ef8f 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -420,7 +420,6 @@ const MAX_NEXT = 3;
+  * names the paths lets it look.
+  */
+ function unplaced(change: Change) {
+-  if (change.intent.footprint.length > 0) return { clause: "", next: [] };
+   return {
+     clause:
+       " Its footprint is empty, so Keel cannot see which changes it would meet: revise it with the paths you will edit, create or delete.",

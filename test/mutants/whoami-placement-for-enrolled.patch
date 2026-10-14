@@ -2,11 +2,11 @@
 # kills: whoami.placement-next
 # why: an agent a person enrolled into its project is told to go and ask an org for an invitation
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index d5fb419f..ab8c4a97 100644
+index 7c7a31d0..451f42cf 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -133,7 +133,7 @@ function sponsorship(agent: Agent) {
- function placement({ agent, invitations, joined }: Identity) {
+@@ -134,7 +134,7 @@ function sponsorship(agent: Agent) {
+ function placement({ agent, invitations, joined }: Identity, working: boolean) {
    const standing =
      invitations.namespaces + invitations.projects + joined.namespaces + joined.projects;
 -  if (agent.projectId !== undefined || standing > 0) return { clause: "", next: [] };

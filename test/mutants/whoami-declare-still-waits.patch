@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.declare-next
+# kills: whoami.declare-next
+# why: an agent with work where its token points is still told to wait ten minutes in its inbox for an invitation
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 7c7a31d0..6a74df9b 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -210,7 +210,7 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+   const working = work(here);
+   const sponsor = sponsorship(agent);
+   const waiting = waitingInvitations(invitations);
+-  const placed = placement(identity, working.next.length > 0);
++  const placed = placement(identity, false);
+   return {
+     status: 200,
+     body: {

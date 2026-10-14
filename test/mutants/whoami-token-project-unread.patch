@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t mcp.set-up
+# kills: mcp.set-up
+# why: whoami's handler never reads the project the token names, so a real agent is never told to declare there
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 719f850a..56c26fd2 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -600,7 +600,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                     }),
+                   ),
+                   Effect.match({
+-                    onSuccess: ({ identity, here }) => whoamiOk(identity, here),
++                    onSuccess: ({ identity }) => whoamiOk(identity),
+                     onFailure: (error) => whoamiError(caller, error),
+                   }),
+                 ),
