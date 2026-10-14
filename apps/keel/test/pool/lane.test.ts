@@ -555,9 +555,9 @@ describe("the Lane DO", () => {
         ).toEqual([[`step-failed x3: bundle: ${oom}; bundle: ${oom}; bundle: ${oom}`]]),
       { timeout: 10_000, interval: 25 },
     );
-    expect(calls.count).toBe(3);
-    expect(verification.started.size).toBe(0);
     // The step the object armed at once forms the next change's batch, bundles it and starts its verification.
+    // The platform may run it before this line does, so the fourth step's bundle untried shows in the count after:
+    // three failed bundles and the next change's one.
     await vi.waitFor(
       async () => {
         await runDurableObjectAlarm(stub);
