@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts -t "anchor.touched"
+# kills: anchor.touched
+# why: an anchor is touched though the change's footprint says it edits only other symbols in that file, so a premise on untouched code is put in doubt
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 9403d38..18598dc 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -166,7 +166,6 @@ export const touchedAnchors = (
+         covering.length > 0 &&
+         covering.every((entry) => entry.symbol !== undefined) &&
+         !covering.some((entry) => anchor.symbol !== undefined && namesSymbol(entry, anchor.symbol));
+-      if (elsewhere) continue;
+       found.set(
+         canonicalJson({ subject: row.subject, path: anchor.path, symbol: anchor.symbol ?? null }),
+         { subject: row.subject, anchor },

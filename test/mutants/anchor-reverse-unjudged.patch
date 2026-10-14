@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts -t "anchor.suspected"
+# kills: anchor.suspected
+# why: a premise relied on after the diff touched its code is never put in doubt: only the side arriving second is judged, and here that is the premise
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index e8f57f6..ad6889b 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -272,7 +272,7 @@ export function anchorPairs(
+             changeId: change.changeId,
+             anchor,
+           });
+-    for (const premise of premises)
++    for (const premise of premises.slice(0, 0))
+       for (const anchor of other.touched ?? [])
+         if (restsOn(premise, anchor) && !judgedBy(other, premise))
+           pairs.push({

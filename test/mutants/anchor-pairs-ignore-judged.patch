@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts -t "anchor.judged-effect"
+# kills: anchor.judged-effect
+# why: a touching change whose effect fallout already judged against the premise puts it in doubt a second time, by its anchor
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index e8f57f6..deff33a 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -266,7 +266,7 @@ export function anchorPairs(
+     if (other.changeId === change.changeId) continue;
+     for (const anchor of touchedNow)
+       for (const premise of other.premises)
+-        if (restsOn(premise, anchor) && !judgedBy(change.after, premise))
++        if (restsOn(premise, anchor))
+           pairs.push({
+             premise: { holder: other.changeId, proposition: premise },
+             changeId: change.changeId,

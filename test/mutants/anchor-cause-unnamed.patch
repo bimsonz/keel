@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts -t "anchor.suspected"
+# kills: anchor.suspected
+# why: a premise put in doubt by an edit does not say which code the edit reached
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index e8f57f6..00d9e4f 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -312,7 +312,7 @@ export function judgeAnchors(
+       subjectId: subject.id,
+       changeId: pair.premise.holder,
+       premise: pair.premise.proposition,
+-      cause: { changeId: pair.changeId, anchor: pair.anchor },
++      cause: { changeId: pair.changeId },
+     });
+     drafts.push({
+       payload: payloadOf(Schema.encodeSync(PremiseSuspected)(suspected)),

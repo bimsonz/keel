@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts -t "anchor.suspected"
+# kills: anchor.suspected
+# why: the subject keeps none of the anchors a derivation touched there, so a premise anchored to the edited code is never put in doubt
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 4fe018e..c661829 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -202,9 +202,7 @@ export function hearSubject(
+           effects: derived.effects.filter((effect) =>
+             isAncestorOrSelf(key, effect.proposition.subject),
+           ),
+-          touched: (derived.touched ?? [])
+-            .filter((each) => each.subject === key)
+-            .map((each) => each.anchor),
++          touched: [],
+         },
+       };
+       relier = derived.changeId;

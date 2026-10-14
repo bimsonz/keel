@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts -t "anchor.touched"
+# kills: anchor.touched
+# why: every live anchor is touched whatever the diff edits, so every premise in the project is put in doubt by every change
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 9403d38..0443348 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -159,7 +159,6 @@ export const touchedAnchors = (
+   const found = new Map<string, TouchedAnchor>();
+   for (const row of anchors)
+     for (const anchor of row.anchors) {
+-      if (!edited.has(anchor.path)) continue;
+       const covering = footprint.filter((entry) => matchesGlob(entry.path, anchor.path));
+       const elsewhere =
+         anchor.symbol !== undefined &&

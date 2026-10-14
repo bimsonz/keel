@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/effects-derived.test.ts -t "anchor.through-objects"
+# kills: anchor.through-objects
+# why: the subject a touched anchor belongs to is neither named nor subscribed, so it never hears the edit and tells no one
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 7a0c6e3..586cd39 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1793,7 +1793,7 @@ export const effectsDerived: (
+     const named = { premises: [], declaredEffects: effects.map((effect) => effect.proposition) };
+     const touched = derived.touched ?? [];
+     // A subject whose anchor the diff touches hears the derivation too, to judge its premises against the edit.
+-    const touchedKeys = [...new Set(touched.map((each) => each.subject))].filter(
++    const touchedKeys = [...new Set(touched.map((each) => each.subject))].slice(0, 0).filter(
+       (key) => !intentSubjects(named).includes(key),
+     );
+     const recorded = yield* precheckCommand(
