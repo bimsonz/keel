@@ -11,9 +11,13 @@ export const WorkerName = Schema.String.check(
 ).pipe(Schema.brand("WorkerName"));
 export type WorkerName = typeof WorkerName.Type;
 
-/** One request a preview must answer before its change may land: a path, the status, and text the body holds. */
+/**
+ * One request a preview must answer before its change may land: a path, the
+ * status, and text the body holds. The path is on the preview's host: a second
+ * `/` or any `\` would let a URL resolve it to another host, so neither is taken.
+ */
 export const SmokeCheck = Schema.Struct({
-  path: Schema.String.check(Schema.isPattern(/^\/[\x21-\x7e]{0,255}$/)),
+  path: Schema.String.check(Schema.isPattern(/^\/(?!\/)[\x21-\x5b\x5d-\x7e]{0,255}$/)),
   status: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
   contains: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))),
 });
@@ -55,7 +59,7 @@ export const parseDeploySpec = (source: string): Result.Result<DeploySpec, Deplo
       }),
     );
   }
-  const decoded = Schema.decodeUnknownResult(DeploySpec)(json);
+  const decoded = Schema.decodeUnknownResult(DeploySpec)(json, { onExcessProperty: "error" });
   return Result.isFailure(decoded)
     ? Result.fail(
         new DeploySpecInvalid({ detail: `${DEPLOY_SPEC_PATH}: ${decoded.failure.message}` }),
@@ -64,36 +68,37 @@ export const parseDeploySpec = (source: string): Result.Result<DeploySpec, Deplo
 };
 
 /**
- * The wrangler config keys that declare a binding or a resource Keel does not
- * yet send with a version. A preview without them would not be the Worker the
- * change describes, so a config with any of them is refused, naming it.
+ * The wrangler config keys Keel takes: the ones it uploads a version with, and
+ * the settings a version does not carry (routes, triggers, observability and
+ * the like belong to a deployment, or to wrangler's own tooling). Any other key
+ * declares a binding or resource Keel does not send with a preview yet, or
+ * changes how the bundle is built, so a config with one is refused, naming it.
+ * A key wrangler adds later is refused too, until Keel reads it.
  */
-export const UNCARRIED_KEYS: readonly string[] = [
-  "ai",
-  "analytics_engine_datasets",
-  "assets",
-  "browser",
-  "containers",
-  "d1_databases",
-  "dispatch_namespaces",
-  "durable_objects",
-  "hyperdrive",
-  "images",
-  "kv_namespaces",
-  "migrations",
-  "mtls_certificates",
-  "pipelines",
-  "queues",
-  "r2_buckets",
-  "secrets_store_secrets",
-  "send_email",
-  "services",
-  "site",
-  "tail_consumers",
-  "unsafe",
-  "vectorize",
-  "version_metadata",
-  "workflows",
+export const TAKEN_KEYS: readonly string[] = [
+  "$schema",
+  "name",
+  "main",
+  "compatibility_date",
+  "compatibility_flags",
+  "vars",
+  "account_id",
+  "compliance_region",
+  "dev",
+  "env",
+  "keep_vars",
+  "limits",
+  "logpush",
+  "minify",
+  "observability",
+  "placement",
+  "preview_urls",
+  "route",
+  "routes",
+  "send_metrics",
+  "triggers",
+  "upload_source_maps",
+  "workers_dev",
 ];
 
 /** What Keel takes from a Worker's wrangler config to upload it: its name, entry, compatibility and plain vars. */
@@ -109,10 +114,25 @@ export interface WranglerFacts {
 export class WranglerConfigRefused extends Schema.TaggedError<WranglerConfigRefused>()(
   "WranglerConfigRefused",
   {
-    reason: Schema.Literals(["unreadable", "incomplete", "uncarried-binding", "toml-not-yet"]),
+    reason: Schema.Literals(["unreadable", "incomplete", "uncarried-key", "toml-not-yet"]),
     detail: Schema.String,
   },
 ) {}
+
+/** The index of the first character from `i` that is neither whitespace nor inside a comment. */
+const pastBlank = (source: string, i: number): number => {
+  let j = i;
+  for (;;) {
+    while (j < source.length && /\s/.test(source[j] ?? "")) j += 1;
+    if (source.startsWith("//", j)) {
+      const end = source.indexOf("\n", j);
+      j = end === -1 ? source.length : end;
+    } else if (source.startsWith("/*", j)) {
+      const end = source.indexOf("*/", j + 2);
+      j = end === -1 ? source.length : end + 2;
+    } else return j;
+  }
+};
 
 /**
  * JSONC as wrangler reads it, to JSON: line and block comments and trailing
@@ -134,8 +154,7 @@ export const jsoncToJson = (source: string): string => {
       const end = source.indexOf("*/", i + 2);
       i = end === -1 ? source.length : end + 2;
     } else if (c === ",") {
-      let j = i + 1;
-      while (j < source.length && /\s/.test(source[j] ?? "")) j += 1;
+      const j = pastBlank(source, i + 1);
       if (source[j] !== "}" && source[j] !== "]") out += c;
       i += 1;
     } else {
@@ -151,8 +170,8 @@ const isStringArray = (value: unknown): value is readonly string[] =>
 
 /**
  * The facts Keel uploads a Worker with, from its wrangler config's text. A
- * `.toml` config is refused until Keel reads TOML; so is one that names a
- * binding Keel does not send (UNCARRIED_KEYS). Only the top level is read: an
+ * `.toml` config is refused until Keel reads TOML; so is one with a key Keel
+ * does not take (TAKEN_KEYS). Only the top level is read: an
  * `env` section is a config for another environment, not this Worker.
  */
 export const wranglerFacts = (
@@ -181,12 +200,12 @@ export const wranglerFacts = (
     return Result.fail(
       new WranglerConfigRefused({ reason: "unreadable", detail: `${fileName} is not an object` }),
     );
-  const uncarried = UNCARRIED_KEYS.filter((key) => Object.hasOwn(config, key));
+  const uncarried = Object.keys(config).filter((key) => !TAKEN_KEYS.includes(key));
   if (uncarried.length > 0)
     return Result.fail(
       new WranglerConfigRefused({
-        reason: "uncarried-binding",
-        detail: `${fileName} declares ${uncarried.join(", ")}, which Keel does not send with a preview yet`,
+        reason: "uncarried-key",
+        detail: `${fileName} declares ${uncarried.join(", ")}, which Keel does not carry into a preview yet`,
       }),
     );
   const name: unknown = Reflect.get(config, "name");
@@ -249,3 +268,24 @@ export const previewAlias = (changeId: ChangeId, worker: WorkerName): string | u
   const alias = `ch-${changeId.slice(-10).toLowerCase()}`;
   return alias.length + 1 + worker.length <= LABEL_MAX ? alias : undefined;
 };
+
+/** A smoke check whose path would be fetched from another host than the preview's. */
+export class SmokePathOffHost extends Schema.TaggedError<SmokePathOffHost>()("SmokePathOffHost", {
+  path: Schema.String,
+  preview: Schema.String,
+}) {}
+
+/**
+ * The address a smoke check fetches: the preview's origin, then the path.
+ * A path that starts with `/` ends the origin's host where it begins, so the
+ * request stays on the preview; any other would let it name a host of its own
+ * (`@evil.example`), and is refused. SmokeCheck's pattern also refuses a path
+ * that a URL resolved against the preview would take elsewhere (`//`, `\`).
+ */
+export const smokeUrl = (
+  preview: string,
+  check: SmokeCheck,
+): Result.Result<string, SmokePathOffHost> =>
+  check.path.startsWith("/")
+    ? Result.succeed(`${preview}${check.path}`)
+    : Result.fail(new SmokePathOffHost({ path: check.path, preview }));
