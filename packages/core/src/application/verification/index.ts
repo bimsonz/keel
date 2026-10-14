@@ -1,12 +1,10 @@
 import type { Effect } from "effect";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type { ChangeId, ConflictId, VerdictId } from "../../domain/kernel/index.ts";
+import type { ChangeId, ConflictId } from "../../domain/kernel/index.ts";
 import type {
   Conflict,
   ConflictNotFound,
   ConflictState,
-  VerdictNotFound,
-  VerdictOutcome,
 } from "../../domain/verification/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
@@ -25,12 +23,6 @@ export interface ConflictPage {
   readonly nextCursor?: string;
 }
 
-export interface VerdictView {
-  readonly id: VerdictId;
-  readonly outcome: VerdictOutcome;
-  readonly evidence: readonly string[];
-}
-
 export const listConflicts: (
   principal: AgentToken,
   query: ConflictQuery,
@@ -40,11 +32,6 @@ export const getConflict: (
   principal: AgentToken,
   conflictId: ConflictId,
 ) => Effect.Effect<Conflict, ConflictNotFound, EntityStore> = stub("verification/getConflict");
-
-export const getVerdict: (
-  principal: AgentToken,
-  verdictId: VerdictId,
-) => Effect.Effect<VerdictView, VerdictNotFound, EntityStore> = stub("verification/getVerdict");
 
 export * from "./command.ts";
 export * from "./deps.ts";
@@ -69,6 +56,7 @@ export * from "./run-plan.ts";
 export * from "./runner-output.ts";
 export * from "./suite.ts";
 export * from "./typecheck.ts";
+export * from "./verdict-index.ts";
 export * from "./verify-candidate.ts";
 export * from "./verify-plan.ts";
 export * from "./world-check.ts";

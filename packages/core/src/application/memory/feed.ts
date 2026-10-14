@@ -93,6 +93,15 @@ const headOf = (store: Store): number => {
   return typeof head === "number" ? head : 0;
 };
 
+/**
+ * The feed's head, the key of a position, and the entry there: for an index
+ * kept beside the feed that walks it from a marker of its own, as the verdict
+ * index does.
+ */
+export const feedHead = headOf;
+export const feedPosition = position;
+export const feedEntry = (store: Store, at: number): FeedEntry | undefined => entryAt(store, at);
+
 /** The feed's head as a cursor: a read from it returns only what arrives after. */
 export const feedCursor = (store: Store): string => position(headOf(store));
 

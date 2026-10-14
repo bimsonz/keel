@@ -21592,6 +21592,18 @@
         },
         "description": "The agents a person stands behind."
       },
+      "StepKind": {
+        "type": "string",
+        "enum": [
+          "deterministic",
+          "decision-model",
+          "generative",
+          "probe",
+          "human",
+          "deploy"
+        ],
+        "description": "What kind of check a plan step is."
+      },
       "SubjectId": {
         "type": "string",
         "pattern": "^sub_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -22537,6 +22549,16 @@
           "not": {}
         }
       },
+      "VerdictEvidenceClass": {
+        "type": "string",
+        "enum": [
+          "proof",
+          "ruling",
+          "testimony",
+          "opinion"
+        ],
+        "description": "How strongly a piece of evidence bears on a verdict (ADR 0005): only proof\nand rulings may fail one. Keel's own record-layer fact, never an MFP field."
+      },
       "VerdictId": {
         "type": "string",
         "pattern": "^vrd_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -22613,6 +22635,174 @@
           "supersede"
         ]
       },
+      "VerdictPlan": {
+        "type": "object",
+        "required": [
+          "hash",
+          "steps"
+        ],
+        "properties": {
+          "hash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "The plan's `planHash`: the stored plan rehashes to it."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerdictPlanStep"
+            },
+            "description": "Its steps, in the plan's order."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A compiled Verification Plan, as a verdict was issued under it."
+      },
+      "VerdictPlanStep": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "tier",
+          "tierReason",
+          "evidenceCeiling",
+          "because"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StepKind"
+          },
+          "tier": {
+            "type": "number",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "description": "Where it runs: 0 in the Worker, 1 in a fresh isolate, 2 in a container."
+          },
+          "tierReason": {
+            "type": "string",
+            "description": "Why the step runs at that tier."
+          },
+          "evidenceCeiling": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictEvidenceClass"
+              }
+            ],
+            "description": "The strongest evidence the step can give."
+          },
+          "because": {
+            "type": "string",
+            "description": "Why this step exists for this change: the premise, effect or rule that put it here."
+          },
+          "guards": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictStepGuard"
+              }
+            ],
+            "description": "Set when the step guards a tenet: its proof fail takes the policy, or bounces when it holds a decision."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One step of a compiled plan."
+      },
+      "VerdictReason": {
+        "type": "object",
+        "required": [
+          "line",
+          "class"
+        ],
+        "properties": {
+          "line": {
+            "type": "string",
+            "description": "The line as the verdict carries it."
+          },
+          "step": {
+            "type": "string",
+            "description": "The plan step the line names, when it names one."
+          },
+          "class": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictEvidenceClass"
+              }
+            ],
+            "description": "The class of the step it names; proof when it names none, since a verifier reports only what ran."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One line of a verdict's evidence."
+      },
+      "VerdictStepDecision": {
+        "type": "object",
+        "required": [
+          "id",
+          "summary"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "summary": {
+            "type": "string",
+            "description": "The chosen option's label."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "VerdictStepGuard": {
+        "type": "object",
+        "required": [
+          "predicate",
+          "policy",
+          "probe"
+        ],
+        "properties": {
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "probe": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "The admitted probe bundle the step runs, pinned under the plan's hash."
+          },
+          "decision": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictStepDecision"
+              }
+            ],
+            "description": "The decision the guard holds, which makes its fail bounce whatever the policy."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The tenet a guard step holds."
+      },
       "VerdictView": {
         "type": "object",
         "required": [
@@ -22631,12 +22821,21 @@
           "reasons": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.Evidence"
-            }
+              "$ref": "#/components/schemas/VerdictReason"
+            },
+            "description": "Each line of the verdict's evidence, as it was issued."
           },
           "issuedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "plan": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictPlan"
+              }
+            ],
+            "description": "The plan the verdict was issued under, as stored under its hash. Absent for\na verdict reached without a plan (a Precheck refusal) and for one whose\nplan is no longer stored."
           }
         },
         "additionalProperties": {

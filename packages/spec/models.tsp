@@ -195,8 +195,100 @@ union VerdictOutcome {
 model VerdictView {
   id: VerdictId;
   outcome: VerdictOutcome;
-  reasons: MFP.Evidence[];
+
+  /** Each line of the verdict's evidence, as it was issued. */
+  reasons: VerdictReason[];
+
   issuedAt: utcDateTime;
+
+  /**
+   * The plan the verdict was issued under, as stored under its hash. Absent for
+   * a verdict reached without a plan (a Precheck refusal) and for one whose
+   * plan is no longer stored.
+   */
+  plan?: VerdictPlan;
+}
+
+/**
+ * How strongly a piece of evidence bears on a verdict (ADR 0005): only proof
+ * and rulings may fail one. Keel's own record-layer fact, never an MFP field.
+ */
+union VerdictEvidenceClass {
+  proof: "proof",
+  ruling: "ruling",
+  testimony: "testimony",
+  opinion: "opinion",
+}
+
+/** One line of a verdict's evidence. */
+model VerdictReason {
+  /** The line as the verdict carries it. */
+  line: string;
+
+  /** The plan step the line names, when it names one. */
+  step?: string;
+
+  /** The class of the step it names; proof when it names none, since a verifier reports only what ran. */
+  class: VerdictEvidenceClass;
+}
+
+/** What kind of check a plan step is. */
+union StepKind {
+  deterministic: "deterministic",
+  decisionModel: "decision-model",
+  generative: "generative",
+  probe: "probe",
+  human: "human",
+  deploy: "deploy",
+}
+
+/** A compiled Verification Plan, as a verdict was issued under it. */
+model VerdictPlan {
+  /** The plan's `planHash`: the stored plan rehashes to it. */
+  hash: ContentHash;
+
+  /** Its steps, in the plan's order. */
+  steps: VerdictPlanStep[];
+}
+
+/** One step of a compiled plan. */
+model VerdictPlanStep {
+  id: string;
+  kind: StepKind;
+
+  /** Where it runs: 0 in the Worker, 1 in a fresh isolate, 2 in a container. */
+  tier: 0 | 1 | 2;
+
+  /** Why the step runs at that tier. */
+  tierReason: string;
+
+  /** The strongest evidence the step can give. */
+  evidenceCeiling: VerdictEvidenceClass;
+
+  /** Why this step exists for this change: the premise, effect or rule that put it here. */
+  because: string;
+
+  /** Set when the step guards a tenet: its proof fail takes the policy, or bounces when it holds a decision. */
+  guards?: VerdictStepGuard;
+}
+
+/** The tenet a guard step holds. */
+model VerdictStepGuard {
+  predicate: MFP.Predicate;
+  policy: PredicatePolicy;
+
+  /** The admitted probe bundle the step runs, pinned under the plan's hash. */
+  probe: ContentHash;
+
+  /** The decision the guard holds, which makes its fail bounce whatever the policy. */
+  decision?: VerdictStepDecision;
+}
+
+model VerdictStepDecision {
+  id: DecisionId;
+
+  /** The chosen option's label. */
+  summary: string;
 }
 
 /**

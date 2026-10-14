@@ -89,7 +89,7 @@ interface Cited {
   readonly name: string;
 }
 
-const CITED_AS: Record<Cited["kind"], { readonly plural: string; readonly line: string }> = {
+export const CITED_AS: Record<Cited["kind"], { readonly plural: string; readonly line: string }> = {
   test: { plural: "failing tests", line: "failed" },
   type: { plural: "type errors", line: "type error" },
   guard: { plural: "guarded behaviour", line: "guard failed" },
