@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-client.test.ts -t "mergebox.client-box-cause"
+# kills: mergebox.client-box-cause
+# why: a box that throws is refused as box-failed with nothing of what it threw, so BatchFailed cannot say why the box failed
+diff --git a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+index a33625bb..12717b79 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+@@ -122,7 +122,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
+           yield* Effect.logWarning(
+             `mergebox ${request.candidateId}: the box did not answer: ${why}`,
+           );
+-          return yield* refuse("box-failed", [], `the box did not answer: ${why}`);
++          return yield* refuse("box-failed");
+         }
+         const box = answer.value;
+         switch (box.kind) {

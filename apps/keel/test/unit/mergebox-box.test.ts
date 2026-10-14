@@ -42,6 +42,8 @@ function fakeBox(
     compose?: Run;
     /** The check's stream, given the canary the box was started with. */
     check?: (canary: string) => string;
+    /** What the trust script answers once the egress is registered. */
+    trust?: Run;
   } = {},
 ) {
   const calls: string[] = [];
@@ -49,6 +51,8 @@ function fakeBox(
   let running = init.running ?? false;
   let unready = init.unready ?? 0;
   let canary = "";
+  // As on the platform: the CA is written, and git gets out, only once the egress is registered.
+  let intercepted = false;
   const box: BoxContainer = {
     get running() {
       return running;
@@ -57,7 +61,12 @@ function fakeBox(
       starts.push(env);
       canary = env["KEEL_CANARY"] ?? "";
       running = true;
+      intercepted = false;
       calls.push("start");
+    },
+    intercept: async () => {
+      intercepted = true;
+      calls.push("intercept");
     },
     stale: async () => init.stale ?? false,
     destroy: async () => {
@@ -80,6 +89,8 @@ function fakeBox(
       }
       if (script === BOX_COMPOSE_SCRIPT) {
         calls.push("compose");
+        if (!intercepted)
+          return { exitCode: 3, stdout: "", stderr: "fatal: unable to access: no egress" };
         return init.compose ?? composed(2);
       }
       if (script === BOX_CHECK_SCRIPT) {
@@ -87,10 +98,14 @@ function fakeBox(
         return { exitCode: 0, stdout: (init.check ?? clean)(canary), stderr: "" };
       }
       calls.push("trust");
-      return { exitCode: 0, stdout: "", stderr: "" };
+      // The trust script waits 10 s for a CA that never comes.
+      if (!intercepted) return { exitCode: 124, stdout: "", stderr: "" };
+      return init.trust ?? { exitCode: 0, stdout: "", stderr: "" };
     },
   };
-  return { box, calls, starts, canary: () => canary };
+  /** The box runs on, and its object has lost what it registered (an object that restarted). */
+  const forget = () => void (intercepted = false);
+  return { box, calls, starts, canary: () => canary, forget };
 }
 
 function store(initial?: string): CanaryStore & { value: () => string | undefined } {
@@ -136,6 +151,7 @@ describe("readyBox", () => {
       "ready",
       "ready",
       "ready",
+      "intercept",
       "trust",
       `plant ${fake.canary()}`,
     ]);
@@ -144,7 +160,56 @@ describe("readyBox", () => {
 
     fake.calls.length = 0;
     expect(await readyBox(fake.box, canaries, clock(10))).toBe(0);
-    expect(fake.calls).toEqual([]);
+    expect(fake.calls).toEqual(["intercept"]);
+  });
+
+  it("[mergebox.box.intercept-before-trust] registers the egress before the box trusts its CA, which the platform writes only then, for a fresh box and a restarted one, and again for a box it reuses, so every compose goes out through it", async () => {
+    const fresh = fakeBox();
+    const canaries = store();
+    await readyBox(fresh.box, canaries, clock(10));
+    expect(fresh.calls).toEqual([
+      "start",
+      "ready",
+      "intercept",
+      "trust",
+      `plant ${fresh.canary()}`,
+    ]);
+    expect(canaries.value()).toBe(fresh.canary());
+
+    const restarted = fakeBox({ running: true });
+    const lost = store();
+    await readyBox(restarted.box, lost, clock(10));
+    expect(restarted.calls).toEqual([
+      "destroy",
+      "start",
+      "ready",
+      "intercept",
+      "trust",
+      `plant ${restarted.canary()}`,
+    ]);
+
+    restarted.forget();
+    restarted.calls.length = 0;
+    expect(await readyBox(restarted.box, lost, clock(10))).toBe(0);
+    const answer = await composeInBox(restarted.box, restarted.canary(), JOB, () => [], 0);
+    expect(answer.kind).toBe("composed");
+    expect(restarted.calls).toEqual(["intercept", "compose", "check"]);
+  });
+
+  it("[mergebox.ready-failed-stage] a box whose script fails is not readied, and says which script, its exit and the end of its stderr, with no remote, account id or token", async () => {
+    const fake = fakeBox({
+      trust: {
+        exitCode: 1,
+        stdout: "",
+        stderr: `cat: https://${ACCOUNT}.artifacts.example/git/ws: art_v1_leaked ${ACCOUNT}`,
+      },
+    });
+    const canaries = store();
+    const readied = readyBox(fake.box, canaries, clock(10));
+    await expect(readied).rejects.toThrow(
+      "the box was not readied: trust exit 1: cat: <remote> <token> <id>",
+    );
+    expect(canaries.value()).toBeUndefined();
   });
 
   it("[mergebox.ready-restart] destroys and starts again a running box whose canary this object lost, or whose image a deploy changed", async () => {

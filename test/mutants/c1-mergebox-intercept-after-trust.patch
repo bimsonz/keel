@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.box.intercept-before-trust"
+# kills: mergebox.box.intercept-before-trust
+# why: the egress is registered after the trust script, which waits for a CA the platform writes only once an intercept is registered, so every start times out and every compose is box-failed
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index e3873798..bf21ea2c 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -115,7 +115,6 @@ export async function readyBox(
+       await new Promise((resolve) => setTimeout(resolve, 250));
+     }
+   }
+-  await container.intercept();
+   for (const [stage, script, args] of [
+     ["trust", BOX_TRUST_SCRIPT, []],
+     ["plant", BOX_PLANT_SCRIPT, [canary]],
+@@ -126,6 +125,7 @@ export async function readyBox(
+         `the box was not readied: ${stage} exit ${run.exitCode}${run.stderr === "" ? "" : `: ${scrubbed(run.stderr).slice(-STDERR_TAIL)}`}`,
+       );
+   }
++  await container.intercept();
+   canaries.set(canary);
+   return now() - began;
+ }

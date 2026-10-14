@@ -27,6 +27,16 @@ export const BoxTimings = Schema.Struct({
   checkBytes: Schema.Number,
 });
 
+/**
+ * What the box said, fit to leave it: no remote (it carries the account id),
+ * no 32-hex id, and no token shape, the canary's included.
+ */
+export const scrubbed = (text: string): string =>
+  text
+    .replace(/https?:\/\/\S+/g, "<remote>")
+    .replace(/\b[0-9a-f]{32}\b/g, "<id>")
+    .replace(/\bart_v\d+_\w+/g, "<token>");
+
 /** MergeBox's answer to a compose. */
 export const BoxComposeAnswer = Schema.Union([
   /** Each member's tree, the chain pushed to `scratch`, and the check that passed. */

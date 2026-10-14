@@ -2,10 +2,10 @@
 # kills: mergebox.client-refusals
 # why: git dying by a signal is taken as infra's, so the change is requeued and the crash is asked again and again
 diff --git a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
-index 147a40ff..6505aa7e 100644
+index a33625bb..7dc78526 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
-@@ -109,7 +109,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
+@@ -134,7 +134,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
              yield* Effect.logError(
                `DEFECT mergebox ${request.candidateId}: git crashed, exit ${box.exitCode}`,
              );
@@ -13,4 +13,4 @@ index 147a40ff..6505aa7e 100644
 +            return yield* refuse("box-failed");
            case "failed":
            case "unsupported":
-             yield* Effect.logWarning(`mergebox ${request.candidateId}: ${box.kind}, ${box.reason}`);
+             yield* Effect.logWarning(

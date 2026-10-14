@@ -646,14 +646,19 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
   if (exhausted !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${exhausted}`);
 });
 
-/** A composition MergeBox refused for its own sake: held on the infrastructure. */
+/** A refused composition as evidence: its reason, its paths, and what failed where the composer saw it. */
+const refusalEvidence = (refused: CompositionRefused) =>
+  `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd() +
+  (refused.detail === undefined ? "" : `: ${refused.detail}`);
+
+/** A composition MergeBox refused for its own sake: held on the infrastructure, with what failed in the box. */
 const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
   holdOnInfra(
     lane,
     batch,
     `compose-refused:${batch.id}`,
     (verdictId, attribution) => ({ _tag: "RefuseComposition", verdictId, attribution }),
-    `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd(),
+    refusalEvidence(refused),
     "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
   );
 
@@ -678,9 +683,7 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
               verdictId,
               subject: batch.id,
               outcome: "bounce",
-              evidence: [
-                `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd(),
-              ],
+              evidence: [refusalEvidence(refused)],
               // Trunk moved under the change: rebase puts trunk's head on the workspace's keel/trunk, and the agent merges it (never a force push).
               nextActions: [
                 remedy(

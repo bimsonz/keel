@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-client.test.ts -t "mergebox.client-box-cause"
+# kills: mergebox.client-box-cause
+# why: the box's own failure is carried into the evidence as it is, so an account id or a token in it is published with the verdict
+diff --git a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+index a33625bb..4ac56bfe 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+@@ -42,7 +42,7 @@ const refuse = (reason: string, paths: readonly string[] = [], detail?: string)
+     new CompositionRefused({
+       reason,
+       paths: [...paths],
+-      ...(detail === undefined ? {} : { detail: scrubbed(detail).slice(0, DETAIL_MAX) }),
++      ...(detail === undefined ? {} : { detail: detail.slice(0, DETAIL_MAX) }),
+     }),
+   );
+ 

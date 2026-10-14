@@ -2,15 +2,15 @@
 # kills: mergebox.ready-restart
 # why: a running box keeps the image it started with after a deploy, so a fixed image never reaches a busy project
 diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
-index 46000f10..9795cb58 100644
+index e3873798..9fb98df5 100644
 --- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
 +++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
-@@ -84,7 +84,7 @@ export async function readyBox(
+@@ -96,7 +96,7 @@ export async function readyBox(
    canaries: CanaryStore,
    now: () => number = Date.now,
  ): Promise<number> {
--  if (container.running && canaries.get() !== undefined && !(await container.stale())) return 0;
-+  if (container.running && canaries.get() !== undefined) return 0;
-   const began = now();
-   if (container.running) await container.destroy();
-   const canary = freshCanary();
+-  if (container.running && canaries.get() !== undefined && !(await container.stale())) {
++  if (container.running && canaries.get() !== undefined) {
+     await container.intercept();
+     return 0;
+   }

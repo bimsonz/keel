@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-box.test.ts -t "mergebox.ready-failed-stage"
+# kills: mergebox.ready-failed-stage
+# why: a script that fails while the box is readied throws its stderr as it is, so a remote with the account id or a token reaches the logs and the evidence
+diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+index e3873798..be07b5d7 100644
+--- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
++++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
+@@ -123,7 +123,7 @@ export async function readyBox(
+     const run = await container.exec(["bash", "-c", script, "box", ...args], BOX_ENV);
+     if (run.exitCode !== 0)
+       throw new Error(
+-        `the box was not readied: ${stage} exit ${run.exitCode}${run.stderr === "" ? "" : `: ${scrubbed(run.stderr).slice(-STDERR_TAIL)}`}`,
++        `the box was not readied: ${stage} exit ${run.exitCode}${run.stderr === "" ? "" : `: ${run.stderr.slice(-STDERR_TAIL)}`}`,
+       );
+   }
+   canaries.set(canary);

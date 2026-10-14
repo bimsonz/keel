@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.box-cause"
+# kills: lane.box-cause
+# why: a box's failure is held with its reason alone, so the hold's and the bounce's evidence never say what failed in the box
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index c08e0059..d496b646 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -649,7 +649,7 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
+ /** A refused composition as evidence: its reason, its paths, and what failed where the composer saw it. */
+ const refusalEvidence = (refused: CompositionRefused) =>
+   `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd() +
+-  (refused.detail === undefined ? "" : `: ${refused.detail}`);
++  "";
+ 
+ /** A composition MergeBox refused for its own sake: held on the infrastructure, with what failed in the box. */
+ const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>

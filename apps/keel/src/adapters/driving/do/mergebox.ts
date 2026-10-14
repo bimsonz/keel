@@ -47,7 +47,8 @@ export class MergeBox extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
   private composing: Composing<RepoRef> | undefined;
 
-  private get container(): BoxContainer {
+  /** The box, whose egress lets out a compose's git to `artifactsHost` alone. */
+  private box(artifactsHost: string): BoxContainer {
     const container = this.ctx.container;
     if (container === undefined) throw new Error("MergeBox has no container");
     const image = () => {
@@ -67,6 +68,7 @@ export class MergeBox extends DurableObject<Env> {
         return info !== null && info.image !== "" && info.image !== image();
       },
       destroy: () => container.destroy(),
+      intercept: () => this.intercept(artifactsHost),
       exec: async (argv, env) => {
         const proc = await container.exec([...argv], { env });
         const out = await proc.output();
@@ -132,13 +134,13 @@ export class MergeBox extends DurableObject<Env> {
       minted: [],
     };
     try {
-      const startMs = await readyBox(this.container, this.canaries);
-      await this.intercept(host);
+      const box = this.box(host);
+      const startMs = await readyBox(box, this.canaries);
       const canary = this.canaries.get() ?? "";
       const remoteOf = (i: number) => remotes[i]?.remote ?? "";
       const composing = this.composing;
       const answer = await composeInBox(
-        this.container,
+        box,
         canary,
         {
           candidateId: job.candidateId,

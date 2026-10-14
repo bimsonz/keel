@@ -1,8 +1,13 @@
 import { CompositionRefused } from "@keeltown/core/domain/integration";
 import type { NamespaceId, ProjectId } from "@keeltown/core/kernel";
 import type { CandidateRequest } from "@keeltown/core/ports";
-import { Cause, Effect, Option, Schema } from "effect";
-import { BoxComposeAnswer, type BoxComposeRequest, BoxLeaseAnswer } from "../../../rpc/mergebox.ts";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
+import {
+  BoxComposeAnswer,
+  type BoxComposeRequest,
+  BoxLeaseAnswer,
+  scrubbed,
+} from "../../../rpc/mergebox.ts";
 import type { BoxComposer } from "../gitcore/candidate-composer.ts";
 
 /** A lease covers a box's cold start (up to three minutes) and its compose, with room. */
@@ -29,8 +34,23 @@ export interface BoxObjects {
 const decodeLease = Schema.decodeUnknownEffect(BoxLeaseAnswer);
 const decodeAnswer = Schema.decodeUnknownEffect(BoxComposeAnswer);
 
-const refuse = (reason: string, paths: readonly string[] = []) =>
-  Effect.fail(new CompositionRefused({ reason, paths: [...paths] }));
+/** How much of what failed in the box a refusal carries into the evidence. */
+const DETAIL_MAX = 500;
+
+const refuse = (reason: string, paths: readonly string[] = [], detail?: string) =>
+  Effect.fail(
+    new CompositionRefused({
+      reason,
+      paths: [...paths],
+      ...(detail === undefined ? {} : { detail: scrubbed(detail).slice(0, DETAIL_MAX) }),
+    }),
+  );
+
+/** What a box that did not answer threw, or why its answer was not one. */
+const whyNot = (cause: Cause.Cause<unknown>): string => {
+  const thrown = Cause.squash(cause);
+  return thrown instanceof Error ? thrown.message : String(thrown);
+};
 
 /** The request a box takes for a candidate: staging, the base, and each member's workspace, base and head. */
 export const boxRequest = (request: CandidateRequest): BoxComposeRequest => ({
@@ -49,8 +69,9 @@ export const boxRequest = (request: CandidateRequest): BoxComposeRequest => ({
  * candidate's: a conflict git found bounces with the box's paths, and git
  * dying by a signal is `git-crashed`, asked once. What the box cannot do for
  * its own sake is infra's (`box-unavailable`, `box-failed`, `box-check`),
- * which the Lane holds and requeues. An answer is logged by its kind, never
- * with a remote, which carries the account id.
+ * which the Lane holds and requeues, with what failed in the box as the
+ * refusal's detail. An answer is logged by its kind, never with a remote,
+ * which carries the account id.
  */
 export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects): BoxComposer {
   return {
@@ -80,11 +101,12 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
           return yield* refuse("box-unavailable");
         }
         const leaseId = lease.value.leaseId;
-        const answer = yield* Effect.tryPromise(() =>
-          objects.box(project).compose(boxRequest(request)),
-        ).pipe(
+        const answer = yield* Effect.tryPromise({
+          try: () => objects.box(project).compose(boxRequest(request)),
+          catch: (thrown) => thrown,
+        }).pipe(
           Effect.flatMap(decodeAnswer),
-          Effect.option,
+          Effect.exit,
           Effect.ensuring(
             Effect.promise(() => gate.release(leaseId)).pipe(
               Effect.catchCause((cause) =>
@@ -95,9 +117,12 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
             ),
           ),
         );
-        if (Option.isNone(answer)) {
-          yield* Effect.logWarning(`mergebox ${request.candidateId}: the box did not answer`);
-          return yield* refuse("box-failed");
+        if (Exit.isFailure(answer)) {
+          const why = scrubbed(whyNot(answer.cause));
+          yield* Effect.logWarning(
+            `mergebox ${request.candidateId}: the box did not answer: ${why}`,
+          );
+          return yield* refuse("box-failed", [], `the box did not answer: ${why}`);
         }
         const box = answer.value;
         switch (box.kind) {
@@ -112,8 +137,10 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
             return yield* refuse("git-crashed");
           case "failed":
           case "unsupported":
-            yield* Effect.logWarning(`mergebox ${request.candidateId}: ${box.kind}, ${box.reason}`);
-            return yield* refuse("box-failed");
+            yield* Effect.logWarning(
+              `mergebox ${request.candidateId}: ${box.kind}, ${scrubbed(box.reason)}`,
+            );
+            return yield* refuse("box-failed", [], `${box.kind}: ${box.reason}`);
         }
         // The box object logged the check that did not pass as a defect.
         return yield* refuse("box-check");

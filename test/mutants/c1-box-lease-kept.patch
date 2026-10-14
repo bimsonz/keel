@@ -2,12 +2,12 @@
 # kills: mergebox.client-composed
 # why: the lease is never given back, so each compose holds one of the namespace's boxes for ten minutes
 diff --git a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
-index 147a40ff..ca26ef99 100644
+index a33625bb..0dda340d 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
-@@ -86,7 +86,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
+@@ -108,7 +108,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
            Effect.flatMap(decodeAnswer),
-           Effect.option,
+           Effect.exit,
            Effect.ensuring(
 -            Effect.promise(() => gate.release(leaseId)).pipe(
 +            Effect.promise(async () => leaseId).pipe(

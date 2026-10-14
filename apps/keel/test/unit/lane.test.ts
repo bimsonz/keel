@@ -101,6 +101,8 @@ interface WorldOptions {
   readonly refuseCompose?: readonly ChangeId[];
   /** Why the composer refuses `refuseCompose`'s changes: GitCore's `overlap` unless given. */
   readonly refuseReason?: string;
+  /** What failed where the composer saw it, with `refuseReason`. */
+  readonly refuseDetail?: string;
   readonly bundles?: Layer.Layer<CandidateBundles>;
   readonly verification?: "required" | "off";
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
@@ -192,6 +194,7 @@ function world(options: WorldOptions = {}) {
   const composing = makeCandidateComposerMemory({
     refuse: options.refuseCompose ?? [],
     ...(options.refuseReason === undefined ? {} : { reason: options.refuseReason }),
+    ...(options.refuseDetail === undefined ? {} : { detail: options.refuseDetail }),
   });
   const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
@@ -985,6 +988,35 @@ describe("the Lane", () => {
           ],
         });
         expect(w.bundles.bundled).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.box-cause] a box's failure is held with what failed in the box, in the hold's evidence and the bounce's",
+    () => {
+      const detail = "the box did not answer: the box was not readied: trust exit 124";
+      const w = world({
+        refuseCompose: [change(1)],
+        refuseReason: "box-failed",
+        refuseDetail: detail,
+      });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let round = 1; round <= 3; round += 1) {
+          expect(yield* laneStep(LANE)).toBe("idle");
+          const failed = (yield* payloads("BatchFailed")).at(-1);
+          if (round < 3)
+            yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+        }
+        const refusal = `composition-refused: box-failed: ${detail}`;
+        const issued = yield* payloads("VerdictIssued");
+        expect(issued[0]).toMatchObject({ outcome: "hold", evidence: [refusal] });
+        expect(issued.at(-1)).toMatchObject({
+          outcome: "bounce",
+          evidence: [`infra-failure x3: ${refusal}; ${refusal}; ${refusal}`, refusal],
+        });
       }).pipe(Effect.provide(w.layer));
     },
   );

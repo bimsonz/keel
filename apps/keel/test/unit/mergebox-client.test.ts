@@ -91,7 +91,18 @@ const composeWith = (boxes: BoxObjects) =>
 const refusalOf = (exit: Exit.Exit<unknown, CompositionRefused>) =>
   Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
 
-const refused = (reason: string, paths: string[] = []) => new CompositionRefused({ reason, paths });
+const refused = (reason: string, paths: string[] = [], detail?: string) =>
+  new CompositionRefused({ reason, paths, ...(detail === undefined ? {} : { detail }) });
+
+/** A refusal's reason and paths, whatever its detail. */
+const reasonOf = (exit: Exit.Exit<unknown, CompositionRefused>) => {
+  const refusal = refusalOf(exit);
+  return refusal instanceof CompositionRefused
+    ? { reason: refusal.reason, paths: refusal.paths }
+    : refusal;
+};
+
+const ACCOUNT = "0123456789abcdef0123456789abcdef";
 
 describe("MergeBox's client", () => {
   it("[mergebox.client-composed] leases a box from the project's namespace's gate as the candidate, asks the project's box the candidate's compose, answers its trees and check, and gives the lease back", async () => {
@@ -169,9 +180,39 @@ describe("MergeBox's client", () => {
     ];
     for (const [answer, expected] of cases) {
       const world = objects({ answer });
-      expect(refusalOf(await composeWith(world.boxes))).toEqual(expected);
+      expect(reasonOf(await composeWith(world.boxes))).toEqual({
+        reason: expected.reason,
+        paths: expected.paths,
+      });
       expect(world.asked.at(-1)).toBe("release lse-1");
     }
+  });
+
+  it("[mergebox.client-box-cause] a box that fails, or throws, says what failed as the refusal's detail, with no remote, account id or token", async () => {
+    const thrown = objects({
+      answer: async () => {
+        throw new Error(
+          `the box was not readied: trust exit 124: fatal: https://${ACCOUNT}.example/git/ws art_v1_leaked`,
+        );
+      },
+    });
+    expect(refusalOf(await composeWith(thrown.boxes))).toEqual(
+      refused(
+        "box-failed",
+        [],
+        "the box did not answer: the box was not readied: trust exit 124: fatal: <remote> <token>",
+      ),
+    );
+    const failed = objects({
+      answer: async () => ({ kind: "failed", reason: `fetch-failed: account ${ACCOUNT}` }),
+    });
+    expect(refusalOf(await composeWith(failed.boxes))).toEqual(
+      refused("box-failed", [], "failed: fetch-failed: account <id>"),
+    );
+    const unknown = objects({ answer: async () => ({ kind: "unsupported", reason: "v2" }) });
+    expect(refusalOf(await composeWith(unknown.boxes))).toEqual(
+      refused("box-failed", [], "unsupported: v2"),
+    );
   });
 
   it("[mergebox.client-release-fails] a lease that cannot be given back is left to its deadline, and the compose still answers", async () => {

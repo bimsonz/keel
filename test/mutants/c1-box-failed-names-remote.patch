@@ -2,15 +2,15 @@
 # kills: mergebox.failed-no-remote
 # why: a failed compose's reason carries git's own words, the remote with the account id among them, into the logs
 diff --git a/apps/keel/src/adapters/driving/do/mergebox-box.ts b/apps/keel/src/adapters/driving/do/mergebox-box.ts
-index 46000f10..f78a499e 100644
+index e3873798..cddace2e 100644
 --- a/apps/keel/src/adapters/driving/do/mergebox-box.ts
 +++ b/apps/keel/src/adapters/driving/do/mergebox-box.ts
-@@ -168,7 +168,7 @@ export async function composeInBox(
+@@ -185,7 +185,7 @@ export async function composeInBox(
+       return { kind: "crashed", exitCode: read.exitCode };
+   }
    // git names the remote it failed on, and a remote carries the account id: never let one out.
-   return {
-     kind: "failed",
--    reason: `${read.reason}: ${run.stderr.replace(/https?:\/\/\S+/g, "<remote>").slice(-400)}`,
-+    reason: `${read.reason}: ${run.stderr.slice(-400)}`,
-   };
+-  return { kind: "failed", reason: `${read.reason}: ${scrubbed(run.stderr).slice(-STDERR_TAIL)}` };
++  return { kind: "failed", reason: `${read.reason}: ${run.stderr.slice(-STDERR_TAIL)}` };
  }
  
+ /** The repos one compose may reach, by the path of each remote: staging to read and write, each workspace to read. */

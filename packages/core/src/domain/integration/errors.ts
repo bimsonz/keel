@@ -82,6 +82,8 @@ export class CompositionRefused extends Schema.TaggedError<CompositionRefused>()
   {
     reason: Schema.String,
     paths: Schema.Array(Schema.String),
+    /** What failed where the composer could see it (MergeBox's stage, exit and stderr's tail), for the evidence; never a remote. */
+    detail: Schema.optional(Schema.String),
   },
 ) {}
 

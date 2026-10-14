@@ -11,7 +11,7 @@ import {
   readBoxCompose,
   scanBoxCheck,
 } from "@keeltown/gitcore";
-import type { BoxComposeAnswer, EgressGrant } from "../../../rpc/mergebox.ts";
+import { type BoxComposeAnswer, type EgressGrant, scrubbed } from "../../../rpc/mergebox.ts";
 
 /** What MergeBox needs of its container, narrowed from the platform's. */
 export interface BoxContainer {
@@ -21,6 +21,12 @@ export interface BoxContainer {
   /** Whether the running box started from an image other than the one this deploy names. */
   readonly stale: () => Promise<boolean>;
   readonly destroy: () => Promise<void>;
+  /**
+   * Registers the egress on the box's outbound HTTPS and HTTP. The platform's
+   * CA appears in the box only once an HTTPS intercept is registered, and
+   * registering again replaces what was there.
+   */
+  readonly intercept: () => Promise<void>;
   readonly exec: (
     argv: readonly string[],
     env: Record<string, string>,
@@ -45,6 +51,9 @@ export const BOX_TRUST_SCRIPT = `set -e
 [ -e ${SYSTEM} ] || { cp ${BUNDLE} ${SYSTEM}.tmp && mv ${SYSTEM}.tmp ${SYSTEM}; }
 timeout 10 sh -c 'until [ -s ${CA} ]; do sleep 0.1; done'
 cat ${SYSTEM} ${CA} > ${BUNDLE}.tmp && mv ${BUNDLE}.tmp ${BUNDLE}`;
+
+/** How much of a failing script's stderr is kept, from its end. */
+const STDERR_TAIL = 400;
 
 /** How long a box has to run its first command. */
 const READY_WITHIN_MS = 180_000;
@@ -73,18 +82,24 @@ export const scratchRef = (candidateId: string) => `refs/keel/box/${candidateId}
 /**
  * Starts the box unless it runs with a canary this object knows, from the
  * image this deploy names: started with a fresh canary in its environment, it
- * runs its first command, trusts the egress's CA, and plants the canary in
- * its file. A box running with a canary this object has lost is destroyed
- * and started again, since its environment cannot change; so is one a deploy
- * has given a new image, which a running box never takes on its own. Answers
- * how long it took (0 when it ran).
+ * runs its first command, has the egress registered, trusts the egress's CA
+ * (which the platform writes only once an intercept is registered), and
+ * plants the canary in its file. A box that runs is intercepted again, so
+ * every compose goes out through this object's egress. A box running with a
+ * canary this object has lost is destroyed and started again, since its
+ * environment cannot change; so is one a deploy has given a new image, which
+ * a running box never takes on its own. Answers how long it took (0 when it
+ * ran).
  */
 export async function readyBox(
   container: BoxContainer,
   canaries: CanaryStore,
   now: () => number = Date.now,
 ): Promise<number> {
-  if (container.running && canaries.get() !== undefined && !(await container.stale())) return 0;
+  if (container.running && canaries.get() !== undefined && !(await container.stale())) {
+    await container.intercept();
+    return 0;
+  }
   const began = now();
   if (container.running) await container.destroy();
   const canary = freshCanary();
@@ -100,12 +115,16 @@ export async function readyBox(
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
-  for (const [script, args] of [
-    [BOX_TRUST_SCRIPT, []],
-    [BOX_PLANT_SCRIPT, [canary]],
+  await container.intercept();
+  for (const [stage, script, args] of [
+    ["trust", BOX_TRUST_SCRIPT, []],
+    ["plant", BOX_PLANT_SCRIPT, [canary]],
   ] as const) {
     const run = await container.exec(["bash", "-c", script, "box", ...args], BOX_ENV);
-    if (run.exitCode !== 0) throw new Error(`the box was not readied: exit ${run.exitCode}`);
+    if (run.exitCode !== 0)
+      throw new Error(
+        `the box was not readied: ${stage} exit ${run.exitCode}${run.stderr === "" ? "" : `: ${scrubbed(run.stderr).slice(-STDERR_TAIL)}`}`,
+      );
   }
   canaries.set(canary);
   return now() - began;
@@ -166,10 +185,7 @@ export async function composeInBox(
       return { kind: "crashed", exitCode: read.exitCode };
   }
   // git names the remote it failed on, and a remote carries the account id: never let one out.
-  return {
-    kind: "failed",
-    reason: `${read.reason}: ${run.stderr.replace(/https?:\/\/\S+/g, "<remote>").slice(-400)}`,
-  };
+  return { kind: "failed", reason: `${read.reason}: ${scrubbed(run.stderr).slice(-STDERR_TAIL)}` };
 }
 
 /** The repos one compose may reach, by the path of each remote: staging to read and write, each workspace to read. */
