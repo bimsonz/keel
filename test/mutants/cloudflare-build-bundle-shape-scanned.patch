@@ -2,7 +2,7 @@
 # kills: build.bundle-not-scanned
 # why: a dependency carrying a sample key or an Artifacts URL abstains every build of its app, so none of its changes ever lands
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 9a96f898..b1bbe961 100644
+index b50b0dcd..8e28ea2d 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 @@ -452,7 +452,10 @@ export const judgeBuildOutput = (
@@ -16,4 +16,4 @@ index 9a96f898..b1bbe961 100644
 +    };
      const judged = judgeBuild(step, output, { config, tail, ...diagnosis, credentialScan });
      const { bundle, ...evidence } = judged.evidence;
-     const redacted = redactJson({ ...evidence }, literals);
+     const redacted = Object.entries(evidence).map(([key, value]) => [
