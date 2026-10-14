@@ -1,5 +1,4 @@
 import { consumeQueue } from "./adapters/driving/queue/consumer.ts";
-import { isolateFor } from "./composition/isolate.ts";
 import { queueRuntime } from "./composition/queue.ts";
 import { enforceRetention } from "./composition/retention.ts";
 
@@ -23,8 +22,12 @@ export { KeelWorldCheck } from "./adapters/driving/workflow/world-check.ts";
 export { PushObserved } from "./adapters/driving/workflow/push-observed.ts";
 
 export default {
+  // The HTTP side loads on the first request, not with the Worker: Cloudflare gives a Worker's global scope a
+  // second of CPU, and scripts/guard-startup.ts fails the build when it is reached as the Worker loads.
   fetch(request, env, ctx): Response | Promise<Response> {
-    return isolateFor(env).app.fetch(request, env, ctx);
+    return import("./composition/isolate.ts").then(({ isolateFor }) =>
+      isolateFor(env).app.fetch(request, env, ctx),
+    );
   },
   queue(batch, env, _ctx): Promise<void> {
     return consumeQueue(batch, queueRuntime(env));

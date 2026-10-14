@@ -8,19 +8,25 @@ import { type Exit, Schema } from "effect";
  */
 export type ExitJson = Schema.Json;
 
+/**
+ * A method's Exit codec, built the first time it is used and kept. The RPC
+ * maps name over a hundred, and building every one as the module loaded
+ * spent about a fifth of the Worker's startup CPU.
+ */
+export type ExitCodec<A, E> = () => Schema.Codec<Exit.Exit<A, E>, Schema.Json>;
+
 export function exitCodec<A, AI, E, EI>(
   success: Schema.Codec<A, AI>,
   failure: Schema.Codec<E, EI>,
-) {
-  return Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect()));
+): ExitCodec<A, E> {
+  let built: Schema.Codec<Exit.Exit<A, E>, Schema.Json> | undefined;
+  return () => (built ??= Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect())));
 }
 
-export type ExitCodec<A, E> = Schema.Codec<Exit.Exit<A, E>, Schema.Json>;
-
 export function encodeExit<A, E>(codec: ExitCodec<A, E>, exit: Exit.Exit<A, E>): ExitJson {
-  return Schema.encodeSync(codec)(exit);
+  return Schema.encodeSync(codec())(exit);
 }
 
 export function decodeExit<A, E>(codec: ExitCodec<A, E>, json: unknown): Exit.Exit<A, E> {
-  return Schema.decodeUnknownSync(codec)(json);
+  return Schema.decodeUnknownSync(codec())(json);
 }

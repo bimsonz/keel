@@ -80,7 +80,7 @@ import {
   type StreamingAi,
 } from "../adapters/driven/workers-ai/platform-function.ts";
 import { artifactsLocationHint, artifactsObjects, codeHostLayer, commitSigning } from "./do.ts";
-import { credentialStoreLayer } from "./isolate.ts";
+import { credentialStoreLayer } from "./credentials.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps

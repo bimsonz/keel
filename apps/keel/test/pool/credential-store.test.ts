@@ -11,7 +11,7 @@ import { Effect, Redacted, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import type { NamespaceDO } from "../../src/adapters/driving/do/namespace.ts";
-import { credentialStoreLayer } from "../../src/composition/isolate.ts";
+import { credentialStoreLayer } from "../../src/composition/credentials.ts";
 import { drainAfter } from "./helpers.ts";
 
 /** A namespace's object, drained after each case: a credential's put and removal commit events. */

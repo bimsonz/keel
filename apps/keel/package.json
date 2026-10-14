@@ -11,7 +11,7 @@
   "scripts": {
     "gen": "wrangler types --include-runtime=true --strict-vars=false",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+    "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run --metafile .wrangler/dry-run.meta.json && node scripts/guard-startup.ts .wrangler/dry-run.meta.json"
   },
   "dependencies": {
     "@better-auth/oauth-provider": "catalog:",

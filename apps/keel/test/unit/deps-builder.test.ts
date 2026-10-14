@@ -290,7 +290,7 @@ describe("the two copies of the deps contract", () => {
       { _tag: "DepsRefused" },
       { _tag: "DepsBounced", reason: "no such member" },
     ])
-      for (const codec of [DepsCodecs.build, KeelVerifyDepsCodecs.build])
+      for (const codec of [DepsCodecs.build(), KeelVerifyDepsCodecs.build])
         expect(Schema.decodeUnknownOption(codec)({ _tag: "Success", value: bad })._tag).toBe(
           "None",
         );

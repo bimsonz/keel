@@ -51,10 +51,6 @@ import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { isD1Unavailable } from "../adapters/driven/d1/unavailable.ts";
-import {
-  CredentialStoreSealed,
-  type CredentialsStub,
-} from "../adapters/driven/credentials/credential-store.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
@@ -82,7 +78,8 @@ import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
-import { ClockLive, IdsLive, SystemLive } from "../adapters/driven/system.ts";
+import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
+import { credentialStoreLayer } from "./credentials.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
 import { cloneAccess } from "../adapters/driving/http/clone-access.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
@@ -167,22 +164,6 @@ export function isolateLayer(
       Layer.provide(ClockLive),
     ),
     SystemLive,
-  );
-}
-
-/**
- * An org's credentials: sealed and opened here, in the Worker,
- * under the KEK Secrets Store holds (`CREDENTIAL_KEK`, known to every seal as
- * `k1`), and kept sealed in the namespace's own object. Pool tests pass the
- * objects they drain.
- */
-export function credentialStoreLayer(
-  env: Env,
-  namespace: (address: string) => CredentialsStub = (address) =>
-    env.NAMESPACE.get(env.NAMESPACE.idFromName(address)),
-) {
-  return CredentialStoreSealed({ id: "k1", read: () => env.CREDENTIAL_KEK.get() }, namespace).pipe(
-    Layer.provide(IdsLive),
   );
 }
 

@@ -14,5 +14,9 @@ await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
   await admin.create(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))));
 }
 
+// The Worker loads its HTTP side on the first request (src/index.ts). Here every module is transformed as it is
+// first asked for, which then takes longer than a case may: load it with the file instead, as the Worker did before.
+await import("../../src/composition/isolate.ts");
+
 // Every object a case registered (drainAfter) flushes before the next case starts, and before the file ends.
 afterEach(drainRegistered, 30_000);
