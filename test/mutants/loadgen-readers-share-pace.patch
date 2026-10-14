@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/limits.test.ts
+# kills: loadgen.reader-ahead
+# why: Readers take the agents' pace: a refresh queues behind every agent's token, and a big run's count freezes while Keel keeps landing
+diff --git a/examples/loadgen/src/limits.ts b/examples/loadgen/src/limits.ts
+index 77112b79..a2cfd8d4 100644
+--- a/examples/loadgen/src/limits.ts
++++ b/examples/loadgen/src/limits.ts
+@@ -77,7 +77,9 @@ export class Pace {
+ export function paces(clock: Clock = REAL): { readonly agents: Pace; readonly readers: Pace } {
+   return {
+     agents: new Pace(AGENT_TOKENS_PER_MINUTE, clock),
+-    readers: new Pace(READER_TOKENS_PER_MINUTE, clock),
++    get readers() {
++      return this.agents;
++    },
+   };
+ }
+ 

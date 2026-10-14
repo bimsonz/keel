@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/loadgen/test/plan.test.ts
+# kills: loadgen.pairs-whole-run
+# why: Each shard plans its own pairs, ignoring the run's: a shard of a hundred has five, and three kinds have no decoy
+diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
+index 24556bed..8e116601 100644
+--- a/examples/loadgen/src/plan.ts
++++ b/examples/loadgen/src/plan.ts
+@@ -174,7 +174,7 @@ export function planRun(options: {
+   const split = mix(count);
+   if (options.pairs !== undefined && options.pairs.length !== split.pairs)
+     throw new Error(`${count} agents take ${split.pairs} pairs, not ${options.pairs.length}`);
+-  const pairs = options.pairs ?? pairKinds(split.pairs, next);
++  const pairs = pairKinds(split.pairs, next);
+   const groups = Math.ceil(split.shared / GROUP_SIZE);
+   const groupSizes = Array.from({ length: groups }, (_, g) =>
+     Math.min(GROUP_SIZE, split.shared - g * GROUP_SIZE),

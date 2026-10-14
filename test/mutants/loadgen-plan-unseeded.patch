@@ -2,15 +2,15 @@
 # kills: loadgen.plan-seeded
 # why: The plan ignores its seed: the key sealed before the run is not the key of the run
 diff --git a/examples/loadgen/src/plan.ts b/examples/loadgen/src/plan.ts
-index 50d7087c..2d151971 100644
+index 24556bed..840f22ed 100644
 --- a/examples/loadgen/src/plan.ts
 +++ b/examples/loadgen/src/plan.ts
-@@ -135,7 +135,7 @@ export function planRun(options: {
-   readonly count: number;
+@@ -169,7 +169,7 @@ export function planRun(options: {
+   readonly pairs?: readonly PairSpec[];
  }): Plan {
    const { run, seed, count } = options;
 -  const next = random(seed);
 +  const next = random(Date.now());
    const dir = `lg/${run}`;
    const split = mix(count);
- 
+   if (options.pairs !== undefined && options.pairs.length !== split.pairs)

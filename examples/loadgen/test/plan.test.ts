@@ -4,8 +4,11 @@ import {
   PENDING,
   anchoredAt,
   apply,
+  dealPairs,
   mix,
+  pairKinds,
   planRun,
+  random,
   sealed,
   type Edit,
   type Plan,
@@ -68,6 +71,40 @@ describe("a loadgen run's plan", () => {
     // The kinds are not in the order they were dealt.
     const dealt = p.key.map((_, k) => BENCH_KINDS[k % BENCH_KINDS.length]);
     expect(p.key.map((k) => k.kind)).not.toEqual(dealt);
+  });
+
+  it("[loadgen.pairs-whole-run] plans a sharded run's pairs once: a decoy of every kind over the run, each shard's key naming only its own sides", () => {
+    const counts = Array.from({ length: 10 }, () => 100);
+    const sizes = counts.map((n) => mix(n).pairs);
+    const dealt = dealPairs(
+      pairKinds(
+        sizes.reduce((sum, n) => sum + n, 0),
+        random(42),
+      ),
+      sizes,
+    );
+    const shards = counts.map((count, k) =>
+      planRun({ run: `r1-p${k}`, seed: 42 + k, count, pairs: dealt[k] ?? [] }),
+    );
+    const keys = shards.flatMap((p) => p.key);
+    expect(keys).toHaveLength(50);
+    for (const kind of BENCH_KINDS) {
+      const ofKind = keys.filter((k) => k.kind === kind);
+      expect({ kind, planted: ofKind.some((k) => k.planted) }).toEqual({ kind, planted: true });
+      expect({ kind, decoy: ofKind.some((k) => !k.planted) }).toEqual({ kind, decoy: true });
+    }
+    for (const p of shards)
+      for (const k of p.key)
+        expect([
+          p.tasks[k.a]?.pair,
+          p.tasks[k.b]?.pair,
+          p.tasks[k.a]?.side,
+          p.tasks[k.b]?.side,
+        ]).toEqual([k.pair, k.pair, "a", "b"]);
+    // A shard given the wrong number of pairs is refused, not planned short.
+    expect(() =>
+      planRun({ run: "r1", seed: 1, count: 100, pairs: dealt[0]?.slice(1) ?? [] }),
+    ).toThrow("100 agents take 5 pairs, not 4");
   });
 
   it("[loadgen.plan-planted] makes a planted pair conflict in its kind, and its decoy look alike without conflicting", () => {

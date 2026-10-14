@@ -29,8 +29,18 @@ import {
 import { patiently, work, type AgentResult } from "../src/agent.ts";
 import { score } from "../src/bench.ts";
 import { compare, expectedTrunk, type Break } from "../src/integrity.ts";
-import { Pace, TOKENS_PER_MINUTE, paced } from "../src/limits.ts";
-import { anchoredAt, planRun, sealed, type PairKey, type Plan } from "../src/plan.ts";
+import { paced, paces, type Pace } from "../src/limits.ts";
+import {
+  anchoredAt,
+  dealPairs,
+  mix,
+  pairKinds,
+  planRun,
+  random,
+  sealed,
+  type PairKey,
+  type Plan,
+} from "../src/plan.ts";
 import { summarise, ties, type KeelEvent, type LoadReport } from "../src/report.ts";
 import { Watch } from "../src/watch.ts";
 
@@ -59,11 +69,25 @@ const log = (line: string) => console.log(`${stamp()} ${line}`);
 
 // The plans and their sealed key, before anything reaches Keel. One project keeps the run's own label.
 const projectName = (k: number) => (k === 0 ? "loadgen" : `loadgen-${k}`);
-const plans: Plan[] = Array.from({ length: shards }, (_, k) =>
+// A sharded run's pairs are planned over the whole run, then dealt to its shards.
+const counts = Array.from(
+  { length: shards },
+  (_, k) => Math.floor(count / shards) + (k < count % shards ? 1 : 0),
+);
+const sizes = counts.map((n) => mix(n).pairs);
+const dealt = dealPairs(
+  pairKinds(
+    sizes.reduce((sum, n) => sum + n, 0),
+    random(seed),
+  ),
+  sizes,
+);
+const plans: Plan[] = counts.map((n, k) =>
   planRun({
     run: shards === 1 ? run : `${run}-p${k}`,
     seed: seed + k,
-    count: Math.floor(count / shards) + (k < count % shards ? 1 : 0),
+    count: n,
+    ...(shards === 1 ? {} : { pairs: dealt[k] ?? [] }),
   }),
 );
 const seal =
@@ -126,16 +150,20 @@ async function account(): Promise<{
   return { agentId: made.agentId, handle: made.handle, signer };
 }
 const me = await account();
-const pace = new Pace(TOKENS_PER_MINUTE);
+const pace = paces();
+/** Token requests the limit refused, and those held past their signature's life, across both paces. */
+const refused = () => pace.agents.refused + pace.readers.refused;
+const signedAgain = () => pace.agents.signedAgain + pace.readers.signedAgain;
 const { tokenEndpoint } = await discover(keel);
 // Each client its own pace-held fetch: a slot it was given and could not use is kept for its retry.
-const client = (runLabel: string, project?: string) =>
+// Agents take the agents' pace; the owner and the readers take the readers', so a refresh never queues behind agents.
+const client = (runLabel: string, project?: string, held: Pace = pace.readers) =>
   new KeelClient({
     baseUrl: keel,
     agentId: me.agentId,
     key: me.signer,
     run: runLabel,
-    fetch: paced((input, init) => globalThis.fetch(input, init), pace, tokenEndpoint),
+    fetch: paced((input, init) => globalThis.fetch(input, init), held, tokenEndpoint),
     ...(project === undefined ? {} : { project }),
   });
 const own = client(`lg-${run}-owner`);
@@ -270,7 +298,7 @@ const progress = setInterval(() => {
   const done = all();
   const by = (o: AgentResult["outcome"]) => done.filter((r) => r.outcome === o).length;
   log(
-    `${done.length}/${count} done: ${by("landed")} landed, ${by("gave-up")} gave up, ${by("failed")} failed; token refusals ${pace.refused}`,
+    `${done.length}/${count} done: ${by("landed")} landed, ${by("gave-up")} gave up, ${by("failed")} failed; token refusals ${refused()}`,
   );
 }, 30_000);
 const following = ready.map((s) =>
@@ -282,7 +310,7 @@ order.sort((x, y) => x.task.index - y.task.index || ready.indexOf(x.s) - ready.i
 await Promise.all(
   order.map(async ({ s, task }) => {
     const result = await work(
-      client(`lg-${s.plan.run}-${task.index}`, s.project),
+      client(`lg-${s.plan.run}-${task.index}`, s.project, pace.agents),
       s.project,
       task,
       {
@@ -421,8 +449,8 @@ const written = {
   keySha256: seal.sha256,
   endedAt: new Date().toISOString(),
   timedOut: Date.now() > deadline,
-  tokenRefusals: pace.refused,
-  tokensSignedAgain: pace.signedAgain,
+  tokenRefusals: refused(),
+  tokensSignedAgain: signedAgain(),
   outcomes: {
     landed: outcomes.filter((r) => r.outcome === "landed").length,
     gaveUp: outcomes.filter((r) => r.outcome === "gave-up").length,
@@ -491,7 +519,7 @@ ${[
   ),
 ].join("\n")}
 
-Trunk breaks: ${breaks.length}. Token refusals (429): ${pace.refused}. Token requests held past their signature's life and signed again: ${pace.signedAgain}.
+Trunk breaks: ${breaks.length}. Token refusals (429): ${refused()}. Token requests held past their signature's life and signed again: ${signedAgain()}.
 Benchmark recall (≥ 70%): ${pct(bench.recall)}; decoy false positives (≤ 20%): ${pct(bench.falsePositiveRate)}; pairs Keel never saw: ${bench.unrun}.`);
 for (const [kind, k] of Object.entries(bench.byKind))
   console.log(

@@ -5,6 +5,10 @@
  * the address, and waits out a refusal rather than failing on it.
  */
 export const TOKENS_PER_MINUTE = 50;
+/** The share the run's readers keep: one refresh in five minutes each, never queued behind the agents. */
+export const READER_TOKENS_PER_MINUTE = 5;
+/** The agents' share: the rest of the run's pace. */
+export const AGENT_TOKENS_PER_MINUTE = TOKENS_PER_MINUTE - READER_TOKENS_PER_MINUTE;
 
 const MINUTE_MS = 60_000;
 
@@ -63,6 +67,18 @@ export class Pace {
     const wait = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : MINUTE_MS;
     this.#pausedUntil = Math.max(this.#pausedUntil, this.#clock.now() + wait);
   }
+}
+
+/**
+ * The run's two paces: its agents', and its readers' apart, so a reader's
+ * refresh never waits behind a thousand agents' queue (lg1000c's count froze
+ * for sixteen minutes that way). Together they hold to `TOKENS_PER_MINUTE`.
+ */
+export function paces(clock: Clock = REAL): { readonly agents: Pace; readonly readers: Pace } {
+  return {
+    agents: new Pace(AGENT_TOKENS_PER_MINUTE, clock),
+    readers: new Pace(READER_TOKENS_PER_MINUTE, clock),
+  };
 }
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;

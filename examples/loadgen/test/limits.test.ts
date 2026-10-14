@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { FRESH_MS, Pace, paced, slotAfter } from "../src/limits.ts";
+import {
+  AGENT_TOKENS_PER_MINUTE,
+  FRESH_MS,
+  Pace,
+  READER_TOKENS_PER_MINUTE,
+  TOKENS_PER_MINUTE,
+  paced,
+  paces,
+  slotAfter,
+} from "../src/limits.ts";
 
 const MINUTE = 60_000;
 
@@ -22,6 +31,29 @@ const TOKEN = "https://keel.test/v1/auth/oauth2/token";
 const ok = () => new Response("{}", { status: 200 });
 
 describe("the token pace", () => {
+  it("[loadgen.reader-ahead] gives a reader's refresh its slot at once while the agents' queue is a minute deep, the two together within the run's pace", async () => {
+    expect(AGENT_TOKENS_PER_MINUTE + READER_TOKENS_PER_MINUTE).toBe(TOKENS_PER_MINUTE);
+    const t = stopped();
+    const pace = paces(t.clock);
+    // A thousand agents start at once: their queue reaches minutes ahead.
+    const agents = Array.from({ length: 1000 }, () => pace.agents.take());
+    const deepest = Math.max(...t.waits);
+    expect(deepest).toBeGreaterThan(MINUTE);
+    // The readers' refreshes in that minute each go at once.
+    const before = t.waits.length;
+    const readers = await Promise.all(
+      Array.from({ length: READER_TOKENS_PER_MINUTE }, () => pace.readers.take()),
+    );
+    expect(readers).toEqual(Array.from({ length: READER_TOKENS_PER_MINUTE }, () => 0));
+    expect(t.waits).toHaveLength(before);
+    await Promise.all(agents);
+    // Every grant, agents' and readers', as one list: on the stopped clock a wait is its slot's time,
+    // and a grant at once asks no wait. No sliding minute holds more than the run's pace.
+    const total = 1000 + READER_TOKENS_PER_MINUTE;
+    const granted = [...Array.from({ length: total - t.waits.length }, () => 0), ...t.waits];
+    expect(busiest(granted.toSorted((a, b) => a - b))).toBe(TOKENS_PER_MINUTE);
+  });
+
   it("[loadgen.pace-minute] grants no sliding minute more than its pace, and the next as soon as the minute allows", async () => {
     const granted: number[] = [];
     for (let i = 0; i < 130; i += 1) granted.push(slotAfter(granted, 0, 50));

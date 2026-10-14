@@ -43,6 +43,12 @@ export interface Task {
   readonly side?: "a" | "b";
 }
 
+/** A benchmark pair before it has sides: its kind, and whether it conflicts or is a decoy. */
+export interface PairSpec {
+  readonly kind: BenchKind;
+  readonly planted: boolean;
+}
+
 export interface PairKey {
   readonly pair: number;
   readonly kind: BenchKind;
@@ -64,7 +70,7 @@ export interface Plan {
 }
 
 /** A small seeded generator (mulberry32): the same seed gives the same plan. */
-function random(seed: number): () => number {
+export function random(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -129,24 +135,46 @@ const groupBase = (members: number) =>
 const subjectOf = (run: string, ...parts: string[]) =>
   [`lg`, run.toLowerCase().replace(/[^a-z0-9-]/g, "-"), ...parts].join(".");
 
-export function planRun(options: {
-  readonly run: string;
-  readonly seed: number;
-  readonly count: number;
-}): Plan {
-  const { run, seed, count } = options;
-  const next = random(seed);
-  const dir = `lg/${run}`;
-  const split = mix(count);
-
-  // The pairs' kinds, balanced across the four, planted and decoy alternating within a kind, then shuffled.
-  const pairs = shuffled(
-    Array.from({ length: split.pairs }, (_, k) => ({
+/** `count` pairs, balanced across the four kinds, planted and decoy alternating within a kind, then shuffled. */
+export function pairKinds(count: number, next: () => number): PairSpec[] {
+  return shuffled(
+    Array.from({ length: count }, (_, k) => ({
       kind: BENCH_KINDS[k % BENCH_KINDS.length] ?? "premise",
       planted: Math.floor(k / BENCH_KINDS.length) % 2 === 0,
     })),
     next,
   );
+}
+
+/**
+ * A run's pairs dealt to its shards: shard k takes the next `sizes[k]` of
+ * them. A run of many shards plans its pairs once, so its kinds and decoys
+ * are balanced over the run; a shard of a hundred plans only five, too few
+ * for a decoy of every kind.
+ */
+export function dealPairs(pairs: readonly PairSpec[], sizes: readonly number[]): PairSpec[][] {
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  if (total !== pairs.length) throw new Error(`${pairs.length} pairs dealt as ${total}`);
+  return sizes.map((size, k) => {
+    const from = sizes.slice(0, k).reduce((sum, n) => sum + n, 0);
+    return pairs.slice(from, from + size);
+  });
+}
+
+export function planRun(options: {
+  readonly run: string;
+  readonly seed: number;
+  readonly count: number;
+  /** Its pairs, when the run's are planned over all its shards; as many as `mix(count)` plans. */
+  readonly pairs?: readonly PairSpec[];
+}): Plan {
+  const { run, seed, count } = options;
+  const next = random(seed);
+  const dir = `lg/${run}`;
+  const split = mix(count);
+  if (options.pairs !== undefined && options.pairs.length !== split.pairs)
+    throw new Error(`${count} agents take ${split.pairs} pairs, not ${options.pairs.length}`);
+  const pairs = options.pairs ?? pairKinds(split.pairs, next);
   const groups = Math.ceil(split.shared / GROUP_SIZE);
   const groupSizes = Array.from({ length: groups }, (_, g) =>
     Math.min(GROUP_SIZE, split.shared - g * GROUP_SIZE),
