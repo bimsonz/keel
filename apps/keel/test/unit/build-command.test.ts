@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  BUILD_BUNDLE_LIMIT,
+  BUILD_CONFIG_LIMIT,
   BUILD_PROTOCOL,
   type DepsAnswer,
   workerAppDeployPack,
@@ -11,6 +13,7 @@ import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import { makeBundleUrlKeys, makeEvidenceStoreMemory, sampleNamespace } from "@keeltown/testing";
 import { Effect, Layer, Result, Schema } from "effect";
 import { execFileSync, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -92,6 +95,32 @@ const decodedScript = (): string => {
 };
 
 const b64 = (bytes: Uint8Array | string): string => Buffer.from(bytes).toString("base64");
+/** How long `bytes` bytes are once base64'd. */
+const b64Length = (bytes: number): number => 4 * Math.ceil(bytes / 3);
+
+/**
+ * What the command's last step prints for a module that gzips to exactly
+ * `bytes`, run by a real sh. The module's bytes do not compress, so its gzip
+ * grows one for one with it.
+ */
+const printedBundle = (bytes: number): string => {
+  const line = buildCommand(DEPLOY.path)
+    .split("\n")
+    .find((l) => l.includes("KEEL_BUNDLE too-large"));
+  if (line === undefined) throw new Error("no bundle line");
+  const dir = mkdtempSync(join(tmpdir(), "keel-bundle-"));
+  const module = join(dir, "worker.js");
+  const gzipped = () =>
+    Number(execFileSync("sh", ["-c", `gzip -c "${module}" | wc -c`], { encoding: "utf8" }).trim());
+  for (let size = bytes, tries = 0; ; tries += 1) {
+    writeFileSync(module, randomBytes(size));
+    const got = gzipped();
+    if (got === bytes) break;
+    if (tries === 8) throw new Error(`no module gzips to ${bytes} bytes`);
+    size += bytes - got;
+  }
+  return execFileSync("sh", ["-c", `K='${dir}'; code=0\n${line}`], { encoding: "utf8" }).trim();
+};
 
 const runScript = (dir: string, config: string) => {
   const script = join(dir, "build.mjs");
@@ -127,6 +156,18 @@ describe("the worker-app build in the box", () => {
     expect(runScript(noMain, "wrangler.jsonc").status).toBe(2);
     const broken = project({ ...WORKER, "src/greet.ts": "export const greet = (" });
     expect(runScript(broken, "wrangler.jsonc").status).toBe(1);
+  });
+
+  it("[build.bundle-cap] a module that gzips to exactly the cap is printed and one byte more is too large, and at the cap the report stays under the engine's 300 kB log", () => {
+    expect(BUILD_BUNDLE_LIMIT).toBe(160 * 1024);
+    const at = printedBundle(BUILD_BUNDLE_LIMIT);
+    expect(at).toMatch(/^KEEL_BUNDLE H4sI[A-Za-z0-9+/]+=*$/);
+    expect(Buffer.from(at.slice("KEEL_BUNDLE ".length), "base64")).toHaveLength(BUILD_BUNDLE_LIMIT);
+    expect(printedBundle(BUILD_BUNDLE_LIMIT + 1)).toBe(
+      `KEEL_BUNDLE too-large ${BUILD_BUNDLE_LIMIT + 1}`,
+    );
+    // Beside it, base64 too: the config's first BUILD_CONFIG_LIMIT bytes and the console's last 4096.
+    expect(at.length + b64Length(BUILD_CONFIG_LIMIT) + b64Length(4096)).toBeLessThan(300_000);
   });
 });
 

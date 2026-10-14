@@ -103,7 +103,9 @@ export function pushObservedRuntime(env: Env): ManagedRuntime.ManagedRuntime<Wor
  */
 function deployLayer(
   env: Env,
-): Layer.Layer<CredentialStore | Deployer | Deployments | DeployTargets | PreviewNotices | SmokeProbe> {
+): Layer.Layer<
+  CredentialStore | Deployer | Deployments | DeployTargets | PreviewNotices | SmokeProbe
+> {
   const project = (projectId: ProjectId) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   return Layer.mergeAll(

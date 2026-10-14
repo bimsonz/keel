@@ -387,6 +387,23 @@ describe("Keel's deploy steps", () => {
           "https://00000001-worker-lite.owner.workers.dev/health",
           "https://00000001-worker-lite.owner.workers.dev/",
         ]);
+        // So is any other 4xx: the preview answered, and what it said stands.
+        for (const status of [400, 401, 403]) {
+          const refused = world({ smoke: () => ({ _tag: "answered", status, body: "" }) });
+          const asking = yield* Effect.forkChild(
+            refused.runAll.pipe(Effect.provide(refused.layer)),
+          );
+          yield* TestClock.adjust(`${SMOKE_BUDGET_MS * 2} millis`);
+          const { smoke: answered } = yield* Fiber.join(asking);
+          expect([status, answered.outcome, refused.probe.asked]).toEqual([
+            status,
+            "fail",
+            [
+              "https://00000001-worker-lite.owner.workers.dev/health",
+              "https://00000001-worker-lite.owner.workers.dev/",
+            ],
+          ]);
+        }
       }),
   );
 
@@ -399,10 +416,9 @@ describe("Keel's deploy steps", () => {
         yield* TestClock.adjust(`${SMOKE_BUDGET_MS * 2} millis`);
         const { smoke } = yield* Fiber.join(fiber);
         expect(smoke.outcome).toBe("fail");
-        // The first check spends the minute, one ask every 3 s; the second, past it, is asked once.
-        const health = down.probe.asked.filter((u) => u.endsWith("/health")).length;
-        expect(health).toBeGreaterThan(1);
-        expect(health).toBeLessThanOrEqual(SMOKE_BUDGET_MS / 3000 + 1);
+        // The first check spends the minute, one ask every 3 s (at 0 s, 3 s, … 60 s); the
+        // second, past it, is asked once.
+        expect(down.probe.asked.filter((u) => u.endsWith("/health"))).toHaveLength(60 / 3 + 1);
         expect(down.probe.asked.filter((u) => u.endsWith(".dev/"))).toHaveLength(1);
         expect(yield* down.documentOf(smoke).pipe(Effect.provide(down.layer))).toMatchObject({
           deploy: { failure: "GET /health answered 500, not 200" },
@@ -413,6 +429,19 @@ describe("Keel's deploy steps", () => {
         const { smoke: never } = yield* Fiber.join(quiet);
         expect(yield* silent.documentOf(never).pipe(Effect.provide(silent.layer))).toMatchObject({
           deploy: { failure: "GET /health never answered: connect timeout" },
+        });
+        // Not up at first, then failing: the failure is the last answer, not the first.
+        const late = world({
+          smoke: (_url, asked) =>
+            asked === 1
+              ? { _tag: "no-answer", error: "connect timeout" }
+              : { _tag: "answered", status: 503, body: "" },
+        });
+        const coming = yield* Effect.forkChild(late.runAll.pipe(Effect.provide(late.layer)));
+        yield* TestClock.adjust(`${SMOKE_BUDGET_MS * 2} millis`);
+        const { smoke: broken } = yield* Fiber.join(coming);
+        expect(yield* late.documentOf(broken).pipe(Effect.provide(late.layer))).toMatchObject({
+          deploy: { failure: "GET /health answered 503, not 200" },
         });
       }),
   );

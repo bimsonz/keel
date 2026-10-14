@@ -3,12 +3,7 @@ import { ConflictSuspected } from "@keeltown/core/domain/verification";
 import { EventEnvelope } from "@keeltown/core/kernel";
 import { DeliveryFailed, type FanOut, PROJECTOR, type Subscriber } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
-import {
-  DeliverJob,
-  decodeExit,
-  deliverInstanceId,
-  EventCodecs,
-} from "../../../rpc/index.ts";
+import { DeliverJob, decodeExit, deliverInstanceId, EventCodecs } from "../../../rpc/index.ts";
 
 /** A Durable Object's `receive`, reached by its address, which is also the object's name. */
 type Receive = (envelopes: unknown) => Promise<unknown>;
@@ -179,7 +174,9 @@ export function probeStart(event: EventEnvelope):
  * Its job names the candidates that landed, in group order. An event that
  * names no advance is acknowledged with the reason, so it never sticks.
  */
-export function deliverStart(event: EventEnvelope):
+export function deliverStart(
+  event: EventEnvelope,
+):
   | { readonly id: string; readonly params: typeof DeliverJob.Encoded }
   | { readonly skipped: string } {
   if (event.type !== "TrunkAdvanced")

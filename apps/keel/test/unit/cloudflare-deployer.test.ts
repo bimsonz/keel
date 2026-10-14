@@ -252,6 +252,22 @@ describe("the Cloudflare Deployer", () => {
             [`POST ${A}/workers/scripts/worker-lite/versions`, { status: 502, body: "<html>" }],
           ]),
         ).toBe("unreachable - Cloudflare answered 502");
+        // Cloudflare's own 5xx, in its error envelope, is still Cloudflare's.
+        expect(
+          yield* failed([
+            ...existing,
+            [
+              `POST ${A}/workers/scripts/worker-lite/versions`,
+              {
+                status: 503,
+                body: {
+                  success: false,
+                  errors: [{ code: 10013, message: "An unknown error has occurred" }],
+                },
+              },
+            ],
+          ]),
+        ).toBe("unreachable 10013 Cloudflare answered 503: An unknown error has occurred");
         expect(
           yield* failed([
             [`GET ${A}/workers/workers/worker-lite`, exists],

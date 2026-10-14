@@ -18,10 +18,13 @@ describe("SmokeProbeFetch", () => {
     () =>
       Effect.gen(function* () {
         const asked: { url: string; init: RequestInit }[] = [];
-        const answer = yield* ask("https://abc-worker.owner.workers.dev/health", async (url, init) => {
-          asked.push({ url, init });
-          return new Response("ok", { status: 302, headers: { location: "https://elsewhere" } });
-        });
+        const answer = yield* ask(
+          "https://abc-worker.owner.workers.dev/health",
+          async (url, init) => {
+            asked.push({ url, init });
+            return new Response("ok", { status: 302, headers: { location: "https://elsewhere" } });
+          },
+        );
         expect(answer).toEqual({ _tag: "answered", status: 302, body: "ok" });
         expect(SMOKE_ANSWER_MS).toBe(10_000);
         expect(asked).toHaveLength(1);
@@ -52,7 +55,10 @@ describe("SmokeProbeFetch", () => {
             else controller.enqueue(new Uint8Array(16 * 1024).fill(97));
           },
         });
-        const capped = yield* ask("https://x.owner.workers.dev/", async () => new Response(endless));
+        const capped = yield* ask(
+          "https://x.owner.workers.dev/",
+          async () => new Response(endless),
+        );
         expect(capped._tag === "answered" ? capped.body.length : 0).toBe(65_536);
         expect(pulled).toBeLessThanOrEqual(6);
       }),

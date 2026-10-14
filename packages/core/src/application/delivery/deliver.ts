@@ -1,10 +1,5 @@
 import { Effect, Option, Result, Schedule } from "effect";
-import type {
-  CandidateId,
-  CommitSha,
-  DeploymentId,
-  ProjectId,
-} from "../../domain/kernel/index.ts";
+import type { CandidateId, CommitSha, DeploymentId, ProjectId } from "../../domain/kernel/index.ts";
 import {
   CredentialStore,
   Deployer,

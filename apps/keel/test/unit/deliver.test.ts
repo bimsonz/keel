@@ -1,12 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { deliverTrunk, type TrunkDelivery } from "@keeltown/core/application/delivery";
 import { type Deployment, DeploymentFailed, DeployTarget } from "@keeltown/core/domain/delivery";
-import {
-  CommitSha,
-  type CredentialId,
-  makeId,
-  type ProjectId,
-} from "@keeltown/core/kernel";
+import { CommitSha, type CredentialId, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CredentialStore, Deployer, DeployTargets } from "@keeltown/core/ports";
 import {
   freshId,
