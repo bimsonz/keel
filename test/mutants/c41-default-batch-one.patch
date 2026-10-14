@@ -1,6 +1,6 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t b12.settings
 # kills: b12.settings-audit
-# why: a project starts with batches of one, so C4.1 is unused until someone sets the size
+# why: a project starts with batches of one, so its lane never batches until someone sets the size
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
 index 89493ac..6888d58 100644
 --- a/packages/core/src/application/integration/project-settings.ts

@@ -1,6 +1,6 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.group-commit"
 # kills: c41.group-commit
-# why: the lane forms a batch of one whatever the project's maxBatchSize, as before C4.1
+# why: the lane forms a batch of one whatever the project's maxBatchSize, as it did before it batched
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
 index 8b5fe91..73d9fbf 100644
 --- a/packages/core/src/application/integration/lane.ts

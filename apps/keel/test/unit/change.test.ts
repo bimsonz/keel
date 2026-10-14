@@ -1417,7 +1417,7 @@ describe("the run an agent's command names", () => {
   );
 });
 
-describe("the conflicts a change's batch keeps apart (C4.1)", () => {
+describe("the conflicts a change's batch keeps apart", () => {
   it.effect(
     "[c41.unsettled] a change's read names each other change it shares a conflict with, on either side, until that conflict is dismissed or resolved",
     () => {

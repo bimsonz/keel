@@ -2034,7 +2034,7 @@ const laneWithOutcomes = (fails: number, passes = 0) => ({
   ],
 });
 
-describe("the Lane batches (C4.1)", () => {
+describe("the Lane's batches", () => {
   it("[c41.size] a lane forms up to the project's maxBatchSize, fewer as its members' recent failure rate rises", () => {
     const lane = laneWithOutcomes;
     expect([0, 1, 2, 3].map((fails) => laneBatchSize(lane(fails), 16))).toEqual([16, 4, 2, 1]);
