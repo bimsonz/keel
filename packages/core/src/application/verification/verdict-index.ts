@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect";
 import type { EvidenceClass, VerdictId } from "../../domain/kernel/index.ts";
 import { type PlanStep, VerdictIssued, VerdictNotFound } from "../../domain/verification/index.ts";
-import { FEED, feedEntry, feedHead, feedPosition } from "../memory/feed.ts";
+import { feedEntry, feedHead, storedAt } from "../memory/feed.ts";
 import { EntityStore, type IndexedVerdict } from "../ports/index.ts";
 import { CITED_AS } from "./verify-candidate.ts";
 
@@ -54,12 +54,15 @@ export function indexVerdicts(
   const head = feedHead(store);
   const to = Math.min(head, from + step);
   for (let at = from + 1; at <= to; at += 1) {
-    const verdictId = verdictOf(store.get(FEED.kind, feedPosition(at)));
+    const verdictId = verdictOf(storedAt(store, at));
     if (verdictId !== undefined) store.put(VERDICT_INDEX.at, verdictId, at);
   }
   if (to > from) store.put(VERDICT_INDEX.indexed.kind, VERDICT_INDEX.indexed.id, to);
   return { to, level: to >= head };
 }
+
+/** Whether the verdict index is level with the feed's head: nothing the feed holds is left to walk. */
+export const verdictsIndexed = (store: Store): boolean => indexedTo(store) >= feedHead(store);
 
 const decodeVerdict = Schema.decodeUnknownOption(VerdictIssued);
 

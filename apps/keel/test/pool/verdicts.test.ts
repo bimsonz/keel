@@ -1,12 +1,17 @@
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { feedHead, recordFeed } from "@keeltown/core/application/memory";
+import { VERDICT_INDEX } from "@keeltown/core/application/verification";
 import type { FlowPlan } from "@keeltown/core/domain/verification";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { PlanStore } from "@keeltown/core/ports";
+import { EntityStore, PlanStore } from "@keeltown/core/ports";
 import { guardedPlan, TEST_DECISION } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PlanStoreR2 } from "../../src/adapters/driven/r2/plan-store.ts";
+import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { PROJECTOR_REFOLD, type ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
 import {
   BASE,
   POOL_ORG,
@@ -22,10 +27,10 @@ import { project as heldProject } from "./project-harness.ts";
 /** The one Projector every object's outbox delivers to. */
 const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName("projector"));
 
-/** A verdict issued in `project`, delivered to the Projector as the lane's outbox would. */
-async function issue(project: ProjectId, evidence: readonly string[], planHash?: string) {
+/** A verdict issued in `project`, as the lane commits it. */
+function issued(project: ProjectId, evidence: readonly string[], planHash?: string) {
   const verdictId = makeId("vrd", ulid());
-  const event = Schema.decodeUnknownSync(EventEnvelope)({
+  return Schema.decodeUnknownSync(EventEnvelope)({
     eventId: makeId("evt", ulid()),
     type: "VerdictIssued",
     entity: { kind: "verdict", id: verdictId },
@@ -44,9 +49,28 @@ async function issue(project: ProjectId, evidence: readonly string[], planHash?:
       ...(planHash === undefined ? {} : { planHash }),
     },
   });
-  await projector().receive([Schema.encodeSync(EventEnvelope)(event)]);
-  return verdictId;
 }
+
+/** A verdict issued in `project`, delivered to the Projector as the lane's outbox would. */
+async function issue(project: ProjectId, evidence: readonly string[], planHash?: string) {
+  const event = issued(project, evidence, planHash);
+  await projector().receive([Schema.encodeSync(EventEnvelope)(event)]);
+  return event.entity.id;
+}
+
+type ProjectorStub = DurableObjectStub<ProjectorDO>;
+
+/** Where a Projector's verdict index stands, where a verdict is in it, and whether its step is armed. */
+const standing = (stub: ProjectorStub, verdictId: string) =>
+  runInDurableObject(stub, (instance: ProjectorDO, state) =>
+    instance["runtime"].runPromise(
+      Effect.map(EntityStore, (store) => ({
+        indexed: store.get(VERDICT_INDEX.indexed.kind, VERDICT_INDEX.indexed.id) ?? 0,
+        at: store.get(VERDICT_INDEX.at, verdictId),
+        armed: armedAlarms(state.storage).some((armed) => armed.reason === PROJECTOR_REFOLD),
+      })),
+    ),
+  );
 
 const stored = async (plan: FlowPlan): Promise<FlowPlan> => {
   await Effect.runPromise(
@@ -63,6 +87,43 @@ async function verdict(verdictId: string, token: string) {
   });
   return { status: response.status, body: await response.json<Record<string, unknown>>() };
 }
+
+describe("the Projector's verdict index", () => {
+  it("[verdict.index-alarm] a Projector woken over a feed its index has not walked arms its step, and its alarm walks it to the head with no read", async () => {
+    const stub = env.PROJECTOR.get(env.PROJECTOR.idFromName(`verdicts:${ulid()}`));
+    const { projectId } = await heldProject();
+    const verdict = issued(projectId, ["failed: x"]);
+    // Recorded as a receipt records it: a receipt never moves the verdict index.
+    const head = await runInDurableObject(stub, (instance: ProjectorDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EntityStore, (store) => {
+          store.transaction(() => recordFeed(store, verdict));
+          return feedHead(store);
+        }),
+      ),
+    );
+    expect(await standing(stub, verdict.entity.id)).toMatchObject({ indexed: 0, at: undefined });
+    await evictDurableObject(stub);
+    await vi.waitFor(
+      async () => {
+        await runDurableObjectAlarm(stub);
+        expect(await standing(stub, verdict.entity.id)).toEqual({
+          indexed: head,
+          at: head,
+          armed: false,
+        });
+      },
+      { timeout: 20_000, interval: 50 },
+    );
+    // Level, it arms nothing when it wakes again.
+    await evictDurableObject(stub);
+    expect(await standing(stub, verdict.entity.id)).toEqual({
+      indexed: head,
+      at: head,
+      armed: false,
+    });
+  });
+});
 
 describe("GET /v1/verdicts/{verdictId}", () => {
   it("[verdict.route] serves a verdict to its project's agent and to a member who reads the project: each line classed by its step, and the plan it was issued under", async () => {

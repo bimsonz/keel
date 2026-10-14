@@ -29,7 +29,11 @@ import { noteVisibility, repairVisibility } from "@keeltown/core/application/int
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
-import { getVerdict } from "@keeltown/core/application/verification";
+import {
+  getVerdict,
+  indexVerdicts,
+  verdictsIndexed,
+} from "@keeltown/core/application/verification";
 import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
@@ -57,7 +61,7 @@ import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 /** Where the Projector counts the nudges it has had. */
 export const NUDGES = { kind: "projector", id: "nudges" } as const;
 
-/** The Projector's own deadline: the next step of the feed's re-fold, due at once. */
+/** The Projector's own deadline: the next step of the feed's re-fold and of its verdict index, due at once. */
 export const PROJECTOR_REFOLD = "projector re-folds the feed";
 
 /**
@@ -66,25 +70,33 @@ export const PROJECTOR_REFOLD = "projector re-folds the feed";
  * nudged; every outbox flush nudges it, the one sanctioned exception to
  * "nothing polls". Until the operation log exists a nudge only counts
  * itself. It does not deliver to itself. Its one deadline of its own re-folds
- * what its feed held before it folded anchors and landings.
+ * what its feed held before it folded anchors and landings, and walks the
+ * feed for the verdict index.
  */
 export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements ProjectorRpc {
   constructor(ctx: DurableObjectState, env: Env) {
     // The directory and the places are for the repairs: the AgentSession and Project DOs write them inline, and this repeats it.
     super(ctx, env, projectorServices(env), { projected: false });
-    // A feed recorded before its anchors and landings were folded is re-folded from this object's own alarm, never from a receipt or a read.
+    // A feed recorded before its anchors and landings were folded is re-folded from this object's own alarm, never from a receipt or a read;
+    // the verdict index walks it from the same alarm, and from a read that misses.
     void ctx.blockConcurrencyWhile(() => this.armRefold());
   }
 
   /**
    * Fixes where the feed's re-fold ends the first time this object wakes with
-   * it, and arms its next step while it is behind, unless one is armed already.
+   * it, and arms its next step while it or the verdict index is behind,
+   * unless one is armed already.
    */
   private async armRefold(): Promise<void> {
-    const { refolded, until } = await this.runtime.runPromise(
-      Effect.map(EntityStore, (store) => store.transaction(() => refoldUntil(store))),
+    const behind = await this.runtime.runPromise(
+      Effect.map(EntityStore, (store) =>
+        store.transaction(() => {
+          const { refolded, until } = refoldUntil(store);
+          return refolded < until || !verdictsIndexed(store);
+        }),
+      ),
     );
-    if (refolded >= until) return;
+    if (!behind) return;
     if (armedAlarms(this.ctx.storage).some((armed) => armed.reason === PROJECTOR_REFOLD)) return;
     await this.stepRefold();
   }
@@ -112,8 +124,12 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     );
     const { from, to, level } = step;
     console.log("projector re-fold step", JSON.stringify({ from, to, at, level }));
+    const verdicts = await this.runtime.runPromise(
+      Effect.map(EntityStore, (store) => store.transaction(() => indexVerdicts(store))),
+    );
+    console.log("projector verdict index step", JSON.stringify({ ...verdicts, at }));
     // This run's own request is on the table until it returns, so the next is armed whatever is there.
-    if (!level) await this.stepRefold();
+    if (!level || !verdicts.level) await this.stepRefold();
   }
 
   async nudge() {
