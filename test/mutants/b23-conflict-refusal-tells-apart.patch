@@ -2,10 +2,10 @@
 # kills: b23.conflicts-audience
 # why: a conflict of a project the caller may not see answers the plain 404 and a missing conflict its own, so a caller tells a hidden project from a conflict that is not there
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 46f99cb8..85a7558a 100644
+index 7c223dbe..9a058100 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -411,8 +411,6 @@ export function refusalResult(
+@@ -437,8 +437,6 @@ export function refusalResult(
      case "NotVisible":
        if (CHANGE_KEYED.has(action))
          return changeNotFound({ requestId }, { changeId: String(Object(input).changeId) });
@@ -13,4 +13,4 @@ index 46f99cb8..85a7558a 100644
 -        return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
        if (action === "Memory_getDecision")
          return decisionNotFound({ requestId }, String(Object(input).decisionId));
-       if (action === "Probes_getProbeSource")
+       if (action === "Views_getVerdict")

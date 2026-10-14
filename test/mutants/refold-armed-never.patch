@@ -2,12 +2,12 @@
 # kills: projector.refold
 # why: a Projector woken over a feed behind its re-fold marks where it ends and never arms the step, so the re-fold never runs
 diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
-index 30789974..4a095e37 100644
+index cfd95f8a..0184b770 100644
 --- a/apps/keel/src/adapters/driving/do/projector.ts
 +++ b/apps/keel/src/adapters/driving/do/projector.ts
-@@ -84,7 +84,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+@@ -98,7 +98,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
      );
-     if (refolded >= until) return;
+     if (!behind) return;
      if (armedAlarms(this.ctx.storage).some((armed) => armed.reason === PROJECTOR_REFOLD)) return;
 -    await this.stepRefold();
    }

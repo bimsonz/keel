@@ -2,11 +2,11 @@
 # kills: b23.probe-source-audience
 # why: a probe's source is decided on the caller's own project whatever project it names, so a public project's probe cannot be read without a token or by a user
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 8d2549b0..5f645608 100644
+index 7c223dbe..c31e1149 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -347,7 +347,7 @@ export const RESOLVERS: Resolvers = {
-   Views_getVerdict: ownProject,
+@@ -369,7 +369,7 @@ export const RESOLVERS: Resolvers = {
+   Views_getVerdict: (input) => verdictProject(input.verdictId),
    Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
    Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
 -  Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
