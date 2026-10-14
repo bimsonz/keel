@@ -1,0 +1,285 @@
+{
+  "run": "lg10s",
+  "seed": 10,
+  "keel": "https://keel.town",
+  "landingsPerMinute": 5.649611118434681,
+  "projects": [
+    {
+      "landingsPerMinute": 2.8248055592173404,
+      "name": "agent-0m08rafzfr0zbf0j/loadgen",
+      "id": "prj_SPASFNYP7M3DJB7EQK9R0QB2ND",
+      "run": "lg10s-p0",
+      "baseCommit": "411e0a85c3d501f987503bd1ed193871568df7e5",
+      "trunkHead": "1eb456db8244d3aab400e963c4feff2e565997ca",
+      "agents": 5,
+      "report": {
+        "agents": 5,
+        "declared": 5,
+        "landed": 5,
+        "bounces": 0,
+        "notLanded": 0,
+        "contentionDensity": 0.4,
+        "reworkRate": 0,
+        "queueMs": {
+          "p50": 38414,
+          "p95": 75920
+        },
+        "preflightMs": {
+          "p50": 1596,
+          "p99": 3891
+        },
+        "trunk": {
+          "promotions": 5,
+          "promotionsPerSecond": 0.047183165046711335,
+          "changesPerGroupCommit": {
+            "mean": 1,
+            "max": 1
+          },
+          "promotionMs": {
+            "p50": 12412,
+            "p95": 20857
+          }
+        }
+      },
+      "trunkBreaks": 0
+    },
+    {
+      "landingsPerMinute": 3.5814480988479676,
+      "name": "agent-0m08rafzfr0zbf0j/loadgen-1",
+      "id": "prj_NDBX5SJNT6094Q1BBT4WK5FSTV",
+      "run": "lg10s-p1",
+      "baseCommit": "6b644b4fc46e8a45f6bb6dceee1e18299f26f4e9",
+      "trunkHead": "0c819b12d68d9ee0e2c0d7580bc4ef3d52ab9ec1",
+      "agents": 5,
+      "report": {
+        "agents": 5,
+        "declared": 5,
+        "landed": 5,
+        "bounces": 0,
+        "notLanded": 0,
+        "contentionDensity": 0.2,
+        "reworkRate": 0,
+        "queueMs": {
+          "p50": 30866,
+          "p95": 55072
+        },
+        "preflightMs": {
+          "p50": 1105,
+          "p99": 4773
+        },
+        "trunk": {
+          "promotions": 5,
+          "promotionsPerSecond": 0.05989028100519847,
+          "changesPerGroupCommit": {
+            "mean": 1,
+            "max": 1
+          },
+          "promotionMs": {
+            "p50": 10884,
+            "p95": 12423
+          }
+        }
+      },
+      "trunkBreaks": 0
+    }
+  ],
+  "verification": "off, the owner's setting; no suite, no guards; this measures coordination and the Trunk, not CI",
+  "lane": "each project's lane forms batches of one (lane.ts formBatch); maxBatchSize is set but not yet read",
+  "maxBatchSize": 16,
+  "keySha256": "1307e80dc1570f7824340c7431570632744e0f920d3450a7e53e84c611a6e637",
+  "endedAt": "2026-10-14T17:25:18.694Z",
+  "timedOut": false,
+  "tokenRefusals": 0,
+  "outcomes": {
+    "landed": 10,
+    "gaveUp": 0,
+    "failed": 0,
+    "reasons": []
+  },
+  "report": {
+    "agents": 10,
+    "declared": 10,
+    "landed": 10,
+    "bounces": 0,
+    "notLanded": 0,
+    "contentionDensity": 0.3,
+    "reworkRate": 0,
+    "queueMs": {
+      "p50": 30866,
+      "p95": 75920
+    },
+    "preflightMs": {
+      "p50": 1444,
+      "p99": 4773
+    },
+    "trunk": {
+      "promotions": 10,
+      "promotionsPerSecond": 0.09436633009342267,
+      "changesPerGroupCommit": {
+        "mean": 1,
+        "max": 1
+      },
+      "promotionMs": {
+        "p50": 11585,
+        "p95": 20857
+      }
+    }
+  },
+  "trunkBreaks": 0,
+  "breaks": [],
+  "bench": {
+    "byKind": {
+      "premise": {
+        "planted": 2,
+        "recalled": 2,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "effect": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "textual": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      },
+      "interaction": {
+        "planted": 0,
+        "recalled": 0,
+        "decoys": 0,
+        "falsePositives": 0
+      }
+    },
+    "unrun": 0,
+    "recall": 1,
+    "falsePositiveRate": null,
+    "passes": {
+      "recall": true,
+      "decoys": false
+    }
+  },
+  "bothLanded": [
+    {
+      "pair": 0,
+      "kind": "premise",
+      "planted": true
+    },
+    {
+      "pair": 10000,
+      "kind": "premise",
+      "planted": true
+    }
+  ],
+  "globalKey": [
+    {
+      "pair": 0,
+      "kind": "premise",
+      "planted": true,
+      "a": 2,
+      "b": 3
+    },
+    {
+      "pair": 10000,
+      "kind": "premise",
+      "planted": true,
+      "a": 6,
+      "b": 7
+    }
+  ],
+  "agents": [
+    {
+      "index": 0,
+      "changeId": "chg_01M4XQ0Z9X42KHZWE2GGK7QMSF",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1444,
+      "project": "loadgen",
+      "global": 0
+    },
+    {
+      "index": 1,
+      "changeId": "chg_01M4XQ0Z9X42KHZWE2GGK7QMSG",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1596,
+      "project": "loadgen",
+      "global": 1
+    },
+    {
+      "index": 2,
+      "changeId": "chg_01M4XQ10HY7J1TVFJSXG0QGV9Q",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1262,
+      "project": "loadgen",
+      "global": 2
+    },
+    {
+      "index": 3,
+      "changeId": "chg_01M4XQ0ZA6BK7JS46T0GSPGS0T",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3451,
+      "project": "loadgen",
+      "global": 3
+    },
+    {
+      "index": 4,
+      "changeId": "chg_01M4XQ0ZA5F787FEXK3KCFRWRE",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 3891,
+      "project": "loadgen",
+      "global": 4
+    },
+    {
+      "index": 0,
+      "changeId": "chg_01M4XQ101FXTFPK3NE2K7Q4HCY",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 4773,
+      "project": "loadgen-1",
+      "global": 5
+    },
+    {
+      "index": 1,
+      "changeId": "chg_01M4XQ101Y5K4FDZSHRRZJX9BN",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 854,
+      "project": "loadgen-1",
+      "global": 6
+    },
+    {
+      "index": 2,
+      "changeId": "chg_01M4XQ0Z2YSBYZWZRHNJ7Q156J",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 4562,
+      "project": "loadgen-1",
+      "global": 7
+    },
+    {
+      "index": 3,
+      "changeId": "chg_01M4XQ0YJR5ASH0FPKAQT64T8S",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1052,
+      "project": "loadgen-1",
+      "global": 8
+    },
+    {
+      "index": 4,
+      "changeId": "chg_01M4XQ0YGEWYV2T5DQ31ZRA51W",
+      "outcome": "landed",
+      "submissions": 1,
+      "declareMs": 1105,
+      "project": "loadgen-1",
+      "global": 9
+    }
+  ]
+}
