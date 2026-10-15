@@ -1,27 +1,19 @@
-// Who has access to a project, as a code host lists a repository's collaborators on its settings: people and
-// agents in one list, an agent marked as one. A project of a person's own namespace is theirs and the agents'
-// they add to it, by Keel's list and its owner's form; an org's is its members', people and agents, whom the
-// org's members page lists and adds.
+// The agents on a project, as a code host lists a repository's collaborators: a row each. A project of a person's
+// own namespace takes agents of its own, by Keel's list and its owner's Invite agent; an org's has the org's,
+// whom the org's People page lists and invites.
 
-import { Button, Input } from "@cloudflare/kumo";
-import { type FormEvent, useMemo, useRef, useState } from "react";
+import { Button, buttonVariants } from "@cloudflare/kumo";
+import { useMemo, useState } from "react";
 import { createAccount } from "../account/account.ts";
-import { Named, declared, said, useListed } from "../account/OrgAgents.tsx";
-import {
-  GRANTS,
-  type Grant,
-  SCOPES,
-  givenOf,
-  removalOf,
-  standingOf,
-} from "../account/orgAgents.ts";
-import { Refusal, SELECT, useAsking } from "../account/parts.tsx";
-import type { ProjectView } from "../contract/keel/index.ts";
+import { useListed } from "../account/OrgAgents.tsx";
+import { SCOPES, type Grant, joinedOf, removalOf } from "../account/orgAgents.ts";
+import { AgentRow, InviteAgent, useSponsored } from "../account/People.tsx";
+import { Refusal, useAsking } from "../account/parts.tsx";
+import { Box, Refused, RowMenu, Rows } from "../account/rows.tsx";
+import type { NamespaceAgent, ProjectView } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
+import { createHttpOrgAgents, createHttpSponsorship } from "../source/http.ts";
 import type { KeelOrgAgents, KeelProjectAgents } from "../source/types.ts";
-
-/** Keel's code, on `/v1`, for a move that wants a passkey sign-in from the last ten minutes. */
-const FRESH_SIGN_IN = "auth.fresh_sign_in_required";
 
 /**
  * The project's three calls, under the shape the list's hook reads: it names a place, and here the place is the
@@ -49,30 +41,23 @@ export function Collaborators({
 }) {
   const agents = useMemo(() => listedBy(invited), [invited]);
   const { listed, unread, read } = useListed(agents, project.id);
-  const [handle, setHandle] = useState("");
-  const [grant, setGrant] = useState<Grant>("work");
+  const sponsorship = useMemo(() => createHttpSponsorship(), []);
+  const sponsored = useSponsored(sponsorship);
   const { busy, refused, ask } = useAsking();
+  const [inviting, setInviting] = useState(false);
   /** What was last asked of Keel here: asked again, as it was, once the reader has signed in afresh. */
-  const last = useRef<(() => Promise<void>) | null>(null);
+  const [last, setLast] = useState<{ asked: () => Promise<void> } | null>(null);
 
   const move = (what: () => Promise<void>): Promise<void> => {
     const asked = async (): Promise<void> => {
       await what();
       await read();
     };
-    last.current = asked;
+    setLast({ asked });
     return ask(asked);
   };
-  const invite = (event: FormEvent): void => {
-    event.preventDefault();
-    const named = handle.trim();
-    void move(async () => {
-      await invited.inviteAgent(named, SCOPES[grant]);
-      setHandle("");
-    });
-  };
-  const again = (): Promise<void> =>
-    ask(async () => {
+  const again = (): void =>
+    void ask(async () => {
       const account = createAccount({ origin: window.location.origin });
       const before = await account.who();
       const signedIn = await account.signInWithPasskey();
@@ -81,114 +66,111 @@ export function Collaborators({
         window.location.reload();
         return;
       }
-      await last.current?.();
+      await last?.asked();
+      setInviting(false);
     });
+  const invite = async (handle: string, grant: Grant): Promise<boolean> => {
+    let sent = false;
+    await move(async () => {
+      await invited.inviteAgent(handle, SCOPES[grant]);
+      sent = true;
+    });
+    return sent;
+  };
+  const menu = (agent: NamespaceAgent) => (
+    <RowMenu
+      label={`Actions for ${agent.handle ?? agent.name}`}
+      disabled={busy}
+      items={[
+        {
+          label: removalOf(agent),
+          danger: true,
+          select: () =>
+            void move(async () => {
+              await invited.removeAgent(agent.id);
+            }),
+        },
+      ]}
+    />
+  );
+  const joined = (listed ?? []).filter((agent) => agent.state === "joined");
+  const pending = (listed ?? []).filter((agent) => agent.state === "invited");
 
-  const owner = project.namespace.handle;
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Collaborators">
-      <h2 className="a-h">Collaborators</h2>
-      <ul className="flex flex-col gap-2" aria-label="Who has access to this project">
-        <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <a className="a-link font-semibold" href={hrefOf({ at: "namespace", handle: owner })}>
-            {owner}
-          </a>
-          <span className="a-chip" data-tone="quiet">
-            owner
-          </span>
-        </li>
-        {(listed ?? []).map((agent) => (
-          <li
-            key={agent.id}
-            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
-          >
-            <div className="flex min-w-0 flex-col">
-              <span className="flex flex-wrap items-center gap-x-2">
-                <Named agent={agent} />
-                <span className="a-chip" data-tone="quiet">
-                  agent
-                </span>
-              </span>
-              {/* Only the project's owner adds one, so a row has nobody's name to tell apart. */}
-              <span className="text-kumo-subtle">
-                {said([declared(agent), givenOf(agent), standingOf(agent)])}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="a-link"
-              disabled={busy}
-              aria-label={`${removalOf(agent)} ${agent.name}`}
-              onClick={() =>
-                void move(async () => {
-                  await invited.removeAgent(agent.id);
-                })
-              }
-            >
-              {removalOf(agent)}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {unread !== null && <Refusal said={unread} />}
-      {listed !== null && listed.length === 0 && (
-        <p className="text-sm text-kumo-default">No agent has been invited to this project.</p>
-      )}
-      <p className="text-sm text-kumo-subtle">
-        You add an agent by its handle. It reads, or reads and works, on this project and on no
-        other of yours, and its questions come to you. It gets nothing until it accepts.
-      </p>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={invite}
-        aria-label="Add an agent to this project"
-      >
-        <Input
-          aria-label="The agent's handle"
-          name="agent"
-          placeholder="its-handle"
-          value={handle}
-          onChange={(event) => setHandle(event.target.value)}
-        />
-        <select
-          className={SELECT}
-          aria-label="What the agent may do on this project"
-          value={grant}
-          onChange={(event) => setGrant(event.target.value === "read" ? "read" : "work")}
-        >
-          {GRANTS.map((offered) => (
-            <option key={offered.grant} value={offered.grant}>
-              {offered.label}
-            </option>
-          ))}
-        </select>
-        <Button type="submit" variant="secondary" disabled={busy || handle.trim() === ""}>
-          Add agent
-        </Button>
-      </form>
-      <Refusal said={refused} />
-      {refused?.code === FRESH_SIGN_IN && (
-        <div>
-          <Button variant="secondary" disabled={busy} onClick={() => void again()}>
-            Sign in again with a passkey
+    <>
+      <Box
+        title="Agents"
+        {...(listed === null ? {} : { count: joined.length })}
+        actions={
+          <Button type="button" size="sm" variant="primary" onClick={() => setInviting(true)}>
+            Invite agent
           </Button>
-        </div>
+        }
+      >
+        <Rows label="Agents on this project">
+          {joined.map((agent) => (
+            <AgentRow key={agent.id} agent={agent} menu={menu(agent)} />
+          ))}
+        </Rows>
+        {listed !== null && joined.length === 0 && (
+          <p className="px-4 py-3 text-sm text-kumo-subtle">No agents</p>
+        )}
+      </Box>
+      {pending.length > 0 && (
+        <Box title="Pending invitations" count={pending.length}>
+          <Rows label="Invitations not yet answered">
+            {pending.map((agent) => (
+              <AgentRow key={agent.id} agent={agent} menu={menu(agent)} />
+            ))}
+          </Rows>
+        </Box>
       )}
-    </section>
+      {unread !== null && <Refusal said={unread} />}
+      {!inviting && <Refused said={refused} busy={busy} again={again} />}
+      {inviting && (
+        <InviteAgent
+          invite={invite}
+          sponsored={sponsored}
+          listed={listed ?? []}
+          busy={busy}
+          refused={refused}
+          again={again}
+          close={() => setInviting(false)}
+        />
+      )}
+    </>
   );
 }
 
-/** Who has access to an org's project: its members, people and agents alike, whom its members page lists and adds. */
-export function OrgCollaborators({ org }: { org: string }) {
+/** The agents on an org's project: the org's, as Keel lists them to a member, invited on the org's People page. */
+export function OrgAgentsOf({ org }: { org: string }) {
+  const agents = useMemo(() => createHttpOrgAgents(), []);
+  const { listed, unread } = useListed(agents, org);
+  const joined = listed === null ? [] : joinedOf(listed);
   return (
-    <section className="a-panel flex flex-col gap-2 p-4" aria-label="Collaborators">
-      <h2 className="a-h">Collaborators</h2>
-      <p className="text-sm text-kumo-default">
-        Everyone in {org} has access to this project, its people and its agents alike.{" "}
-        <a className="a-link" href={hrefOf({ at: "org", org, tab: "members" })}>
-          See who, and add an agent, on {org}'s members page
-        </a>
-      </p>
-    </section>
+    <>
+      <Box
+        title="Agents"
+        {...(listed === null ? {} : { count: joined.length })}
+        actions={
+          <a
+            className={buttonVariants({ variant: "secondary", size: "sm" })}
+            href={hrefOf({ at: "org", org, tab: "members" })}
+          >
+            Manage
+          </a>
+        }
+      >
+        <Rows label="Agents on this project">
+          {joined.map((agent) => (
+            <AgentRow key={agent.id} agent={agent} />
+          ))}
+        </Rows>
+        {listed !== null && joined.length === 0 && (
+          <p className="px-4 py-3 text-sm text-kumo-subtle">No agents</p>
+        )}
+      </Box>
+      {unread !== null && <Refusal said={unread} />}
+    </>
   );
 }

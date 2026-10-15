@@ -1,8 +1,8 @@
-// A project's Cloudflare accounts, on its settings, for the owner of its namespace: the deploy targets Keel holds
-// for it, and Continue with Cloudflare, which sends the owner to Cloudflare's consent screen to tick one account.
-// Keel's callback makes an API token of its own on that account, which may only edit its Workers, stores it as a
-// credential of the project's namespace and sets the target with it, then sends the owner back here with how it
-// went. The section is that one button, the connected account and how the last Connect went.
+// A project's Cloudflare account, under its settings' Integrations, for the owner of its namespace, as a code host lists an installed app: a box
+// with Connect to Cloudflare in its header and a row for each deploy target Keel holds. Connect sends the owner of
+// the project's namespace to Cloudflare's consent screen to tick one account; Keel's callback makes an API token
+// of its own there, which may only edit its Workers, stores it as a credential of the namespace and sets the
+// target with it, then sends the owner back with how it went.
 
 import { CloudflareLogo } from "@cloudflare/kumo";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
@@ -10,13 +10,13 @@ import { useStored } from "../account/Credentials.tsx";
 import {
   CONNECT_SAID,
   FIRST_TARGET,
-  PROVIDER,
   TOKENS_PAGE,
   credentialOf,
   outcomeIn,
   refusedAtIn,
 } from "../account/credentials.ts";
 import { Refusal, type Said, saidOf, useAsking } from "../account/parts.tsx";
+import { Box, Row, RowMenu, Rows } from "../account/rows.tsx";
 import type { DeployTargetView, ProjectView } from "../contract/keel/index.ts";
 import { KeelRefused, type KeelCredentials, type KeelDeployTargets } from "../source/types.ts";
 
@@ -69,6 +69,20 @@ function useOutcome() {
   return { outcome, refusedAt };
 }
 
+/** Cloudflare's own button: its mark in white on its orange, and its words. */
+function ConnectButton({ busy }: { busy: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={busy}
+      className="inline-flex h-8 items-center gap-2 rounded-md bg-[#F38020] px-3 text-sm font-semibold text-white hover:bg-[#E06D10] disabled:opacity-60"
+    >
+      <CloudflareLogo variant="glyph" color="white" className="h-4 w-auto" aria-hidden />
+      Connect to Cloudflare
+    </button>
+  );
+}
+
 export function CloudflareTargets({
   project,
   targets,
@@ -78,12 +92,9 @@ export function CloudflareTargets({
   targets: KeelDeployTargets;
   credentials: KeelCredentials;
 }) {
-  const handle = project.namespace.handle;
   const connected = useTargets(targets);
-  const stored = useStored(credentials, handle);
+  const stored = useStored(credentials, project.namespace.handle);
   const { outcome, refusedAt } = useOutcome();
-  // The target a project's .keel/deploy.json names first: Connect sets it, and asks for no name.
-  const name = FIRST_TARGET;
   const { busy, refused, ask } = useAsking();
   // Connecting an account is optional configuration of an instance: one without an OAuth client says so plainly.
   const [unset, setUnset] = useState(false);
@@ -92,7 +103,8 @@ export function CloudflareTargets({
     event.preventDefault();
     void ask(async () => {
       try {
-        window.location.assign(await targets.beginConnect(name));
+        // The target a project's .keel/deploy.json names first: Connect sets it, and asks for no name.
+        window.location.assign(await targets.beginConnect(FIRST_TARGET));
       } catch (error) {
         if (!(error instanceof KeelRefused) || error.code !== "cloudflare.not_configured")
           throw error;
@@ -103,91 +115,88 @@ export function CloudflareTargets({
   const said = outcome === undefined ? undefined : CONNECT_SAID[outcome];
 
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Cloudflare">
-      <h2 className="a-h">Cloudflare</h2>
-      {said !== undefined && (
-        <output
-          aria-label="How connecting went"
-          className={`block text-sm ${said.ok ? "text-kumo-strong" : "text-kumo-danger"}`}
-        >
-          {said.said}
-          {refusedAt !== undefined && ` (${refusedAt})`}
-        </output>
-      )}
-      {connected.unread !== null && <Refusal said={connected.unread} />}
-      {connected.listed !== null && connected.listed.length === 0 && (
-        <p className="text-sm text-kumo-default">No connected accounts</p>
-      )}
-      {connected.listed !== null && connected.listed.length > 0 && (
-        <ul className="flex flex-col gap-2" aria-label="Connected accounts">
-          {connected.listed.map((target) => {
+    <>
+      <Box
+        title="Cloudflare"
+        actions={
+          <form onSubmit={consent} aria-label="Connect a Cloudflare account">
+            <ConnectButton busy={busy} />
+          </form>
+        }
+      >
+        {said !== undefined && (
+          <output
+            aria-label="How connecting went"
+            className={`block border-b border-kumo-hairline px-4 py-3 text-sm ${said.ok ? "text-kumo-strong" : "text-kumo-danger"}`}
+          >
+            {said.said}
+            {refusedAt !== undefined && ` (${refusedAt})`}
+          </output>
+        )}
+        <Rows label="Connected accounts">
+          {(connected.listed ?? []).map((target) => {
             const credential = credentialOf(target, stored.listed ?? []);
             return (
-              <li
+              <Row
                 key={target.name}
-                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
-              >
-                <div className="flex min-w-0 flex-col">
-                  <span className="a-mono font-semibold text-kumo-strong">{target.name}</span>
-                  <span className="text-kumo-subtle [overflow-wrap:anywhere]">
-                    {PROVIDER[target.provider]} account{" "}
-                    <span className="a-mono">{target.accountId}</span>
-                    {target.workersDev !== undefined && (
-                      <>
-                        {" "}
-                        · Previews <span className="a-mono">{target.workersDev}</span>
-                      </>
-                    )}
+                label={target.name}
+                avatar={
+                  <span
+                    aria-hidden
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[#F38020]"
+                  >
+                    <CloudflareLogo variant="glyph" color="white" className="h-3.5 w-auto" />
                   </span>
-                  {stored.listed !== null && (
-                    <span className="text-kumo-subtle [overflow-wrap:anywhere]">
-                      {credential === undefined
-                        ? "Token: removed, connect again"
-                        : `Token: ${credential.label}`}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="a-link"
-                  disabled={busy}
-                  aria-label={`Remove the target ${target.name}`}
-                  onClick={() =>
-                    void ask(async () => {
-                      await targets.clearTarget(target.name);
-                      await connected.read();
-                    })
-                  }
-                >
-                  Remove
-                </button>
-              </li>
+                }
+                title={<span className="a-mono font-semibold text-kumo-strong">{target.name}</span>}
+                meta={[
+                  target.workersDev === undefined ? undefined : `Previews ${target.workersDev}`,
+                  stored.listed === null
+                    ? undefined
+                    : credential === undefined
+                      ? "Token removed: connect again"
+                      : `Token ${credential.label}`,
+                ]
+                  .filter((part) => part !== undefined)
+                  .join(" · ")}
+                menu={
+                  <RowMenu
+                    label={`Actions for ${target.name}`}
+                    disabled={busy}
+                    items={[
+                      {
+                        label: "Remove",
+                        danger: true,
+                        select: () =>
+                          void ask(async () => {
+                            await targets.clearTarget(target.name);
+                            await connected.read();
+                          }),
+                      },
+                    ]}
+                  />
+                }
+              />
             );
           })}
-        </ul>
-      )}
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={consent}
-        aria-label="Connect a Cloudflare account"
-      >
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex h-8 items-center gap-2 rounded-md bg-[#F38020] px-3 text-sm font-semibold text-white hover:bg-[#E06D10] disabled:opacity-60"
-        >
-          <CloudflareLogo variant="glyph" color="white" className="h-4 w-auto" aria-hidden />
-          Connect to Cloudflare
-        </button>
-      </form>
-      {unset && <p className="text-sm text-kumo-default">Not available on this instance</p>}
-      <Refusal said={refused} />
-      {stored.unread !== null && <Refusal said={stored.unread} />}
-      <p className="text-sm">
-        <a className="a-link" href={TOKENS_PAGE} target="_blank" rel="noreferrer">
-          Revoke on Cloudflare
-        </a>
-      </p>
-    </section>
+        </Rows>
+        {connected.listed !== null && connected.listed.length === 0 && (
+          <p className="px-4 py-3 text-sm text-kumo-subtle">No connected accounts</p>
+        )}
+        {(unset || connected.unread !== null || refused !== null || stored.unread !== null) && (
+          <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3">
+            {unset && <p className="text-sm text-kumo-default">Not available on this instance</p>}
+            <Refusal said={connected.unread} />
+            <Refusal said={refused} />
+            <Refusal said={stored.unread} />
+          </div>
+        )}
+        <p className="border-t border-kumo-hairline px-4 py-3 text-sm">
+          <a className="a-link" href={TOKENS_PAGE} target="_blank" rel="noreferrer">
+            Revoke on Cloudflare
+          </a>
+        </p>
+      </Box>
+    </>
   );
 }

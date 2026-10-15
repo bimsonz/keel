@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/patch.test.ts
+# kills: patch.folded
+# why: a diff of thousands of lines is drawn at once, however long it is
+diff --git a/apps/console/src/engine/patch.ts b/apps/console/src/engine/patch.ts
+index c57b4fc1..df15f302 100644
+--- a/apps/console/src/engine/patch.ts
++++ b/apps/console/src/engine/patch.ts
+@@ -33,5 +33,5 @@ export const LARGE = 400;
+ 
+ /** Whether a file's diff waits to be asked for: Keel marked it too large, or it changes more lines than a page should draw at once. */
+ export function folded(file: ChangedFile): boolean {
+-  return file.tooLarge === true || file.additions + file.deletions > LARGE;
++  return file.tooLarge === true;
+ }

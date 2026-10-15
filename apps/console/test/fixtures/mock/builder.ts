@@ -17,7 +17,7 @@ import type {
   VerdictPlan,
   VerdictView,
 } from "../../../src/contract/keel/index.ts";
-import type { ChangeDiff } from "../../../src/source/types.ts";
+import type { FixtureDiff } from "./hunks.ts";
 import { reasonOf } from "./plans.ts";
 
 type EventInput = {
@@ -62,7 +62,7 @@ export interface GeneratedLog {
   observationTimes: number[];
   /** Gates not yet decided. An empty list means the story runs to its end. */
   gates: Gate[];
-  diffs: Map<string, ChangeDiff>;
+  diffs: Map<string, FixtureDiff>;
   probes: Map<string, ProbeSource>;
   /** Each verdict's evidence, as Keel's read model would serve it. */
   verdicts: Map<string, VerdictView>;
@@ -129,7 +129,7 @@ export class ScriptBuilder {
   }[] = [];
   readonly #observations: { t: number; order: number; observation: Observation }[] = [];
   readonly #gates: Gate[] = [];
-  readonly diffs = new Map<string, ChangeDiff>();
+  readonly diffs = new Map<string, FixtureDiff>();
   readonly probes = new Map<string, ProbeSource>();
   readonly verdicts = new Map<string, VerdictView>();
   /** Set by a script whose story has a repository to browse. */

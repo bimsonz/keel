@@ -49,6 +49,8 @@ import type {
 } from "../../../src/contract/keel/index.ts";
 import { RepoRefused } from "../../../src/source/repository.ts";
 import { LATTICES } from "../lattices.ts";
+import type { ChangeDiff } from "../../../src/source/types.ts";
+import { wireDiffOf } from "./hunks.ts";
 import type { GeneratedLog } from "./builder.ts";
 import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
@@ -1758,6 +1760,16 @@ export function createFakeKeel(
         if (!visible || (asked !== null && asked !== project.id)) return gone();
         const source = log.probes.get(decodeURIComponent(probeSource[1] ?? ""));
         return source === undefined ? gone() : Response.json(source satisfies ProbeSource);
+      }
+
+      // A change's diff, file by file in unified hunks, to whoever its project is shown to.
+      const changeDiff = /^\/v1\/changes\/([^/]+)\/diff$/.exec(url.pathname);
+      if (changeDiff !== null && request.method === "GET") {
+        if (!visible) return gone();
+        const diff = log.diffs.get(decodeURIComponent(changeDiff[1] ?? ""));
+        return diff === undefined
+          ? problem(404, "resource.not_found")
+          : Response.json(wireDiffOf(diff) satisfies ChangeDiff);
       }
 
       if (url.pathname === "/v1/lattices" && request.method === "GET")

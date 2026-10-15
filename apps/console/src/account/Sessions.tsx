@@ -5,6 +5,7 @@ import { Button } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import type { Account, OwnSession } from "./account.ts";
 import { Refusal, saidOf, useAsking } from "./parts.tsx";
+import { Box } from "./rows.tsx";
 import { rowsOf } from "./sessions.ts";
 
 export function Sessions({ account, onSignedOut }: { account: Account; onSignedOut: () => void }) {
@@ -48,16 +49,45 @@ export function Sessions({ account, onSignedOut }: { account: Account; onSignedO
   };
 
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Sessions">
-      <h2 className="a-h">Sessions</h2>
-      <p className="text-sm text-kumo-subtle">
-        Each browser and terminal signed in as you. Agents are not signed in as you, and are not
-        listed or touched here.
-      </p>
-      <Refusal said={unread} />
-      <ul className="flex flex-col gap-2" aria-label="Your sessions">
+    <Box
+      title="Sessions"
+      {...(sessions === null ? {} : { count: sessions.length })}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() =>
+              void ask(() =>
+                after(async () => {
+                  await account.signOutElsewhere();
+                  setEnded(true);
+                }),
+              )
+            }
+          >
+            Sign out everywhere else
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() =>
+              void ask(async () => {
+                await account.signOut();
+                onSignedOut();
+              })
+            }
+          >
+            Sign out
+          </Button>
+        </div>
+      }
+    >
+      <ul className="divide-y divide-kumo-hairline" aria-label="Your sessions">
         {rowsOf(sessions ?? []).map((row) => (
-          <li key={row.id} className="flex items-start justify-between gap-3 text-sm">
+          <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
             <div className="flex min-w-0 flex-col">
               <span className="text-kumo-strong" title={row.userAgent}>
                 {row.device}
@@ -81,36 +111,13 @@ export function Sessions({ account, onSignedOut }: { account: Account; onSignedO
           </li>
         ))}
       </ul>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="secondary"
-          disabled={busy}
-          onClick={() =>
-            void ask(() =>
-              after(async () => {
-                await account.signOutElsewhere();
-                setEnded(true);
-              }),
-            )
-          }
-        >
-          Sign out everywhere else
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={busy}
-          onClick={() =>
-            void ask(async () => {
-              await account.signOut();
-              onSignedOut();
-            })
-          }
-        >
-          Sign out
-        </Button>
-      </div>
-      {ended && <p className="text-sm text-kumo-default">Every other session is ended.</p>}
-      <Refusal said={refused} />
-    </section>
+      {(unread !== null || refused !== null || ended) && (
+        <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3">
+          <Refusal said={unread} />
+          {ended && <p className="text-sm text-kumo-default">Every other session is ended.</p>}
+          <Refusal said={refused} />
+        </div>
+      )}
+    </Box>
   );
 }

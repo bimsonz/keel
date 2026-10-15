@@ -12,7 +12,7 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { CodeDiff } from "./later.tsx";
+import { FilesChanged } from "./FilesChanged.tsx";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
 import type {
   ChangePageState,
@@ -1471,25 +1471,14 @@ export function Change({
             )}
           </p>
         ) : (
-          <>
-            <p className="a-num text-sm text-kumo-subtle">
-              {diff.files.length} {diff.files.length === 1 ? "file" : "files"} ·{" "}
-              <span style={{ color: "var(--a-pass-ink)" }}>+{diff.additions}</span>{" "}
-              <span style={{ color: "var(--a-fail-ink)" }}>−{diff.deletions}</span> · notes are
-              pinned to the lines they are about
-            </p>
-            {diff.files.map((file) => (
-              <section key={file.path} className="a-panel overflow-hidden" aria-label={file.path}>
-                <CodeDiff
-                  file={file}
-                  annotations={diff.annotations}
-                  mode={mode}
-                  renderAnnotation={renderNote}
-                  className="a-code"
-                />
-              </section>
-            ))}
-          </>
+          <FilesChanged
+            files={diff.files}
+            additions={diff.additions}
+            deletions={diff.deletions}
+            annotations={diff.annotations}
+            mode={mode}
+            renderAnnotation={renderNote}
+          />
         ))}
     </Detail>
   );

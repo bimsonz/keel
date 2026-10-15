@@ -6,6 +6,7 @@
 // seeking live above it, so the mock needs no timers and the real stream needs
 // no changes to the views.
 
+import type { ChangedFile } from "../contract/diff.ts";
 import type { AnyEvent } from "../contract/events.ts";
 import type * as Keel from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
@@ -91,12 +92,13 @@ export interface KeelEventSource {
   readObservations(request?: ReadRequest): Promise<Page<Observation>>;
 }
 
+/** Keel's diff of a change: the files its commit alters against the trunk it was made on. */
+export type { ChangedFile, DiffHunk, DiffLine } from "../contract/diff.ts";
+
 export interface ChangeDiff {
-  changeId: string;
-  commit: string;
-  files: { path: string; before: string | null; after: string | null }[];
-  /** Code tied to subjects: where a proposition is anchored. */
-  anchors: {
+  files: ChangedFile[];
+  /** Code tied to subjects, where a proposition is anchored: a test fixture's alone (`src/contract/provisional.ts`). */
+  anchors?: {
     path: string;
     symbol?: string;
     line: number;

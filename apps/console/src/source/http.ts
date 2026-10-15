@@ -628,8 +628,11 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         FOREVER,
         signal,
       ),
-    getDiff: (changeId: string): Promise<ChangeDiff> =>
-      Promise.reject(new Error(`the API has no diff endpoint yet (${changeId})`)),
+    async getDiff(changeId: string, signal?: AbortSignal): Promise<ChangeDiff> {
+      const response = await read(`/v1/changes/${encodeURIComponent(changeId)}/diff`, signal);
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ChangeDiff>(response);
+    },
     async getProbeSource(probeId: string, signal?: AbortSignal): Promise<ProbeSource> {
       // The operation's own input: the probe in the path, and the project it is a probe of.
       const { probeId: id, ...query }: Probes_getProbeSourceInput = {

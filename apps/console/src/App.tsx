@@ -189,7 +189,7 @@ function Page({ route, mode, project }: { route: Route; mode: Mode; project: Pro
     case "insights":
       return <InsightsPage tab={route.tab} />;
     case "settings":
-      return <SettingsPage project={project} />;
+      return <SettingsPage project={project} section={route.section} />;
     default:
       return <Missing />;
   }

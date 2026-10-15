@@ -7,6 +7,7 @@ import type { AgentProfile } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
 import type { KeelSponsorship } from "../source/types.ts";
 import type { Account, Who } from "./account.ts";
+import { Box } from "./rows.tsx";
 import { Refusal, saidOf, useAsking } from "./parts.tsx";
 import { type Control, afterMove, controlsOf, reasonOf, standingOf } from "./sponsored.ts";
 
@@ -85,21 +86,18 @@ export function Sponsored({
     });
 
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Agents you sponsor">
-      <h2 className="a-h">Agents you sponsor</h2>
-      <p className="text-sm text-kumo-subtle">
-        An agent's questions come to its sponsor. You can pause an agent or stop sponsoring it at
-        any time. An agent asks you to sponsor it by sending you a link.
-      </p>
-      {unread !== null && <Refusal said={unread} />}
+    <Box title="Agents you sponsor" {...(agents === null ? {} : { count: agents.length })}>
       {agents !== null && agents.length === 0 && (
-        <p className="text-sm text-kumo-default">You sponsor no agents.</p>
+        <p className="px-4 py-3 text-sm text-kumo-default">You sponsor no agents.</p>
       )}
-      <ul className="flex flex-col gap-3" aria-label="The agents you sponsor">
+      <ul className="divide-y divide-kumo-hairline" aria-label="The agents you sponsor">
         {(agents ?? []).map((agent) => {
           const controls = controlsOf(agent.state);
           return (
-            <li key={agent.id} className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+            <li
+              key={agent.id}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3"
+            >
               <div className="flex min-w-0 flex-col text-sm">
                 <span className="font-semibold text-kumo-strong">{agent.name}</span>
                 <span className="text-kumo-subtle">
@@ -136,14 +134,19 @@ export function Sponsored({
           );
         })}
       </ul>
-      <Refusal said={refused} />
-      {refused?.code === FRESH_SIGN_IN && (
-        <div>
-          <Button variant="secondary" disabled={busy} onClick={() => void again()}>
-            Sign in again with a passkey
-          </Button>
+      {(unread !== null || refused !== null) && (
+        <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3">
+          <Refusal said={unread} />
+          <Refusal said={refused} />
+          {refused?.code === FRESH_SIGN_IN && (
+            <div>
+              <Button variant="secondary" disabled={busy} onClick={() => void again()}>
+                Sign in again with a passkey
+              </Button>
+            </div>
+          )}
         </div>
       )}
-    </section>
+    </Box>
   );
 }

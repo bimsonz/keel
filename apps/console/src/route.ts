@@ -13,7 +13,7 @@
 //   P/decisions[?subject=<key>]    what was ruled     P/decisions/<D-n>
 //   P/mission-control              the live graph     P/subjects/<key>      with that subject open
 //   P/insights[/funnel|/benchmark]
-//   P/settings                     who may read the project
+//   P/settings[/access|agents|integrations]  the project's settings, General at the bare address
 //
 // `ref` is a commit, or `trunk` for wherever trunk's head is. Nothing here
 // touches the browser: `parse` reads an address and `href` writes one.
@@ -50,7 +50,8 @@ export type Route =
   | { at: "mission-control"; subject?: string }
   | { at: "pipeline" }
   | { at: "insights"; tab: InsightsTab }
-  | { at: "settings" }
+  /** The project's settings: General at the bare address, and each other section at its own. */
+  | { at: "settings"; section?: SettingsSection }
   /** An address that names nothing the console has. */
   | { at: "missing" };
 
@@ -63,6 +64,9 @@ const MISSING: Route = { at: "missing" };
 const CHANGE_TABS: readonly ChangeTab[] = ["overview", "checks", "files", "alternatives"];
 const CONFLICT_TABS: readonly ConflictTab[] = ["overview", "probe", "evidence"];
 const INSIGHTS_TABS: readonly InsightsTab[] = ["trunk", "funnel", "benchmark"];
+/** The sections of a project's settings beside General, as a code host's repository settings have theirs. */
+export const SETTINGS_SECTIONS = ["access", "agents", "integrations"] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 function among<Value extends string>(
   values: readonly Value[],
@@ -160,8 +164,11 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       const tab = among(INSIGHTS_TABS.slice(1), first);
       return tab === undefined || more.length > 0 ? MISSING : { at: "insights", tab };
     }
-    case "settings":
-      return first === undefined ? { at: "settings" } : MISSING;
+    case "settings": {
+      if (first === undefined) return { at: "settings" };
+      const section = among(SETTINGS_SECTIONS, first);
+      return section === undefined || more.length > 0 ? MISSING : { at: "settings", section };
+    }
     default:
       return MISSING;
   }
@@ -232,7 +239,7 @@ function pathOf(route: Route): string[] {
     case "insights":
       return ["insights", ...(route.tab === "trunk" ? [] : [route.tab])];
     case "settings":
-      return ["settings"];
+      return ["settings", ...(route.section === undefined ? [] : [route.section])];
     default:
       return [];
   }

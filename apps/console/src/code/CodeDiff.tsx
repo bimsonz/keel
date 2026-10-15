@@ -1,6 +1,8 @@
-import { File, MultiFileDiff } from "@pierre/diffs/react";
+import { File, MultiFileDiff, PatchDiff } from "@pierre/diffs/react";
 import type { CSSProperties, ReactNode } from "react";
+import type { ChangedFile } from "../contract/diff.ts";
 import type { DiffAnnotation, DiffFile } from "../domain/state.ts";
+import { patchOf } from "../engine/patch.ts";
 import type { Mode } from "../theme/mode.ts";
 
 const THEME = { dark: "pierre-dark", light: "pierre-light" } as const;
@@ -60,6 +62,47 @@ export function CodeDiff({
   if (before !== null)
     return <MultiFileDiff<DiffAnnotation> oldFile={before} newFile={null} {...shared} />;
   return null;
+}
+
+/**
+ * One file of a change as Keel's diff gives it: its hunks drawn as a code host draws a pull request's file, with
+ * line numbers on both sides and additions and deletions coloured. The page draws the file's own header.
+ */
+export function PatchView({
+  file,
+  annotations,
+  mode,
+  renderAnnotation,
+  className,
+}: {
+  file: ChangedFile;
+  annotations: DiffAnnotation[];
+  mode: Mode;
+  renderAnnotation: (annotation: DiffAnnotation) => ReactNode;
+  className?: string;
+}) {
+  return (
+    <PatchDiff<DiffAnnotation>
+      patch={patchOf(file)}
+      options={{
+        theme: THEME,
+        themeType: mode,
+        diffStyle: "unified",
+        overflow: "wrap",
+        disableFileHeader: true,
+      }}
+      lineAnnotations={annotations
+        .filter((annotation) => annotation.path === file.path)
+        .map((annotation) => ({
+          side: annotation.side,
+          lineNumber: annotation.line,
+          metadata: annotation,
+        }))}
+      renderAnnotation={(annotation) => renderAnnotation(annotation.metadata)}
+      disableWorkerPool
+      {...(className === undefined ? {} : { className })}
+    />
+  );
 }
 
 /** Something said beneath one line of a file. */

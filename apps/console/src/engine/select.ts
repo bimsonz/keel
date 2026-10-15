@@ -519,21 +519,9 @@ function viewed(
   };
 }
 
-function changedLines(
-  before: string | null,
-  after: string | null,
-): { additions: number; deletions: number } {
-  const old = new Set((before ?? "").split("\n"));
-  const now = new Set((after ?? "").split("\n"));
-  return {
-    additions: [...now].filter((line) => !old.has(line) && line.trim() !== "").length,
-    deletions: [...old].filter((line) => !now.has(line) && line.trim() !== "").length,
-  };
-}
-
 function annotationsOf(world: World, change: ChangeEntry, diff: ChangeDiff): DiffAnnotation[] {
   const notes: DiffAnnotation[] = [];
-  for (const anchor of diff.anchors) {
+  for (const anchor of diff.anchors ?? []) {
     const subject = world.subjectByKey(anchor.subjectKey);
     const effect = change.effects.find(
       (e) =>
@@ -681,7 +669,6 @@ export function changePageOf(
   const escalation =
     change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
   const diff = resources.diffs.get(change.id);
-  const counts = (diff?.files ?? []).map((file) => changedLines(file.before, file.after));
   const withLabel =
     conflict?.parties
       .filter((id) => id !== change.id)
@@ -818,8 +805,8 @@ export function changePageOf(
       state: diff !== undefined ? "read" : resources.refused.has(change.id) ? "refused" : "reading",
       files: diff?.files ?? [],
       annotations: diff === undefined ? [] : annotationsOf(world, change, diff),
-      additions: counts.reduce((sum, count) => sum + count.additions, 0),
-      deletions: counts.reduce((sum, count) => sum + count.deletions, 0),
+      additions: (diff?.files ?? []).reduce((sum, file) => sum + file.additions, 0),
+      deletions: (diff?.files ?? []).reduce((sum, file) => sum + file.deletions, 0),
     },
     precedents: change.precedents.map((precedent) => ({
       decisionId: precedent.decisionId,

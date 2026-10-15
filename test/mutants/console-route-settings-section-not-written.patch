@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.settings
+# why: a section of a project's settings is written as General's address, so its link leads back to General
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 1bad0843..89a10caa 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -235,7 +235,7 @@ function pathOf(route: Route): string[] {
+     case "insights":
+       return ["insights", ...(route.tab === "trunk" ? [] : [route.tab])];
+     case "settings":
+-      return ["settings", ...(route.section === undefined ? [] : [route.section])];
++      return ["settings"];
+     default:
+       return [];
+   }

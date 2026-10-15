@@ -45,6 +45,16 @@ import { wayToFresh } from "./fresh.ts";
 import { Fork, NewProject } from "./NewProject.tsx";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
+import { Box } from "./rows.tsx";
+import {
+  BrowsersIcon,
+  FingerprintIcon,
+  type Icon,
+  KeyIcon,
+  RobotIcon,
+  UserIcon,
+  WarningIcon,
+} from "@phosphor-icons/react";
 import { Sessions } from "./Sessions.tsx";
 import { Sponsor } from "./Sponsor.tsx";
 import { Sponsored } from "./Sponsored.tsx";
@@ -403,19 +413,15 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
     };
   }, [account]);
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Passkeys">
-      <h2 className="a-h">Passkeys</h2>
-      <p className="text-sm text-kumo-subtle">
-        A passkey signs you in from this device with no code and no password.
-      </p>
+    <Box title="Passkeys" {...(passkeys === null ? {} : { count: passkeys.length })}>
       {passkeys !== null && passkeys.length === 0 && (
-        <p className="text-sm text-kumo-default">You have no passkey yet.</p>
+        <p className="px-4 py-3 text-sm text-kumo-default">You have no passkey yet.</p>
       )}
-      <ul className="flex flex-col gap-1.5" aria-label="Your passkeys">
+      <ul className="divide-y divide-kumo-hairline" aria-label="Your passkeys">
         {(passkeys ?? []).map((passkey) => (
           <li
             key={passkey.id}
-            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm"
           >
             {renaming?.id === passkey.id ? (
               <form
@@ -488,7 +494,7 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
         ))}
       </ul>
       <form
-        className="flex items-end gap-2"
+        className="flex flex-wrap items-end gap-2 border-t border-kumo-hairline px-4 py-3"
         onSubmit={(event) => {
           event.preventDefault();
           const naming = name.trim();
@@ -511,26 +517,40 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
           Add a passkey
         </Button>
       </form>
-      <Refusal said={refused} />
-      {/* Under Keel's sentence, the way this person signs in afresh: a touch of the passkey they have, or with
-          none the sign-in they came by. */}
-      {way === "passkey" && (
-        <div>
-          <Button variant="secondary" disabled={busy} onClick={() => void again()}>
-            Sign in again with a passkey
-          </Button>
+      {refused !== null && (
+        <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3">
+          <Refusal said={refused} />
+          {/* Under Keel's sentence, the way this person signs in afresh: a touch of the passkey they have, or
+              with none the sign-in they came by. */}
+          {way === "passkey" && (
+            <div>
+              <Button variant="secondary" disabled={busy} onClick={() => void again()}>
+                Sign in again with a passkey
+              </Button>
+            </div>
+          )}
+          {way === "sign-in" && (
+            <div>
+              <Button variant="secondary" disabled={busy} onClick={() => void afresh()}>
+                Sign in again
+              </Button>
+            </div>
+          )}
         </div>
       )}
-      {way === "sign-in" && (
-        <div>
-          <Button variant="secondary" disabled={busy} onClick={() => void afresh()}>
-            Sign in again
-          </Button>
-        </div>
-      )}
-    </section>
+    </Box>
   );
 }
+
+/** The sections of a person's settings, as a code host's personal settings sidebar lists them. */
+const ACCOUNT_SECTIONS: readonly { id: string; label: string; Icon: Icon }[] = [
+  { id: "account", label: "Account", Icon: UserIcon },
+  { id: "passkeys", label: "Passkeys", Icon: FingerprintIcon },
+  { id: "sessions", label: "Sessions", Icon: BrowsersIcon },
+  { id: "agents", label: "Agents", Icon: RobotIcon },
+  { id: "credentials", label: "Credentials", Icon: KeyIcon },
+  { id: "danger-zone", label: "Danger zone", Icon: WarningIcon },
+];
 
 function Settings({
   account,
@@ -544,27 +564,55 @@ function Settings({
   who: Who;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-6 py-10">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-semibold text-kumo-strong">Your account</h1>
-        <p className="text-base text-kumo-default">
-          {[who.handle, who.email].filter((part) => part !== undefined).join(" · ")}
-        </p>
-      </header>
-      <Passkeys account={account} who={who} />
-      <Sponsored account={account} sponsorship={sponsorship} who={who} />
-      {/* A person's own namespace is theirs alone, so its credentials are theirs to keep. */}
-      {who.handle !== undefined && (
-        <NamespaceCredentials
-          credentials={credentials}
-          handle={who.handle}
-          readerId={who.id}
-          owner
-          whose="your"
-        />
-      )}
-      <Sessions account={account} onSignedOut={() => go("/")} />
-      <Closing account={account} who={who} />
+    <div className="mx-auto flex w-full max-w-[1012px] flex-col gap-6 px-6 py-8 md:flex-row md:items-start">
+      <nav aria-label="Settings" className="shrink-0 md:sticky md:top-4 md:w-56">
+        <ul className="flex gap-1 overflow-x-auto md:flex-col">
+          {ACCOUNT_SECTIONS.map(({ id, label, Icon }) => (
+            <li key={id}>
+              <a
+                href={`#${id}`}
+                className="flex h-8 items-center gap-2 rounded-md px-2 text-sm whitespace-nowrap text-kumo-default hover:bg-kumo-tint"
+              >
+                <Icon size={16} aria-hidden />
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="flex min-w-0 flex-1 flex-col gap-5">
+        <header id="account" className="flex flex-col gap-1 border-b border-kumo-hairline pb-2">
+          <h1 className="text-xl font-semibold text-kumo-strong">Your account</h1>
+          <p className="text-sm text-kumo-subtle">
+            {[who.handle === undefined ? undefined : `@${who.handle}`, who.email]
+              .filter((part) => part !== undefined)
+              .join(" · ")}
+          </p>
+        </header>
+        <div id="passkeys" className="scroll-mt-4">
+          <Passkeys account={account} who={who} />
+        </div>
+        <div id="sessions" className="scroll-mt-4">
+          <Sessions account={account} onSignedOut={() => go("/")} />
+        </div>
+        <div id="agents" className="scroll-mt-4">
+          <Sponsored account={account} sponsorship={sponsorship} who={who} />
+        </div>
+        {/* A person's own namespace is theirs alone, so its credentials are theirs to keep. */}
+        {who.handle !== undefined && (
+          <div id="credentials" className="scroll-mt-4">
+            <NamespaceCredentials
+              credentials={credentials}
+              handle={who.handle}
+              readerId={who.id}
+              owner
+            />
+          </div>
+        )}
+        <div id="danger-zone" className="scroll-mt-4">
+          <Closing account={account} who={who} />
+        </div>
+      </div>
     </div>
   );
 }

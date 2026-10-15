@@ -53,6 +53,7 @@ import { KEEL_QUICKSTART } from "../own.ts";
 import { NamespaceCredentials } from "./Credentials.tsx";
 import { JoinedAgents } from "./OrgAgents.tsx";
 import { People } from "./People.tsx";
+import { Box, DangerZone, Rows, Setting } from "./rows.tsx";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 import { manages, mayDelete } from "./roles.ts";
 import { type NamespaceTab, TAB_LABEL, tabHref, tabsOf } from "./namespaceTabs.ts";
@@ -439,77 +440,78 @@ function OrgSettings({
   const { busy, refused, ask } = useAsking();
   if (!manages(page.role))
     return (
-      <section className="a-panel p-4">
-        <p className="text-sm text-kumo-subtle">
-          An owner or a maintainer changes an org's settings.
-        </p>
-      </section>
+      <Box title="Profile">
+        <p className="px-4 py-3 text-sm text-kumo-subtle">Owners and maintainers only</p>
+      </Box>
     );
   return (
     <>
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Name">
-        <h2 className="a-h">Name</h2>
-        <p className="text-sm text-kumo-subtle">
-          The handle, <span className="a-mono text-kumo-default">{org.handle}</span>, is in every
-          address under this org and does not change.
-        </p>
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void ask(async () => {
-              await account.renameOrg(org, name.trim());
-              await read();
-            });
-          }}
-        >
-          <Input
-            label="Name"
-            name="name"
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <Button type="submit" variant="secondary" disabled={busy || name.trim() === org.name}>
-            Rename
-          </Button>
-        </form>
-      </section>
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Delete this org">
-        <h2 className="a-h">Delete this org</h2>
-        {page.role === "owner" ? (
-          <form
-            className="flex items-end gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!mayDelete(org, { role: page.role }, typed)) return;
-              void ask(async () => {
-                await account.deleteOrg(org);
-                go(hrefOf({ at: "settings" }));
-              });
-            }}
-          >
-            <Input
-              label={`Type ${org.handle} to delete it, with its members and invitations`}
-              name="confirm"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-            />
-            <Button
-              type="submit"
-              variant="secondary"
-              disabled={busy || !mayDelete(org, { role: page.role }, typed)}
+      <Box title="Profile">
+        <Rows label="Profile">
+          <Setting name="Name">
+            <form
+              className="flex items-end gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void ask(async () => {
+                  await account.renameOrg(org, name.trim());
+                  await read();
+                });
+              }}
             >
-              Delete this org
-            </Button>
-          </form>
-        ) : (
-          <p className="text-sm text-kumo-subtle">Only an owner deletes an org.</p>
-        )}
-      </section>
+              <Input
+                aria-label="Name"
+                name="name"
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <Button type="submit" variant="secondary" disabled={busy || name.trim() === org.name}>
+                Rename
+              </Button>
+            </form>
+          </Setting>
+          <Setting name="Handle" value={<span className="a-mono">{org.handle}</span>} />
+        </Rows>
+      </Box>
       <Refusal said={refused} />
+      {page.role === "owner" && (
+        <DangerZone>
+          <li>
+            <section aria-label="Delete this org" className="flex flex-col gap-3 px-4 py-3">
+              <h3 className="text-sm font-semibold text-kumo-strong">Delete this org</h3>
+              <form
+                className="flex flex-wrap items-end gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!mayDelete(org, { role: page.role }, typed)) return;
+                  void ask(async () => {
+                    await account.deleteOrg(org);
+                    go(hrefOf({ at: "settings" }));
+                  });
+                }}
+              >
+                <Input
+                  label={`Type ${org.handle} to delete it`}
+                  name="confirm"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={typed}
+                  onChange={(event) => setTyped(event.target.value)}
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="!text-kumo-danger"
+                  disabled={busy || !mayDelete(org, { role: page.role }, typed)}
+                >
+                  Delete this org
+                </Button>
+              </form>
+            </section>
+          </li>
+        </DangerZone>
+      )}
     </>
   );
 }
@@ -754,7 +756,6 @@ export function NamespacePages({
           handle={held.org.handle}
           readerId={who.id}
           owner={held.role === "owner"}
-          whose={`${held.org.handle}'s`}
         />
       )}
       {open === "settings" && (

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/patch.test.ts
+# kills: patch.lines
+# why: an added line is drawn as deleted and a deleted one as added
+diff --git a/apps/console/src/engine/patch.ts b/apps/console/src/engine/patch.ts
+index c57b4fc1..bd417378 100644
+--- a/apps/console/src/engine/patch.ts
++++ b/apps/console/src/engine/patch.ts
+@@ -3,7 +3,7 @@
+ 
+ import type { ChangedFile } from "../contract/diff.ts";
+ 
+-const MARK = { context: " ", add: "+", del: "-" } as const;
++const MARK = { context: " ", add: "-", del: "+" } as const;
+ 
+ /** The file's unified patch: git's header for its status, then each hunk's range line and its lines. */
+ export function patchOf(file: ChangedFile): string {

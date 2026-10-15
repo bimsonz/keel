@@ -104,14 +104,25 @@ describe("the console's addresses", () => {
     }
   });
 
-  it("[route.settings] gives a project's settings an address of their own, with nothing under it", () => {
+  it("[route.settings] gives a project's settings an address of their own, General at it and each other section under it, and nothing else under it", () => {
     expect(parse("/acme/demo/settings", "")).toEqual({
       namespace: "acme",
       project: "demo",
       route: { at: "settings" },
     });
     expect(href("acme", "demo", { at: "settings" })).toBe("/acme/demo/settings");
+    for (const section of ["access", "agents", "integrations"] as const) {
+      expect(parse(`/acme/demo/settings/${section}`, "").route).toEqual({
+        at: "settings",
+        section,
+      });
+      expect(href("acme", "demo", { at: "settings", section })).toBe(
+        `/acme/demo/settings/${section}`,
+      );
+      expect(parse(`/acme/demo/settings/${section}/more`, "").route).toEqual({ at: "missing" });
+    }
     expect(parse("/acme/demo/settings/members", "").route).toEqual({ at: "missing" });
+    expect(parse("/acme/demo/settings/general", "").route).toEqual({ at: "missing" });
     // The first segment of that name is the reader's own settings, and nobody's handle.
     expect(parse("/settings", "")).toMatchObject({ namespace: null, project: null });
   });

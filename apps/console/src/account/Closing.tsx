@@ -9,6 +9,7 @@ import { TRUNK, href } from "../route.ts";
 import { type Account, Refused, type Who } from "./account.ts";
 import { NOTHING, type Standing, mayClose } from "./closing.ts";
 import { FRESH_SIGN_IN_REQUIRED, wayToFresh } from "./fresh.ts";
+import { DangerZone } from "./rows.tsx";
 import { Refusal, type Said, go, saidOf } from "./parts.tsx";
 
 interface Answer {
@@ -60,77 +61,80 @@ export function Closing({ account, who }: { account: Account; who: Who }) {
   const { projects, orgs } = refused?.standing ?? NOTHING;
 
   return (
-    <section className="a-panel flex flex-col gap-3 p-4" aria-label="Delete your account">
-      <h2 className="a-h">Delete your account</h2>
-      <p className="text-sm text-kumo-subtle">
-        This cannot be undone. Keel deletes no project with an account: while yours owns one, or is
-        an org's only owner, Keel refuses and names what is in the way.
-      </p>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!mayClose(who, typed)) return;
-          void ask(async () => {
-            await account.deleteAccount();
-            go("/");
-          });
-        }}
-      >
-        <Input
-          label={`Type ${handle} to delete your account`}
-          name="confirm"
-          autoCapitalize="none"
-          spellCheck={false}
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-        />
-        <Button type="submit" variant="secondary" disabled={busy || !mayClose(who, typed)}>
-          Delete your account
-        </Button>
-      </form>
-      {afresh && (
-        <output className="text-sm text-kumo-default">
-          You are signed in again with your passkey.
-        </output>
-      )}
-      {/* Keel's sentence. Its ways forward for an org are drawn beside that org, below, and not twice. */}
-      {refused !== null && (
-        <Refusal said={orgs.length > 0 ? { ...refused.said, next: [] } : refused.said} />
-      )}
-      {projects.length > 0 && (
-        <ul className="flex flex-col gap-1 text-sm" aria-label="Projects your account owns">
-          {projects.map((name) => (
-            <li key={name}>
-              <a
-                className="a-link break-all"
-                href={href(handle, name, { at: "code", kind: "tree", ref: TRUNK, path: "" })}
-              >
-                {handle}/{name}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-      {orgs.length > 0 && (
-        <ul className="flex flex-col gap-1 text-sm" aria-label="Orgs you are the only owner of">
-          {orgs.map((org) => (
-            <li key={org.id} className="flex flex-wrap gap-x-2">
-              <span className="break-all text-kumo-strong">{org.handle}</span>
-              <a className="a-link" href={hrefOf({ at: "org", org: org.handle, tab: "members" })}>
-                {org.next ?? "Members"}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-      {refused?.touch === true && (
-        <div>
-          <Button variant="secondary" disabled={busy} onClick={() => void touch()}>
-            Sign in again with a passkey
-          </Button>
-        </div>
-      )}
-    </section>
+    <DangerZone>
+      <li>
+        <section aria-label="Delete your account" className="flex flex-col gap-3 px-4 py-3">
+          <h3 className="text-sm font-semibold text-kumo-strong">Delete your account</h3>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!mayClose(who, typed)) return;
+              void ask(async () => {
+                await account.deleteAccount();
+                go("/");
+              });
+            }}
+          >
+            <Input
+              label={`Type ${handle} to delete your account`}
+              name="confirm"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+            />
+            <Button type="submit" variant="secondary" disabled={busy || !mayClose(who, typed)}>
+              Delete your account
+            </Button>
+          </form>
+          {afresh && (
+            <output className="text-sm text-kumo-default">
+              You are signed in again with your passkey.
+            </output>
+          )}
+          {/* Keel's sentence. Its ways forward for an org are drawn beside that org, below, and not twice. */}
+          {refused !== null && (
+            <Refusal said={orgs.length > 0 ? { ...refused.said, next: [] } : refused.said} />
+          )}
+          {projects.length > 0 && (
+            <ul className="flex flex-col gap-1 text-sm" aria-label="Projects your account owns">
+              {projects.map((name) => (
+                <li key={name}>
+                  <a
+                    className="a-link break-all"
+                    href={href(handle, name, { at: "code", kind: "tree", ref: TRUNK, path: "" })}
+                  >
+                    {handle}/{name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {orgs.length > 0 && (
+            <ul className="flex flex-col gap-1 text-sm" aria-label="Orgs you are the only owner of">
+              {orgs.map((org) => (
+                <li key={org.id} className="flex flex-wrap gap-x-2">
+                  <span className="break-all text-kumo-strong">{org.handle}</span>
+                  <a
+                    className="a-link"
+                    href={hrefOf({ at: "org", org: org.handle, tab: "members" })}
+                  >
+                    {org.next ?? "Members"}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {refused?.touch === true && (
+            <div>
+              <Button variant="secondary" disabled={busy} onClick={() => void touch()}>
+                Sign in again with a passkey
+              </Button>
+            </div>
+          )}
+        </section>
+      </li>
+    </DangerZone>
   );
 }

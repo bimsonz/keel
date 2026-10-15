@@ -27,7 +27,7 @@ export function Box({
       aria-label={title}
       className="overflow-hidden rounded-lg border border-kumo-line bg-kumo-base"
     >
-      <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-kumo-hairline bg-kumo-tint px-4 py-2">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-kumo-hairline bg-kumo-tint px-4 py-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-kumo-strong">
           {title}
           {count !== undefined && (
@@ -37,7 +37,7 @@ export function Box({
           )}
         </h2>
         {actions}
-      </header>
+      </div>
       {children}
     </section>
   );

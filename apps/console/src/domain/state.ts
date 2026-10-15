@@ -2,6 +2,7 @@
 // every field here is derived from events (or, where the catalogue has no
 // fact yet, from an observation), never invented by a view.
 
+import type { ChangedFile } from "../contract/diff.ts";
 import type {
   DerivedEffect,
   EvidenceClass,
@@ -450,7 +451,8 @@ export interface ChangePageState {
   /** `state`: Keel has answered with it, has not yet, or would not. Until it is read there are no files to count. */
   diff: {
     state: "reading" | "read" | "refused";
-    files: DiffFile[];
+    /** Keel's diff of the change, file by file, as `GET /v1/changes/{id}/diff` answers it. */
+    files: ChangedFile[];
     annotations: DiffAnnotation[];
     additions: number;
     deletions: number;

@@ -18,6 +18,7 @@ const pipeline = () => import("./Pipeline.tsx");
 const PipelineLater = lazy(async () => ({ default: (await pipeline()).Pipeline }));
 const DiffLater = lazy(async () => ({ default: (await code()).CodeDiff }));
 const FileLater = lazy(async () => ({ default: (await code()).CodeFile }));
+const PatchLater = lazy(async () => ({ default: (await code()).PatchView }));
 const MissionLater = lazy(async () => ({ default: (await mission()).MissionCanvas }));
 const MarkdownLater = lazy(async () => ({ default: (await prose()).Markdown }));
 
@@ -56,6 +57,14 @@ export function CodeDiff(props: ComponentProps<typeof DiffLater>) {
   return (
     <Suspense fallback={null}>
       <DiffLater {...props} />
+    </Suspense>
+  );
+}
+
+export function PatchView(props: ComponentProps<typeof PatchLater>) {
+  return (
+    <Suspense fallback={null}>
+      <PatchLater {...props} />
     </Suspense>
   );
 }

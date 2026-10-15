@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/patch.test.ts
+# kills: patch.status
+# why: an added file is said to have come from a file of its own name, not from nothing
+diff --git a/apps/console/src/engine/patch.ts b/apps/console/src/engine/patch.ts
+index c57b4fc1..df1f400d 100644
+--- a/apps/console/src/engine/patch.ts
++++ b/apps/console/src/engine/patch.ts
+@@ -13,7 +13,7 @@ export function patchOf(file: ChangedFile): string {
+   if (file.status === "deleted") head.push("deleted file mode 100644");
+   if (file.status === "renamed") head.push(`rename from ${from}`, `rename to ${file.path}`);
+   head.push(
+-    `--- ${file.status === "added" ? "/dev/null" : `a/${from}`}`,
++    `--- a/${from}`,
+     `+++ ${file.status === "deleted" ? "/dev/null" : `b/${file.path}`}`,
+   );
+   const body = file.hunks.flatMap((hunk) => {

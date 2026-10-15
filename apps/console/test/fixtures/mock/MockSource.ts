@@ -3,6 +3,7 @@
 // one thing that changes it is a ruling, which appends that option's
 // continuation to the log.
 
+import { wireDiffOf } from "./hunks.ts";
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
   NamespaceRef,
@@ -188,7 +189,7 @@ export function createMockSource(options: MockOptions): MockSource {
       const diff = log.diffs.get(changeId);
       return diff === undefined
         ? Promise.reject(new Error(`no diff for ${changeId}`))
-        : Promise.resolve(diff);
+        : Promise.resolve(wireDiffOf(diff));
     },
     getProbeSource(probeId: string): Promise<ProbeSource> {
       const probe = log.probes.get(probeId);

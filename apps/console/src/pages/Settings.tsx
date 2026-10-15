@@ -1,75 +1,281 @@
-// A project's settings: who may read it, and what else Keel holds for it.
-// Keel reads them to a member of the project's namespace and lets a maintainer or
-// an owner replace them. The page shows what Keel answered, offers the change
-// to whoever Keel named a maintainer, and says Keel's refusal in its words.
+// A project's settings, as a code host lays out a repository's: a sidebar of sections, each at its own address
+// and with one purpose. General is what Keel holds for trunk, the upstream an import syncs from, and the Danger
+// zone; Access, the people who may read the project; Agents, the agents on it; Integrations, its Cloudflare
+// account. Keel reads the settings to a member of the project's namespace and lets a maintainer or an owner
+// replace them; what it answers is what the page shows, and a refusal is said in its words.
 
 import { Button, Input } from "@cloudflare/kumo";
-import { useEffect, useState } from "react";
+import {
+  GearIcon,
+  type Icon,
+  PlugsConnectedIcon,
+  RobotIcon,
+  UsersIcon,
+} from "@phosphor-icons/react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Refusal, type Said, saidOf, useAsking } from "../account/parts.tsx";
-import type { NamespaceRef, ProjectSettings, ProjectView } from "../contract/keel/index.ts";
-import { usePlayer } from "../engine/react.tsx";
+import { Box, DangerZone, FormDialog, Rows, Setting, Tag } from "../account/rows.tsx";
+import type { ProjectSettings, ProjectView, UpstreamSync } from "../contract/keel/index.ts";
+import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { Visibility } from "../engine/projects.ts";
-import { maintains, mayPublish, owns, readBy } from "../engine/settings.ts";
+import { branchOf, maintains, mayPublish, owns, readBy, syncedSaid } from "../engine/settings.ts";
+import type { SettingsSection } from "../route.ts";
+import { Link } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
+import { Access } from "./Access.tsx";
 import { CloudflareTargets } from "./Cloudflare.tsx";
-import { Collaborators, OrgCollaborators, invitesHere } from "./Collaborators.tsx";
-import { SyncUpstream } from "./Sync.tsx";
+import { Collaborators, OrgAgentsOf, invitesHere } from "./Collaborators.tsx";
 
-/** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
-function readers(visibility: Visibility, namespace: NamespaceRef): string {
-  if (visibility === "public") return "Anyone reads its code and its log, signed in or not.";
-  return namespace.kind === "org"
-    ? `Only members of ${namespace.handle} read it.`
-    : `Only ${namespace.handle} reads it.`;
-}
+/** The sidebar, as a code host's repository settings have it: General first, at the bare address. */
+const SECTIONS: readonly { section: SettingsSection | undefined; label: string; Icon: Icon }[] = [
+  { section: undefined, label: "General", Icon: GearIcon },
+  { section: "access", label: "Access", Icon: UsersIcon },
+  { section: "agents", label: "Agents", Icon: RobotIcon },
+  { section: "integrations", label: "Integrations", Icon: PlugsConnectedIcon },
+];
 
-/** The rest of what Keel holds for the project, as it answered: shown, and changed nowhere on this page. */
-function Held({ settings }: { settings: ProjectSettings }) {
+function Sidebar({ open }: { open: SettingsSection | undefined }) {
   return (
-    <section
-      className="a-panel flex flex-col gap-3 p-4"
-      aria-label="What Keel holds for this project"
-    >
-      <h2 className="a-h">What Keel holds for this project</h2>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-kumo-subtle">Verification</dt>
-        <dd className="text-kumo-default">
-          {settings.verification === "off"
-            ? "Off: the lane skips verification and marks what lands unverified."
-            : "Required: the lane verifies each batch before it lands."}
-        </dd>
-        <dt className="text-kumo-subtle">Largest batch</dt>
-        <dd className="text-kumo-default">
-          {settings.maxBatchSize.toLocaleString("en-US")}{" "}
-          {settings.maxBatchSize === 1 ? "change" : "changes"}
-        </dd>
-        <dt className="text-kumo-subtle">Protected paths</dt>
-        <dd className="text-kumo-default">
-          {settings.protectedPaths.length === 0 ? (
-            "None"
-          ) : (
-            <ul className="a-mono flex flex-col gap-0.5" aria-label="Protected paths">
-              {settings.protectedPaths.map((glob) => (
-                <li key={glob}>{glob}</li>
-              ))}
-            </ul>
-          )}
-          <p className="text-kumo-subtle">
-            Only Keel changes these. A change that touches one is refused at precheck.
-          </p>
-        </dd>
-      </dl>
-    </section>
+    <nav aria-label="Settings" className="shrink-0 md:w-56">
+      <ul className="flex gap-1 overflow-x-auto md:flex-col">
+        {SECTIONS.map(({ section, label, Icon }) => (
+          <li key={label}>
+            <Link
+              to={section === undefined ? { at: "settings" } : { at: "settings", section }}
+              aria-current={section === open ? "page" : undefined}
+              className="flex h-8 items-center gap-2 rounded-md px-2 text-sm whitespace-nowrap text-kumo-default hover:bg-kumo-tint aria-[current=page]:bg-kumo-fill aria-[current=page]:font-semibold aria-[current=page]:text-kumo-strong"
+            >
+              <Icon size={16} aria-hidden />
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
-export function SettingsPage({ project }: { project: ProjectView }) {
+/** A section's own heading, ruled off from what follows it, as a code host heads each settings page. */
+function Heading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="border-b border-kumo-hairline pb-2 text-xl font-semibold text-kumo-strong">
+      {children}
+    </h2>
+  );
+}
+
+/** Sync from upstream, on an imported project, for its owner: the branch it came from, and the one button. */
+function Upstream({ sync }: { sync: () => Promise<UpstreamSync> }) {
+  const upstream = useSelected((world) => world.trunk.upstream);
+  const [outcome, setOutcome] = useState<UpstreamSync>();
+  const { busy, refused, ask } = useAsking();
+  // Trunk's first entry says whether it was imported, and Keel syncs nothing else.
+  if (upstream === undefined) return null;
+  return (
+    <Box title="Upstream">
+      <Rows label="Upstream">
+        <Setting
+          name={branchOf(upstream.ref)}
+          value={
+            <a className="a-link" href={upstream.url} rel="noreferrer" target="_blank">
+              {upstream.url}
+            </a>
+          }
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={() =>
+              void ask(async () => {
+                setOutcome(undefined);
+                setOutcome(await sync());
+              })
+            }
+          >
+            Sync from upstream
+          </Button>
+        </Setting>
+      </Rows>
+      {(outcome !== undefined || refused !== null) && (
+        <div className="border-t border-kumo-hairline px-4 py-3 text-sm">
+          {outcome !== undefined && (
+            <output className="text-kumo-default">{syncedSaid(outcome)}</output>
+          )}
+          <Refusal said={refused} />
+        </div>
+      )}
+    </Box>
+  );
+}
+
+/** Make public, in a dialog that waits for the project's name: anyone then reads its code and its log. */
+function Publish({
+  project,
+  busy,
+  publish,
+  close,
+}: {
+  project: ProjectView;
+  busy: boolean;
+  publish: () => void;
+  close: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const submit = (event: FormEvent): void => {
+    event.preventDefault();
+    if (mayPublish(project, typed)) publish();
+  };
+  return (
+    <FormDialog
+      open
+      close={close}
+      title={`Make ${project.name} public`}
+      action="Make public"
+      busy={busy}
+      ready={mayPublish(project, typed)}
+      submit={submit}
+    >
+      <Input
+        label={`Type ${project.name} to confirm`}
+        name="confirm"
+        autoCapitalize="none"
+        autoComplete="off"
+        spellCheck={false}
+        value={typed}
+        onChange={(event) => setTyped(event.target.value)}
+      />
+    </FormDialog>
+  );
+}
+
+function General({
+  project,
+  held,
+  change,
+  busy,
+  refused,
+}: {
+  project: ProjectView;
+  held: ProjectSettings;
+  change: (to: Visibility) => Promise<boolean>;
+  busy: boolean;
+  refused: Said | null;
+}) {
+  const { source } = usePlayer();
+  const [publishing, setPublishing] = useState(false);
+  const visibility: Visibility = held.visibility ?? project.visibility;
+  const batch = held.maxBatchSize;
+  return (
+    <>
+      <Heading>General</Heading>
+      <Box title="Project">
+        <Rows label="Project">
+          <Setting name="Name" value={<span className="a-mono">{project.name}</span>} />
+          <Setting
+            name="Visibility"
+            value={<Tag>{visibility === "public" ? "Public" : "Private"}</Tag>}
+          />
+        </Rows>
+      </Box>
+      <Box title="Trunk">
+        <Rows label="Trunk">
+          <Setting name="Verification" value={held.verification === "off" ? "Off" : "Required"} />
+          <Setting
+            name="Max batch size"
+            value={`${batch.toLocaleString("en-US")} ${batch === 1 ? "change" : "changes"}`}
+          />
+          <Setting
+            name="Protected paths"
+            value={
+              held.protectedPaths.length === 0 ? (
+                "None"
+              ) : (
+                <ul className="a-mono flex flex-col gap-0.5" aria-label="Protected paths">
+                  {held.protectedPaths.map((glob) => (
+                    <li key={glob}>{glob}</li>
+                  ))}
+                </ul>
+              )
+            }
+          />
+        </Rows>
+      </Box>
+      {/* Keel syncs an imported trunk for the project's owner alone. */}
+      {source.syncUpstream !== undefined && owns(project) && (
+        <Upstream sync={source.syncUpstream} />
+      )}
+      {maintains(project) && (
+        <DangerZone>
+          <Setting name="Change visibility" value={visibility === "public" ? "Public" : "Private"}>
+            {visibility === "public" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="!text-kumo-danger"
+                disabled={busy}
+                onClick={() => void change("private")}
+              >
+                Make private
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                className="!text-kumo-danger"
+                disabled={busy}
+                onClick={() => setPublishing(true)}
+              >
+                Make public
+              </Button>
+            )}
+          </Setting>
+          {refused !== null && (
+            <li className="px-4 py-3">
+              <Refusal said={refused} />
+            </li>
+          )}
+        </DangerZone>
+      )}
+      {publishing && (
+        <Publish
+          project={project}
+          busy={busy}
+          close={() => setPublishing(false)}
+          publish={() =>
+            void change("public").then((done) => {
+              if (done) setPublishing(false);
+              return done;
+            })
+          }
+        />
+      )}
+    </>
+  );
+}
+
+export function SettingsPage({
+  project,
+  section,
+}: {
+  project: ProjectView;
+  section: SettingsSection | undefined;
+}) {
   const player = usePlayer();
   const { source } = player;
+  // Keel's Connect callback comes back to the bare settings with how it went: that is Integrations' to say.
+  const [arrived] = useState(() => new URLSearchParams(window.location.search).has("cloudflare"));
+  const open = section ?? (arrived ? "integrations" : undefined);
+  useEffect(() => {
+    if (!arrived || section !== undefined) return;
+    // Integrations' own address, once it has read how Connect went and taken that off the address.
+    const address = new URL(window.location.href);
+    address.pathname = `${address.pathname.replace(/\/$/, "")}/integrations`;
+    window.history.replaceState(window.history.state, "", address);
+  }, [arrived, section]);
   const [held, setHeld] = useState<ProjectSettings>();
   const [unread, setUnread] = useState<Said | null>(null);
-  const [typed, setTyped] = useState("");
   const { busy, refused, ask } = useAsking();
 
   useEffect(() => {
@@ -103,119 +309,71 @@ export function SettingsPage({ project }: { project: ProjectView }) {
     return (
       <Column>
         <h1 className="text-xl font-semibold text-kumo-strong">Settings</h1>
-        <section className="a-panel flex flex-col gap-3 p-4" aria-label="Settings">
-          <Refusal said={unread} />
-          <p className="text-sm text-kumo-subtle">
-            {project.namespace.kind === "org"
-              ? `Keel reads a project's settings to the members of ${project.namespace.handle}, and an owner or a maintainer changes them.`
-              : `Keel reads a project's settings to ${project.namespace.handle}, whose project it is.`}
-          </p>
-        </section>
+        <Refusal said={unread} />
       </Column>
     );
   if (held === undefined) return null;
 
-  const visibility: Visibility = held.visibility ?? project.visibility;
   const { putSettings } = source;
-  const change = (to: Visibility): Promise<void> =>
-    ask(async () => {
+  const change = async (to: Visibility): Promise<boolean> => {
+    let done = false;
+    await ask(async () => {
       // Keel replaces the settings whole: what it answered goes back with the one field changed, and what it
       // answers to that is what the page then shows.
       const answered = await putSettings(readBy(held, to));
       setHeld(answered);
       if (answered.visibility !== undefined) player.readBy(answered.visibility);
-      setTyped("");
+      done = true;
     });
+    return done;
+  };
 
   return (
     <Column>
-      <h1 className="text-xl font-semibold text-kumo-strong">Settings</h1>
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Who may read this project">
-        <h2 className="a-h">Who may read this project</h2>
-        <p className="flex flex-wrap items-center gap-2 text-base text-kumo-default">
-          <span className="a-chip" data-tone="quiet">
-            {visibility}
-          </span>
-          {readers(visibility, project.namespace)}
-        </p>
-        {!maintains(project) ? (
-          <p className="text-sm text-kumo-subtle">
-            {project.namespace.kind === "org"
-              ? `An owner or a maintainer of ${project.namespace.handle} changes this.`
-              : `${project.namespace.handle} changes this.`}
-          </p>
-        ) : visibility === "public" ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void change("private")}
-            >
-              Make private
-            </Button>
-            <span className="text-sm text-kumo-subtle">
-              {readers("private", project.namespace)}
-            </span>
-          </div>
-        ) : (
-          <form
-            className="flex flex-wrap items-end gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!mayPublish(project, typed)) return;
-              void change("public");
-            }}
-          >
-            <Input
-              label={`Type ${project.name} to make it public: anyone will read its code and its log`}
-              name="confirm"
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-            />
-            <Button
-              type="submit"
-              variant="secondary"
-              disabled={busy || !mayPublish(project, typed)}
-            >
-              Make public
-            </Button>
-          </form>
-        )}
-        <Refusal said={refused} />
-      </section>
-      {/* Who has access: a person's own project lists its owner and the agents they added; an org's is its members'. */}
-      {source.invited !== undefined && invitesHere(project) && (
-        <Collaborators project={project} invited={source.invited} />
-      )}
-      {project.namespace.kind === "org" && maintains(project) && (
-        <OrgCollaborators org={project.namespace.handle} />
-      )}
-      {/* Where the project deploys is its namespace's owner's to say, and Keel reads it to them alone. */}
-      {source.targets !== undefined &&
-        source.credentials !== undefined &&
-        (owns(project) ? (
-          <CloudflareTargets
-            project={project}
-            targets={source.targets}
-            credentials={source.credentials}
-          />
-        ) : (
-          <section className="a-panel flex flex-col gap-2 p-4" aria-label="Cloudflare">
-            <h2 className="a-h">Cloudflare</h2>
-            <p className="text-sm text-kumo-default">
-              An owner of {project.namespace.handle} connects this project to a Cloudflare account.
-            </p>
-          </section>
-        ))}
-      {/* Keel syncs an imported trunk for the project's owner alone. */}
-      {source.syncUpstream !== undefined && owns(project) && (
-        <SyncUpstream sync={source.syncUpstream} />
-      )}
-      <Held settings={held} />
+      <h1 className="sr-only">Settings</h1>
+      <div className="flex flex-col gap-6 md:flex-row md:items-start">
+        <Sidebar open={open} />
+        <div className="flex min-w-0 flex-1 flex-col gap-5">
+          {open === undefined && (
+            <General project={project} held={held} change={change} busy={busy} refused={refused} />
+          )}
+          {open === "access" && (
+            <>
+              <Heading>Access</Heading>
+              <Access project={project} />
+            </>
+          )}
+          {open === "agents" && (
+            <>
+              <Heading>Agents</Heading>
+              {source.invited !== undefined && invitesHere(project) ? (
+                <Collaborators project={project} invited={source.invited} />
+              ) : project.namespace.kind === "org" ? (
+                <OrgAgentsOf org={project.namespace.handle} />
+              ) : null}
+            </>
+          )}
+          {open === "integrations" && (
+            <>
+              <Heading>Integrations</Heading>
+              {/* Where the project deploys is its namespace's owner's to say, and Keel reads it to them alone. */}
+              {source.targets !== undefined &&
+                source.credentials !== undefined &&
+                (owns(project) ? (
+                  <CloudflareTargets
+                    project={project}
+                    targets={source.targets}
+                    credentials={source.credentials}
+                  />
+                ) : (
+                  <Box title="Cloudflare">
+                    <p className="px-4 py-3 text-sm text-kumo-subtle">Owner only</p>
+                  </Box>
+                ))}
+            </>
+          )}
+        </div>
+      </div>
     </Column>
   );
 }

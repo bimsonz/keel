@@ -151,7 +151,6 @@ describe("the HTTP source", () => {
   it("says plainly what the API cannot give yet", async () => {
     const keel = fakeLog(500);
     const source = createHttpSource(keel.project, { fetch: keel.serve });
-    await expect(source.getDiff("chg_01")).rejects.toThrow("no diff endpoint yet");
     await expect(source.readObservations()).resolves.toEqual({ items: [], nextCursor: "" });
   });
 });

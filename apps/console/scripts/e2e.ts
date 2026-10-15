@@ -430,16 +430,39 @@ expectEqual(
   "Overview | Verification 3 | Files changed 2",
 );
 await parts.filter({ hasText: "Files changed" }).click();
-await page.locator("section.a-panel[aria-label]").first().waitFor();
+await page.locator('main section[id^="diff-"]').first().waitFor();
 expectEqual("change: its files have an address", pathOf(page), "/acme/demo/changes/1/files");
 // A part's address opens that part, from nowhere.
 await page.goto(at("/changes/1/files", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
-await page.locator("section.a-panel[aria-label]").first().waitFor();
+await page.locator('main section[id^="diff-"]').first().waitFor();
 expectEqual(
   "change: its diff, opened cold",
-  String(await page.locator("section.a-panel[aria-label]").count()),
+  String(await page.locator('main section[id^="diff-"]').count()),
   "2",
 );
+/** The Files changed tab as a code host lays it out: the count of files and lines, the tree, and each file's box. */
+const filesTab = async (shown: Page): Promise<string> => {
+  const boxes = shown.locator('main section[id^="diff-"]');
+  const heads = await boxes.evaluateAll((found) =>
+    found.map((box) => (box.firstElementChild?.textContent ?? "").replaceAll(/\s+/g, " ").trim()),
+  );
+  return `${squash(await shown.getByLabel("Files changed", { exact: true }).innerText())} | tree ${(await shown.getByRole("navigation", { name: "Changed files" }).getByRole("button").allInnerTexts()).map(squash).join(", ")} | ${heads.join(" || ")}`;
+};
+expectEqual(
+  "change: Files changed counts the files, lists them in a tree, and heads each file's box with its path and its added and removed lines",
+  await filesTab(page),
+  "2 files changed | tree check.ts, cache.ts | src/authz/check.ts+2 −2 || src/authz/cache.tsAdded+23 −0",
+);
+await shot(page, "files-changed");
+// A file's box folds away from its header, and opens again.
+const firstFile = page.locator('main section[id^="diff-"]').first();
+await firstFile.getByRole("button", { name: /^Collapse / }).click();
+expectEqual(
+  "change: a file's box folds away from its header",
+  `${await firstFile.locator(".a-code").count()} | ${await firstFile.getByRole("button", { name: /^Expand / }).count()}`,
+  "0 | 1",
+);
+await firstFile.getByRole("button", { name: /^Expand / }).click();
 
 // A hosted agent says so.
 await page.goto(at("/changes/1205", "scenario=s2&t=200&play=0"), { waitUntil: "networkidle" });
@@ -2051,19 +2074,24 @@ expectEqual(
   "1 | false true",
 );
 
-// Keel's contract has no way to read a change's diff either. Its page says so, and counts no files.
+// Keel serves a change's diff: the page reads it from Keel's own endpoint, file by file, and counts them in the tab.
 await visitor.goto(`${built}/ada/demo/changes/1/files`, { waitUntil: "domcontentloaded" });
-await visitor.getByText("Keel does not serve this change's diff").waitFor({ timeout: 10_000 });
+await visitor
+  .locator('main section[id^="diff-"]')
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 expectEqual(
-  "built: a diff Keel does not serve is not counted as no files",
-  squash(
+  "built: a change's diff is read from Keel's /v1/changes/{id}/diff and drawn file by file, the tab counting its files",
+  `${await visitor.locator('main section[id^="diff-"]').count()} | ${squash(
     await visitor
       .getByRole("navigation", { name: "Change" })
       .getByRole("link", { name: /Files changed/ })
       .innerText(),
-  ),
-  "Files changed",
+  )} | ${open.calls.some((call) => /^\/v1\/changes\/[^/]+\/diff$/.test(call.path))}`,
+  "2 | Files changed 2 | true",
 );
+await shot(visitor, "files-changed-built");
 
 // An address with a dot in it opens from nowhere, as it does where the console is deployed.
 await visitor.goto(`${built}/ada/demo/subjects/authz.permission-evaluation`, {
@@ -2381,6 +2409,7 @@ expectEqual(
         call.path
           .replace(/\/v1\/agents\/agt_[0-9A-Z]+$/, "/v1/agents/{id}")
           .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
+          .replace(/\/v1\/changes\/[^/]+\/diff$/, "/v1/changes/{id}/diff")
           .replace(/\/v1\/probes\/[^/]+\/source$/, "/v1/probes/{id}/source")
           .replace(
             /\/v1\/namespaces\/[^/]+\/projects\/[^/]+$/,
@@ -2393,7 +2422,7 @@ expectEqual(
   ]
     .toSorted()
     .join(" "),
-  "/v1/agents/{id} /v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree",
+  "/v1/agents/{id} /v1/changes/{id}/diff /v1/events /v1/lattices /v1/namespaces/{handle} /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(
@@ -3496,35 +3525,38 @@ await later.close();
 // ── The project's settings ──
 // Keel holds them. It reads them to Ada as a member of the project's org, and lets her replace them as its owner.
 await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
-const whoReads = person.getByRole("region", { name: "Who may read this project" });
+const whoReads = person.getByRole("region", { name: "Project" });
 await whoReads.waitFor();
 const readersSaid = async (): Promise<string> =>
-  squash(await whoReads.locator("p").first().innerText());
+  squash(await whoReads.getByRole("listitem").nth(1).innerText());
 const frameSaid = async (): Promise<string> =>
   squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "";
 expectEqual(
-  "settings: the page says who may read the project, as Keel holds it, under its own tab",
-  `${pathOf(person)} | ${await readersSaid()} | ${squash(await person.getByRole("navigation", { name: "Project" }).locator('[aria-current="page"]').innerText())}`,
-  "/ada/demo/settings | private Only ada reads it. | Settings",
+  "settings: General says who may read the project, as Keel holds it, under its own tab and the sidebar's first section",
+  `${pathOf(person)} | ${await readersSaid()} | ${squash(await person.getByRole("navigation", { name: "Project" }).locator('[aria-current="page"]').innerText())} | ${(await person.getByRole("navigation", { name: "Settings" }).getByRole("link").allInnerTexts()).map(squash).join(" ")} | ${squash(await person.getByRole("navigation", { name: "Settings" }).locator('[aria-current="page"]').innerText())}`,
+  "/ada/demo/settings | Visibility Private | Settings | General Access Agents Integrations | General",
 );
 expectEqual(
-  "settings: and the rest of what Keel holds for it",
-  squash(
-    await person.getByRole("region", { name: "What Keel holds for this project" }).innerText(),
-  ),
-  "What Keel holds for this project Verification Required: the lane verifies each batch before it lands. Largest batch 8 changes Protected paths infra/** Only Keel changes these. A change that touches one is refused at precheck.",
+  "settings: and the rest of what Keel holds for trunk, a setting a row, with no sentence among them",
+  squash(await person.getByRole("region", { name: "Trunk" }).innerText()),
+  "Trunk Verification Required Max batch size 8 changes Protected paths infra/**",
 );
-const publishing = person.getByRole("button", { name: "Make public" });
+await shot(person, "project-settings");
+const dangerZone = person.getByRole("region", { name: "Danger zone" });
+await dangerZone.getByRole("button", { name: "Make public" }).click();
+const publishDialog = person.getByRole("dialog", { name: "Make demo public" });
+const publishing = publishDialog.getByRole("button", { name: "Make public" });
 expectEqual(
   "settings: making a project public waits for its name to be typed",
   String(await publishing.isDisabled()),
   "true",
 );
-await person.getByLabel(/^Type demo to make it public/).fill("dem");
+await publishDialog.getByLabel("Type demo to confirm").fill("dem");
 expectEqual("settings: and for the whole of it", String(await publishing.isDisabled()), "true");
-await person.getByLabel(/^Type demo to make it public/).fill("demo");
-await shot(person, "project-settings");
+await publishDialog.getByLabel("Type demo to confirm").fill("demo");
+await shot(person, "project-settings-publish");
 await publishing.click();
+await publishDialog.waitFor({ state: "detached" });
 const hiding = person.getByRole("button", { name: "Make private" });
 await hiding.waitFor();
 // The frame is redrawn a moment after the page. It is given that moment, and whatever it then says is compared.
@@ -3537,7 +3569,7 @@ await person
 expectEqual(
   "settings: made public, the page and the frame say what Keel answered",
   `${await readersSaid()} | ${await frameSaid()}`,
-  "public Anyone reads its code and its log, signed in or not. | ada / demo public Fork Live ada",
+  "Visibility Public | ada / demo public Fork Live ada",
 );
 const replaced = shut.calls.filter((call) => call.method === "PUT");
 expectEqual(
@@ -3579,11 +3611,11 @@ expectEqual(
 );
 // Private again is one click.
 await hiding.click();
-await publishing.waitFor();
+await dangerZone.getByRole("button", { name: "Make public" }).waitFor();
 expectEqual(
   "settings: one click makes it private again",
   `${await readersSaid()} | ${await frameSaid()} | ${shut.calls.filter((call) => call.method === "PUT").length}`,
-  "private Only ada reads it. | ada / demo private Fork Live ada | 2",
+  "Visibility Private | ada / demo private Fork Live ada | 2",
 );
 expectEqual(
   "settings: and a visitor is told of it what they are told of a project that is not there",
@@ -4286,7 +4318,7 @@ const setsOf = (keel: FakeKeel, name: string): Call[] =>
   keel.calls.filter(
     (call) => call.method === "PUT" && call.path.endsWith(`/deploy-targets/${name}`),
   );
-await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await person.goto(`${built}/ada/demo/settings/integrations`, { waitUntil: "domcontentloaded" });
 await cloudflareOn(person)
   .getByText("No connected accounts")
   .waitFor({ timeout: 15_000 })
@@ -4340,9 +4372,9 @@ expectEqual(
   "https://dash.cloudflare.com/oauth2/auth?state → /v1/cloudflare/callback?code&state → /ada/demo/settings?cloudflare | Connected",
 );
 expectEqual(
-  "cloudflare: once it is said, the address is the settings' own again",
+  "cloudflare: once it is said, the address is Integrations' own",
   person.url(),
-  `${built}/ada/demo/settings`,
+  `${built}/ada/demo/settings/integrations`,
 );
 const targetRows = cloudflareOn(person)
   .getByRole("list", { name: "Connected accounts" })
@@ -4355,7 +4387,7 @@ await targetRows
 expectEqual(
   "cloudflare: the target is listed as Keel's callback set it, on the account consented to, with its workers.dev subdomain and Keel's own token",
   `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | ${connectsOf(deploying).length} connect, for ${connectsOf(deploying)[0]?.path.split("/").at(-2) ?? "none"} | ${consentsAsked.length} consent | ${deploying.calls.filter((call) => call.path === "/v1/cloudflare/callback").length} callback | ${setsOf(deploying, "production").length} sets from the page`,
-  `production Cloudflare account ${GOOD_ACCOUNT} · Previews ada-previews.workers.dev Token: Keel deploys: ada/demo Remove | 1 connect, for production | 1 consent | 1 callback | 0 sets from the page`,
+  `production Previews ada-previews.workers.dev · Token Keel deploys: ada/demo | 1 connect, for production | 1 consent | 1 callback | 0 sets from the page`,
 );
 // The token is a credential of the namespace: listed on its owner's settings under the label Keel gave it, and
 // removable there. Nothing on that page takes a token.
@@ -4387,7 +4419,7 @@ await credentialsOn(person)
   .getByText("No credential is stored.")
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await person.goto(`${built}/ada/demo/settings/integrations`, { waitUntil: "domcontentloaded" });
 await targetRows
   .first()
   .getByText(/Token/)
@@ -4396,7 +4428,7 @@ await targetRows
 expectEqual(
   "cloudflare: a target whose token was removed says it cannot reach its account, and is listed as Keel keeps it",
   `${(await targetRows.allInnerTexts()).map(squash).join(" || ")} | fields ${await fieldsOf(cloudflareOn(person))}`,
-  `production Cloudflare account ${GOOD_ACCOUNT} · Previews ada-previews.workers.dev Token: removed, connect again Remove | fields none`,
+  `production Previews ada-previews.workers.dev · Token removed: connect again | fields none`,
 );
 // At a phone's width the section's words stay on the screen: each run of text is measured where it is drawn.
 await person.setViewportSize({ width: 390, height: 844 });
@@ -4419,12 +4451,9 @@ expectEqual(
 );
 await shot(person, "cloudflare-phone");
 await person.setViewportSize({ width: 1280, height: 900 });
+await fromMenu(person, "Actions for production", "Remove");
 await cloudflareOn(person)
-  .getByRole("button", { name: "Remove the target production" })
-  .click({ timeout: 15_000 })
-  .catch(() => undefined);
-await cloudflareOn(person)
-  .getByRole("button", { name: "Remove the target production" })
+  .getByRole("button", { name: "Actions for production" })
   .waitFor({ state: "detached", timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
@@ -4501,7 +4530,7 @@ const usedBeforeSignIn = rowSaid(await passkeyRows(newcomer).first().innerText()
 expectEqual(
   "passkey sign-up: signed up and in, by a handle and a passkey, and no address is shown",
   `${squash(await newcomer.locator("header").first().innerText())} | ${squash(await newcomer.locator("main header").innerText())} | ${await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} | ${String((await newcomer.content()).includes("keel.invalid"))}`,
-  "Keel turing | Your account turing | 1 | false",
+  "Keel turing | Your account @turing | 1 | false",
 );
 await newcomer.goto(`${built}/turing`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("heading", { level: 1 }).first().waitFor();
@@ -5721,91 +5750,108 @@ const personal = createFakeKeel({
 });
 // The route put on last is the one that answers: from here Noether's Keel is the one with her own project.
 await asDeployed(noether.context(), { keel: personal, identity: inviting });
-/** A project's settings list who has access to it, as a code host's Collaborators: people and agents in one list. */
-const accessOn = (shown: Page): Locator =>
-  shown.locator('main section[aria-label="Collaborators"]');
-const invitedOn = (shown: Page): Locator =>
-  accessOn(shown).getByRole("list", { name: "Who has access to this project" });
-const accessRows = async (shown: Page): Promise<string[]> =>
-  (await invitedOn(shown).getByRole("listitem").allInnerTexts()).map(squash);
-/** The rows of the agents added, which are all but the owner's. */
-const invitedRows = async (shown: Page): Promise<string[]> =>
-  (await accessRows(shown)).filter((row) => !row.endsWith(" owner"));
+/** A project's Agents settings: the agents on it, as a code host lists a repository's collaborators, a row each. */
+const agentsOn = (shown: Page): Locator => shown.getByRole("region", { name: "Agents" });
+const projectAgentRows = async (shown: Page): Promise<string[]> =>
+  (
+    await shown
+      .getByRole("main")
+      .getByRole("list", { name: /^(Agents on this project|Invitations not yet answered)$/ })
+      .getByRole("listitem")
+      .allInnerTexts()
+  ).map(squash);
 const lastProjectInvitation = (): string =>
   personal.calls.findLast(
     (call) => call.method === "POST" && call.path === `/v1/projects/${personal.project.id}/agents`,
   )?.body ?? "nothing asked";
-await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
-await accessOn(noether)
-  .getByText("No agent has been invited to this project.")
+await noether.goto(`${built}/noether/demo/settings/agents`, { waitUntil: "domcontentloaded" });
+await agentsOn(noether)
+  .getByText("No agents")
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-if ((await accessOn(noether).getByLabel("The agent's handle").count()) > 0) {
-  await accessOn(noether).getByLabel("The agent's handle").fill("tidy-otter");
-  await accessOn(noether)
-    .getByLabel("What the agent may do on this project")
-    .selectOption({ label: "Read" });
-  await accessOn(noether).getByRole("button", { name: "Add agent" }).click();
+const projectAgentDialog = noether.getByRole("dialog", { name: "Invite agent" });
+if ((await agentsOn(noether).getByRole("button", { name: "Invite agent" }).count()) > 0) {
+  await agentsOn(noether).getByRole("button", { name: "Invite agent" }).click();
+  await projectAgentDialog.getByLabel("Agent handle or name").fill("tidy-otter");
+  await projectAgentDialog.getByRole("combobox").selectOption({ label: "Read" });
+  await projectAgentDialog.getByRole("button", { name: "Invite", exact: true }).click();
+  await projectAgentDialog.waitFor({ state: "detached", timeout: 10_000 }).catch(() => undefined);
 }
-await Promise.race([
-  invitedOn(noether).getByText("Tidy Otter").first().waitFor({ timeout: 10_000 }),
-  accessOn(noether).getByRole("alert").first().waitFor({ timeout: 10_000 }),
-]).catch(() => undefined);
+await noether
+  .getByRole("main")
+  .getByText("Tidy Otter")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
 await shot(noether, "project-agents");
 expectEqual(
-  "project agents: the owner invites an agent to her own project by its handle, to read alone, and the row says what Keel answered and nothing of who invited",
-  `${(await invitedRows(noether)).join(" | ") || "nothing listed"} | ${lastProjectInvitation()}`,
-  'Tidy Otter agent Read · Pending Cancel invitation | {"agent":"tidy-otter","scopes":["agent:read"]}',
+  "project agents: the owner invites an agent to her own project by its handle, to read alone, and its row, pending, says what Keel answered and nothing of who invited",
+  `${(await projectAgentRows(noether)).join(" | ") || "nothing listed"} | ${lastProjectInvitation()}`,
+  'Tidy Otter Agent @tidy-otter Read | {"agent":"tidy-otter","scopes":["agent:read"]}',
 );
-// The agent accepts, which is its own call. The project's settings then list who has access: its owner and the
-// agent, each in the same row, the agent marked as one.
+// The agent accepts, which is its own call. The project's Agents then list it, marked as one and linked to its page.
 personal.joins(personal.project.id, OTTER.id);
-await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
-await invitedOn(noether)
+await noether.goto(`${built}/noether/demo/settings/agents`, { waitUntil: "domcontentloaded" });
+await agentsOn(noether)
   .getByText(/Joined/)
   .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 await shot(noether, "project-collaborators");
 expectEqual(
-  "project access: the settings list who has access in one list, the owner and the agent alike, the agent marked as one and linked to its page",
-  `${(await accessRows(noether)).join(" | ") || "nothing listed"} | ${await invitedOn(noether)
+  "project agents: once the agent accepts, the project's Agents list it, marked as one and linked to its page",
+  `${(await projectAgentRows(noether)).join(" | ") || "nothing listed"} | ${await agentsOn(noether)
     .getByRole("link")
     .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href") ?? "").join(" "))
     .catch(() => "no links")}`,
-  `noether owner | Tidy Otter agent Read · Joined ${today} Remove | /noether /tidy-otter`,
+  `Tidy Otter Agent @tidy-otter · Joined ${today} Read | /tidy-otter`,
+);
+// Access lists the people who may read it: on her own project, its owner.
+await noether.goto(`${built}/noether/demo/settings/access`, { waitUntil: "domcontentloaded" });
+const accessOn = (shown: Page): Locator =>
+  shown.getByRole("region", { name: "People with access" });
+await accessOn(noether)
+  .getByRole("listitem")
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await shot(noether, "project-access");
+expectEqual(
+  "project access: a person's own project lists its owner, by name and handle, as a code host lists who has access",
+  `${(await accessOn(noether).getByRole("listitem").allInnerTexts()).map(squash).join(" | ")} | ${String(await accessOn(noether).getByRole("link").first().getAttribute("href"))}`,
+  "N noether @noether Owner | /noether",
 );
 // Ten minutes on, Keel takes no removal from this sign-in, and the page offers the passkey touch that answers it.
 await inviting.age();
-await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
-await invitedOn(noether)
+await noether.goto(`${built}/noether/demo/settings/agents`, { waitUntil: "domcontentloaded" });
+await agentsOn(noether)
   .getByText("Tidy Otter")
   .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-const takeOff = invitedOn(noether).getByRole("button", {
-  name: /^(Remove|Cancel invitation) Tidy Otter$/,
-});
-if ((await takeOff.count()) > 0) await takeOff.click();
-await accessOn(noether)
+await fromMenu(noether, "Actions for tidy-otter", "Remove");
+await noether
+  .getByRole("main")
   .getByRole("alert")
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
-const touchForProject = accessOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
+const touchForProject = noether
+  .getByRole("main")
+  .getByRole("button", { name: "Confirm with passkey" });
 expectEqual(
   "project agents: a removal from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and the agent is still on the project",
-  `${await refusalOn(noether)} | ${await touchForProject.count()} offered | ${(await invitedRows(noether)).length} listed`,
+  `${await refusalOn(noether)} | ${await touchForProject.count()} offered | ${(await projectAgentRows(noether)).length} listed`,
   "This needs a fresh sign-in: a passkey sign-in from the last ten minutes. Sign in again with your passkey, then retry | 1 offered | 1 listed",
 );
 if ((await touchForProject.count()) > 0) await touchForProject.click();
-await accessOn(noether)
-  .getByText("No agent has been invited to this project.")
+await agentsOn(noether)
+  .getByText("No agents")
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
   "project agents: one touch signs in afresh and asks again what Keel refused, and the agent is off the project",
-  `${(await invitedRows(noether)).length} listed | ${await refusalOn(noether)}`,
+  `${(await projectAgentRows(noether)).length} listed | ${await refusalOn(noether)}`,
   "0 listed | no refusal",
 );
 // An org's project takes no invitation of its own: its settings say so, and send a maintainer to the org.
@@ -5823,22 +5869,32 @@ const ofTheOrg = createFakeKeel({
   roleIn: (userId, org) => inviting.roleIn(userId, org),
 });
 await asDeployed(noether.context(), { keel: ofTheOrg, identity: inviting });
-await noether.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
-await noether
-  .getByRole("heading", { name: "Who may read this project" })
+await noether.goto(`${built}/symmetry/demo/settings/access`, { waitUntil: "domcontentloaded" });
+const orgAccess = noether.getByRole("region", { name: "Members" });
+await orgAccess
+  .getByRole("listitem")
+  .nth(1)
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await shot(noether, "project-access-org");
+expectEqual(
+  "project access: an org's project is its members', listed with their roles, and Manage leads to the org's People page",
+  `${(await orgAccess.getByRole("listitem").allInnerTexts()).map(squash).join(" | ")} | ${String(await orgAccess.getByRole("link", { name: "Manage" }).getAttribute("href"))}`,
+  "N noether You @noether Owner | F franklin @franklin Member | /orgs/symmetry/members",
+);
+await noether.goto(`${built}/symmetry/demo/settings/agents`, { waitUntil: "domcontentloaded" });
+await agentsOn(noether)
+  .getByText("No agents")
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
-  "project access: an org's project is its members', people and agents alike, and sends its maintainer to the org's members page to see who and add one",
-  (await accessOn(noether).count()) === 0
-    ? "no section"
-    : `${await accessOn(noether).getByRole("button").count()} buttons | ${String(await accessOn(noether).getByRole("link").first().getAttribute("href"))} | ${squash(await accessOn(noether).innerText())}`,
-  "0 buttons | /orgs/symmetry/members | Collaborators Everyone in symmetry has access to this project, its people and its agents alike. See who, and add an agent, on symmetry's members page",
+  "project agents: an org's project takes no invitation of its own: its Agents are the org's, and Manage leads to the org's People page",
+  `${await agentsOn(noether).getByText("No agents").count()} | ${await agentsOn(noether).getByRole("button", { name: "Invite agent" }).count()} invite | ${String(await agentsOn(noether).getByRole("link", { name: "Manage" }).getAttribute("href"))}`,
+  "1 | 0 invite | /orgs/symmetry/members",
 );
 // Sync from upstream, on the settings of a project imported from a public repository, for its owner alone, as a
 // code host's "Sync fork": upstream named, trunk's head, the action, and what Keel answered.
-const syncOn = (shown: Page): Locator =>
-  shown.locator('main section[aria-label="Sync from upstream"]');
+const syncOn = (shown: Page): Locator => shown.getByRole("region", { name: "Upstream" });
 const syncButton = (shown: Page): Locator =>
   syncOn(shown).getByRole("button", { name: "Sync from upstream" });
 const syncSaid = async (shown: Page): Promise<string> =>
@@ -5853,6 +5909,11 @@ const syncOffered = async (shown: Page): Promise<string> => {
   return `${await syncOn(shown).count()} offered`;
 };
 // The org's project above was made empty, not imported: its owner is offered no sync.
+await noether.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
+await noether
+  .getByRole("region", { name: "Trunk" })
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
 expectEqual(
   "sync: a project that was not imported offers its owner no sync from upstream",
   await syncOffered(noether),
@@ -5903,16 +5964,6 @@ await syncOn(noether)
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 const firstSync = await syncSaid(noether);
-// Keel's feed brings its TrunkSynced, and trunk's row follows it.
-await syncOn(noether)
-  .getByRole("link", { name: UPSTREAM_HEAD.slice(0, 7) })
-  .waitFor({ timeout: 10_000 })
-  .catch(() => undefined);
-const trunkAfter = await syncOn(noether)
-  .locator("dd a")
-  .last()
-  .innerText()
-  .catch(() => "no trunk");
 await shot(noether, "project-sync");
 if ((await syncButton(noether).count()) > 0) await syncButton(noether).click();
 await syncOn(noether)
@@ -5920,13 +5971,13 @@ await syncOn(noether)
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
 expectEqual(
-  "sync: the owner of an imported project is offered a sync from upstream on its settings, naming upstream and trunk, fast-forwards trunk, and asked again it is already up to date",
-  `${offeredSync} | ${firstSync} | trunk ${trunkAfter} | ${await syncSaid(noether)} | ${
+  "sync: the owner of an imported project is offered a sync from upstream on its General settings, naming upstream's branch and address, fast-forwards trunk, and asked again it is already up to date",
+  `${offeredSync} | ${firstSync} | ${await syncSaid(noether)} | ${
     syncing.calls.filter(
       (call) => call.method === "POST" && call.path === `/v1/projects/${syncing.project.id}/sync`,
     ).length
   } asked`,
-  `Sync from upstream Fast-forward trunk to the latest commit on main. Keel refuses if trunk has commits that main does not. Upstream https://github.com/acme/demo main Trunk ${startedAt} Sync from upstream | Fast-forwarded trunk from ${startedAt} to 5f0e1d2. | trunk 5f0e1d2 | Already up to date. | 2 asked`,
+  `Upstream main https://github.com/acme/demo Sync from upstream | Fast-forwarded trunk from ${startedAt} to 5f0e1d2. | Already up to date. | 2 asked`,
 );
 expectEqual(
   "sync: the upstream is linked at its own address, opened apart from the console",
@@ -5939,7 +5990,7 @@ expectEqual(
 // A plain member of the org reads the project's settings, and is offered no sync: Keel takes one from the owner alone.
 await franklin.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
 await franklin
-  .getByRole("heading", { name: "Who may read this project" })
+  .getByRole("region", { name: "Project" })
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 expectEqual(
