@@ -2,12 +2,12 @@
 # kills: swarm.given-brief
 # why: The run's model never reaches its workers: they think with the Worker's own while the run's record names another
 diff --git a/examples/swarm/src/run/dispatch.ts b/examples/swarm/src/run/dispatch.ts
-index 9d661a9e..d657cf6b 100644
+index e84ecca6..647f8a27 100644
 --- a/examples/swarm/src/run/dispatch.ts
 +++ b/examples/swarm/src/run/dispatch.ts
 @@ -39,7 +39,6 @@ export function workerAt(
        keyring,
-       run: run.shape === "one" ? `${run.id}-${index}` : run.id,
+       run: run.shape === "one" ? (run.tasks?.[index]?.label ?? `${run.id}-${index}`) : run.id,
        project: run.project,
 -      ...(run.model === undefined ? {} : { model: run.model }),
      },

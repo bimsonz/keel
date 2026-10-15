@@ -252,6 +252,9 @@ export class Director extends DurableObject<Env> {
       dir: `test/swarm/${run.id}`,
       workers: run.workers,
       label: run.id,
+      ...(run.tasks?.some((t) => t.label !== undefined) === true
+        ? { labels: run.tasks.map((t, i) => t.label ?? `${run.id}-${i}`) }
+        : {}),
     });
     const { slots, ...rest } = run;
     return {

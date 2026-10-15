@@ -66,11 +66,12 @@
   },
   // Email Service's sending: the sign-in codes, from KEEL_MAIL_FROM.
   "send_email": [{ "name": "EMAIL" }],
-  // Workers Rate Limiting, each keyed by IP: writes to /v1/auth/* (sign-in, codes, sign-up),
-  // and token exchanges at /v1/oauth/token.
+  // Workers Rate Limiting. AUTH_LIMIT, keyed by IP: writes to /v1/auth/* (sign-in, codes, sign-up).
+  // TOKEN_LIMIT: token exchanges, counted per agent on each token issued and per address on each
+  // refused exchange (token-limits.ts); 600 a minute, so one agent's many runs fit.
   "ratelimits": [
     { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
-    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
+    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } },
   ],
 
   // Every id below is a sentinel. scripts/deploy.ts writes a gitignored

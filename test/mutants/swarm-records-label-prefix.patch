@@ -2,15 +2,15 @@
 # kills: swarm.records-label
 # why: Run r1's records take in run r10's changes
 diff --git a/examples/swarm/src/run/events.ts b/examples/swarm/src/run/events.ts
-index a230e3f8..94627fbf 100644
+index 129bb7ae..e8007956 100644
 --- a/examples/swarm/src/run/events.ts
 +++ b/examples/swarm/src/run/events.ts
-@@ -60,7 +60,7 @@ export function recordsFrom(
-   const ours = (label: unknown) =>
-     run.label !== undefined &&
-     typeof label === "string" &&
--    (label === run.label || label.startsWith(`${run.label}-`));
-+    (label === run.label || label.startsWith(run.label));
-   /** The worker a label names, `<run>-<index>`, when it names one. */
+@@ -69,7 +69,7 @@ export function recordsFrom(
+     given(label) >= 0 ||
+     (run.label !== undefined &&
+       typeof label === "string" &&
+-      (label === run.label || label.startsWith(`${run.label}-`)));
++      (label === run.label || label.startsWith(run.label)));
+   /** The worker a label names: its place among the run's own labels, or `<run>-<index>`. */
    const workerOf = (label: unknown): number | undefined => {
-     if (run.label === undefined || typeof label !== "string") return undefined;
+     if (given(label) >= 0) return given(label);

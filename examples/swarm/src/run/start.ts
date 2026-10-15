@@ -9,10 +9,15 @@ import * as v from "valibot";
 
 export const Shape = v.picklist(["one", "many"]);
 
-/** A task given with the run: a short title for its report, and the brief its worker is told. */
+/**
+ * A task given with the run: a short title for its report, the brief its worker is told, and
+ * optionally the label its run goes by, which Keel shows beside the run's changes: what the agent
+ * does (`checksha-tests-004`) reads better there than its run's id and number.
+ */
 export const GivenTask = v.strictObject({
   title: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
   brief: v.pipe(v.string(), v.minLength(1), v.maxLength(20_000)),
+  label: v.optional(v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9-]{0,62}$/))),
 });
 export type GivenTask = v.InferOutput<typeof GivenTask>;
 

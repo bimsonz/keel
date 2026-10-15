@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/given.test.ts
+# kills: swarm.given-label
+# why: A given task's label is ignored: Keel's pages name the run by the swarm's id and number, not by what its agent does
+diff --git a/examples/swarm/src/run/dispatch.ts b/examples/swarm/src/run/dispatch.ts
+index e84ecca6..9d661a9e 100644
+--- a/examples/swarm/src/run/dispatch.ts
++++ b/examples/swarm/src/run/dispatch.ts
+@@ -37,7 +37,7 @@ export function workerAt(
+     id: `${run.id}-${index}`,
+     initialData: {
+       keyring,
+-      run: run.shape === "one" ? (run.tasks?.[index]?.label ?? `${run.id}-${index}`) : run.id,
++      run: run.shape === "one" ? `${run.id}-${index}` : run.id,
+       project: run.project,
+       ...(run.model === undefined ? {} : { model: run.model }),
+     },

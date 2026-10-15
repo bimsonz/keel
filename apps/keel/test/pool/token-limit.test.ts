@@ -126,13 +126,13 @@ describe("the token endpoint's rate limit", () => {
     );
   });
 
-  it("[oauth.limit-binding] the Worker's own limiter blocks an address past 60 refused exchanges in a minute", async () => {
+  it("[oauth.limit-binding] the Worker's own limiter blocks an address past 600 refused exchanges in a minute", async () => {
     const stranger = { clientId: "nobody", clientSecret: "not-a-secret" };
-    // The binding's windows follow the wall clock, so 121 exchanges put 61 in one window however they fall.
+    // The binding's windows follow the wall clock, so 1,201 exchanges put 601 in one window however they fall.
     const statuses: number[] = [];
-    while (statuses.length < 121 && statuses.at(-1) !== 429)
+    while (statuses.length < 1201 && statuses.at(-1) !== 429)
       statuses.push((await exchangeFrom(worker, "192.0.2.9", stranger)).status);
-    expect(statuses.indexOf(429)).toBeGreaterThanOrEqual(60);
+    expect(statuses.indexOf(429)).toBeGreaterThanOrEqual(600);
     // The refusal is that address's alone.
     expect((await exchangeFrom(worker, "192.0.2.10", stranger)).status).toBe(401);
   });

@@ -54,15 +54,25 @@ const pathOf = (entry: unknown): string | undefined =>
  */
 export function recordsFrom(
   events: readonly KeelEvent[],
-  run: { readonly dir: string; readonly workers: number; readonly label?: string },
+  run: {
+    readonly dir: string;
+    readonly workers: number;
+    readonly label?: string;
+    /** The labels the run's workers went by, by worker, where the run gave its own. */
+    readonly labels?: readonly string[];
+  },
 ): WorkerRecord[] {
   const prefix = `${run.dir}/`;
+  const given = (label: unknown) =>
+    typeof label === "string" && run.labels !== undefined ? run.labels.indexOf(label) : -1;
   const ours = (label: unknown) =>
-    run.label !== undefined &&
-    typeof label === "string" &&
-    (label === run.label || label.startsWith(`${run.label}-`));
-  /** The worker a label names, `<run>-<index>`, when it names one. */
+    given(label) >= 0 ||
+    (run.label !== undefined &&
+      typeof label === "string" &&
+      (label === run.label || label.startsWith(`${run.label}-`)));
+  /** The worker a label names: its place among the run's own labels, or `<run>-<index>`. */
   const workerOf = (label: unknown): number | undefined => {
+    if (given(label) >= 0) return given(label);
     if (run.label === undefined || typeof label !== "string") return undefined;
     const rest = label.startsWith(`${run.label}-`) ? label.slice(run.label.length + 1) : "";
     return /^\d+$/.test(rest) ? Number(rest) : undefined;

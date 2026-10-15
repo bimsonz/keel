@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/token-limit.test.ts
 # kills: oauth.limit-binding
-# why: the Worker's own limiter lets an address make 600 exchanges a minute where 60 is meant, ten times the guesses at a client secret
+# why: the Worker's own limiter lets an address make 6,000 exchanges a minute where 600 is meant, ten times the guesses at a client secret
 diff --git a/apps/keel/wrangler.jsonc b/apps/keel/wrangler.jsonc
-index 8594289..a062e2b 100644
+index a188c01b..fa6fc0b8 100644
 --- a/apps/keel/wrangler.jsonc
 +++ b/apps/keel/wrangler.jsonc
-@@ -37,7 +37,7 @@
-   // and token exchanges at /v1/oauth/token.
+@@ -71,7 +71,7 @@
+   // refused exchange (token-limits.ts); 600 a minute, so one agent's many runs fit.
    "ratelimits": [
      { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
--    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
-+    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } },
+-    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 600, "period": 60 } },
++    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 6000, "period": 60 } },
    ],
  
    // Every id below is a sentinel. scripts/deploy.ts writes a gitignored

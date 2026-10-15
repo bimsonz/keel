@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit examples/swarm/test/events.test.ts
+# kills: swarm.records-labels
+# why: A run's records ignore the labels it gave: a named run's changes are never counted, and its report says nobody declared
+diff --git a/examples/swarm/src/run/events.ts b/examples/swarm/src/run/events.ts
+index 129bb7ae..4ee95a07 100644
+--- a/examples/swarm/src/run/events.ts
++++ b/examples/swarm/src/run/events.ts
+@@ -64,7 +64,7 @@ export function recordsFrom(
+ ): WorkerRecord[] {
+   const prefix = `${run.dir}/`;
+   const given = (label: unknown) =>
+-    typeof label === "string" && run.labels !== undefined ? run.labels.indexOf(label) : -1;
++    -1;
+   const ours = (label: unknown) =>
+     given(label) >= 0 ||
+     (run.label !== undefined &&

@@ -56,6 +56,30 @@ describe("a run given its tasks", () => {
     ]);
   });
 
+  it("[swarm.given-label] runs each worker under its given task's label, and under the run's id and number where it has none", () => {
+    const labelled = [
+      { title: "a", brief: "a", label: "checksha-tests-004" },
+      { title: "b", brief: "b" },
+    ];
+    const run = {
+      id: "r1",
+      shape: "one",
+      workers: 2,
+      seed: 1,
+      project: "prj_K",
+      tasks: labelled,
+    } as const;
+    expect([0, 1].map((i) => workerAt(run, i, "one")?.initialData.run)).toEqual([
+      "checksha-tests-004",
+      "r1-1",
+    ]);
+    expect(v.safeParse(Start, { ...START, tasks: labelled }).success).toBe(true);
+    expect(
+      v.safeParse(Start, { ...START, tasks: [{ title: "a", brief: "a", label: "Has Spaces" }] })
+        .success,
+    ).toBe(false);
+  });
+
   it("[swarm.planned-brief] starts a run given no tasks on its planned ones, with the Worker's own model", () => {
     const run = { id: "r1", shape: "one", workers: 3, seed: 42, project: "prj_K" } as const;
     const planned = planTasks({ seed: 42, count: 3, run: "r1" })[1];

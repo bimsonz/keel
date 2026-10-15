@@ -37,7 +37,7 @@ export function workerAt(
     id: `${run.id}-${index}`,
     initialData: {
       keyring,
-      run: run.shape === "one" ? `${run.id}-${index}` : run.id,
+      run: run.shape === "one" ? (run.tasks?.[index]?.label ?? `${run.id}-${index}`) : run.id,
       project: run.project,
       ...(run.model === undefined ? {} : { model: run.model }),
     },

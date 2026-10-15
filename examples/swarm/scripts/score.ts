@@ -19,6 +19,7 @@ const { values } = parseArgs({
     run: { type: "string" },
     project: { type: "string" },
     key: { type: "string" },
+    labels: { type: "string" },
     keel: { type: "string", default: "https://keel.town" },
   },
 });
@@ -71,13 +72,21 @@ async function eventsOf(keel: string, project: string): Promise<KeelEvent[]> {
 const events = await eventsOf(values.keel, values.project);
 const labelOf = (e: KeelEvent): unknown =>
   Reflect.get(Object(Reflect.get(e.payload, "run")), "label");
-/** Each worker's first change: the worker is the label's `<run>-<index>`. */
+// A run of given tasks may name its runs itself (--labels: the tasks file it was given); a worker is then its label's place.
+const tasksFile: unknown =
+  values.labels === undefined ? [] : JSON.parse(readFileSync(values.labels, "utf8"));
+const given: unknown[] = Array.isArray(tasksFile)
+  ? tasksFile.map((t: unknown) => Reflect.get(Object(t), "label"))
+  : [];
+/** Each worker's first change: the worker is its label's place among the given labels, or the label's `<run>-<index>`. */
 const firstChange = new Map<number, string>();
 for (const e of events) {
   if (e.payload._tag !== "IntentDeclared") continue;
   const label = labelOf(e);
-  if (typeof label !== "string" || !label.startsWith(`${run}-`)) continue;
-  const index = Number(label.slice(run.length + 1));
+  if (typeof label !== "string") continue;
+  const place = given.indexOf(label);
+  if (place < 0 && !label.startsWith(`${run}-`)) continue;
+  const index = place >= 0 ? place : Number(label.slice(run.length + 1));
   if (Number.isInteger(index) && !firstChange.has(index))
     firstChange.set(index, e.payload.changeId);
 }

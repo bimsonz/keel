@@ -67,6 +67,33 @@ describe("a run's records from Keel's events", () => {
     expect(records.some((r) => r.changeId === "c-elsewhere")).toBe(false);
   });
 
+  it("[swarm.records-labels] finds a run's workers by the labels the run gave them, each at its place", () => {
+    const labelled = (s: number, changeId: string, label: string) =>
+      event(s, "IntentDeclared", {
+        changeId,
+        footprint: [{ path: "test/swarm/camera/001-checkSha.test.ts", op: "create" }],
+        premises: [],
+        run: { id: "run_1", label },
+      });
+    const events = [
+      labelled(0, "c-sha", "checksha-tests-001"),
+      labelled(1, "c-color", "checkcolor-impure"),
+      labelled(2, "c-other", "someone-else"),
+      event(5, "ChangeLanded", { changeId: "c-sha" }),
+    ];
+    const records = recordsFrom(events, {
+      dir: "test/swarm/r2",
+      workers: 3,
+      label: "r2",
+      labels: ["checkcolor-impure", "checksha-tests-001", "r2-2"],
+    });
+    expect(records.map(({ index, changeId, outcome }) => ({ index, changeId, outcome }))).toEqual([
+      { index: 0, changeId: "c-color", outcome: "unfinished" },
+      { index: 1, changeId: "c-sha", outcome: "landed" },
+      { index: 2, changeId: undefined, outcome: "unfinished" },
+    ]);
+  });
+
   it("[swarm.records-label] counts a change on the fixture's own code as the run's when one of the run's workers declared it", () => {
     const labelled = (s: number, changeId: string, label: string) =>
       event(s, "IntentDeclared", {
