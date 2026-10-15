@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t change.landed-noted
+# kills: change.landed-noted
+# why: a landed change's conflict is drawn as one that stands against it, with View conflict
+diff --git a/apps/console/src/views/Change.tsx b/apps/console/src/views/Change.tsx
+index 30c035c8..247bc496 100644
+--- a/apps/console/src/views/Change.tsx
++++ b/apps/console/src/views/Change.tsx
+@@ -695,7 +695,7 @@ function ConflictsRow({ state }: { state: ChangePageState }) {
+   const { conflict, change } = state;
+   // Keel landed it: a conflict it was in did not hold it, and is noted beneath the landing, not drawn as one that
+   // stands against it.
+-  if (conflict !== undefined && change.state === "landed")
++  if (conflict !== undefined && change.state === "withdrawn")
+     return (
+       <Row
+         tone="quiet"

@@ -669,10 +669,11 @@ export function changePageOf(
   const escalation =
     change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
   const diff = resources.diffs.get(change.id);
-  const withLabel =
+  const others =
     conflict?.parties
       .filter((id) => id !== change.id)
-      .map((id) => world.changes.get(id)?.label ?? "") ?? [];
+      .map((id) => ({ id, label: world.changes.get(id)?.label ?? "" })) ?? [];
+  const withLabel = others.map((other) => other.label);
   const chosen = escalation?.options.find(
     (option) => option.id === escalation.ruling?.option,
   )?.label;
@@ -753,6 +754,7 @@ export function changePageOf(
             state: conflict.state,
             // A change can also conflict with what trunk already holds.
             with: withLabel.filter((label) => label !== "").join(", ") || "a tenet on trunk",
+            others: others.filter((other) => other.label !== ""),
             summary: conflict.title,
           },
         }),

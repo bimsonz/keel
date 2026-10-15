@@ -22,11 +22,17 @@ export function Head({
   label,
   state,
   meta,
+  under,
 }: {
   title: ReactNode;
   label: string;
   state: ReactNode;
   meta: ReactNode;
+  /**
+   * A line in grey under the title, which then carries the label: the formal claim a question in plain words
+   * stands for ("" where there is none beyond the words).
+   */
+  under?: string;
 }) {
   return (
     <header className="flex flex-col gap-2">
@@ -34,8 +40,17 @@ export function Head({
         className="text-[24px] font-semibold leading-tight text-kumo-strong"
         style={{ textWrap: "balance" }}
       >
-        {title} <span className="a-detail-label">{label}</span>
+        {title}
+        {under === undefined && (
+          <>
+            {" "}
+            <span className="a-detail-label">{label}</span>
+          </>
+        )}
       </h1>
+      {under !== undefined && (
+        <p className="text-base text-kumo-subtle">{under === "" ? label : `${under} · ${label}`}</p>
+      )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-kumo-subtle">
         {state}
         {meta}

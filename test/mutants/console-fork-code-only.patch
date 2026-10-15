@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t frame.fork
+# kills: frame.fork
+# why: Fork is on the Code page alone, not in the header of every tab
+diff --git a/apps/console/src/views/Frame.tsx b/apps/console/src/views/Frame.tsx
+index ee5a96ca..0f0e7623 100644
+--- a/apps/console/src/views/Frame.tsx
++++ b/apps/console/src/views/Frame.tsx
+@@ -199,7 +199,7 @@ export function Frame({
+           <span className="flex min-h-9 shrink-0 items-center gap-4">
+             {/* The project's own action, on every one of its tabs, as a code host has Fork in a repository's
+                 header. A visitor signs in first, and comes back to the form. A test fixture is not Keel's to fork. */}
+-            {project !== "" && reader !== undefined && (
++            {project !== "" && route.at === "code" && reader !== undefined && (
+               <a
+                 href={hrefOf({ at: "fork", namespace, project })}
+                 className={buttonVariants({ variant: "secondary", size: "sm" })}

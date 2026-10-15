@@ -11,7 +11,6 @@ import {
   FolderOpenIcon,
   FolderSimpleIcon,
   GitCommitIcon,
-  GitForkIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -25,9 +24,7 @@ import type {
 } from "../engine/repository.ts";
 import { directoryOf } from "../engine/readme.ts";
 import { TRUNK } from "../route.ts";
-import { buttonVariants } from "@cloudflare/kumo";
-import { hrefOf } from "../places.ts";
-import { Link, useWhere } from "../router.tsx";
+import { Link } from "../router.tsx";
 import type { RepoNote } from "../contract/provisional.ts";
 import type { Mode } from "../theme/mode.ts";
 import { CloneMenu } from "./Clone.tsx";
@@ -483,20 +480,6 @@ function Commit({
   );
 }
 
-/** Forking the project: a visitor signs in first, and comes back to the form. */
-function Fork() {
-  const { namespace, project } = useWhere();
-  return (
-    <a
-      href={hrefOf({ at: "fork", namespace, project })}
-      className={buttonVariants({ variant: "secondary", size: "sm" })}
-    >
-      <GitForkIcon size={15} />
-      Fork
-    </a>
-  );
-}
-
 export function Repository({
   state,
   address,
@@ -573,10 +556,9 @@ export function Repository({
               Browse the files
             </Link>
           )}
-          {/* The project's own actions are on its home, as a code host has Fork on a repository's. */}
+          {/* How to clone it is on its home, as a code host has Code on a repository's. Fork is in the header. */}
           {address.view === "code" && address.path === "" && (
             <span className="ml-auto flex items-center gap-2">
-              <Fork />
               <CloneMenu visibility={state.project.visibility} />
             </span>
           )}

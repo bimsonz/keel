@@ -693,6 +693,35 @@ function ChecksRow({
 /** The conflicts this change is in, as the merge box says whether a branch conflicts with its base. */
 function ConflictsRow({ state }: { state: ChangePageState }) {
   const { conflict, change } = state;
+  // Keel landed it: a conflict it was in did not hold it, and is noted beneath the landing, not drawn as one that
+  // stands against it.
+  if (conflict !== undefined && change.state === "landed")
+    return (
+      <Row
+        tone="quiet"
+        icon={<ScalesIcon size={20} weight="bold" />}
+        title={
+          <>
+            Noted:{" "}
+            <ConflictLink id={conflict.id} className="a-link">
+              {conflict.label}
+            </ConflictLink>{" "}
+            with{" "}
+            {conflict.others.length === 0
+              ? conflict.with
+              : conflict.others.map((other, index) => (
+                  <span key={other.id}>
+                    {index > 0 && ", "}
+                    <ChangeLink id={other.id} className="a-link">
+                      {other.label}
+                    </ChangeLink>
+                  </span>
+                ))}{" "}
+            · didn't hold this change
+          </>
+        }
+      />
+    );
   if (conflict !== undefined)
     return (
       <Row

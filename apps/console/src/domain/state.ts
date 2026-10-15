@@ -399,7 +399,15 @@ export interface ChangePageState {
      */
     plan?: { hash: string; own: boolean; steps: PlanStepRow[] };
   };
-  conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
+  conflict?: {
+    id: string;
+    label: string;
+    state: ConflictState;
+    with: string;
+    /** The other changes in it, each by its id and label: none where it is with a tenet on trunk. */
+    others: { id: string; label: string }[];
+    summary: string;
+  };
   /**
    * Present when Keel has told this change that others have its intent: their declared effects make the same
    * claims. `others` is in the order Keel named them. Keel never ranks them or picks one, and nor does this.

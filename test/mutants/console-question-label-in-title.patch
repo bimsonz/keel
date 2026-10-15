@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t question.plain-head
+# kills: question.plain-head
+# why: the formal claim is not said beneath the question, and its label is in the heading
+diff --git a/apps/console/src/views/Escalation.tsx b/apps/console/src/views/Escalation.tsx
+index 68147476..792cc2e5 100644
+--- a/apps/console/src/views/Escalation.tsx
++++ b/apps/console/src/views/Escalation.tsx
+@@ -90,7 +90,7 @@ export function Escalation({
+       <Head
+         title={escalation.question}
+         label={escalation.label}
+-        under={words.title === escalation.question ? "" : words.title}
++        under={undefined}
+         state={
+           <span className="a-chip" data-tone={open ? "person" : "quiet"}>
+             {open && <HandPalmIcon size={13} weight="fill" />}

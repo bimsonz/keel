@@ -2,11 +2,12 @@
 // The project is the frame, as a repository is on a code host; everything
 // else is a tab of it.
 
-import { Badge } from "@cloudflare/kumo";
+import { Badge, buttonVariants } from "@cloudflare/kumo";
 import {
   ChartBarIcon,
   CodeIcon,
   GearIcon,
+  GitForkIcon,
   GitPullRequestIcon,
   FlowArrowIcon,
   GraphIcon,
@@ -196,6 +197,17 @@ export function Frame({
             )}
           </div>
           <span className="flex min-h-9 shrink-0 items-center gap-4">
+            {/* The project's own action, on every one of its tabs, as a code host has Fork in a repository's
+                header. A visitor signs in first, and comes back to the form. A test fixture is not Keel's to fork. */}
+            {project !== "" && reader !== undefined && (
+              <a
+                href={hrefOf({ at: "fork", namespace, project })}
+                className={buttonVariants({ variant: "secondary", size: "sm" })}
+              >
+                <GitForkIcon size={15} aria-hidden />
+                Fork
+              </a>
+            )}
             <Source source={source} />
             {reader !== undefined && (
               <ReaderMenu

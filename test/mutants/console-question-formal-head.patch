@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t question.plain-head
+# kills: question.plain-head
+# why: a question's page is headed by the formal claim, not Keel's question in plain words
+diff --git a/apps/console/src/views/Escalation.tsx b/apps/console/src/views/Escalation.tsx
+index 68147476..99f0b7a7 100644
+--- a/apps/console/src/views/Escalation.tsx
++++ b/apps/console/src/views/Escalation.tsx
+@@ -88,7 +88,7 @@ export function Escalation({
+     <Detail>
+       {/* Keel's own question in plain words leads, and the formal claim it stands for is said beneath it. */}
+       <Head
+-        title={escalation.question}
++        title={words.title}
+         label={escalation.label}
+         under={words.title === escalation.question ? "" : words.title}
+         state={

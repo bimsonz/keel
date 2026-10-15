@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t change.landed-noted
+# kills: change.landed-noted
+# why: the change a landed change's conflict was with is named and not linked
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index b5995a8a..24b309a7 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -754,7 +754,7 @@ export function changePageOf(
+             state: conflict.state,
+             // A change can also conflict with what trunk already holds.
+             with: withLabel.filter((label) => label !== "").join(", ") || "a tenet on trunk",
+-            others: others.filter((other) => other.label !== ""),
++            others: [],
+             summary: conflict.title,
+           },
+         }),

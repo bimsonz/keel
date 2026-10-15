@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/rulings.test.ts -t frame.fork
+# kills: frame.fork
+# why: a test fixture, which is not Keel's, is offered to be forked
+diff --git a/apps/console/src/views/Frame.tsx b/apps/console/src/views/Frame.tsx
+index ee5a96ca..1aa81d29 100644
+--- a/apps/console/src/views/Frame.tsx
++++ b/apps/console/src/views/Frame.tsx
+@@ -199,7 +199,7 @@ export function Frame({
+           <span className="flex min-h-9 shrink-0 items-center gap-4">
+             {/* The project's own action, on every one of its tabs, as a code host has Fork in a repository's
+                 header. A visitor signs in first, and comes back to the form. A test fixture is not Keel's to fork. */}
+-            {project !== "" && reader !== undefined && (
++            {project !== "" && (
+               <a
+                 href={hrefOf({ at: "fork", namespace, project })}
+                 className={buttonVariants({ variant: "secondary", size: "sm" })}

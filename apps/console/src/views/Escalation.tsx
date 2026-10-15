@@ -86,9 +86,11 @@ export function Escalation({
 
   return (
     <Detail>
+      {/* Keel's own question in plain words leads, and the formal claim it stands for is said beneath it. */}
       <Head
-        title={words.title}
+        title={escalation.question}
         label={escalation.label}
+        under={words.title === escalation.question ? "" : words.title}
         state={
           <span className="a-chip" data-tone={open ? "person" : "quiet"}>
             {open && <HandPalmIcon size={13} weight="fill" />}
@@ -201,8 +203,7 @@ export function Escalation({
             <summary className="cursor-pointer text-sm font-semibold text-kumo-strong">
               Details
             </summary>
-            <p className="mt-2 text-sm text-kumo-subtle">{escalation.question}</p>
-            <p className="mt-1 text-sm text-kumo-subtle">{CATEGORY[escalation.category]}</p>
+            <p className="mt-2 text-sm text-kumo-subtle">{CATEGORY[escalation.category]}</p>
             {escalation.evidence.length === 0 ? (
               <p className="text-base text-kumo-subtle">
                 Keel gave no evidence with this question.
