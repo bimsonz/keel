@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/batch-verification.test.ts -t "capacity.free"
+# kills: capacity.free
+# why: a gate that does not answer reads as every box free, so a lane speculates to the cap on no reading at all
+diff --git a/apps/keel/src/adapters/driven/workflow/batch-verification.ts b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+index 8421944f..81170af0 100644
+--- a/apps/keel/src/adapters/driven/workflow/batch-verification.ts
++++ b/apps/keel/src/adapters/driven/workflow/batch-verification.ts
+@@ -94,7 +94,7 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts, tier2: Tier2
+       capacity: () =>
+         Effect.tryPromise(() => tier2.free()).pipe(
+           Effect.map((free) => ({ free })),
+-          Effect.orElseSucceed(() => ({ free: 0 })),
++          Effect.orElseSucceed(() => ({ free: 330 })),
+         ),
+     }),
+   );

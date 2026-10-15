@@ -11,6 +11,8 @@ import {
   liveLeases,
   nextDeadline,
   releaseLease,
+  TIER2_BOX_CAP,
+  TIER2_GATE,
 } from "./boxgate-leases.ts";
 import { KeelObjectWith } from "./keel-object.ts";
 
@@ -31,7 +33,8 @@ const namespaceOf = (name: string | undefined) =>
  * namespace's `concurrent-containers` (its own override before the
  * instance's default, and none while it is halted). A box holds a lease for
  * as long as it composes, and the alarm reclaims a lease whose holder never
- * gave it back.
+ * gave it back. `boxgate:tier2` (TIER2_GATE) is the one gate that is no
+ * namespace's: it counts keel-verify's Tier 2 boxes under their cap.
  */
 export class BoxGate extends KeelObjectWith<BoxGateServices> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -51,6 +54,7 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
 
   /** The namespace's limit, read before the leases so no ask interleaves between their read and write. */
   private async limit(): Promise<number> {
+    if (this.ctx.id.name === TIER2_GATE) return TIER2_BOX_CAP;
     const namespace = namespaceOf(this.ctx.id.name);
     const settings = await this.runtime.runPromise(
       NamespaceUsage.use((usage) => usage.settings(namespace)),
@@ -75,6 +79,12 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
   /** Gives a lease back; one already gone, released or expired, changes nothing. */
   async release(leaseId: string): Promise<void> {
     await this.keep(releaseLease(this.leases, leaseId, Date.now()));
+  }
+
+  /** How many more leases the limit allows now, never below 0. */
+  async free(): Promise<number> {
+    const limit = await this.limit();
+    return Math.max(0, limit - liveLeases(this.leases, Date.now()).length);
   }
 
   /** How many leases are live, for tests and the operator. */

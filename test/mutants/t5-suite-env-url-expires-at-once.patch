@@ -2,15 +2,15 @@
 # kills: runner.no-credentials
 # why: The hydration URL a step is given expires the second it is made, so its one verified refetch is always refused
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 97f9b415..3f5b8627 100644
+index 6afe70a3..cb3fa19c 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -341,7 +341,7 @@ export const SuiteRuntimeCi = (deps: {
+@@ -602,7 +602,7 @@ export const SuiteRuntimeCi = (deps: {
                return { ...stop.report, resultRef: stopRef } satisfies StepResult;
              }
              const expires =
 -              Math.floor((yield* Clock.currentTimeMillis) / 1000) + BUNDLE_URL_TTL_SECONDS;
 +              Math.floor((yield* Clock.currentTimeMillis) / 1000);
              const url = yield* Effect.promise(() =>
-               signedBundleUrl(deps.signingKey, namespace, bundle, expires),
+               signedBundleUrl(deps.signingKey, namespace, job.bundle, expires),
              );

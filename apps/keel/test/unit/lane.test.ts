@@ -225,6 +225,7 @@ function world(options: WorldOptions = {}) {
             return inner.standing(instanceId);
           }),
         stop: inner.stop,
+        capacity: inner.capacity,
       });
     }),
   ).pipe(Layer.provide(Layer.merge(verification.layer, outbox.layer)));

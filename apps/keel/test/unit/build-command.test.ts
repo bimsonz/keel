@@ -213,6 +213,7 @@ describe("the build's runner", () => {
               return { logs: { stdout: STDOUT } };
             },
             durable: (_name, effect) => effect,
+            boxes: { acquire: async () => ({ granted: false }), release: async () => {} },
             literals: [],
             signingKey: keys.signingKey,
           }).pipe(Layer.provide(store.layer)),

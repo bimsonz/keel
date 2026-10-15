@@ -16,6 +16,16 @@ export interface BoxLease {
 /** The gate's answer to an ask, as it crosses RPC. */
 export type GateAnswer = BoxLeaseAnswer;
 
+/**
+ * The gate of keel-verify's Tier 2 boxes, across every namespace: each Tier 2
+ * step holds a lease while its runner runs, so `BatchVerification.capacity`
+ * can say how many are free. Its limit is KeelSandbox's `max_instances`.
+ */
+export const TIER2_GATE = "boxgate:tier2";
+
+/** KeelSandbox's `max_instances` in keel-verify's wrangler.jsonc, which a test holds this to. */
+export const TIER2_BOX_CAP = 330;
+
 /** How long a refused ask is told to wait when no lease will end sooner: a namespace held at 0. */
 const NO_ROOM_WAIT_MS = 60_000;
 

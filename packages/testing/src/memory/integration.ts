@@ -712,13 +712,15 @@ export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly
  * new. A started instance stands Running until `end` says how it ended, one
  * never started is `missing`, and `stopped` lists the instances stopped while
  * they ran, in order: each then stands terminated. `looked` lists every
- * instance whose standing was read.
+ * instance whose standing was read. `capacity.free` is the free boxes it
+ * answers, 330 until a test sets it.
  */
 export function makeBatchVerificationMemory() {
   const started = new Map<string, VerificationJob>();
   const ended = new Map<string, InstanceStanding>();
   const stopped: string[] = [];
   const looked: string[] = [];
+  const capacity = { free: 330 };
   const standingOf = (instanceId: string): InstanceStanding =>
     ended.get(instanceId) ??
     (started.has(instanceId) ? { _tag: "Running" } : { _tag: "Failed", status: "missing" });
@@ -726,6 +728,7 @@ export function makeBatchVerificationMemory() {
     started,
     stopped,
     looked,
+    capacity,
     /** Ends an instance as the platform would report it from here on. */
     end: (instanceId: string, standing: InstanceStanding) => {
       ended.set(instanceId, standing);
@@ -748,6 +751,7 @@ export function makeBatchVerificationMemory() {
             stopped.push(instanceId);
             ended.set(instanceId, { _tag: "Failed", status: "terminated" });
           }),
+        capacity: () => Effect.sync(() => ({ free: capacity.free })),
       }),
     ),
   };

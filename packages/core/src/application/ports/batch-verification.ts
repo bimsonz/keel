@@ -51,7 +51,10 @@ export type InstanceStanding =
  * so a retried step is idempotent. The verdict comes back through
  * `BatchVerdicts`. An instance that will never send one is found by
  * `standing`, and `stop` ends one that outran its budget: stopping an
- * instance that has ended, or was never made, does nothing.
+ * instance that has ended, or was never made, does nothing. `capacity` is
+ * how many Tier 2 boxes KeelVerify could start now, across every project:
+ * the boxes' cap less those in use, never below 0, and 0 when it cannot be
+ * read, so a lane that speculates bounds its depth by it.
  */
 export class BatchVerification extends Context.Service<
   BatchVerification,
@@ -59,5 +62,6 @@ export class BatchVerification extends Context.Service<
     readonly start: (instanceId: string, job: VerificationJob) => Effect.Effect<void>;
     readonly standing: (instanceId: string) => Effect.Effect<InstanceStanding>;
     readonly stop: (instanceId: string) => Effect.Effect<void>;
+    readonly capacity: () => Effect.Effect<{ readonly free: number }>;
   }
 >()("keel/BatchVerification") {}

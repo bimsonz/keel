@@ -13,6 +13,7 @@ import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { NamespaceUsageRpc } from "../../src/adapters/driven/do-rpc/namespace-usage.ts";
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { TIER2_BOX_CAP, TIER2_GATE } from "../../src/adapters/driving/do/boxgate-leases.ts";
 
 const WAIT = { timeout: 20_000, interval: 25 };
 const TTL = 600_000;
@@ -78,6 +79,22 @@ describe("BoxGate", () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
     await runDurableObjectAlarm(gate(namespace));
     await vi.waitFor(async () => expect(await stored()).toEqual({ leases: [], armed: [] }), WAIT);
+  });
+});
+
+describe("the Tier 2 gate", () => {
+  it("[capacity.tier2-gate] counts keel-verify's Tier 2 boxes against their cap, whatever namespace they run for: free is the cap less the live leases", async () => {
+    const tier2 = env.BOXGATE.get(env.BOXGATE.idFromName(TIER2_GATE));
+    const before = await tier2.free();
+    expect(before).toBe(TIER2_BOX_CAP - (await tier2.held()));
+    const a = await tier2.acquire({ holder: `${freshNamespace()}/job-a/js-ts.suite`, ttlMs: TTL });
+    const b = await tier2.acquire({ holder: `${freshNamespace()}/job-b/js-ts.suite`, ttlMs: TTL });
+    if (!a.granted || !b.granted) throw new Error("the Tier 2 gate refused under its cap");
+    expect(await tier2.free()).toBe(before - 2);
+    await tier2.release(a.leaseId);
+    expect(await tier2.free()).toBe(before - 1);
+    await tier2.release(b.leaseId);
+    expect(await tier2.free()).toBe(before);
   });
 });
 

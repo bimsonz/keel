@@ -56,6 +56,7 @@ import { WorkspaceRefresherGitCore } from "../adapters/driven/gitcore/workspace-
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
+import { TIER2_GATE } from "../adapters/driving/do/boxgate-leases.ts";
 import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
 import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
@@ -296,7 +297,9 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       AgentDirectoryD1(env.DB),
       CandidateComposerTiered(objects, commitSigning(env), box).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
-      BatchVerificationWorkflow(env.CI_WORKFLOW),
+      BatchVerificationWorkflow(env.CI_WORKFLOW, {
+        free: () => env.BOXGATE.get(env.BOXGATE.idFromName(TIER2_GATE)).free(),
+      }),
       StagingWriterGitCore({ trunk: repos.trunk, staging: repos.staging }).pipe(
         Layer.provide(host),
       ),

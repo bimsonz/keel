@@ -31,6 +31,8 @@ import {
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import {
+  type BoxLedger,
+  boxHoldMs,
   type Durable,
   JS_TS_SUITE_COMMAND,
   judgeCommandOutput,
@@ -83,7 +85,29 @@ const PARTS = [
 const READY: DepsAnswer = { _tag: "DepsReady", install: "1".repeat(64), parts: PARTS };
 
 /** The runtime over a runner the test scripts, with steps recorded instead of made durable. */
-const runtime = (runner: SuiteRunner) => {
+/**
+ * A box ledger that grants every ask unless told to refuse or to throw, and
+ * records each ask and each release, with what the runner had been asked by then.
+ */
+const ledger = (answer: "grant" | "refuse" | "throw" = "grant") => {
+  const asked: Array<{ readonly holder: string; readonly ttlMs: number }> = [];
+  const released: string[] = [];
+  const boxes: BoxLedger = {
+    acquire: async (holder, ttlMs) => {
+      asked.push({ holder, ttlMs });
+      if (answer === "throw") throw new Error("the gate is away");
+      return answer === "grant"
+        ? { granted: true, leaseId: `lease-${asked.length}` }
+        : { granted: false };
+    },
+    release: async (leaseId) => {
+      released.push(leaseId);
+    },
+  };
+  return { asked, released, boxes };
+};
+
+const runtime = (runner: SuiteRunner, boxes: BoxLedger = ledger().boxes) => {
   const calls: SuiteRunnerOptions[] = [];
   const steps: string[] = [];
   const durable: Durable = (name, effect) =>
@@ -97,6 +121,7 @@ const runtime = (runner: SuiteRunner) => {
         return runner(options);
       },
       durable,
+      boxes,
       literals: [ACCOUNT],
       signingKey: KEYS.signingKey,
     }).pipe(Layer.provide(store.layer)),
@@ -436,6 +461,62 @@ describe("the Tier 2 suite runtime", () => {
       expect(retries.limit).toBeLessThanOrEqual(3);
     }
   });
+
+  it.effect(
+    "[capacity.lease] a Tier 2 step holds a lease named for its job and step while its runner runs, for every attempt's deadline and the waits between, and gives it back after, even when the engine gave up; a step with no runner takes none",
+    () =>
+      Effect.gen(function* () {
+        const green = yield* Effect.promise(() => runnerStdout(3, 0, "3 passed"));
+        for (const runner of [
+          stdoutRunner(green),
+          (async () => {
+            throw new Error("runner failed after its retries");
+          }) satisfies SuiteRunner,
+        ]) {
+          const l = ledger();
+          let heldWhileRunning = false;
+          const rt = runtime(async (options) => {
+            heldWhileRunning = l.asked.length === 1 && l.released.length === 0;
+            return runner(options);
+          }, l.boxes);
+          const j = job();
+          yield* Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, j, READY)).pipe(
+            Effect.provide(rt.layer),
+          );
+          expect(heldWhileRunning).toBe(true);
+          expect(l.asked).toEqual([
+            { holder: `${sampleNamespace}/${j.jobId}/${step.id}`, ttlMs: boxHoldMs(SUITE_CONFIG) },
+          ]);
+          expect(boxHoldMs(SUITE_CONFIG)).toBeGreaterThan(
+            SUITE_CONFIG.timeout * (SUITE_CONFIG.retries.limit + 1),
+          );
+          expect(l.released).toEqual(["lease-1"]);
+        }
+        const none = ledger();
+        yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }, READY),
+        ).pipe(Effect.provide(runtime(stdoutRunner(""), none.boxes).layer));
+        expect(none.asked).toEqual([]);
+      }),
+  );
+
+  it.effect(
+    "[capacity.never-stops] a lease refused, or a gate that throws, still runs the step: the ledger only counts",
+    () =>
+      Effect.gen(function* () {
+        const green = yield* Effect.promise(() => runnerStdout(3, 0, "3 passed"));
+        for (const answer of ["refuse", "throw"] as const) {
+          const l = ledger(answer);
+          const rt = runtime(stdoutRunner(green), l.boxes);
+          const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+            v.run(sampleNamespace, job(), READY),
+          ).pipe(Effect.provide(rt.layer));
+          expect(result?.outcome).toBe("pass");
+          expect(rt.calls).toHaveLength(1);
+          expect(l.released).toEqual([]);
+        }
+      }),
+  );
 
   it.effect(
     "[no-runner.tier2] abstains as no runner's on a step it has no command for, without starting a runner",

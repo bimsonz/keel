@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project 'pool:*' apps/keel/test/pool/boxgate.test.ts -t "capacity.tier2-gate"
+# kills: capacity.tier2-gate
+# why: free ignores the leases held, so every box always reads as free
+diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
+index 31d25965..b7f0dfbf 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate.ts
+@@ -84,7 +84,7 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+   /** How many more leases the limit allows now, never below 0. */
+   async free(): Promise<number> {
+     const limit = await this.limit();
+-    return Math.max(0, limit - liveLeases(this.leases, Date.now()).length);
++    return limit;
+   }
+ 
+   /** How many leases are live, for tests and the operator. */

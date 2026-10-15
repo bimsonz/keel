@@ -43,10 +43,12 @@ import type {
 import { PROJECTOR } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import {
+  type BoxLedger,
   type Durable,
   type SuiteRunner,
   SuiteRuntimeCi,
 } from "../adapters/driven/ci/suite-runtime.ts";
+import { TIER2_GATE } from "../adapters/driving/do/boxgate-leases.ts";
 import { PRECHECK_TREES } from "../adapters/driven/artifacts/code-host.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
 import { DeployerCloudflare } from "../adapters/driven/deploy/cloudflare-deployer.ts";
@@ -146,6 +148,15 @@ export function deliverRuntime(
  * `durable` makes the runtime's own side effects Workflow steps, so a replay
  * returns what the first run stored.
  */
+/** The Tier 2 boxes' gate (BoxGate `boxgate:tier2`), where each Tier 2 runner holds a lease while it runs. */
+const tier2Boxes = (env: Env): BoxLedger => {
+  const gate = () => env.BOXGATE.get(env.BOXGATE.idFromName(TIER2_GATE));
+  return {
+    acquire: (holder, ttlMs) => gate().acquire({ holder, ttlMs }),
+    release: (leaseId) => gate().release(leaseId),
+  };
+};
+
 export function keelVerifyRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
@@ -191,6 +202,7 @@ export function keelVerifyRuntime(
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
+        boxes: tier2Boxes(env),
         // A required secret on every deployed Worker; absent only in tests.
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
         signingKey: env.BUNDLE_URL_SIGNING_KEY,
@@ -397,6 +409,7 @@ export function worldCheckRuntime(
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
+        boxes: tier2Boxes(env),
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
         signingKey: env.BUNDLE_URL_SIGNING_KEY,
       }).pipe(Layer.provide(evidence)),

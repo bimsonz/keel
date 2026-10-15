@@ -1,6 +1,8 @@
 // KeelVerify through the Workflow binding: one instance per id, the job
 // encoded as KeelVerify's params; how an instance stands, read in Keel's
 // terms; and stopping one that still runs.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
 import { ContentHash, makeId } from "@keeltown/core/kernel";
 import { BatchVerification, type VerificationJob } from "@keeltown/core/ports";
@@ -9,9 +11,11 @@ import { Effect, Schema } from "effect";
 import {
   BatchVerificationWorkflow,
   INSTANCE_ERROR_MAX,
+  type Tier2Boxes,
   type WorkflowRun,
   type WorkflowStarts,
 } from "../../src/adapters/driven/workflow/batch-verification.ts";
+import { TIER2_BOX_CAP } from "../../src/adapters/driving/do/boxgate-leases.ts";
 import { keelVerifyParams } from "../../src/rpc/keel-verify.ts";
 
 const hash = (c: string) => Schema.decodeUnknownSync(ContentHash)(`sha256:${c.repeat(64)}`);
@@ -27,6 +31,9 @@ const JOB: VerificationJob = {
 };
 
 type Status = Awaited<ReturnType<WorkflowRun["status"]>>;
+
+/** A Tier 2 gate with 12 boxes free. */
+const BOXES: Tier2Boxes = { free: async () => 12 };
 
 /**
  * A Workflow binding that holds instances by id, as the platform does, and
@@ -59,6 +66,35 @@ function workflow() {
 
 describe("BatchVerification over the Workflow binding", () => {
   it.effect(
+    "[capacity.free] answers the Tier 2 gate's free boxes, and none when the gate does not answer",
+    () =>
+      Effect.gen(function* () {
+        const wf = workflow();
+        const read = (boxes: Tier2Boxes) =>
+          Effect.flatMap(BatchVerification, (v) => v.capacity()).pipe(
+            Effect.provide(BatchVerificationWorkflow(wf.binding, boxes)),
+          );
+        expect(yield* read(BOXES)).toEqual({ free: 12 });
+        expect(
+          yield* read({
+            free: async () => {
+              throw new Error("the gate is away");
+            },
+          }),
+        ).toEqual({ free: 0 });
+      }),
+  );
+
+  it("[capacity.cap-matches] the Tier 2 gate's limit is KeelSandbox's max_instances in keel-verify's config", () => {
+    const config = readFileSync(
+      fileURLToPath(new URL("../../../keel-verify/wrangler.jsonc", import.meta.url)),
+      "utf8",
+    );
+    const sandbox = /"class_name":\s*"KeelSandbox",[^}]*?"max_instances":\s*(\d+)/.exec(config);
+    expect(Number(sandbox?.[1])).toBe(TIER2_BOX_CAP);
+  });
+
+  it.effect(
     "[verification.start] creates one KeelVerify instance per id with the job as its params; starting again starts nothing",
     () => {
       const wf = workflow();
@@ -71,7 +107,7 @@ describe("BatchVerification over the Workflow binding", () => {
           { id: "keel-verify-evt-1", params: keelVerifyParams(JOB) },
           { id: "keel-verify-evt-2", params: keelVerifyParams(JOB) },
         ]);
-      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding)));
+      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding, BOXES)));
     },
   );
 
@@ -123,7 +159,7 @@ describe("BatchVerification over the Workflow binding", () => {
           _tag: "Failed",
           status: "missing",
         });
-      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding)));
+      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding, BOXES)));
     },
   );
 
@@ -153,7 +189,7 @@ describe("BatchVerification over the Workflow binding", () => {
         expect(standing.error).not.toContain(token);
         expect(INSTANCE_ERROR_MAX).toBe(200);
         expect(standing.error).toHaveLength(200);
-      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding)));
+      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding, BOXES)));
     },
   );
 
@@ -176,7 +212,7 @@ describe("BatchVerification over the Workflow binding", () => {
           _tag: "Failed",
           status: "terminated",
         });
-      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding)));
+      }).pipe(Effect.provide(BatchVerificationWorkflow(wf.binding, BOXES)));
     },
   );
 });

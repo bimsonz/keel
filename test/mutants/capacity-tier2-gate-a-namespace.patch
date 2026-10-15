@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project 'pool:*' apps/keel/test/pool/boxgate.test.ts -t "capacity.tier2-gate"
+# kills: capacity.tier2-gate
+# why: the Tier 2 gate reads its limit as a namespace's quota, which it is not, so it cannot count
+diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
+index 31d25965..79efa802 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate.ts
+@@ -54,7 +54,6 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+ 
+   /** The namespace's limit, read before the leases so no ask interleaves between their read and write. */
+   private async limit(): Promise<number> {
+-    if (this.ctx.id.name === TIER2_GATE) return TIER2_BOX_CAP;
+     const namespace = namespaceOf(this.ctx.id.name);
+     const settings = await this.runtime.runPromise(
+       NamespaceUsage.use((usage) => usage.settings(namespace)),

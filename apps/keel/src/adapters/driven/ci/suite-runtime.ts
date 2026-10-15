@@ -38,6 +38,7 @@ import type {
   StepReport,
   StepResult,
   StepRun,
+  VerificationJob,
 } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import {
@@ -314,6 +315,23 @@ export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
 export type SuiteRunner = (
   options: SuiteRunnerOptions,
 ) => Promise<{ readonly logs: { readonly stdout: string | ReadableStream<Uint8Array> } }>;
+
+/**
+ * Keel's count of Tier 2 boxes in use (BoxGate `boxgate:tier2`): a step holds
+ * a lease while its runner runs, so `BatchVerification.capacity` can say how
+ * many are free. It only counts: a refused or failed ask still runs the step.
+ */
+export interface BoxLedger {
+  readonly acquire: (
+    holder: string,
+    ttlMs: number,
+  ) => Promise<{ readonly granted: boolean; readonly leaseId?: string }>;
+  readonly release: (leaseId: string) => Promise<void>;
+}
+
+/** How long a step's runner may hold its box: every attempt to its deadline, and a quarter hour for the waits between them. */
+export const boxHoldMs = (config: SuiteRunnerOptions["config"]): number =>
+  config.timeout * (config.retries.limit + 1) + 15 * 60_000;
 
 /** Stores evidence as a durable Workflow step: a replay returns the first hash instead of storing again. */
 export type Durable = (
@@ -594,6 +612,9 @@ const abstained = (step: PlanStep, failure: InfraFailure): StepReport => ({
  * gave up on abstains `unavailable`, and a step this runtime has no runner
  * for abstains `no-runner`.
  *
+ * Each runner holds a lease on `boxes` while it runs, named for its job and
+ * step, so the free boxes can be counted; asking for it never stops a step.
+ *
  * `literals` are secret values to redact wherever they appear (the account id).
  * `signingKey` signs the URLs each runner is handed, its own bundle's and its
  * deps parts', for a step's life.
@@ -601,6 +622,7 @@ const abstained = (step: PlanStep, failure: InfraFailure): StepReport => ({
 export const SuiteRuntimeCi = (deps: {
   readonly runner: SuiteRunner;
   readonly durable: Durable;
+  readonly boxes: BoxLedger;
   readonly literals: readonly string[];
   readonly signingKey: string;
 }) =>
@@ -609,7 +631,7 @@ export const SuiteRuntimeCi = (deps: {
     Effect.gen(function* () {
       const evidence = yield* EvidenceStore;
       const runStep =
-        (namespace: NamespaceId, bundle: ContentHash, handed: DepsAnswer) => (step: PlanStep) =>
+        (namespace: NamespaceId, job: VerificationJob, handed: DepsAnswer) => (step: PlanStep) =>
           Effect.gen(function* () {
             const tier2 = tier2RunnerFor(step);
             if (tier2 === undefined || step.tier.tier !== 2) return abstained(step, "no-runner");
@@ -624,7 +646,7 @@ export const SuiteRuntimeCi = (deps: {
             const expires =
               Math.floor((yield* Clock.currentTimeMillis) / 1000) + BUNDLE_URL_TTL_SECONDS;
             const url = yield* Effect.promise(() =>
-              signedBundleUrl(deps.signingKey, namespace, bundle, expires),
+              signedBundleUrl(deps.signingKey, namespace, job.bundle, expires),
             );
             const parts = yield* Effect.promise(() =>
               Promise.all(
@@ -632,6 +654,12 @@ export const SuiteRuntimeCi = (deps: {
                   signedDepsPartUrl(deps.signingKey, namespace, part.sha256, expires),
                 ),
               ),
+            );
+            const lease = yield* Effect.tryPromise(() =>
+              deps.boxes.acquire(`${namespace}/${job.jobId}/${step.id}`, boxHoldMs(tier2.config)),
+            ).pipe(
+              Effect.map((answer) => (answer.granted ? answer.leaseId : undefined)),
+              Effect.orElseSucceed(() => undefined),
             );
             const stdout = yield* Effect.tryPromise(() =>
               deps.runner({
@@ -647,6 +675,8 @@ export const SuiteRuntimeCi = (deps: {
               Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
               Effect.catch(() => Effect.succeed(undefined)),
             );
+            if (lease !== undefined)
+              yield* Effect.tryPromise(() => deps.boxes.release(lease)).pipe(Effect.ignore);
             if (stdout === undefined) return abstained(step, "unavailable");
             const judged = yield* tier2.judge(step, stdout, deps.literals);
             const resultRef = yield* deps.durable(
@@ -657,8 +687,7 @@ export const SuiteRuntimeCi = (deps: {
             return { ...result, resultRef } satisfies StepResult;
           });
       return VerifierRuntime.of({
-        run: (namespace, job, handed) =>
-          Effect.forEach(job.steps, runStep(namespace, job.bundle, handed)),
+        run: (namespace, job, handed) => Effect.forEach(job.steps, runStep(namespace, job, handed)),
       });
     }),
   );

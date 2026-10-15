@@ -18,6 +18,11 @@ export interface WorkflowStarts {
   create(options: { id: string; params: Readonly<Record<string, unknown>> }): Promise<unknown>;
 }
 
+/** The Tier 2 boxes' gate (BoxGate `boxgate:tier2`), as the adapter reads it. */
+export interface Tier2Boxes {
+  free(): Promise<number>;
+}
+
 /** An instance's own error message is cited no longer than this. */
 export const INSTANCE_ERROR_MAX = 200;
 
@@ -63,9 +68,10 @@ export async function exists(workflow: WorkflowStarts, id: string): Promise<bool
  * already holds is a started instance, so the Lane's retried step starts
  * nothing new. A create that fails for any other reason is a defect, and the
  * Lane's step runs again. An id the binding does not hold stands `missing`,
- * and stopping it, or an instance that has ended, does nothing.
+ * and stopping it, or an instance that has ended, does nothing. Capacity is
+ * the Tier 2 gate's free boxes, and 0 when the gate does not answer.
  */
-export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
+export const BatchVerificationWorkflow = (workflow: WorkflowStarts, tier2: Tier2Boxes) =>
   Layer.succeed(
     BatchVerification,
     BatchVerification.of({
@@ -85,5 +91,10 @@ export const BatchVerificationWorkflow = (workflow: WorkflowStarts) =>
           const run = await workflow.get(instanceId);
           if (standingOf(await run.status())._tag === "Running") await run.terminate();
         }),
+      capacity: () =>
+        Effect.tryPromise(() => tier2.free()).pipe(
+          Effect.map((free) => ({ free })),
+          Effect.orElseSucceed(() => ({ free: 0 })),
+        ),
     }),
   );
