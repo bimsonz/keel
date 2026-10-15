@@ -103,13 +103,13 @@ describe("a link's card", () => {
     expect(r.keel).toHaveLength(1);
   });
 
-  it("[cards.fallback] serves the site's card where Keel shows no project, and never waits on Keel past its bound", async () => {
+  it("[cards.fallback] serves the site's card where Keel answers it shows no project, and never waits on Keel past its bound", async () => {
     const r = rig();
     // A private project, or none, is no project to an anonymous read: the page, as built.
     expect(await (await r.ask("/acme/secret", TWITTER)).text()).toBe("the page");
     expect(r.retagged).toEqual([]);
 
-    // A Keel that does not answer: the card is given up at the bound.
+    // A Keel that does not answer: the wait is given up at the bound, and the link's own place is its card.
     const silent = { fetch: () => new Promise<Response>(() => undefined) };
     const started = Date.now();
     expect(
@@ -121,7 +121,7 @@ describe("a link's card", () => {
         undefined,
         50,
       ),
-    ).toBeNull();
+    ).toEqual({ title: "keel/keel", description: SITE.description });
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(placeOf("/keel/forge.git/info/refs", new Set())).toBeNull();
   });
@@ -154,9 +154,10 @@ describe("a link's card", () => {
       },
     };
     const deferred: Promise<unknown>[] = [];
-    expect(
-      await readCard(slow, ORIGIN, place, cache, (work) => deferred.push(work), 20),
-    ).toBeNull();
+    expect(await readCard(slow, ORIGIN, place, cache, (work) => deferred.push(work), 20)).toEqual({
+      title: "keel/keel",
+      description: SITE.description,
+    });
     expect(deferred).toHaveLength(1);
     await Promise.all(deferred);
     // The next crawler is given what the late read brought, and Keel is not asked again.
@@ -177,8 +178,33 @@ describe("a link's card", () => {
           : Promise.reject(new Error("dropped"));
       },
     };
-    expect(await readCard(struggling, ORIGIN, place, away)).toBeNull();
-    expect(await readCard(struggling, ORIGIN, place, away)).toBeNull();
+    for (let read = 0; read < 2; read += 1)
+      // oxlint-disable-next-line no-await-in-loop -- one crawler after another
+      expect(await readCard(struggling, ORIGIN, place, away)).toEqual({
+        title: "keel/keel",
+        description: SITE.description,
+      });
     expect([tries, away.size()]).toEqual([2, 0]);
+  });
+
+  it("[cards.place-title] names the link's own place while Keel is away, and never a project Keel answers there is none of", async () => {
+    // Keel away for a moment: the crawler is given the link's place, which whoever shared it has made public.
+    const away = rig(() =>
+      Promise.resolve(Response.json({ code: "service.unavailable" }, { status: 503 })),
+    );
+    expect(await (await away.ask("/acme/widgets/changes", TWITTER)).text()).toBe(
+      "the page as acme/widgets",
+    );
+    expect(away.retagged).toEqual([
+      {
+        card: { title: "acme/widgets", description: SITE.description },
+        url: `${ORIGIN}/acme/widgets/changes`,
+        image: `${ORIGIN}/og.png`,
+      },
+    ]);
+    // Keel's answer that there is no such project for anyone: the site's card, so no private name is confirmed.
+    const definite = rig();
+    expect(await (await definite.ask("/acme/secret", TWITTER)).text()).toBe("the page");
+    expect(definite.retagged).toEqual([]);
   });
 });

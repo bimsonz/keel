@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/cards.test.ts -t "cards.fallback"
+# kills: cards.fallback
+# why: the first crawler of a cold project is given the site's card, which X keeps for the post
+diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
+index f47bb26c..23219ad2 100644
+--- a/apps/console/src/worker/cards.ts
++++ b/apps/console/src/worker/cards.ts
+@@ -153,7 +153,7 @@ export async function readCard(
+   if (outcome === LATE) {
+     // The read goes on, and what it brings is kept for the next crawler. This one is given the link's own place.
+     defer?.(answered);
+-    return placeCard(place);
++    return null;
+   }
+   // Keel away for a moment has not said there is no such project: the link's own place, as when it is late.
+   return outcome.away ? placeCard(place) : cardOf(place, outcome.view);

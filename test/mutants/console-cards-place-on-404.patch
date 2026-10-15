@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/cards.test.ts -t "cards.place-title"
+# kills: cards.place-title
+# why: a project Keel answers there is none of is named on its card, which confirms a private project's name to anyone who guesses it
+diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
+index f47bb26c..e8f5d78c 100644
+--- a/apps/console/src/worker/cards.ts
++++ b/apps/console/src/worker/cards.ts
+@@ -156,7 +156,7 @@ export async function readCard(
+     return placeCard(place);
+   }
+   // Keel away for a moment has not said there is no such project: the link's own place, as when it is late.
+-  return outcome.away ? placeCard(place) : cardOf(place, outcome.view);
++  return cardOf(place, outcome.view) ?? placeCard(place);
+ }
+ 
+ /**

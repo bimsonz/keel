@@ -89,8 +89,9 @@ const LATE = Symbol("late");
 export type Defer = (work: Promise<unknown>) => void;
 
 /**
- * The project's card as Keel shows it to anyone, or null where it shows none: a private project, one that is not
- * there, or a Keel slower than `waitMs`. Read with nothing of the asker's request: no cookie, no credential.
+ * The project's card as Keel shows it to anyone; null where Keel answers it shows none (a private project, or
+ * one that is not there); and the link's own place where Keel is slower than `waitMs` or away. Read with
+ * nothing of the asker's request: no cookie, no credential.
  * What Keel answers is kept for `CARD_KEPT_S` per project, whenever it comes: a read that outlasts the wait goes
  * on (`defer`), and the next crawler is given what it brought. Only Keel's own answer is kept, the project or
  * its having none (404): a read that failed, timed out or met Keel away is asked again by the next.
@@ -116,13 +117,17 @@ export async function readCard(
         { headers: { accept: "application/json" } },
       ),
     )
-    .then(async (response): Promise<{ view: unknown; keep: boolean }> =>
+    .then(async (response): Promise<{ view: unknown; keep: boolean; away: boolean }> =>
       response.ok
-        ? { view: await response.json(), keep: true }
-        : { view: null, keep: response.status === 404 },
+        ? { view: await response.json(), keep: true, away: false }
+        : {
+            view: null,
+            keep: response.status === 404,
+            away: response.status >= 500 || response.status === 429,
+          },
     )
-    .catch(() => ({ view: null, keep: false }))
-    .then(async ({ view, keep }) => {
+    .catch(() => ({ view: null, keep: false, away: true }))
+    .then(async ({ view, keep, away }) => {
       if (keep)
         await cache
           ?.put(
@@ -135,22 +140,32 @@ export async function readCard(
             }),
           )
           .catch(() => undefined);
-      return view;
+      return { view, away };
     });
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const view = await Promise.race([
+  const outcome = await Promise.race([
     answered,
     new Promise<typeof LATE>((resolve) => {
       timer = setTimeout(() => resolve(LATE), waitMs);
     }),
   ]);
   clearTimeout(timer);
-  if (view === LATE) {
-    // The page goes with the site's card; the read goes on, and what it brings is kept for the next crawler.
+  if (outcome === LATE) {
+    // The read goes on, and what it brings is kept for the next crawler. This one is given the link's own place.
     defer?.(answered);
-    return null;
+    return placeCard(place);
   }
-  return cardOf(place, view);
+  // Keel away for a moment has not said there is no such project: the link's own place, as when it is late.
+  return outcome.away ? placeCard(place) : cardOf(place, outcome.view);
+}
+
+/**
+ * The card a link names when Keel has not answered in time: its own place, which whoever shared the link has
+ * already made public, and the site's line. Never given where Keel answered that there is no such project for
+ * anyone (404): a private project's name is not confirmed by a card.
+ */
+export function placeCard(place: Place): Card {
+  return { title: `${place.namespace}/${place.project}`, description: SITE.description };
 }
 
 /** The tags a card sets, by the attribute each is found by and its value. */

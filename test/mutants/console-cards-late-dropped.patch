@@ -2,14 +2,14 @@
 # kills: cards.late-kept
 # why: a read past the wait is lost with the response, so every crawler of a cold project is given the site's card
 diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
-index 96e63b43..7376bee5 100644
+index f47bb26c..09d9adb6 100644
 --- a/apps/console/src/worker/cards.ts
 +++ b/apps/console/src/worker/cards.ts
-@@ -147,7 +147,6 @@ export async function readCard(
+@@ -152,7 +152,6 @@ export async function readCard(
    clearTimeout(timer);
-   if (view === LATE) {
-     // The page goes with the site's card; the read goes on, and what it brings is kept for the next crawler.
+   if (outcome === LATE) {
+     // The read goes on, and what it brings is kept for the next crawler. This one is given the link's own place.
 -    defer?.(answered);
-     return null;
+     return placeCard(place);
    }
-   return cardOf(place, view);
+   // Keel away for a moment has not said there is no such project: the link's own place, as when it is late.
