@@ -1,7 +1,7 @@
 // A change read by id through the deployed fetch handler: the change is a real
 // Change DO (on in-memory code and pool) read for itself and its project, and
 // whether that project is public is its real Project DO's setting.
-import { Proposition } from "@keeltown/core/domain/coordination";
+import { LEASE_TTL_MS, Proposition } from "@keeltown/core/domain/coordination";
 import { makeId, type ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { ulid } from "ulid";
@@ -46,6 +46,7 @@ interface ChangeBody {
   readonly premises: readonly { readonly subject: string; readonly value: unknown }[];
   readonly declaredEffects?: readonly { readonly subject: string; readonly value: unknown }[];
   readonly commitSha?: string;
+  readonly lease?: { readonly id: string; readonly renewedAt: string; readonly lapsesAt?: string };
 }
 
 /** GET /v1/changes/{id} through the doorway, with a bearer token or with none. */
@@ -120,6 +121,46 @@ describe("[b12.get-change] a change by id, from its own DO", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ code: "change.not_found" });
     expect((await read("not-a-change", member)).status).toBe(400);
+  });
+});
+
+describe("[b12.held-lease] the lease, read back by the agent holding it", () => {
+  it("[b12.held-lease] its own agent reads the active lease and when it lapses, and while the platform holds the change no lapse time; a member of its org, another agent and a visitor read no lease", async () => {
+    const p = await project();
+    const { c, member } = await declaredIn(p.projectId);
+    const user = (await seedUser(uniqueHandle("member"))).token;
+    const { lease } = await c.current();
+    const own = await (await read(c.changeId, member)).json<ChangeBody>();
+    expect(own.lease).toEqual({
+      id: lease.id,
+      renewedAt: new Date(lease.renewedAt).toISOString(),
+      lapsesAt: new Date(lease.renewedAt + LEASE_TTL_MS).toISOString(),
+    });
+    expect((await (await read(c.changeId, user)).json<ChangeBody>()).lease).toBeUndefined();
+
+    await using precheck = await inertPrecheck();
+    const commitSha = await c.push();
+    ok(
+      decodeExit(
+        ChangeCodecs.submit,
+        await c.stub.submit({
+          agentId: c.agentId,
+          leaseId: lease.id,
+          commitSha,
+          idempotencyKey: "submit-1",
+        }),
+      ),
+    );
+    const held = await (await read(c.changeId, member)).json<ChangeBody>();
+    expect(held).toMatchObject({ state: "submitted" });
+    expect(held.lease?.id).toBe(lease.id);
+    expect(held.lease?.lapsesAt).toBeUndefined();
+
+    await p.open();
+    const outsider = await tokenFor(await seedAgent());
+    expect((await (await read(c.changeId, outsider)).json<ChangeBody>()).lease).toBeUndefined();
+    expect((await (await read(c.changeId)).json<ChangeBody>()).lease).toBeUndefined();
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
 });
 

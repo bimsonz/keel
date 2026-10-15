@@ -110,6 +110,7 @@ const RULES: Record<EventType, Rule[]> = {
   ChangeWithdrawn: [change(WITHDRAWABLE, "withdrawn")],
   ChangeSuperseded: [change(WITHDRAWABLE, "superseded")],
   LeaseLapsed: [change(undefined)],
+  LeaseRestarted: [change(AGENT_OWNED)],
 
   SubjectMinted: [{ kind: "subject", idField: "subjectId", from: null, to: "minted" }],
   PremiseSuspected: [{ kind: "subject", idField: "subjectId" }],

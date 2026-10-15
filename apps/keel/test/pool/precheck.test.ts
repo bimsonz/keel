@@ -651,7 +651,8 @@ describe("Precheck", () => {
     await (await workflows.get())[0]?.waitForStatus("complete");
 
     const log = await c.log();
-    expect(log.at(-1)?.payload).toMatchObject({
+    // The bounce, then the restart of the lease it hands back.
+    expect(log.at(-2)?.payload).toMatchObject({
       _tag: "ChangeBounced",
       reasons: [`precheck:unreadable:ObjectNotFound ${BASE}`],
     });
@@ -728,7 +729,7 @@ describe("Precheck", () => {
     await instance?.waitForStatus("complete");
 
     expect((await c.current()).state).toBe("bounced");
-    const bounced = (await c.log()).at(-1);
+    const bounced = (await c.log()).at(-2);
     expect(bounced?.payload).toMatchObject({
       _tag: "ChangeBounced",
       reasons: ["precheck:guard:.keel/guards/g1.test.ts (.keel/guards/**)"],
@@ -749,12 +750,13 @@ describe("Precheck", () => {
     expect((await c.current()).state).toBe("bounced");
     const log = await c.log();
     // Nothing was derived or compiled between the start and the refusal.
-    expect(log.map((e) => e.type).slice(-3)).toEqual([
+    expect(log.map((e) => e.type).slice(-4)).toEqual([
       "ChangeSubmitted",
       "PrecheckStarted",
       "ChangeBounced",
+      "LeaseRestarted",
     ]);
-    expect(log.at(-1)?.payload).toMatchObject({
+    expect(log.at(-2)?.payload).toMatchObject({
       _tag: "ChangeBounced",
       reasons: [
         `precheck:project-unplaced:project ${unplaced} belongs to no namespace, so nothing of this change can be kept or verified`,
@@ -833,7 +835,7 @@ describe("Precheck", () => {
     await instance?.waitForStatus("complete");
 
     expect((await c.current()).state).toBe("bounced");
-    expect((await c.log()).at(-1)?.payload).toMatchObject({
+    expect((await c.log()).at(-2)?.payload).toMatchObject({
       _tag: "ChangeBounced",
       reasons: [`precheck:not-on-base:${"c".repeat(40)} does not descend from ${BASE}`],
       nextActions: [{ kind: "call", operationId: "rebase", args: { base: BASE } }],
@@ -877,7 +879,7 @@ describe("Precheck", () => {
     await old.waitForStatus("complete");
 
     expect((await c.current()).state).toBe("bounced");
-    expect((await c.log()).at(-1)?.payload).toMatchObject({
+    expect((await c.log()).at(-2)?.payload).toMatchObject({
       _tag: "ChangeBounced",
       reasons: [
         `precheck:no-base:${commitSha} was submitted without the base it is judged against`,

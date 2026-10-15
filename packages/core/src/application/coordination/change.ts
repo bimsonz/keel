@@ -687,6 +687,45 @@ const transition = <T extends Tag>(
   return Result.succeed({ change: renewed, drafts });
 };
 
+/**
+ * Renews the lease on the stored change when the call holds it, in a
+ * transaction of its own and with no event: `renewedAt` is state.
+ */
+const renewHeld = (changeId: ChangeId, leaseId: LeaseId) =>
+  Effect.gen(function* () {
+    const store = yield* EntityStore;
+    const now = yield* (yield* Clock).now;
+    store.transaction(() => {
+      const stored = storedChange(store, changeId);
+      if (stored === undefined) return;
+      const renewed = renew(stored, leaseId, now);
+      if (Result.isSuccess(renewed))
+        store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));
+    });
+  });
+
+/**
+ * A call under the change's lease that passed the lease check and was then
+ * refused still renews the lease, in a transaction of its own: its agent is at
+ * work on the change. A refusal of the lease itself, or of a change the caller
+ * may not see, renews nothing.
+ */
+const renewingOnRefusal =
+  <C, A, E extends { readonly _tag: string }, R>(
+    call: (changeId: ChangeId, command: C) => Effect.Effect<A, E, R>,
+    leaseOf: (command: C) => LeaseId | undefined,
+  ) =>
+  (changeId: ChangeId, command: C): Effect.Effect<A, E, R | Clock | EntityStore> => {
+    const leaseId = leaseOf(command);
+    return leaseId === undefined
+      ? call(changeId, command)
+      : Effect.tapError(call(changeId, command), (error) =>
+          error._tag === "LeaseStale" || error._tag === "ChangeNotFound"
+            ? Effect.void
+            : renewHeld(changeId, leaseId),
+        );
+  };
+
 const asTransition = (decided: {
   readonly change: Change;
   readonly drafts: readonly EventDraft[];
@@ -1005,7 +1044,7 @@ export const declare: (
 });
 
 /** Revises the intent under the lease, at the revision the caller last read. */
-export const revise: (
+const reviseCall: (
   changeId: ChangeId,
   command: ReviseChange,
 ) => Effect.Effect<
@@ -1070,6 +1109,8 @@ export const revise: (
   return { change, preflight: issuedPreflight(committed.events) };
 });
 
+export const revise = renewingOnRefusal(reviseCall, (command) => command.leaseId);
+
 /** How many times a rely reads what is near the intent it leaves before it commits on what it read last. */
 export const RELY_READS = 3;
 
@@ -1088,7 +1129,7 @@ const isMoved = (e: unknown): e is IntentMoved => e === INTENT_MOVED;
  * intent, so the rely reads again for the intent it now leaves, up to
  * RELY_READS times, and then commits on its last read.
  */
-export const rely: (
+const relyCall: (
   changeId: ChangeId,
   command: RelyChange,
 ) => Effect.Effect<
@@ -1154,6 +1195,8 @@ export const rely: (
     return { change, preflight: issuedPreflight(committed.events) };
   }
 });
+
+export const rely = renewingOnRefusal(relyCall, (command) => command.leaseId);
 
 /**
  * What is near a change now: the preflight of its stored intent against its
@@ -1221,7 +1264,7 @@ const preflightOf = (
  * workspace is looked up first, and the domain weighs it after the lease.
  * Commits ChangeSubmitted, which starts Precheck.
  */
-export const submit: (
+const submitCall: (
   changeId: ChangeId,
   command: SubmitChange,
 ) => Effect.Effect<
@@ -1265,6 +1308,8 @@ export const submit: (
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
 
+export const submit = renewingOnRefusal(submitCall, (command) => command.leaseId);
+
 /** Who withdraws: the agent under its lease, or a maintainer by user id. */
 const withdrawnBy = ({
   authority,
@@ -1278,7 +1323,7 @@ const withdrawnBy = ({
  * maintainer of another project is answered ChangeNotFound, as for a change
  * that does not exist. The pool collects its workspace by event.
  */
-export const abandon: (
+const abandonCall: (
   changeId: ChangeId,
   command: AbandonChange,
 ) => Effect.Effect<
@@ -1321,13 +1366,17 @@ export const abandon: (
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
 
+export const abandon = renewingOnRefusal(abandonCall, ({ authority }) =>
+  authority._tag === "Lease" ? authority.leaseId : undefined,
+);
+
 /**
  * Records under the change's lease why a decision does not govern it
  * (PrecedentDistinguished, on the change). It moves no conflict, guard or
  * verdict: a guard that holds the decision still runs on the change, and only
  * a person's ruling ends a decision. Idempotent by Idempotency-Key per change.
  */
-export const distinguish: (
+const distinguishCall: (
   changeId: ChangeId,
   command: DistinguishPrecedent,
 ) => Effect.Effect<
@@ -1349,21 +1398,24 @@ export const distinguish: (
     (tx): Result.Result<Transition<Change>, ChangeNotFound | LeaseStale> => {
       const change = storedChange(tx.store, changeId);
       if (change === undefined) return Result.fail(new ChangeNotFound({ changeId }));
-      const held = checkLease(change, command.leaseId, tx.at);
-      if (Result.isFailure(held)) return Result.fail(held.failure);
+      const renewed = renew(change, command.leaseId, tx.at);
+      if (Result.isFailure(renewed)) return Result.fail(renewed.failure);
+      tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed.success)));
       const distinguished = PrecedentDistinguished.make({
         decisionId: command.decisionId,
         changeId,
         distinction: command.distinction,
       });
       return Result.succeed({
-        value: change,
+        value: renewed.success,
         drafts: [{ payload: payloadOf(encodeDistinguished(distinguished)) }],
       });
     },
   );
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
+
+export const distinguish = renewingOnRefusal(distinguishCall, (command) => command.leaseId);
 
 const encodeDistinguished = Schema.encodeSync(PrecedentDistinguished);
 
@@ -1445,7 +1497,7 @@ export const adopt: (
  * DO, never the mirror, which lags) put on the workspace's `keel/trunk`, and
  * ChangeRebased committed. A retry of a committed key pushes nothing again.
  */
-export const rebase: (
+const rebaseCall: (
   changeId: ChangeId,
   command: RebaseChange,
 ) => Effect.Effect<
@@ -1511,6 +1563,8 @@ export const rebase: (
   );
   return yield* answer(yield* settled(changeId, command.idempotencyKey, committed));
 });
+
+export const rebase = renewingOnRefusal(rebaseCall, (command) => command.leaseId);
 
 /** Where an agent may commit to its workspace: as for Submit and Rebase. */
 const COMMITTABLE: ReadonlySet<ChangeState> = new Set<ChangeState>(["working", "bounced"]);
@@ -1589,7 +1643,7 @@ const commitFingerprint = (command: CommitEdits): string =>
  * (state, not an event: the commit itself is seen as the workspace's push).
  * Only the change's own workspace is written, never trunk.
  */
-export const commitEdits: (
+const commitEditsCall: (
   changeId: ChangeId,
   command: CommitEdits,
 ) => Effect.Effect<
@@ -1692,14 +1746,16 @@ export const commitEdits: (
   return yield* answer(committed.value);
 });
 
+export const commitEdits = renewingOnRefusal(commitEditsCall, (command) => command.leaseId);
+
 /**
  * A fresh token for the workspace the change holds, for its own agent under
  * its current lease, in any state before the change ends (`mayUseWorkspace`):
- * the same workspace, a new two-hour token, and no event. A retry mints
+ * the same workspace, a new two-hour token, the lease renewed, and no event. A retry mints
  * again; nothing is stored. An ended change never reaches the pool, which
  * would grant a holder without a workspace a new one.
  */
-export const refreshWorkspace: (
+const refreshWorkspaceCall: (
   changeId: ChangeId,
   command: RefreshWorkspace,
 ) => Effect.Effect<
@@ -1719,11 +1775,17 @@ export const refreshWorkspace: (
     now,
   );
   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+  yield* renewHeld(changeId, command.leaseId);
   // The pool finds the workspace this change holds and only mints a token: it cannot run out.
   return yield* (yield* WorkspacePool)
     .grant(allowed.success.projectId, changeId)
     .pipe(Effect.orDie);
 });
+
+export const refreshWorkspace = renewingOnRefusal(
+  refreshWorkspaceCall,
+  (command) => command.leaseId,
+);
 
 /**
  * The lease's deadline came: commits LeaseLapsed (and parks an agent-owned

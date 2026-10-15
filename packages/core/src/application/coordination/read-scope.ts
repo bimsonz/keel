@@ -86,6 +86,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   ChangeWithdrawn: "public",
   ChangeSuperseded: "public",
   LeaseLapsed: "public",
+  LeaseRestarted: "public",
   SubjectMinted: "public",
   PremiseSuspected: "public",
   PremiseReaffirmed: "public",

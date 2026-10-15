@@ -61,6 +61,7 @@ import {
   IntentDeclared,
   IntentRevised,
   LeaseLapsed,
+  LeaseRestarted,
   PlanCompiled,
   PrecheckStarted,
   PreflightIssued,
@@ -68,7 +69,7 @@ import {
   type TouchedAnchor,
 } from "./events.ts";
 import { reviseIntent } from "./intent.ts";
-import { checkLease, isLapsed, lapsesAt } from "./lease.ts";
+import { checkLease, deadlinePassed, isLapsed, lapsesAt } from "./lease.ts";
 import type { Preflight } from "./preflight.ts";
 import type { FootprintEntry, Predicate, PredicatePolicies, Proposition } from "./proposition.ts";
 
@@ -97,6 +98,7 @@ export const ChangeEvent = Schema.Union([
   ChangeWithdrawn,
   ChangeSuperseded,
   LeaseLapsed,
+  LeaseRestarted,
 ]);
 export type ChangeEvent = typeof ChangeEvent.Type;
 
@@ -454,15 +456,18 @@ const conflictActions = (changeId: ChangeId, conflictId: ConflictId): readonly N
 ];
 
 /**
- * A transition from a platform-owned state into an agent-owned one. If the
- * lease lapsed while the platform held the change, the change parks for
- * adoption in the same transaction, so no change is left orphaned.
+ * A transition from a platform-owned state into an agent-owned one. The lease
+ * cannot lapse while the platform holds the change, so the hand-back starts
+ * its 15 minutes again: `LeaseRestarted`, in the same transaction, which a
+ * replay folds as it was decided. A lease recorded Lapsed while the platform
+ * held the change, under the rule before this one, is restarted too: the
+ * lapse does not stand, and the change goes back to its agent, not to a park.
  */
-const intoAgentOwned = (change: Change, now: Instant, event: ChangeEvent): Decision =>
+const intoAgentOwned = (change: Change, event: ChangeEvent): Decision =>
   Result.succeed(
-    !isAgentOwned(change.state) && isLapsed(change.lease, now)
-      ? [event, ChangeParked.make({ changeId: change.id, reason: "lease-lapsed" })]
-      : [event],
+    isAgentOwned(change.state)
+      ? [event]
+      : [event, LeaseRestarted.make({ changeId: change.id, leaseId: change.lease.id })],
   );
 
 const preflightIssued = (changeId: ChangeId, revision: number, preflight: Preflight) =>
@@ -669,7 +674,6 @@ export const decideChange = (
       return at("deriving")
         ? intoAgentOwned(
             change,
-            now,
             ChangeDrifted.make({ changeId: id, revision, blocking: command.blocking }),
           )
         : refuse(change, command);
@@ -750,7 +754,6 @@ export const decideChange = (
           return refuse(change, command);
         return intoAgentOwned(
           change,
-          now,
           ChangeBounced.make({
             changeId: id,
             declined: command.declined,
@@ -767,7 +770,6 @@ export const decideChange = (
         if (!awaitingRuling) return refuse(change, command);
         return intoAgentOwned(
           change,
-          now,
           ChangeBounced.make({
             changeId: id,
             decisionId: command.decisionId,
@@ -791,7 +793,6 @@ export const decideChange = (
             : defaultBounceActions(id);
       return intoAgentOwned(
         change,
-        now,
         ChangeBounced.make({
           changeId: id,
           ...cause,
@@ -839,19 +840,35 @@ export const decideChange = (
       );
 
     case "Adopt":
-      if (!isLapsed(change.lease, now)) {
+      if (
+        !isLapsed(change, now) ||
+        // A lease recorded Lapsed while the platform held the change waits for the hand-back too.
+        !(isAgentOwned(change.state) || (at("parked") && change.parkReason === "lease-lapsed"))
+      ) {
+        // While the platform holds the change its lease cannot lapse: there is no time to give.
         return Result.fail(
-          new LeaseNotLapsed({
-            changeId: id,
-            lapsesAt: lapsesAt(change.lease),
-            nextActions: [
-              {
-                kind: "wait",
-                title: "Wait for the lease to lapse: adoption needs a Lapsed lease",
-                args: { lapsesAt: lapsesAt(change.lease) },
-              },
-            ],
-          }),
+          isAgentOwned(change.state)
+            ? new LeaseNotLapsed({
+                changeId: id,
+                lapsesAt: lapsesAt(change.lease),
+                nextActions: [
+                  {
+                    kind: "wait",
+                    title: "Wait for the lease to lapse: adoption needs a Lapsed lease",
+                    args: { lapsesAt: lapsesAt(change.lease) },
+                  },
+                ],
+              })
+            : new LeaseNotLapsed({
+                changeId: id,
+                nextActions: [
+                  {
+                    kind: "wait",
+                    title:
+                      "Wait for Keel to hand the change back: its lease runs only while its agent holds it, and lapses 15 minutes after the hand-back unless renewed",
+                  },
+                ],
+              }),
         );
       }
       return Result.succeed([
@@ -870,19 +887,18 @@ export const decideChange = (
       if (
         command.leaseId !== change.lease.id ||
         change.lease.state !== "active" ||
-        !isLapsed(change.lease, now)
+        !isLapsed(change, now)
       )
         return Result.succeed([]);
-      const lapsed = LeaseLapsed.make({
-        changeId: id,
-        leaseId: change.lease.id,
-        renewedAt: change.lease.renewedAt,
-      });
-      return Result.succeed(
-        isAgentOwned(change.state)
-          ? [lapsed, ChangeParked.make({ changeId: id, reason: "lease-lapsed" })]
-          : [lapsed],
-      );
+      // Only a change that waits on its agent can lapse, and it parks for adoption as it does.
+      return Result.succeed([
+        LeaseLapsed.make({
+          changeId: id,
+          leaseId: change.lease.id,
+          renewedAt: change.lease.renewedAt,
+        }),
+        ChangeParked.make({ changeId: id, reason: "lease-lapsed" }),
+      ]);
     }
 
     case "Withdraw":
@@ -1115,7 +1131,8 @@ export const evolveChange = (
           ])
         : illegal(change, event);
     case "ChangeAdopted": {
-      if (!isLapsed(change.lease, committed.at)) return illegal(change, event);
+      // The lease's own time rule: a log decided under any rule of when a lease lapses folds.
+      if (!deadlinePassed(change.lease, committed.at)) return illegal(change, event);
       // The change is the adopter's run's from here, or no run's: never still the run that held it.
       const { run: _held, ...held } = change;
       const adopted: Change = {
@@ -1144,6 +1161,13 @@ export const evolveChange = (
         event.leaseId === change.lease.id &&
         committed.at >= lapsesAt(change.lease)
         ? { ...change, lease: { ...change.lease, state: "lapsed" } }
+        : illegal(change, event);
+    case "LeaseRestarted":
+      // A lease recorded Lapsed while the platform held the change is active again: the same lease, the same holder.
+      return (change.lease.state === "active" || change.lease.state === "lapsed") &&
+        event.leaseId === change.lease.id &&
+        isAgentOwned(change.state)
+        ? { ...change, lease: { ...change.lease, state: "active", renewedAt: committed.at } }
         : illegal(change, event);
 
     default: {

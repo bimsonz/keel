@@ -604,6 +604,13 @@ model LeaseLapsed {
   renewedAt: Instant;
 }
 
+/** The platform handed the change back to its agent: the lease's 15 minutes start again from here. */
+model LeaseRestarted {
+  _tag: "LeaseRestarted";
+  changeId: ChangeId;
+  leaseId: LeaseId;
+}
+
 model SubjectMinted {
   _tag: "SubjectMinted";
   subjectId: SubjectId;
@@ -2014,6 +2021,7 @@ union KeelEvent {
   ChangeWithdrawn,
   ChangeSuperseded,
   LeaseLapsed,
+  LeaseRestarted,
   SubjectMinted,
   PremiseSuspected,
   PremiseReaffirmed,

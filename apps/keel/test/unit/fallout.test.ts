@@ -866,7 +866,7 @@ describe("a premise anchored to code another change edits", () => {
 });
 
 describe("what the holder is told of a premise in doubt", () => {
-  it("[anchor.notice] a premise put in doubt by an edit is told as a suspicion that holds nothing, naming the change, the code and what to do; one an effect put in doubt is told as before", () => {
+  it("[anchor.notice] a premise put in doubt by an edit is told as a suspicion that holds nothing, naming the change, the footprint that covers the code and what to do; one an effect put in doubt is told as before", () => {
     const envelopeOf = (cause: Record<string, unknown>): EventEnvelope => ({
       eventId: makeId("evt", ulidOf(990)),
       type: "PremiseSuspected",
@@ -885,10 +885,19 @@ describe("what the holder is told of a premise in doubt", () => {
       },
     });
     const byEdit = detailOf(envelopeOf({ changeId: changeOf(3), anchor: PRICE_AT }));
-    expect(byEdit).toContain(`${changeOf(3)} edits src/price.ts (price)`);
+    // The footprint covers the anchor's file: the change may not have edited the symbol itself.
+    expect(byEdit).toContain(
+      `${changeOf(3)}'s footprint covers src/price.ts, where price is anchored: the code your premise on billing.price rests on.`,
+    );
     expect(byEdit).toContain("billing.price");
     expect(byEdit).toContain("a suspicion, not a conflict: nothing is held or bounced");
     expect(byEdit).toContain("why");
+    const byFile = detailOf(
+      envelopeOf({ changeId: changeOf(3), anchor: { path: "src/price.ts", commit: PINNED } }),
+    );
+    expect(byFile).toContain(
+      `${changeOf(3)}'s footprint covers src/price.ts, the file your premise on billing.price rests on.`,
+    );
     const byEffect = detailOf(
       envelopeOf({
         changeId: changeOf(3),

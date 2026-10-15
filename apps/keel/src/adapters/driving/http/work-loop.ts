@@ -40,6 +40,9 @@ import {
   type WireContext,
   effectOfMfp,
   effectToMfp,
+  isAgentOwned,
+  lapsesAt,
+  leaseStands,
   premiseOfMfp,
   premiseToMfp,
   retractedBy,
@@ -85,7 +88,7 @@ import type {
   SubmitResult,
 } from "../../../generated/http/app.gen.ts";
 import { type NoticeView, noticeView } from "../notices.ts";
-import type { Caller } from "./caller.ts";
+import type { AgentClaims, Caller } from "./caller.ts";
 import { runView } from "./mappers.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
 import { PREMISE_EXAMPLE, PREMISE_HELP, premiseOfAgent } from "./premise-input.ts";
@@ -1322,9 +1325,37 @@ export function relyError(
   }
 }
 
-/** A change read by id: the change itself, bare, as the spec's `Change`. */
-export function changeOk(change: Change): ChangeResult {
-  return { status: 200, body: changeView(change, teller()) };
+/**
+ * A change read by id: the change itself, bare, as the spec's `Change`. The
+ * agent holding its lease, under the change's run when it has one, reads the
+ * lease too, so a lease it lost track of can be read back.
+ */
+export function changeOk(change: Change, reader?: AgentClaims): ChangeResult {
+  const view = changeView(change, teller());
+  return {
+    status: 200,
+    body: holdsLease(change, reader) ? { ...view, lease: heldLeaseView(change) } : view,
+  };
+}
+
+/** Whether `reader` is the agent holding the change's lease, under the change's run when it has one. */
+function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
+  return (
+    reader !== undefined &&
+    leaseStands(change) &&
+    reader.agentId === change.lease.agentId &&
+    (change.run === undefined || change.run.id === reader.run?.id)
+  );
+}
+
+/** The lease as its holder reads it, with no lapse time while the platform holds the change. */
+function heldLeaseView(change: Change) {
+  const { lease } = change;
+  return {
+    id: lease.id,
+    renewedAt: iso(lease.renewedAt),
+    ...(isAgentOwned(change.state) ? { lapsesAt: iso(lapsesAt(lease)) } : {}),
+  };
 }
 
 export function changeReadError(caller: Caller, error: ChangeNotFound): ChangeResult {
@@ -1409,7 +1440,10 @@ export function adoptError(
       return {
         status: 409,
         body: problem(409, "change.lease_not_lapsed", caller.requestId, {
-          detail: `${error.changeId}'s lease lapses at ${iso(error.lapsesAt)}; it can be adopted after that.`,
+          detail:
+            error.lapsesAt === undefined
+              ? `Keel holds ${error.changeId} now, and its lease cannot lapse until Keel hands it back to its agent.`
+              : `${error.changeId}'s lease lapses at ${iso(error.lapsesAt)}; it can be adopted after that.`,
           nextActions: apiActions(error.nextActions),
         }),
       };

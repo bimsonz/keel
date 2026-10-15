@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts -t anchor.notice
+# kills: anchor.notice
+# why: the notice says the change edits the anchor's symbol when its footprint only covers the file
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 8265436..187369f 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -134,7 +134,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
+       return Option.match(decodeAnchorSuspicion(event.payload), {
+         onNone: () => undefined,
+         onSome: ({ premise, cause }) =>
+-          `${cause.changeId}'s footprint covers ${cause.anchor.path}, ${cause.anchor.symbol === undefined ? "the file" : `where ${cause.anchor.symbol} is anchored: the code`} your premise on ${premise.subject} rests on. This is a suspicion, not a conflict: nothing is held or bounced. Check your premise against that change with why, and revise or rely again if it no longer holds`,
++          `${cause.changeId} edits ${cause.anchor.path}${cause.anchor.symbol === undefined ? "" : ` (${cause.anchor.symbol})`}, the code your premise on ${premise.subject} rests on. This is a suspicion, not a conflict: nothing is held or bounced. Check your premise against that change with why, and revise or rely again if it no longer holds`,
+       });
+     case "ConflictNoted":
+       return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;

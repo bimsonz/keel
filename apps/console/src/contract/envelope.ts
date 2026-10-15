@@ -61,6 +61,7 @@ export const EVENT_TYPES = [
   "ChangeWithdrawn",
   "ChangeSuperseded",
   "LeaseLapsed",
+  "LeaseRestarted",
   // coordination: subjects and premises
   "SubjectMinted",
   "PremiseSuspected",

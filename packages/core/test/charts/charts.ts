@@ -12,6 +12,7 @@ const to = (id: string) => (path: string) => `#${id}.${path}`;
 const c = to("change");
 /** Withdrawal and supersession, from every state but Integrating and the terminals. */
 const ends = { ChangeWithdrawn: c("withdrawn"), ChangeSuperseded: c("superseded") };
+/** Adoption of a lapsed lease, where the change waits on its agent: under the platform a lease does not lapse. */
 const waits = (state: string) => ({ ChangeAdopted: c(state) });
 const lapses = { ChangeParked: c("parked.leaseLapsed") };
 
@@ -31,13 +32,12 @@ export const changeChart: Chart = {
         ...ends,
       },
     },
-    submitted: { on: { PrecheckStarted: c("deriving"), ...waits("submitted"), ...ends } },
+    submitted: { on: { PrecheckStarted: c("deriving"), ...ends } },
     deriving: {
       on: {
         ChangeDrifted: c("drifted"),
         PlanCompiled: c("verifying"),
         ChangeBounced: c("bounced"),
-        ...waits("deriving"),
         ...ends,
       },
     },
@@ -47,7 +47,6 @@ export const changeChart: Chart = {
         ChangeQueued: c("queued"),
         ChangeParked: c("parked.awaitingRuling"),
         ChangeBounced: c("bounced"),
-        ...waits("verifying"),
         ...ends,
       },
     },
@@ -56,7 +55,6 @@ export const changeChart: Chart = {
         ChangeBatched: c("integrating"),
         ChangeParked: c("parked.awaitingRuling"),
         ChangeBounced: c("bounced"),
-        ...waits("queued"),
         ...ends,
       },
     },
@@ -65,7 +63,6 @@ export const changeChart: Chart = {
         ChangeRequeued: c("queued"),
         ChangeBounced: c("bounced"),
         ChangeLanded: c("landed"),
-        ...waits("integrating"),
       },
     },
     bounced: {
@@ -91,7 +88,6 @@ export const changeChart: Chart = {
             ChangeBounced: c("bounced"),
             // Held by another question: it waits on that one, from where it first parked.
             ChangeParked: c("parked.awaitingRuling"),
-            ...waits("parked.awaitingRuling"),
           },
         },
         leaseLapsed: {
@@ -112,13 +108,10 @@ export const changeChart: Chart = {
 };
 
 // Lease: the life of one lease, so adoption supersedes the old lease (the new one starts Active).
+// It lapses only while the change waits on its agent, so a change lands under an Active lease.
 
 const l = to("lease");
-const released = {
-  ChangeLanded: l("released"),
-  ChangeWithdrawn: l("released"),
-  ChangeSuperseded: l("released"),
-};
+const ended = { ChangeWithdrawn: l("released"), ChangeSuperseded: l("released") };
 
 export const leaseChart: Chart = {
   id: "lease",
@@ -128,15 +121,15 @@ export const leaseChart: Chart = {
     active: {
       on: {
         LeaseLapsed: l("lapsed"),
-        ChangeParked: [
-          { target: l("lapsed"), guard: "lease-lapsed" },
-          { target: l("active"), guard: "awaiting-ruling" },
-        ],
+        // The platform hands the change back: the 15 minutes start again.
+        LeaseRestarted: l("active"),
+        ChangeParked: [{ target: l("active"), guard: "awaiting-ruling" }],
         ChangeAdopted: l("superseded"),
-        ...released,
+        ChangeLanded: l("released"),
+        ...ended,
       },
     },
-    lapsed: { on: { ChangeParked: l("lapsed"), ChangeAdopted: l("superseded"), ...released } },
+    lapsed: { on: { ChangeParked: l("lapsed"), ChangeAdopted: l("superseded"), ...ended } },
     released: { type: "final" },
     superseded: { type: "final" },
   },

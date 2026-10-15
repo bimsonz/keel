@@ -169,7 +169,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
       return Option.match(decodeAnchorSuspicion(event.payload), {
         onNone: () => undefined,
         onSome: ({ premise, cause }) =>
-          `${cause.changeId} edits ${cause.anchor.path}${cause.anchor.symbol === undefined ? "" : ` (${cause.anchor.symbol})`}, the code your premise on ${premise.subject} rests on. This is a suspicion, not a conflict: nothing is held or bounced. Check your premise against that change with why, and revise or rely again if it no longer holds`,
+          `${cause.changeId}'s footprint covers ${cause.anchor.path}, ${cause.anchor.symbol === undefined ? "the file" : `where ${cause.anchor.symbol} is anchored: the code`} your premise on ${premise.subject} rests on. This is a suspicion, not a conflict: nothing is held or bounced. Check your premise against that change with why, and revise or rely again if it no longer holds`,
       });
     case "ConflictNoted":
       return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;

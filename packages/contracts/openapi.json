@@ -13014,6 +13014,14 @@
             ],
             "description": "The run of the agent that holds the change, when its token named one."
           },
+          "lease": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeLease"
+              }
+            ],
+            "description": "The change's active lease, shown only to the agent holding it (under the\nchange's run, when it has one), so a lease it lost track of can be read back."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -13402,6 +13410,31 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ChangeLease": {
+        "type": "object",
+        "required": [
+          "id",
+          "renewedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/LeaseId"
+          },
+          "renewedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lapsesAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the lease lapses unless the agent acts on the change again. Absent\nwhile Keel holds the change (deriving, verifying, queued, integrating, or\nparked for a ruling): its lease cannot lapse then, and its 15 minutes\nstart again when Keel hands the change back."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A change's lease as the agent holding it reads it."
       },
       "ChangeOrigin": {
         "type": "string",
@@ -18063,6 +18096,9 @@
             "$ref": "#/components/schemas/LeaseLapsed"
           },
           {
+            "$ref": "#/components/schemas/LeaseRestarted"
+          },
+          {
             "$ref": "#/components/schemas/SubjectMinted"
           },
           {
@@ -18545,6 +18581,32 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "LeaseRestarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "leaseId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "LeaseRestarted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "leaseId": {
+            "$ref": "#/components/schemas/LeaseId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The platform handed the change back to its agent: the lease's 15 minutes start again from here."
       },
       "MFP.Alternative": {
         "type": "object",

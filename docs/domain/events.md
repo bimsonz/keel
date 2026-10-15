@@ -101,7 +101,8 @@ Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identi
 | `ChangeAdopted` | Change DO | `changeId, previousAgentId, agentId, run?, leaseId, briefRef` | the previous lease | both agents | Re-leased under the same Change-Id with a cold-start brief |
 | `ChangeWithdrawn` | Change DO | `changeId, by, reason?` | the workspace, subscriptions | Subject DOs relied on, Lane DO, WorkspacePool DO | Subscriptions dropped; workspace collected |
 | `ChangeSuperseded` | Change DO | `changeId, by: changeId, decisionId?` | the workspace, subscriptions | Subject DOs relied on, Lane DO, WorkspacePool DO | An alternative landed instead: by a ruling, or by policy, when the alternative retracting a tenet loses automatically (then caused by the winner's `ChangeLanded`) |
-| `LeaseLapsed` | Change DO | `changeId, leaseId, renewedAt` | — | the agent | Raised by the lease's deadline alarm, 15 minutes after the last renewal. Parks the change if it is in a state the agent owns |
+| `LeaseLapsed` | Change DO | `changeId, leaseId, renewedAt` | — | the agent | Raised by the lease's deadline alarm, 15 minutes after the last renewal or the platform's last hand-back, only while the change is in a state the agent owns: the deadline does not run while the platform holds the change. Parks the change in the same commit |
+| `LeaseRestarted` | Change DO | `changeId, leaseId` | — | the agent | Committed with the platform's hand-back of a change to its agent (`ChangeBounced`, `ChangeDrifted`), in the same commit: the lease's 15 minutes start again from here. A lease recorded Lapsed while the platform held the change is Active again: that lapse does not stand. A replay folds the restart as it was decided, so a log committed before the event existed keeps the deadlines it was decided under |
 
 ### Subjects and premises
 

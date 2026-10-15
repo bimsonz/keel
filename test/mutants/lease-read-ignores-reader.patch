@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/get-change.test.ts -t b12.held-lease
+# kills: b12.held-lease
+# why: the change read never passes its caller, so the agent holding the lease cannot read it back
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index d4db74a..2387d24 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -724,7 +724,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+             readChange(decoded.success).pipe(
+               Effect.match({
+                 onSuccess: ({ change }) =>
+-                  changeOk(change, caller.principal._tag === "Agent" ? caller.token : undefined),
++                  changeOk(change),
+                 onFailure: (error) => changeReadError(caller, error),
+               }),
+             ),

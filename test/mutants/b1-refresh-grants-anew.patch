@@ -2,10 +2,11 @@
 # kills: workspace.refresh-same
 # why: The refresh asks the pool for a holder that holds nothing, so it is granted another workspace
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 8a60214b..af567fb6 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1492,7 +1492,7 @@
-   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+@@ -1773,7 +1773,7 @@ const refreshWorkspaceCall: (
+   yield* renewHeld(changeId, command.leaseId);
    // The pool finds the workspace this change holds and only mints a token: it cannot run out.
    return yield* (yield* WorkspacePool)
 -    .grant(allowed.success.projectId, changeId)

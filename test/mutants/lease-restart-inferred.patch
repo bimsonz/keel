@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts -t change.replay-old-logs
+# kills: change.replay-old-logs
+# why: the fold restarts the lease on every bounce, so a log whose bounce restarted nothing no longer folds
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index f61b735..99cc6e5 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1086,7 +1086,7 @@ export const evolveChange = (
+       return from("deriving", "verifying", "queued") ||
+         (event.conflictId === undefined &&
+           (from("integrating") || (from("parked") && change.parkReason === "awaiting-ruling")))
+-        ? moveTo(change, "bounced", [
++        ? moveTo({ ...change, lease: { ...change.lease, renewedAt: committed.at } }, "bounced", [
+             "parkReason",
+             "escalationId",
+             "parkedFrom",

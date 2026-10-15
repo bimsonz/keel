@@ -5,9 +5,12 @@ import {
   Change,
   type ChangeCommand,
   ChangeBounced,
+  ChangeAdopted,
   ChangeEvent,
   ChangeParked,
+  LeaseLapsed,
   ChangeResumed,
+  checkLease,
   decideChange,
   type DerivedEffect,
   evolveChange,
@@ -158,8 +161,11 @@ const keyOf = (c: Change | undefined): Key =>
 const terminal = (k: Key): boolean => k === "landed" || k === "withdrawn" || k === "superseded";
 const agentOwned = (k: Key): boolean =>
   k === "declared" || k === "working" || k === "drifted" || k === "bounced";
+// A lease lapses only while the change waits on its agent: under the platform its deadline does not run,
+// and a lapse recorded there (under the rule before this one) does not stand.
 const lapsedAt = (c: Change, now: number): boolean =>
-  c.lease.state === "lapsed" || (c.lease.state === "active" && now - c.lease.renewedAt >= TTL);
+  (agentOwned(keyOf(c)) || keyOf(c) === "parked:lease-lapsed") &&
+  (c.lease.state === "lapsed" || (c.lease.state === "active" && now - c.lease.renewedAt >= TTL));
 
 interface Step {
   /** Steer the run along the happy path, down a side exit, or anywhere at all. */
@@ -596,7 +602,8 @@ const oracle = (
   const carried = leaseCarried(command);
   if (carried !== undefined && (carried !== before.lease.id || lapsedAt(before, now)))
     return "refused";
-  const intoAgent = (k: Key): Key => (lapsedAt(before, now) ? "parked:lease-lapsed" : k);
+  // Handed back, the change goes to its agent: a lapse recorded under the platform does not park it.
+  const intoAgent = (k: Key): Key => k;
   const batchMatches = (batchId: string | undefined) =>
     batchId !== undefined && batchId === before.batchId;
   switch (command._tag) {
@@ -673,7 +680,9 @@ const oracle = (
         ? parkedFrom
         : "refused";
     case "Adopt":
-      if (!lapsedAt(before, now)) return "refused";
+      // A change the platform holds waits for its hand-back, whatever its lease.
+      if (!lapsedAt(before, now) || !(agentOwned(key) || key === "parked:lease-lapsed"))
+        return "refused";
       return key === "parked:lease-lapsed"
         ? before.workspaceId === undefined
           ? "declared"
@@ -683,10 +692,11 @@ const oracle = (
       if (
         command.leaseId !== before.lease.id ||
         before.lease.state !== "active" ||
+        !agentOwned(key) ||
         now - before.lease.renewedAt < TTL
       )
         return "noop";
-      return agentOwned(key) ? "parked:lease-lapsed" : key;
+      return "parked:lease-lapsed";
     case "Withdraw":
       return key === "integrating" ? "refused" : "withdrawn";
     case "Supersede":
@@ -1011,8 +1021,8 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     ).toThrow(IllegalTransition);
   });
 
-  it("[change.no-orphan] an agent-owned change always holds an Active lease; a lapse under the platform parks it on the way back", () => {
-    let lapsedHandBacks = 0;
+  it("[change.no-orphan] an agent-owned change always holds an Active lease, and the platform hands a change back with its lease's 15 minutes started again", () => {
+    let handBacks = 0;
     assertReaching(
       fc.property(planArb, (plan) =>
         run(plan).records.every((r) => {
@@ -1025,62 +1035,99 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
             !agentOwned(keyOf(r.before)) &&
             !terminal(keyOf(r.before)) &&
             r.after !== undefined &&
-            keyOf(r.after) !== keyOf(r.before);
-          const intoAgent =
-            handBack &&
-            r.after !== undefined &&
-            (agentOwned(keyOf(r.after)) || keyOf(r.after) === "parked:lease-lapsed") &&
+            agentOwned(keyOf(r.after)) &&
             r.kind !== "Adopt";
-          if (!(intoAgent && r.before !== undefined && lapsedAt(r.before, r.now))) return owned;
-          lapsedHandBacks++;
-          return owned && keyOf(r.after) === "parked:lease-lapsed";
+          if (!handBack) return owned;
+          handBacks++;
+          return owned && r.after?.lease.renewedAt === r.now;
         }),
       ),
     );
-    expect(lapsedHandBacks).toBeGreaterThan(0);
-    // The alarm fires while Verifying (platform-owned): the change stays put. The bounce then hands it back parked.
+    expect(handBacks).toBeGreaterThan(0);
+    // Past the 15 minutes while Verifying (platform-owned): the alarm records nothing, and the bounce hands the change back with its lease running again.
     const verifying = drive([
       ...[declare, start, submit, precheck, compile].map((c) => [c, 1] as const),
       [lapse, TTL],
       [bounce, 1],
     ]);
-    expect(verifying.keys.slice(-2)).toEqual(["verifying", "parked:lease-lapsed"]);
-    expect(tags(verifying.log).slice(-3)).toEqual(["LeaseLapsed", "ChangeBounced", "ChangeParked"]);
-    // No alarm yet, but the lease lapsed on read: the bounce still parks it.
-    const unalarmed = drive([
-      ...[declare, start, submit, precheck, compile].map((c) => [c, 1] as const),
-      [bounce, TTL],
-    ]);
-    expect(unalarmed.keys.at(-1)).toBe("parked:lease-lapsed");
+    expect(verifying.keys.slice(-2)).toEqual(["verifying", "bounced"]);
+    expect(tags(verifying.log).slice(-2)).toEqual(["ChangeBounced", "LeaseRestarted"]);
+    expect(verifying.state?.lease).toMatchObject({ state: "active", renewedAt: verifying.now });
+    // The 15 minutes run from the hand-back: the alarm parks the change then, and not before.
+    const handedBack = (dt: number) =>
+      drive([
+        ...[declare, start, submit, precheck, compile].map((c) => [c, 1] as const),
+        [bounce, TTL],
+        [lapse, dt],
+      ]);
+    expect(handedBack(TTL - 1).keys.at(-1)).toBe("bounced");
+    expect(handedBack(TTL).keys.at(-1)).toBe("parked:lease-lapsed");
   });
 
-  it("[change.lapse-parks-agent-owned-only] the lease alarm parks agent-owned states and leaves platform-owned ones where they are", () => {
+  it("[change.held-lapse-void] a lapse recorded while the platform held the change does not stand: its holder's lease still passes, nobody may adopt the change, and handing it back restarts the same lease", () => {
+    // Recorded under the rule before this one: past the 15 minutes while Verifying, the lease was marked Lapsed.
+    const held = drive([declare, start, submit, precheck, compile].map((c) => [c, 1] as const));
+    const recordedAt = Instant(held.now + TTL);
+    const recorded = evolveChange(held.state, {
+      at: recordedAt,
+      payload: LeaseLapsed.make({ changeId: CHANGE, leaseId: LEASE, renewedAt: Instant(held.now) }),
+    });
+    expect(recorded.lease.state).toBe("lapsed");
+    const now = Instant(recordedAt + 1);
+    const context = { now, changeId: CHANGE };
+    // While the platform holds it, its holder may still withdraw it, and nobody may adopt it.
+    expect(Result.isSuccess(checkLease(recorded, LEASE, now))).toBe(true);
+    expect(failureTag(decideChange(recorded, adopt, context))).toBe("LeaseNotLapsed");
+    // Handed back, it goes to its agent with the same lease running again from the hand-back, not to a park.
+    const back = decideChange(recorded, bounce, context);
+    expect(Result.isSuccess(back) ? tags(back.success) : back.failure._tag).toEqual([
+      "ChangeBounced",
+      "LeaseRestarted",
+    ]);
+    const bounced = Result.isSuccess(back)
+      ? back.success.reduce<Change>((c, payload) => evolveChange(c, { at: now, payload }), recorded)
+      : recorded;
+    expect(bounced.state).toBe("bounced");
+    expect(bounced.lease).toMatchObject({ id: LEASE, state: "active", renewedAt: now });
+    // Its agent works on it under that lease, until the 15 minutes from the hand-back run out.
+    expect(Result.isSuccess(checkLease(bounced, LEASE, now))).toBe(true);
+    expect(Result.isSuccess(checkLease(bounced, LEASE, Instant(now + TTL)))).toBe(false);
+  });
+
+  it("[change.lapse-parks-agent-owned-only] the lease alarm parks agent-owned states, and records nothing while the platform holds the change", () => {
     let parkedByAlarm = 0;
-    let keptByAlarm = 0;
+    let quietUnderPlatform = 0;
     assertReaching(
       fc.property(planArb, (plan) =>
         run(plan)
-          .records.filter((r) => r.kind === "Lapse" && eventsOf(r).length > 0)
+          .records.filter((r) => r.kind === "Lapse" && r.before !== undefined)
           .every((r) => {
             const from = keyOf(r.before);
             if (agentOwned(from)) {
+              if (eventsOf(r).length === 0) return true;
               parkedByAlarm++;
               return keyOf(r.after) === "parked:lease-lapsed";
             }
-            keptByAlarm++;
-            return !r.threw && keyOf(r.after) === from && r.after?.lease.state === "lapsed";
+            if (
+              from !== "parked:lease-lapsed" &&
+              !terminal(from) &&
+              r.before !== undefined &&
+              r.now - r.before.lease.renewedAt >= TTL
+            )
+              quietUnderPlatform++;
+            return !r.threw && eventsOf(r).length === 0 && keyOf(r.after) === from;
           }),
       ),
     );
     expect(parkedByAlarm).toBeGreaterThan(0);
-    expect(keptByAlarm).toBeGreaterThan(0);
-    // In Integrating the change belongs to its batch: the lapse is recorded, nothing moves.
+    expect(quietUnderPlatform).toBeGreaterThan(0);
+    // In Integrating the change belongs to its batch: past the 15 minutes, the alarm records nothing.
     const integrating = drive([
       ...[declare, start, submit, precheck, compile, queue, batch].map((c) => [c, 1] as const),
       [lapse, TTL],
     ]);
     expect(integrating.keys.at(-1)).toBe("integrating");
-    expect(tags(integrating.log).at(-1)).toBe("LeaseLapsed");
+    expect(tags(integrating.log).at(-1)).toBe("ChangeBatched");
     const working = drive([...[declare, start].map((c) => [c, 1] as const), [lapse, TTL]]);
     expect(working.keys.at(-1)).toBe("parked:lease-lapsed");
   });
@@ -1423,7 +1470,8 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       [{ ...ruledAgainst, decisionId: D2 }, 1],
     ]);
     expect(thenAgainst.keys.slice(-2)).toEqual([waiting, "bounced"]);
-    expect(thenAgainst.log.at(-1)).toMatchObject({ _tag: "ChangeBounced", decisionId: D2 });
+    // The bounce, then the restart of the lease it hands back.
+    expect(thenAgainst.log.at(-2)).toMatchObject({ _tag: "ChangeBounced", decisionId: D2 });
     // The refusal names every question still open, blocks on nothing else, and says what the wait is for.
     const heldFor = drive([...verified, [parkUnder(E1), 1], [resumeOn(D1, E2, E1), 1]]).results.at(
       -1,
@@ -1529,7 +1577,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       ...[declare, start, submit, precheck, compile].map((c) => [c, 1] as const),
       [bounce, 1],
     ]);
-    expect(bounced.log.at(-1)).toMatchObject({
+    expect(bounced.log.at(-2)).toMatchObject({
       _tag: "ChangeBounced",
       nextActions: [{ operationId: "submit" }],
     });
@@ -1834,14 +1882,38 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(parked.keys.slice(-2)).toEqual(["parked:lease-lapsed", "working"]);
     expect(parked.state?.lease).toMatchObject({ id: ADOPTED, state: "active" });
-    // Waiting on a ruling, the change keeps waiting, now under the new lease.
+    // Waiting on a ruling, the platform holds the change: its lease cannot lapse, however long it waits.
     const ruling = drive([
       ...[declare, start, submit, precheck, compile].map((c) => [c, 1] as const),
       [{ _tag: "Park", escalationId: makeId("esc", ulid(10)) }, 1],
       [adopt, TTL],
     ]);
     expect(ruling.keys.at(-1)).toBe("parked:awaiting-ruling");
-    expect(ruling.state?.lease.id).toBe(ADOPTED);
+    expect(ruling.state?.lease.id).toBe(LEASE);
+    const refused = ruling.results.at(-1);
+    const notLapsed =
+      refused !== undefined &&
+      Result.isFailure(refused) &&
+      refused.failure._tag === "LeaseNotLapsed"
+        ? refused.failure
+        : undefined;
+    expect(notLapsed?.changeId).toBe(CHANGE);
+    // No time to give while the platform holds it: the lease lapses only once the change is back.
+    expect(notLapsed?.lapsesAt).toBeUndefined();
+    // A lease recorded Lapsed while the platform held the change waits for the hand-back too.
+    const held = drive([declare, start, submit, precheck, compile].map((c) => [c, 1] as const));
+    const recordedAt = Instant(held.now + TTL);
+    const recorded = evolveChange(held.state, {
+      at: recordedAt,
+      payload: LeaseLapsed.make({ changeId: CHANGE, leaseId: LEASE, renewedAt: Instant(T0 + 1) }),
+    });
+    const adoptedWhileHeld = decideChange(recorded, adopt, {
+      now: Instant(recordedAt + 1),
+      changeId: CHANGE,
+    });
+    expect(Result.isFailure(adoptedWhileHeld) ? adoptedWhileHeld.failure._tag : "adopted").toBe(
+      "LeaseNotLapsed",
+    );
     // Parked before a workspace was granted, it goes back to waiting for one.
     expect(
       drive([
@@ -2018,9 +2090,10 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
       [proven, 0],
     ]);
     expect(queued.keys.at(-1)).toBe("bounced");
-    expect(queued.log.at(-1)).toMatchObject({ _tag: "ChangeBounced", conflictId: CONFLICT });
+    // The bounce, then the restart of the lease it hands back.
+    expect(queued.log.at(-2)).toMatchObject({ _tag: "ChangeBounced", conflictId: CONFLICT });
     // With no next actions given, the bounce names the conflict's ways forward.
-    const bounced = queued.log.at(-1);
+    const bounced = queued.log.at(-2);
     expect(
       bounced?._tag === "ChangeBounced" && bounced.nextActions?.map((a) => a.operationId),
     ).toEqual(["Conflicts_getConflict", "revise", "resolve"]);
@@ -2072,7 +2145,8 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     const large = drive([...integrating, [declinedBounce(BATCH, "pack-too-large"), 0]]);
     expect(large.state?.state).toBe("bounced");
     expect(large.state).not.toHaveProperty("batchId");
-    const event = large.log.at(-1);
+    // The bounce, then the restart of the lease it hands back.
+    const event = large.log.at(-2);
     expect(event).toMatchObject({
       _tag: "ChangeBounced",
       declined: { batchId: BATCH, reason: "pack-too-large" },
@@ -2086,7 +2160,7 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
       ["call", "declare"],
       ["call", "submit"],
     ]);
-    const full = drive([...integrating, [declinedBounce(BATCH, "repo-bytes-quota"), 0]]).log.at(-1);
+    const full = drive([...integrating, [declinedBounce(BATCH, "repo-bytes-quota"), 0]]).log.at(-2);
     expect(
       full?._tag === "ChangeBounced" && full.nextActions?.map((a) => [a.kind, a.operationId]),
     ).toEqual([
@@ -2146,7 +2220,6 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
               if (!parked || r.before === undefined) return Result.isFailure(p.result);
               if (!Result.isSuccess(p.result)) return false;
               const [first, ...rest] = p.result.success;
-              const lapsed = lapsedAt(r.before, r.now);
               bounced++;
               return (
                 first?._tag === "ChangeBounced" &&
@@ -2155,10 +2228,9 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
                 first.conflictId === undefined &&
                 first.declined === undefined &&
                 (first.nextActions ?? []).length > 0 &&
-                // Handed back under a lapsed lease, it parks for adoption as any bounce does.
-                JSON.stringify(rest.map((e) => e._tag)) ===
-                  JSON.stringify(lapsed ? ["ChangeParked"] : []) &&
-                p.key === (lapsed ? "parked:lease-lapsed" : "bounced")
+                // Handed back, its lease's 15 minutes start again, even from a lapse recorded while it waited.
+                JSON.stringify(rest.map((e) => e._tag)) === JSON.stringify(["LeaseRestarted"]) &&
+                p.key === "bounced"
               );
             })
           );
@@ -2176,13 +2248,14 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     for (const key of ["parkReason", "escalationId", "parkedFrom", "laneId"])
       expect(fromQueued.state).not.toHaveProperty(key);
     // The decision is the bounce's one cause, and with no actions given it names the two ways forward.
-    const event = fromQueued.log.at(-1);
+    // The bounce, then the restart of the lease it hands back.
+    const event = fromQueued.log.at(-2);
     expect(event).toMatchObject({ _tag: "ChangeBounced", decisionId: RULING });
     for (const cause of ["verdictId", "conflictId", "declined"])
       expect(event).not.toHaveProperty(cause);
     // Through the wire it is the same bounce.
     expect(
-      throughTheWire(fromQueued.log.map((payload) => ({ at: T0, payload }))).at(-1)?.payload,
+      throughTheWire(fromQueued.log.map((payload) => ({ at: T0, payload }))).at(-2)?.payload,
     ).toEqual(event);
     expect(
       event?._tag === "ChangeBounced" && event.nextActions?.map((a) => [a.kind, a.operationId]),
@@ -2195,7 +2268,7 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
       ...verifying,
       [park, 0],
       [{ ...ruledAgainst, nextActions: [{ kind: "wait", title: "Wait for the other change" }] }, 0],
-    ]).log.at(-1);
+    ]).log.at(-2);
     expect(given?._tag === "ChangeBounced" && given.nextActions).toEqual([
       { kind: "wait", title: "Wait for the other change" },
     ]);
@@ -2212,10 +2285,12 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(failureTag(orphaned.results.at(-1))).toBe("ChangeStateRefused");
     expect(orphaned.keys.slice(-2)).toEqual(["parked:lease-lapsed", "parked:lease-lapsed"]);
-    // The lease lapsed while the change waited: the ruling bounces it, and it parks for adoption.
-    const stale = drive([...verifying, [park, 0], [ruledAgainst, TTL]]);
-    expect(tags(stale.log).slice(-2)).toEqual(["ChangeBounced", "ChangeParked"]);
-    expect(stale.keys.at(-1)).toBe("parked:lease-lapsed");
+    // A ruling that comes past the 15 minutes finds the lease alive: the platform held the
+    // change, so it bounces it with the lease running again from the bounce.
+    const late = drive([...verifying, [park, 0], [ruledAgainst, TTL]]);
+    expect(tags(late.log).slice(-2)).toEqual(["ChangeBounced", "LeaseRestarted"]);
+    expect(late.keys.at(-1)).toBe("bounced");
+    expect(late.state?.lease).toMatchObject({ state: "active", renewedAt: late.now });
     // The decision is one cause among four: alone it decodes, beside another it does not.
     const decode = Schema.decodeUnknownSync(ChangeEvent);
     const base = { _tag: "ChangeBounced", changeId: CHANGE, reasons: [] };
@@ -2431,7 +2506,11 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(tagsOf(early.log)).not.toContain("EffectsDerived");
     // The derivation is on the log when the drift sends the change back to its agent.
     const drifted = drive([...deriving, [derive, 0], [drifts, 0]]);
-    expect(tagsOf(drifted.log).slice(-2)).toEqual(["EffectsDerived", "ChangeDrifted"]);
+    expect(tagsOf(drifted.log).slice(-3)).toEqual([
+      "EffectsDerived",
+      "ChangeDrifted",
+      "LeaseRestarted",
+    ]);
     expect(drifted.state?.state).toBe("drifted");
     // A bounced change resubmitted without a revision is a new pass over a new commit: it derives again.
     const again = drive([
@@ -2685,6 +2764,7 @@ const changeFolds = (
   const inState = (...states: readonly Change["state"][]): boolean => states.includes(f.state);
   if (inState("landed", "withdrawn", "superseded")) return "illegal";
   const awaitsRuling = inState("parked") && f.park === "awaiting-ruling";
+  // An adoption folds by the lease's own time rule, so a log decided under any rule folds.
   const leaseLapsed =
     f.lease.state === "lapsed" || (f.lease.state === "active" && at >= f.lease.renewed + TTL);
   const when = (legal: boolean, lands: () => FoldedChange): FoldedChange | "illegal" =>
@@ -2835,6 +2915,14 @@ const changeFolds = (
       return when(
         f.lease.state === "active" && event.leaseId === f.lease.id && at >= f.lease.renewed + TTL,
         () => ({ ...f, lease: { ...f.lease, state: "lapsed" } }),
+      );
+    case "LeaseRestarted":
+      // A hand-back's restart, once the change waits on its agent again: a lapse recorded under the platform too.
+      return when(
+        (f.lease.state === "active" || f.lease.state === "lapsed") &&
+          event.leaseId === f.lease.id &&
+          inState("declared", "working", "drifted", "bounced"),
+        () => ({ ...f, lease: { ...f.lease, state: "active", renewed: at } }),
       );
     default: {
       const unreachable: never = event;
@@ -3001,12 +3089,84 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
         return [event, bare];
       }
       case "LeaseLapsed":
+      case "LeaseRestarted":
         return leases.map((leaseId) => ({ ...event, leaseId }));
       default:
         return [event];
     }
   };
 };
+
+/** The events a run commits, each at the instant it was decided. */
+const logOf = (script: readonly (readonly [ChangeCommand, number])[]) => {
+  let state: Change | undefined;
+  let now = T0;
+  const log: Committed<ChangeEvent>[] = [];
+  for (const [command, dt] of script) {
+    now = Instant(now + dt);
+    const result = decideChange(state, command, { now, changeId: CHANGE });
+    if (Result.isFailure(result)) throw new Error(`${command._tag} was refused`);
+    for (const payload of result.success) {
+      state = evolveChange(state, { at: now, payload });
+      log.push({ at: now, payload });
+    }
+  }
+  return { log, now };
+};
+
+describe("logs decided under an earlier rule of when a lease lapses", () => {
+  it("[change.replay-old-logs] a log in which a hand-back restarted nothing replays to the change it was decided as: an adoption while verifying past the deadline, and adoptions after a bounce just before it", () => {
+    // Verifying since its declare: the lease's deadline is a TTL after the declare.
+    const held = logOf([declare, start, submit, precheck, compile].map((c) => [c, 1] as const));
+    const declaredAt = held.log[0]?.at ?? T0;
+    const after = (dt: number) => Instant(held.now + dt);
+    const bounced = ChangeBounced.make({
+      changeId: CHANGE,
+      verdictId: makeId("vrd", ulid(6)),
+      reasons: ["a conflict was proven"],
+      nextActions: [],
+    });
+    const adopted = ChangeAdopted.make({
+      changeId: CHANGE,
+      previousAgentId: AGENT,
+      agentId: makeId("agt", ulid(8)),
+      leaseId: ADOPTED,
+      briefRef: "brief",
+    });
+    const replayed = (tail: readonly Committed<ChangeEvent>[]) => {
+      const change = replayChange([...held.log, ...tail]);
+      return { state: change?.state, lease: change?.lease.id, holder: change?.lease.state };
+    };
+    // A: adopted while Verifying, past the deadline, before the alarm made the lapse visible.
+    expect(replayed([{ at: after(TTL), payload: adopted }])).toEqual({
+      state: "verifying",
+      lease: ADOPTED,
+      holder: "active",
+    });
+    // E: bounced 10 s before the deadline, which the bounce did not move, and adopted 20 s after it.
+    expect(
+      replayed([
+        { at: after(TTL - 10_000), payload: bounced },
+        { at: after(TTL + 20_000), payload: adopted },
+      ]),
+    ).toEqual({ state: "bounced", lease: ADOPTED, holder: "active" });
+    // F: the same bounce, then the alarm at the deadline parks it, and an adoption takes it back.
+    expect(
+      replayed([
+        { at: after(TTL - 10_000), payload: bounced },
+        {
+          at: after(TTL),
+          payload: LeaseLapsed.make({ changeId: CHANGE, leaseId: LEASE, renewedAt: declaredAt }),
+        },
+        {
+          at: after(TTL),
+          payload: ChangeParked.make({ changeId: CHANGE, reason: "lease-lapsed" }),
+        },
+        { at: after(TTL + 1), payload: adopted },
+      ]),
+    ).toEqual({ state: "working", lease: ADOPTED, holder: "active" });
+  });
+});
 
 describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
@@ -3031,10 +3191,11 @@ describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Forty-one shapes of change, nothing among them and two of them one fold past the tour, each
-    // meeting the first two events of a kind at each revision, sixty in all their forms, at four
-    // instants: 41 × 60 × 4 = 9840 folds. The table takes 1716 of them and refuses the rest.
+    // Thirty shapes of change, nothing among them and two of them one fold past the tour (no lease
+    // lapses while the platform holds a change), each meeting the first two events of a kind at
+    // each revision, sixty-four in all their forms, at four instants: 30 × 64 × 4 = 7680 folds.
+    // The table takes 1208 of them and refuses the rest.
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 9840, refused: 8124, rows: 41 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 7680, refused: 6472, rows: 30 });
   });
 });

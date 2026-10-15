@@ -27,7 +27,7 @@ import {
   submit,
 } from "@keeltown/core/application/coordination";
 import { tellPreview } from "@keeltown/core/application/delivery";
-import { lapsesAt } from "@keeltown/core/domain/coordination";
+import { isAgentOwned, lapsesAt } from "@keeltown/core/domain/coordination";
 import { ChangeId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Exit, Option, Schema } from "effect";
@@ -333,11 +333,16 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     await this.armLease();
   }
 
-  /** Arms the active lease's deadline at `renewedAt` + 15 min, and withdraws every other lease's. */
+  /**
+   * Arms the active lease's deadline at `renewedAt` + 15 min while the change
+   * waits on its agent, and withdraws every other deadline: a lease cannot
+   * lapse while the platform holds the change.
+   */
   private async armLease(): Promise<void> {
     const change = await this.runtime.runPromise(Effect.option(getChange(this.changeId)));
-    const lease = Option.isSome(change) ? change.value.lease : undefined;
-    const active = lease?.state === "active" ? lease : undefined;
+    const held =
+      Option.isSome(change) && isAgentOwned(change.value.state) ? change.value : undefined;
+    const active = held?.lease.state === "active" ? held.lease : undefined;
     const keep = active === undefined ? undefined : leaseDeadline(active.id);
     for (const armed of armedAlarms(this.ctx.storage)) {
       if (LEASE_DEADLINE.test(armed.reason) && armed.reason !== keep)

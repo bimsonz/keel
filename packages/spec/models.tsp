@@ -47,6 +47,20 @@ model Lease {
   lapsesAt: utcDateTime;
 }
 
+/** A change's lease as the agent holding it reads it. */
+model ChangeLease {
+  id: LeaseId;
+  renewedAt: utcDateTime;
+
+  /**
+   * When the lease lapses unless the agent acts on the change again. Absent
+   * while Keel holds the change (deriving, verifying, queued, integrating, or
+   * parked for a ruling): its lease cannot lapse then, and its 15 minutes
+   * start again when Keel hands the change back.
+   */
+  lapsesAt?: utcDateTime;
+}
+
 /**
  * The throwaway repo a change is worked in, and how to push to it:
  * clone `remote`, commit, push `HEAD:refs/heads/main`, then submit the
@@ -97,6 +111,12 @@ model Change {
 
   /** The run of the agent that holds the change, when its token named one. */
   run?: RunRef;
+
+  /**
+   * The change's active lease, shown only to the agent holding it (under the
+   * change's run, when it has one), so a lease it lost track of can be read back.
+   */
+  lease?: ChangeLease;
 
   createdAt: utcDateTime;
 }

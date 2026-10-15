@@ -377,6 +377,36 @@ describe("the lease's deadline", () => {
     expect((await c.current()).state).toBe("working");
     expect(await leaseAlarms(c)).toHaveLength(1);
   });
+
+  it("[b11.lapse-held] arms no deadline while the platform holds the change, records no lapse past it, and arms one 15 minutes after the hand-back", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await changeUnderTest();
+    const lease = ok(await c.declare()).change.lease.id;
+    ok(await submit(c, lease, await c.push(), "submit-1"));
+    const whileHeld = await leaseAlarms(c);
+    c.clock.advance(LEASE_TTL_MS);
+    await deadline(c, lease);
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      ),
+    );
+    c.clock.advance(1);
+    const back = ok(
+      decodeExit(ChangeCodecs.precheckRefused, await c.stub.precheckRefused(refusing(1, "p-1"))),
+    ).change;
+
+    expect(whileHeld).toEqual([]);
+    expect((await c.log()).map((event) => event.type)).not.toContain("LeaseLapsed");
+    expect(back.state).toBe("bounced");
+    expect(back.lease).toMatchObject({ state: "active", renewedAt: c.clock.now() });
+    expect(await leaseAlarms(c)).toEqual([
+      { kind: "deadline", reason: `lease ${lease} lapses`, at: c.clock.now() + LEASE_TTL_MS },
+    ]);
+    await expectStateIsTheLog(c);
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
 });
 
 describe("Precheck and the change", () => {
@@ -408,7 +438,8 @@ describe("a Precheck refusal over RPC", () => {
     const refused = ok(
       decodeExit(ChangeCodecs.precheckRefused, await c.stub.precheckRefused(refusing(1, "p-1"))),
     );
-    const bounced = (await c.log()).at(-1);
+    // The bounce, then the restart of the lease it hands back.
+    const bounced = (await c.log()).at(-2);
 
     expect(refused.change.state).toBe("bounced");
     expect(bounced?.payload).toMatchObject({ _tag: "ChangeBounced", verdictId: refused.verdictId });
@@ -687,13 +718,14 @@ describe("a change moved by its real lane's delivered events", () => {
     ).find((event) => event.type === "BatchFormed");
     const log = await c.log();
 
-    expect(log.map((event) => event.type).slice(-3)).toEqual([
+    expect(log.map((event) => event.type).slice(-4)).toEqual([
       "ChangeQueued",
       "ChangeBatched",
       "ChangeBounced",
+      "LeaseRestarted",
     ]);
     // KeelVerify's remedy, through the lane's VerdictIssued, not the machine's "fix and submit".
-    expect(log.at(-1)?.payload).toEqual(
+    expect(log.at(-2)?.payload).toEqual(
       expect.objectContaining({ reasons: ["test-failed: test/auth.test.ts"], nextActions: REMEDY }),
     );
     expect(otherFormed).toBeDefined();

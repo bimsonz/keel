@@ -536,7 +536,7 @@ export function makeChangesMemory(
                 state: change.state,
                 command: "Adopt",
               });
-            if (!lapsed.has(changeId) && !isLapsed(change.lease, now))
+            if (!lapsed.has(changeId) && !isLapsed(change, now))
               return yield* new LeaseNotLapsed({
                 changeId,
                 lapsesAt: lapsesAt(change.lease),
@@ -597,7 +597,7 @@ export function makeChangesMemory(
               (change.lease.id !== authority.leaseId ||
                 change.lease.state !== "active" ||
                 lapsed.has(changeId) ||
-                isLapsed(change.lease, now))
+                isLapsed(change, now))
             )
               return yield* new LeaseStale({ changeId, leaseId: authority.leaseId });
             if (change.state === "integrating") return yield* refused;

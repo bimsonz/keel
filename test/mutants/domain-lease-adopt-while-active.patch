@@ -2,15 +2,15 @@
 # kills: lease.adopt-iff-lapsed
 # why: A change is adopted from under an agent whose lease is alive
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..ac9031cf 100644
+index f61b7350..ed97d261 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -824,7 +824,7 @@ export const decideChange = (
-       );
+@@ -840,7 +840,7 @@ export const decideChange = (
  
      case "Adopt":
--      if (!isLapsed(change.lease, now)) {
-+      if (change.lease.state === "released") {
-         return Result.fail(
-           new LeaseNotLapsed({
-             changeId: id,
+       if (
+-        !isLapsed(change, now) ||
++        change.lease.state === "released" ||
+         // A lease recorded Lapsed while the platform held the change waits for the hand-back too.
+         !(isAgentOwned(change.state) || (at("parked") && change.parkReason === "lease-lapsed"))
+       ) {

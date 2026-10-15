@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b11.refresh-renews
+# kills: b11.refresh-renews
+# why: a workspace token refreshed under the lease leaves the lease's renewal where it was
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 8a60214..fe017a0 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1770,7 +1770,6 @@ const refreshWorkspaceCall: (
+     now,
+   );
+   if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+-  yield* renewHeld(changeId, command.leaseId);
+   // The pool finds the workspace this change holds and only mints a token: it cannot run out.
+   return yield* (yield* WorkspacePool)
+     .grant(allowed.success.projectId, changeId)

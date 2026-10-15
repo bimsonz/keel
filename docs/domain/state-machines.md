@@ -61,13 +61,11 @@ stateDiagram-v2
   Working --> Withdrawn: ChangeWithdrawn
   Working --> Superseded: ChangeSuperseded
   Submitted --> Deriving: PrecheckStarted
-  Submitted --> Submitted: ChangeAdopted
   Submitted --> Withdrawn: ChangeWithdrawn
   Submitted --> Superseded: ChangeSuperseded
   Deriving --> Drifted: ChangeDrifted
   Deriving --> Verifying: PlanCompiled
   Deriving --> Bounced: ChangeBounced
-  Deriving --> Deriving: ChangeAdopted
   Deriving --> Withdrawn: ChangeWithdrawn
   Deriving --> Superseded: ChangeSuperseded
   Drifted --> Working: IntentRevised
@@ -78,19 +76,16 @@ stateDiagram-v2
   Verifying --> Queued: ChangeQueued
   Verifying --> AwaitingRuling: ChangeParked
   Verifying --> Bounced: ChangeBounced
-  Verifying --> Verifying: ChangeAdopted
   Verifying --> Withdrawn: ChangeWithdrawn
   Verifying --> Superseded: ChangeSuperseded
   Queued --> Integrating: ChangeBatched
   Queued --> AwaitingRuling: ChangeParked
   Queued --> Bounced: ChangeBounced
-  Queued --> Queued: ChangeAdopted
   Queued --> Withdrawn: ChangeWithdrawn
   Queued --> Superseded: ChangeSuperseded
   Integrating --> Queued: ChangeRequeued
   Integrating --> Bounced: ChangeBounced
   Integrating --> Landed: ChangeLanded
-  Integrating --> Integrating: ChangeAdopted
   Bounced --> Working: IntentRevised
   Bounced --> Submitted: ChangeSubmitted
   Bounced --> Bounced: ChangeRebased
@@ -104,7 +99,6 @@ stateDiagram-v2
   AwaitingRuling --> Queued: ChangeResumed [parked from Queued]
   AwaitingRuling --> Bounced: ChangeBounced
   AwaitingRuling --> AwaitingRuling: ChangeParked
-  AwaitingRuling --> AwaitingRuling: ChangeAdopted
   LeaseLapsed --> Working: ChangeAdopted [has-workspace]
   LeaseLapsed --> Declared: ChangeAdopted [no-workspace]
   Landed --> [*]
@@ -139,9 +133,9 @@ stateDiagram-v2
 | Parked (awaiting-ruling) | Parked (awaiting-ruling) | The ruling it waits for is given while another of its conflicts is still with a person: its resume is refused, and it is parked under that conflict's escalation | The park names another escalation than the one the change waits on: the same one is refused | `ChangeParked {reason: awaiting-ruling}`, naming the escalation it waits on from here. Nothing else moves: where it was parked from, its lane, its plan and its lease stay, so the last ruling resumes it to where it was first parked |
 | Parked (awaiting-ruling) | Bounced | The ruling it waits for goes against it (caused by the `ConflictResolved` that names the change in `against`) | The change is parked for a ruling: a decision bounces a change from no other state, and one parked for a lapsed lease stays parked | `ChangeBounced {decisionId}`: the decision is its one cause. It leaves the park as any bounce does, out of its lane, with the ways forward: revise the intent so that it no longer contradicts what was ruled, or withdraw |
 | Parked (lease-lapsed) | Working | `adopt` | The lease is Lapsed | `ChangeAdopted` (new lease; the old token is fenced). A change parked before its workspace was granted returns to Declared |
-| any other non-terminal state | the same state | `adopt` | The lease is Lapsed | `ChangeAdopted`: the change keeps waiting (e.g. Parked awaiting-ruling, Verifying), now with the new lease |
-| an agent-owned state | Parked (lease-lapsed) | The lease's deadline alarm | The lease lapsed: 15 minutes since `renewedAt` | `LeaseLapsed`, then `ChangeParked {reason: lease-lapsed}` |
-| a platform-owned state | an agent-owned state, with a Lapsed lease | Any transition into Bounced, Drifted, or Working after a ruling | The lease lapsed while the platform owned the change | that transition's event, then `ChangeParked {reason: lease-lapsed}` in the same transaction |
+| an agent-owned state | the same state | `adopt` | The lease is Lapsed: its deadline passed, and the alarm has not yet parked the change | `ChangeAdopted`: the change stays where it is, now with the new lease. While the platform holds the change its lease cannot lapse, so adoption is refused as not lapsed, with no lapse time and a wait for the hand-back |
+| an agent-owned state | Parked (lease-lapsed) | The lease's deadline alarm | The lease lapsed: 15 minutes since `renewedAt`, which a hand-back moves to its own time | `LeaseLapsed`, then `ChangeParked {reason: lease-lapsed}` |
+| a platform-owned state | an agent-owned state | Any transition into Bounced or Drifted | — | That transition's event, then `LeaseRestarted` in the same transaction: the lease's 15 minutes start again from the hand-back. A lease recorded Lapsed while the platform held the change, under the rule before the deadline ran only while it waits on its agent, is restarted too: that lapse does not stand, and the change goes to its agent, not to a park |
 | any non-terminal state | the same state | A conflict is proven against the change under an `advise` or `annotate` policy | — | `ConflictNoted {policy}`: nothing moves. Under `advise` it names the ways forward (read the conflict, revise, resolve); under `annotate` it notifies no one |
 | any but Integrating and terminal | Withdrawn | `abandon` | Valid lease, or scope `operator` | `ChangeWithdrawn` |
 | any but Integrating and terminal | Superseded | A ruling chooses an alternative; or, by policy, an alternative that retracts a tenet loses automatically when the winner lands | — | `ChangeSuperseded` (caused by `RulingGiven` or by the winner's `ChangeLanded`) |
@@ -155,8 +149,8 @@ stateDiagram-v2
 - **No resume past a question a person was asked:** the ruling on one of a change's conflicts never resumes it while another is with a person. The Change DO hands the machine the escalations still open with the resume, and the machine refuses it while there is one; the change stays parked and waits on that one, so a ruling that then goes against it finds it waiting and bounces it. It resumes on the last ruling, in whatever order they come.
 - **A resumed change is the change that was parked:** it is back in the state it was parked from, in its lane and under its plan, and only its lease may have moved while it waited. (Property-tested against the harness's own record of where it was parked, not the change's.)
 - Effects used in any verdict are derived by Keel, never taken from the agent.
-- A lapse parks only agent-owned states. In Integrating the change belongs to its batch, so withdrawal waits until the batch resolves.
-- **No orphaned change:** for every event sequence, a change in an agent-owned state has an Active lease or is Parked. (Property-tested: a lease lapsing in any platform-owned state, followed by any transition into an agent-owned state, ends Parked.)
+- A lease lapses only while the change waits on its agent (an agent-owned state): while the platform holds it, from Submitted to Integrating or parked for a ruling, the deadline does not run, and the hand-back starts it again. A lapse parks the change. In Integrating the change belongs to its batch, so withdrawal waits until the batch resolves.
+- **No orphaned change:** for every event sequence, a change in an agent-owned state has an Active lease or is Parked. (Property-tested: every hand-back into an agent-owned state leaves an Active lease renewed at the hand-back, and the alarm records nothing while the platform holds the change.)
 - Every landed change has an Intent revision, a Session link and a Verdict with evidence.
 
 ---
@@ -170,7 +164,7 @@ Owner: Change DO. A Lease is a permit to act on a Change, carrying a server-mint
 stateDiagram-v2
   [*] --> Active: IntentDeclared / ChangeAdopted
   Active --> Lapsed: LeaseLapsed
-  Active --> Lapsed: ChangeParked [lease-lapsed]
+  Active --> Active: LeaseRestarted
   Active --> Active: ChangeParked [awaiting-ruling]
   Active --> Superseded: ChangeAdopted
   Active --> Released: ChangeLanded
@@ -178,7 +172,6 @@ stateDiagram-v2
   Active --> Released: ChangeSuperseded
   Lapsed --> Lapsed: ChangeParked
   Lapsed --> Superseded: ChangeAdopted
-  Lapsed --> Released: ChangeLanded
   Lapsed --> Released: ChangeWithdrawn
   Lapsed --> Released: ChangeSuperseded
   Released --> [*]
@@ -189,8 +182,9 @@ stateDiagram-v2
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
 | — | Active | `declare` or `adopt` | — | `IntentDeclared` / `ChangeAdopted` carry the `leaseId` |
-| Active | Active | Any MCP or REST call on the change, or the agent's hook | The call carries this `leaseId` | none: `renewedAt` is state, not an event |
-| Active | Lapsed | The deadline alarm at `renewedAt + 15 min` | No renewal since | `LeaseLapsed` |
+| Active | Active | Any call on the change that carries this `leaseId` and passes the lease check, whether it is then accepted or refused | The lease is the change's, and not lapsed | none: `renewedAt` is state, not an event |
+| Active | Active | The platform hands the change back to its agent (Bounced, Drifted) | — | `LeaseRestarted`: `renewedAt` is the hand-back's time |
+| Active | Lapsed | The deadline alarm at `renewedAt + 15 min`, armed only while the change waits on its agent | No renewal or hand-back since | `LeaseLapsed` |
 | Lapsed | Superseded | `adopt` by any agent with scope `agent:work` | — | `ChangeAdopted` (the new lease's token fences the old) |
 | Active, Lapsed | Released | The change lands, is withdrawn or is superseded (e.g. an operator withdraws a parked change) | — | the change's terminal event |
 
@@ -199,9 +193,10 @@ stateDiagram-v2
 **Invariants**
 - Every mutating call on a change carries its `leaseId`; a call with a stale token is refused with next actions. "No lease" is never permission. Once the deadline passes, the current token is refused too (as lapsed, with adoption as the next action), whether or not the alarm has fired.
 - Every refusal and every bounce carries at least one next action.
-- Whether a lease has lapsed is computed on read, from `renewedAt` and the time passed in; the alarm only makes the lapse visible as an event. It is a deadline, never a polling loop, and it is re-armed only while the lease is Active.
-- `renewedAt` is state the Change DO persists, not an event, so a replay rebuilds every other field exactly and gives the lease's issue time as `renewedAt`.
-- Adoption is a lease operation: it is allowed whenever the lease is Lapsed, whatever the change is waiting on.
+- Whether a lease has lapsed is computed on read, from `renewedAt`, the change's state and the time passed in; the alarm only makes the lapse visible as an event. It is a deadline, never a polling loop, and it is armed only while the lease is Active and the change waits on its agent.
+- `renewedAt` is state the Change DO persists, not an event, so a replay rebuilds every other field exactly and gives the lease's issue time, or its last `LeaseRestarted`, as `renewedAt`.
+- Adoption is a lease operation: it is allowed whenever the lease is Lapsed and the change waits on its agent, or is parked for the lapse. A lease lapses only while the change waits on its agent, so a change the platform holds cannot be adopted until it is handed back and 15 minutes pass.
+- A lapse recorded while the platform held the change, under the rule before this one, does not stand: its holder's token still passes the lease check, nobody may adopt the change, and the hand-back's `LeaseRestarted` makes the same lease Active again. No one else can hold that lease, since an adoption issues a new one. The fold judges an adoption by the lease's own time rule, so a log decided under any rule of when a lease lapses still folds.
 
 ---
 

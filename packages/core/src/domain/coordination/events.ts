@@ -277,6 +277,11 @@ export const LeaseLapsed = Schema.TaggedStruct("LeaseLapsed", {
   leaseId: LeaseId,
   renewedAt: InstantSchema,
 });
+/** The platform handed the change back to its agent: the lease's 15 minutes start again from here. */
+export const LeaseRestarted = Schema.TaggedStruct("LeaseRestarted", {
+  changeId: ChangeId,
+  leaseId: LeaseId,
+});
 
 // Subjects and premises
 
@@ -359,6 +364,7 @@ export const CoordinationEvent = Schema.Union([
   ChangeWithdrawn,
   ChangeSuperseded,
   LeaseLapsed,
+  LeaseRestarted,
   SubjectMinted,
   PremiseSuspected,
   PremiseReaffirmed,

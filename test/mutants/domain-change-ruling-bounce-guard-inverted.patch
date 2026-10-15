@@ -2,10 +2,10 @@
 # kills: change.ruling-bounces, change.chart
 # why: the guard is inverted: a ruling's decision is refused on the change waiting for it, so no ruling ever bounces the change it goes against
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2549e49a..f4458680 100644
+index f61b7350..15b1b823 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -727,7 +727,7 @@ export const decideChange = (
+@@ -766,7 +766,7 @@ export const decideChange = (
        }
        if (command.decisionId !== undefined) {
          // A ruling goes against a change only while the change waits for it.
@@ -13,4 +13,4 @@ index 2549e49a..f4458680 100644
 +        if (awaitingRuling) return refuse(change, command);
          return intoAgentOwned(
            change,
-           now,
+           ChangeBounced.make({

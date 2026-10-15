@@ -2,13 +2,13 @@
 # kills: b31.distinguish
 # why: a distinction answers 200 and records nothing on the change
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 4e4191d2..3d8870dd 100644
+index 8a60214b..1bcec7df 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1269,7 +1269,7 @@ export const distinguish: (
+@@ -1403,7 +1403,7 @@ const distinguishCall: (
        });
        return Result.succeed({
-         value: change,
+         value: renewed.success,
 -        drafts: [{ payload: payloadOf(encodeDistinguished(distinguished)) }],
 +        drafts: [],
        });

@@ -824,7 +824,8 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             readChange(decoded.success).pipe(
               Effect.match({
-                onSuccess: ({ change }) => changeOk(change),
+                onSuccess: ({ change }) =>
+                  changeOk(change, caller.principal._tag === "Agent" ? caller.token : undefined),
                 onFailure: (error) => changeReadError(caller, error),
               }),
             ),

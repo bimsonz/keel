@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b12.held-lease
+# kills: b12.held-lease
+# why: a lease recorded Lapsed while the platform held the change is hidden from its holder, though it still passes the lease check
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 2953dfb4..15f0e6f6 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1286,7 +1286,7 @@ export function changeOk(change: Change, reader?: AgentClaims): ChangeResult {
+ function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
+   return (
+     reader !== undefined &&
+-    leaseStands(change) &&
++    change.lease.state === "active" &&
+     reader.agentId === change.lease.agentId &&
+     (change.run === undefined || change.run.id === reader.run?.id)
+   );

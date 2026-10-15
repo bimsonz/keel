@@ -45,10 +45,14 @@ export class ChangeInOtherProject extends Schema.TaggedError<ChangeInOtherProjec
   { changeId: ChangeId },
 ) {}
 
-/** `adopt` while the lease is still alive: adoption needs a Lapsed lease. */
+/**
+ * `adopt` while the lease is still alive: adoption needs a Lapsed lease.
+ * `lapsesAt` is when it lapses unless renewed; absent while Keel holds the
+ * change, when it cannot lapse until Keel hands the change back.
+ */
 export class LeaseNotLapsed extends Schema.TaggedError<LeaseNotLapsed>()("LeaseNotLapsed", {
   changeId: ChangeId,
-  lapsesAt: InstantSchema,
+  lapsesAt: Schema.optional(InstantSchema),
   nextActions: Schema.Array(NextAction),
 }) {}
 

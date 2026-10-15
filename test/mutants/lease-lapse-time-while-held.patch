@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b12.held-lease
+# kills: b12.held-lease
+# why: the holder reads a lapse time while the platform holds the change, when its lease cannot lapse
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 782e06a..c6e6d99 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1269,7 +1269,7 @@ function heldLeaseView(change: Change) {
+   return {
+     id: lease.id,
+     renewedAt: iso(lease.renewedAt),
+-    ...(isAgentOwned(change.state) ? { lapsesAt: iso(lapsesAt(lease)) } : {}),
++    lapsesAt: iso(lapsesAt(lease)),
+   };
+ }
+ 

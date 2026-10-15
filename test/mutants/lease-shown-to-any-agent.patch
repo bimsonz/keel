@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b12.held-lease
+# kills: b12.held-lease
+# why: a change's lease is shown to any agent that reads the change
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 2953dfb4..fd9b546b 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1287,7 +1287,6 @@ function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
+   return (
+     reader !== undefined &&
+     leaseStands(change) &&
+-    reader.agentId === change.lease.agentId &&
+     (change.run === undefined || change.run.id === reader.run?.id)
+   );
+ }

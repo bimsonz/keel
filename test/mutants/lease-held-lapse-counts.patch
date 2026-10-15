@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts -t change.held-lapse-void
+# kills: change.held-lapse-void
+# why: a lapse recorded while the platform held the change counts, so its holder's calls are refused as lapsed and the change can be adopted from under it
+diff --git a/packages/core/src/domain/coordination/lease.ts b/packages/core/src/domain/coordination/lease.ts
+index 8afc26e9..e87e1cb9 100644
+--- a/packages/core/src/domain/coordination/lease.ts
++++ b/packages/core/src/domain/coordination/lease.ts
+@@ -36,7 +36,7 @@ const waitsOnAgent = (change: Change): boolean =>
+  * change, under the rule before this one, does not stand either.
+  */
+ export const isLapsed = (change: Change, now: Instant): boolean =>
+-  waitsOnAgent(change) && deadlinePassed(change.lease, now);
++  change.lease.state === "lapsed" || (waitsOnAgent(change) && deadlinePassed(change.lease, now));
+ 
+ /**
+  * Whether the change's lease is still its holder's permit: active, or recorded

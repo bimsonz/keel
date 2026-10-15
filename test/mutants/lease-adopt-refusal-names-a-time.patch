@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts -t lease.adopt-iff-lapsed
+# kills: lease.adopt-iff-lapsed
+# why: adoption refused while the platform holds the change names a lapse time the lease will never keep
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index f61b735..376fa67 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -846,7 +846,7 @@ export const decideChange = (
+       ) {
+         // While the platform holds the change its lease cannot lapse: there is no time to give.
+         return Result.fail(
+-          isAgentOwned(change.state)
++          true
+             ? new LeaseNotLapsed({
+                 changeId: id,
+                 lapsesAt: lapsesAt(change.lease),

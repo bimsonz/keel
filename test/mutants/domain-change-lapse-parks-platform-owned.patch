@@ -2,15 +2,15 @@
 # kills: change.lapse-parks-agent-owned-only
 # why: The lease alarm parks a change the platform holds
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 8b58b69..f43fadb 100644
+index f61b7350..9173c7a4 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -573,7 +573,7 @@ export const decideChange = (
-         renewedAt: change.lease.renewedAt,
-       });
-       return Result.succeed(
--        isAgentOwned(change.state)
-+        !TERMINAL.has(change.state)
-           ? [lapsed, ChangeParked.make({ changeId: id, reason: "lease-lapsed" })]
-           : [lapsed],
-       );
+@@ -886,7 +886,7 @@ export const decideChange = (
+       if (
+         command.leaseId !== change.lease.id ||
+         change.lease.state !== "active" ||
+-        !isLapsed(change, now)
++        now < lapsesAt(change.lease)
+       )
+         return Result.succeed([]);
+       // Only a change that waits on its agent can lapse, and it parks for adoption as it does.

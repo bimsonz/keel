@@ -5,6 +5,7 @@ import {
   changeRead,
   changeWorkspace,
   declare,
+  distinguish,
   getChange,
   lapseLease,
   planCompiled,
@@ -17,12 +18,14 @@ import {
   reactToBatch,
   RELY_READS,
   rely,
+  refreshWorkspace,
   revise,
   submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import {
+  AgentId,
   ChangeId,
   CommitSha,
   ConflictId,
@@ -30,6 +33,7 @@ import {
   EscalationId,
   EventEnvelope,
   makeId,
+  RunRef,
 } from "@keeltown/core/kernel";
 import {
   Clock,
@@ -63,6 +67,7 @@ import {
   ReviseCommand,
   SubmitCommand,
 } from "../../src/rpc/index.ts";
+import { changeOk } from "../../src/adapters/driving/http/work-loop.ts";
 
 const changeId = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const agentId = "agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
@@ -401,22 +406,85 @@ describe("leases", () => {
   );
 
   it.effect(
-    "[b11.lapse] parks a change whose lease lapsed while the platform held it at its next agent-owned transition",
+    "[b11.lapse] keeps the lease of a change the platform holds past 15 minutes, and starts the 15 minutes again when it hands the change back",
     () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
+        const lease = declared.change.lease.id;
         const sha = yield* pushToWorkspace;
-        yield* submit(changeId, submitting(declared.change.lease.id, sha, "submit-1"));
-        yield* precheckStarted(
-          changeId,
-          Schema.decodeUnknownSync(PrecheckStartedCommand)({ revision: 1, instanceId: "p-1" }),
-        );
+        yield* submit(changeId, submitting(lease, sha, "submit-1"));
+        yield* precheckStarted(changeId, starting(1, "p-1"));
         clock.advance(LEASE_TTL_MS);
-        const platformOwned = yield* lapseLease(changeId, declared.change.lease.id, "due");
+        const held = yield* lapseLease(changeId, lease, "due");
+        clock.advance(1);
+        yield* precheckRefused(changeId, refusing(1, "p-1"));
+        const handedBack = yield* getChange(changeId);
+        clock.advance(LEASE_TTL_MS - 1);
+        const early = yield* lapseLease(changeId, lease, "early");
+        clock.advance(1);
+        const parked = yield* lapseLease(changeId, lease, "due-again");
 
-        expect(platformOwned.state).toBe("deriving");
-        expect(platformOwned.lease.state).toBe("lapsed");
+        expect(held.state).toBe("deriving");
+        expect(held.lease.state).toBe("active");
+        expect(handedBack.state).toBe("bounced");
+        expect(handedBack.lease).toMatchObject({
+          state: "active",
+          renewedAt: clock.now() - LEASE_TTL_MS,
+        });
+        expect(early.state).toBe("bounced");
+        expect(parked.state).toBe("parked");
+        expect(parked.parkReason).toBe("lease-lapsed");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b11.renew-on-refusal] a call refused after it passed the lease check renews the lease; one refused at the check renews nothing",
+    () => {
+      const { layer, clock } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        const lease = declared.change.lease.id;
+        clock.advance(60_000);
+        const mismatched = yield* Effect.exit(revise(changeId, revising(lease, 7, "revise-1")));
+        const renewed = (yield* getChange(changeId)).lease.renewedAt;
+        clock.advance(60_000);
+        const other = "lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9";
+        const stale = yield* Effect.exit(revise(changeId, revising(other, 1, "revise-2")));
+        const kept = (yield* getChange(changeId)).lease.renewedAt;
+
+        expect(failureTag(mismatched)).toContain("RevisionMismatch");
+        expect(renewed).toBe(clock.now() - 60_000);
+        expect(failureTag(stale)).toContain("LeaseStale");
+        expect(kept).toBe(renewed);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b11.refresh-renews] a workspace token refreshed under the lease renews it, and a precedent distinguished under it does too",
+    () => {
+      const { layer, clock } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        const leaseId = declared.change.lease.id;
+        const agent = Schema.decodeUnknownSync(AgentId)(agentId);
+        clock.advance(60_000);
+        yield* refreshWorkspace(changeId, { agentId: agent, projectId: sampleProjectId, leaseId });
+        const refreshed = (yield* getChange(changeId)).lease.renewedAt;
+        clock.advance(60_000);
+        const distinguished = yield* distinguish(changeId, {
+          agentId: agent,
+          leaseId,
+          decisionId: makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+          distinction: "this change reads the cache the decision does not govern",
+          idempotencyKey: "distinguish-1",
+        });
+
+        expect(refreshed).toBe(clock.now() - 60_000);
+        expect(distinguished.lease.renewedAt).toBe(clock.now());
+        expect((yield* getChange(changeId)).lease.renewedAt).toBe(clock.now());
       }).pipe(Effect.provide(layer));
     },
   );
@@ -645,7 +713,10 @@ const batched = Effect.gen(function* () {
   return batchId;
 });
 
-const lastEvent = Effect.map(EventOutbox, (outbox) => outbox.log(changeRef).at(-1));
+/** The change's last event, read past the restart of its lease that follows a hand-back. */
+const lastEvent = Effect.map(EventOutbox, (outbox) =>
+  outbox.log(changeRef).findLast((event) => event.type !== "LeaseRestarted"),
+);
 
 describe("the change's batch, delivered", () => {
   it.effect(
@@ -1073,7 +1144,8 @@ describe("a Precheck refusal", () => {
         const replayed = yield* precheckRefused(changeId, refusal);
         const outbox = yield* EventOutbox;
         const verdict = outbox.log({ kind: "verdict", id: answered.verdictId });
-        const bounced = outbox.log({ kind: "change", id: changeId }).at(-1);
+        // The bounce, then the restart of the lease it hands back.
+        const bounced = outbox.log({ kind: "change", id: changeId }).at(-2);
 
         expect(answered.change.state).toBe("bounced");
         expect(replayed.verdictId).toBe(answered.verdictId);
@@ -1536,9 +1608,66 @@ describe("a conflict of the change put to a person", () => {
   );
 });
 
+/** The change as `reader` reads it by id: its lease, if the read shows one. */
+const leaseShown = (
+  change: Parameters<typeof changeOk>[0],
+  reader?: Parameters<typeof changeOk>[1],
+) => Reflect.get(Object(changeOk(change, reader).body), "lease");
+const claims = (agent: string, run?: { readonly id: string; readonly label: string }) => ({
+  agentId: Schema.decodeUnknownSync(AgentId)(agent),
+  scopes: [],
+  revocationEpoch: 0,
+  ...(run === undefined ? {} : { run: Schema.decodeUnknownSync(RunRef)(run) }),
+});
+
 describe("the run an agent's command names", () => {
   const RUN = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0", label: "run-c" };
   const OTHER = { id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V1", label: "run-b" };
+
+  it.effect(
+    "[b12.held-lease] a change read by id shows its lease only to its agent under the change's run, with no lapse time while the platform holds it, and a lapse recorded there does not hide it",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring({ run: RUN }));
+        const { lease } = declared.change;
+        const shown = leaseShown(declared.change, claims(agentId, RUN));
+        expect(shown).toEqual({
+          id: lease.id,
+          renewedAt: new Date(lease.renewedAt).toISOString(),
+          lapsesAt: new Date(lease.renewedAt + LEASE_TTL_MS).toISOString(),
+        });
+        expect(leaseShown(declared.change, claims(agentId, OTHER))).toBeUndefined();
+        expect(leaseShown(declared.change, claims(agentId))).toBeUndefined();
+        expect(leaseShown(declared.change, claims(adopterId, RUN))).toBeUndefined();
+        expect(leaseShown(declared.change)).toBeUndefined();
+
+        const sha = yield* pushToWorkspace;
+        const submitted = yield* submit(
+          changeId,
+          Schema.decodeUnknownSync(SubmitCommand)({
+            agentId,
+            run: RUN,
+            leaseId: lease.id,
+            commitSha: sha,
+            idempotencyKey: "submit-1",
+          }),
+        );
+        const held = { id: lease.id, renewedAt: new Date(submitted.lease.renewedAt).toISOString() };
+        expect(leaseShown(submitted, claims(agentId, RUN))).toEqual(held);
+        // Recorded Lapsed while the platform held the change, under the rule before this one: the lapse does
+        // not stand, and the lease is still its holder's. Parked for a lapse, the change is nobody's until adopted.
+        const recorded = { ...submitted, lease: { ...submitted.lease, state: "lapsed" as const } };
+        expect(leaseShown(recorded, claims(agentId, RUN))).toEqual(held);
+        expect(
+          leaseShown(
+            { ...recorded, state: "parked", parkReason: "lease-lapsed" },
+            claims(agentId, RUN),
+          ),
+        ).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
+  );
 
   /** Each event on the change, as who caused it and under which run. */
   const caused = Effect.map(EventOutbox, (outbox) =>

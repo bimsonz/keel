@@ -2,11 +2,11 @@
 # kills: change.ruling-bounces
 # why: the bounce leaves its decision off the event, so nothing says which ruling sent the change back
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2549e49a..922b102f 100644
+index f61b7350..879d933f 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -733,7 +733,6 @@ export const decideChange = (
-           now,
+@@ -771,7 +771,6 @@ export const decideChange = (
+           change,
            ChangeBounced.make({
              changeId: id,
 -            decisionId: command.decisionId,

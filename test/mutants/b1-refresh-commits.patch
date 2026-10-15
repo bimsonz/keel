@@ -2,11 +2,12 @@
 # kills: workspace.refresh-same
 # why: The refresh commits an event, so every token an agent asks for is in the change's log
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 8a60214b..5f329c2a 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1491,9 +1491,16 @@
-   );
+@@ -1772,9 +1772,16 @@ const refreshWorkspaceCall: (
    if (Result.isFailure(allowed)) return yield* Effect.fail(allowed.failure);
+   yield* renewHeld(changeId, command.leaseId);
    // The pool finds the workspace this change holds and only mints a token: it cannot run out.
 -  return yield* (yield* WorkspacePool)
 +  const granted = yield* (yield* WorkspacePool)
@@ -21,4 +22,4 @@ diff --git a/packages/core/src/application/coordination/change.ts b/packages/cor
 +  return granted;
  });
  
- /**
+ export const refreshWorkspace = renewingOnRefusal(

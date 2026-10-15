@@ -2,15 +2,15 @@
 # kills: lease.chart
 # why: A lapse releases the lease instead of marking it lapsed
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 387ce90..cca48d0 100644
+index 6c9f50e0..4973e9c4 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -791,7 +791,7 @@ export const evolveChange = (
+@@ -1159,7 +1159,7 @@ export const evolveChange = (
        return change.lease.state === "active" &&
          event.leaseId === change.lease.id &&
          committed.at >= lapsesAt(change.lease)
 -        ? { ...change, lease: { ...change.lease, state: "lapsed" } }
 +        ? { ...change, lease: { ...change.lease, state: "released" } }
          : illegal(change, event);
- 
-     default: {
+     case "LeaseRestarted":
+       // A lease recorded Lapsed while the platform held the change is active again: the same lease, the same holder.

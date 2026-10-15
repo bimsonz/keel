@@ -110,7 +110,7 @@ describe("no self-loops", () => {
     const kinds = (await inboxOf(c.agentId)).map((notice) => notice.kind);
 
     expect(own).toEqual(["IntentDeclared", "PreflightIssued", "ChangeStarted", "ChangeSubmitted"]);
-    expect(platform).toEqual(["PrecheckStarted", "ChangeBounced"]);
+    expect(platform).toEqual(["PrecheckStarted", "ChangeBounced", "LeaseRestarted"]);
     for (const type of own) expect(kinds).not.toContain(type);
     expect(kinds).toEqual(expect.arrayContaining(["PrecheckStarted", "ChangeBounced"]));
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);

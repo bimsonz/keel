@@ -2,10 +2,10 @@
 # kills: lease.stale-refused
 # why: A stale token is refused without saying what to do next
 diff --git a/packages/core/src/domain/coordination/lease.ts b/packages/core/src/domain/coordination/lease.ts
-index 8a50958..98a00ac 100644
+index 9130c959..2551b309 100644
 --- a/packages/core/src/domain/coordination/lease.ts
 +++ b/packages/core/src/domain/coordination/lease.ts
-@@ -47,12 +47,7 @@ export const checkLease = (
+@@ -63,12 +63,7 @@ export const checkLease = (
      (change.lease.state !== "active" && change.lease.state !== "lapsed")
    ) {
      return Result.fail(
@@ -18,4 +18,4 @@ index 8a50958..98a00ac 100644
 +      new LeaseStale({ changeId: change.id, leaseId, reason: "stale", nextActions: [] }),
      );
    }
-   if (isLapsed(change.lease, now)) {
+   if (isLapsed(change, now)) {

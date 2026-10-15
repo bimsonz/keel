@@ -220,7 +220,7 @@ describe("commit", () => {
   );
 
   it.effect(
-    "[commit.head-moved] a workspace that moved is the writer's refusal, passed on, and the lease is not renewed",
+    "[commit.head-moved] a workspace that moved is the writer's refusal, passed on, and the lease is renewed: the call held it",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -241,7 +241,8 @@ describe("commit", () => {
             expected: base,
             head: first.commit.commitSha,
           });
-          expect((yield* getChange(changeId)).lease.renewedAt).toBe(renewedAt);
+          // Refused after the lease check, the call still renews the lease: its agent is at work.
+          expect((yield* getChange(changeId)).lease.renewedAt).toBe(renewedAt + 60_000);
         }).pipe(Effect.provide(w.layerFor(base)));
       });
     },
