@@ -1,4 +1,4 @@
-import { Effect, Option, Result, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
 import {
   ChangeBounced,
   ChangeParked,
@@ -40,15 +40,17 @@ import {
   type Counterpart,
   type EntityRef,
   type EventEnvelope,
+  globsMayOverlap,
   type Instant,
   type NamespaceId,
-  type NextAction,
+  NextAction,
   ProjectId,
+  VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
   type FlowPlan,
   unionPlans,
-  type VerdictOutcome,
+  VerdictOutcome,
   VerdictIssued,
 } from "../../domain/verification/index.ts";
 import {
@@ -155,6 +157,23 @@ const ActiveBatch = Schema.Struct({
   failed: Schema.optional(Schema.Array(Schema.String)),
   /** The green batch's BatchVerified re-offered to trunk so far, and when the last went (epoch ms). */
   reoffered: Schema.optional(Schema.Struct({ count: Schema.Int, at: Schema.Number })),
+  /** Behind the batch in flight: the batch whose candidate this one was composed on. */
+  on: Schema.optional(BatchId),
+  /** Behind the batch in flight: KeelVerify's verdict, kept until every batch ahead has landed. */
+  kept: Schema.optional(
+    Schema.Struct({
+      instanceId: Schema.String,
+      fence: Schema.Struct({ batchId: BatchId, attempt: Schema.Int, chainEpoch: Schema.Int }),
+      candidateId: CandidateId,
+      verdictId: VerdictId,
+      outcome: VerdictOutcome,
+      planHash: ContentHash,
+      evidence: Schema.Array(Schema.String),
+      failingTests: Schema.Array(Schema.String),
+      nextActions: Schema.optionalKey(Schema.Array(NextAction)),
+      unrun: Schema.optionalKey(Schema.Literal(true)),
+    }),
+  ),
 });
 type ActiveBatch = typeof ActiveBatch.Type;
 
@@ -168,6 +187,30 @@ export const Lane = Schema.Struct({
     Schema.Array(Schema.Struct({ changeId: ChangeId, planHash: ContentHash })),
   ),
   active: Schema.optional(ActiveBatch),
+  /**
+   * Speculation: batches formed on the candidate of the batch ahead (the
+   * first on the batch in flight's), each verified at once. A verdict for one
+   * is kept until every batch ahead has landed, so trunk is only ever offered
+   * the batch in flight; any failure of one, or of a batch ahead, cancels it
+   * and every batch behind it.
+   */
+  behind: Schema.optional(Schema.Array(ActiveBatch)),
+  /** Bumped by every cancel, so a verdict for a cancelled batch is fenced. */
+  chainEpoch: Schema.optional(Schema.Int),
+  /**
+   * The batch in flight a batch behind it failed behind (refused, or its step
+   * failed): nothing more forms behind it, so the changes that failed there
+   * wait to form in flight, where a refusal is decided as any other.
+   */
+  heldBehind: Schema.optional(BatchId),
+  /**
+   * Each change's place in the lane: the order it first joined the queue in.
+   * A change requeued goes back to its place, never to the front, so one that
+   * keeps failing never overtakes changes that were waiting before it.
+   */
+  places: Schema.optional(Schema.Array(Schema.Struct({ changeId: ChangeId, place: Schema.Int }))),
+  /** How many changes have joined the queue: the next to join takes the place after them. */
+  joined: Schema.optional(Schema.Int),
   advances: Schema.Array(
     Schema.Struct({ from: CommitSha, to: CommitSha, members: Schema.Array(ChangeId) }),
   ),
@@ -232,8 +275,12 @@ const emptyLane = (laneId: string): Lane => ({
 export const laneStanding = Effect.fn("integration/laneStanding")(function* (laneId: string) {
   const store = yield* EntityStore;
   const lane = laneOf(store, laneId);
-  const active = lane?.active === undefined ? undefined : batchOf(store, lane.active.batchId);
-  return { queued: lane?.queue.length ?? 0, inFlight: active?.members.length ?? 0 };
+  const inFlight = [lane?.active, ...(lane?.behind ?? [])].reduce(
+    (sum, slot) =>
+      sum + (slot === undefined ? 0 : (batchOf(store, slot.batchId)?.members.length ?? 0)),
+    0,
+  );
+  return { queued: lane?.queue.length ?? 0, inFlight };
 });
 
 /** Whether the lane was destroyed: it then hears no event, forms no batch and takes no verdict. */
@@ -345,8 +392,60 @@ const fold = (batch: Batch | undefined, events: readonly CandidateEvent[], at: I
 /** Whether the lane already holds a change: queued, or a member of its batch in flight. */
 const holds = (store: Store, lane: Lane, changeId: ChangeId): boolean =>
   lane.queue.includes(changeId) ||
-  (lane.active !== undefined &&
-    (batchOf(store, lane.active.batchId)?.members.includes(changeId) ?? false));
+  [lane.active, ...(lane.behind ?? [])].some(
+    (slot) =>
+      slot !== undefined && (batchOf(store, slot.batchId)?.members.includes(changeId) ?? false),
+  );
+
+/** The order `changeId` first joined the lane's queue in; 0 for one queued before places were kept. */
+const placeOf = (lane: Lane, changeId: ChangeId): number | undefined =>
+  lane.places?.find((entry) => entry.changeId === changeId)?.place;
+
+/**
+ * The lane with `changeId` in its queue at its place: after every change that
+ * first joined before it. A change the lane never placed takes the next place,
+ * so it joins at the back; one queued before places were kept counts as first.
+ */
+const enqueue = (lane: Lane, changeId: ChangeId): Lane => {
+  const known = placeOf(lane, changeId);
+  const joined = (lane.joined ?? 0) + (known === undefined ? 1 : 0);
+  const place = known ?? joined;
+  const placed: Lane =
+    known === undefined
+      ? { ...lane, joined, places: [...(lane.places ?? []), { changeId, place }] }
+      : lane;
+  const at = placed.queue.findIndex((id) => (placeOf(placed, id) ?? 0) > place);
+  return {
+    ...placed,
+    queue:
+      at === -1
+        ? [...placed.queue, changeId]
+        : [...placed.queue.slice(0, at), changeId, ...placed.queue.slice(at)],
+  };
+};
+
+/** The lane with the places of `changeIds` forgotten: each has left the lane for good. */
+const unplace = (lane: Lane, changeIds: readonly ChangeId[]): Lane =>
+  lane.places === undefined
+    ? lane
+    : { ...lane, places: lane.places.filter((entry) => !changeIds.includes(entry.changeId)) };
+
+/** The lane with `batchId`'s batch, in flight or behind it, replaced by `update` of it. */
+const withSlot = (
+  lane: Lane,
+  batchId: BatchId,
+  update: (slot: ActiveBatch) => ActiveBatch,
+): Lane =>
+  lane.active?.batchId === batchId
+    ? { ...lane, active: update(lane.active) }
+    : {
+        ...lane,
+        behind: (lane.behind ?? []).map((slot) => (slot.batchId === batchId ? update(slot) : slot)),
+      };
+
+/** Whether `batchId` is one of the batches behind the batch in flight. */
+const isBehind = (lane: Lane, batchId: BatchId): boolean =>
+  (lane.behind ?? []).some((slot) => slot.batchId === batchId);
 
 const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
 const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
@@ -383,17 +482,14 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         const queued = decodeQueued(event.payload);
         return queued.laneId !== laneId || holds(tx.store, lane, queued.changeId)
           ? undefined
-          : withPlan(
-              { ...lane, queue: [...lane.queue, queued.changeId] },
-              queued.changeId,
-              queued.planHash,
-            );
+          : withPlan(enqueue(lane, queued.changeId), queued.changeId, queued.planHash);
       }
       case "ChangeRequeued": {
         const requeued = decodeRequeued(event.payload);
         if (holds(tx.store, lane, requeued.changeId)) return undefined;
+        // Back to its place, after every change that was waiting before it: never to the front.
         const back = withPlan(
-          { ...lane, queue: [requeued.changeId, ...lane.queue] },
+          enqueue(lane, requeued.changeId),
           requeued.changeId,
           requeued.planHash,
         );
@@ -425,7 +521,9 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
           (kept && !holds(tx.store, lane, ended.changeId))
           ? withoutAlone(
               withPlan(
-                { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
+                unplace({ ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }, [
+                  ended.changeId,
+                ]),
                 ended.changeId,
                 undefined,
               ),
@@ -438,7 +536,10 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         return advanced.projectId !== lane.projectId
           ? undefined
           : {
-              ...lane,
+              ...unplace(
+                lane,
+                advanced.landings.map((landing) => landing.changeId),
+              ),
               advances: [
                 ...lane.advances,
                 {
@@ -646,6 +747,8 @@ interface QueuedRead {
   readonly changeId: ChangeId;
   readonly effects: QueuedChange["effects"];
   readonly unsettled: readonly ChangeId[];
+  /** The paths its declared footprint names: two changes whose paths may overlap are batched apart. */
+  readonly paths: readonly string[];
   /** Undefined when the change was queued with none, or its plan or its change could not be read: it then joins no one. */
   readonly plan: FlowPlan | undefined;
 }
@@ -662,6 +765,7 @@ const readQueued = (lane: Lane, namespace: NamespaceId, changeId: ChangeId) =>
       changeId,
       effects: read?.change.intent.declaredEffects ?? [],
       unsettled: read?.unsettled ?? [],
+      paths: read?.change.intent.footprint.map((entry) => entry.path) ?? [],
       plan,
     } satisfies QueuedRead;
   });
@@ -674,8 +778,8 @@ interface Chosen {
 
 /**
  * Chooses a batch of up to `size` from the queue's front, the head first:
- * belief-aware (`planBatches`: no two changes with an unsettled conflict or
- * opposite effects, and a risky change alone, where risky is a change with no
+ * belief-aware (`planBatches`: no two changes with an unsettled conflict,
+ * opposite effects or a path both declare, and a risky change alone, where risky is a change with no
  * readable plan, one whose plan is a person's (`humanClass`), or one marked to
  * run alone). Members join in queue order while their plans still union, and
  * the union is stored as the batch's plan; a batch of one runs its member's
@@ -699,9 +803,21 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
     risky:
       read.plan === undefined || read.plan.humanClass || aloneOf(lane, read.changeId) !== undefined,
   }));
-  const pairs = reads.flatMap((read) =>
-    read.unsettled.map((other) => [read.changeId, other] as const),
+  // Changes whose footprints may touch one path are batched apart, as an unsettled conflict is:
+  // speculation then composes the later on the earlier's candidate, so their overlap is an order,
+  // never a failed batch.
+  const overlapping = reads.flatMap((read, i) =>
+    reads
+      .slice(i + 1)
+      .filter((other) =>
+        other.paths.some((path) => read.paths.some((mine) => globsMayOverlap(path, mine))),
+      )
+      .map((other) => [read.changeId, other.changeId] as const),
   );
+  const pairs = [
+    ...reads.flatMap((read) => read.unsettled.map((other) => [read.changeId, other] as const)),
+    ...overlapping,
+  ];
   const [planned = []] = planBatches(queued, failureRate(lane), pairs, 1, size);
   const plans = new Map(reads.map((read) => [read.changeId, read.plan]));
   const joined: { readonly changeId: ChangeId; readonly plan: FlowPlan }[] = [];
@@ -725,12 +841,21 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
  * head, alone when it is marked so (under the batch id its bisection named),
  * else with what `chooseMembers` adds, up to `laneBatchSize`. The members are
  * read first; one no longer queued, or a new head, forms nothing, and the
- * step tries again.
+ * step tries again. With `on`, the last batch of the speculation chain, it
+ * forms behind it instead: on its candidate, with every member ahead as its
+ * predecessors.
  */
-const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?: ActiveBatch) {
   const [head] = lane.queue;
   if (head === undefined) return;
-  const base = yield* stagingOnTrunk(lane);
+  const store = yield* EntityStore;
+  const base = on?.composed?.commitSha ?? (yield* stagingOnTrunk(lane));
+  const ahead =
+    on === undefined
+      ? []
+      : [lane.active, ...(lane.behind ?? [])].flatMap((slot) =>
+          slot === undefined ? [] : (batchOf(store, slot.batchId)?.members ?? []),
+        );
   const named = aloneOf(lane, head);
   const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
   const size = named === undefined ? laneBatchSize(lane, settings.maxBatchSize) : 1;
@@ -746,8 +871,9 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
     { entity: batchRef(batchId), cause: `form:${batchId}`, project: lane.projectId },
     (tx): Result.Result<Transition<undefined>, CandidateRejection> => {
       const now = laneOf(tx.store, lane.laneId) ?? lane;
+      const tail = (now.behind ?? []).at(-1) ?? now.active;
       if (
-        now.active !== undefined ||
+        (on === undefined ? now.active !== undefined : tail?.batchId !== on.batchId) ||
         now.queue[0] !== head ||
         members.some((member) => !now.queue.includes(member))
       )
@@ -761,9 +887,9 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
             projectId: lane.projectId,
             members,
             base,
-            predecessors: [],
+            predecessors: ahead,
             attempt: 0,
-            chainEpoch: 0,
+            chainEpoch: now.chainEpoch ?? 0,
           },
           { now: tx.at, batchId },
         ),
@@ -775,10 +901,16 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
           tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
           const planHash = chosen.planHash;
           const left = members.reduce((acc, member) => withPlan(acc, member, undefined), now);
+          const slot: ActiveBatch = {
+            batchId,
+            candidateId,
+            ...(planHash === undefined ? {} : { planHash }),
+            ...(on === undefined ? {} : { on: on.batchId }),
+          };
           putLane(tx.store, {
             ...withoutAlone(left, members),
             queue: now.queue.filter((id) => !members.includes(id)),
-            active: { batchId, candidateId, ...(planHash === undefined ? {} : { planHash }) },
+            ...(on === undefined ? { active: slot } : { behind: [...(now.behind ?? []), slot] }),
           });
           return { value: undefined, drafts: events.map((e) => batchDraft(e, members)) };
         },
@@ -1073,6 +1205,10 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
   batch: Batch,
 ) {
   if (active.planHash === undefined) {
+    if (isBehind(lane, batch.id)) {
+      yield* cancelBehind(lane.laneId, batch.id, batch.id, "no plan");
+      return;
+    }
     yield* refusePlanless(lane, batch);
     return;
   }
@@ -1116,9 +1252,21 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
       base: batch.base,
       at: formed.at,
       members,
+      // Behind the batch in flight a refusal is decided again in flight: no cold box for it here.
+      ...(isBehind(lane, batch.id) ? { gitcoreOnly: true as const } : {}),
     }),
   );
   if (Result.isFailure(composed)) {
+    // Behind the batch in flight, a refusal is decided again once the batch is in flight itself.
+    if (isBehind(lane, batch.id)) {
+      yield* cancelBehind(
+        lane.laneId,
+        batch.id,
+        batch.id,
+        `compose refused: ${composed.failure.reason}`,
+      );
+      return;
+    }
     yield* refuseComposition(lane, batch, composed.failure, members);
     return;
   }
@@ -1137,13 +1285,11 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
         },
       },
     ],
-    lane: () => ({
-      ...now,
-      active: {
-        ...active,
+    lane: () =>
+      withSlot(now, batch.id, (slot) => ({
+        ...slot,
         composed: { commitSha: candidate.commitSha, commits: candidate.commits },
-      },
-    }),
+      })),
   })).pipe(Effect.orDie);
 });
 
@@ -1193,13 +1339,16 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
   );
   if (Result.isSuccess(bundled)) {
     yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
-      ...now,
-      active: { ...active, bundle: bundled.success },
+      ...withSlot(now, batch.id, (slot) => ({ ...slot, bundle: bundled.success })),
       lastBundle: bundled.success,
     }));
     return;
   }
   const refused = bundled.failure;
+  if (isBehind(lane, batch.id)) {
+    yield* cancelBehind(lane.laneId, batch.id, batch.id, `bundle refused: ${refused.reason}`);
+    return;
+  }
   const blame =
     refused.path === undefined
       ? "infra"
@@ -1327,7 +1476,7 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
     ...(active.composed === undefined ? {} : { candidateCommit: active.composed.commitSha }),
   });
   yield* noteLane(lane, `verify-started:${batch.id}`, (now) =>
-    now.active?.batchId === batch.id ? { ...now, active: { ...now.active, started: true } } : now,
+    withSlot(now, batch.id, (slot) => ({ ...slot, started: true })),
   );
 });
 
@@ -1390,10 +1539,18 @@ const followTrunk = Effect.fn("integration/followTrunk")(function* (
   const active = lane.active;
   const batch = active === undefined ? undefined : batchOf(yield* EntityStore, active.batchId);
   if (batch?.state === "green" && batch.members.every((m) => advance.members.includes(m)))
-    yield* onBatch(lane.laneId, batch.id, `promote:${batch.id}`, (_, now) => ({
-      moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
-      lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
-    })).pipe(Effect.orDie);
+    yield* onBatch(lane.laneId, batch.id, `promote:${batch.id}`, (_, now) => {
+      // The first batch behind it is in flight now: it was composed on this one's candidate, trunk's head.
+      const [next, ...rest] = now.behind ?? [];
+      return {
+        moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
+        lane: () => ({
+          ...withoutInfra(now, batch.members),
+          active: next,
+          behind: rest,
+        }),
+      };
+    }).pipe(Effect.orDie);
   yield* noteLane(lane, `followed:${advance.from}..${advance.to}`, (now) => ({
     ...now,
     advances: now.advances.filter((a) => a.from !== advance.from || a.to !== advance.to),
@@ -1617,6 +1774,99 @@ export const laneStepFailed = Effect.fn("integration/laneStepFailed")(function* 
 export type LaneStep = "idle" | "waiting" | "staged" | "again";
 
 /**
+ * Cancels the batch `from` behind the batch in flight and every batch behind
+ * it, last first: each is invalidated (`cancelled`, `because` the batch whose
+ * failure undid them), which sends its members back to the queue through
+ * their Change DOs, and a KeelVerify instance started for it is stopped.
+ * Nothing is blamed on any member: each forms again on trunk's head.
+ */
+const cancelBehind = Effect.fn("integration/cancelBehind")(function* (
+  laneId: string,
+  from: BatchId,
+  because: BatchId,
+  why: string,
+) {
+  const lane = laneOf(yield* EntityStore, laneId);
+  const behind = lane?.behind ?? [];
+  const at = behind.findIndex((slot) => slot.batchId === from);
+  if (at === -1) return;
+  const outbox = yield* EventOutbox;
+  const cancelled = behind.slice(at);
+  for (const slot of cancelled.toReversed()) {
+    yield* onBatch(laneId, slot.batchId, `cancel:${slot.batchId}`, (batch, now) => ({
+      moves: isCandidateTerminal(batch)
+        ? []
+        : [{ command: { _tag: "Cancel", candidateId: slot.candidateId, because } }],
+      lane: () => ({
+        ...now,
+        behind: (now.behind ?? []).filter((each) => each.batchId !== slot.batchId),
+        chainEpoch: (now.chainEpoch ?? 0) + 1,
+        // A batch that failed behind on its own forms no more there: it waits to be in flight.
+        ...(because === from && now.active !== undefined ? { heldBehind: now.active.batchId } : {}),
+      }),
+    })).pipe(Effect.orDie);
+    if (slot.started === true)
+      yield* (yield* BatchVerification).stop(
+        instanceOf(laneId, formedOf(outbox, slot.batchId).eventId),
+      );
+  }
+  yield* Effect.logInfo(
+    `lane ${laneId}: cancelled ${cancelled.map((slot) => slot.batchId).join(", ")} behind ${because}: ${why}`,
+  );
+});
+
+/**
+ * One move of the speculation chain behind the batch in flight, while it
+ * verifies: the first batch behind that has a stage to run runs it (compose
+ * on the candidate ahead, bundle, start KeelVerify), and once each has
+ * started, another batch forms behind the last, on its candidate, while the
+ * queue holds changes. A step that fails, or a batch already settled, cancels
+ * that batch and every batch behind it. A project whose verification is off
+ * speculates nothing: it has nothing to wait for. True when something moved.
+ */
+const stepBehind = Effect.fn("integration/stepBehind")(function* (laneId: string) {
+  const store = yield* EntityStore;
+  const lane = laneOf(store, laneId);
+  const active = lane?.active;
+  if (lane === undefined || active === undefined) return false;
+  const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
+  if (settings.verification === "off") return false;
+  for (const slot of lane.behind ?? []) {
+    const batch = batchOf(store, slot.batchId);
+    if (batch === undefined || isCandidateTerminal(batch)) {
+      yield* cancelBehind(laneId, slot.batchId, slot.on ?? slot.batchId, "its batch was settled");
+      return true;
+    }
+    const ran =
+      batch.state === "forming"
+        ? yield* Effect.exit(composeBatch(lane, slot, batch))
+        : batch.state === "assembled" && slot.bundle === undefined && slot.composed !== undefined
+          ? yield* Effect.exit(bundleBatch(lane, slot, batch, slot.composed))
+          : slot.bundle !== undefined &&
+              (batch.state === "assembled" ||
+                (batch.state === "verifying" && slot.started !== true))
+            ? yield* Effect.exit(verifyBatch(lane, slot, batch, slot.bundle))
+            : undefined;
+    if (ran === undefined) continue;
+    if (Exit.isFailure(ran))
+      yield* cancelBehind(
+        laneId,
+        slot.batchId,
+        slot.batchId,
+        `its step failed: ${Cause.pretty(ran.cause).slice(0, STEP_ERROR_MAX)}`,
+      );
+    return true;
+  }
+  const tail = (lane.behind ?? []).at(-1) ?? active;
+  if (tail.composed === undefined || lane.queue.length === 0) return false;
+  if (lane.heldBehind === active.batchId) return false;
+  // Depth is chosen, not capped: another batch while a box is free to verify it.
+  if ((yield* (yield* BatchVerification).capacity()).free <= 0) return false;
+  yield* formBatch(lane, tail);
+  return (laneOf(yield* EntityStore, laneId)?.behind?.length ?? 0) > (lane.behind?.length ?? 0);
+});
+
+/**
  * Drives the lane as far as it can go without a reply from outside: follow
  * trunk, then Form → Compose → Bundle → Verify for the one batch in flight,
  * and one look at a verification that has outrun its budget. A batch formed
@@ -1638,6 +1888,28 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
     const active = lane.active;
     if (active?.declined === true) {
       yield* invalidateBatch(lane, active.batchId);
+      continue;
+    }
+    const kept = active?.kept;
+    if (active !== undefined && kept !== undefined) {
+      // In flight now, the verdict it was given behind is recorded as any other.
+      yield* noteLane(lane, `unkept:${active.batchId}`, (now) =>
+        withSlot(now, active.batchId, ({ kept: _kept, ...slot }) => slot),
+      );
+      yield* recordVerdict(laneId, kept).pipe(
+        Effect.catchTags({ ResultFenced: () => Effect.void, CandidateNotFound: () => Effect.void }),
+      );
+      continue;
+    }
+    const [first] = lane.behind ?? [];
+    if (active === undefined && first !== undefined) {
+      // What was built on a batch that did not land is given up, and its members queued again.
+      yield* cancelBehind(
+        laneId,
+        first.batchId,
+        first.on ?? first.batchId,
+        "the batch ahead did not land",
+      );
       continue;
     }
     if (active === undefined) {
@@ -1686,6 +1958,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
     const due = verifying(store, yield* EventOutbox, laneId)?.due;
     if (due !== undefined && (yield* (yield* Clock).now) >= due)
       if ((yield* checkVerification(laneId)) !== "running") continue;
+    if (yield* stepBehind(laneId)) return "staged" satisfies LaneStep;
     return "waiting" satisfies LaneStep;
   }
 });
@@ -1863,7 +2136,17 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
       ? found
       : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
   const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
-  yield* issue(laneId, batch, `${verdict.instanceId}:recordVerdict`, verdict, fence).pipe(
+  const lane = laneOf(store, laneId);
+  if (lane !== undefined && isBehind(lane, batch.id)) {
+    if (fence.attempt !== batch.attempt || fence.chainEpoch !== batch.chainEpoch)
+      return yield* new ResultFenced({ batchId: batch.id, ...fence });
+    // Kept until every batch ahead has landed: trunk is only ever offered the batch in flight.
+    return yield* noteLane(lane, `${verdict.instanceId}:keep`, (now) =>
+      withSlot(now, batch.id, (slot) => ({ ...slot, kept: verdict })),
+    ).pipe(Effect.asVoid);
+  }
+  return yield* issue(laneId, batch, `${verdict.instanceId}:recordVerdict`, verdict, fence).pipe(
+    Effect.asVoid,
     Effect.catchTags({
       CandidateStateRefused: (refused) => {
         const now = batchOf(store, batch.id);

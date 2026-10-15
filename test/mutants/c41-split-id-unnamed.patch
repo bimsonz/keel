@@ -2,13 +2,13 @@
 # kills: c41.unattributed-alone
 # why: a member split out by a bisection forms under a fresh id, not the one CandidateBisected named, so the record names batches that never form
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8b5fe91..a2d485f 100644
+index 373b53ed..6578f124 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -711,7 +711,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
-   const [head] = lane.queue;
-   if (head === undefined) return;
-   const base = yield* stagingOnTrunk(lane);
+@@ -790,7 +790,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?:
+       : [lane.active, ...(lane.behind ?? [])].flatMap((slot) =>
+           slot === undefined ? [] : (batchOf(store, slot.batchId)?.members ?? []),
+         );
 -  const named = aloneOf(lane, head);
 +  const named = aloneOf(lane, head) === undefined ? undefined : { batchId: undefined };
    const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);

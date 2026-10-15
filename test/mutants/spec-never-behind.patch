@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: no batch ever forms behind the one in flight, so a lane verifies one batch at a time with boxes idle
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index ec24f7ea..dd4df85e 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1799,7 +1799,7 @@ const stepBehind = Effect.fn("integration/stepBehind")(function* (laneId: string
+   if (tail.composed === undefined || lane.queue.length === 0) return false;
+   if (lane.heldBehind === active.batchId) return false;
+   // Depth is chosen, not capped: another batch while a box is free to verify it.
+-  if ((yield* (yield* BatchVerification).capacity()).free <= 0) return false;
++  if ((yield* (yield* BatchVerification).capacity()).free <= Infinity) return false;
+   yield* formBatch(lane, tail);
+   return (laneOf(yield* EntityStore, laneId)?.behind?.length ?? 0) > (lane.behind?.length ?? 0);
+ });

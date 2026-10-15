@@ -52,6 +52,13 @@ export interface CandidateRequest {
    * never takes a `cand/` ref: it goes to `refs/heads/probe/<conflictId>/ab`.
    */
   readonly ref?: string | undefined;
+  /**
+   * Compose in GitCore (Tier 0) alone, and answer its refusal rather than
+   * trying MergeBox: a batch speculated behind another, whose refusal is
+   * decided again once it is in flight. A cold box would hold the lane's step
+   * for minutes on a conflict GitCore already found.
+   */
+  readonly gitcoreOnly?: true;
 }
 
 /** A composed candidate: one commit per member, chained in batch order, its ref pushed to staging. */

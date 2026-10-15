@@ -54,6 +54,7 @@ const KINDS: readonly Kind[] = [
   "Promote",
   "Invalidate",
   "RecordStep",
+  "Cancel",
 ];
 
 /** The happy path out of each state, and the table's other exits (state-machines.md § Candidate). */
@@ -70,10 +71,10 @@ const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
 };
 const SIDE: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Form"],
-  forming: ["RefuseComposition"],
-  assembled: ["RefuseBundle"],
-  verifying: ["Failed", "Failed"],
-  green: ["Invalidate"],
+  forming: ["RefuseComposition", "Cancel"],
+  assembled: ["RefuseBundle", "Cancel"],
+  verifying: ["Failed", "Failed", "Cancel"],
+  green: ["Invalidate", "Cancel"],
   red: ["Bisect"],
   bisected: KINDS,
   promoted: KINDS,
@@ -251,6 +252,12 @@ const build = (
               },
         ...fence,
       };
+    case "Cancel":
+      return {
+        _tag: "Cancel",
+        candidateId: makeId("cnd", ulid(n)),
+        because: makeId("bat", ulid(n + 7)),
+      };
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -376,6 +383,13 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
       return before.state === "green" ? "invalidated" : "refused";
     case "RecordStep":
       return before.state === "verifying" && fresh(command) ? "verifying" : "refused";
+    case "Cancel":
+      return before.state === "forming" ||
+        before.state === "assembled" ||
+        before.state === "verifying" ||
+        before.state === "green"
+        ? "invalidated"
+        : "refused";
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -906,7 +920,12 @@ const folds = (from: Folded | undefined, event: CandidateEvent): Folded | "illeg
     case "CandidatePromoted":
       return moves("green", "promoted");
     case "CandidateInvalidated":
-      return moves("green", "invalidated");
+      // Cancelled behind a batch that failed, from wherever it stood short of a verdict on trunk.
+      return from.state === "green" ||
+        (event.reason === "cancelled" &&
+          (from.state === "forming" || from.state === "assembled" || from.state === "verifying"))
+        ? { ...from, state: "invalidated" }
+        : "illegal";
     case "VerificationStepStarted":
     case "VerificationStepFinished":
       return from.state === "verifying" ? from : "illegal";
@@ -992,35 +1011,37 @@ describe("the Candidate fold", () => {
     // of one red with nobody blamed. Each meets the same 379 forms of the events the walks
     // committed: 2 formings in 7 forms (14); 12 assemblies in 2 (24); 12 starts and 12
     // verifications in 3 (72); 6 bisections in 3 (18); 2 promotions and 2 invalidations in 3,
-    // the pair's forms as another candidate's one form (10); 2 step starts and 6 step results in
-    // 3, the starts' forms as another candidate's one form (23); and 28 failures, 27 pairs of
-    // verdict and candidate in each of 6 blames (162), each failure as another batch's (28) and as
-    // another candidate's (28). 22 × 379 = 8338 folds, 869 of them taken and 7469 refused.
+    // the pair's forms as another candidate's one form (10); the step starts and results the
+    // walks commit while verifying, each in its forms; and 28 failures, 27 pairs of verdict and
+    // candidate in each of 6 blames (162), each failure as another batch's (28) and as another
+    // candidate's, where two that differ only in candidate meet (27); and since a batch behind
+    // another may be cancelled short of a verdict, the cancellations a walk commits from forming,
+    // assembled and verifying too. 22 × 523 = 11506 folds, 1637 of them taken and 9869 refused.
     expect(foldShape(cases)).toEqual({
-      folds: 8338,
-      refused: 7469,
+      folds: 11506,
+      refused: 9869,
       rows: [
         "none",
         `${BATCH} forming of 2${HOME}`,
         `${BATCH} assembled of 2${HOME}`,
         `${BATCH} red of 2, blaming textual${HOME}`,
+        `${BATCH} invalidated of 2${HOME}`,
         `${BATCH} verifying of 2${HOME}`,
-        `${BATCH} red of 2, blaming ${A}${HOME}`,
+        `${BATCH} red of 2, blaming chg_00000000000000000000000001${HOME}`,
         `${BATCH} red of 2, blaming infra${HOME}`,
         `${BATCH} green of 2${HOME}`,
         `${BATCH} red of 2, blaming interaction${HOME}`,
         `${BATCH} red of 2, blaming unattributed${HOME}`,
         `${BATCH} promoted of 2${HOME}`,
-        `${BATCH} invalidated of 2${HOME}`,
         `${BATCH} bisected of 2, blaming unattributed${HOME}`,
         `${BATCH} forming of 1${HOME}`,
         `${BATCH} assembled of 1${HOME}`,
-        `${BATCH} red of 1, blaming ${A}${HOME}`,
+        `${BATCH} red of 1, blaming chg_00000000000000000000000001${HOME}`,
+        `${BATCH} invalidated of 1${HOME}`,
         `${BATCH} verifying of 1${HOME}`,
         `${BATCH} red of 1, blaming infra${HOME}`,
         `${BATCH} green of 1${HOME}`,
         `${BATCH} promoted of 1${HOME}`,
-        `${BATCH} invalidated of 1${HOME}`,
         `${BATCH} red of 1, blaming unattributed${HOME}`,
       ],
     });

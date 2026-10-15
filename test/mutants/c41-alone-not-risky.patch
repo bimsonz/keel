@@ -2,15 +2,15 @@
 # kills: c41.runs-alone
 # why: a change requeued after its members clashed joins the next head's batch, so the clash repeats
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8b5fe91..e97eab5 100644
+index 4d471f0d..fb93e142 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -677,7 +677,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+@@ -801,7 +801,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
      id: read.changeId,
      effects: read.effects,
      risky:
 -      read.plan === undefined || read.plan.humanClass || aloneOf(lane, read.changeId) !== undefined,
 +      read.plan === undefined || read.plan.humanClass,
    }));
-   const pairs = reads.flatMap((read) =>
-     read.unsettled.map((other) => [read.changeId, other] as const),
+   // Changes whose footprints may touch one path are batched apart, as an unsettled conflict is:
+   // speculation then composes the later on the earlier's candidate, so their overlap is an order,

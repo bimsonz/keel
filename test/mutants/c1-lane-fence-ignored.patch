@@ -2,15 +2,15 @@
 # kills: lane.verdict-fenced
 # why: The verdict is decided under the batch's own attempt instead of the one it reports, so a stale attempt's result lands
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 4c57f5d..30ad1f0 100644
+index 373b53ed..a8fd844c 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1236,7 +1236,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+@@ -2064,7 +2064,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
      found !== undefined && found.candidateId === verdict.candidateId
        ? found
        : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
 -  const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
 +  const fence = { attempt: batch.attempt, chainEpoch: batch.chainEpoch };
-   yield* issue(laneId, batch, `${verdict.instanceId}:recordVerdict`, verdict, fence).pipe(
-     Effect.catchTags({
-       CandidateStateRefused: (refused) => {
+   const lane = laneOf(store, laneId);
+   if (lane !== undefined && isBehind(lane, batch.id)) {
+     if (fence.attempt !== batch.attempt || fence.chainEpoch !== batch.chainEpoch)

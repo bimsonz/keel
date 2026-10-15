@@ -1,0 +1,3 @@
+### Fixed
+
+- **A requeued change goes back to its place in the queue, never to the front** (no route or event). A lane's queue is ordered by when each change first joined it: the Lane's state gains `places?` and `joined?`. A change sent back by an infrastructure failure, a clash, a bisection or a cancel behind the batch in flight now waits after every change that was waiting before it, where it used to jump to the front. On keel/keel changes that kept looping held seven others queued an hour earlier off for 60–93 minutes. A change resumed after a person's ruling still goes to the front, and a change queued before places were kept counts as first.

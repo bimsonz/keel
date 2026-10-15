@@ -2,15 +2,15 @@
 # kills: lane.compose-deterministic
 # why: A retried compose stamps its commits with the clock instead of BatchFormed's time, so a retry pushes different SHAs
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 92a44f1..0121554 100644
+index d0a721ff..79d90a68 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -521,7 +521,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+@@ -1190,7 +1190,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
        candidateId: active.candidateId,
        staging: projectRepos(lane.projectId).staging,
        base: batch.base,
 -      at: formed.at,
 +      at: yield* (yield* Clock).now,
        members,
-     }),
-   );
+       // Behind the batch in flight a refusal is decided again in flight: no cold box for it here.
+       ...(isBehind(lane, batch.id) ? { gitcoreOnly: true as const } : {}),

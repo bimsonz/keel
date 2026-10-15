@@ -2,14 +2,14 @@
 # kills: lanes.contract.view
 # why: the Lane dies when asked for a lane no change ever joined, so the lanes route of a new project answers a defect
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 2ce5f83b..423b91c5 100644
+index 373b53ed..b584d6fe 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -189,6 +189,7 @@ const emptyLane = (laneId: string): Lane => ({
+@@ -259,6 +259,7 @@ const emptyLane = (laneId: string): Lane => ({
  export const laneStanding = Effect.fn("integration/laneStanding")(function* (laneId: string) {
    const store = yield* EntityStore;
    const lane = laneOf(store, laneId);
 +  if (lane === undefined) return yield* Effect.die(new Error(`lane ${laneId} was never used`));
-   const active = lane?.active === undefined ? undefined : batchOf(store, lane.active.batchId);
-   return { queued: lane?.queue.length ?? 0, inFlight: active?.members.length ?? 0 };
- });
+   const inFlight = [lane?.active, ...(lane?.behind ?? [])].reduce(
+     (sum, slot) =>
+       sum + (slot === undefined ? 0 : (batchOf(store, slot.batchId)?.members.length ?? 0)),

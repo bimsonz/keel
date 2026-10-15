@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: a landing drops the chain behind it instead of moving it up, so every speculative verification is thrown away
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 373b53ed..4e16bb07 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1478,8 +1478,8 @@ const followTrunk = Effect.fn("integration/followTrunk")(function* (
+         moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
+         lane: () => ({
+           ...withoutInfra(now, batch.members),
+-          active: next,
+-          behind: rest,
++          active: undefined,
++          behind: now.behind ?? [],
+         }),
+       };
+     }).pipe(Effect.orDie);

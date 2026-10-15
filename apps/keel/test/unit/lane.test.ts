@@ -42,6 +42,7 @@ import {
   type ContentHash,
   type EntityRef,
   EventEnvelope,
+  Glob,
   Instant,
   makeId,
 } from "@keeltown/core/kernel";
@@ -2517,6 +2518,226 @@ describe("the Lane's batches", () => {
         yield* toVerifying(w);
         // One failure in twenty: of six queued, a batch of five lands the most per verification.
         expect(yield* membersInFlight).toEqual([2, 3, 4, 5, 6].map(change));
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+});
+
+/** The KeelVerify instance the lane started for `batchId`. */
+const instanceFor = (w: World, batchId: BatchId) =>
+  [...w.verification.started].find(([, job]) => job.fence.batchId === batchId)?.[0] ?? "none";
+
+/** The lane's batch in flight and the batches behind it, as stored. */
+const chain = Effect.gen(function* () {
+  const lane = laneOf(yield* EntityStore, LANE);
+  return { active: lane?.active, behind: lane?.behind ?? [] };
+});
+
+describe("the Lane's queue order", () => {
+  it.effect(
+    "[lane.queue-place] a change requeued goes back to its place in the order it first joined, never to the front: changes that keep failing do not overtake one that was waiting before them",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        // Queued with no plan it runs alone, so the batch forms without it, behind changes queued after it.
+        yield* queue(w, change(2), null);
+        yield* queue(w, change(3));
+        for (let round = 0; round < 3; round++) {
+          const v = yield* toVerifying(w);
+          expect(yield* membersInFlight).toEqual([change(1), change(3)]);
+          yield* recordVerdict(LANE, verdict(v.batchId, v.candidateId, v.instanceId, "park"));
+          for (const id of [change(3), change(1)])
+            yield* requeuedFor(id, v.batchId, "infra-failure");
+          expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([
+            change(1),
+            change(2),
+            change(3),
+          ]);
+        }
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+});
+
+describe("the Lane's overlaps", () => {
+  it.effect(
+    "[lane.overlap-apart] two queued changes whose footprints may share a path are batched apart, the later behind the earlier, while changes that share none batch together",
+    () => {
+      const w = world({ maxBatchSize: 4 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const touching = (id: ChangeId, path: string) => {
+          const held = w.changes.get(id);
+          if (held === undefined) throw new Error(`${id} was never queued`);
+          w.changes.set(id, {
+            ...held,
+            intent: { ...held.intent, footprint: [{ path: Glob.make(path), op: "edit" }] },
+          });
+        };
+        for (const [n, path] of [
+          [1, "src/a.ts"],
+          [2, "src/b.ts"],
+          // A glob over both: it names neither path, yet may touch either.
+          [3, "src/*.ts"],
+        ] as const) {
+          yield* queue(w, change(n));
+          touching(change(n), path);
+        }
+        yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual([change(1), change(2)]);
+        expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(3)]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+});
+
+describe("the Lane's speculation", () => {
+  it.effect(
+    "[lane.speculate] while the batch in flight verifies and a box is free, the next forms behind it on its candidate and verifies at once; its verdict is kept until the batch ahead has landed, and only then is trunk offered it",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        for (const n of [1, 2]) yield* queue(w, change(n));
+        w.verification.capacity.free = 4;
+        expect(yield* stepped(LANE)).toBe("waiting");
+        const { active, behind } = yield* chain;
+        const [next] = behind;
+        if (active?.composed === undefined || next === undefined)
+          throw new Error("no batch formed behind the one in flight");
+        // Composed on the candidate ahead, with its members as predecessors, and verifying already.
+        expect(batchOf(yield* EntityStore, next.batchId)).toMatchObject({
+          base: active.composed.commitSha,
+          predecessors: [change(1)],
+          members: [change(2)],
+          state: "verifying",
+        });
+        // Behind the batch in flight it is composed in GitCore alone; the batch in flight in every tier.
+        expect(w.composed.map((request) => request.gitcoreOnly)).toEqual([undefined, true]);
+        // Its green verdict is kept: trunk hears nothing of it while the batch ahead is in flight.
+        yield* recordVerdict(
+          LANE,
+          verdict(next.batchId, next.candidateId, instanceFor(w, next.batchId), "land"),
+        );
+        expect(yield* payloads("BatchVerified")).toEqual([]);
+        expect((yield* chain).behind[0]?.kept).toMatchObject({ outcome: "land" });
+        yield* recordVerdict(
+          LANE,
+          verdict(active.batchId, active.candidateId, instanceFor(w, active.batchId), "land"),
+        );
+        expect((yield* payloads("BatchVerified")).map((p) => p["batchId"])).toEqual([
+          active.batchId,
+        ]);
+        // Trunk lands the first at its candidate: the second is in flight, and offered now.
+        yield* advance(base, active.composed.commitSha, [change(1)]);
+        yield* stepped(LANE);
+        expect((yield* chain).active?.batchId).toBe(next.batchId);
+        expect((yield* payloads("BatchVerified")).map((p) => p["batchId"])).toEqual([
+          active.batchId,
+          next.batchId,
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.speculate-cancel] a batch in flight that fails cancels every batch behind it: each is invalidated as cancelled because of it, its KeelVerify instance is stopped, and nothing is blamed on its members",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        for (const n of [1, 2, 3]) yield* queue(w, change(n));
+        w.verification.capacity.free = 4;
+        expect(yield* stepped(LANE)).toBe("waiting");
+        const { active, behind } = yield* chain;
+        if (active === undefined || behind.length !== 2)
+          throw new Error(`expected two batches behind, found ${behind.length}`);
+        yield* recordVerdict(
+          LANE,
+          verdict(active.batchId, active.candidateId, instanceFor(w, active.batchId), "bounce"),
+        );
+        yield* stepped(LANE);
+        const cancelled = (yield* payloads("CandidateInvalidated")).map((p) => [
+          p["batchId"],
+          p["reason"],
+          p["because"],
+        ]);
+        expect(cancelled).toEqual(
+          behind.toReversed().map((slot) => [slot.batchId, "cancelled", active.batchId]),
+        );
+        expect(w.verification.stopped.toSorted()).toEqual(
+          behind.map((slot) => instanceFor(w, slot.batchId)).toSorted(),
+        );
+        expect((yield* chain).behind).toEqual([]);
+        expect((yield* payloads("BatchFailed")).map((p) => p["batchId"])).toEqual([active.batchId]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.speculate-held] a batch refused behind the batch in flight is cancelled because of itself, and nothing more forms behind that batch: what failed there waits to form in flight",
+    () => {
+      const w = world({ refuseCompose: [change(2)] });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        for (const n of [1, 2, 3]) yield* queue(w, change(n));
+        w.verification.capacity.free = 8;
+        expect(yield* stepped(LANE)).toBe("waiting");
+        const formed = yield* payloads("BatchFormed");
+        const refused = formed.find(
+          (p) => JSON.stringify(p["members"]) === JSON.stringify([change(2)]),
+        );
+        expect(
+          (yield* payloads("CandidateInvalidated")).map((p) => [
+            p["batchId"],
+            p["reason"],
+            p["because"],
+          ]),
+        ).toEqual([[refused?.["batchId"], "cancelled", refused?.["batchId"]]]);
+        const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.behind ?? []).toEqual([]);
+        expect(lane?.heldBehind).toBe(lane?.active?.batchId);
+        // Back in the queue, it does not form behind the same batch again, nor does anything else.
+        yield* requeuedFor(
+          change(2),
+          Schema.decodeUnknownSync(BatchId)(refused?.["batchId"]),
+          "invalidated",
+        );
+        yield* stepped(LANE);
+        expect(yield* payloads("BatchFormed")).toHaveLength(formed.length);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.speculate-kept-red] a red verdict kept for a batch behind is recorded once it is in flight: it fails then, on its own member",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        for (const n of [1, 2]) yield* queue(w, change(n));
+        w.verification.capacity.free = 4;
+        expect(yield* stepped(LANE)).toBe("waiting");
+        const { active, behind } = yield* chain;
+        const [next] = behind;
+        if (active?.composed === undefined || next === undefined)
+          throw new Error("no batch formed behind the one in flight");
+        yield* recordVerdict(
+          LANE,
+          verdict(next.batchId, next.candidateId, instanceFor(w, next.batchId), "bounce"),
+        );
+        expect(yield* payloads("BatchFailed")).toEqual([]);
+        yield* recordVerdict(
+          LANE,
+          verdict(active.batchId, active.candidateId, instanceFor(w, active.batchId), "land"),
+        );
+        yield* advance(base, active.composed.commitSha, [change(1)]);
+        yield* stepped(LANE);
+        expect(
+          (yield* payloads("BatchFailed")).map((p) => [p["batchId"], p["attribution"]]),
+        ).toEqual([[next.batchId, change(2)]]);
       }).pipe(Effect.provide(w.layer));
     },
   );

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.overlap-apart"
+# kills: lane.overlap-apart
+# why: a change whose footprint is a glob over another's path joins its batch, and the two fail together on their overlap
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 4d471f0d..c804ae3d 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -810,7 +810,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+     reads
+       .slice(i + 1)
+       .filter((other) =>
+-        other.paths.some((path) => read.paths.some((mine) => globsMayOverlap(path, mine))),
++        other.paths.some((path) => read.paths.includes(path)),
+       )
+       .map((other) => [read.changeId, other.changeId] as const),
+   );

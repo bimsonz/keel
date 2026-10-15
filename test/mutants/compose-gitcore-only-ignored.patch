@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/candidate-composer-tiered.test.ts -t "compose.gitcore-only"
+# kills: compose.gitcore-only
+# why: a compose asked for GitCore alone still tries the box, so the lane waits minutes on a refusal GitCore already gave
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index 06a16f2e..3769d682 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -292,7 +292,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
+                 tierReason: TIER_REASON,
+               };
+             });
+-            if (box === undefined || request.gitcoreOnly === true) return yield* tier0;
++            if (box === undefined) return yield* tier0;
+             return yield* tier0.pipe(
+               Effect.catchTag("CompositionRefused", (refused) =>
+                 Effect.gen(function* () {

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: a batch behind the head is composed in every tier, so a conflict there holds the lane's step on a cold box for minutes
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d0a721ff..d0a06844 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1193,7 +1193,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+       at: formed.at,
+       members,
+       // Behind the batch in flight a refusal is decided again in flight: no cold box for it here.
+-      ...(isBehind(lane, batch.id) ? { gitcoreOnly: true as const } : {}),
+     }),
+   );
+   if (Result.isFailure(composed)) {

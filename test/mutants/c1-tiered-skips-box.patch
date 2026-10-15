@@ -2,15 +2,16 @@
 # kills: compose.tiered-box
 # why: a batch GitCore refuses is refused, and MergeBox is never asked to compose it
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index 840aec1b..c4881fae 100644
+index 06a16f2e..8134f313 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -292,7 +292,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
+@@ -292,7 +292,8 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
                  tierReason: TIER_REASON,
                };
              });
--            if (box === undefined) return yield* tier0;
-+            if (box === undefined || request.members.length > 0) return yield* tier0;
+-            if (box === undefined || request.gitcoreOnly === true) return yield* tier0;
++            if (box === undefined || request.gitcoreOnly === true || request.members.length > 0)
++              return yield* tier0;
              return yield* tier0.pipe(
                Effect.catchTag("CompositionRefused", (refused) =>
                  Effect.gen(function* () {

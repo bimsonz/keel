@@ -2,15 +2,15 @@
 # kills: lane.status
 # why: in flight counts the batch and not its members, so a batch of several changes reads as one change
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 2ce5f83b..9e59b297 100644
+index 373b53ed..f22cec4d 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -190,7 +190,7 @@ export const laneStanding = Effect.fn("integration/laneStanding")(function* (lan
-   const store = yield* EntityStore;
+@@ -261,7 +261,7 @@ export const laneStanding = Effect.fn("integration/laneStanding")(function* (lan
    const lane = laneOf(store, laneId);
-   const active = lane?.active === undefined ? undefined : batchOf(store, lane.active.batchId);
--  return { queued: lane?.queue.length ?? 0, inFlight: active?.members.length ?? 0 };
-+  return { queued: lane?.queue.length ?? 0, inFlight: active === undefined ? 0 : 1 };
- });
- 
- /** Whether the lane was destroyed: it then hears no event, forms no batch and takes no verdict. */
+   const inFlight = [lane?.active, ...(lane?.behind ?? [])].reduce(
+     (sum, slot) =>
+-      sum + (slot === undefined ? 0 : (batchOf(store, slot.batchId)?.members.length ?? 0)),
++      sum + (slot === undefined ? 0 : 1),
+     0,
+   );
+   return { queued: lane?.queue.length ?? 0, inFlight };

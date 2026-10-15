@@ -75,7 +75,11 @@ function fakeBox(answer: (request: CandidateRequest) => ReturnType<BoxComposer["
  * second: `edit` is what the change does to the README trunk's second commit
  * also rewrote, so GitCore refuses it unless the change leaves that line be.
  */
-async function composedInTiers(edit: string, boxFor: (tree: string) => BoxComposer) {
+async function composedInTiers(
+  edit: string,
+  boxFor: (tree: string) => BoxComposer,
+  gitcoreOnly = false,
+) {
   const keys = await makeCommitSigningKeys();
   const code = makeCodeHostMemory();
   const staging: RepoRef = { namespace: "memory", name: "prj-staging" };
@@ -141,6 +145,7 @@ async function composedInTiers(edit: string, boxFor: (tree: string) => BoxCompos
           members: [
             { changeId: CHANGE, repo: workspace, base: first, head: seeded.head, title: TITLE },
           ],
+          ...(gitcoreOnly ? { gitcoreOnly: true as const } : {}),
         }),
       ),
     ).pipe(Effect.provide(layer)),
@@ -206,6 +211,15 @@ describe("the composer in tiers", () => {
       `${"0".repeat(40)} ${composed.commitSha} refs/heads/cand/${CANDIDATE}`,
       `${"f".repeat(40)} ${"0".repeat(40)} ${scratch}`,
     ]);
+  });
+
+  it("[compose.gitcore-only] a batch composed in GitCore alone that GitCore refuses is refused with GitCore's reason, and the box is never asked", async () => {
+    const fake = fakeBox(() => Effect.die(new Error("the box was asked")));
+    const run = await composedInTiers("mine\n", () => fake.box, true);
+    expect(fake.asked).toHaveLength(0);
+    if (Exit.isSuccess(run.exit)) throw new Error("composed");
+    expect(Cause.squash(run.exit.cause)).toBeInstanceOf(CompositionRefused);
+    expect(run.pushes).toHaveLength(0);
   });
 
   it("[compose.tiered-both-refuse] a batch the box refuses too is refused with the box's reason and paths, and nothing is pushed", async () => {

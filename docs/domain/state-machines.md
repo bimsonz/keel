@@ -311,10 +311,13 @@ stateDiagram-v2
   [*] --> Forming: BatchFormed
   Forming --> Assembled: CandidateAssembled
   Forming --> Red: BatchFailed
+  Forming --> Invalidated: CandidateInvalidated
   Assembled --> Verifying: VerificationStarted
   Assembled --> Red: BatchFailed
+  Assembled --> Invalidated: CandidateInvalidated
   Verifying --> Green: BatchVerified
   Verifying --> Red: BatchFailed
+  Verifying --> Invalidated: CandidateInvalidated
   Green --> Promoted: CandidatePromoted
   Green --> Invalidated: CandidateInvalidated
   Red --> Bisected: CandidateBisected
@@ -327,7 +330,7 @@ stateDiagram-v2
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Forming | The lane forms a batch | N = min(the project's `maxBatchSize`, clamp(ln 0.8 / ln(1−p), 1, 16)), p the share of failures among the lane's last 20 member outcomes; the queue's head first, then members in queue order; no two members that share a conflict neither dismissed nor resolved, or with opposite effects on one subject; risky changes alone (a person's plan, or requeued `textual` or `interaction`); members whose plans union, and the union stored as the batch's plan; no speculation yet | `BatchFormed` |
+| — | Forming | The lane forms a batch | N = min(the project's `maxBatchSize`, clamp(ln 0.8 / ln(1−p), 1, 16)), p the share of failures among the lane's last 20 member outcomes; the queue's head first, then members in queue order; no two members that share a conflict neither dismissed nor resolved, or with opposite effects on one subject; risky changes alone (a person's plan, or requeued `textual` or `interaction`); members whose plans union, and the union stored as the batch's plan. While the batch in flight verifies and a KeelVerify box is free, the lane forms the next batch behind the last, on its candidate, with every member ahead as its predecessors | `BatchFormed` |
 | Forming | Assembled | GitCore composes the tree (Tier 0), or MergeBox when GitCore refuses (Tier 2) | — | `CandidateAssembled` (with tier and reason) |
 | Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed`: for a batch of one, attributed to its member, so the change bounces with next actions; for a larger batch, `textual`: every member requeues and runs alone next, and the Lane opens no Conflict for it (a proven one would bounce the innocent member too) |
 | Forming | Red | MergeBox cannot compose for its own sake: BoxGate has no room, the box could not fetch, push or answer, or its check of the box did not pass | — | `BatchFailed` attributed to `infra`, and the verdict holds: every member requeues. A batch of one refused that way the third time in a row is attributed to its member instead, and bounces with the reasons and a next action to submit again unchanged. In a batch of several every member counts the failure, and one that reaches the third runs alone next |
@@ -339,6 +342,7 @@ stateDiagram-v2
 | Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches): today one a member, and each member forms its next batch alone under the id that named it |
 | Green | Promoted | Caused by `TrunkAdvanced` | — | `CandidatePromoted` |
 | Green | Invalidated | Caused by `PromotionDeclined`: trunk moved and the commutation rule fails | — | `CandidateInvalidated` |
+| Forming, Assembled, Verifying or Green | Invalidated | The lane cancels a batch it speculated behind another, when a batch ahead of it fails, or its own step fails before it is in flight | Only a batch behind the one in flight: its verdict is kept until every batch ahead has landed, so trunk is never offered it | `CandidateInvalidated {reason: cancelled, because}`, naming the batch whose failure undid it; every member requeues (`ChangeRequeued {reason: invalidated}`) and forms again on trunk's head, blamed for nothing |
 
 **Terminal:** Promoted, Invalidated, Bisected, Red (unless it is `unattributed` with several members, which is bisected).
 

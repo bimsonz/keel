@@ -292,7 +292,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
                 tierReason: TIER_REASON,
               };
             });
-            if (box === undefined) return yield* tier0;
+            if (box === undefined || request.gitcoreOnly === true) return yield* tier0;
             return yield* tier0.pipe(
               Effect.catchTag("CompositionRefused", (refused) =>
                 Effect.gen(function* () {

@@ -12164,13 +12164,18 @@
           "reason": {
             "type": "string",
             "enum": [
-              "head-moved"
+              "head-moved",
+              "cancelled"
             ]
+          },
+          "because": {
+            "$ref": "#/components/schemas/BatchId"
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "The batch is given up and its members go back to the queue: trunk's head moved under a green batch\n(`head-moved`), or a batch it was built on top of in the lane's speculation chain failed (`cancelled`,\n`because` that batch)."
       },
       "CandidatePromoted": {
         "type": "object",

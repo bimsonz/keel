@@ -2,22 +2,22 @@
 # kills: lane.fifo
 # why: The lane batches the newest queued change first, so changes land out of the order they were queued
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8b5fe912..7525fce3 100644
+index 373b53ed..85d70222 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -708,7 +708,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
-  * step tries again.
+@@ -780,7 +780,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+  * predecessors.
   */
- const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?: ActiveBatch) {
 -  const [head] = lane.queue;
 +  const head = lane.queue.at(-1);
    if (head === undefined) return;
-   const base = yield* stagingOnTrunk(lane);
-   const named = aloneOf(lane, head);
-@@ -728,7 +728,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
-       const now = laneOf(tx.store, lane.laneId) ?? lane;
+   const store = yield* EntityStore;
+   const base = on?.composed?.commitSha ?? (yield* stagingOnTrunk(lane));
+@@ -808,7 +808,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?:
+       const tail = (now.behind ?? []).at(-1) ?? now.active;
        if (
-         now.active !== undefined ||
+         (on === undefined ? now.active !== undefined : tail?.batchId !== on.batchId) ||
 -        now.queue[0] !== head ||
 +        now.queue.at(-1) !== head ||
          members.some((member) => !now.queue.includes(member))

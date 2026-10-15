@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: a batch behind is composed on trunk instead of the candidate ahead, so it never contains what it lands after
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 373b53ed..aac88e37 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -783,7 +783,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?:
+   const [head] = lane.queue;
+   if (head === undefined) return;
+   const store = yield* EntityStore;
+-  const base = on?.composed?.commitSha ?? (yield* stagingOnTrunk(lane));
++  const base = yield* stagingOnTrunk(lane);
+   const ahead =
+     on === undefined
+       ? []

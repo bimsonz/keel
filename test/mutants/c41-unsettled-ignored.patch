@@ -2,17 +2,15 @@
 # kills: c41.no-unsettled-pair
 # why: the lane ignores the conflicts its changes say they share, so two changes a conflict is open between are verified and landed together
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8b5fe91..2d3f7a7 100644
+index 39eb6063..342e1ec5 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -679,9 +679,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
-     risky:
-       read.plan === undefined || read.plan.humanClass || aloneOf(lane, read.changeId) !== undefined,
-   }));
--  const pairs = reads.flatMap((read) =>
--    read.unsettled.map((other) => [read.changeId, other] as const),
--  );
-+  const pairs = reads.flatMap((read) => read.unsettled.map(() => [read.changeId, read.changeId] as const));
+@@ -810,7 +810,7 @@ const chooseMembers = Effect.fn("integration/chooseMembers")(function* (
+       .map((other) => [read.changeId, other.changeId] as const),
+   );
+   const pairs = [
+-    ...reads.flatMap((read) => read.unsettled.map((other) => [read.changeId, other] as const)),
++    ...reads.flatMap((read) => read.unsettled.map(() => [read.changeId, read.changeId] as const)),
+     ...overlapping,
+   ];
    const [planned = []] = planBatches(queued, failureRate(lane), pairs, 1, size);
-   const plans = new Map(reads.map((read) => [read.changeId, read.plan]));
-   const joined: { readonly changeId: ChangeId; readonly plan: FlowPlan }[] = [];

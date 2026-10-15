@@ -2,14 +2,18 @@
 # kills: candidate.fold-table
 # why: the fold takes CandidateInvalidated with its guard gone: `batch.state === "green"`.
 diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
-index 46ee4c8c..d5e1e70a 100644
+index 28738d6d..637ffee8 100644
 --- a/packages/core/src/domain/integration/candidate-machine.ts
 +++ b/packages/core/src/domain/integration/candidate-machine.ts
-@@ -399,7 +399,7 @@ export const evolveCandidate = (
+@@ -425,11 +425,7 @@ export const evolveCandidate = (
      case "CandidatePromoted":
        return batch.state === "green" ? { ...batch, state: "promoted" } : illegal(batch, event);
      case "CandidateInvalidated":
--      return batch.state === "green" ? { ...batch, state: "invalidated" } : illegal(batch, event);
+-      return batch.state === "green" ||
+-        (event.reason === "cancelled" &&
+-          (batch.state === "forming" || batch.state === "assembled" || batch.state === "verifying"))
+-        ? { ...batch, state: "invalidated" }
+-        : illegal(batch, event);
 +      return { ...batch, state: "invalidated" };
      default: {
        const unreachable: never = event;

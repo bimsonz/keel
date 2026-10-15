@@ -150,10 +150,29 @@ export const candidateChart: Chart = {
   initial: "forming",
   meta: { createdBy: "BatchFormed", section: "Candidate" },
   states: {
-    forming: { on: { CandidateAssembled: b("assembled"), BatchFailed: b("red") } },
+    // Cancelled (CandidateInvalidated) when a batch it was speculated behind fails.
+    forming: {
+      on: {
+        CandidateAssembled: b("assembled"),
+        BatchFailed: b("red"),
+        CandidateInvalidated: b("invalidated"),
+      },
+    },
     // A refused bundle fails the batch before verification starts.
-    assembled: { on: { VerificationStarted: b("verifying"), BatchFailed: b("red") } },
-    verifying: { on: { BatchVerified: b("green"), BatchFailed: b("red") } },
+    assembled: {
+      on: {
+        VerificationStarted: b("verifying"),
+        BatchFailed: b("red"),
+        CandidateInvalidated: b("invalidated"),
+      },
+    },
+    verifying: {
+      on: {
+        BatchVerified: b("green"),
+        BatchFailed: b("red"),
+        CandidateInvalidated: b("invalidated"),
+      },
+    },
     green: { on: { CandidatePromoted: b("promoted"), CandidateInvalidated: b("invalidated") } },
     // Terminal unless several members failed and nobody is blamed yet: then it is bisected.
     red: { tags: ["terminal"], on: { CandidateBisected: b("bisected") } },

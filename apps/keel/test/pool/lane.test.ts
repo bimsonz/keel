@@ -475,6 +475,36 @@ describe("the Lane DO", () => {
     await drainOutbox(stub);
   });
 
+  it("[lane.do.speculate] through the real object, three changes verify at once in a chain; a red verdict for the middle one is kept until the first has landed, then fails it and cancels the third behind it, stopping its instance", async () => {
+    const { stub, laneId, verification, writer, pushCandidate } = await lane();
+    verification.capacity.free = 8;
+    await stub.receive([1, 2, 3].map((n) => queued(laneId, n)));
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(3), { timeout: 20_000 });
+    const [first, middle, last] = [...verification.started.entries()];
+    if (first === undefined || middle === undefined || last === undefined)
+      throw new Error("three batches never verified at once");
+    const kept = decodeExit(
+      LaneCodecs.recordVerdict,
+      await stub.recordVerdict({ ...landing(middle[1], middle[0]), outcome: "bounce" }),
+    );
+    expect(kept).toEqual(Exit.void);
+    expect(await batchState(stub, middle[1].fence.batchId)).toBe("verifying");
+    const tip = await pushCandidate(first[1].candidateId);
+    await stub.recordVerdict(landing(first[1], first[0]));
+    await vi.waitFor(
+      async () => {
+        expect(writer.head()).toBe(tip);
+        expect(await batchState(stub, first[1].fence.batchId)).toBe("promoted");
+        expect(await batchState(stub, middle[1].fence.batchId)).toBe("red");
+        expect(await batchState(stub, last[1].fence.batchId)).toBe("invalidated");
+      },
+      { timeout: 20_000, interval: 50 },
+    );
+    expect(verification.stopped).toEqual([last[0]]);
+    await drainOutbox(stub);
+  });
+
   it("[lane.do.reoffer] a BatchVerified trunk never took is re-offered on the lane's deadline, and lands", async () => {
     const { stub, laneId, projectId, verification, writer, pushCandidate } = await lane();
     await stub.receive([queued(laneId, 1)]);

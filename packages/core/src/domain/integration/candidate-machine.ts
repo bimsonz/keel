@@ -107,7 +107,9 @@ export type CandidateCommand =
   | ({ readonly _tag: "RecordStep"; readonly step: StepReported } & Fence)
   | { readonly _tag: "Bisect"; readonly into: readonly BatchId[] }
   | { readonly _tag: "Promote"; readonly trunkSha: CommitSha }
-  | { readonly _tag: "Invalidate" };
+  | { readonly _tag: "Invalidate" }
+  /** A batch speculation built on `because`'s candidate, which failed: given up from wherever it stands. */
+  | { readonly _tag: "Cancel"; readonly candidateId: CandidateId; readonly because: BatchId };
 
 /** Facts from I/O: the time, and the batch this decision is about (the Lane DO's key for it). */
 export interface CandidateFacts {
@@ -347,6 +349,21 @@ export const decideCandidate = (
           ])
         : refuse(batchId, batch.state, command);
 
+    case "Cancel":
+      return batch.state === "forming" ||
+        batch.state === "assembled" ||
+        batch.state === "verifying" ||
+        batch.state === "green"
+        ? Result.succeed([
+            CandidateInvalidated.make({
+              candidateId: batch.candidateId ?? command.candidateId,
+              batchId,
+              reason: "cancelled",
+              because: command.because,
+            }),
+          ])
+        : refuse(batchId, batch.state, command);
+
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -433,7 +450,11 @@ export const evolveCandidate = (
     case "CandidatePromoted":
       return batch.state === "green" ? { ...batch, state: "promoted" } : illegal(batch, event);
     case "CandidateInvalidated":
-      return batch.state === "green" ? { ...batch, state: "invalidated" } : illegal(batch, event);
+      return batch.state === "green" ||
+        (event.reason === "cancelled" &&
+          (batch.state === "forming" || batch.state === "assembled" || batch.state === "verifying"))
+        ? { ...batch, state: "invalidated" }
+        : illegal(batch, event);
     default: {
       const unreachable: never = event;
       return unreachable;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate-cancel"
+# kills: lane.speculate-cancel
+# why: a cancelled batch's KeelVerify instance runs on, holding a box for a verdict nobody reads
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index ec24f7ea..1e63a5d3 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1743,7 +1743,7 @@ const cancelBehind = Effect.fn("integration/cancelBehind")(function* (
+         ...(because === from && now.active !== undefined ? { heldBehind: now.active.batchId } : {}),
+       }),
+     })).pipe(Effect.orDie);
+-    if (slot.started === true)
++    if (slot.started === true && false)
+       yield* (yield* BatchVerification).stop(
+         instanceOf(laneId, formedOf(outbox, slot.batchId).eventId),
+       );

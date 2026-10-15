@@ -713,14 +713,14 @@ export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly
  * never started is `missing`, and `stopped` lists the instances stopped while
  * they ran, in order: each then stands terminated. `looked` lists every
  * instance whose standing was read. `capacity.free` is the free boxes it
- * answers, 330 until a test sets it.
+ * answers: none until a test sets some, so a lane speculates nothing unless asked.
  */
 export function makeBatchVerificationMemory() {
   const started = new Map<string, VerificationJob>();
   const ended = new Map<string, InstanceStanding>();
   const stopped: string[] = [];
   const looked: string[] = [];
-  const capacity = { free: 330 };
+  const capacity = { free: 0 };
   const standingOf = (instanceId: string): InstanceStanding =>
     ended.get(instanceId) ??
     (started.has(instanceId) ? { _tag: "Running" } : { _tag: "Failed", status: "missing" });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate-cancel"
+# kills: lane.speculate-cancel
+# why: batches built on a candidate that failed are kept, and verify on a tree trunk will never hold
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 373b53ed..75a4a758 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1831,7 +1831,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       continue;
+     }
+     const [first] = lane.behind ?? [];
+-    if (active === undefined && first !== undefined) {
++    if (active === undefined && first !== undefined && false) {
+       // What was built on a batch that did not land is given up, and its members queued again.
+       yield* cancelBehind(
+         laneId,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: a batch behind names no predecessors, so trunk cannot tell it waits on the batches ahead
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 373b53ed..f80e4892 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -821,7 +821,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane, on?:
+             projectId: lane.projectId,
+             members,
+             base,
+-            predecessors: ahead,
++            predecessors: [],
+             attempt: 0,
+             chainEpoch: now.chainEpoch ?? 0,
+           },

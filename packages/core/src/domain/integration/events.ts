@@ -134,10 +134,16 @@ export const CandidateBisected = Schema.TaggedStruct("CandidateBisected", {
   batchId: BatchId,
   into: Schema.Array(BatchId),
 });
+/**
+ * The batch is given up, and its members go back to the queue: trunk's head
+ * moved under a green batch (`head-moved`), or a batch it was built on top of
+ * in the lane's speculation chain failed (`cancelled`, `because` that batch).
+ */
 export const CandidateInvalidated = Schema.TaggedStruct("CandidateInvalidated", {
   candidateId: CandidateId,
   batchId: BatchId,
-  reason: Schema.Literal("head-moved"),
+  reason: Schema.Literals(["head-moved", "cancelled"]),
+  because: Schema.optional(BatchId),
 });
 export const CandidatePromoted = Schema.TaggedStruct("CandidatePromoted", {
   candidateId: CandidateId,

@@ -1398,11 +1398,17 @@ model CandidateBisected {
   into: BatchId[];
 }
 
+/**
+ * The batch is given up and its members go back to the queue: trunk's head moved under a green batch
+ * (`head-moved`), or a batch it was built on top of in the lane's speculation chain failed (`cancelled`,
+ * `because` that batch).
+ */
 model CandidateInvalidated {
   _tag: "CandidateInvalidated";
   candidateId: CandidateId;
   batchId: BatchId;
-  reason: "head-moved";
+  reason: "head-moved" | "cancelled";
+  because?: BatchId;
 }
 
 model CandidatePromoted {

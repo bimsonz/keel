@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.queue-place"
+# kills: lane.queue-place
+# why: a requeued change jumps to the front, so changes that keep failing starve one that was waiting before them
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 7d1cbf58..151d8532 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -487,7 +487,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         if (holds(tx.store, lane, requeued.changeId)) return undefined;
+         // Back to its place, after every change that was waiting before it: never to the front.
+         const back = withPlan(
+-          enqueue(lane, requeued.changeId),
++          { ...lane, queue: [requeued.changeId, ...lane.queue] },
+           requeued.changeId,
+           requeued.planHash,
+         );

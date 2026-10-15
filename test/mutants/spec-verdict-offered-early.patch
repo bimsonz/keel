@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.speculate"
+# kills: lane.speculate
+# why: a verdict for a batch behind is recorded at once, so trunk is offered a batch whose predecessor may still fail
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 373b53ed..ba4dde72 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2066,7 +2066,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+       : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
+   const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
+   const lane = laneOf(store, laneId);
+-  if (lane !== undefined && isBehind(lane, batch.id)) {
++  if (lane !== undefined && isBehind(lane, batch.id) && false) {
+     if (fence.attempt !== batch.attempt || fence.chainEpoch !== batch.chainEpoch)
+       return yield* new ResultFenced({ batchId: batch.id, ...fence });
+     // Kept until every batch ahead has landed: trunk is only ever offered the batch in flight.
