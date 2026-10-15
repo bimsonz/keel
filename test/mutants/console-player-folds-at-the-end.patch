@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/asread.test.ts
+# kills: player.as-read
+# why: a big project's change page waits for the log's last page before it draws anything
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 5ba7133e..ec7bd1bc 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -295,7 +295,6 @@ export class Player {
+       this.#observationCursor = observations.nextCursor;
+       // Keel's log is shown as it is read: a big project's pages take seconds, and a page asks only for what
+       // it names, so what each page brings is folded as it comes rather than once the last has.
+-      if (this.live && !this.loaded) this.seek(this.end);
+       const movedOn = events.nextCursor !== (from ?? "");
+       if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
+     }

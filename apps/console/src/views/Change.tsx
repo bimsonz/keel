@@ -346,7 +346,7 @@ const PILL = {
   closed: { label: "Closed", Icon: GitPullRequestIcon },
 } as const;
 
-function StatePill({ state }: { state: ChangeState }) {
+export function StatePill({ state }: { state: ChangeState }) {
   const pill = pillOf(state);
   const { label, Icon } = PILL[pill];
   return (

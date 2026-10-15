@@ -217,6 +217,8 @@ function pageOf(route: Route, address: string): string {
 
 /** The places that need nothing of the project's log: its code, and its settings, which Keel is asked for. */
 const UNLOGGED: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit", "settings"]);
+/** The places drawn as the log is read: one change is drawn once its own entries are, not once the log's last is. */
+const AS_READ: ReadonlySet<Route["at"]> = new Set(["change"]);
 
 /** A project's pages, in its frame. */
 function Console({
@@ -247,7 +249,8 @@ function Console({
     note: project.visibility,
   }));
   // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
-  const waiting = !player.loaded && !UNLOGGED.has(route.at) && route.at !== "missing";
+  const waiting =
+    !player.loaded && !UNLOGGED.has(route.at) && !AS_READ.has(route.at) && route.at !== "missing";
   return (
     <WhereProvider
       namespace={found.namespace.handle}

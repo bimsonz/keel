@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts
+# kills: prefetch.no-readme
+# why: a project without a README is asked for one and logs a 404
+diff --git a/apps/console/src/source/prefetch.ts b/apps/console/src/source/prefetch.ts
+index a4e96274..0e5de2e0 100644
+--- a/apps/console/src/source/prefetch.ts
++++ b/apps/console/src/source/prefetch.ts
+@@ -48,9 +48,10 @@ export async function prefetchAddress(pathname: string, search = ""): Promise<vo
+           reads.push(
+             source.getTree(id, atOf(route.ref, route.path)).then((tree) => {
+               const readme = readmeAmong(tree.entries);
+-              return readme === undefined
+-                ? undefined
+-                : source.getBlob(id, atOf(route.ref, readme.path));
++              return source.getBlob(
++                id,
++                atOf(route.ref, route.path === "" ? "README.md" : `${route.path}/README.md`),
++              );
+             }),
+           );
+         else reads.push(source.getBlob(id, atOf(route.ref, route.path)));

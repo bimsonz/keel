@@ -2,12 +2,12 @@
 # kills: player.drain, http.empty-pages
 # why: the log is taken to have ended at a page that holds none of the project's entries, though its cursor moved on
 diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
-index f5a8742..d1a9ea0 100644
+index 5ba7133e..5c2c074f 100644
 --- a/apps/console/src/engine/player.ts
 +++ b/apps/console/src/engine/player.ts
-@@ -282,7 +282,7 @@ export class Player {
-       }
-       this.#observationCursor = observations.nextCursor;
+@@ -297,7 +297,7 @@ export class Player {
+       // it names, so what each page brings is folded as it comes rather than once the last has.
+       if (this.live && !this.loaded) this.seek(this.end);
        const movedOn = events.nextCursor !== (from ?? "");
 -      if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
 +      if (events.items.length === 0 && observations.items.length === 0) return;

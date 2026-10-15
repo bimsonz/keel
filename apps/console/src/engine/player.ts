@@ -293,6 +293,9 @@ export class Player {
         this.#observationTimes.push(at);
       }
       this.#observationCursor = observations.nextCursor;
+      // Keel's log is shown as it is read: a big project's pages take seconds, and a page asks only for what
+      // it names, so what each page brings is folded as it comes rather than once the last has.
+      if (this.live && !this.loaded) this.seek(this.end);
       const movedOn = events.nextCursor !== (from ?? "");
       if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
     }

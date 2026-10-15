@@ -4,6 +4,7 @@
 // its way, and never asks twice. Only Keel's plain reads are asked for here; the project's log is the
 // player's to read.
 
+import { readmeAmong } from "../engine/readme.ts";
 import { parse, TRUNK } from "../route.ts";
 import { FRESH_MS } from "./cache.ts";
 import { createHttpDirectory, createHttpSource } from "./http.ts";
@@ -41,12 +42,18 @@ export async function prefetchAddress(pathname: string, search = ""): Promise<vo
       case "code": {
         const named = route.ref === TRUNK ? {} : { ref: route.ref };
         reads.push(source.getCommits(id, { ...named, limit: HISTORY }));
-        if (route.kind === "tree") {
-          reads.push(source.getTree(id, atOf(route.ref, route.path)));
-          // The README is asked for beside its directory, not after it: most directories that have one name it so.
-          const readme = route.path === "" ? "README.md" : `${route.path}/README.md`;
-          reads.push(source.getBlob(id, atOf(route.ref, readme)));
-        } else reads.push(source.getBlob(id, atOf(route.ref, route.path)));
+        if (route.kind === "tree")
+          // A README is asked for only where the directory names one: a guess at one that is not there is a 404
+          // the browser reports as an error, on every project without one.
+          reads.push(
+            source.getTree(id, atOf(route.ref, route.path)).then((tree) => {
+              const readme = readmeAmong(tree.entries);
+              return readme === undefined
+                ? undefined
+                : source.getBlob(id, atOf(route.ref, readme.path));
+            }),
+          );
+        else reads.push(source.getBlob(id, atOf(route.ref, route.path)));
         for (const parent of route.path === "" ? [] : above(route.path))
           reads.push(source.getTree(id, atOf(route.ref, parent)));
         break;

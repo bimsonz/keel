@@ -165,7 +165,7 @@ describe("a public project's kept log pages", () => {
 });
 
 describe("prefetching a page's reads", () => {
-  it("[prefetch.code] a code address asks for the project, the directory and those above it, its README and trunk's history, and the page's own reads then find them", async () => {
+  it("[prefetch.code] a code address asks for the project, the directory and those above it, the README it names and trunk's history, and the page's own reads then find them", async () => {
     readCache.clear();
     const asked: string[] = [];
     const serve = (input: RequestInfo | URL): Promise<Response> => {
@@ -176,8 +176,26 @@ describe("prefetching a page's reads", () => {
       asked.push(`${url.pathname}${url.search}`);
       if (url.pathname === "/v1/namespaces/acme/projects/demo")
         return Promise.resolve(Response.json(projectOf("public")));
+      // The directory read names a README; the ones above it name none.
       if (url.pathname.endsWith("/repo/tree"))
-        return Promise.resolve(Response.json({ commit: SHA, path: "", entries: [] }));
+        return Promise.resolve(
+          Response.json({
+            commit: SHA,
+            path: "",
+            entries:
+              url.searchParams.get("path") === "src/authz"
+                ? [
+                    {
+                      name: "README.md",
+                      path: "src/authz/README.md",
+                      kind: "blob",
+                      mode: "100644",
+                      sha: SHA,
+                    },
+                  ]
+                : [],
+          }),
+        );
       if (url.pathname.endsWith("/repo/blob"))
         return Promise.resolve(Response.json({ path: "x", content: "" }));
       if (url.pathname.endsWith("/repo/commits"))
@@ -202,6 +220,34 @@ describe("prefetching a page's reads", () => {
       await source.getTree(projectOf("public").id, { path: "src/authz" });
       await source.getCommits(projectOf("public").id, { limit: 100 });
       expect(asked).toHaveLength(6);
+    } finally {
+      vi.unstubAllGlobals();
+      readCache.clear();
+    }
+  });
+
+  it("[prefetch.no-readme] asks for no README a directory does not name, so a project without one meets no 404", async () => {
+    readCache.clear();
+    const asked: string[] = [];
+    const serve = (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+        ORIGIN,
+      );
+      asked.push(`${url.pathname}${url.search}`);
+      if (url.pathname === "/v1/namespaces/acme/projects/demo")
+        return Promise.resolve(Response.json(projectOf("public")));
+      if (url.pathname.endsWith("/repo/tree"))
+        return Promise.resolve(Response.json({ commit: SHA, path: "", entries: [] }));
+      if (url.pathname.endsWith("/repo/commits"))
+        return Promise.resolve(Response.json({ items: [] }));
+      return Promise.resolve(Response.json({}, { status: 404 }));
+    };
+    vi.stubGlobal("fetch", serve);
+    try {
+      await prefetchAddress("/acme/demo");
+      expect(asked.filter((path) => path.includes("/repo/blob"))).toEqual([]);
+      expect(asked.some((path) => path.endsWith("/repo/tree"))).toBe(true);
     } finally {
       vi.unstubAllGlobals();
       readCache.clear();
