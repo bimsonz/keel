@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/isolate-code-host.test.ts
+# kills: isolate.workspace-reads
+# why: the HTTP isolate reads only trunks, so a change not yet landed has no diff and the diff answers 500
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index b16a1d27..e4391479 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -125,7 +125,7 @@ export function isolateLayer(
+     memory: makeMemoryTier(),
+     shared: caches.default,
+     background: waitUntil,
+-  }).pipe(Layer.provide(overrides.codeHost ?? CodeHostArtifacts(artifactsNamespaces(env))));
++  }).pipe(Layer.provide(overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS })));
+   return Layer.mergeAll(
+     overrides.changes ?? ChangesRpc({ change, agentSession }),
+     overrides.inbox ?? InboxRpc(agentSession),

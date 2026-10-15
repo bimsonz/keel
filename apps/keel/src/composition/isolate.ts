@@ -96,7 +96,7 @@ import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.t
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import type { Watches } from "../adapters/driving/mcp/listen.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
-import { artifactsLocationHint } from "./do.ts";
+import { artifactsLocationHint, artifactsNamespaces } from "./do.ts";
 import { doorwayOf } from "./doorway.ts";
 
 /**
@@ -116,14 +116,16 @@ export function isolateLayer(
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
   const directory = AgentDirectoryD1(env.DB);
-  // The repo read API reads trunks, which live in the core namespace alone. What it reads by id
-  // is cached, behind each handler's authorisation: in this isolate's memory, then the colo's cache.
+  // The repo read API reads trunks in the core namespace, and a change's diff reads its workspace
+  // until it lands, so both namespaces are served, as every CodeHost is. What it reads by id is
+  // cached under its repo, behind each handler's authorisation: in this isolate's memory, then the
+  // colo's cache.
   const codeHost = CodeHostReadCache({
     host: env.KEEL_HOST,
     memory: makeMemoryTier(),
     shared: caches.default,
     background: waitUntil,
-  }).pipe(Layer.provide(overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS })));
+  }).pipe(Layer.provide(overrides.codeHost ?? CodeHostArtifacts(artifactsNamespaces(env))));
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),

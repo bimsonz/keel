@@ -397,7 +397,7 @@ export function decisionsLayer(env: Env): Layer.Layer<Decisions> {
 }
 
 export function codeHostLayer(env: Env, options: CodeHostOptions = {}): Layer.Layer<CodeHost> {
-  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) }, options);
+  return CodeHostArtifacts(artifactsNamespaces(env), options);
 }
 
 declare global {
@@ -414,6 +414,11 @@ declare global {
 /** The workspaces namespace: TEST_ARTIFACTS where a test binds it, WORKSPACES everywhere else. */
 const workspaces = (env: Env): Artifacts => env.TEST_ARTIFACTS ?? env.WORKSPACES;
 
+/** Every Artifacts namespace Keel reads, by name: trunks in the core namespace, changes in the workspaces. */
+export const artifactsNamespaces = (env: Env): Readonly<Record<string, Artifacts>> => ({
+  "keel-core": env.ARTIFACTS,
+  "keel-ws-00": workspaces(env),
+});
+
 /** gitcore's object reads over the Artifacts bindings: the core namespace and the workspaces. */
-export const artifactsObjects = (env: Env) =>
-  ArtifactsObjects({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
+export const artifactsObjects = (env: Env) => ArtifactsObjects(artifactsNamespaces(env));
