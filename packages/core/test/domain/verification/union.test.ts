@@ -12,6 +12,7 @@ import {
   compile,
   type Flow,
   type FlowPlan,
+  mergeStep,
   planHashOf,
   unionPlans,
 } from "../../../src/domain/verification/index.ts";
@@ -93,6 +94,12 @@ const stepsIn = (flow: Flow): readonly string[] => {
 };
 
 const STRICTNESS: Readonly<Record<PredicatePolicy, number>> = { annotate: 0, advise: 1, block: 2 };
+
+/** The plan with a command of its own on every step, as a project's flow gives one. */
+const carry = (p: FlowPlan): FlowPlan => ({
+  ...p,
+  steps: p.steps.map((s) => ({ ...s, run: { command: `run ${s.id}`, timeoutMs: 60_000 } })),
+});
 
 describe("unionPlans: the plan a batch runs", () => {
   it("[union.singleton] a batch of one runs its member's plan unchanged, hash and all", () => {
@@ -210,6 +217,47 @@ describe("unionPlans: the plan a batch runs", () => {
       }),
     );
     expect(shared).toBeGreaterThan(0);
+  });
+
+  it("[union.keeps-command] a step two members share keeps the command it carries, so its runner still has one", () => {
+    let shared = 0;
+    fc.assert(
+      fc.property(batchArb, ([head, ...tail]) => {
+        const carried = [carry(head), ...tail.map(carry)] as const;
+        const u = unionOf(carried);
+        return u.steps.every((s) => {
+          if (distinct(carried).filter((m) => m.steps.some((x) => x.id === s.id)).length >= 2)
+            shared++;
+          return s.run?.command === `run ${s.id}` && s.run.timeoutMs === 60_000;
+        });
+      }),
+    );
+    expect(shared).toBeGreaterThan(0);
+  });
+
+  it("[union.merge-self] a step merged with itself keeps every field it holds, whatever it carries, so the union drops nothing a step gains", () => {
+    const runArb = fc.option(
+      fc.record({ command: fc.string({ minLength: 1 }), timeoutMs: fc.integer({ min: 1 }) }),
+      { nil: undefined },
+    );
+    let carried = 0;
+    fc.assert(
+      fc.property(batchArb, runArb, (plans, run) =>
+        plans.every((p) =>
+          p.steps.every((step) => {
+            const s = run === undefined ? step : { ...step, run };
+            if (s.run !== undefined) carried++;
+            const merged = mergeStep(s, s);
+            return (
+              JSON.stringify(Object.keys(merged).toSorted()) ===
+                JSON.stringify(Object.keys(s).toSorted()) &&
+              JSON.stringify(merged.run) === JSON.stringify(s.run)
+            );
+          }),
+        ),
+      ),
+    );
+    expect(carried).toBeGreaterThan(0);
   });
 
   it("[union.version-conflict] members that plan a step at different versions, or come from different compilers, cannot share a run", () => {

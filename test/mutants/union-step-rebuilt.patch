@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/union.test.ts -t "union.merge-self"
+# kills: union.merge-self union.keeps-command
+# why: the union rebuilds a shared step field by field, so a step's command and deploy spec are dropped, and every batch of two or more parks with its Tier 2 steps unrun
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 43d27a6c..f98d53c0 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -55,7 +55,8 @@ export const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
+         ? a.guards
+         : b.guards;
+   return {
+-    ...a,
++    id: a.id,
++    kind: a.kind,
+     evidenceCeiling: weakest(a.evidenceCeiling, b.evidenceCeiling),
+     appliesTo: sortedUnion<Glob>(a.appliesTo, b.appliesTo),
+     tier,

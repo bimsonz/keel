@@ -29,9 +29,13 @@ const inOrder = <A>(order: readonly A[], ...lists: readonly (readonly A[])[]): A
 /**
  * One step as two members planned it: the same spec (same version), so the
  * only differences are what each change's facts and paths made of it. Every
- * choice is the stricter one, and none depends on argument order.
+ * choice is the stricter one, and none depends on argument order. The step
+ * starts as `a`, so whatever a step carries that no rule here merges (its
+ * command, its deploy spec, any field it gains) goes into the union as it is:
+ * without its command a Tier 2 step has no runner and abstains, and every
+ * batch of two or more parks.
  */
-const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
+export const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
   const tier =
     a.tier.tier !== b.tier.tier
       ? a.tier.tier > b.tier.tier
@@ -51,8 +55,7 @@ const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
         ? a.guards
         : b.guards;
   return {
-    id: a.id,
-    kind: a.kind,
+    ...a,
     evidenceCeiling: weakest(a.evidenceCeiling, b.evidenceCeiling),
     appliesTo: sortedUnion<Glob>(a.appliesTo, b.appliesTo),
     tier,
