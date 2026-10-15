@@ -42,6 +42,9 @@
     // Not a secret: it is in every consent URL. scripts/deploy.ts fills it from Terraform, which registers the
     // client; empty here, where Connect answers that no client is registered.
     "CF_OAUTH_CLIENT_ID": "",
+    // The instance's quota configuration (R9): {"defaults"?, "namespaces"?: {"<namespace id>": limits}}, as
+    // JSON. scripts/deploy.ts fills it from the operator's file; "{}" gives every namespace the defaults.
+    "KEEL_QUOTAS": "{}",
     // Each PlatformFunction's model, by exact id: never cloudflare/auto.
     "PLATFORM_FUNCTION_PINS": { "keel.probe.freshness": "@cf/moonshotai/kimi-k2.7-code" },
   },

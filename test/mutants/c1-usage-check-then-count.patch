@@ -2,24 +2,24 @@
 # kills: usage.contract.serialised
 # why: The count is read before a yield and the decision made on it afterwards, so racing admissions each decide on a stale count and pass the limit together
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index 9a5139b5..8573b373 100644
+index c81576c7..45d3f56c 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -100,6 +100,8 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
- ) {
+@@ -120,6 +120,8 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
    const store = yield* EntityStore;
    const now = yield* (yield* Clock).now;
+   const instance = yield* InstanceQuotas;
 +  const stale = usedAt(store, namespace, kind, now);
 +  yield* Effect.yieldNow;
    const answer = store.transaction((): Result.Result<QuotaAdmitted, QuotaExceeded> => {
      const id = `${namespace}/${kind}/admit/${key}`;
      const first = store.get(KEY, id);
-@@ -108,7 +110,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+@@ -128,7 +130,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
        if (keyed.exceeded !== undefined) return Result.fail(keyed.exceeded);
        if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
      }
 -    const used = usedAt(store, namespace, kind, now);
 +    const used = stale;
-     const { overrides, halted } = settingsOf(store, namespace);
+     const { overrides, halted } = settingsOf(store, namespace, instance);
      const decided = admitQuota({ kind, amount, used, now, overrides, halted });
      if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);

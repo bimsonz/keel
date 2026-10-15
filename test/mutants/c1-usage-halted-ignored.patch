@@ -2,13 +2,13 @@
 # kills: usage.contract.halted
 # why: A halted namespace is admitted as if it were not, so its verification spend never stops
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index 9a5139b5..baea4f69 100644
+index c81576c7..90963327 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -110,7 +110,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+@@ -130,7 +130,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
      }
      const used = usedAt(store, namespace, kind, now);
-     const { overrides, halted } = settingsOf(store, namespace);
+     const { overrides, halted } = settingsOf(store, namespace, instance);
 -    const decided = admitQuota({ kind, amount, used, now, overrides, halted });
 +    const decided = admitQuota({ kind, amount, used, now, overrides, halted: false });
      if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);

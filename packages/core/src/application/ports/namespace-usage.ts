@@ -1,6 +1,12 @@
 import { Context, type Effect, Schema } from "effect";
 import { type QuotaAdmitted, type QuotaExceeded, QuotaKind } from "../../domain/identity/index.ts";
-import type { NamespaceId } from "../../domain/kernel/index.ts";
+import { NamespaceId } from "../../domain/kernel/index.ts";
+
+/** Limits by kind, for the kinds they name: each a finite number, zero or more. */
+const Limits = Schema.Record(
+  QuotaKind,
+  Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+);
 
 /**
  * A namespace's own quota settings, kept beside its counts: the limits that take
@@ -8,13 +14,27 @@ import type { NamespaceId } from "../../domain/kernel/index.ts";
  * verification spend is stopped. A limit is a finite number, zero or more.
  */
 export const UsageSettings = Schema.Struct({
-  overrides: Schema.Record(
-    QuotaKind,
-    Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
-  ),
+  overrides: Limits,
   halted: Schema.Boolean,
 });
 export type UsageSettings = typeof UsageSettings.Type;
+
+/**
+ * The instance's quota configuration (R9), as whoever runs it sets it: limits
+ * that replace `DEFAULT_QUOTAS` for every namespace (`defaults`), and limits
+ * for named namespaces (`namespaces`). A namespace's own settings come before
+ * both. Empty, every namespace has the defaults.
+ */
+export const InstanceQuotasConfig = Schema.Struct({
+  defaults: Schema.optionalKey(Limits),
+  namespaces: Schema.optionalKey(Schema.Record(NamespaceId, Limits)),
+});
+export type InstanceQuotasConfig = typeof InstanceQuotasConfig.Type;
+
+/** The instance's quota configuration, read where admissions are decided; none until the composition provides it. */
+export const InstanceQuotas = Context.Reference<InstanceQuotasConfig>("keel/InstanceQuotas", {
+  defaultValue: () => ({}),
+});
 
 /**
  * A namespace's usage against its quotas: one count per
@@ -51,7 +71,12 @@ export class NamespaceUsage extends Context.Service<
       amount: number,
       key: string,
     ) => Effect.Effect<void>;
-    /** The namespace's settings; no overrides and not halted until it is configured. */
+    /**
+     * The namespace's settings as they apply: its own limits, then the
+     * instance's for it, then the instance's defaults, each kind from the first
+     * that names it (`DEFAULT_QUOTAS` for a kind none names); not halted until
+     * it is configured.
+     */
     readonly settings: (namespace: NamespaceId) => Effect.Effect<UsageSettings>;
     /**
      * Replaces the namespace's settings whole; every admission after it is decided

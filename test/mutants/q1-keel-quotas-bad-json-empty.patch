@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/namespace-usage.test.ts
+# kills: usage.instance-quotas
+# why: KEEL_QUOTAS that is not JSON gives every namespace the defaults
+diff --git a/apps/keel/src/composition/quotas.ts b/apps/keel/src/composition/quotas.ts
+index e808ae93..70f03dad 100644
+--- a/apps/keel/src/composition/quotas.ts
++++ b/apps/keel/src/composition/quotas.ts
+@@ -17,7 +17,7 @@ export function instanceQuotas(raw: unknown): InstanceQuotasConfig {
+   try {
+     json = JSON.parse(typeof raw === "string" && raw.trim() !== "" ? raw : "{}");
+   } catch (error) {
+-    throw new Error(`KEEL_QUOTAS is not JSON: ${String(error)}`, { cause: error });
++    json = {};
+   }
+   const decoded = decodeInstanceQuotas(json);
+   if (Exit.isFailure(decoded))

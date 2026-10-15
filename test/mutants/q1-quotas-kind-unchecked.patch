@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/quotas.test.ts
+# kills: deploy.quotas-invalid, deploy.quotas-agree
+# why: a misspelt kind passes the deploy's check, so the Worker refuses to start after the deploy
+diff --git a/scripts/lib/quotas.ts b/scripts/lib/quotas.ts
+index d06ad763..b201a0a6 100644
+--- a/scripts/lib/quotas.ts
++++ b/scripts/lib/quotas.ts
+@@ -50,7 +50,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
+ const limitsProblem = (limits: unknown, where: string): string | undefined => {
+   if (!isObject(limits)) return `${where} is not an object of limits`;
+   for (const [kind, limit] of Object.entries(limits)) {
+-    if (!(QUOTA_KINDS as readonly string[]).includes(kind))
++    if (kind === "")
+       return `${where} names ${JSON.stringify(kind)}, which is no quota kind`;
+     if (typeof limit !== "number" || !Number.isFinite(limit) || limit < 0)
+       return `${where}'s ${kind} is not a finite number, zero or more`;

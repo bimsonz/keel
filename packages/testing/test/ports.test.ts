@@ -87,14 +87,19 @@ const CONTRACT_PORTS = [
   "Metrics",
 ];
 
-/** A port is an exported `Context.Service` class keyed under `keel/`. */
+/**
+ * A port is an exported `Context.Service` class keyed under `keel/`. A
+ * `Context.Reference`, which has a default, is configuration read where it is
+ * used (the instance's quotas), not a port an adapter provides.
+ */
 const declared = Object.entries(ports)
   .filter(
     ([, value]) =>
       typeof value === "function" &&
       "key" in value &&
       typeof value.key === "string" &&
-      value.key.startsWith("keel/"),
+      value.key.startsWith("keel/") &&
+      !("defaultValue" in value),
   )
   .map(([name]) => name);
 

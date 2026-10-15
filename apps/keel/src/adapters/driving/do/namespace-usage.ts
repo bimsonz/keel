@@ -14,8 +14,9 @@ import {
   NamespaceUsageSettings,
   UsageCount,
 } from "../../../rpc/namespace-usage.ts";
+import { namespaceUsageServices } from "../../../composition/do.ts";
 import { armedAlarms, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
-import { KeelObject } from "./keel-object.ts";
+import { KeelObjectWith } from "./keel-object.ts";
 
 /** The object's own deadline: forget the keys first answered a week ago or longer. */
 export const USAGE_PRUNE = "usage prune";
@@ -31,11 +32,16 @@ const decodeSettings = Schema.decodeUnknownEffect(NamespaceUsageSettings);
  * limits and whether its spend is stopped), which every admission is decided
  * under. One object per namespace, so the platform serialises a namespace's admissions:
  * no two interleave between the check and the count. It commits no event; the
- * counts are its state. Keys are forgotten a week after their first answer,
+ * counts are its state. Its limits are the instance's configuration (`KEEL_QUOTAS`)
+ * under the namespace's own settings. Keys are forgotten a week after their first answer,
  * by `usage prune`, armed a day after a count and then daily while any key is
  * held.
  */
-export class NamespaceUsageDO extends KeelObject implements NamespaceUsageRpc {
+export class NamespaceUsageDO extends KeelObjectWith<never> implements NamespaceUsageRpc {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, namespaceUsageServices(env));
+  }
+
   private get namespace(): NamespaceId {
     return usageNamespace(this.ctx.id.name);
   }

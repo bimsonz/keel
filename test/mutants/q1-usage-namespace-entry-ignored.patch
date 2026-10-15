@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/namespace-usage.test.ts
+# kills: usage.configured
+# why: the instance's entry for a namespace is never read
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index c81576c7..97e6f50c 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -59,7 +59,7 @@ const settingsOf = (
+   const own = stored === undefined ? UNSET : decodeSettings(stored);
+   return {
+     ...own,
+-    overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
++    overrides: { ...instance.defaults, ...own.overrides },
+   };
+ };
+ 

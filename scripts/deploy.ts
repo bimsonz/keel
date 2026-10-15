@@ -22,6 +22,7 @@ import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
 import { CLIENT_ID_VAR, oauthClientAtDeploy } from "./lib/oauth-client.ts";
+import { QUOTAS_VAR, quotasAtDeploy, quotasFile } from "./lib/quotas.ts";
 import { examplePinProblems, pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
 import { ApiRefused, verifyStore } from "./lib/cloudflare-api.ts";
@@ -190,6 +191,22 @@ function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string;
   // Sign-in codes come from the site's mail subdomain, which is onboarded to Email Service's sending.
   if (isObject(vars) && "KEEL_MAIL_FROM" in vars)
     set(["vars", "KEEL_MAIL_FROM"], `noreply@mail.${host}`);
+  // The instance's quota limits, from the operator's file: never "{}" on keel.town (lib/quotas.ts).
+  const file = quotasFile();
+  const quotas = quotasAtDeploy(
+    committed,
+    environment,
+    () => (existsSync(file) ? readFileSync(file, "utf8") : undefined),
+    file,
+  );
+  if (quotas.kind === "refused") throw new Error(`${source}: ${quotas.reason}`);
+  if (quotas.kind === "defaults") console.log(`${source}: ${quotas.said}`);
+  if (quotas.kind === "configured") {
+    set(["vars", QUOTAS_VAR], quotas.value);
+    console.log(
+      `${source}: ${QUOTAS_VAR} configures ${quotas.namespaces} namespace${quotas.namespaces === 1 ? "" : "s"}${quotas.defaults ? " and the instance's defaults" : ""}`,
+    );
+  }
   // The half of the bundle URL key pair that only verifies: a var, so keel-verify holds no secret.
   if (isObject(vars) && "BUNDLE_URL_PUBLIC_KEY" in vars)
     set(

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/quotas.test.ts
+# kills: deploy.quotas-required
+# why: staging deploys with no quota file, so keel.town ships "{}" and holds keel/keel to the defaults
+diff --git a/scripts/lib/quotas.ts b/scripts/lib/quotas.ts
+index d06ad763..43483aac 100644
+--- a/scripts/lib/quotas.ts
++++ b/scripts/lib/quotas.ts
+@@ -97,7 +97,7 @@ export function quotasAtDeploy(
+   if (!isObject(vars) || !(QUOTAS_VAR in vars)) return { kind: "none" };
+   const text = read();
+   if (text === undefined)
+-    return environment === QUOTAS_REQUIRED_IN
++    return false
+       ? {
+           kind: "refused",
+           reason: `${QUOTAS_VAR}: ${file} is missing. Refusing to deploy ${environment} without it: every namespace would have the defaults, and keel/keel would stop at 120 container-minutes a day`,

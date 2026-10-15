@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/namespace-usage.test.ts
+# kills: usage.instance-quotas
+# why: a misspelt kind in KEEL_QUOTAS is dropped, leaving the namespace on the defaults
+diff --git a/apps/keel/src/composition/quotas.ts b/apps/keel/src/composition/quotas.ts
+index e808ae93..3f61ef5c 100644
+--- a/apps/keel/src/composition/quotas.ts
++++ b/apps/keel/src/composition/quotas.ts
+@@ -3,7 +3,7 @@ import { Cause, Exit, Schema } from "effect";
+ 
+ // A key the configuration does not know (a misspelt kind) refuses: dropped, it would leave a namespace on the defaults.
+ const decodeInstanceQuotas = Schema.decodeUnknownExit(InstanceQuotasConfig, {
+-  onExcessProperty: "error",
++  onExcessProperty: "ignore",
+ });
+ 
+ /**

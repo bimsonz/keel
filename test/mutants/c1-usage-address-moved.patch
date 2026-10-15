@@ -2,11 +2,11 @@
 # kills: usage.address
 # why: Every namespace's usage object is looked for at another address, so each namespace's counts, keys and settings start again from nothing
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index 9a5139b5..d3ef3605 100644
+index c81576c7..04d6ecb1 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -44,7 +44,7 @@ const settingsOf = (store: Store, namespace: NamespaceId): UsageSettings => {
-   return stored === undefined ? UNSET : decodeSettings(stored);
+@@ -63,7 +63,7 @@ const settingsOf = (
+   };
  };
  
 -const ADDRESS = "usage:";

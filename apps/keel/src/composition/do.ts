@@ -11,6 +11,7 @@ import {
   type FanOut,
   type HumanGate,
   type Ids,
+  InstanceQuotas,
   type NamespaceUsage,
   type NamespaceAgents,
   type Namespaces,
@@ -36,6 +37,7 @@ import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import { Effect, Layer, ManagedRuntime, Option } from "effect";
 import { CodeHostArtifacts, type CodeHostOptions } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
+import { instanceQuotas } from "./quotas.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
 import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
@@ -246,6 +248,11 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
       ProjectNamespacesD1(env.DB),
     );
   });
+}
+
+/** The NamespaceUsage object's driven services beyond the backbone: the instance's quota configuration. */
+export function namespaceUsageServices(env: Env): Layer.Layer<never> {
+  return Layer.succeed(InstanceQuotas, instanceQuotas(env.KEEL_QUOTAS));
 }
 
 /** BoxGate reads its namespace's `concurrent-containers` and halt from the namespace's usage object. */

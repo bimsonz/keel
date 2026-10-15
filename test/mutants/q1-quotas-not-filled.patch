@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/quotas.test.ts
+# kills: deploy.quotas-fill
+# why: the file is read and checked, but the var stays "{}"
+diff --git a/scripts/lib/quotas.ts b/scripts/lib/quotas.ts
+index d06ad763..aed1b81b 100644
+--- a/scripts/lib/quotas.ts
++++ b/scripts/lib/quotas.ts
+@@ -121,7 +121,7 @@ export function quotasAtDeploy(
+   const namespaces = isObject(json) && isObject(json["namespaces"]) ? json["namespaces"] : {};
+   return {
+     kind: "configured",
+-    value: JSON.stringify(json),
++    value: "{}",
+     namespaces: Object.keys(namespaces).length,
+     defaults: isObject(json) && json["defaults"] !== undefined,
+   };

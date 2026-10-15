@@ -14,8 +14,10 @@ import {
 } from "@keeltown/core/application/identity";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
 import { makeId } from "@keeltown/core/kernel";
+import { InstanceQuotas, type InstanceQuotasConfig } from "@keeltown/core/ports";
 import { makeEntityStoreMemory, makeManualClock } from "@keeltown/testing";
 import { Effect, Exit, Layer } from "effect";
+import { instanceQuotas } from "../../src/composition/quotas.ts";
 
 // A namespace is a person's, an agent's or an org's, by the id of its account.
 const PERSON = makeId("usr", "01J9ZZZZZZZZZZZZZZZZZZZZZX");
@@ -120,4 +122,69 @@ describe("the usage store", () => {
       }).pipe(Effect.provide(w.layer));
     },
   );
+});
+
+describe("the instance's quota configuration", () => {
+  // Limits written out, never taken from the code under test.
+  const CONFIG: InstanceQuotasConfig = {
+    defaults: { "container-minutes": 300, projects: 4 },
+    namespaces: { [ORG]: { "container-minutes": 9000, "concurrent-containers": 40 } },
+  };
+  const configured = () => {
+    const w = world();
+    return { ...w, layer: Layer.mergeAll(w.layer, Layer.succeed(InstanceQuotas, CONFIG)) };
+  };
+
+  it.effect(
+    "[usage.configured] a namespace's own limit comes before the instance's for it, and that before the instance's defaults, kind by kind",
+    () =>
+      Effect.gen(function* () {
+        // The org's configured entry, over the configured default.
+        expect(yield* admitUsage(ORG, "container-minutes", 9000, "org-all")).toEqual({
+          limit: 9000,
+          remaining: 0,
+        });
+        // A kind the org's entry leaves out: the configured default, then DEFAULT_QUOTAS.
+        expect(yield* admitUsage(ORG, "projects", 1, "org-p")).toEqual({ limit: 4, remaining: 3 });
+        expect(yield* admitUsage(ORG, "model-calls", 1, "org-m")).toEqual({
+          limit: DEFAULT_QUOTAS["model-calls"],
+          remaining: DEFAULT_QUOTAS["model-calls"] - 1,
+        });
+        // A namespace the configuration does not name has its defaults.
+        const refused = yield* Effect.exit(admitUsage(PERSON, "container-minutes", 301, "p-over"));
+        expect(Exit.isFailure(refused)).toBe(true);
+        expect(yield* admitUsage(PERSON, "container-minutes", 300, "p-all")).toEqual({
+          limit: 300,
+          remaining: 0,
+        });
+        // The namespace's own setting wins over both, and settings say the limits as they apply.
+        yield* configureUsage(AGENT, { overrides: { "container-minutes": 7 }, halted: false });
+        expect(yield* admitUsage(AGENT, "container-minutes", 7, "a-all")).toEqual({
+          limit: 7,
+          remaining: 0,
+        });
+        expect(yield* usageSettings(ORG)).toEqual({
+          overrides: { "container-minutes": 9000, "concurrent-containers": 40, projects: 4 },
+          halted: false,
+        });
+        expect(yield* usageSettings(AGENT)).toEqual({
+          overrides: { "container-minutes": 7, projects: 4 },
+          halted: false,
+        });
+      }).pipe(Effect.provide(configured().layer)),
+  );
+
+  it("[usage.instance-quotas] KEEL_QUOTAS decodes as the configuration, empty is none, and anything else stops the composition", () => {
+    expect(instanceQuotas("{}")).toEqual({});
+    expect(instanceQuotas("")).toEqual({});
+    expect(instanceQuotas(JSON.stringify(CONFIG))).toEqual(CONFIG);
+    for (const bad of [
+      "not json",
+      "[]",
+      JSON.stringify({ defaults: { "container-minutes": -1 } }),
+      JSON.stringify({ defaults: { "box-hours": 3 } }),
+      JSON.stringify({ namespaces: { keel: { projects: 3 } } }),
+    ])
+      expect(() => instanceQuotas(bad)).toThrow(/KEEL_QUOTAS/);
+  });
 });

@@ -2,12 +2,12 @@
 # kills: usage.contract.refusal-counts-nothing
 # why: A refused amount is counted all the same, so a refusal eats the room that was left
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index 9a5139b5..1183a0ab 100644
+index c81576c7..e1c29e3c 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -111,7 +111,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+@@ -131,7 +131,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
      const used = usedAt(store, namespace, kind, now);
-     const { overrides, halted } = settingsOf(store, namespace);
+     const { overrides, halted } = settingsOf(store, namespace, instance);
      const decided = admitQuota({ kind, amount, used, now, overrides, halted });
 -    if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);
 +    putUsed(store, namespace, kind, used + amount, now);

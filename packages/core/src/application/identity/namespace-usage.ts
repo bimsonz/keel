@@ -7,7 +7,13 @@ import {
   resetAt,
 } from "../../domain/identity/index.ts";
 import { type Instant, InstantSchema, NamespaceId } from "../../domain/kernel/index.ts";
-import { Clock, EntityStore, UsageSettings } from "../ports/index.ts";
+import {
+  Clock,
+  EntityStore,
+  InstanceQuotas,
+  type InstanceQuotasConfig,
+  UsageSettings,
+} from "../ports/index.ts";
 
 /** The EntityStore kind holding a namespace's count of one quota kind, keyed `<namespace>/<kind>`. */
 const COUNT = "usage-count";
@@ -39,9 +45,22 @@ type Store = (typeof EntityStore)["Service"];
 /** A namespace with no settings of its own: the instance's limits, and nothing stopped. */
 const UNSET: UsageSettings = { overrides: {}, halted: false };
 
-const settingsOf = (store: Store, namespace: NamespaceId): UsageSettings => {
+/**
+ * The namespace's settings as they apply: its own limits before the instance's
+ * for it, and those before the instance's defaults, kind by kind. What is
+ * stored stays the namespace's own.
+ */
+const settingsOf = (
+  store: Store,
+  namespace: NamespaceId,
+  instance: InstanceQuotasConfig,
+): UsageSettings => {
   const stored = store.get(SETTINGS, namespace);
-  return stored === undefined ? UNSET : decodeSettings(stored);
+  const own = stored === undefined ? UNSET : decodeSettings(stored);
+  return {
+    ...own,
+    overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
+  };
 };
 
 const ADDRESS = "usage:";
@@ -89,8 +108,8 @@ const putUsed = (
  * has one; otherwise the domain's decision on the namespace's count now under the
  * namespace's settings, the amount counted when it is admitted, and the answer kept
  * under the key, all in one transaction, so no other admission interleaves.
- * The namespace's own limit comes before the instance's default, and a halted namespace's
- * spend kinds are refused.
+ * The namespace's own limit comes before the instance's for it, and that before the
+ * instance's default (`settingsOf`); a halted namespace's spend kinds are refused.
  */
 export const admitUsage = Effect.fn("identity/admitUsage")(function* (
   namespace: NamespaceId,
@@ -100,6 +119,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
 ) {
   const store = yield* EntityStore;
   const now = yield* (yield* Clock).now;
+  const instance = yield* InstanceQuotas;
   const answer = store.transaction((): Result.Result<QuotaAdmitted, QuotaExceeded> => {
     const id = `${namespace}/${kind}/admit/${key}`;
     const first = store.get(KEY, id);
@@ -109,7 +129,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
       if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
     }
     const used = usedAt(store, namespace, kind, now);
-    const { overrides, halted } = settingsOf(store, namespace);
+    const { overrides, halted } = settingsOf(store, namespace, instance);
     const decided = admitQuota({ kind, amount, used, now, overrides, halted });
     if (Result.isSuccess(decided)) putUsed(store, namespace, kind, used + amount, now);
     store.put(
@@ -164,11 +184,11 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* () 
   });
 });
 
-/** `NamespaceUsage.settings` over this object's own store: the namespace's settings, or none of its own. */
+/** `NamespaceUsage.settings` over this object's own store: the namespace's settings as they apply (`settingsOf`). */
 export const usageSettings = Effect.fn("identity/usageSettings")(function* (
   namespace: NamespaceId,
 ) {
-  return settingsOf(yield* EntityStore, namespace);
+  return settingsOf(yield* EntityStore, namespace, yield* InstanceQuotas);
 });
 
 /**
