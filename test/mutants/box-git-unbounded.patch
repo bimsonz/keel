@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/deadline.test.ts -t "box.low-speed"
+# kills: box.low-speed
+# why: a stalled fetch or push in the box holds it, and every compose queued on it, past its lease
+diff --git a/packages/gitcore/src/mergebox-script.ts b/packages/gitcore/src/mergebox-script.ts
+index 88d5e808..deccb695 100644
+--- a/packages/gitcore/src/mergebox-script.ts
++++ b/packages/gitcore/src/mergebox-script.ts
+@@ -50,7 +50,6 @@ printf '%s\\n' "$1" > ${BOX_CANARY_FILE}`;
+  * bytes a second for ${BOX_LOW_SPEED_SECONDS} s, exits ${BOX_TRANSPORT_EXIT}.
+  */
+ export const BOX_COMPOSE_SCRIPT = `set -u
+-export GIT_HTTP_LOW_SPEED_LIMIT=${BOX_LOW_SPEED_BYTES} GIT_HTTP_LOW_SPEED_TIME=${BOX_LOW_SPEED_SECONDS}
+ staging=$1; base=$2; scratch=$3; shift 3
+ fail() { rc=$1; shift; printf '%s\\n' "$*" >&2; [ "$rc" -gt 128 ] && exit "$rc"; exit ${BOX_TRANSPORT_EXIT}; }
+ dir=$(mktemp -d "$HOME/box.XXXXXX") || exit ${BOX_TRANSPORT_EXIT}

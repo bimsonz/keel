@@ -1,3 +1,4 @@
+import { gitRemote } from "./remote.ts";
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { CommitSha, ProjectId } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
@@ -9,7 +10,7 @@ import {
   type SyncOutcome,
   WorkspaceRebaser,
 } from "@keeltown/core/ports";
-import { type GitRemote, ReceivePackBusy, relay } from "@keeltown/gitcore";
+import { ReceivePackBusy, relay } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 import { TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
 
@@ -37,7 +38,7 @@ export const WorkspaceRebaserGitCore = (
         Effect.gen(function* () {
           const info = yield* host.info(repo);
           const token = yield* host.mintToken(repo, access, TOKEN_TTL_SECONDS);
-          return { url: info.remote, token: token.token } satisfies GitRemote;
+          return gitRemote(info.remote, token.token);
         });
 
       const heldBy = (workspace: RepoRef) =>

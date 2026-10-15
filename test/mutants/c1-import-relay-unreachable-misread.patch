@@ -2,12 +2,12 @@
 # kills: artifacts.import-refused
 # why: an upstream the relay cannot read either is answered as not found, so a repository that is only unreachable reads as one that does not exist
 diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-index 39246f53..53b28343 100644
+index c2952ce3..584d46f5 100644
 --- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-@@ -114,7 +114,7 @@ async function relayImport(
+@@ -118,7 +118,7 @@ async function relayImport(
  ): Promise<void> {
-   const upstream = { url: source.url };
+   const upstream = gitRemote(source.url);
    const advertised = await advertisement(upstream).catch(() => {
 -    throw new ImportRefused({ reason: "unreachable" });
 +    throw new ImportRefused({ reason: "not-found" });

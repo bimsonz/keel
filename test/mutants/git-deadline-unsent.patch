@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/deadline.test.ts
+# kills: git.deadline
+# why: a remote's deadline is never sent with its requests, so a git service that never answers holds whatever waits on it
+diff --git a/packages/gitcore/src/push.ts b/packages/gitcore/src/push.ts
+index 4da59e6f..b1d05867 100644
+--- a/packages/gitcore/src/push.ts
++++ b/packages/gitcore/src/push.ts
+@@ -48,7 +48,7 @@ export interface GitRemote {
+ 
+ /** What bounds each request to `remote`: an abort signal at its deadline, when it has one. */
+ export const deadlineOf = (remote: GitRemote): { readonly signal?: AbortSignal } =>
+-  remote.deadlineMs === undefined ? {} : { signal: AbortSignal.timeout(remote.deadlineMs) };
++  {};
+ 
+ /** The credential each request to `remote` carries: none for a public remote. */
+ export const authorizationOf = (remote: GitRemote): Readonly<Record<string, string>> =>

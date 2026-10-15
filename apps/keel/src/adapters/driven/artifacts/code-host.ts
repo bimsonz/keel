@@ -1,3 +1,4 @@
+import { gitRemote } from "../gitcore/remote.ts";
 import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   CodeHost,
@@ -90,7 +91,7 @@ async function advertisedBranches(
 ): Promise<Imported[]> {
   const [info, token] = await Promise.all([handle.info(), handle.createToken("read", 60)]);
   try {
-    const refs = await advertisedRefs({ url: info.remote, token: token.plaintext });
+    const refs = await advertisedRefs(gitRemote(info.remote, token.plaintext));
     return [...refs]
       .filter(([ref]) => ref.startsWith(BRANCH))
       .map(([ref, hash]) => ({ ref, commit: toCommitSha(hash) }))
@@ -115,7 +116,7 @@ async function relayImport(
   name: string,
   source: { readonly url: string; readonly ref?: string | undefined },
 ): Promise<void> {
-  const upstream = { url: source.url };
+  const upstream = gitRemote(source.url);
   const advertised = await advertisement(upstream).catch(() => {
     throw new ImportRefused({ reason: "unreachable" });
   });
@@ -129,7 +130,7 @@ async function relayImport(
   await namespace.delete(name);
   const made = await namespace.create(name);
   try {
-    const sent = await relaySend({ url: made.remote, token: made.token }, move, pack);
+    const sent = await relaySend(gitRemote(made.remote, made.token), move, pack);
     if (sent.kind !== "advanced") throw new Error(`an import's relay was ${sent.kind}`);
   } catch (e) {
     // Its tokens go with it.
@@ -151,7 +152,7 @@ async function resolveRef(handle: RepoHandle, ref: string): Promise<string | und
   if (ref.startsWith(BRANCH))
     return (await handle.log({ ref: ref.slice(BRANCH.length), limit: 1 }))[0]?.hash;
   const [info, token] = await Promise.all([handle.info(), handle.createToken("read", 60)]);
-  return (await advertisedRefs({ url: info.remote, token: token.plaintext })).get(ref);
+  return (await advertisedRefs(gitRemote(info.remote, token.plaintext))).get(ref);
 }
 
 /** Revokes a token on a repo, through a handle opened for the purpose. */

@@ -5,9 +5,11 @@
 import { CompositionRefused } from "@keeltown/core/domain/integration";
 import { CommitSha, Instant, makeId, NamespaceId } from "@keeltown/core/kernel";
 import type { CandidateRequest } from "@keeltown/core/ports";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
+import { Cause, Effect, Exit, Fiber, Option, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import {
+  BOX_COMPOSE_MS,
   BOX_LEASE_MS,
   type BoxObjects,
   boxComposerRpc,
@@ -187,6 +189,26 @@ describe("MergeBox's client", () => {
       expect(world.asked.at(-1)).toBe("release lse-1");
     }
   });
+
+  it.effect(
+    "[mergebox.client-hung] a box that never answers is given up at BOX_COMPOSE_MS as one that did not answer: box-failed, naming the timeout, with the lease given back",
+    () =>
+      Effect.gen(function* () {
+        const world = objects({ answer: () => new Promise<unknown>(() => {}) });
+        const compose = yield* Effect.forkChild(
+          Effect.exit(boxComposerRpc(() => PROJECT, world.boxes).compose(REQUEST)),
+        );
+        for (let i = 0; i < 1_000 && world.asked.at(-1) !== `compose ${PROJECT}`; i++)
+          yield* Effect.yieldNow;
+        expect(world.asked.at(-1)).toBe(`compose ${PROJECT}`);
+        yield* TestClock.adjust(BOX_COMPOSE_MS);
+        expect(refusalOf(yield* Fiber.join(compose))).toMatchObject({
+          reason: "box-failed",
+          detail: expect.stringMatching(/timed out/i),
+        });
+        expect(world.asked.at(-1)).toBe("release lse-1");
+      }),
+  );
 
   it("[mergebox.client-box-cause] a box that fails, or throws, says what failed as the refusal's detail, with no remote, account id or token", async () => {
     const thrown = objects({

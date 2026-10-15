@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.staging-bounded"
+# kills: lane.staging-bounded
+# why: a staging move that never answers holds the Lane's step, and every deadline of the Lane behind it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 41bfa3a7..31fd29fa 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -782,7 +782,7 @@ const stagingOnTrunk = (lane: Lane) =>
+     const trunk = lane.trunkHead;
+     if (trunk === undefined || head === trunk) return head;
+     const moved = yield* Effect.result(
+-      (yield* StagingWriter).fastForward(head, trunk).pipe(Effect.timeout(STAGING_MOVE_MS)),
++      (yield* StagingWriter).fastForward(head, trunk),
+     );
+     if (Result.isFailure(moved))
+       return yield* Effect.die(

@@ -1,3 +1,4 @@
+import { gitRemote } from "./remote.ts";
 import { type BoxCheck, CompositionRefused } from "@keeltown/core/domain/integration";
 import { CommitSha } from "@keeltown/core/kernel";
 import {
@@ -232,7 +233,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
           const token = yield* host
             .mintToken(staging, "write", TOKEN_TTL_SECONDS)
             .pipe(Effect.catchTag("RepoNotFound", Effect.die));
-          const remote = { url: info.remote, token: token.token };
+          const remote = gitRemote(info.remote, token.token);
           const pack = yield* Effect.promise(() => writePack(objects));
           for (let attempt = 0; attempt <= BUSY_RETRIES; attempt += 1) {
             const outcome = yield* Effect.promise(() =>
@@ -259,7 +260,7 @@ const composer = (open: OpenObjects, signing: CommitSigningConfig, box: BoxCompo
           const token = yield* host.mintToken(staging, "write", TOKEN_TTL_SECONDS);
           const outcome = yield* Effect.promise(() =>
             receivePack(
-              { url: info.remote, token: token.token },
+              gitRemote(info.remote, token.token),
               [{ ref, old: tip, new: ZERO_OID }],
               null,
             ),

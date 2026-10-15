@@ -2,14 +2,15 @@
 # kills: pool.refresh-too-large
 # why: a pack over the cap is read back like any failure: main is where it was, so the same relay is retried for ever
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 5d3cef4..209d894 100644
+index 8ac282a7..3d48d65a 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -435,7 +435,6 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
-     const relayed = yield* refresher.advance(project, repo, from, head).pipe(
+@@ -548,7 +548,7 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+       Effect.timeout(RELAY_MS),
        Effect.as("landed" as const),
        // What lies past its base can never be relayed: a fresh fork replaces it.
 -      Effect.catchTag("PackTooLarge", () => Effect.succeed("too-large" as const)),
++
        Effect.exit,
      );
      // A refusal, a missing repo or a failure part-way says nothing of where main is: read it back.

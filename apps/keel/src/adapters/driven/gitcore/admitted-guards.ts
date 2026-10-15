@@ -1,3 +1,4 @@
+import { gitRemote } from "./remote.ts";
 import { projectRepos } from "@keeltown/core/application/integration";
 import {
   GUARD_FILE,
@@ -64,7 +65,7 @@ export const pushOverSmartHttp: GuardPush = (repo, update, objects) =>
     const token = yield* host.mintToken(repo, "write", TOKEN_TTL_SECONDS);
     const pack = yield* Effect.promise(() => writePack(objects));
     return yield* Effect.promise(() =>
-      receivePack({ url: info.remote, token: token.token }, [update], pack),
+      receivePack(gitRemote(info.remote, token.token), [update], pack),
     );
   }).pipe(Effect.catchTag("RepoNotFound", Effect.die));
 

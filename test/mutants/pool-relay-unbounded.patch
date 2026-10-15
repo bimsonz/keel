@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts -t "pool.claim-relay-bounded"
+# kills: pool.claim-relay-bounded
+# why: a relay that never answers holds the grant, and the agent's declare with it
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8ac282a7..8f2d260a 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -545,7 +545,6 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+     if (claimed.duplicate || claimed.value === undefined) return "left" satisfies Refreshed;
+     const { repo, from } = claimed.value;
+     const relayed = yield* refresher.advance(project, repo, from, head).pipe(
+-      Effect.timeout(RELAY_MS),
+       Effect.as("landed" as const),
+       // What lies past its base can never be relayed: a fresh fork replaces it.
+       Effect.catchTag("PackTooLarge", () => Effect.succeed("too-large" as const)),

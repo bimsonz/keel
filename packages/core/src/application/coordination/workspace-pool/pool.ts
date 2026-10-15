@@ -212,6 +212,15 @@ const forkOne = (source: RepoName, repo: RepoName) =>
     return { remote: info.remote, baseSha };
   });
 
+/**
+ * How long one slot's relay onto trunk may run before it counts as failed
+ * and is read back. A grant waits on it inline, so an agent's declare does:
+ * unbounded, a relay that never answers held the declare until its client
+ * gave up. Trunk's deltas relay in seconds, and keel's whole 17 MB history in
+ * about a minute.
+ */
+export const RELAY_MS = 120_000;
+
 /** How many of the trunk commits relayed onto a workspace's main its slot remembers. */
 export const RELAYS_KEPT = 8;
 
@@ -536,6 +545,7 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
     if (claimed.duplicate || claimed.value === undefined) return "left" satisfies Refreshed;
     const { repo, from } = claimed.value;
     const relayed = yield* refresher.advance(project, repo, from, head).pipe(
+      Effect.timeout(RELAY_MS),
       Effect.as("landed" as const),
       // What lies past its base can never be relayed: a fresh fork replaces it.
       Effect.catchTag("PackTooLarge", () => Effect.succeed("too-large" as const)),

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mergebox-client.test.ts -t "mergebox.client-hung"
+# kills: mergebox.client-hung
+# why: a box that never answers holds the Lane's step for good
+diff --git a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+index b5138766..896e71b1 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/mergebox.ts
+@@ -113,7 +113,6 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
+           try: () => objects.box(project).compose(boxRequest(request)),
+           catch: (thrown) => thrown,
+         }).pipe(
+-          Effect.timeout(BOX_COMPOSE_MS),
+           Effect.flatMap(decodeAnswer),
+           Effect.exit,
+           Effect.ensuring(

@@ -42,7 +42,13 @@ export interface GitRemote {
   readonly url: string;
   readonly token?: string;
   readonly fetch?: typeof fetch;
+  /** How long one request may run, its response body included, before it is aborted with a TimeoutError. None: unbounded. */
+  readonly deadlineMs?: number;
 }
+
+/** What bounds each request to `remote`: an abort signal at its deadline, when it has one. */
+export const deadlineOf = (remote: GitRemote): { readonly signal?: AbortSignal } =>
+  remote.deadlineMs === undefined ? {} : { signal: AbortSignal.timeout(remote.deadlineMs) };
 
 /** The credential each request to `remote` carries: none for a public remote. */
 export const authorizationOf = (remote: GitRemote): Readonly<Record<string, string>> =>
@@ -126,6 +132,7 @@ export async function advertisement(remote: GitRemote): Promise<Advertisement> {
   const f = remote.fetch ?? fetch;
   const res = await f(`${remote.url}/info/refs?service=git-upload-pack`, {
     headers: authorizationOf(remote),
+    ...deadlineOf(remote),
   });
   const body = new Uint8Array(await res.arrayBuffer());
   if (!res.ok) throw new Error(`ref advertisement answered HTTP ${res.status}`);
@@ -199,6 +206,7 @@ export async function receivePack(
   ]);
   const f = remote.fetch ?? fetch;
   const res = await f(`${remote.url}/git-receive-pack`, {
+    ...deadlineOf(remote),
     method: "POST",
     headers: {
       ...authorizationOf(remote),

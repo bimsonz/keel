@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/git-remote.test.ts
+# kills: git.remote-deadline
+# why: Keel's remotes carry no deadline, so every git request it makes is unbounded again
+diff --git a/apps/keel/src/adapters/driven/gitcore/remote.ts b/apps/keel/src/adapters/driven/gitcore/remote.ts
+index 4ebfdea2..bbf1c95b 100644
+--- a/apps/keel/src/adapters/driven/gitcore/remote.ts
++++ b/apps/keel/src/adapters/driven/gitcore/remote.ts
+@@ -13,5 +13,4 @@ export const GIT_HTTP_DEADLINE_MS = 120_000;
+ export const gitRemote = (url: string, token?: string): GitRemote => ({
+   url,
+   ...(token === undefined ? {} : { token }),
+-  deadlineMs: GIT_HTTP_DEADLINE_MS,
+ });

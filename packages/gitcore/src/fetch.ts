@@ -7,6 +7,7 @@
 import { concat, dec, ZERO_OID } from "./bytes.ts";
 import {
   authorizationOf,
+  deadlineOf,
   FLUSH,
   type GitRemote,
   type PushOutcome,
@@ -78,6 +79,7 @@ async function requestPack(
   ]);
   const f = remote.fetch ?? fetch;
   const res = await f(`${remote.url}/git-upload-pack`, {
+    ...deadlineOf(remote),
     method: "POST",
     headers: {
       ...authorizationOf(remote),

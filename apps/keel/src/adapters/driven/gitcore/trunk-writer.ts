@@ -1,3 +1,4 @@
+import { gitRemote } from "./remote.ts";
 import { CommitSha } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
@@ -93,7 +94,7 @@ export const TrunkWriterGitCore = (
         Effect.gen(function* () {
           const info = yield* host.info(repo);
           const token = yield* host.mintToken(repo, access, TOKEN_TTL_SECONDS);
-          return { url: info.remote, token: token.token } satisfies GitRemote;
+          return gitRemote(info.remote, token.token);
         });
 
       const headOf = (repo: RepoRef) =>
@@ -257,7 +258,7 @@ export const TrunkWriterGitCore = (
         // An upstream is someone else's public repository: it is read with no credential, as the import's relay reads it.
         upstreamHead: (upstream) =>
           Effect.tryPromise({
-            try: () => advertisement({ url: upstream.url }),
+            try: () => advertisement(gitRemote(upstream.url)),
             catch: () => new UpstreamUnreachable({ ...upstream, reason: "unreachable" }),
           }).pipe(
             Effect.map((advertised) => {
@@ -269,7 +270,7 @@ export const TrunkWriterGitCore = (
           Effect.gen(function* () {
             const move: RelayMove = { ref: UPSTREAM_REF, from: null, to, haves };
             const pack = yield* Effect.tryPromise({
-              try: () => relayPack({ url: upstream.url }, move),
+              try: () => relayPack(gitRemote(upstream.url), move),
               catch: (cause) => cause,
             }).pipe(
               Effect.catch((cause): Effect.Effect<never, PackTooLarge | UpstreamUnreachable> =>

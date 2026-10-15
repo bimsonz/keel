@@ -1105,11 +1105,14 @@ describe("Precheck's warm pool", () => {
         "the pool's oldest kept claim is forgotten",
       );
     });
-    await runDurableObjectAlarm(pool);
-    expect((await claimsOf([first, second, third])).map((row) => row.event_id)).toEqual([
-      second,
-      third,
-    ]);
+    // The platform may run the alarm before this line does: wait for its pass either way.
+    await vi.waitFor(async () => {
+      await runDurableObjectAlarm(pool);
+      expect((await claimsOf([first, second, third])).map((row) => row.event_id)).toEqual([
+        second,
+        third,
+      ]);
+    }, WAIT);
     // Earlier cases' claims are kept here too: the alarm is armed for the oldest row left, never the deleted one.
     const { armed, oldest } = await runInDurableObject(pool, (_pool, state) => ({
       armed: state.storage.sql

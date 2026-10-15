@@ -27,6 +27,7 @@ import {
   reofferDue,
   reofferVerified,
   INFRA_HOLD_MS,
+  STAGING_MOVE_MS,
   STEP_FAILURES_BEFORE_INFRA,
   VERIFY_BUDGET_MS,
   verificationDue,
@@ -79,7 +80,8 @@ import {
   suitePlan,
   workerAppPlan,
 } from "@keeltown/testing";
-import { Cause, Effect, Exit, Layer, Result, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import * as fc from "fast-check";
 import { ulid } from "ulid";
 
@@ -123,12 +125,16 @@ interface WorldOptions {
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
   /** Staging's main refuses every move, as a staging some other writer holds would. */
   readonly stagingStuck?: boolean;
+  /** Staging's move never answers, as a git service that hangs. */
+  readonly stagingHung?: boolean;
   /** The project's largest batch: 1 unless given, so a case batches only when it says so. */
   readonly maxBatchSize?: number;
 }
 
 /** The Lane's ports in memory, staging's main shared by the code host and the StagingWriter. */
 function world(options: WorldOptions = {}) {
+  /** How many moves of staging were asked of a writer that never answers. */
+  const hungMoves = { count: 0 };
   const code = makeCodeHostMemory();
   const clock = makeManualClock();
   const outbox = makeEventOutboxMemory();
@@ -254,7 +260,20 @@ function world(options: WorldOptions = {}) {
             fastForward: () => Effect.fail(new PushRejected({ reason: "stale" })),
           }),
         )
-      : staging.layer,
+      : options.stagingHung === true
+        ? Layer.succeed(
+            StagingWriter,
+            StagingWriter.of({
+              fastForward: () =>
+                Effect.andThen(
+                  Effect.sync(() => {
+                    hungMoves.count += 1;
+                  }),
+                  Effect.never,
+                ),
+            }),
+          )
+        : staging.layer,
     projects.layer,
     makePlacedProject(PROJECT).layer,
     directory.layer,
@@ -274,6 +293,7 @@ function world(options: WorldOptions = {}) {
     verification,
     bundles,
     staging,
+    hungMoves,
     changes,
     unsettled,
     bases,
@@ -1379,6 +1399,28 @@ describe("the Lane", () => {
         expect(yield* payloads("BatchFormed")).toEqual([
           expect.objectContaining({ members: [change(1)], base: landed }),
         ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.staging-bounded] a staging move that never answers fails the step at STAGING_MOVE_MS, naming the timeout, and forms nothing: the step backs off and the lane's other deadlines run",
+    () => {
+      const w = world({ stagingHung: true });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* advance(base, sha("e"), []);
+        yield* queue(w, change(1));
+        const step = yield* Effect.forkChild(Effect.exit(stepped(LANE)));
+        for (let i = 0; i < 1_000 && w.hungMoves.count === 0; i++) yield* Effect.yieldNow;
+        expect(w.hungMoves.count).toBe(1);
+        yield* TestClock.adjust(STAGING_MOVE_MS);
+        const exit = yield* Fiber.join(step);
+        expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "succeeded").toMatch(
+          /TimeoutError/,
+        );
+        expect(yield* payloads("BatchFormed")).toEqual([]);
+        expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(1)]);
       }).pipe(Effect.provide(w.layer));
     },
   );

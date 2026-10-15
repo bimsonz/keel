@@ -13,6 +13,14 @@ import type { BoxComposer } from "../gitcore/candidate-composer.ts";
 /** A lease covers a box's cold start (up to three minutes) and its compose, with room. */
 export const BOX_LEASE_MS = 10 * 60_000;
 
+/**
+ * How long the Lane waits on its box's answer: a cold start (up to three
+ * minutes) and the slowest compose seen (six), inside the lease, so the box
+ * is still held while it is waited on. Past it the box did not answer
+ * (`box-failed`), and the Lane's step goes on.
+ */
+export const BOX_COMPOSE_MS = 8 * 60_000;
+
 /** A namespace's BoxGate, as the client calls it. */
 export interface BoxGateStub {
   readonly acquire: (ask: { readonly holder: string; readonly ttlMs: number }) => Promise<unknown>;
@@ -105,6 +113,7 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
           try: () => objects.box(project).compose(boxRequest(request)),
           catch: (thrown) => thrown,
         }).pipe(
+          Effect.timeout(BOX_COMPOSE_MS),
           Effect.flatMap(decodeAnswer),
           Effect.exit,
           Effect.ensuring(

@@ -20,6 +20,15 @@ export const BOX_CHECK_CAP_BYTES = 8 * 1024 * 1024;
 export const BOX_TRANSPORT_EXIT = 3;
 
 /**
+ * The slowest a box's git transfer may run, in bytes a second, for
+ * `BOX_LOW_SPEED_SECONDS` together before git aborts it. A stalled fetch or
+ * push otherwise held the box, and the composes queued behind it on the
+ * same project, past its 10-minute lease.
+ */
+export const BOX_LOW_SPEED_BYTES = 1_000;
+export const BOX_LOW_SPEED_SECONDS = 60;
+
+/**
  * $1 the canary. Marks the start, then plants the canary in a file, so the
  * check can show it reads both the environment and the files it searches.
  */
@@ -37,9 +46,11 @@ printf '%s\\n' "$1" > ${BOX_CANARY_FILE}`;
  * <oid>` per member and `pushed <tip>` once the chain is on the scratch ref;
  * on a conflict `refused <i>` and a `path <p>` line per conflicted path, and
  * exits 1. A git that dies by a signal exits with its own status (over 128);
- * a fetch or a push that fails exits ${BOX_TRANSPORT_EXIT}.
+ * a fetch or a push that fails, or that stalls below ${BOX_LOW_SPEED_BYTES}
+ * bytes a second for ${BOX_LOW_SPEED_SECONDS} s, exits ${BOX_TRANSPORT_EXIT}.
  */
 export const BOX_COMPOSE_SCRIPT = `set -u
+export GIT_HTTP_LOW_SPEED_LIMIT=${BOX_LOW_SPEED_BYTES} GIT_HTTP_LOW_SPEED_TIME=${BOX_LOW_SPEED_SECONDS}
 staging=$1; base=$2; scratch=$3; shift 3
 fail() { rc=$1; shift; printf '%s\\n' "$*" >&2; [ "$rc" -gt 128 ] && exit "$rc"; exit ${BOX_TRANSPORT_EXIT}; }
 dir=$(mktemp -d "$HOME/box.XXXXXX") || exit ${BOX_TRANSPORT_EXIT}

@@ -12,6 +12,7 @@ import {
   poolStatus,
   refillPool,
   refreshSlots,
+  RELAY_MS,
   RELAYS_KEPT,
   Slot,
   STUCK_REFRESH_MS,
@@ -35,6 +36,7 @@ import {
   makeWorkspaceRefresherMemory,
 } from "@keeltown/testing";
 import { Deferred, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import * as fc from "fast-check";
 
 // prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
@@ -55,9 +57,18 @@ const holder = (n: number) =>
  * - `hold-after`: main moves, then it waits before answering;
  * - `lost`: main moves and the answer never arrives;
  * - `die`: it fails before anything is written;
- * - `busy`, `too-large`: the port's own refusals, with nothing written.
+ * - `busy`, `too-large`: the port's own refusals, with nothing written;
+ * - `never`: it never answers, as a git service that hangs.
  */
-type Relay = "pass" | "hold-before" | "hold-after" | "lost" | "die" | "busy" | "too-large";
+type Relay =
+  | "pass"
+  | "hold-before"
+  | "hold-after"
+  | "lost"
+  | "die"
+  | "busy"
+  | "too-large"
+  | "never";
 
 /** Waits, yielding to the other fibers, until `done`. */
 const until = (done: () => boolean) =>
@@ -121,6 +132,7 @@ function world(script: Relay[] = []) {
             "too-large": Effect.fail(
               new PackTooLarge({ repo: workspace, bytes: 70_000_000, limit: 62_914_560 }),
             ),
+            never: Effect.never,
           };
           return Effect.suspend(() => {
             relays.push({ workspace: workspace.name, from, to });
@@ -898,6 +910,25 @@ describe("WorkspacePool claim", () => {
         expect(w.relays).toHaveLength(1);
         expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: base });
         expect((yield* eventsOf(slot.id)).map(tagOf)).toEqual(["WorkspaceForked"]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[pool.claim-relay-bounded] a claim whose relay never answers gives it up at RELAY_MS, as it would a refused one: the agent is answered PoolExhausted with a five-second retry, and the workspace is ready at its old base, not left mid-relay",
+    () => {
+      const w = world(["never"]);
+      return Effect.gen(function* () {
+        const base = yield* w.stock(1);
+        yield* w.land(1);
+        const claim = yield* Effect.forkChild(Effect.flip(grantWorkspace(PROJECT, holder(1))));
+        yield* until(() => w.relays.length === 1);
+        yield* TestClock.adjust(RELAY_MS);
+        expect(yield* Fiber.join(claim)).toMatchObject({
+          _tag: "PoolExhausted",
+          retryAfterMs: 5_000,
+        });
+        expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: base });
       }).pipe(Effect.provide(w.layer));
     },
   );

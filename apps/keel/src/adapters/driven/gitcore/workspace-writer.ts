@@ -1,3 +1,4 @@
+import { gitRemote } from "./remote.ts";
 import { CommitSha } from "@keeltown/core/kernel";
 import {
   CodeHost,
@@ -128,7 +129,7 @@ export const WorkspaceWriterGitCore = (open: OpenObjects, host: string) => {
               );
             const info = yield* code.info(workspace);
             const token = yield* code.mintToken(workspace, "write", TOKEN_TTL_SECONDS);
-            const remote = { url: info.remote, token: token.token };
+            const remote = gitRemote(info.remote, token.token);
             const answer = {
               commitSha: toCommitSha(composed.commit),
               tree: composed.tree,

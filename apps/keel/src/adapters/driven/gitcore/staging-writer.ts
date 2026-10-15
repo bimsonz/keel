@@ -1,6 +1,7 @@
+import { gitRemote } from "./remote.ts";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import { CodeHost, type PackTooLarge, type RepoRef, StagingWriter } from "@keeltown/core/ports";
-import { type GitRemote, ReceivePackBusy, relay } from "@keeltown/gitcore";
+import { ReceivePackBusy, relay } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 import { MAIN, TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
 
@@ -21,7 +22,7 @@ export const StagingWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; stagi
         Effect.gen(function* () {
           const info = yield* host.info(repo);
           const token = yield* host.mintToken(repo, access, TOKEN_TTL_SECONDS);
-          return { url: info.remote, token: token.token } satisfies GitRemote;
+          return gitRemote(info.remote, token.token);
         });
 
       return StagingWriter.of({

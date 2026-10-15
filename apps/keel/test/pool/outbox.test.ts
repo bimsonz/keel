@@ -243,10 +243,11 @@ describe("the event backbone across real Durable Objects", () => {
       await Reflect.get(instance, "runtime").runPromise(
         emit(entity, "declare", [`agent:${agentId}`]),
       );
-      // The deadline's reason sorts before the flush's, and both are due at the same instant.
+      // The deadline's reason sorts before the flush's, and both are due at the same instant. The
+      // flush is armed first: the platform's alarm may fire between the two, and then runs it alone.
       const at = Date.now();
-      await scheduleAlarm(state.storage, { kind: "deadline", reason: "a deadline", at });
       await scheduleAlarm(state.storage, { kind: "debounce", reason: OUTBOX_FLUSH, at });
+      await scheduleAlarm(state.storage, { kind: "deadline", reason: "a deadline", at });
     });
     await runDurableObjectAlarm(emitter);
     await vi.waitFor(() => expect(owed).toEqual([0]), WAIT);

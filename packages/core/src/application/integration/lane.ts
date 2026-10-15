@@ -766,13 +766,24 @@ const afterInfra = (batch: Batch, failures: number): readonly NextAction[] => [
  * batch on any other head, since trunk would only decline it. A move that
  * fails is a defect: the step is retried later, and nothing forms meanwhile.
  */
+/**
+ * How long the Lane waits on staging's move onto trunk before the step fails
+ * into its backoff. The move is a relay, two git requests the adapter bounds
+ * at 120 s each. Unbounded, a relay that never answers held the Lane's whole
+ * alarm: no batch formed and no green batch was re-offered (the Trunk's own
+ * hang on 15 Oct, one object over).
+ */
+export const STAGING_MOVE_MS = 240_000;
+
 const stagingOnTrunk = (lane: Lane) =>
   Effect.gen(function* () {
     const staging = projectRepos(lane.projectId).staging;
     const head = yield* (yield* CodeHost).head(staging, MAIN).pipe(Effect.orDie);
     const trunk = lane.trunkHead;
     if (trunk === undefined || head === trunk) return head;
-    const moved = yield* Effect.result((yield* StagingWriter).fastForward(head, trunk));
+    const moved = yield* Effect.result(
+      (yield* StagingWriter).fastForward(head, trunk).pipe(Effect.timeout(STAGING_MOVE_MS)),
+    );
     if (Result.isFailure(moved))
       return yield* Effect.die(
         new Error(
