@@ -210,6 +210,12 @@ export interface ChangeEntry {
     scope?: string;
     stance?: "followed" | "distinguished" | "overrule-requested";
   }[];
+  /**
+   * What the change's latest preflight read near its intent: how many live changes it read, and how many
+   * subject keys they were under. Absent until a preflight that carried it; a preflight without it leaves
+   * nothing here.
+   */
+  compared?: { changes: number; subjects: number };
 }
 
 /**
@@ -688,6 +694,14 @@ export class World {
             ...(precedent.scope === undefined ? {} : { scope: precedent.scope }),
           });
         }
+        // What the preflight compared: how many live changes it read near the intent, and how many subject
+        // keys they were under. A preflight without it leaves nothing here.
+        if (event.payload.compared === undefined) delete change.compared;
+        else
+          change.compared = {
+            changes: event.payload.compared.changes,
+            subjects: event.payload.compared.subjects,
+          };
         break;
       }
       case "IntentRevised": {
