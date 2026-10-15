@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.mirror-after-offer"
+# kills: trunk.do.mirror-after-offer
+# why: the mirror syncs the moment trunk advances, before the Lane's offer of the next batch arrives, so a slow mirror holds that batch
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index 54eb21c2..b38b6adb 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -307,7 +307,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+       await scheduleAlarm(this.ctx.storage, {
+         kind: "deadline",
+         reason: MIRROR_SYNC,
+-        at: Date.now() + this.mirrorAfterAdvanceMs,
++        at: Date.now(),
+       });
+     if (outcome === "frozen")
+       console.error(`trunk ${projectId} froze promotion: its head is not one the WAL explains`);

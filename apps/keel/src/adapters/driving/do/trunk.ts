@@ -65,6 +65,14 @@ export const TRUNK_DEADLINE_MS = 120_000;
 /** How long the mirror's sync steps aside for a promotion armed with it. */
 export const MIRROR_AFTER_PROMOTION_MS = 1_000;
 
+/**
+ * How long after an advance the mirror's sync waits. The Lane offers the
+ * next batch the moment it hears the advance, a few hundred milliseconds
+ * later, so that batch's debounce is armed before the sync is due, and goes
+ * first.
+ */
+export const MIRROR_AFTER_ADVANCE_MS = 5_000;
+
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
 const decodeInstant = Schema.decodeUnknownEffect(InstantSchema);
 const decodeOrigin = Schema.decodeUnknownEffect(TrunkOrigin);
@@ -106,6 +114,9 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
 
   /** `TRUNK_DEADLINE_MS`; a pool test shortens it. */
   private deadlineMs = TRUNK_DEADLINE_MS;
+
+  /** `MIRROR_AFTER_ADVANCE_MS`; a pool test shortens it. */
+  private mirrorAfterAdvanceMs = MIRROR_AFTER_ADVANCE_MS;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(
@@ -296,7 +307,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       await scheduleAlarm(this.ctx.storage, {
         kind: "deadline",
         reason: MIRROR_SYNC,
-        at: Date.now(),
+        at: Date.now() + this.mirrorAfterAdvanceMs,
       });
     if (outcome === "frozen")
       console.error(`trunk ${projectId} froze promotion: its head is not one the WAL explains`);

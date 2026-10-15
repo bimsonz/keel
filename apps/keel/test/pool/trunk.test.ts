@@ -678,6 +678,8 @@ describe("the Trunk DO's promotion", () => {
     const t = await promoting(undefined, hung);
     await runInDurableObject(t.stub, (instance: TrunkDO) => {
       Reflect.set(instance, "deadlineMs", 200);
+      // The mirror due at the advance itself: only its stepping aside orders it after the push.
+      Reflect.set(instance, "mirrorAfterAdvanceMs", 0);
     });
     const first = await t.composed(1, t.base);
     const second = await t.composed(2, first);
@@ -705,6 +707,46 @@ describe("the Trunk DO's promotion", () => {
         ),
       ).toContain(MIRROR_SYNC),
     );
+  });
+
+  it("[trunk.do.mirror-after-offer] the batch the Lane offers on hearing an advance is pushed before the mirror syncs that advance, though it arrives after the advance", async () => {
+    const calls: string[] = [];
+    const t = await promoting(undefined, (writer) =>
+      Layer.effect(
+        TrunkWriter,
+        Effect.gen(function* () {
+          const inner = yield* TrunkWriter;
+          return TrunkWriter.of({
+            ...inner,
+            push: (from, to, admit) => {
+              calls.push("push");
+              return inner.push(from, to, admit);
+            },
+            sync: (targets) => {
+              calls.push("sync");
+              return inner.sync(targets);
+            },
+          });
+        }),
+      ).pipe(Layer.provide(writer)),
+    );
+    await runInDurableObject(t.stub, (instance: TrunkDO) => {
+      Reflect.set(instance, "mirrorAfterAdvanceMs", 1_000);
+    });
+    const first = await t.composed(1, t.base);
+    const second = await t.composed(2, first);
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () =>
+      expect(await t.status()).toMatchObject(Exit.succeed({ head: first })),
+    );
+    // The alarm runs again before the Lane's offer arrives, as the platform's does: nothing is due yet.
+    await runDurableObjectAlarm(t.stub);
+    await t.stub.receive([t.verified(2, first)]);
+    await t.until(async () =>
+      expect(await t.status()).toMatchObject(Exit.succeed({ head: second })),
+    );
+    await t.until(async () => expect(calls).toContain("sync"));
+    expect(calls.slice(0, calls.indexOf("sync"))).toEqual(["push", "push"]);
   });
 
   it("[trunk.do.refused-quota] through the real object a project's history and each landing are counted into its namespace, and a batch over what is left is declined while a smaller one behind it lands", async () => {
