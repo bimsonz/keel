@@ -2,15 +2,15 @@
 # kills: seed.snapshot
 # why: a change's page waits for the whole log again once a snapshot can be drawn, though its own entries are drawn as they are read
 diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
-index 935f79f1..56b26f9d 100644
+index 37cffd56..ba3ae5f7 100644
 --- a/apps/console/src/engine/seed.ts
 +++ b/apps/console/src/engine/seed.ts
-@@ -24,7 +24,7 @@ export const drawable = (
+@@ -26,7 +26,7 @@ export const drawable = (
    player: { readonly loaded: boolean; readonly provisional: boolean },
    at: Route["at"],
  ): boolean =>
 -  player.loaded || (player.provisional && DRAWN_FROM_SNAPSHOT.has(at)) || AS_READ.has(at);
 +  player.loaded || (player.provisional && DRAWN_FROM_SNAPSHOT.has(at));
  
- /** A world of the snapshot's changes: each by its number, its holder, goal, state and revision, and when it was declared. */
- export function provisionalWorld(snapshot: FeedSnapshot): World {
+ /**
+  * A world of the snapshot's changes: each by its number, its holder, goal, state and revision, and when it was

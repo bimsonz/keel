@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t growth.seeded
+# kills: growth.seeded
+# why: trunk's head is said verified from a snapshot that does not say so
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 2152cbab..fb833836 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -307,7 +307,7 @@ export function seededGrowthOf(seeded: World, name: string): Growth {
+     fade: 1,
+     kind: "project",
+     name,
+-    ...(head === "" ? {} : { head: { height: advances, sha: head } }),
++    ...(head === "" ? {} : { head: { height: advances, sha: head, verified: true } }),
+     live,
+     landed,
+   };

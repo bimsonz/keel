@@ -248,8 +248,8 @@ function Console({
     href: href(project.namespace.handle, project.name, HOME, carriedParams()),
     note: project.visibility,
   }));
-  // A page read from the log has nothing to draw until the log has been read, or a snapshot of it that draws
-  // the page in full, unless it is drawn as the log is read. The code waits for none of it.
+  // A page read from the log has nothing to draw until the log has been read, or a snapshot of it that the page
+  // draws from (seed.ts), unless it is drawn as the log is read. The code waits for none of it.
   const waiting = !drawable(player, route.at) && !UNLOGGED.has(route.at) && route.at !== "missing";
   return (
     <WhereProvider

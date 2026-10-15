@@ -56,7 +56,8 @@ interface Placed {
 export interface ProjectNode extends Placed {
   kind: "project";
   name: string;
-  head?: { height: number; sha: string; verified: boolean };
+  /** Trunk's head: whether Keel verified it is not known while the diagram is drawn from a snapshot. */
+  head?: { height: number; sha: string; verified?: boolean };
   live: number;
   landed: number;
 }
@@ -164,7 +165,7 @@ export interface Bounds {
 }
 
 /** The box round some nodes. */
-function boundsOf(nodes: readonly GrowthNode[]): Bounds {
+function boundsOf(nodes: readonly Pick<Placed, "x" | "y" | "w" | "h">[]): Bounds {
   let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const node of nodes) {
     x0 = Math.min(x0, node.x);
@@ -255,6 +256,15 @@ function pileOf(stage: Stage): PileStage | undefined {
     : undefined;
 }
 
+/** Where a fork's agent sits: on its outer side, at its outer corner, clear of the line in from the project. */
+function agentBeside(centre: { x: number; y: number }): { x: number; y: number } {
+  const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
+  return {
+    x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,
+    y: centre.y + outward.y * (SIZE.fork.h / 2 + AGENT_GAP + SIZE.agent.h / 2),
+  };
+}
+
 /** Why Keel parked a change, in the words the list of changes uses: never its reason's own token. */
 const PARKED_WHY: Readonly<Record<string, string>> = {
   "lease-lapsed": "Waiting on its agent: its lease lapsed",
@@ -270,6 +280,49 @@ function standingOf(change: FlowChange, now: number): Standing {
   if (change.stage === "precheck" || change.stage === "batch" || now - change.since < MOVING_MS)
     return "moving";
   return "waiting";
+}
+
+/**
+ * The diagram while the log is read, from Keel's snapshot of its head (seed.ts): the project alone, with trunk's
+ * height and head, its live changes and its landings, each as the log gives it once read. Whether Keel verified
+ * trunk's head, and every fork, wait for the log: the snapshot says where a change stands but not since when, nor
+ * whether one whose agent's lease lapsed bounced first, so a fork drawn from it would move or retime when the log
+ * took over. The view is fitted to the places the forks will be given, so it does not jump when they come.
+ */
+export function seededGrowthOf(seeded: World, name: string): Growth {
+  let live = 0;
+  let landed = 0;
+  let standing = 0;
+  for (const change of seeded.changes.values()) {
+    if (change.state === "landed") landed += 1;
+    else if (change.state !== "withdrawn" && change.state !== "superseded") {
+      standing += 1;
+      // Not live while it waits on its agent, as `waitsOnItsAgent` has it of the log's.
+      if (change.parkedOn !== "lease-lapsed") live += 1;
+    }
+  }
+  const { head, advances } = seeded.trunk;
+  const project: ProjectNode = {
+    ...box("project", SIZE.project, { x: 0, y: 0 }),
+    fade: 1,
+    kind: "project",
+    name,
+    ...(head === "" ? {} : { head: { height: advances, sha: head } }),
+    live,
+    landed,
+  };
+  // The places the first forks are given, from the top round, each with its agent beside it.
+  const places = Array.from({ length: Math.min(standing, FORK_SLOTS) }, (_, slot) => {
+    const centre = at(RING.fork, slotAngle(slot, FORK_SLOTS));
+    return [box("", SIZE.fork, centre), box("", SIZE.agent, agentBeside(centre))];
+  }).flat();
+  return {
+    nodes: [project],
+    edges: [],
+    bounds: boundsOf([project]),
+    focus: boundsOf([project, ...places]),
+    runs: 0,
+  };
 }
 
 /** The diagram of the project `name` as its log stands at `now`, placed where `kept` put each thing before. */
@@ -375,13 +428,8 @@ export function growthOf(
         fork.standing === "moving" && (change.stage === "declared" || change.stage === "precheck"),
       fade,
     });
-    // Its agent sits on its outer side, at its outer corner, clear of the line in from the project.
     if (entry !== undefined) {
-      const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
-      const agentCentre = {
-        x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,
-        y: centre.y + outward.y * (SIZE.fork.h / 2 + AGENT_GAP + SIZE.agent.h / 2),
-      };
+      const agentCentre = agentBeside(centre);
       const called = agentName(world.agents.get(entry.agentId), cards.get(entry.agentId));
       const agent: AgentNode = {
         ...box(`agent:${change.id}:${entry.agentId}`, SIZE.agent, agentCentre),

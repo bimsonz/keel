@@ -2,15 +2,15 @@
 # kills: growth.fork
 # why: an agent is drawn on top of its fork
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index ece58765..a96bad5b 100644
+index 2152cbab..590cd42b 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -368,7 +368,7 @@ export function growthOf(
-       const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
-       const agentCentre = {
-         x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,
--        y: centre.y + outward.y * (SIZE.fork.h / 2 + AGENT_GAP + SIZE.agent.h / 2),
-+        y: centre.y,
-       };
-       const called = agentName(world.agents.get(entry.agentId), cards.get(entry.agentId));
-       const agent: AgentNode = {
+@@ -261,7 +261,7 @@ function agentBeside(centre: { x: number; y: number }): { x: number; y: number }
+   const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
+   return {
+     x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,
+-    y: centre.y + outward.y * (SIZE.fork.h / 2 + AGENT_GAP + SIZE.agent.h / 2),
++    y: centre.y,
+   };
+ }
+ 

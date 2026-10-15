@@ -8,11 +8,13 @@ import type { Route } from "../route.ts";
 import { World } from "./world.ts";
 
 /**
- * The pages a snapshot's world draws in full: the list of changes, each by its number, goal, state and holder.
- * Every other page reads what only the log holds (a change's footprint and verdicts, conflicts, decisions), so
- * it waits for the log rather than show less than there is.
+ * The pages a snapshot's world draws: the list of changes in full, each by its number, goal, state and holder;
+ * and Mission Control's project, with trunk's head, its live changes and its landings, and what of its header
+ * the snapshot holds, with the rest waiting on the log (growth.ts). Every other page reads what only the log holds
+ * (a change's footprint and verdicts, conflicts, decisions), so it waits for the log rather than show less than
+ * there is.
  */
-const DRAWN_FROM_SNAPSHOT: ReadonlySet<Route["at"]> = new Set(["changes"]);
+const DRAWN_FROM_SNAPSHOT: ReadonlySet<Route["at"]> = new Set(["changes", "mission-control"]);
 /** The places drawn as the log is read: one change is drawn once its own entries are, not once the log's last is. */
 const AS_READ: ReadonlySet<Route["at"]> = new Set(["change"]);
 
@@ -26,9 +28,16 @@ export const drawable = (
 ): boolean =>
   player.loaded || (player.provisional && DRAWN_FROM_SNAPSHOT.has(at)) || AS_READ.has(at);
 
-/** A world of the snapshot's changes: each by its number, its holder, goal, state and revision, and when it was declared. */
+/**
+ * A world of the snapshot's changes: each by its number, its holder, goal, state and revision, and when it was
+ * declared; and trunk's head and height, where Keel gives them.
+ */
 export function provisionalWorld(snapshot: FeedSnapshot): World {
   const world = new World();
+  if (snapshot.trunk !== undefined) {
+    world.trunk.head = snapshot.trunk.head;
+    world.trunk.advances = snapshot.trunk.height;
+  }
   // A change's place on the story's clock, from the first change declared: the log's own epoch is not read yet.
   const first = Math.min(...snapshot.changes.map((change) => Date.parse(change.declaredAt)));
   // In the order the log declares them, as a world folded from it holds them: Keel answers newest first.
@@ -57,7 +66,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
       alternatives: [],
       precedents: [],
       doubts: [],
-      ...(change.parkReason === undefined ? {} : { parkReason: change.parkReason }),
+      ...(change.parkReason === undefined ? {} : { parkedOn: change.parkReason }),
     });
   }
   return world;

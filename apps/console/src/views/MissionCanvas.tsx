@@ -142,9 +142,11 @@ function ProjectCard({ data }: NodeProps<FlowNode<ProjectNode, "project">>) {
           <>
             <b className="a-num">{count(node.head.height)}</b>
             <span className="a-mono">{node.head.sha.slice(0, 7)}</span>
-            <Badge variant={node.head.verified ? "primary" : "outline"}>
-              {node.head.verified ? "Verified" : "Unverified"}
-            </Badge>
+            {node.head.verified !== undefined && (
+              <Badge variant={node.head.verified ? "primary" : "outline"}>
+                {node.head.verified ? "Verified" : "Unverified"}
+              </Badge>
+            )}
           </>
         )}
       </div>
@@ -450,7 +452,8 @@ const onTop = (edge: Growth["edges"][number]): number =>
   edge.kind === "fail" || edge.kind === "land" ? 1 : 0;
 
 export interface MissionCanvasProps {
-  canvas: Canvas;
+  /** Null while the diagram is drawn from Keel's snapshot, as the log is read: the header waits for the log. */
+  canvas: Canvas | null;
   growth: Growth;
   now: number;
   mode: Mode;
@@ -525,7 +528,7 @@ export function MissionCanvas({ canvas, growth, now, mode, loaded }: MissionCanv
 
   return (
     <div ref={frame} className="a-mc a-arch" data-full={isFull || undefined}>
-      <Header canvas={canvas} runs={growth.runs} />
+      <MissionHeader canvas={canvas} growth={growth} />
       <div className="a-mc-stage">
         <ReactFlow
           nodes={nodes}
@@ -615,48 +618,62 @@ export function MissionCanvas({ canvas, growth, now, mode, loaded }: MissionCanv
 
 // ── The header and the inspector ──────────────────────────────────────────
 
-function Header({ canvas, runs }: { canvas: Canvas; runs: number }) {
-  const { answers, counts } = canvas;
-  const rate = answers.perMinute.toLocaleString("en-US", { maximumFractionDigits: 1 });
+/** A figure the log holds and Keel's snapshot does not, while the log is read. */
+const PENDING = "…";
+
+/** The header's four answers, as it says them. */
+function answersSaid(answers: Canvas["answers"]) {
+  // Where Keel verified no advance, none is green: say so, not "0 of n".
+  const unverified = answers.advances > 0 && answers.unverified === answers.advances;
+  return {
+    advancesTerm: unverified ? "Advances" : "Green advances",
+    advances:
+      answers.advances === 0
+        ? "—"
+        : unverified
+          ? `Unverified ${count(answers.unverified)}`
+          : `${count(answers.green)} of ${count(answers.advances)}`,
+    caught: count(answers.caught),
+    recovered:
+      answers.bounced === 0 ? "—" : `${count(answers.recovered)} of ${count(answers.bounced)}`,
+    rate: answers.perMinute.toLocaleString("en-US", { maximumFractionDigits: 1 }),
+  };
+}
+
+export function MissionHeader({ canvas, growth }: { canvas: Canvas | null; growth: Growth }) {
+  // While the log is read: the project's live changes and landings, which Keel's snapshot gives as the log will
+  // once read, and a wait for each figure only the log holds.
+  const project = growth.nodes.find((node): node is ProjectNode => node.kind === "project");
+  const said = canvas === null ? null : answersSaid(canvas.answers);
+  const live = canvas === null ? (project?.live ?? 0) : canvas.live;
+  const landed = canvas === null ? (project?.landed ?? 0) : canvas.counts.landed;
   return (
-    <div className="a-mc-strip">
+    <div className="a-mc-strip" aria-busy={canvas === null || undefined}>
       <dl className="a-mc-answers">
         <div>
-          <dt>
-            {answers.advances > 0 && answers.unverified === answers.advances
-              ? "Advances"
-              : "Green advances"}
-          </dt>
-          <dd className="a-num">
-            {answers.advances === 0
-              ? "—"
-              : // Where Keel verified no advance, none is green: say so, not "0 of n".
-                answers.unverified === answers.advances
-                ? `Unverified ${count(answers.unverified)}`
-                : `${count(answers.green)} of ${count(answers.advances)}`}
-          </dd>
+          <dt>{said?.advancesTerm ?? "Green advances"}</dt>
+          <dd className="a-num">{said?.advances ?? PENDING}</dd>
         </div>
         <div>
           <dt>Caught</dt>
-          <dd className="a-num">{count(answers.caught)}</dd>
+          <dd className="a-num">{said?.caught ?? PENDING}</dd>
         </div>
         <div>
           <dt>Recovered</dt>
-          <dd className="a-num">
-            {answers.bounced === 0
-              ? "—"
-              : `${count(answers.recovered)} of ${count(answers.bounced)}`}
-          </dd>
+          <dd className="a-num">{said?.recovered ?? PENDING}</dd>
         </div>
         <div>
           <dt>Landings / min</dt>
-          <dd className="a-num">{rate}</dd>
+          <dd className="a-num">{said?.rate ?? PENDING}</dd>
         </div>
       </dl>
       <p className="a-mc-counts a-num">
-        Agents {count(counts.agents)}
-        {runs > counts.agents ? ` · Runs ${count(runs)}` : ""} · Live {count(canvas.live)} · Batches{" "}
-        {count(counts.batches)} · Landed {count(counts.landed)}
+        Agents {canvas === null ? PENDING : count(canvas.counts.agents)}
+        {canvas !== null && growth.runs > canvas.counts.agents
+          ? ` · Runs ${count(growth.runs)}`
+          : ""}{" "}
+        · Live {count(live)} · Batches {canvas === null ? PENDING : count(canvas.counts.batches)} ·
+        Landed {count(landed)}
       </p>
     </div>
   );

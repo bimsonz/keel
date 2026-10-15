@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t growth.seeded
+# kills: growth.seeded, mission.header-seeded
+# why: a change waiting on its agent is counted live from the snapshot, and the count drops when the log is read
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 2152cbab..849f61b2 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -298,7 +298,7 @@ export function seededGrowthOf(seeded: World, name: string): Growth {
+     else if (change.state !== "withdrawn" && change.state !== "superseded") {
+       standing += 1;
+       // Not live while it waits on its agent, as `waitsOnItsAgent` has it of the log's.
+-      if (change.parkedOn !== "lease-lapsed") live += 1;
++      live += 1;
+     }
+   }
+   const { head, advances } = seeded.trunk;

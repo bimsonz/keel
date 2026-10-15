@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.mission-control
+# kills: seed.mission-control
+# why: Mission Control draws nothing until the whole log is read
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 37cffd56..1ce65200 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -14,7 +14,7 @@ import { World } from "./world.ts";
+  * (a change's footprint and verdicts, conflicts, decisions), so it waits for the log rather than show less than
+  * there is.
+  */
+-const DRAWN_FROM_SNAPSHOT: ReadonlySet<Route["at"]> = new Set(["changes", "mission-control"]);
++const DRAWN_FROM_SNAPSHOT: ReadonlySet<Route["at"]> = new Set(["changes"]);
+ /** The places drawn as the log is read: one change is drawn once its own entries are, not once the log's last is. */
+ const AS_READ: ReadonlySet<Route["at"]> = new Set(["change"]);
+ 

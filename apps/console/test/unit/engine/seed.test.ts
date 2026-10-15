@@ -1,18 +1,20 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { ProjectView } from "../../../src/contract/keel/index.ts";
+import type { ChangeSummary, ProjectView } from "../../../src/contract/keel/index.ts";
 import { Player } from "../../../src/engine/player.ts";
 import { holdersShown } from "../../../src/engine/holder.ts";
 import { changesOf } from "../../../src/engine/lists.ts";
 import { ConsoleProvider } from "../../../src/engine/react.tsx";
-import { drawable } from "../../../src/engine/seed.ts";
+import { drawable, provisionalWorld } from "../../../src/engine/seed.ts";
+import type { World } from "../../../src/engine/world.ts";
 import { ChangesPage } from "../../../src/pages/Changes.tsx";
 import { WhereProvider } from "../../../src/router.tsx";
 import { NamesProvider } from "../../../src/views/links.tsx";
 import { createHttpSource } from "../../../src/source/http.ts";
 import { ChangePage } from "../../../src/pages/Change.tsx";
 import { generateS1 } from "../../fixtures/mock/s1.ts";
+import { Hand } from "../../fixtures/pipeline.ts";
 
 type S1Log = ReturnType<typeof generateS1>;
 
@@ -133,6 +135,29 @@ function heldKeel(
     declared: declarations.length,
   };
 }
+
+/** A change Keel parked, as its snapshot of the log's head gives it. */
+const parked = (
+  changeId: string,
+  number: number,
+  parkReason: ChangeSummary["parkReason"],
+): ChangeSummary => ({
+  changeId,
+  number,
+  state: "parked",
+  parkReason,
+  agentId: "agt_1",
+  goal: `goal of ${changeId}`,
+  revision: 1,
+  declaredAt: "2026-10-15T09:00:00.000Z",
+  updatedAt: "2026-10-15T09:00:05.000Z",
+});
+
+/** What each open change in a world's list waits on, by the change. */
+const waits = (world: World) =>
+  changesOf(world, "open", 50)
+    .rows.map((row) => [row.id, row.parkedOn] as const)
+    .toSorted(([a], [b]) => a.localeCompare(b));
 
 /** The first change's page, its conversation, as the console draws it for this player. */
 function drawnChange(player: Player): string {
@@ -349,6 +374,43 @@ describe("a project drawn while its log is read", () => {
     keel.release();
     await loading;
     vi.unstubAllGlobals();
+  });
+
+  it("[seed.mission-control] Mission Control is drawn from the snapshot while the log is read, and the pipeline waits for the log", async () => {
+    const keel = heldKeel("log");
+    const player = new Player(
+      createHttpSource(keel.project, {
+        origin: ORIGIN,
+        fetch: keel.serve,
+        cache: null,
+        logPages: null,
+      }),
+    );
+    const loading = player.load();
+    await vi.waitFor(() => expect(player.provisional).toBe(true));
+    expect(drawable(player, "mission-control")).toBe(true);
+    // The pipeline's columns need where each change stands and since when, which only the log says.
+    expect(drawable(player, "pipeline")).toBe(false);
+
+    keel.release();
+    await loading;
+    expect(player.seeded).toBeNull();
+    expect(drawable(player, "pipeline")).toBe(true);
+  });
+
+  it("[seed.parked-on] a change Keel parked is drawn from the snapshot waiting on what the list drawn from the log says it waits on", () => {
+    const hand = new Hand().declare("chg_r").declare("chg_w");
+    hand.at(5).park("chg_r", "awaiting-ruling").park("chg_w", "lease-lapsed");
+    const seeded = provisionalWorld({
+      cursor: "4",
+      changes: [parked("chg_w", 2, "lease-lapsed"), parked("chg_r", 1, "awaiting-ruling")],
+    });
+    expect(waits(seeded)).toEqual(waits(hand.world()));
+    // The one on a person's ruling is not said to wait on its agent.
+    expect(waits(seeded)).toEqual([
+      ["chg_r", "awaiting-ruling"],
+      ["chg_w", "lease-lapsed"],
+    ]);
   });
 
   it("[seed.order] the list drawn from the snapshot lists the changes in the order the list drawn from the log does", async () => {

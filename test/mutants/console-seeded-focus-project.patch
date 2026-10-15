@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t growth.seeded
+# kills: growth.seeded
+# why: the view is fitted to the project alone while seeded, and zooms out when the forks come
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 2152cbab..65dd2d94 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -320,7 +320,7 @@ export function seededGrowthOf(seeded: World, name: string): Growth {
+     nodes: [project],
+     edges: [],
+     bounds: boundsOf([project]),
+-    focus: boundsOf([project, ...places]),
++    focus: boundsOf([project]),
+     runs: 0,
+   };
+ }

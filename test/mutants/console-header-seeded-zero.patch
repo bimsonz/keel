@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/mission.test.ts
+# kills: mission.header-seeded
+# why: the header says Live 0 while the log is read, and jumps when it is
+diff --git a/apps/console/src/views/MissionCanvas.tsx b/apps/console/src/views/MissionCanvas.tsx
+index de8faafd..a21ce9bd 100644
+--- a/apps/console/src/views/MissionCanvas.tsx
++++ b/apps/console/src/views/MissionCanvas.tsx
+@@ -645,7 +645,7 @@ export function MissionHeader({ canvas, growth }: { canvas: Canvas | null; growt
+   // once read, and a wait for each figure only the log holds.
+   const project = growth.nodes.find((node): node is ProjectNode => node.kind === "project");
+   const said = canvas === null ? null : answersSaid(canvas.answers);
+-  const live = canvas === null ? (project?.live ?? 0) : canvas.live;
++  const live = canvas === null ? 0 : canvas.live;
+   const landed = canvas === null ? (project?.landed ?? 0) : canvas.counts.landed;
+   return (
+     <div className="a-mc-strip" aria-busy={canvas === null || undefined}>

@@ -13,8 +13,11 @@ import {
   SETTLED_MS,
   growthOf,
   keptAfresh,
+  seededGrowthOf,
 } from "../../../src/engine/growth.ts";
 import { canvasOf } from "../../../src/engine/canvas.ts";
+import type { ChangeSummary, FeedSnapshot } from "../../../src/contract/keel/index.ts";
+import { provisionalWorld } from "../../../src/engine/seed.ts";
 import { Hand } from "../../fixtures/pipeline.ts";
 
 const forkOf = (growth: Growth, id: string): ForkNode | undefined =>
@@ -472,5 +475,93 @@ describe("a change waiting on its agent", () => {
     expect(canvas.live).toBe(2);
     // The agent holds all three, and two of them are live.
     expect(canvas.agents.map((agent) => [agent.changes, agent.live])).toEqual([[3, 2]]);
+  });
+});
+
+/** A change as Keel's snapshot of the log's head gives it. */
+const summary = (
+  changeId: string,
+  number: number,
+  state: ChangeSummary["state"],
+  parkReason?: ChangeSummary["parkReason"],
+): ChangeSummary => ({
+  changeId,
+  number,
+  state,
+  ...(parkReason === undefined ? {} : { parkReason }),
+  agentId: "agt_1",
+  goal: `goal of ${changeId}`,
+  revision: 1,
+  declaredAt: "2026-10-15T09:00:00.000Z",
+  updatedAt: "2026-10-15T09:01:00.000Z",
+});
+
+const projectNode = (growth: Growth) => growth.nodes.find((node) => node.kind === "project");
+
+describe("the diagram while the log is read", () => {
+  it("[growth.seeded] draws the project from Keel's snapshot as the read log draws it, with no fork, its view fitted where the forks will stand", () => {
+    // keel/swarm's shape: two landed; many whose agent's lease lapsed, three of them bounced long since; two
+    // parked on a person's ruling; one withdrawn.
+    const hand = new Hand().queued(["chg_l1", "chg_l2"]).at(10).form("bat_1", ["chg_l1", "chg_l2"]);
+    hand.at(20).verified("bat_1").promoting("grp_1", ["bat_1"], ["chg_l1", "chg_l2"]);
+    hand.at(21).land("chg_l1", "sha_2").land("chg_l2", "sha_2");
+    hand.advance("grp_1", "sha_2", ["chg_l1", "chg_l2"], { height: 2 });
+    const lapsed = Array.from({ length: 18 }, (_, n) => `chg_w${n}`);
+    const bouncedLong = ["chg_b1", "chg_b2", "chg_b3"];
+    hand.at(30);
+    for (const id of [...lapsed, ...bouncedLong, "chg_r1", "chg_r2", "chg_x"]) hand.declare(id);
+    hand.at(40);
+    for (const id of bouncedLong) hand.bounce(id, ["the build failed"], { verdictId: "vrd_b" });
+    hand.at(50).withdraw("chg_x");
+    hand.at(60);
+    for (const id of [...lapsed, ...bouncedLong]) hand.park(id, "lease-lapsed");
+    hand.park("chg_r1", "awaiting-ruling").park("chg_r2", "awaiting-ruling");
+    // The same project, as Keel's snapshot of the log's head gives it, newest first.
+    const snapshot: FeedSnapshot = {
+      cursor: "99",
+      trunk: { head: "sha_2", height: 2 },
+      changes: [
+        summary("chg_l1", 1, "landed"),
+        summary("chg_l2", 2, "landed"),
+        ...[...lapsed, ...bouncedLong].map((id, n) => summary(id, 3 + n, "parked", "lease-lapsed")),
+        summary("chg_r1", 24, "parked", "awaiting-ruling"),
+        summary("chg_r2", 25, "parked", "awaiting-ruling"),
+        summary("chg_x", 26, "withdrawn"),
+      ].toReversed(),
+    };
+    const read = growthOf(hand.world(), 3 * 60 * 60 * 1000, "keel/swarm", keptAfresh());
+    const seeded = seededGrowthOf(provisionalWorld(snapshot), "keel/swarm");
+
+    // The log, once read: trunk's head verified, the two on a ruling live, and every fork's place taken.
+    expect(projectNode(read)).toMatchObject({
+      head: { height: 2, sha: "sha_2", verified: true },
+      live: 2,
+      landed: 2,
+    });
+    expect(read.nodes.filter((node) => node.kind === "fork")).toHaveLength(FORK_SLOTS);
+    // The snapshot draws the same project, but for whether trunk's head was verified, which only the log says.
+    const { head: _verified, ...same } = projectNode(read)!;
+    expect(projectNode(seeded)).toEqual({ ...same, head: { height: 2, sha: "sha_2" } });
+    // And nothing else until the log is read: no fork, pile or line, so nothing drawn early moves or retimes.
+    expect(seeded.nodes.map((node) => node.kind)).toEqual(["project"]);
+    expect(seeded.edges).toEqual([]);
+    // The view is fitted where the forks stand once the log is read, so it does not move when they come.
+    expect(seeded.focus).toEqual(read.focus);
+
+    // A project with no change standing, as keel/keel: the project alone, fitted as the read log fits it.
+    const quiet = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]);
+    quiet.at(20).verified("bat_1").promoting("grp_1", ["bat_1"], ["chg_a"]);
+    quiet.at(21).land("chg_a", "sha_1").advance("grp_1", "sha_1", ["chg_a"], { height: 1 });
+    const quietRead = growthOf(quiet.world(), 3 * 60 * 60 * 1000, "keel/keel", keptAfresh());
+    const quietSeeded = seededGrowthOf(
+      provisionalWorld({
+        cursor: "9",
+        trunk: { head: "sha_1", height: 1 },
+        changes: [summary("chg_a", 1, "landed")],
+      }),
+      "keel/keel",
+    );
+    expect(quietSeeded.focus).toEqual(quietRead.focus);
+    expect(projectNode(quietSeeded)).toMatchObject({ live: 0, landed: 1 });
   });
 });

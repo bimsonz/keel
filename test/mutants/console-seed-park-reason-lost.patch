@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.parked-on
+# kills: seed.parked-on, growth.seeded, mission.header-seeded
+# why: the snapshot's park reason goes to a field the World does not have, so a change on a ruling is said to wait on its agent
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 37cffd56..dd653720 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -66,7 +66,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
+       alternatives: [],
+       precedents: [],
+       doubts: [],
+-      ...(change.parkReason === undefined ? {} : { parkedOn: change.parkReason }),
++      ...(change.parkReason === undefined ? {} : { parkReason: change.parkReason }),
+     });
+   }
+   return world;

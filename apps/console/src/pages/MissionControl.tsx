@@ -4,7 +4,7 @@
 
 import { Suspense, lazy, useRef } from "react";
 import { canvasOf } from "../engine/canvas.ts";
-import { growthOf, keptAfresh } from "../engine/growth.ts";
+import { growthOf, keptAfresh, seededGrowthOf } from "../engine/growth.ts";
 import { useClock, useHolderCards, usePlayer, useSelected } from "../engine/react.tsx";
 import { subjectDetailOf } from "../engine/subject.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -31,13 +31,22 @@ export function MissionControlPage({
   const clock = useClock(1);
   // Where each fork and batch was put: kept while the reader is here, so nothing placed moves.
   const kept = useRef(keptAfresh());
-  const canvas = useSelected((world, { t, cards }) => canvasOf(world, t, cards), [clock]);
+  // While the log is read, Keel's snapshot of its head draws the project and what of the header it holds
+  // (seed.ts); the rest waits for the log, rather than be drawn from part of it and then change.
+  const canvas = useSelected(
+    (world, { t, cards, seeded }) => (seeded === null ? canvasOf(world, t, cards) : null),
+    [clock],
+  );
   const growth = useSelected(
-    (world, { t, cards }) => growthOf(world, t, name, kept.current, cards),
+    (world, { t, cards, seeded }) =>
+      seeded === null
+        ? growthOf(world, t, name, kept.current, cards)
+        : seededGrowthOf(seeded, name),
     [clock, name],
   );
   const detail = useSelected(
-    (world, { cards }) => (subject === undefined ? null : subjectDetailOf(world, subject, cards)),
+    (world, { cards, seeded }) =>
+      subject === undefined || seeded !== null ? null : subjectDetailOf(world, subject, cards),
     [subject],
   );
   // A card is asked for each agent drawn, so it is named as its card names it.
@@ -64,9 +73,15 @@ export function MissionControlPage({
         </div>
         {detail !== null && <SubjectPanel detail={detail} />}
         {subject !== undefined && detail === null && (
-          <aside className="a-subject px-5 py-4" aria-label={`Subject ${subject}`}>
+          <aside
+            className="a-subject px-5 py-4"
+            aria-label={`Subject ${subject}`}
+            aria-busy={player.seeded !== null || undefined}
+          >
             <h2 className="a-mono break-all text-lg font-semibold text-kumo-strong">{subject}</h2>
-            <p className="mt-1 text-base text-kumo-subtle">No subject of this name.</p>
+            <p className="mt-1 text-base text-kumo-subtle">
+              {player.seeded === null ? "No subject of this name." : "Loading"}
+            </p>
           </aside>
         )}
       </div>
