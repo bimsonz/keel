@@ -66,14 +66,36 @@ export class MemberRefused extends Refusal {
   }
 }
 
-/** Reads from the first reader holding the object: a staging repo first, then each member's workspace. */
+/**
+ * Reads from the first reader holding the object, trying first the readers
+ * that answered most recently (move to front), then the rest in their order:
+ * a staging repo, then each member's workspace. A restack reads each member's
+ * objects in runs from its own workspace, between reads of trunk's from
+ * staging, so an object costs about one miss. Trying the readers in a fixed
+ * order cost one miss per workspace ahead of the member's, on every read, and
+ * a batch of n about n²/2.
+ */
 export class FallbackReader implements ObjectReader {
-  constructor(private readonly readers: readonly ObjectReader[]) {}
+  /** The readers' indices, the one that answered last first. */
+  private readonly order: number[];
+
+  constructor(private readonly readers: readonly ObjectReader[]) {
+    this.order = readers.map((_, i) => i);
+  }
 
   private async first<A>(oid: string, read: (r: ObjectReader) => Promise<A>): Promise<A> {
-    for (const reader of this.readers) {
+    for (const [at, i] of [...this.order].entries()) {
+      const reader = this.readers[i];
+      if (reader === undefined) continue;
       try {
-        return await read(reader);
+        const answer = await read(reader);
+        // Another read may have moved it meanwhile: it goes to the front from wherever it stands now.
+        const now = at > 0 ? this.order.indexOf(i) : 0;
+        if (now > 0) {
+          this.order.splice(now, 1);
+          this.order.unshift(i);
+        }
+        return answer;
       } catch (e) {
         if (!(e instanceof MissingObject)) throw e;
       }

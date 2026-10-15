@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fallback-reader.test.ts -t composer.reads-linear
+# kills: composer.reads-linear
+# why: the reader tries staging and each workspace in a fixed order on every read, so a batch of n composes in n squared misses
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index 1b2284d6..7cb6eb71 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -91,7 +91,7 @@ export class FallbackReader implements ObjectReader {
+         const answer = await read(reader);
+         // Another read may have moved it meanwhile: it goes to the front from wherever it stands now.
+         const now = at > 0 ? this.order.indexOf(i) : 0;
+-        if (now > 0) {
++        if (now > 0 && now < 0) {
+           this.order.splice(now, 1);
+           this.order.unshift(i);
+         }
