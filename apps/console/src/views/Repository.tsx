@@ -353,28 +353,27 @@ function FileView({ view, mode }: { view: Extract<RepositoryView, { kind: "file"
   );
 }
 
-/** The changes a commit landed, each a link where this console's log has the change. */
+/**
+ * The changes a commit landed, each a link to its page by its number. A change this console's log has not
+ * reached yet (the code is read at Keel's head while the log is still read) has no number to show: it is left
+ * out until the log has it, rather than named by a piece of its id.
+ */
 function Landed({ commit }: { commit: CommitRow }) {
-  if (commit.changes.length === 0) return null;
+  const known = commit.changes.filter((change) => change.known);
+  if (known.length === 0) return null;
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       <span className="text-sm text-kumo-subtle">landed</span>
-      {commit.changes.map((change) =>
-        change.known ? (
-          <ChangeLink
-            key={change.id}
-            id={change.id}
-            className="a-chip a-mono"
-            title={`Open change ${change.label}`}
-          >
-            {change.label}
-          </ChangeLink>
-        ) : (
-          <span key={change.id} className="a-chip a-mono" data-tone="quiet">
-            {change.label}
-          </span>
-        ),
-      )}
+      {known.map((change) => (
+        <ChangeLink
+          key={change.id}
+          id={change.id}
+          className="a-chip a-mono"
+          title={`Open change ${change.label}`}
+        >
+          {change.label}
+        </ChangeLink>
+      ))}
     </span>
   );
 }

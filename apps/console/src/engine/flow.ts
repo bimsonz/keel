@@ -275,6 +275,30 @@ export class Flow {
           if (group.batches.includes(event.payload.batchId)) this.promoting.delete(groupId);
         break;
       }
+      case "TrunkInitialized": {
+        // Where trunk starts: a commit that landed no change. Its height is none, as the world has it.
+        if (this.commits.length === 0)
+          this.commits.unshift({
+            height: 0,
+            sha: event.payload.head,
+            t,
+            changes: [],
+            verified: true,
+          });
+        break;
+      }
+      case "TrunkSynced": {
+        // Trunk's head is upstream's own commit now: an advance that landed no change.
+        this.commits.unshift({
+          height: event.payload.height ?? (this.commits[0]?.height ?? 0) + 1,
+          sha: event.payload.to,
+          t,
+          changes: [],
+          verified: true,
+        });
+        if (this.commits.length > COMMITS_KEPT) this.commits.length = COMMITS_KEPT;
+        break;
+      }
       case "TrunkAdvanced": {
         const group = this.promoting.get(event.payload.groupId);
         this.promoting.delete(event.payload.groupId);

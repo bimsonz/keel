@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/steady.test.ts -t "lists.bounced-lapsed"
+# kills: lists.bounced-lapsed
+# why: Changes counts 0 bounced where Pipeline and Mission Control count 24: a change bounced and then left by its agent is filed as open only
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index e553fe14..8ae116b2 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -245,7 +245,7 @@ export function filtersOfChange(
+   change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
+ ): readonly ChangeFilter[] {
+   if (change.state === "parked" && change.parkedOn !== "awaiting-ruling")
+-    return change.parkedFrom === "bounced" ? FILTERS_OF_CHANGE.bounced : ["open"];
++    return ["open"];
+   return FILTERS_OF_CHANGE[change.state];
+ }
+ 

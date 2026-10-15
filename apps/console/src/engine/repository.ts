@@ -450,16 +450,26 @@ function browserOf(
   return entries;
 }
 
-/** What the repository view shows at `address`, from what has been read so far. */
+/**
+ * Trunk's head as the code reads it. While the log is still being read, the head it has folded to so far is one
+ * trunk has long left, and following it would read the code again at every head the log passes on its way: the
+ * code is read at Keel's own head until the log is read to its end, and at the log's head from then on.
+ */
+export function headToRead(player: { readonly loaded: boolean; readonly world: World }): string {
+  return player.loaded ? player.world.trunk.head : "";
+}
+
+/** What the repository view shows at `address`, from what has been read so far, with trunk's head at `head`. */
 export function repositoryOf(
   world: World,
   reader: RepositoryReader,
   address: RepoAddress,
   browsing: Browsing = AS_IT_COMES,
+  head: string = world.trunk.head,
 ): RepositoryState {
   const reading = reader.reading;
   if (reading?.id === undefined || reader.refused) return { status: "refused" };
-  const ref = reader.refOf(address, world.trunk.head);
+  const ref = reader.refOf(address, head);
   // The commit being read: the one Keel resolved the ref to, once it has answered anything read at it.
   const sha = reader.resolved.get(reader.keyOf(ref, "")) ?? (ref === HEAD ? undefined : ref);
   const parts = address.path === "" ? [] : address.path.split("/");

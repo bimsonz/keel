@@ -2,14 +2,15 @@
 # kills: parked.reason
 # why: a change parked because its agent's lease lapsed is shown as waiting on a person's ruling
 diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
-index 96e119ca..5b48c94e 100644
+index e553fe14..6058526e 100644
 --- a/apps/console/src/engine/lists.ts
 +++ b/apps/console/src/engine/lists.ts
-@@ -242,7 +242,6 @@ function listing<Entry, Row, Filter extends string>(
+@@ -244,8 +244,6 @@ function listing<Entry, Row, Filter extends string>(
  export function filtersOfChange(
-   change: Pick<ChangeEntry, "state" | "parkedOn">,
+   change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
  ): readonly ChangeFilter[] {
--  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling") return ["open"];
+-  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling")
+-    return change.parkedFrom === "bounced" ? FILTERS_OF_CHANGE.bounced : ["open"];
    return FILTERS_OF_CHANGE[change.state];
  }
  

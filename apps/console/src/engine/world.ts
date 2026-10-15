@@ -134,6 +134,11 @@ export interface ChangeEntry {
   requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
   /** Why Keel parked it, the last time it did: a person's ruling to wait on, or its agent's lapsed lease. */
   parkedOn?: ParkReason;
+  /**
+   * Where it stood when Keel parked it: a change bounced and then parked because its agent's lease lapsed is a
+   * bounced change still, with nobody to revise it.
+   */
+  parkedFrom?: ChangeState;
   /** The run that holds the change, where its holder's token named one. Whoever adopts the change replaces it. */
   run?: RunRef;
   declaredAt: string;
@@ -971,9 +976,13 @@ export class World {
         break;
       }
       case "ChangeParked": {
+        const before = this.changes.get(event.payload.changeId);
+        const from = before?.state === "parked" ? before.parkedFrom : before?.state;
         const change = this.#change(event.payload.changeId, "parked");
         if (change === undefined) break;
         change.parkedOn = event.payload.reason;
+        if (from === undefined) delete change.parkedFrom;
+        else change.parkedFrom = from;
         if (event.payload.escalationId !== undefined)
           change.escalationId = event.payload.escalationId;
         break;

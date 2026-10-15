@@ -22,6 +22,21 @@ export function isOwn(
   return who.handle !== undefined && namespace.handle === who.handle;
 }
 
+/**
+ * Whether a handle is one of the reader's orgs, as Keel's list of their orgs says: undefined until it has said.
+ * Only such a handle is read as an org; any other is a person's, an agent's or an org they are not in, and the
+ * org read would only be refused. A person with no handle yet is in no org.
+ */
+export function inOrg(
+  handle: string,
+  who: { handle?: string | undefined },
+  orgs: readonly { handle: string }[] | null,
+): boolean | undefined {
+  if (who.handle === undefined) return false;
+  if (orgs === null) return undefined;
+  return orgs.some((org) => org.handle.toLowerCase() === handle.toLowerCase());
+}
+
 /** What the frame's dropdown lists: the person's own handle first, marked as theirs, then their orgs. */
 export function accountsOf(
   orgs: readonly Org[],

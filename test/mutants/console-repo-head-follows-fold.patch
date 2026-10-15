@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/steady.test.ts -t "repository.head-while-reading"
+# kills: repository.head-while-reading
+# why: the Code page reads the tree and history again at every trunk head the log passes while it is read: four of each on keel/swarm, its files shown at 6.6 s
+diff --git a/apps/console/src/engine/repository.ts b/apps/console/src/engine/repository.ts
+index 9a0805f9..b8e56634 100644
+--- a/apps/console/src/engine/repository.ts
++++ b/apps/console/src/engine/repository.ts
+@@ -456,7 +456,7 @@ function browserOf(
+  * code is read at Keel's own head until the log is read to its end, and at the log's head from then on.
+  */
+ export function headToRead(player: { readonly loaded: boolean; readonly world: World }): string {
+-  return player.loaded ? player.world.trunk.head : "";
++  return player.world.trunk.head;
+ }
+ 
+ /** What the repository view shows at `address`, from what has been read so far, with trunk's head at `head`. */

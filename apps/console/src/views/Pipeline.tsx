@@ -831,7 +831,10 @@ export function Pipeline({ canvas, now, mode, live, loaded }: PipelineProps) {
 
   // Fitted once, when there is first something to fit, and never again by itself: every column across the
   // width, the top of each in view. A long column is followed down by panning.
-  const something = canvas.changes.length + canvas.batches.length + canvas.commits.length > 0;
+  // Trunk's starting commit alone is no history to draw: a project with nothing else says it has no live changes.
+  const something =
+    canvas.changes.length + canvas.batches.length > 0 ||
+    canvas.commits.some((commit) => commit.height > 0);
   const across = useCallback((duration: number): void => {
     const room = frame.current?.querySelector(".a-mc-stage")?.getBoundingClientRect();
     if (room === undefined || flow.current === null) return;

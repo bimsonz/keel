@@ -2,7 +2,7 @@
 # kills: accounts.own
 # why: every handle is taken for the reader's own, so an org's page is drawn as their account, with no members and no settings
 diff --git a/apps/console/src/account/accounts.ts b/apps/console/src/account/accounts.ts
-index 629daa0..4606748 100644
+index 36f4fb51..f797de62 100644
 --- a/apps/console/src/account/accounts.ts
 +++ b/apps/console/src/account/accounts.ts
 @@ -19,7 +19,7 @@ export function isOwn(
@@ -13,4 +13,4 @@ index 629daa0..4606748 100644
 +  return who.handle !== undefined;
  }
  
- /** What the frame's dropdown lists: the person's own handle first, marked as theirs, then their orgs. */
+ /**

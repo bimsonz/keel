@@ -4,7 +4,7 @@
 // from its answer.
 
 import { AgentAbout, useCard } from "./AgentAbout.tsx";
-import { isOwn } from "./accounts.ts";
+import { inOrg, isOwn } from "./accounts.ts";
 import { Button, Input, buttonVariants } from "@cloudflare/kumo";
 import {
   BookBookmarkIcon,
@@ -212,11 +212,15 @@ function ProjectsPanel({
   );
 }
 
-/** An org as Keel reads it to this reader: undefined while it is asked for, null where there is none for them. */
+/**
+ * An org as Keel reads it to this reader: undefined while it is asked for, null where there is none for them. It
+ * is asked for only where `member` says the reader is in an org of that handle; a handle they are not, it is none.
+ */
 function useOrg(
   account: Account,
   handle: string,
   who: Who,
+  member: boolean | undefined,
 ): { held: OrgPage | null | undefined; read: () => Promise<void> } {
   const [held, setHeld] = useState<OrgPage | null>();
   const read = useCallback(
@@ -224,6 +228,7 @@ function useOrg(
     [account, handle, who],
   );
   useEffect(() => {
+    if (member !== true) return undefined;
     let here = true;
     const first = async (): Promise<void> => {
       const answer = await account.org(handle, who);
@@ -233,8 +238,8 @@ function useOrg(
     return () => {
       here = false;
     };
-  }, [account, handle, who]);
-  return { held, read };
+  }, [account, handle, who, member]);
+  return { held: member === false ? null : member === undefined ? undefined : held, read };
 }
 
 /** A person as a code host names one: by handle, with their name beside it. Never by an address. */
@@ -728,7 +733,7 @@ export function NamespacePages({
   /** The orgs Keel lists the reader in: null until it has. */
   orgs: readonly Org[] | null;
 }) {
-  const { held, read } = useOrg(account, handle, who);
+  const { held, read } = useOrg(account, handle, who, inOrg(handle, who, orgs));
   const projects = useProjects(directory, handle);
   // A person needs no org: their own handle is their account, and reads as that.
   if (isOwn({ handle }, who)) return <Own directory={directory} who={who} tab={tab} orgs={orgs} />;

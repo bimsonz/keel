@@ -237,17 +237,27 @@ function listing<Entry, Row, Filter extends string>(
 
 /**
  * The filters a change is filed under. A parked change waits on a person only where Keel parked it for a ruling:
- * one parked because its agent's lease lapsed waits on its agent, and is open and nothing narrower.
+ * one parked because its agent's lease lapsed waits on its agent, and is open and nothing narrower, unless Keel
+ * had bounced it. Bounced means the same here as in the pipeline and Mission Control: from Keel's bounce until
+ * the change moves on, submitted again or adopted, whether or not its agent is still there to revise it.
  */
 export function filtersOfChange(
-  change: Pick<ChangeEntry, "state" | "parkedOn">,
+  change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
 ): readonly ChangeFilter[] {
-  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling") return ["open"];
+  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling")
+    return change.parkedFrom === "bounced" ? FILTERS_OF_CHANGE.bounced : ["open"];
   return FILTERS_OF_CHANGE[change.state];
 }
 
+/** Whether a change counts as bounced: Keel bounced it, and it has not moved on since. */
+export function isBounced(change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">): boolean {
+  return filtersOfChange(change).includes("bounced");
+}
+
 /** Whether a change waits on a person's ruling: parked, and for that. */
-export function waitsOnARuling(change: Pick<ChangeEntry, "state" | "parkedOn">): boolean {
+export function waitsOnARuling(
+  change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
+): boolean {
   return filtersOfChange(change).includes("parked");
 }
 

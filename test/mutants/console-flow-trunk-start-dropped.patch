@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/steady.test.ts -t "flow.trunk-start"
+# kills: flow.trunk-start
+# why: a new project's trunk reads "—" in Mission Control and the pipeline, though it has its first commit
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index c2f1e0bd..7a11de5f 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -277,7 +277,7 @@ export class Flow {
+       }
+       case "TrunkInitialized": {
+         // Where trunk starts: a commit that landed no change. Its height is none, as the world has it.
+-        if (this.commits.length === 0)
++        if (this.commits.length < 0)
+           this.commits.unshift({
+             height: 0,
+             sha: event.payload.head,

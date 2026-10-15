@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/steady.test.ts -t "accounts.in-org"
+# kills: accounts.in-org
+# why: a person's own profile, an agent's page and any handle are read as an org, and Better Auth refuses each with a 400 in the console
+diff --git a/apps/console/src/account/accounts.ts b/apps/console/src/account/accounts.ts
+index 36f4fb51..a18f690f 100644
+--- a/apps/console/src/account/accounts.ts
++++ b/apps/console/src/account/accounts.ts
+@@ -34,7 +34,7 @@ export function inOrg(
+ ): boolean | undefined {
+   if (who.handle === undefined) return false;
+   if (orgs === null) return undefined;
+-  return orgs.some((org) => org.handle.toLowerCase() === handle.toLowerCase());
++  return orgs.length > 0;
+ }
+ 
+ /** What the frame's dropdown lists: the person's own handle first, marked as theirs, then their orgs. */

@@ -6,10 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { type WhyDecision, readWhy } from "../source/why.ts";
 import { DecisionLink } from "../views/links.tsx";
 import { dateTime } from "../views/parts.tsx";
-import { PAGE, changesOf, waitsOnARuling } from "../engine/lists.ts";
+import { PAGE, changesOf, isBounced, waitsOnARuling } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
 import { hrefOf } from "../places.ts";
-import { type Browsing, type RepoAddress, repositoryOf } from "../engine/repository.ts";
+import { type Browsing, type RepoAddress, headToRead, repositoryOf } from "../engine/repository.ts";
 import { type Route, TRUNK } from "../route.ts";
 import { Link, navigate, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
@@ -136,7 +136,7 @@ function About() {
       else if (change.state !== "withdrawn" && change.state !== "superseded") tally.open += 1;
       if (change.state === "verifying" || change.state === "integrating") tally.running += 1;
       if (waitsOnARuling(change)) tally.parked += 1;
-      if (change.state === "bounced") tally.bounced += 1;
+      if (isBounced(change)) tally.bounced += 1;
     }
     return tally;
   });
@@ -157,6 +157,10 @@ function About() {
         .map((row) => [row.held.handle ?? "", row.agent]),
     ),
   ].slice(0, 8);
+  // Counted while the log is still read, the numbers and trunk's head would be wherever the log had got to:
+  // the column is filled once the log is read, as the lists are.
+  const loaded = useSelected((_world, reading) => reading.loaded);
+  if (!loaded) return <aside className="flex flex-col gap-5" aria-label="About" aria-busy="true" />;
   return (
     <aside className="flex flex-col gap-5" aria-label="About">
       <section className="flex flex-col gap-2">
@@ -258,11 +262,12 @@ export function CodePage({ route, mode }: { route: CodeRoute; mode: Mode }) {
 
   // Read from Keel as the page asks for it, and again whenever what is known changes.
   useEffect(() => {
-    player.repository.want(address, player.world.trunk.head, opened);
+    player.repository.want(address, headToRead(player), opened);
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- `version` stands for the world's contents: trunk's head moves, and what was read says what to read next
   }, [player, address, opened, version]);
   const state = useSelected(
-    (world, { repository }) => repositoryOf(world, repository, address, browsing),
+    (world, reading) =>
+      repositoryOf(world, reading.repository, address, browsing, headToRead(reading)),
     [address, browsing],
   );
   // An address says whether it is a directory or a file, and only Keel knows. Where it guessed wrong, it is put right.
