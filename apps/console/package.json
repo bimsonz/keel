@@ -20,6 +20,7 @@
     "@cloudflare/kumo": "catalog:",
     "@phosphor-icons/react": "catalog:",
     "@pierre/diffs": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "@xyflow/react": "catalog:",
     "better-auth": "catalog:",
     "react": "catalog:",

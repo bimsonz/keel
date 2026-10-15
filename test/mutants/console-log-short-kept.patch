@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t log-pages.full
+# kills: log-pages.full
+# why: a short page, the log's moving end, is kept, so a reader coming back never reads what was appended after it
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 880bb28..8e02fe7 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -561,7 +561,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+     if (page.items === undefined || typeof page.nextCursor !== "string")
+       throw new Error("reading events failed: the page has no cursor");
+     // A full page holds exactly what follows its cursor, for ever: it is kept for the next visit.
+-    if (keeps && page.items.length === limit && page.nextCursor !== from)
++    if (keeps && page.nextCursor !== from)
+       void kept.put(project.id, from, { limit, items: page.items, nextCursor: page.nextCursor });
+     return {
+       items: page.items.flatMap((record) => toEvent(record) ?? []),

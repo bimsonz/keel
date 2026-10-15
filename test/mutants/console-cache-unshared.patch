@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t cache.shared
+# kills: cache.shared
+# why: every read asks Keel, so a page and the link that led to it ask twice and nothing is served from memory
+diff --git a/apps/console/src/source/cache.ts b/apps/console/src/source/cache.ts
+index 86fb1d4..50ebd80 100644
+--- a/apps/console/src/source/cache.ts
++++ b/apps/console/src/source/cache.ts
+@@ -56,7 +56,7 @@ export function cachedRead<T>(
+   staleTime: number,
+   signal?: AbortSignal,
+ ): Promise<T> {
+-  if (cache === undefined) return read(signal);
++  if (true) return read(signal);
+   return untilAborted(
+     cache.fetchQuery({ queryKey: key, queryFn: ({ signal: own }) => read(own), staleTime }),
+     signal,

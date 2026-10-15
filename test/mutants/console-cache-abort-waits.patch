@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t cache.abort
+# kills: cache.abort
+# why: a reader who has gone elsewhere waits for the read to finish instead of being answered at once
+diff --git a/apps/console/src/source/cache.ts b/apps/console/src/source/cache.ts
+index 86fb1d4..e976d82 100644
+--- a/apps/console/src/source/cache.ts
++++ b/apps/console/src/source/cache.ts
+@@ -34,7 +34,7 @@ const nothing = (): void => undefined;
+  * it, and its answer is kept for the next to ask.
+  */
+ function untilAborted<T>(answer: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+-  if (signal === undefined) return answer;
++  return answer;
+   if (signal.aborted) return Promise.reject(signal.reason);
+   let abort: () => void = nothing;
+   const aborted = new Promise<never>((_, reject) => {

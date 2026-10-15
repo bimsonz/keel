@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t prefetch.code
+# kills: prefetch.code
+# why: the directories listed beside a file are not asked for ahead, so the file's page waits on each
+diff --git a/apps/console/src/source/prefetch.ts b/apps/console/src/source/prefetch.ts
+index c20dd90..c684a56 100644
+--- a/apps/console/src/source/prefetch.ts
++++ b/apps/console/src/source/prefetch.ts
+@@ -47,8 +47,6 @@ export async function prefetchAddress(pathname: string, search = ""): Promise<vo
+           const readme = route.path === "" ? "README.md" : `${route.path}/README.md`;
+           reads.push(source.getBlob(id, atOf(route.ref, readme)));
+         } else reads.push(source.getBlob(id, atOf(route.ref, route.path)));
+-        for (const parent of route.path === "" ? [] : above(route.path))
+-          reads.push(source.getTree(id, atOf(route.ref, parent)));
+         break;
+       }
+       case "commits":

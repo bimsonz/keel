@@ -2,14 +2,14 @@
 # kills: probe.refused
 # why: Keel's refusal to give a probe's source is read as a source with no files
 diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
-index 0b2784f..4c52f0a 100644
+index 880bb283..c9bfd44d 100644
 --- a/apps/console/src/source/http.ts
 +++ b/apps/console/src/source/http.ts
-@@ -251,7 +251,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+@@ -640,7 +640,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
          `/v1/probes/${encodeURIComponent(id)}/source${queryOf({ ...query })}`,
          signal,
        );
 -      if (!response.ok) throw await refusalOf(response);
        return answered<ProbeSource>(response);
      },
-     async getLattices(signal?: AbortSignal): Promise<LatticeSet> {
+     // The lattices are Keel's, the same for every project and every visit; a verdict is never changed once issued.

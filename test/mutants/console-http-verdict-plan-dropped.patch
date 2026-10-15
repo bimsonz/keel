@@ -2,16 +2,16 @@
 # kills: http.verdict-plan
 # why: the console reads Keel's view of a verdict without the plan it was issued under
 diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
-index d1ab7ea7..dbfc1fe5 100644
+index 880bb283..579507d5 100644
 --- a/apps/console/src/source/http.ts
 +++ b/apps/console/src/source/http.ts
-@@ -563,7 +563,8 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
-     async getVerdict(verdictId: string, signal?: AbortSignal): Promise<VerdictView> {
-       const response = await read(`/v1/verdicts/${encodeURIComponent(verdictId)}`, signal);
-       if (!response.ok) throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
--      return answered<VerdictView>(response);
-+      const { plan: _plan, ...view } = await answered<VerdictView>(response);
-+      return view;
-     },
-     // An agent's card is Keel's one read of it, whoever asks and from whichever page.
-     findAgent: (agentId, signal) => createHttpSponsorship(options).findAgent(agentId, signal),
+@@ -665,7 +665,8 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           const response = await read(`/v1/verdicts/${encodeURIComponent(verdictId)}`, own);
+           if (!response.ok)
+             throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
+-          return answered<VerdictView>(response);
++          const { plan: _plan, ...view } = await answered<VerdictView>(response);
++          return view;
+         },
+         FOREVER,
+         signal,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t log-pages.full
+# kills: log-pages.full
+# why: a private project's log is kept in the browser after the page, whoever signs in next
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 880bb28..5724736 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -512,7 +512,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+   const read = reader(options);
+   const cache = cacheOf(options);
+   // A public project's log is anyone's: its full pages are kept between visits. A private one's are not.
+-  const kept = project.visibility === "public" ? logPagesOf(options) : undefined;
++  const kept = logPagesOf(options);
+ 
+   /**
+    * One of Keel's reads of the project's repository. Keel says why it refuses one by its own code: no such

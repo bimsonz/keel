@@ -76,6 +76,9 @@ import type {
   Repo_listCommitsInput,
   VerdictView,
 } from "../contract/keel/index.ts";
+import type { QueryClient } from "@tanstack/react-query";
+import { cachedRead, FOREVER, FRESH_MS, pinned, readCache } from "./cache.ts";
+import { browserLogPages, type LogPages } from "./log-pages.ts";
 import { type KeelRepository, RepoRefused } from "./repository.ts";
 import {
   type ChangeDiff,
@@ -103,7 +106,29 @@ export interface HttpOptions {
   /** Where Keel is. The page's own origin, so nothing, unless a test says otherwise. */
   origin?: string;
   fetch?: typeof fetch;
+  /** The cache reads share: the console's own unless the options bring a fetch of their own (a test's); none when null. */
+  cache?: QueryClient | null;
+  /** Where a public project's full log pages are kept between visits: the browser's own, as for `cache`. */
+  logPages?: LogPages | null;
 }
+
+/** The cache a reader reads through. */
+const cacheOf = (options: HttpOptions): QueryClient | undefined =>
+  options.cache === null
+    ? undefined
+    : (options.cache ?? (options.fetch === undefined ? readCache : undefined));
+
+/** The browser's kept log pages, opened when a source first asks for them. */
+let browserPages: { readonly pages: LogPages | undefined } | undefined;
+
+/** Where a reader keeps a public project's full log pages. */
+const logPagesOf = (options: HttpOptions): LogPages | undefined => {
+  if (options.logPages === null) return undefined;
+  if (options.logPages !== undefined) return options.logPages;
+  if (options.fetch !== undefined) return undefined;
+  browserPages ??= { pages: browserLogPages() };
+  return browserPages.pages;
+};
 
 export type HttpSource = KeelEventSource &
   KeelResources &
@@ -178,9 +203,10 @@ async function answered<Body>(response: Response): Promise<Body> {
 
 /** A read of Keel, with nothing added to it: what the browser sends to its own origin is all Keel is shown. */
 function reader(options: HttpOptions): (path: string, signal?: AbortSignal) => Promise<Response> {
-  const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
-  return (path, signal) => request(`${origin}${path}`, signal === undefined ? {} : { signal });
+  // The page's fetch is looked up at each read, not when the reader is made: one made before a test's stand-in arrives reads through it too.
+  return (path, signal) =>
+    (options.fetch ?? fetch)(`${origin}${path}`, signal === undefined ? {} : { signal });
 }
 
 /**
@@ -214,13 +240,20 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
     return answered<AgentProfile>(response);
   };
   return {
-    async findAgent(agentId, signal) {
-      const response = await read(`/v1/agents/${encodeURIComponent(agentId)}`, signal);
-      // An agent Keel knows none of by that id.
-      if (response.status === 404) return null;
-      if (!response.ok) throw await refusalOf(response);
-      return answered<AgentCard>(response);
-    },
+    findAgent: (agentId, signal) =>
+      cachedRead(
+        cacheOf(options),
+        ["agent", agentId],
+        async (own) => {
+          const response = await read(`/v1/agents/${encodeURIComponent(agentId)}`, own);
+          // An agent Keel knows none of by that id.
+          if (response.status === 404) return null;
+          if (!response.ok) throw await refusalOf(response);
+          return answered<AgentCard>(response);
+        },
+        FRESH_MS,
+        signal,
+      ),
     async approve(agentId, code) {
       const {
         agentId: named,
@@ -362,39 +395,61 @@ export function createHttpCredentials(options: HttpOptions = {}): KeelCredential
 
 export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
   const read = reader(options);
+  const cache = cacheOf(options);
   return {
-    async findNamespace(handle, signal) {
-      const response = await read(`/v1/namespaces/${encodeURIComponent(handle)}`, signal);
-      // A handle nobody has.
-      if (response.status === 404) return null;
-      if (!response.ok) throw await refusalOf(response);
-      return answered<NamespaceView>(response);
-    },
-    async findProject(namespace, name, signal) {
-      const response = await read(
-        `/v1/namespaces/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
+    findNamespace: (handle, signal) =>
+      cachedRead(
+        cache,
+        ["namespace", handle],
+        async (own) => {
+          const response = await read(`/v1/namespaces/${encodeURIComponent(handle)}`, own);
+          // A handle nobody has.
+          if (response.status === 404) return null;
+          if (!response.ok) throw await refusalOf(response);
+          return answered<NamespaceView>(response);
+        },
+        FRESH_MS,
         signal,
-      );
-      // Keel answers a project it does not show this reader as it answers one that is not there.
-      if (response.status === 404) return null;
-      if (!response.ok) throw await refusalOf(response);
-      return answered<ProjectView>(response);
-    },
-    async listProjects(signal) {
-      const listed: ProjectView[] = [];
-      let cursor: string | undefined;
-      do {
-        // oxlint-disable-next-line no-await-in-loop -- a page names the next one
-        const response = await read(`/v1/projects${queryOf({ cursor, limit: 100 })}`, signal);
-        // oxlint-disable-next-line no-await-in-loop -- as above
-        if (!response.ok) throw await refusalOf(response);
-        // oxlint-disable-next-line no-await-in-loop -- as above
-        const page = await answered<Partial<ProjectPage>>(response);
-        listed.push(...(page.items ?? []));
-        cursor = page.nextCursor;
-      } while (cursor !== undefined && cursor !== "");
-      return listed;
-    },
+      ),
+    findProject: (namespace, name, signal) =>
+      cachedRead(
+        cache,
+        ["project", namespace, name],
+        async (own) => {
+          const response = await read(
+            `/v1/namespaces/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
+            own,
+          );
+          // Keel answers a project it does not show this reader as it answers one that is not there.
+          if (response.status === 404) return null;
+          if (!response.ok) throw await refusalOf(response);
+          return answered<ProjectView>(response);
+        },
+        FRESH_MS,
+        signal,
+      ),
+    listProjects: (signal) =>
+      cachedRead(
+        cache,
+        ["projects"],
+        async (own) => {
+          const listed: ProjectView[] = [];
+          let cursor: string | undefined;
+          do {
+            // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+            const response = await read(`/v1/projects${queryOf({ cursor, limit: 100 })}`, own);
+            // oxlint-disable-next-line no-await-in-loop -- as above
+            if (!response.ok) throw await refusalOf(response);
+            // oxlint-disable-next-line no-await-in-loop -- as above
+            const page = await answered<Partial<ProjectPage>>(response);
+            listed.push(...(page.items ?? []));
+            cursor = page.nextCursor;
+          } while (cursor !== undefined && cursor !== "");
+          return listed;
+        },
+        FRESH_MS,
+        signal,
+      ),
     async listWaiting(signal) {
       const listed: EscalationView[] = [];
       let cursor: string | undefined;
@@ -443,6 +498,8 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
         body: JSON.stringify(body),
       });
       if (!response.ok) throw await refusalOf(response);
+      // The list of projects is asked again, now that it holds one more.
+      void cache?.invalidateQueries({ queryKey: ["projects"] });
       return answered<ProjectView>(response);
     },
   };
@@ -453,6 +510,9 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
   const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
   const read = reader(options);
+  const cache = cacheOf(options);
+  // A public project's log is anyone's: its full pages are kept between visits. A private one's are not.
+  const kept = project.visibility === "public" ? logPagesOf(options) : undefined;
 
   /**
    * One of Keel's reads of the project's repository. Keel says why it refuses one by its own code: no such
@@ -483,6 +543,16 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       ...(asked.cursor === undefined || asked.cursor === "" ? {} : { cursor: asked.cursor }),
       ...((asked.waitSec ?? 0) > 0 ? { wait: Math.min(asked.waitSec ?? 0, 30) } : {}),
     };
+    const from = input.cursor ?? "";
+    const limit = input.limit ?? 500;
+    // A page waited on is the log's moving end, and is never kept.
+    const keeps = kept !== undefined && input.wait === undefined;
+    const known = keeps ? await kept.get(project.id, from) : undefined;
+    if (known !== undefined && known.limit === limit)
+      return {
+        items: known.items.flatMap((record) => toEvent(record) ?? []),
+        nextCursor: known.nextCursor,
+      };
     const response = await read(`/v1/events${queryOf({ ...input })}`, asked.signal);
     if (!response.ok) throw await refusalOf(response);
     const page: Partial<EventPage> = await response.json();
@@ -490,6 +560,9 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
     // the beginning, for ever, so a page that does not is refused.
     if (page.items === undefined || typeof page.nextCursor !== "string")
       throw new Error("reading events failed: the page has no cursor");
+    // A full page holds exactly what follows its cursor, for ever: it is kept for the next visit.
+    if (keeps && page.items.length === limit && page.nextCursor !== from)
+      void kept.put(project.id, from, { limit, items: page.items, nextCursor: page.nextCursor });
     return {
       items: page.items.flatMap((record) => toEvent(record) ?? []),
       nextCursor: page.nextCursor,
@@ -507,26 +580,54 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
     readEvents: (asked = {}) => events(asked),
     readObservations: (asked = {}) =>
       Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" }),
+    // What is read at one commit never changes; what is read at a branch, or at trunk's head, can.
     getTree: (projectId, at, signal) =>
-      repo<RepoTree>(
-        projectId,
-        `/tree${queryOf({ ...at } satisfies Omit<Repo_getTreeInput, "projectId">)}`,
+      cachedRead(
+        cache,
+        ["repo", projectId, "tree", at.ref ?? "", at.path],
+        (own) =>
+          repo<RepoTree>(
+            projectId,
+            `/tree${queryOf({ ...at } satisfies Omit<Repo_getTreeInput, "projectId">)}`,
+            own,
+          ),
+        pinned(at.ref) ? FOREVER : FRESH_MS,
         signal,
       ),
     getBlob: (projectId, at, signal) =>
-      repo<RepoBlob>(
-        projectId,
-        `/blob${queryOf({ ...at } satisfies Omit<Repo_getBlobInput, "projectId">)}`,
+      cachedRead(
+        cache,
+        ["repo", projectId, "blob", at.ref ?? "", at.path],
+        (own) =>
+          repo<RepoBlob>(
+            projectId,
+            `/blob${queryOf({ ...at } satisfies Omit<Repo_getBlobInput, "projectId">)}`,
+            own,
+          ),
+        pinned(at.ref) ? FOREVER : FRESH_MS,
         signal,
       ),
     getCommits: (projectId, asked, signal) =>
-      repo<RepoCommitPage>(
-        projectId,
-        `/commits${queryOf({ ...asked } satisfies Omit<Repo_listCommitsInput, "projectId">)}`,
+      cachedRead(
+        cache,
+        ["repo", projectId, "commits", asked.ref ?? "", asked.cursor ?? "", asked.limit ?? 0],
+        (own) =>
+          repo<RepoCommitPage>(
+            projectId,
+            `/commits${queryOf({ ...asked } satisfies Omit<Repo_listCommitsInput, "projectId">)}`,
+            own,
+          ),
+        FRESH_MS,
         signal,
       ),
     getCommit: (projectId, sha, signal) =>
-      repo<RepoCommitDiff>(projectId, `/commits/${encodeURIComponent(sha)}`, signal),
+      cachedRead(
+        cache,
+        ["repo", projectId, "commit", sha],
+        (own) => repo<RepoCommitDiff>(projectId, `/commits/${encodeURIComponent(sha)}`, own),
+        FOREVER,
+        signal,
+      ),
     getDiff: (changeId: string): Promise<ChangeDiff> =>
       Promise.reject(new Error(`the API has no diff endpoint yet (${changeId})`)),
     async getProbeSource(probeId: string, signal?: AbortSignal): Promise<ProbeSource> {
@@ -542,17 +643,33 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       if (!response.ok) throw await refusalOf(response);
       return answered<ProbeSource>(response);
     },
-    async getLattices(signal?: AbortSignal): Promise<LatticeSet> {
-      const response = await read("/v1/lattices", signal);
-      if (!response.ok) throw new Error(`reading lattices failed: ${response.status}`);
-      const lattices: LatticeSet = await response.json();
-      return lattices;
-    },
-    async getVerdict(verdictId: string, signal?: AbortSignal): Promise<VerdictView> {
-      const response = await read(`/v1/verdicts/${encodeURIComponent(verdictId)}`, signal);
-      if (!response.ok) throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
-      return answered<VerdictView>(response);
-    },
+    // The lattices are Keel's, the same for every project and every visit; a verdict is never changed once issued.
+    getLattices: (signal?: AbortSignal): Promise<LatticeSet> =>
+      cachedRead(
+        cache,
+        ["lattices"],
+        async (own) => {
+          const response = await read("/v1/lattices", own);
+          if (!response.ok) throw new Error(`reading lattices failed: ${response.status}`);
+          const lattices: LatticeSet = await response.json();
+          return lattices;
+        },
+        FOREVER,
+        signal,
+      ),
+    getVerdict: (verdictId: string, signal?: AbortSignal): Promise<VerdictView> =>
+      cachedRead(
+        cache,
+        ["verdict", verdictId],
+        async (own) => {
+          const response = await read(`/v1/verdicts/${encodeURIComponent(verdictId)}`, own);
+          if (!response.ok)
+            throw new Error(`reading verdict ${verdictId} failed: ${response.status}`);
+          return answered<VerdictView>(response);
+        },
+        FOREVER,
+        signal,
+      ),
     // An agent's card is Keel's one read of it, whoever asks and from whichever page.
     findAgent: (agentId, signal) => createHttpSponsorship(options).findAgent(agentId, signal),
     // Keel decides who may answer: the person a question was put to first, and a maintainer of the project's

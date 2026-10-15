@@ -1,0 +1,3 @@
+### Changed
+
+- **The console reads Keel once for every page that asks** (console only; no route, event or contract). Its reads share one cache: reads asked together are one request, an answer is served from memory for 30 seconds, and what is read at a commit is kept for the visit. A public project's full pages of log are kept in the browser between visits, so a returning reader reads Keel only for what came after them. A page's reads are asked for as soon as its address is known, and while the pointer rests on a link to it, so the code page's directory, its README, the directories above and trunk's history are read together rather than one after another.

@@ -2,15 +2,15 @@
 # kills: http.namespace
 # why: a project is asked for at an org's address, which Keel no longer answers and which a person's or an agent's project never had
 diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
-index b5a71f9..5cf0851 100644
+index 880bb283..3ce89d2d 100644
 --- a/apps/console/src/source/http.ts
 +++ b/apps/console/src/source/http.ts
-@@ -147,7 +147,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
-     },
-     async findProject(namespace, name, signal) {
-       const response = await read(
--        `/v1/namespaces/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
-+        `/v1/orgs/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
-         signal,
-       );
-       // Keel answers a project it does not show this reader as it answers one that is not there.
+@@ -417,7 +417,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+         ["project", namespace, name],
+         async (own) => {
+           const response = await read(
+-            `/v1/namespaces/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
++            `/v1/orgs/${encodeURIComponent(namespace)}/projects/${encodeURIComponent(name)}`,
+             own,
+           );
+           // Keel answers a project it does not show this reader as it answers one that is not there.

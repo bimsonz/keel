@@ -2,10 +2,10 @@
 # kills: new.call
 # why: the attempt's key is sent in the body as well, which is not the operation's input: Keel's body is whose, what name and how it starts
 diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
-index abf41bf3..7e139bb1 100644
+index 880bb283..d8aaf244 100644
 --- a/apps/console/src/source/http.ts
 +++ b/apps/console/src/source/http.ts
-@@ -318,7 +318,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+@@ -495,7 +495,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
        const response = await (options.fetch ?? fetch)(`${options.origin ?? ""}/v1/projects`, {
          method: "POST",
          headers: { "content-type": "application/json", "idempotency-key": attempt },
@@ -13,4 +13,4 @@ index abf41bf3..7e139bb1 100644
 +        body: JSON.stringify({ ...body, "idempotency-key": attempt }),
        });
        if (!response.ok) throw await refusalOf(response);
-       return answered<ProjectView>(response);
+       // The list of projects is asked again, now that it holds one more.

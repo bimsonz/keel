@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/cache.test.ts -t log-pages.full
+# kills: log-pages.full
+# why: kept pages are never read back, so a reader coming back reads the whole log from Keel again
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 880bb28..197eb9b 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -548,7 +548,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+     // A page waited on is the log's moving end, and is never kept.
+     const keeps = kept !== undefined && input.wait === undefined;
+     const known = keeps ? await kept.get(project.id, from) : undefined;
+-    if (known !== undefined && known.limit === limit)
++    if (known !== undefined && known.limit === -1)
+       return {
+         items: known.items.flatMap((record) => toEvent(record) ?? []),
+         nextCursor: known.nextCursor,
