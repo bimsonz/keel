@@ -752,7 +752,7 @@ model AgentRevoked {
 }
 
 /**
- * A person stands behind the agent: a link that carries no rights and needs
+ * A person sponsors the agent: a link that carries no rights and needs
  * no org. The agent asked for it and the person approved it.
  */
 model AgentSponsored {

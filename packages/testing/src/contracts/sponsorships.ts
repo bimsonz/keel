@@ -51,7 +51,7 @@ const row = (agentId: AgentId) =>
     Option.map((agent) => [agent.sponsor ?? null, agent.state] as const),
   );
 
-/** An agent nobody stands behind: enrolled, then left by the member who enrolled it. */
+/** An agent nobody sponsors: enrolled, then left by the member who enrolled it. */
 const alone = Effect.gen(function* () {
   const first = user();
   const agentId = yield* enrolled(first);
@@ -71,7 +71,7 @@ export function describeSponsorshipsContract(adapter: string, make: () => Sponso
           const agentId = yield* enrolled(first);
           expect(yield* row(agentId)).toEqual(Option.some([first.userId, "active"]));
 
-          // Somebody already stands behind it: no code is given that could not be used.
+          // Somebody already sponsors it: no code is given that could not be used.
           const held = yield* Effect.flip(links.ask(agentId));
           expect(held).toMatchObject({ _tag: "AgentStateRefused", reason: "sponsor-held" });
 
@@ -162,7 +162,7 @@ export function describeSponsorshipsContract(adapter: string, make: () => Sponso
     );
 
     it.live(
-      "[sponsorships.contract] the provider's consent needs no code, one person stands behind an agent at a time, and the same person again changes nothing",
+      "[sponsorships.contract] the provider's consent needs no code, one person sponsors an agent at a time, and the same person again changes nothing",
       () => {
         const harness = make();
         return Effect.gen(function* () {

@@ -182,7 +182,7 @@ export interface ProjectResource {
 }
 
 /**
- * An agent's own account, with the person who stands behind it when there is
+ * An agent's own account, with the person who sponsors it when there is
  * one. It belongs to no org: what is decided on it is between the agent and its
  * sponsor, and to everyone else it is not there.
  */

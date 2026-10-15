@@ -249,9 +249,9 @@ export function detailOf(event: EventEnvelope): string | undefined {
             : `you were taken off the project ${p.projectId}: you have no standing there now`,
       });
     case "AgentSponsored":
-      return "a person now stands behind you: your questions go to them, and they may pause you";
+      return "a person now sponsors you: your questions go to them, and they may pause you";
     case "AgentUnsponsored":
-      return "nobody stands behind you now";
+      return "nobody sponsors you now";
     case "SponsorRequested":
       return Option.match(decodeRequested(event.payload), {
         onNone: () => undefined,
@@ -282,7 +282,7 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
   if (named !== undefined) return named;
   if (event.type === "AgentSponsored" || event.type === "AgentUnsponsored")
     return [
-      { kind: "read", title: "Read who you are and who stands behind you", operationId: "whoami" },
+      { kind: "read", title: "Read who you are and who sponsors you", operationId: "whoami" },
     ];
   if (event.type === "SponsorRequested")
     return Option.match(decodeRequested(event.payload), {

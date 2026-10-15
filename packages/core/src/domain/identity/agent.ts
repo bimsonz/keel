@@ -50,7 +50,7 @@ export const Agent = Schema.Struct({
   /** The agent's org. Optional only for agents enrolled before tenancy. */
   org: Schema.optional(NamespaceId),
   /**
-   * The person who stands behind the agent: the member who enrolled it, or
+   * The person who sponsors the agent: the member who enrolled it, or
    * whoever approved its ask. At most one, and the link carries no rights.
    */
   sponsor: Schema.optional(UserId),

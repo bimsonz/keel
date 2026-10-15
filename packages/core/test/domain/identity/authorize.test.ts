@@ -1436,7 +1436,7 @@ describe("authorize", () => {
     if (ann === undefined || cy === undefined) throw new Error("three users are drawn from");
     const account: AgentResource = { _tag: "Agent", agentId: BOT, sponsor: ann };
     const sponsor = user({ userId: ann });
-    // An owner of the org the agent works in, who does not stand behind it.
+    // An owner of the org the agent works in, who does not sponsor it.
     const owner = user({ userId: cy, memberships: [{ org: ORG_1, role: "owner" }] });
     const itself = agentOn(PRJ_1);
     const another = agentOn(PRJ_1, { agentId: OTHER_BOT });
@@ -1444,7 +1444,7 @@ describe("authorize", () => {
     const read = (who: Principal, on: AgentResource | MissingResource = account) =>
       moves.filter(isAction).map((move) => outcome(decide(who, move, on)));
     expect(read(sponsor)).toEqual(["ok:", "ok:", "ok:"]);
-    // Whoever does not stand behind it cannot tell it from an agent that does not exist.
+    // Whoever does not sponsor it cannot tell it from an agent that does not exist.
     expect(read(owner)).toEqual(["404", "404", "404"]);
     expect(read(owner, MISSING)).toEqual(["404", "404", "404"]);
     expect(read(sponsor, MISSING)).toEqual(["404", "404", "404"]);

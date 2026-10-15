@@ -211,7 +211,7 @@ const agent = (agentId: AgentId, over: { readonly paused?: boolean } = {}): Call
     standing: { _tag: "Invited", by: { userId: MAY, role: "maintainer", suspended: false } },
   });
 const VISITOR = callerAs({ _tag: "Anonymous" });
-/** May maintains acme, where the agents work, and stands behind none of them. */
+/** May maintains acme, where the agents work, and sponsors none of them. */
 const may = (session: SignedIn | null = FRESH) => person(MAY, session, [[ACME, "maintainer"]]);
 
 type Answer = { readonly status: number; readonly body: Record<string, unknown> };
@@ -232,7 +232,7 @@ async function asked(w: World, agentId: AgentId): Promise<string> {
   return String(resultOf(given)["code"]);
 }
 
-/** An agent `sponsor` stands behind, through the ask and the approval. */
+/** An agent `sponsor` sponsors, through the ask and the approval. */
 async function sponsored(w: World, sponsor: UserId, name = "held"): Promise<AgentId> {
   const agentId = w.enrolled(name);
   const code = await asked(w, agentId);
@@ -297,7 +297,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.sponsor-http] a person approves with the code and stands behind the agent; a wrong, used or run-out code and an agent that does not exist are one answer", async () => {
+  it("[link.sponsor-http] a person approves with the code and sponsors the agent; a wrong, used or run-out code and an agent that does not exist are one answer", async () => {
     const w = world();
     const bot = w.enrolled("bot");
     const other = w.enrolled("other");
@@ -332,7 +332,7 @@ describe("the sponsor link at the doorway", () => {
     // The code is spent: a second person holding it reads the same as any miss.
     expect(await approve(w, person(BOB), bot, code)).toEqual(miss);
     expect(w.rowOf(bot)).toEqual([ANN, "active"]);
-    // An agent somebody stands behind is given no new code.
+    // An agent somebody sponsors is given no new code.
     const again = answer(await w.handlers.askSponsor(agent(bot), {}));
     expect(refusal(again).slice(0, 2)).toEqual([409, "agent.state_refused"]);
     expect(again.body["nextActions"]).toMatchObject([{ operationId: "Agents_endSponsorship" }]);
@@ -345,11 +345,11 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.sponsor-http] whoever comes to stand behind an agent spends its ask, and an approval the agent's standing refuses is a 409 only once the code is right", async () => {
+  it("[link.sponsor-http] whoever comes to sponsor an agent spends its ask, and an approval the agent's standing refuses is a 409 only once the code is right", async () => {
     const w = world();
     const bot = w.enrolled("bot");
     const code = await asked(w, bot);
-    // Somebody came to stand behind it another way, between its ask and this approval.
+    // Somebody came to sponsor it another way, between its ask and this approval.
     await w.runtime.runPromise(
       Sponsorships.use((links) =>
         links.approve({
@@ -436,7 +436,7 @@ describe("the sponsor link at the doorway", () => {
     expect(refusal(await end(w, may(), held))).toEqual(NOT_THERE);
     expect(refusal(await end(w, agent(w.enrolled("another")), held))).toEqual(NOT_THERE);
     expect(refusal(await end(w, VISITOR, held)).slice(0, 2)).toEqual([401, "auth.required"]);
-    // An agent that does not exist reads exactly as one the caller does not stand behind.
+    // An agent that does not exist reads exactly as one the caller does not sponsor.
     expect(await end(w, person(BOB), makeId("agt", ulid()))).toEqual(
       await end(w, person(BOB), held),
     );
@@ -448,7 +448,7 @@ describe("the sponsor link at the doorway", () => {
     expect(ended.body).toMatchObject({ id: held, state: "active" });
     expect(ended.body).not.toHaveProperty("sponsor");
     expect(w.rowOf(held)).toEqual([null, "active"]);
-    // Once ended, the person who stood behind it is nobody to it.
+    // Once ended, the person who sponsored it is nobody to it.
     expect(refusal(await end(w, person(ANN), held))).toEqual(NOT_THERE);
 
     const leaving = await sponsored(w, ANN, "leaving");
@@ -505,7 +505,7 @@ describe("the sponsor link at the doorway", () => {
       expect(refusal(await move(w, VISITOR, held)).slice(0, 2)).toEqual([401, "auth.required"]);
     }
     expect(w.rowOf(held)).toEqual([ANN, "active"]);
-    // Nobody pauses an agent nobody stands behind.
+    // Nobody pauses an agent nobody sponsors.
     const alone = w.enrolled("alone");
     expect(refusal(await pause(w, person(ANN), alone))).toEqual(NOT_THERE);
     expect(refusal(await pause(w, may(), alone))).toEqual(NOT_THERE);
@@ -529,7 +529,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.pause] a person lists the agents they stand behind, and only those", async () => {
+  it("[link.pause] a person lists the agents they sponsor, and only those", async () => {
     const w = world();
     const first = await sponsored(w, ANN, "first");
     const second = await sponsored(w, ANN, "second");
@@ -567,7 +567,7 @@ describe("the sponsor link at the doorway", () => {
       expect(refusal(await unpause(w, person(ANN, session), bot)).slice(0, 2)).toEqual(TOUCH);
       expect(refusal(await end(w, person(ANN, session), bot)).slice(0, 2)).toEqual(TOUCH);
       expect(w.rowOf(bot)).toEqual([ANN, "suspended"]);
-      // Whoever does not stand behind the agent learns nothing from the touch: it is not there.
+      // Whoever does not sponsor the agent learns nothing from the touch: it is not there.
       expect(refusal(await pause(w, person(BOB, session), bot))).toEqual(NOT_THERE);
       expect(refusal(await end(w, person(BOB, session), bot))).toEqual(NOT_THERE);
       await w.runtime.dispose();
@@ -605,7 +605,7 @@ describe("the sponsor link at the doorway", () => {
     await w.runtime.dispose();
   });
 
-  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the namespace it works in, its handle when it signed itself up, never who stands behind it", async () => {
+  it("[link.card-public] anyone reads who an agent is, and the same card: its name, its kind and the namespace it works in, its handle when it signed itself up, never who sponsors it", async () => {
     const w = world();
     const held = await sponsored(w, ANN, "carded");
     const card = async (caller: Caller, agentId: string) =>

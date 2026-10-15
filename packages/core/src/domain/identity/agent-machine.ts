@@ -51,7 +51,7 @@ export type AgentCommand =
   | { readonly _tag: "Suspend"; readonly reason: string; readonly by: CommandActor }
   | { readonly _tag: "Reinstate"; readonly by: CommandActor }
   | { readonly _tag: "Revoke"; readonly by: CommandActor }
-  /** A person stands behind the agent. The agent asked first: the caller holds that proof. */
+  /** A person sponsors the agent. The agent asked first: the caller holds that proof. */
   | { readonly _tag: "Sponsor"; readonly by: UserId }
   /** The sponsor switches the link off, or the agent leaves it: `by` is one of the two. */
   | { readonly _tag: "EndSponsorship"; readonly by: CommandActor };

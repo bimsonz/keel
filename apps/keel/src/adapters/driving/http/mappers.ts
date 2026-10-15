@@ -108,12 +108,12 @@ function waitingInvitations({ namespaces, projects }: Identity["invitations"]) {
   };
 }
 
-/** What `whoami` tells an agent nobody stands behind: that a person must, and the call that asks one. */
+/** What `whoami` tells an agent nobody sponsors: that a person must, and the call that asks one. */
 function sponsorship(agent: Agent) {
   return agent.sponsor !== undefined
     ? { clause: "", next: [] }
     : {
-        clause: " Nobody stands behind you yet: ask a person to sponsor you.",
+        clause: " Nobody sponsors you yet: ask a person to sponsor you.",
         next: [
           {
             kind: "call" as const,

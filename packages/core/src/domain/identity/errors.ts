@@ -53,7 +53,7 @@ export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>
  * when the state's name does not: another person already sponsors the agent,
  * or nobody does; whoever asked to end the link is neither the sponsor nor the
  * agent; or the agent is paused, when it cannot leave its sponsor and nobody
- * new can stand behind it.
+ * new can sponsor it.
  */
 export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
   "AgentStateRefused",

@@ -89,7 +89,7 @@ function keel(options: { readonly store?: "none"; readonly env?: Record<string, 
         return Response.json(
           {
             ok: true,
-            summary: `Show ${SPONSOR_PAGE} to the person who will stand behind you.`,
+            summary: `Show ${SPONSOR_PAGE} to the person who will sponsor you.`,
             result: { code: "code-1", url: SPONSOR_PAGE, expiresAt: "2026-10-14T02:10:00.000Z" },
           },
           { status: 201 },

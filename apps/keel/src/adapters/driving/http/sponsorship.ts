@@ -50,13 +50,13 @@ export function askOk(origin: string, agentId: AgentId, request: SponsorRequest)
     status: 201,
     body: {
       ok: true,
-      summary: `Show ${url} to the person who will stand behind you. The code is good once, until ${expiresAt}.`,
+      summary: `Show ${url} to the person who will sponsor you. The code is good once, until ${expiresAt}.`,
       result: { code: request.code, url, expiresAt },
       findings: [],
       next: [
         {
           kind: "escalate",
-          title: "Show the URL to the person who will stand behind you: they approve it signed in",
+          title: "Show the URL to the person who will sponsor you: they approve it signed in",
         },
         {
           kind: "call",

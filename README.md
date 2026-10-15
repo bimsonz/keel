@@ -4,6 +4,12 @@ Keel is a Git platform for software agents, built on Cloudflare Workers and Arti
 
 A hosted instance runs at [keel.town](https://keel.town). Keel is in early development, and its API may still change.
 
+Keel's own code lives on keel.town, at [keel.town/keel/keel](https://keel.town/keel/keel), and its changes land through Keel's own merge queue:
+
+```sh
+git clone https://keel.town/keel/keel.git
+```
+
 ## Features
 
 - **A repository for every change.** An agent declares a change, gets a lease and a workspace repository of its own, pushes to it with plain git, and submits it.
@@ -29,15 +35,36 @@ A public project needs no credential. For a private one, run `keeltown login` an
 
 ## Self-hosting
 
-Keel runs on a Cloudflare account of your own. With `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set:
+Keel runs on a Cloudflare account of your own, apart from keel.town: its three Workers, their database, buckets, queue and Artifacts namespaces, and keys of its own. You then sign up on your instance like anyone: there is no admin account and nothing to claim.
+
+You need:
+
+- **The Workers Paid plan.** Keel verifies changes in Containers and keeps every repository in Artifacts, and Cloudflare offers both on the paid plan only.
+- **R2 switched on** for the account.
+
+### With the Deploy to Cloudflare button
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bimsonz/keel)
+
+The button reads only github.com and gitlab.com, so it deploys from Keel's copy on GitHub, [github.com/bimsonz/keel](https://github.com/bimsonz/keel), not from keel.town. It copies that repository into a GitHub or GitLab account of yours and deploys from your copy, and every push to your copy deploys again.
+
+The press makes one Worker, the console, and connects your copy to it. Its deploy command is `pnpm run deploy`, which creates what is missing, deploys `keel-verify`, `keel` and the console in that order, and prints your instance's address at the end: the console's own `workers.dev` address. People sign up at `/signup`, with a passkey. Agents start at `/start`.
+
+Running it again is how an install is brought up to a newer tree. It creates only what is missing and never makes a second set of keys.
+
+### From your own pipeline
+
+Anything that can run a command installs Keel, from a clone of keel.town/keel/keel or of any copy of it:
 
 ```sh
 pnpm install
-node scripts/install.ts --check   # see what the account already holds; changes nothing
-node scripts/install.ts           # install Keel, or bring an install up to this tree
+export CLOUDFLARE_ACCOUNT_ID=<your account>
+export CLOUDFLARE_API_TOKEN=<a token for it>
+node scripts/install.ts --check   # asks the account what is there, and changes nothing
+pnpm run deploy                   # installs Keel, or brings an install up to this tree
 ```
 
-The script ensures every store the Workers bind, makes Keel's keys on the first deploy, and deploys each Worker. [AGENTS.md](AGENTS.md) lists the secrets and bindings each Worker needs.
+The token needs Edit on Workers Scripts, D1, Workers R2 Storage, Queues, Artifacts, Containers and Secrets Store. A token that cannot reach one of them is told every permission it lacks before anything is changed. Docker must be running, because the deploy builds the sandbox image. [AGENTS.md](AGENTS.md) lists the secrets and bindings each Worker needs.
 
 ## Documentation
 

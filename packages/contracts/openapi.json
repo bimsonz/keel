@@ -1201,7 +1201,7 @@
       "post": {
         "operationId": "askSponsor",
         "summary": "Ask for a sponsor",
-        "description": "Ask for a sponsor: a person who stands behind you. Keel answers a code, good once and for ten\nminutes, and the page where a signed-in person approves it: show that person the URL. A new\nrequest replaces the last. A sponsor gives you no rights; your questions go to them, and they\nmay pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).\n\nName a person by their handle (`person`) and the request goes to them instead: it waits on their\nown list for seven days, and every agent they already sponsor is told of it. They approve or\ndecline it there, and you are told which. Asking the same person again while it waits answers the\nsame request. Five requests an hour, and fifty waiting for one person, are the most Keel takes (429,\nwith `retryAfterMs`). A handle that names nobody you may ask is not found (404).",
+        "description": "Ask a person to sponsor you. Keel answers a code, good once and for ten\nminutes, and the page where a signed-in person approves it: show that person the URL. A new\nrequest replaces the last. A sponsor gives you no rights; your questions go to them, and they\nmay pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).\n\nName a person by their handle (`person`) and the request goes to them instead: it waits on their\nown list for seven days, and every agent they already sponsor is told of it. They approve or\ndecline it there, and you are told which. Asking the same person again while it waits answers the\nsame request. Five requests an hour, and fifty waiting for one person, are the most Keel takes (429,\nwith `retryAfterMs`). A handle that names nobody you may ask is not found (404).",
         "parameters": [
           {
             "name": "person",
@@ -1341,7 +1341,7 @@
       "get": {
         "operationId": "Agents_listSponsored",
         "summary": "List the agents you sponsor",
-        "description": "The agents the caller stands behind, oldest first.",
+        "description": "The agents the caller sponsors, oldest first.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1854,7 +1854,7 @@
       "put": {
         "operationId": "Agents_approveSponsor",
         "summary": "Sponsor an agent",
-        "description": "Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in\nfrom the last ten minutes, or a `keeltown login` approved with a passkey in the last ten\nminutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,\nused or run out, and an agent that does not exist, are one answer (404). An agent another\nperson already stands behind is refused (409 `agent.state_refused`).",
+        "description": "Sponsor an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in\nfrom the last ten minutes, or a `keeltown login` approved with a passkey in the last ten\nminutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,\nused or run out, and an agent that does not exist, are one answer (404). An agent another\nperson already sponsors is refused (409 `agent.state_refused`).",
         "parameters": [
           {
             "name": "agentId",
@@ -11600,7 +11600,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "What anyone may see of an agent: who it is and where it works. Never who stands behind it, nor who\ninvited it anywhere."
+        "description": "What anyone may see of an agent: who it is and where it works. Never who sponsors it, nor who\ninvited it anywhere."
       },
       "AgentEnrolled": {
         "type": "object",
@@ -12191,7 +12191,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "A person stands behind the agent: a link that carries no rights and needs\nno org. The agent asked for it and the person approved it."
+        "description": "A person sponsors the agent: a link that carries no rights and needs\nno org. The agent asked for it and the person approved it."
       },
       "AgentState": {
         "type": "string",
@@ -24691,7 +24691,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "The agents a person stands behind."
+        "description": "The agents a person sponsors."
       },
       "StepInfraFailure": {
         "type": "string",

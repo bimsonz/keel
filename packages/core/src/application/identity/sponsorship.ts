@@ -64,7 +64,7 @@ const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded
  * The agent this AgentSession DO is for asks for a sponsor. The isolate minted
  * the code and sends only its hash, as it does a client secret. One request an
  * agent: a new one replaces the last. It commits no event, since nothing about
- * the agent has changed yet. An agent somebody already stands behind is
+ * the agent has changed yet. An agent somebody already sponsors is
  * refused (`sponsor-held`), so no code is ever given that could not be used.
  */
 export const askSponsor: (

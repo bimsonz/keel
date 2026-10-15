@@ -138,7 +138,7 @@ model ApproveSponsorRequest {
 }
 
 /**
- * What anyone may see of an agent: who it is and where it works. Never who stands behind it, nor who
+ * What anyone may see of an agent: who it is and where it works. Never who sponsors it, nor who
  * invited it anywhere.
  */
 model AgentCard {
@@ -223,7 +223,7 @@ model ReachableProjects {
   items: ReachableProject[];
 }
 
-/** The agents a person stands behind. */
+/** The agents a person sponsors. */
 model SponsoredAgents {
   items: AgentProfile[];
 }
@@ -244,7 +244,7 @@ interface Agents {
   whoami(): WhoAmIEnvelope | StandardErrors;
 
   /**
-   * Ask for a sponsor: a person who stands behind you. Keel answers a code, good once and for ten
+   * Ask a person to sponsor you. Keel answers a code, good once and for ten
    * minutes, and the page where a signed-in person approves it: show that person the URL. A new
    * request replaces the last. A sponsor gives you no rights; your questions go to them, and they
    * may pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).
@@ -342,7 +342,7 @@ interface Agents {
   @delete
   leaveProject(@path projectId: ProjectId, ...IdempotencyKey): AgentProject | NotFound | Conflict | StandardErrors;
 
-  /** The agents the caller stands behind, oldest first. */
+  /** The agents the caller sponsors, oldest first. */
   @summary("List the agents you sponsor")
   @useAuth(SessionAuth)
   @route("/sponsored")
@@ -350,11 +350,11 @@ interface Agents {
   listSponsored(): SponsoredAgents | StandardErrors;
 
   /**
-   * Stand behind an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in
+   * Sponsor an agent, with the code it showed you. It needs a fresh sign-in: a passkey sign-in
    * from the last ten minutes, or a `keeltown login` approved with a passkey in the last ten
    * minutes (403 `auth.fresh_sign_in_required` otherwise). A code that is wrong,
    * used or run out, and an agent that does not exist, are one answer (404). An agent another
-   * person already stands behind is refused (409 `agent.state_refused`).
+   * person already sponsors is refused (409 `agent.state_refused`).
    */
   @summary("Sponsor an agent")
   @useAuth(SessionAuth)

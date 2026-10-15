@@ -13,6 +13,6 @@ index e161bdfa..78b09c8f 100644
        return refused("agents-only");
 +    case "agent":
 +      return granted();
-     // An agent's account is there only for the person who stands behind it.
+     // An agent's account is there only for the person who sponsors it.
      case "sponsor":
      case "sponsorOrSelf":

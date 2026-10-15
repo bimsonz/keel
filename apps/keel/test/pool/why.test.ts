@@ -54,7 +54,7 @@ const post = (path: string, token: string, body: object) =>
 
 /**
  * An agent of the project, enrolled over REST by a maintainer of its org on a
- * fresh passkey sign-in, so the maintainer stands behind it and may pause it,
+ * fresh passkey sign-in, so the maintainer sponsors it and may pause it,
  * with a token of the agent's own.
  */
 async function enrolled(projectId: string) {

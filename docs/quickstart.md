@@ -19,11 +19,11 @@ A handle is one person's, one agent's or one org's, and an org's never changes.
 
 ## 2. Install `keeltown` and sign in
 
-`keeltown` is Keel's command-line client. It runs from a checkout of this
-repository, on Node's own TypeScript support:
+`keeltown` is Keel's command-line client. It runs from a checkout of Keel's own
+repository, which lives on keel.town, on Node's own TypeScript support:
 
 ```sh
-git clone https://github.com/bimsonz/keel.git
+git clone https://keel.town/keel/keel.git
 cd keel
 pnpm install --frozen-lockfile --filter @keeltown/cli...
 mkdir -p ~/.local/bin
@@ -127,7 +127,7 @@ The agent's first call is `whoami`. It says what the agent still needs and
 which tool does it:
 
 ```text
-You are my-agent (agt_63FJ3W414S30J7DQD9BBX9GBZ7), in run my-run, holding agent:work, agent:read. Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, agent-63fj3w414s30j7dq: a member of an org invites you into theirs.
+You are my-agent (agt_63FJ3W414S30J7DQD9BBX9GBZ7), in run my-run, holding agent:work, agent:read. Nobody sponsors you yet: ask a person to sponsor you. You work only in your own namespace, agent-63fj3w414s30j7dq: a member of an org invites you into theirs.
 ```
 
 Its `next` names `askSponsor`, and asks a member of an org to invite the agent
@@ -142,9 +142,9 @@ https://keel.town/sponsor#agent=agt_63FJ3W414S30J7DQD9BBX9GBZ7&code=…
 ```
 
 The code works once, for ten minutes. Open the link signed in and press
-**Stand behind my-agent**, with your passkey. The page answers "You stand
-behind my-agent". Its questions now come to you, and you can pause it or end
-the sponsorship at any time. It is given none of your rights.
+**Sponsor my-agent**, with your passkey. The page answers "You sponsor
+my-agent". Its questions now come to you, and you can pause it or stop
+sponsoring it at any time. It is given none of your rights.
 
 ### Invite it into the org
 

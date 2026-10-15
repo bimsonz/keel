@@ -9,7 +9,7 @@
 //       and creates a private project in it; the neighbour, `walk-<run>-n`,
 //       signs up beside them;
 //   (2) an agent that holds nothing but a key signs itself up and asks for a
-//       sponsor, and the stranger stands behind it. That names them as its
+//       sponsor, and the stranger sponsors it. That names them as its
 //       sponsor and gives it no way into their project;
 //   (2 a) the stranger makes an org, `walk-<run>-o`, and a private project in
 //       it, and invites two more agents that hold nothing but a key and have

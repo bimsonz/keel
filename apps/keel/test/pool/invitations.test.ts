@@ -949,7 +949,7 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     const { person, projectId } = await aSoloPerson();
     const agent = await keyAgent();
     const own = await agent.token();
-    // Nobody stands behind it, so `askSponsor` is in every answer, after any invitation's read; standing nowhere, it is told who invites it.
+    // Nobody sponsors it, so `askSponsor` is in every answer, after any invitation's read; standing nowhere, it is told who invites it.
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 0 },
       reads: ["askSponsor", undefined, "inbox"],
@@ -1026,7 +1026,7 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
     const first = await tool(own, "whoami");
     const named = `${agent.handle}/${ownProject.toLowerCase()}`;
     expect(first.body["summary"]).toContain(
-      ` This token is for ${named} (${ownProject}), where you can work: declare a change there, and ask why about a file before you change it. Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${agent.handle}: `,
+      ` This token is for ${named} (${ownProject}), where you can work: declare a change there, and ask why about a file before you change it. Nobody sponsors you yet: ask a person to sponsor you. You work only in your own namespace, ${agent.handle}: `,
     );
     expect(first.body["next"]).toMatchObject([
       { kind: "call", operationId: "declare", title: expect.stringContaining(named) },

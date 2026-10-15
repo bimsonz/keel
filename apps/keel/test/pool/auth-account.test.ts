@@ -353,7 +353,7 @@ describe("deleting an account at /v1/auth", () => {
     );
     if (!Exit.isSuccess(inbox)) throw new Error("the inbox read failed");
     expect(inbox.value.notices.map((notice) => [notice.kind, notice.detail])).toEqual([
-      ["AgentUnsponsored", "nobody stands behind you now"],
+      ["AgentUnsponsored", "nobody sponsors you now"],
     ]);
   });
 

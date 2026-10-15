@@ -208,7 +208,7 @@ const agentProject = (id: unknown) =>
   });
 
 /**
- * An agent's own account, with the person who stands behind it: what a pause,
+ * An agent's own account, with the person who sponsors it: what a pause,
  * the end of its sponsor's link and a read of the agent are decided on. The
  * directory's row has the sponsor before a link move answers, so the next
  * request is decided on it.

@@ -50,7 +50,7 @@ const AGENT = makeId("agt", "0".repeat(26));
 const PROJECT = makeId("prj", "0".repeat(26));
 const SPONSOR = makeId("usr", "1".repeat(26));
 const OTHER = makeId("usr", "2".repeat(26));
-/** A person who never stands behind the agent, and another agent: neither is a party to its link. */
+/** A person who never sponsors the agent, and another agent: neither is a party to its link. */
 const STRANGER = makeId("usr", "3".repeat(26));
 const ELSEWHERE = makeId("agt", "9".repeat(26));
 /** Whoever moves an agent's standing: a person, named as a command names one. */
@@ -188,7 +188,7 @@ const oracle = (before: Agent | undefined, command: AgentCommand): Key | "refuse
   }
 };
 
-/** An agent's state and who stands behind it: what the sponsor link's rule is about. */
+/** An agent's state and who sponsors it: what the sponsor link's rule is about. */
 interface Linked {
   readonly state: Agent["state"];
   readonly sponsor?: typeof SPONSOR;
@@ -305,7 +305,7 @@ const namesItsEnder = (
   return event._tag === "AgentReinstated" && event.by === by;
 };
 
-/** What the fold's table is about: an agent's state, who stands behind it, its revocation epoch, when it began, its name, kind and scopes, and the keys it holds. */
+/** What the fold's table is about: an agent's state, who sponsors it, its revocation epoch, when it began, its name, kind and scopes, and the keys it holds. */
 interface Folded {
   readonly state: Agent["state"];
   readonly sponsor?: UserId;
@@ -692,7 +692,7 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(tags(again.results[3])).toEqual(["AgentUnsponsored"]);
     expect(again.state?.sponsor).toBe(OTHER);
 
-    // A revoked agent keeps the record of who stood behind it, and takes neither command.
+    // A revoked agent keeps the record of who sponsored it, and takes neither command.
     const revoked = drive([build("Enroll"), sponsor, build("Revoke"), end, another]);
     expect(reason(revoked.results[3])).toBe("state");
     expect(reason(revoked.results[4])).toBe("state");
@@ -704,7 +704,7 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
       fc.property(linkRunArb, (commands) =>
         walk(commands).every(({ command, before, after, sponsor }) => {
           if (before?.state !== "suspended") return true;
-          // Nobody new stands behind a paused agent.
+          // Nobody new sponsors a paused agent.
           if (after?.sponsor !== undefined && after.sponsor !== sponsor) return false;
           if (after?.state !== "active") return true;
           return (

@@ -6,7 +6,7 @@ index 4a5aca00..b9863520 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
 @@ -433,9 +433,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
-     // An agent's account is there only for the person who stands behind it.
+     // An agent's account is there only for the person who sponsors it.
      case "sponsor":
      case "sponsorOrSelf":
 -      return resource._tag === "Agent" && resource.sponsor === principal.userId

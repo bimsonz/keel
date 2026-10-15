@@ -48,7 +48,7 @@ import type {
  *   org, or whoever holds `maintain` there, and a person too; `ownAsUser`:
  *   an owner, and a person: an org's credentials and a project's deploy
  *   targets are never an agent's, wherever it governs;
- * - `sponsor`: the person who stands behind the agent the action is on, and
+ * - `sponsor`: the person who sponsors the agent the action is on, and
  *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
  *   the agent itself.
  */
@@ -606,7 +606,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "work":
     case "agent":
       return refused("agents-only");
-    // An agent's account is there only for the person who stands behind it.
+    // An agent's account is there only for the person who sponsors it.
     case "sponsor":
     case "sponsorOrSelf":
       return resource._tag === "Agent" && resource.sponsor === principal.userId
@@ -616,7 +616,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
       break;
   }
   if (resource._tag === "Fork") return fork(principal, resource);
-  // An agent that exists is there for anyone to read, as the public: who it is, never who stands behind it.
+  // An agent that exists is there for anyone to read, as the public: who it is, never who sponsors it.
   if (resource._tag === "Agent") return need === "read" ? granted("public") : hidden();
   if (resource._tag !== "Project" && resource._tag !== "Namespace") return hidden();
   const unseen = notSeen(principal, resource);

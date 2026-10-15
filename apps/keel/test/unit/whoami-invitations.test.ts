@@ -86,11 +86,11 @@ describe("whoami's answer", () => {
     ]);
   });
 
-  it("[whoami.sponsor-next] tells an agent nobody stands behind to ask a person, askSponsor first unless an invitation waits to be read, and says nothing of it once someone does", () => {
+  it("[whoami.sponsor-next] tells an agent nobody sponsors to ask a person, askSponsor first unless an invitation waits to be read, and says nothing of it once someone does", () => {
     const { sponsor: _, ...unsponsored } = agent;
     const alone = answer({ agent: unsponsored, session: null, invitations: none, joined: none });
     expect(alone.summary).toBe(
-      `You are unit-agent (${agent.id}), holding agent:read, agent:work. Nobody stands behind you yet: ask a person to sponsor you.`,
+      `You are unit-agent (${agent.id}), holding agent:read, agent:work. Nobody sponsors you yet: ask a person to sponsor you.`,
     );
     expect(alone.next).toEqual([
       {
@@ -163,7 +163,7 @@ describe("whoami's answer", () => {
     const working = whoamiOk(fresh, here);
     if (working.status !== 200) throw new Error(`whoami answered ${working.status}`);
     expect(working.body.summary).toBe(
-      `You are key-agent (${keyAgent.id}), holding agent:read, agent:work. This token is for ${keyAgent.handle}/app (${sampleProjectId}), where you can work: declare a change there, and ask why about a file before you change it. Nobody stands behind you yet: ask a person to sponsor you. You work only in your own namespace, ${keyAgent.handle}: a member of an org invites you into theirs.`,
+      `You are key-agent (${keyAgent.id}), holding agent:read, agent:work. This token is for ${keyAgent.handle}/app (${sampleProjectId}), where you can work: declare a change there, and ask why about a file before you change it. Nobody sponsors you yet: ask a person to sponsor you. You work only in your own namespace, ${keyAgent.handle}: a member of an org invites you into theirs.`,
     );
     expect(working.body.next).toEqual([
       {

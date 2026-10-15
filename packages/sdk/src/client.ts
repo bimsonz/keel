@@ -388,13 +388,13 @@ export class KeelClient {
     return this.call("Agents_getAgent", { agentId }, options);
   }
 
-  /** The agents the signed-in person stands behind. */
+  /** The agents the signed-in person sponsors. */
   sponsoredAgents(options?: CallOptions): Promise<WireOutputs["Agents_listSponsored"]> {
     return this.call("Agents_listSponsored", {}, options);
   }
 
   /**
-   * The signed-in person stands behind an agent, with the code it showed them. Keel wants a fresh
+   * The signed-in person sponsors an agent, with the code it showed them. Keel wants a fresh
    * sign-in for it: a passkey sign-in from the last ten minutes.
    */
   approveSponsor(

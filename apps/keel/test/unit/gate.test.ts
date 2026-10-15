@@ -377,7 +377,7 @@ describe("the request gate", () => {
   );
 
   it.effect(
-    "[gate.sponsorless] an agent somebody stands behind stands as that person does in its org, and one in no org is refused by name",
+    "[gate.sponsorless] an agent somebody sponsors stands as that person does in its org, and one in no org is refused by name",
     () =>
       Effect.gen(function* () {
         const admitted = yield* principalOf(yield* tokenAt(2));

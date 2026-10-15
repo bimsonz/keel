@@ -80,11 +80,9 @@ describe("the sponsor link on the real AgentSession DO", () => {
     );
     const left = await waiting;
     expect(Date.now() - started).toBeLessThan(5_000);
-    expect(left.notices).toEqual([
-      ["AgentUnsponsored", "nobody stands behind you now", ["whoami"]],
-    ]);
+    expect(left.notices).toEqual([["AgentUnsponsored", "nobody sponsors you now", ["whoami"]]]);
 
-    // Another person stands behind it, then the agent itself leaves: it is told of the first only.
+    // Another person sponsors it, then the agent itself leaves: it is told of the first only.
     await run(
       Sponsorships.use((links) =>
         links.approve({
@@ -104,7 +102,7 @@ describe("the sponsor link on the real AgentSession DO", () => {
     expect(after.notices).toEqual([
       [
         "AgentSponsored",
-        "a person now stands behind you: your questions go to them, and they may pause you",
+        "a person now sponsors you: your questions go to them, and they may pause you",
         ["whoami"],
       ],
     ]);
@@ -168,7 +166,7 @@ describe("the sponsor link through the real Worker", () => {
     const token = String((await exchange()).body["access_token"]);
     const me = () => http(token, "GET", "/agents/me");
 
-    // The member who enrolled it stands behind it; the agent itself leaves, and asks.
+    // The member who enrolled it sponsors it; the agent itself leaves, and asks.
     expect(Object(Object((await me()).body["result"]).agent).sponsor).toBe(member.userId);
     const left = await http(token, "DELETE", `/agents/${agentId}/sponsor`);
     expect(left.status).toBe(200);
