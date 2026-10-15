@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.composed
+# why: a verdict naming no step draws no check
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..90c868f2 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -592,7 +592,7 @@ function checksOf(verdict: {
+   if (steps.length > 0)
+     return steps.map((step) => ({ name: step.name, result: step.result, line: step.line }));
+   const [first] = verdict.evidence;
+-  if (first === undefined || verdict.outcome === "land") return [];
++  return [];
+   return [
+     { name: first.split(":")[0] ?? first, result: "fail", line: verdict.evidence.join("\n") },
+   ];

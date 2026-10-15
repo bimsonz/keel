@@ -426,137 +426,6 @@
   opacity: 1;
 }
 
-/* ── Mission Control's graph ── */
-:root .a-mission-graph {
-  --xy-background-color: transparent;
-  --xy-edge-stroke-width: 1.5;
-  --xy-handle-background-color: transparent;
-  --xy-handle-border-color: transparent;
-  --xy-edge-label-background-color: var(--color-kumo-canvas);
-}
-
-:root .a-mission-graph .react-flow__handle {
-  width: 1px;
-  height: 1px;
-  min-width: 0;
-  min-height: 0;
-  opacity: 0;
-}
-
-/* A node that has to move makes one short, straight move. Nothing drifts. */
-:root .a-mission-graph .react-flow__node {
-  transition: transform 240ms ease-out;
-}
-
-:root .a-fn {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 232px;
-  padding: 9px 12px;
-  border: 1px solid var(--color-kumo-line);
-  border-radius: 10px;
-  background: var(--color-kumo-base);
-  font-size: 14px;
-  line-height: 1.3;
-  animation: a-fn-arrive 220ms ease-out;
-}
-
-@keyframes a-fn-arrive {
-  from {
-    opacity: 0;
-  }
-}
-
-:root .a-fn[data-kind="agent"],
-:root .a-fn[data-kind="guard"] {
-  justify-content: center;
-}
-
-:root .a-fn[data-kind="stack"],
-:root .a-fn[data-kind="reference"] {
-  border-style: dashed;
-  background: transparent;
-}
-
-/* React Flow turns pointer events off for nodes that cannot be dragged or selected. These ones open something. */
-:root .a-fn[data-open="true"] {
-  cursor: pointer;
-  pointer-events: all;
-}
-
-:root .a-fn[data-open="true"]:hover {
-  border-color: var(--text-color-kumo-subtle);
-}
-
-:root .a-fn[data-open="true"]:focus-visible {
-  outline: 2px solid var(--color-kumo-brand);
-  outline-offset: 2px;
-}
-
-:root .a-fn[data-tone="suspected"] {
-  border-color: var(--a-suspected);
-}
-
-:root .a-fn[data-tone="proven"] {
-  border-color: var(--a-fail);
-}
-
-:root .a-fn[data-tone="pass"] {
-  border-color: color-mix(in oklab, var(--a-pass) 60%, transparent);
-}
-
-/* Orange is the question itself. What waits on it gets the outline, not the fill. */
-:root .a-fn[data-tone="person"] {
-  border-color: var(--a-person);
-}
-
-:root .a-fn[data-kind="escalation"][data-tone="person"] {
-  background: var(--a-person-tint);
-}
-
-:root .a-fn-kind {
-  font-size: 12px;
-  color: var(--text-color-kumo-subtle);
-}
-
-:root .a-fn-clamp {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-:root .a-mission-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  font-size: 13px;
-  color: var(--text-color-kumo-subtle);
-}
-
-:root .a-mission-key i {
-  display: inline-block;
-  width: 22px;
-  margin-right: 6px;
-  vertical-align: middle;
-  border-top: 2px solid var(--color-kumo-interact);
-}
-
-:root .a-mission-key i[data-line="dashed"] {
-  border-top-style: dashed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root .a-mission-graph .react-flow__node {
-    transition: none;
-  }
-
-  :root .a-fn {
-    animation: none;
-  }
-}
-
 /* ── The review funnel ── */
 :root .a-funnel {
   width: 100%;
@@ -740,9 +609,9 @@
   outline-offset: 1px;
 }
 
-:root .a-fn[data-selected="true"] {
-  outline: 2px solid var(--color-kumo-brand);
-  outline-offset: 2px;
+:root .a-fn-kind {
+  font-size: 12px;
+  color: var(--text-color-kumo-subtle);
 }
 
 /* ── The repository ─────────────────────────────────────────────────────── */
@@ -1134,33 +1003,6 @@
 
 /* It is never cut short: where the row is too narrow for it and what follows, what follows goes beneath. */
 /* One line where there is room for it. On a narrow screen the numbers wrap under each other, and none is cut off. */
-:root .a-trunk-line {
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 28px;
-  min-height: 44px;
-  padding: 6px 24px;
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-:root .a-trunk-line > div {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-:root .a-trunk-line dt {
-  color: var(--text-color-kumo-subtle);
-}
-
-:root .a-trunk-line dd {
-  color: var(--text-color-kumo-strong);
-  font-size: 14px;
-  font-weight: 600;
-}
 
 :root .a-stats {
   width: 100%;
@@ -1253,87 +1095,6 @@
   border-radius: 0 0 10px 10px;
 }
 
-/* ── Mission Control: lanes, and the columns' names above them ─────────── */
-
-/* The page scrolls. The graph inside it neither pans nor zooms. */
-:root .a-mission {
-  height: 100%;
-  overflow: auto;
-}
-
-/* The names of the columns stay put while the lanes go by beneath them. */
-:root .a-mission-head {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  height: 34px;
-  border-bottom: 1px solid var(--color-kumo-line);
-  background: var(--color-kumo-canvas);
-}
-
-:root .a-mission-head > span {
-  position: absolute;
-  top: 0;
-  display: flex;
-  align-items: center;
-  height: 100%;
-  color: var(--text-color-kumo-subtle);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-:root .a-mission-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 20px 20px;
-}
-
-/* A lane's band: the rule above it, and the control that opens or closes it. */
-:root .a-lane {
-  display: flex;
-  width: 100%;
-  border-top: 1px solid var(--color-kumo-hairline);
-  font-size: 14px;
-}
-
-:root .a-lane[data-open="false"] {
-  align-items: center;
-  gap: 16px;
-  padding-right: 24px;
-  cursor: pointer;
-  pointer-events: all;
-}
-
-:root .a-lane[data-open="false"]:hover {
-  background: var(--color-kumo-tint);
-}
-
-:root .a-lane-toggle {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 43px;
-  color: var(--text-color-kumo-subtle);
-}
-
-:root button.a-lane-toggle {
-  pointer-events: all;
-  cursor: pointer;
-}
-
-:root button.a-lane-toggle:hover {
-  color: var(--text-color-kumo-strong);
-}
-
-:root .a-lane:focus-visible,
-:root button.a-lane-toggle:focus-visible {
-  outline: 2px solid var(--color-kumo-brand);
-  outline-offset: -2px;
-}
-
 /* ── The files beside the code ──────────────────────────────────────────── */
 
 :root .a-files {
@@ -1403,4 +1164,1028 @@
   outline: 2px solid var(--color-kumo-brand);
   outline-offset: -2px;
   border-radius: 4px;
+}
+
+/* ── Mission Control's canvas ─────────────────────────────────────────────
+ * Keel's own live view, not a code host's page: a dark field, columns in the
+ * order Keel takes a change, and colour kept for what it means. A run's own
+ * colour says who; green, red, yellow and orange say what Keel said.
+ */
+:root {
+  --mc-ground: light-dark(oklch(97.5% 0.003 260), oklch(13.5% 0.008 260));
+  --mc-dot: light-dark(oklch(84% 0.004 260), oklch(26% 0.01 260));
+  --mc-band: light-dark(oklch(95% 0.004 260 / 0.7), oklch(17% 0.01 260 / 0.65));
+  --mc-card: light-dark(oklch(100% 0 0), oklch(20% 0.012 260));
+  --mc-card-line: light-dark(oklch(88% 0.006 260), oklch(30% 0.014 260));
+  --mc-ink: light-dark(oklch(24% 0.01 260), oklch(93% 0.006 260));
+  --mc-ink-quiet: light-dark(oklch(48% 0.01 260), oklch(70% 0.012 260));
+  --mc-head: light-dark(oklch(42% 0.012 260), oklch(76% 0.014 260));
+  --mc-trunk: light-dark(oklch(58% 0.14 150), oklch(74% 0.16 150));
+  --mc-move: light-dark(oklch(60% 0.15 255), oklch(78% 0.13 245));
+  --mc-mini-chip: light-dark(oklch(70% 0.04 255), oklch(55% 0.06 255));
+  --mc-mini-batch: light-dark(oklch(84% 0.03 255), oklch(32% 0.04 255));
+  --mc-mini-commit: var(--mc-trunk);
+  --mc-mini-agent: light-dark(oklch(76% 0.02 260), oklch(42% 0.02 260));
+  /* A run's colour: eight hues at one lightness, so none outshouts another. */
+  --mc-h0: light-dark(oklch(58% 0.15 255), oklch(74% 0.13 255));
+  --mc-h1: light-dark(oklch(60% 0.15 25), oklch(74% 0.14 25));
+  --mc-h2: light-dark(oklch(58% 0.13 165), oklch(76% 0.12 165));
+  --mc-h3: light-dark(oklch(56% 0.16 305), oklch(74% 0.14 305));
+  --mc-h4: light-dark(oklch(64% 0.13 75), oklch(80% 0.13 80));
+  --mc-h5: light-dark(oklch(58% 0.11 205), oklch(78% 0.1 205));
+  --mc-h6: light-dark(oklch(58% 0.17 350), oklch(74% 0.15 350));
+  --mc-h7: light-dark(oklch(60% 0.14 120), oklch(78% 0.14 125));
+}
+:root .a-mc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--mc-ground);
+  color: var(--mc-ink);
+}
+:root .a-mc[data-full] {
+  height: 100vh;
+}
+:root .a-mc-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+:root .a-mc .react-flow {
+  background: transparent;
+}
+:root .a-mc .react-flow__node {
+  transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .a-mc .react-flow__node-band,
+:root .a-mc .react-flow__node-head,
+:root .a-mc .react-flow__node-spine {
+  pointer-events: none;
+}
+:root .a-mc .a-mc-ground {
+  --xy-background-pattern-color-props: var(--mc-dot);
+}
+:root .a-mc i[data-hue="0"],
+:root .a-mc-swatch[data-hue="0"] {
+  --hue: var(--mc-h0);
+}
+:root .a-mc i[data-hue="1"],
+:root .a-mc-swatch[data-hue="1"] {
+  --hue: var(--mc-h1);
+}
+:root .a-mc i[data-hue="2"],
+:root .a-mc-swatch[data-hue="2"] {
+  --hue: var(--mc-h2);
+}
+:root .a-mc i[data-hue="3"],
+:root .a-mc-swatch[data-hue="3"] {
+  --hue: var(--mc-h3);
+}
+:root .a-mc i[data-hue="4"],
+:root .a-mc-swatch[data-hue="4"] {
+  --hue: var(--mc-h4);
+}
+:root .a-mc i[data-hue="5"],
+:root .a-mc-swatch[data-hue="5"] {
+  --hue: var(--mc-h5);
+}
+:root .a-mc i[data-hue="6"],
+:root .a-mc-swatch[data-hue="6"] {
+  --hue: var(--mc-h6);
+}
+:root .a-mc i[data-hue="7"],
+:root .a-mc-swatch[data-hue="7"] {
+  --hue: var(--mc-h7);
+}
+:root .a-mc-swatch {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--hue, var(--mc-ink-quiet));
+}
+
+/* The strip: Keel's four answers, live. */
+:root .a-mc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 28px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--mc-card-line);
+  background: light-dark(oklch(99% 0.002 260), oklch(16% 0.01 260));
+}
+:root .a-mc-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mc-ink-quiet);
+}
+:root .a-mc-live[data-live] {
+  color: var(--mc-trunk);
+}
+:root .a-mc-live[data-live] i {
+  background: var(--mc-trunk);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--mc-trunk) 60%, transparent);
+  animation: a-mc-beat 2.4s ease-out infinite;
+}
+@keyframes a-mc-beat {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--mc-trunk) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+:root .a-mc-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 0;
+}
+:root .a-mc-answers > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+:root .a-mc-answers dt {
+  font-size: 12.5px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-answers dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--mc-ink);
+}
+:root .a-mc-counts {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 7px;
+  background: var(--mc-card);
+  color: var(--mc-ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+:root .a-mc-tools button:hover {
+  border-color: var(--mc-move);
+}
+:root .a-mc-tools {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+}
+:root .a-mc-minimap {
+  --xy-minimap-background-color-props: light-dark(
+    oklch(98% 0.003 260 / 0.92),
+    oklch(16% 0.01 260 / 0.92)
+  );
+  --xy-minimap-mask-background-color-props: light-dark(
+    oklch(90% 0.004 260 / 0.55),
+    oklch(8% 0.01 260 / 0.6)
+  );
+  border: 1px solid var(--mc-card-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Columns. */
+:root .a-mc-band {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  background: var(--mc-band);
+}
+:root .a-mc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  height: 100%;
+  padding: 4px 2px 0;
+  border-bottom: 1px solid var(--mc-card-line);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mc-head);
+}
+:root .a-mc-head b {
+  font-size: 15px;
+  letter-spacing: 0;
+  color: var(--mc-ink);
+}
+
+/* A change. */
+:root .a-mc-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  height: 100%;
+  padding: 8px 10px;
+  overflow: hidden;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 9px;
+  background: var(--mc-card);
+  box-shadow: 0 1px 2px light-dark(oklch(20% 0.02 260 / 0.06), oklch(0% 0 0 / 0.35));
+  cursor: pointer;
+  animation: a-mc-arrive 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes a-mc-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+:root .a-mc-chip:hover,
+:root .a-mc-chip[data-selected] {
+  border-color: var(--hue, var(--mc-move));
+}
+:root .a-mc-chip[data-selected] {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--mc-move) 28%, transparent);
+}
+:root .a-mc-chip[data-member] {
+  padding: 5px 8px;
+  border-radius: 7px;
+}
+:root .a-mc-chip[data-stage="bounced"] {
+  border-color: color-mix(in oklab, var(--a-fail) 55%, var(--mc-card-line));
+}
+:root .a-mc-chip[data-parked] {
+  border-color: color-mix(in oklab, var(--a-person) 70%, var(--mc-card-line));
+}
+:root .a-mc-chip[data-quiet] {
+  opacity: 0.55;
+}
+:root .a-mc-chip-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+:root .a-mc-chip-top b {
+  color: var(--mc-ink);
+}
+:root .a-mc-rev {
+  font-size: 11px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 17px;
+  white-space: nowrap;
+  color: var(--mc-ink-quiet);
+  background: color-mix(in oklab, var(--mc-ink-quiet) 14%, transparent);
+}
+:root .a-mc-flag[data-tone="person"] {
+  color: var(--a-person-ink);
+  background: var(--a-person-tint);
+}
+:root .a-mc-goal {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--mc-ink);
+}
+:root .a-mc-facts,
+:root .a-mc-why {
+  overflow: hidden;
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-why {
+  color: var(--a-fail-ink);
+}
+:root .a-mc[data-far] .a-mc-goal,
+:root .a-mc[data-far] .a-mc-facts,
+:root .a-mc[data-far] .a-mc-why {
+  visibility: hidden;
+}
+
+/* An agent and its runs. */
+:root .a-mc-agent {
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 11px;
+  background: var(--mc-card);
+}
+:root .a-mc-agent-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  font-size: 13.5px;
+}
+:root .a-mc-agent-top .a-mc-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+:root .a-mc-runs {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+:root .a-mc-runs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  font-size: 12.5px;
+  color: var(--mc-ink);
+}
+:root .a-mc-runs li b {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--mc-ink-quiet);
+}
+
+/* A batch, and the batches it rests on. */
+:root .a-mc-batch {
+  position: relative;
+  height: 100%;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--mc-move) 45%, var(--mc-card-line));
+  border-radius: 13px;
+  background: color-mix(in oklab, var(--mc-move) 7%, var(--mc-band));
+  cursor: pointer;
+}
+:root .a-mc-batch[data-speculative] {
+  border-style: dashed;
+}
+:root .a-mc-batch[data-state="verifying"] {
+  border-color: var(--mc-move);
+}
+:root .a-mc-batch[data-state="green"],
+:root .a-mc-batch[data-state="promoting"] {
+  border-color: var(--mc-trunk);
+  background: color-mix(in oklab, var(--mc-trunk) 9%, var(--mc-band));
+}
+:root .a-mc-batch[data-state="red"] {
+  border-color: var(--a-fail);
+  background: color-mix(in oklab, var(--a-fail) 9%, var(--mc-band));
+}
+:root .a-mc-batch[data-state="cancelled"],
+:root .a-mc-batch[data-state="bisected"],
+:root .a-mc-batch[data-state="declined"] {
+  border-style: dashed;
+  border-color: var(--a-na-line);
+  opacity: 0.65;
+}
+:root .a-mc-batch-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  height: 24px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-batch-top b {
+  font-size: 13px;
+  color: var(--mc-ink);
+}
+:root .a-mc-batch-state {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--mc-ink);
+}
+:root .a-mc-more,
+:root .a-mc-batch-why {
+  position: absolute;
+  bottom: 6px;
+  left: 14px;
+  font-size: 11.5px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-batch-why {
+  right: 14px;
+  left: auto;
+  color: var(--a-fail-ink);
+}
+:root .a-mc-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+:root .a-mc-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--mc-move);
+}
+:root .react-flow__edge-path.a-mc-rail {
+  stroke: var(--mc-move);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+}
+
+/* Verification. */
+:root .a-mc-verify {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 11px;
+  background: var(--mc-card);
+}
+:root .a-mc-verify-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+:root .a-mc-verify-top b {
+  margin-left: auto;
+  font-size: 14px;
+}
+:root .a-mc-verify[data-running] .a-mc-verify-top {
+  color: var(--mc-move);
+}
+:root .a-mc-verify[data-state="red"] .a-mc-verify-top {
+  color: var(--a-fail-ink);
+}
+:root .a-mc-verify[data-state="green"] .a-mc-verify-top,
+:root .a-mc-verify[data-state="promoting"] .a-mc-verify-top {
+  color: var(--mc-trunk);
+}
+:root .a-mc-spin {
+  animation: a-mc-spin 1.1s linear infinite;
+}
+@keyframes a-mc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+:root .a-mc-steps {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root .a-mc-steps li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+:root .a-mc-steps li[data-result="pass"] svg {
+  color: var(--mc-trunk);
+}
+:root .a-mc-steps li[data-result="fail"] svg {
+  color: var(--a-fail);
+}
+:root .a-mc-steps li[data-result="abstain"] svg,
+:root .a-mc-steps li[data-result="said"] svg {
+  color: var(--a-na-line);
+}
+:root .a-mc-steps li[data-result="escalate"] svg {
+  color: var(--a-person);
+}
+:root .a-mc-step-word {
+  font-size: 11px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-shimmer {
+  height: 4px;
+  margin-top: auto;
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg, transparent, var(--mc-move), transparent) 0 0 / 40% 100% no-repeat,
+    color-mix(in oklab, var(--mc-move) 14%, transparent);
+  animation: a-mc-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes a-mc-sweep {
+  from {
+    background-position:
+      -40% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      140% 0,
+      0 0;
+  }
+}
+
+/* Trunk. */
+:root .a-mc-spine {
+  width: 100%;
+  height: 100%;
+  border-radius: 1px;
+  background: linear-gradient(
+    var(--mc-trunk),
+    color-mix(in oklab, var(--mc-trunk) 10%, transparent)
+  );
+}
+:root .a-mc-commit {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  height: 100%;
+  padding: 7px 10px 7px 8px;
+}
+:root .a-mc-commit-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border: 2px solid var(--mc-trunk);
+  border-radius: 50%;
+  background: var(--mc-ground);
+}
+:root .a-mc-commit[data-head] .a-mc-commit-dot {
+  background: var(--mc-trunk);
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--mc-trunk) 22%, transparent);
+}
+:root .a-mc-commit[data-verified="false"] .a-mc-commit-dot {
+  border-color: var(--a-suspected);
+}
+:root .a-mc-commit-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-commit-top b {
+  font-size: 14px;
+  color: var(--mc-ink);
+}
+:root .a-mc-commit-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 9px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--mc-ink);
+}
+:root .a-mc-commit-changes span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+:root .a-mc-commit-changes .a-mc-swatch {
+  width: 7px;
+  height: 7px;
+}
+
+/* Many changes: a dot each. */
+:root .a-mc-dense {
+  position: relative;
+  height: 100%;
+  cursor: pointer;
+}
+:root .a-mc-dense-dots {
+  display: grid;
+  grid-template-columns: repeat(15, 14px);
+  grid-auto-rows: 14px;
+  padding-top: 4px;
+}
+:root .a-mc-dense-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--hue, var(--mc-ink-quiet));
+}
+:root .a-mc-dense-dots i[data-parked] {
+  outline: 1.5px solid var(--a-person);
+}
+:root .a-mc-dense-dots i[data-quiet] {
+  opacity: 0.4;
+}
+:root .a-mc-tip {
+  position: absolute;
+  z-index: 10;
+  max-width: 260px;
+  padding: 5px 8px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 6px;
+  background: var(--mc-card);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* What ties two changes: a conflict, and the same intent. */
+:root .react-flow__edge-path.a-mc-tie {
+  stroke-width: 2;
+  fill: none;
+}
+:root .react-flow__edge-path.a-mc-tie[data-kind="conflict"] {
+  stroke: var(--a-fail);
+}
+:root .react-flow__edge-path.a-mc-tie[data-kind="conflict"][data-state="suspected"] {
+  stroke-dasharray: 6 5;
+  animation: a-mc-breathe 2.6s ease-in-out infinite;
+}
+:root .react-flow__edge-path.a-mc-tie[data-kind="same"] {
+  stroke: var(--a-suspected);
+  stroke-dasharray: 2 5;
+}
+@keyframes a-mc-breathe {
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+:root .a-mc-tie-label {
+  position: absolute;
+  padding: 1px 7px;
+  border: 1px solid var(--a-fail);
+  border-radius: 999px;
+  background: var(--mc-card);
+  font-size: 11px;
+  color: var(--a-fail-ink);
+  pointer-events: all;
+}
+
+/* A move, as it happens. */
+:root .a-mc-particles {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+:root .a-mc-particle {
+  fill: var(--mc-move);
+  filter: drop-shadow(0 0 4px var(--mc-move));
+}
+:root .a-mc-particle[data-tone="bounce"] {
+  fill: var(--a-fail);
+  filter: drop-shadow(0 0 4px var(--a-fail));
+}
+:root .a-mc-particle[data-tone="land"] {
+  fill: var(--mc-trunk);
+  filter: drop-shadow(0 0 5px var(--mc-trunk));
+}
+
+/* Nothing yet, and what one thing is. */
+:root .a-mc-empty {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  max-width: 46ch;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+:root .a-mc-empty h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+:root .a-mc-empty p {
+  margin-top: 6px;
+  color: var(--mc-ink-quiet);
+}
+:root .a-mc-inspect {
+  position: absolute;
+  top: 56px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
+  width: min(340px, calc(100% - 28px));
+  padding: 16px 18px;
+  overflow-y: auto;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 12px;
+  background: var(--mc-card);
+  box-shadow: 0 12px 32px light-dark(oklch(20% 0.02 260 / 0.14), oklch(0% 0 0 / 0.5));
+  font-size: 13.5px;
+}
+:root .a-mc-inspect h2 {
+  font-size: 18px;
+  font-weight: 650;
+}
+:root .a-mc-inspect h3 {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mc-head);
+}
+:root .a-mc-inspect p,
+:root .a-mc-inspect li {
+  margin-top: 6px;
+}
+:root .a-mc-inspect a {
+  color: var(--mc-move);
+}
+:root .a-mc-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 18px;
+  color: var(--mc-ink-quiet);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .a-mc .react-flow__node,
+  :root .a-mc-chip,
+  :root .a-mc-shimmer,
+  :root .a-mc-spin,
+  :root .a-mc-live[data-live] i,
+  :root .react-flow__edge-path.a-mc-tie {
+    transition: none;
+    animation: none;
+  }
+}
+:root .a-mc-note {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--a-suspected-ink);
+}
+
+/*
+ * Mission Control: the project as an architecture diagram growing outward. Cards are neutral; only what Keel
+ * said is coloured: green passed or landed, red failed or bounced, amber waiting on someone, blue moving.
+ */
+:root {
+  --arch-pass: light-dark(oklch(55% 0.15 150), oklch(72% 0.17 150));
+  --arch-fail: light-dark(oklch(55% 0.2 27), oklch(68% 0.19 25));
+  --arch-wait: light-dark(oklch(62% 0.13 80), oklch(78% 0.13 80));
+  --arch-edge: light-dark(oklch(70% 0.01 260), oklch(46% 0.012 260));
+}
+:root .a-arch .react-flow__node {
+  transition:
+    opacity 600ms ease-out,
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .a-arch-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+:root .a-arch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+:root .a-arch-quiet {
+  color: var(--mc-ink-quiet);
+  font-size: 12px;
+}
+:root .a-arch-project,
+:root .a-arch-fork,
+:root .a-arch-batch,
+:root .a-arch-deploy,
+:root .a-arch-pile,
+:root .a-arch-check {
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 8px;
+  background: var(--mc-card);
+  color: var(--mc-ink);
+  font-size: 13px;
+  box-shadow: 0 1px 2px oklch(0% 0 0 / 0.18);
+}
+:root .a-arch-project {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-width: 2px;
+  border-color: var(--mc-head);
+  font-size: 15px;
+}
+:root .a-arch-project > .a-arch-row:first-of-type b {
+  font-size: 16px;
+}
+:root .a-arch-fork,
+:root .a-arch-batch,
+:root .a-arch-deploy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+:root .a-arch-goal {
+  overflow: hidden;
+  color: var(--mc-ink-quiet);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root .a-arch-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 999px;
+  color: var(--mc-ink-quiet);
+  font-size: 11px;
+  line-height: 18px;
+}
+:root .a-arch-time {
+  color: var(--mc-ink-quiet);
+  font-size: 11px;
+}
+:root .a-arch-fork[data-standing="moving"],
+:root .a-arch-batch[data-state="verifying"],
+:root .a-arch-batch[data-state="assembled"],
+:root .a-arch-batch[data-state="forming"] {
+  border-color: var(--mc-move);
+}
+:root .a-arch-fork[data-standing="stuck"],
+:root .a-arch-batch[data-state="red"] {
+  border-color: var(--arch-fail);
+}
+:root .a-arch-fork[data-standing="done"],
+:root .a-arch-batch[data-state="green"],
+:root .a-arch-batch[data-state="promoting"] {
+  border-color: var(--arch-pass);
+}
+:root .a-arch-state[data-standing="moving"],
+:root .a-arch-state[data-state="verifying"] {
+  border-color: var(--mc-move);
+  color: var(--mc-move);
+}
+:root .a-arch-state[data-standing="stuck"],
+:root .a-arch-state[data-state="red"] {
+  border-color: var(--arch-fail);
+  color: var(--arch-fail);
+}
+:root .a-arch-state[data-standing="done"],
+:root .a-arch-state[data-state="green"],
+:root .a-arch-state[data-state="promoting"] {
+  border-color: var(--arch-pass);
+  color: var(--arch-pass);
+}
+:root .a-arch-fork[data-chosen],
+:root .a-arch-batch[data-chosen] {
+  outline: 2px solid var(--mc-move);
+  outline-offset: 2px;
+}
+:root .a-arch-agent {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 11px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 999px;
+  background: var(--mc-card);
+  color: var(--mc-ink-quiet);
+}
+:root .a-arch-pile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-style: dashed;
+  color: var(--mc-ink-quiet);
+}
+:root .a-arch-pile b {
+  color: var(--mc-ink);
+}
+:root .a-arch-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+:root .a-arch-check[data-result="pass"] svg {
+  color: var(--arch-pass);
+}
+:root .a-arch-check[data-result="fail"] {
+  border-color: var(--arch-fail);
+}
+:root .a-arch-check[data-result="fail"] svg {
+  color: var(--arch-fail);
+}
+:root .a-arch-check[data-result="escalate"] svg {
+  color: var(--arch-wait);
+}
+:root .a-arch-check[data-result="running"] {
+  border-color: var(--mc-move);
+}
+:root .a-arch-check[data-result="running"] svg {
+  color: var(--mc-move);
+}
+:root .a-arch-spin {
+  animation: a-mc-spin 1.1s linear infinite;
+}
+:root .a-arch-deploy[data-down] {
+  opacity: 0.6;
+}
+:root .a-arch-wire {
+  fill: none;
+  stroke: var(--arch-edge);
+  stroke-width: 1.5;
+}
+:root .a-arch-wire[data-kind="works"] {
+  stroke-width: 1;
+}
+:root .a-arch-wire[data-kind="chain"] {
+  stroke-dasharray: 4 4;
+}
+:root .a-arch-wire[data-kind="land"] {
+  stroke: var(--arch-pass);
+  stroke-width: 2;
+}
+:root .a-arch-wire[data-kind="fail"] {
+  stroke: var(--arch-fail);
+  stroke-width: 2;
+}
+:root .a-arch .react-flow__edge.animated .a-arch-wire {
+  stroke: var(--mc-move);
+}
+:root .a-arch .react-flow__edge.animated .a-arch-wire[data-kind="land"] {
+  stroke: var(--arch-pass);
+}
+:root .a-arch .react-flow__edge.animated .a-arch-wire[data-kind="fail"] {
+  stroke: var(--arch-fail);
+}
+:root .a-arch-legend {
+  display: flex;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--mc-card-line);
+  border-radius: 8px;
+  background: var(--mc-card);
+  color: var(--mc-ink-quiet);
+  font-size: 12px;
+}
+:root .a-arch-legend span::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: var(--arch-edge);
+  content: "";
+}
+:root .a-arch-legend [data-standing="moving"]::before {
+  background: var(--mc-move);
+}
+:root .a-arch-legend [data-standing="stuck"]::before,
+:root .a-arch-legend [data-kind="fail"]::before {
+  background: var(--arch-fail);
+}
+:root .a-arch-legend [data-kind="land"]::before {
+  background: var(--arch-pass);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .a-arch-spin {
+    animation: none;
+  }
+  :root .a-arch .react-flow__edge.animated path {
+    animation: none;
+  }
 }

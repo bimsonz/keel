@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/place.test.ts
+# kills: place.stack
+# why: a column stacks its changes latest first, so the one that came first sinks as others arrive
+diff --git a/apps/console/src/engine/place.ts b/apps/console/src/engine/place.ts
+index bdecd01e..a8fbaaf5 100644
+--- a/apps/console/src/engine/place.ts
++++ b/apps/console/src/engine/place.ts
+@@ -112,7 +112,7 @@
+     const dotted = canvas.dotted.includes(stage);
+     canvas.changes
+       .filter((change) => change.stage === stage)
+-      .toSorted((a, b) => a.since - b.since || a.id.localeCompare(b.id))
++      .toSorted((a, b) => b.since - a.since || a.id.localeCompare(b.id))
+       .forEach((change, row) => {
+         // A dotted column has a dot for each change, row by row, under its count.
+         const box = dotted

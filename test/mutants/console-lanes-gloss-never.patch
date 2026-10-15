@@ -2,15 +2,13 @@
 # kills: references.gloss
 # why: a subject glossed in words loses its gloss
 diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
-index c708be39..9c910885 100644
+index 1ccc56af..b6086d91 100644
 --- a/apps/console/src/engine/lanes.ts
 +++ b/apps/console/src/engine/lanes.ts
-@@ -252,7 +252,7 @@ function tie(
+@@ -22,5 +22,5 @@
  
  /** What a subject's gloss says beside its key: nothing where Keel glossed it with the key itself. */
  export function glossOf(subject: { key: string; gloss: string }): string {
 -  return subject.gloss.trim() === subject.key ? "" : subject.gloss;
 +  return "";
  }
- 
- function where(world: World, change: ChangeEntry): string | undefined {

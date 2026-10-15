@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.join
+# why: a batch is drawn on the forks' ring
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..5b53731e 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -429,7 +429,7 @@ export function growthOf(
+     const state = batchState(batch);
+     const why = whyOf(batch, world);
+     const node: BatchNode = {
+-      ...box(`batch:${batch.id}`, SIZE.batch, at(RING.batch, angle)),
++      ...box(`batch:${batch.id}`, SIZE.batch, at(RING.fork, angle)),
+       fade,
+       kind: "batch",
+       batchId: batch.id,

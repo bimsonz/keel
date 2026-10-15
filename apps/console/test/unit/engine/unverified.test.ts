@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
-import { lanesOf } from "../../../src/engine/lanes.ts";
+import { canvasOf } from "../../../src/engine/canvas.ts";
 import { changePageOf, trunkStatsOf } from "../../../src/engine/select.ts";
 import { World } from "../../../src/engine/world.ts";
 
@@ -79,16 +79,21 @@ function worldWith(verified: boolean | undefined, landed = true, verdictSaysSo =
   return world;
 }
 
+/** Trunk's advances on Mission Control's canvas, by height and whether each was verified, and what its header counts unverified. */
+function missionOf(world: World): { commits: [number, boolean][]; unverified: number } {
+  const canvas = canvasOf(world, 3_000);
+  return {
+    commits: canvas.commits.map((commit) => [commit.height, commit.verified]),
+    unverified: canvas.answers.unverified,
+  };
+}
+
 describe("a project with verification switched off", () => {
   it("is marked wherever its changes and advances are shown", () => {
     const world = worldWith(false);
     expect(trunkStatsOf(world, 3_000)).toMatchObject({ advances: 7, unverifiedAdvances: 1 });
     expect(changePageOf(world, "chg_1", NO_RESOURCES)?.change.unverified).toBe(true);
-    expect(
-      lanesOf(world, 2_500)
-        .lanes.flatMap((lane) => lane.nodes)
-        .find((node) => node.kind === "change"),
-    ).toMatchObject({ unverified: true });
+    expect(missionOf(world)).toEqual({ commits: [[7, false]], unverified: 1 });
   });
 
   it("marks a change from its advance alone, where its verdict did not say", () => {
@@ -107,11 +112,7 @@ describe("a project with verification switched off", () => {
       const world = worldWith(verified);
       expect(trunkStatsOf(world, 3_000)).toMatchObject({ advances: 7, unverifiedAdvances: 0 });
       expect(changePageOf(world, "chg_1", NO_RESOURCES)?.change.unverified).toBe(false);
-      expect(
-        lanesOf(world, 2_500)
-          .lanes.flatMap((lane) => lane.nodes)
-          .find((node) => node.kind === "change"),
-      ).not.toHaveProperty("unverified");
+      expect(missionOf(world)).toEqual({ commits: [[7, true]], unverified: 0 });
     }
   });
 });

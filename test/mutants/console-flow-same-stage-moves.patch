@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.move
+# why: an event of the stage a change is already in counts as a move and restarts its time there
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..8dc8b83b 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -283,7 +283,6 @@
+     else if (stage !== "queue") delete change.requeued;
+     // A park holds where it was put until Keel moves the change on.
+     delete change.parked;
+-    if (change.stage === stage) return;
+     change.from = change.stage;
+     change.stage = stage;
+     change.since = t;

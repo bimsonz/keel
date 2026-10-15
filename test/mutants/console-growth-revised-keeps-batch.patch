@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.revised
+# why: a revised change keeps the batch it bounced out of
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..cdb47efd 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -377,7 +377,7 @@ export function growthOf(
+     { batch: FlowBatch; forks: string[]; piles: Set<PileStage> }
+   >();
+   for (const change of standing) {
+-    if (change.stage !== "batch" && change.stage !== "bounced" && change.stage !== "landed")
++    if (change.stage === "gone")
+       continue;
+     const batch = lastBatchOf(change.id, flow.batches.values());
+     if (batch === undefined) continue;

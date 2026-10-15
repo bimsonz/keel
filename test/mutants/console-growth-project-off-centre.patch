@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.centre
+# why: the project is drawn off the centre
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..d616c22d 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -245,7 +245,7 @@ export function growthOf(
+   for (const change of flow.changes.values())
+     if (change.stage !== "landed" && change.stage !== "gone") live += 1;
+   const project: ProjectNode = {
+-    ...box("project", SIZE.project, { x: 0, y: 0 }),
++    ...box("project", SIZE.project, { x: SIZE.project.w, y: 0 }),
+     fade: 1,
+     kind: "project",
+     name,

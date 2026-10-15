@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.standing
+# why: a change that just moved is drawn waiting
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..03eebc9b 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -224,7 +224,7 @@ function pileOf(stage: Stage): PileStage | undefined {
+ function standingOf(change: FlowChange, now: number): Standing {
+   if (change.stage === "landed") return "done";
+   if (change.stage === "bounced" || change.parked !== undefined) return "stuck";
+-  if (change.stage === "precheck" || change.stage === "batch" || now - change.since < MOVING_MS)
++  if (change.stage === "precheck" || change.stage === "batch")
+     return "moving";
+   return "waiting";
+ }

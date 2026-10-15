@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.land
+# why: a landing is not drawn back into the project
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..be2b2f37 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -535,7 +535,7 @@ export function growthOf(
+     }
+ 
+     // Landed: back into the project.
+-    if (batch.members.some((id) => flow.changes.get(id)?.stage === "landed"))
++    if (batch.members.length < 0)
+       edges.push({
+         id: `land:${batch.id}`,
+         kind: "land",

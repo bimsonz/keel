@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { type GraphNode, lanesOf } from "../../../src/engine/lanes.ts";
 import {
   type Reference,
   laneName,
@@ -50,7 +49,7 @@ describe("[references.lane] a lane is called by the name Keel gives it within it
     );
   });
 
-  it("calls a queued change's lane by its name on its page and in Mission Control", () => {
+  it("calls a queued change's lane by its name on its page", () => {
     const b = openingOf(1, [["agt_a", "interactive"]], ["auth.cache"]);
     declareChange(b, "chg_a", "agt_a", [premiseOn("auth.cache")]);
     b.after(1).emit({
@@ -60,10 +59,6 @@ describe("[references.lane] a lane is called by the name Keel gives it within it
     });
     const world = foldedLog(b);
     expect(changePageOf(world, "chg_a", NOTHING)?.change.lane).toBe("main");
-    const node = lanesOf(world, 10_000)
-      .lanes.flatMap((lane) => lane.nodes)
-      .find((each): each is Extract<GraphNode, { kind: "change" }> => each.kind === "change");
-    expect(node?.where).toBe("lane main");
   });
 });
 
@@ -147,10 +142,9 @@ const glossed = (gloss: string) => {
   declareChange(b, "chg_a", "agt_a", [premiseOn("auth.cache"), premiseOn("auth.roles")]);
   return foldedLog(b);
 };
+/** Each subject's key and its gloss, as its panel beside Mission Control says them. */
 const subjectsOf = (world: ReturnType<typeof glossed>) =>
-  lanesOf(world, 10_000).lanes.flatMap((lane) =>
-    lane.subject === undefined ? [] : [[lane.subject.key, lane.subject.gloss]],
-  );
+  ["auth.cache", "auth.roles"].map((key) => [key, subjectDetailOf(world, key)?.gloss]);
 
 describe("[references.gloss] a subject's gloss is drawn only where it says more than its key", () => {
   it("draws no gloss where Keel glossed a subject with its key", () => {

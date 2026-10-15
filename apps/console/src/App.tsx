@@ -18,6 +18,7 @@ import { HomePage } from "./pages/Home.tsx";
 import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
+import { PipelinePage } from "./pages/Pipeline.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
 import { type Route, TRUNK, href } from "./route.ts";
 import { WhereProvider, carriedParams, useAddress } from "./router.tsx";
@@ -165,10 +166,13 @@ function Page({ route, mode, project }: { route: Route; mode: Mode; project: Pro
     case "mission-control":
       return (
         <MissionControlPage
+          name={`${project.namespace.handle}/${project.name}`}
           mode={mode}
           {...(route.subject === undefined ? {} : { subject: route.subject })}
         />
       );
+    case "pipeline":
+      return <PipelinePage mode={mode} />;
     case "insights":
       return <InsightsPage tab={route.tab} />;
     case "settings":
@@ -188,6 +192,7 @@ function pageOf(route: Route, address: string): string {
     route.at === "escalations" ||
     route.at === "decisions" ||
     route.at === "mission-control" ||
+    route.at === "pipeline" ||
     route.at === "code" ||
     route.at === "insights"
   )

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.paths
+# why: a revised footprint replaces the paths Keel read off the change's diff
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..1001fc75 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -137,7 +137,7 @@
+       case "IntentDeclared":
+       case "IntentRevised": {
+         const change = this.changes.get(event.payload.changeId);
+-        if (change !== undefined && !change.touched && event.payload.footprint !== undefined)
++        if (change !== undefined && event.payload.footprint !== undefined)
+           change.paths = event.payload.footprint.map((entry) => entry.path);
+         break;
+       }

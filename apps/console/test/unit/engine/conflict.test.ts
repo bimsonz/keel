@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { conflictDetailOf } from "../../../src/engine/conflict.ts";
 import type { Resources } from "../../../src/engine/select.ts";
 import { conflictPageOf } from "../../../src/engine/select.ts";
-import { contradictionsOf, sidesOf } from "../../../src/engine/sides.ts";
+import { contradictionsOf } from "../../../src/engine/sides.ts";
 import type { ScriptBuilder } from "../../fixtures/mock/builder.ts";
 import { World } from "../../../src/engine/world.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
@@ -71,10 +71,6 @@ describe("a conflict, as Keel names it", () => {
     const world = foldedLog(b);
     const conflict = world.conflicts.get("cfl_1");
     if (conflict === undefined) throw new Error("the conflict was not folded");
-    expect(sidesOf(world, conflict)).toMatchObject({
-      holder: { id: "chg_2" },
-      other: { id: "chg_1" },
-    });
     const page = conflictPageOf(world, "cfl_1", NOTHING_READ);
     expect(page?.parties?.A).toMatchObject({
       world: "A",
@@ -117,7 +113,6 @@ describe("a conflict, as Keel names it", () => {
     const world = foldedLog(b);
     const conflict = world.conflicts.get("cfl_1");
     if (conflict === undefined) throw new Error("the conflict was not folded");
-    expect(sidesOf(world, conflict)).toBeNull();
     expect(conflictDetailOf(world, "cfl_1")).not.toHaveProperty("sides");
     const page = conflictPageOf(world, "cfl_1", NOTHING_READ);
     expect(page).not.toBeNull();

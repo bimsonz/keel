@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.chip
+# why: a change Keel took out of its batch and queued again still names that batch
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..c64ea8b5 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -255,7 +255,7 @@
+     since: flow.since,
+     ...(flow.from === undefined ? {} : { from: flow.from }),
+     moves: flow.moves,
+-    ...(change.batchId === undefined || flow.stage !== "batch" ? {} : { batchId: change.batchId }),
++    ...(change.batchId === undefined ? {} : { batchId: change.batchId }),
+     ...(flow.parked === undefined ? {} : { parked: flow.parked }),
+     ...(flow.requeued === undefined ? {} : { requeued: flow.requeued }),
+     ...(flow.stage === "bounced" && change.bounce?.reasons[0] !== undefined

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.chain
+# why: a batch is drawn on the earliest-formed batch holding one of its predecessors, not the latest
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..8e1d9139 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -275,7 +275,7 @@
+     let under: FlowBatch | undefined;
+     for (const changeId of batch.predecessors) {
+       const held = holder.get(changeId);
+-      if (held !== undefined && (under === undefined || held.formedT > under.formedT)) under = held;
++      if (held !== undefined && (under === undefined || held.formedT < under.formedT)) under = held;
+     }
+     if (under !== undefined) on.set(batch.id, under);
+     for (const member of batch.members) holder.set(member, batch);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.land
+# why: a landed branch never fades
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..d7b8e696 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -259,7 +259,7 @@ export function growthOf(
+ 
+   // A fork stands while it is live, and a landed one while it dissolves.
+   const fadeOf = (change: FlowChange): number =>
+-    change.stage === "landed" ? 1 - (now - change.since) / DISSOLVE_MS : 1;
++    1;
+   const standing = [...flow.changes.values()].filter(
+     (change) => change.stage !== "gone" && fadeOf(change) > 0,
+   );

@@ -48,6 +48,7 @@ export type Route =
   /** One decision, by Keel's label for it, or by its id where a link has only that. */
   | { at: "decision"; name: string }
   | { at: "mission-control"; subject?: string }
+  | { at: "pipeline" }
   | { at: "insights"; tab: InsightsTab }
   | { at: "settings" }
   /** An address that names nothing the console has. */
@@ -148,6 +149,8 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
     }
     case "mission-control":
       return first === undefined ? { at: "mission-control" } : MISSING;
+    case "pipeline":
+      return first === undefined ? { at: "pipeline" } : MISSING;
     case "subjects":
       return first === undefined || more.length > 0
         ? MISSING
@@ -211,6 +214,7 @@ function pathOf(route: Route): string[] {
     case "changes":
     case "conflicts":
     case "escalations":
+    case "pipeline":
     case "mission-control":
       return route.at === "mission-control" && route.subject !== undefined
         ? ["subjects", route.subject]

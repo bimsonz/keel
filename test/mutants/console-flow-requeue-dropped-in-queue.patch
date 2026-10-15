@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.requeue
+# why: an event that keeps a requeued change in the queue drops why Keel requeued it
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..78b1ab9a 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -280,7 +280,7 @@
+       return;
+     }
+     if (event.type === "ChangeRequeued") change.requeued = event.payload.reason;
+-    else if (stage !== "queue") delete change.requeued;
++    else delete change.requeued;
+     // A park holds where it was put until Keel moves the change on.
+     delete change.parked;
+     if (change.stage === stage) return;

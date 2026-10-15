@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.unverified
+# why: an advance Keel took with verification off is counted green
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..7c90de81 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -480,7 +480,7 @@
+   const since = now - RATE_SPAN_MS;
+   const recent = flow.landings.filter((t) => t > since && t <= now).length;
+   return {
+-    green: Math.max(0, trunk.advances - trunk.redCount - trunk.unverifiedAdvances),
++    green: Math.max(0, trunk.advances - trunk.redCount),
+     advances: trunk.advances,
+     unverified: trunk.unverifiedAdvances,
+     caught,

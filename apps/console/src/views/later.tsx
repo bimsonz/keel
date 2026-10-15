@@ -1,6 +1,6 @@
 // The heaviest things the page draws, loaded when a page first draws one: the
 // code viewer, which carries the highlighter, the reader of Markdown, and
-// Mission Control's graph. The home, a handle's page, the account pages and
+// Mission Control's canvas. The home, a handle's page, the account pages and
 // every list draw none of them, so they are not in the script those pages wait
 // for. Each is asked for by the pages that draw it and by nothing else; while it
 // comes, its place is empty.
@@ -12,11 +12,13 @@ import type { Route } from "../route.ts";
 export type { LineNote };
 
 const code = () => import("../code/CodeDiff.tsx");
-const mission = () => import("./MissionGraph.tsx");
+const mission = () => import("./MissionCanvas.tsx");
 const prose = () => import("./Markdown.tsx");
+const pipeline = () => import("./Pipeline.tsx");
+const PipelineLater = lazy(async () => ({ default: (await pipeline()).Pipeline }));
 const DiffLater = lazy(async () => ({ default: (await code()).CodeDiff }));
 const FileLater = lazy(async () => ({ default: (await code()).CodeFile }));
-const MissionLater = lazy(async () => ({ default: (await mission()).MissionGraph }));
+const MissionLater = lazy(async () => ({ default: (await mission()).MissionCanvas }));
 const MarkdownLater = lazy(async () => ({ default: (await prose()).Markdown }));
 
 /** Which of them a page at each place draws. A place not listed draws none. */
@@ -25,6 +27,7 @@ const DRAWN: Partial<Record<Route["at"], readonly (() => Promise<unknown>)[]>> =
   change: [code],
   conflict: [code],
   "mission-control": [mission],
+  pipeline: [pipeline],
 };
 
 /** How long a directory's page is left alone before the viewer is asked for, in milliseconds. */
@@ -65,7 +68,7 @@ export function CodeFile(props: ComponentProps<typeof FileLater>) {
   );
 }
 
-export function MissionGraph(props: ComponentProps<typeof MissionLater>) {
+export function MissionCanvas(props: ComponentProps<typeof MissionLater>) {
   return (
     <Suspense fallback={null}>
       <MissionLater {...props} />
@@ -77,6 +80,14 @@ export function Markdown(props: ComponentProps<typeof MarkdownLater>) {
   return (
     <Suspense fallback={null}>
       <MarkdownLater {...props} />
+    </Suspense>
+  );
+}
+
+export function Pipeline(props: ComponentProps<typeof PipelineLater>) {
+  return (
+    <Suspense fallback={null}>
+      <PipelineLater {...props} />
     </Suspense>
   );
 }

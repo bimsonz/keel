@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.join
+# why: a batch in flight is drawn with nothing moving into it
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..baec0b9d 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -442,7 +442,7 @@ export function growthOf(
+       ...(why === undefined ? {} : { why }),
+     };
+     nodes.push(node);
+-    const going = batch.ended === undefined;
++    const going = false;
+     for (const id of forks)
+       edges.push({
+         id: `join:${id}:${batch.id}`,

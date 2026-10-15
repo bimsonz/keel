@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.landed-in
+# why: one landing is kept for each advance, however many changes it carried
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..db57baeb 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -251,8 +251,8 @@
+           verified: event.payload.verified !== false,
+         });
+         if (this.commits.length > COMMITS_KEPT) this.commits.length = COMMITS_KEPT;
++        this.landings.push(t);
+         for (const landing of event.payload.landings) {
+-          this.landings.push(t);
+           const change = this.changes.get(landing.changeId);
+           if (change !== undefined) change.landedIn = event.payload.to;
+         }

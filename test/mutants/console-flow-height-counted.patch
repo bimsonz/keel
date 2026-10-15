@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.commits
+# why: an advance that gives no height is numbered by how many advances this log holds, not after the last height Keel gave
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..66a0b2f3 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -244,7 +244,7 @@
+           if (batch !== undefined) batch.ended = { ...batch.ended, t, how: "landed" };
+         }
+         this.commits.unshift({
+-          height: event.payload.height ?? (this.commits[0]?.height ?? 0) + 1,
++          height: event.payload.height ?? this.commits.length + 1,
+           sha: event.payload.to,
+           t,
+           changes: event.payload.landings.map((landing) => landing.changeId),

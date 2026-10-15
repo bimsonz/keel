@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.parked
+# why: a park is cleared only when the change changes stage, so a change resumed where it was parked still reads parked
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..617a19f3 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -281,9 +281,9 @@
+     }
+     if (event.type === "ChangeRequeued") change.requeued = event.payload.reason;
+     else if (stage !== "queue") delete change.requeued;
++    if (change.stage === stage) return;
+     // A park holds where it was put until Keel moves the change on.
+     delete change.parked;
+-    if (change.stage === stage) return;
+     change.from = change.stage;
+     change.stage = stage;
+     change.since = t;

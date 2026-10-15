@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/place.test.ts
+# kills: place.batches
+# why: a batch with an odd number of changes is a line short, and its last change is drawn outside its box
+diff --git a/apps/console/src/engine/place.ts b/apps/console/src/engine/place.ts
+index bdecd01e..34c9f9d7 100644
+--- a/apps/console/src/engine/place.ts
++++ b/apps/console/src/engine/place.ts
+@@ -95,7 +95,7 @@
+ export function batchHeight(batch: CanvasBatch, compact: boolean): number {
+   if (compact) return COMPACT_H;
+   const shown = Math.min(batch.shown.length, MEMBERS_SHOWN);
+-  const lines = Math.max(1, Math.ceil(shown / 2));
++  const lines = Math.max(1, Math.floor(shown / 2));
+   return BATCH_HEAD + lines * (MEMBER_H + MEMBER_GAP) + (batch.more > 0 ? 22 : 0) + 4;
+ }
+ 

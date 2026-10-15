@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/place.test.ts
+# kills: place.columns
+# why: the queue column stands before precheck, against the order a change goes through Keel
+diff --git a/apps/console/src/engine/place.ts b/apps/console/src/engine/place.ts
+index bdecd01e..7216a5cd 100644
+--- a/apps/console/src/engine/place.ts
++++ b/apps/console/src/engine/place.ts
+@@ -50,8 +50,8 @@
+     ["agents", "Agents", AGENT_W],
+     ["bounced", "Bounced", CHIP_W],
+     ["declared", "Declared", CHIP_W],
+-    ["precheck", "Precheck", CHIP_W],
+     ["queue", "Queue", CHIP_W],
++    ["precheck", "Precheck", CHIP_W],
+     ["batches", "Batches in flight", BATCH_W],
+     ["verify", "Verify", 240],
+     ["trunk", "Trunk", 220],

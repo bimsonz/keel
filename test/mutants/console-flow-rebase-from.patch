@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.base
+# why: a rebased change keeps as its base the commit it was rebased from
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..fc363c85 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -150,7 +150,7 @@
+       }
+       case "ChangeRebased": {
+         const change = this.changes.get(event.payload.changeId);
+-        if (change !== undefined) change.base = event.payload.to;
++        if (change !== undefined) change.base = event.payload.from;
+         break;
+       }
+       case "EffectsDerived": {

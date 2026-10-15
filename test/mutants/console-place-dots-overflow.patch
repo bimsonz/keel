@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/place.test.ts
+# kills: place.dots
+# why: a row of dots holds one more than the column is wide enough for
+diff --git a/apps/console/src/engine/place.ts b/apps/console/src/engine/place.ts
+index bdecd01e..b061f84f 100644
+--- a/apps/console/src/engine/place.ts
++++ b/apps/console/src/engine/place.ts
+@@ -117,7 +117,7 @@
+         // A dotted column has a dot for each change, row by row, under its count.
+         const box = dotted
+           ? {
+-              x: x + (row % DOTS_PER_ROW) * DOT,
++              x: x + (row % (DOTS_PER_ROW + 1)) * DOT,
+               y: DOTS_TOP + Math.floor(row / DOTS_PER_ROW) * DOT,
+               width: DOT - 3,
+               height: DOT - 3,

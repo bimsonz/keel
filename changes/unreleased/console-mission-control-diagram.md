@@ -1,0 +1,3 @@
+### Changed
+
+- Mission Control draws a project as an architecture diagram that grows outward as Keel works: the project in the centre with trunk's head; a fork off it for each change, with the agent working on it; forks joining into the batch Keel formed; the batch's checks, each with what it came to or its timer while it runs; a preview Keel deployed; a landing drawn back into the project, after which the branch dissolves; a bounce drawn red from the check that failed back to the fork and its agent. Nothing placed moves, and past what fits, waiting forks are counted in piles by stage. The old graph of lanes and its layout are removed.

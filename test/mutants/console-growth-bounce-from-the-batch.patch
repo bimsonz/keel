@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.bounce
+# why: a bounce is drawn from the batch, not from the check that failed
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..a7c0fe42 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -557,7 +557,7 @@ export function growthOf(
+         (each) =>
+           each.id === `fork:${id}` || (each.kind === "agent" && each.id.startsWith(`agent:${id}:`)),
+       );
+-      for (const from of failed.length > 0 ? failed.map((each) => each.id) : [node.id])
++      for (const from of [node.id])
+         for (const to of back)
+           edges.push({
+             id: `fail:${from}:${to.id}`,

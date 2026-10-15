@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.deploy
+# why: a preview Keel deployed is not drawn
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..00073226 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -513,7 +513,7 @@ export function growthOf(
+       .map((id) => world.changes.get(id)?.preview)
+       .find((each) => each !== undefined);
+     let last = node.id;
+-    if (preview !== undefined) {
++    if (preview === null) {
+       const deploy: DeployNode = {
+         ...box(`deploy:${batch.id}`, SIZE.deploy, at(RING.deploy, angle)),
+         fade,

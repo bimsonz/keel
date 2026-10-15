@@ -4,24 +4,9 @@
 // Keel suspected without naming them has no sides here either.
 
 import type { SuspectPremise } from "../contract/keel/index.ts";
-import type { ChangeEntry, ConflictEntry, World } from "./world.ts";
-
-export interface Sides {
-  /** The change that relies on the contested proposition: world A of the matrix. */
-  holder: ChangeEntry;
-  /** The change whose effect goes against it: world B. */
-  other: ChangeEntry;
-}
+import type { ConflictEntry, World } from "./world.ts";
 
 const SETTLED: ReadonlySet<string> = new Set(["resolved", "dismissed"]);
-
-/** The two changes Keel named, where it named both and the log holds both. */
-export function sidesOf(world: World, conflict: ConflictEntry): Sides | null {
-  if (conflict.premise === undefined || conflict.effect === undefined) return null;
-  const holder = world.changes.get(conflict.premise.holder);
-  const other = world.changes.get(conflict.effect.changeId);
-  return holder === undefined || other === undefined ? null : { holder, other };
-}
 
 /** The open conflicts in which `changeId` is the side that alters, each with the premise Keel set its effect against. */
 export function contradictionsOf(

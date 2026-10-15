@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.steps
+# why: a step Keel names on two lines is drawn twice, once for each line
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index fdf495f5..19824e7c 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -201,7 +201,7 @@ export function stepsOf(evidence: readonly string[]): CanvasStep[] {
+       continue;
+     }
+     const [, name = line, result = "said", tier] = match;
+-    steps.set(name, {
++    steps.set(line, {
+       name,
+       result: RESULT[result] ?? "said",
+       ...(tier === undefined ? {} : { tier: Number(tier) }),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.fork
+# why: an agent is drawn on top of its fork
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..1ef319e2 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -329,7 +329,7 @@ export function growthOf(
+       const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
+       const agentCentre = {
+         x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,
+-        y: centre.y + outward.y * (SIZE.fork.h / 2 + AGENT_GAP + SIZE.agent.h / 2),
++        y: centre.y,
+       };
+       const called = agentName(world.agents.get(entry.agentId), cards.get(entry.agentId));
+       const agent: AgentNode = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lanesOf } from "../../../src/engine/lanes.ts";
+import { canvasOf } from "../../../src/engine/canvas.ts";
 import { type ConsoleSource, Player } from "../../../src/engine/player.ts";
 import { trunkStatsOf } from "../../../src/engine/select.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
@@ -30,30 +30,39 @@ async function live(clock: { sinceTheLogBegan: number }, cut = false): Promise<P
   return player;
 }
 
-const drawn = (player: Player): string[] =>
-  lanesOf(player.world, player.t).lanes.flatMap((lane) =>
-    lane.nodes.flatMap((node) => (node.kind === "change" ? [`${node.label} ${node.state}`] : [])),
-  );
+/** Mission Control's canvas as it stands at the player's now. */
+const canvasNow = (player: Player) => canvasOf(player.world, player.t);
+/** The changes trunk's commits on the canvas carried. */
+const carried = (player: Player): string[] =>
+  canvasNow(player).commits.flatMap((commit) => commit.changes.map((change) => change.label));
+const quiet = (player: Player): string[] =>
+  canvasNow(player).changes.flatMap((change) => (change.quiet ? [change.label] : []));
 
 describe("a live console's clock", () => {
   it("[clock.live] follows the wall clock when Keel's log is quiet, so what finished is seen to have", async () => {
     const clock = { sinceTheLogBegan: 0 };
     const player = await live(clock, true);
     const landed = player.end;
-    // The moment it lands, the change is still in its lane, so it is seen to land.
+    // The moment it lands, the change is drawn on the commit that carried it, and counted in the rate of landings.
     clock.sinceTheLogBegan = landed + 1_000;
     player.tick(16);
     expect(player.t).toBe(landed + 1_000);
-    expect(drawn(player)).toContain("#2 landed");
+    expect(carried(player)).toEqual(["#2"]);
     expect(trunkStatsOf(player.world, player.t).landedPerMinute).toBe(1);
-    // Keel writes nothing more. A quarter of a minute on, the change has left its lane.
-    clock.sinceTheLogBegan = landed + 15_000;
-    player.tick(16);
-    expect(drawn(player)).not.toContain("#2 landed");
-    // And two minutes on, nothing has landed in the last minute.
+    expect(canvasNow(player).answers.perMinute).toBe(0.1);
+    // Keel writes nothing more. Two minutes on, nothing has landed in the last minute.
     clock.sinceTheLogBegan = landed + 120_000;
     player.tick(16);
     expect(trunkStatsOf(player.world, player.t).landedPerMinute).toBe(0);
+    // Eleven minutes on, nothing has landed in Mission Control's last ten, and the change left behind is not quiet yet.
+    clock.sinceTheLogBegan = landed + 11 * 60_000;
+    player.tick(16);
+    expect(canvasNow(player).answers.perMinute).toBe(0);
+    expect(quiet(player)).toEqual([]);
+    // Half an hour on, it has not moved for half an hour, and is drawn quiet.
+    clock.sinceTheLogBegan = landed + 31 * 60_000;
+    player.tick(16);
+    expect(quiet(player)).toEqual(["#1"]);
   });
 
   it("[clock.skew] is never behind the log's own end, whatever this machine's clock says", async () => {

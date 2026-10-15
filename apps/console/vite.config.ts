@@ -38,7 +38,7 @@ function early(): Plugin {
   const files = text || ["", "tree"].includes(place)
     ? prose
     : ["mission-control", "subjects"].includes(place)
-      ? ${JSON.stringify(filesOf("MissionGraph"))}
+      ? ${JSON.stringify(filesOf("MissionCanvas"))}
       : ["blob", "commit", "conflicts"].includes(place)
         ? ${JSON.stringify(filesOf("CodeDiff"))}
         : [];

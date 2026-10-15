@@ -31,7 +31,7 @@ const read = ["src", "test", "scripts"]
 describe("the names the console uses", () => {
   it("has read the console's own source, and enough of it to mean something", () => {
     expect(read.length).toBeGreaterThan(60);
-    expect(read.some((path) => path.endsWith("MissionGraph.tsx"))).toBe(true);
+    expect(read.some((path) => path.endsWith("MissionCanvas.tsx"))).toBe(true);
   });
 
   it("calls no file by a retired name", () => {

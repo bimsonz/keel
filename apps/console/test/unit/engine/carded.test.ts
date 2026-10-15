@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AgentCard } from "../../../src/contract/keel/index.ts";
+import { canvasOf } from "../../../src/engine/canvas.ts";
 import { type Cards, holdersOf } from "../../../src/engine/holder.ts";
-import { type Lanes, lanesOf, subjectOf } from "../../../src/engine/lanes.ts";
+import { subjectOf } from "../../../src/engine/lanes.ts";
 import { CHANGE_FILTERS, PAGE, changesOf } from "../../../src/engine/lists.ts";
 import { type Resources, changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { subjectDetailOf } from "../../../src/engine/subject.ts";
@@ -70,12 +71,10 @@ const sidesOf = (world: World, cards?: Cards): string[] => {
     .toSorted();
 };
 
-const agentNodes = (lanes: Lanes): string[] =>
-  lanes.lanes
-    .flatMap((lane) => lane.nodes)
-    .flatMap((node) =>
-      node.kind === "agent" ? [`${node.label} ${node.agentClass} ${node.id.split(":")[1]}`] : [],
-    )
+/** The agents Mission Control's canvas names, each with the class written beside it and the agent's id. */
+const canvasAgents = (world: World, cards?: Cards): string[] =>
+  canvasOf(world, MID, cards)
+    .agents.map((agent) => `${agent.name} ${agent.agentClass ?? "unnamed"} ${agent.id}`)
     .toSorted();
 
 describe("an agent named from Keel's card of it, on every page that names one", () => {
@@ -151,16 +150,17 @@ describe("an agent named from Keel's card of it, on every page that names one", 
     expect(listed()).toEqual(["an agent unnamed"]);
   });
 
-  it("[carded.node] draws an agent beside its change in Mission Control once the reader has its card, under the card's name and with no class", () => {
-    expect(agentNodes(lanesOf(visitor, MID, {}, cards))).toEqual([
+  it("[carded.node] names each agent on Mission Control's canvas from its card once the reader has it, with no class", () => {
+    expect(canvasAgents(visitor, cards)).toEqual([
       `Heron unnamed ${heron}`,
       `Otter unnamed ${otter}`,
     ]);
-    // With no name for it there is nothing to draw: not before its card is read, and not where Keel has none.
-    expect(agentNodes(lanesOf(visitor, MID))).toEqual([]);
-    expect(agentNodes(lanesOf(visitor, MID, {}, new Map([[otter, null]])))).toEqual([]);
+    // With no name for it, it is an agent: before its card is read, and where Keel has none.
+    const unnamed = [`Agent unnamed ${heron}`, `Agent unnamed ${otter}`].toSorted();
+    expect(canvasAgents(visitor)).toEqual(unnamed);
+    expect(canvasAgents(visitor, new Map([[otter, null]]))).toEqual(unnamed);
     // A member's log has the enrolment: the class stays, beside the card's name.
-    expect(agentNodes(lanesOf(member, MID, {}, cards))).toEqual([
+    expect(canvasAgents(member, cards)).toEqual([
       `Heron ${member.agents.get(heron)?.class} ${heron}`,
       `Otter ${member.agents.get(otter)?.class} ${otter}`,
     ]);

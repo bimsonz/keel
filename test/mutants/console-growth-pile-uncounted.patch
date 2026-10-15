@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.pile
+# why: a pile counts one whatever it holds
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..49832056 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -358,7 +358,7 @@ export function growthOf(
+       fade: 1,
+       kind: "pile",
+       stage,
+-      count: ids.length,
++      count: 1,
+     };
+     nodes.push(pile);
+     edges.push({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.hue
+# why: the hash is read as a signed number, so half the agents get a negative hue
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..1fd5a51d 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -175,7 +175,7 @@
+   let hash = 2_166_136_261;
+   for (let index = 0; index < agentId.length; index += 1)
+     hash = Math.imul(hash ^ agentId.codePointAt(index)!, 16_777_619);
+-  return (hash >>> 0) % HUES;
++  return hash % HUES;
+ }
+ 
+ const STEP_LINE = /^([\w.:-]+?):\s+(pass|fail|abstain|escalate|annotate)\b(?:[^)]*?tier (\d))?/;

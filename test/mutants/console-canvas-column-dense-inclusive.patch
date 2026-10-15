@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.dense
+# why: a stage holding exactly COLUMN_DENSE_AT changes is already drawn as dots
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..7357895a 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -452,7 +452,7 @@
+     live: chips.length,
+     dense: chips.length > DENSE_AT,
+     dotted: CHIP_STAGES.filter(
+-      (stage) => chips.length > DENSE_AT || counts[stage] > COLUMN_DENSE_AT,
++      (stage) => chips.length > DENSE_AT || counts[stage] >= COLUMN_DENSE_AT,
+     ),
+     compact: batches.length > BATCHES_COMPACT_AT,
+   };

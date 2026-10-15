@@ -1,116 +1,73 @@
-// Mission Control: the live graph of what exists in Keel right now, with
-// trunk's numbers above it and a subject's detail beside it.
+// Mission Control: the project drawn as an architecture diagram that grows
+// outward as Keel works on it, live. A subject named in the address opens its
+// panel beside it.
 
-import { Suspense, lazy, useCallback, useState } from "react";
-import type { AgentClass } from "../domain/state.ts";
-import { LANES, lanesOf } from "../engine/lanes.ts";
+import { Suspense, lazy, useRef } from "react";
+import { canvasOf } from "../engine/canvas.ts";
+import { growthOf, keptAfresh } from "../engine/growth.ts";
 import { useClock, useHolderCards, usePlayer, useSelected } from "../engine/react.tsx";
-import { trunkStatsOf } from "../engine/select.ts";
 import { subjectDetailOf } from "../engine/subject.ts";
 import type { Mode } from "../theme/mode.ts";
-import { MissionGraph } from "../views/later.tsx";
+import { MissionCanvas } from "../views/later.tsx";
 import { SubjectPanel } from "../views/SubjectPanel.tsx";
-import { TrunkLine } from "../views/TrunkStats.tsx";
-import { CLASS_WORD } from "../views/parts.tsx";
 
 // Playback is for a test fixture's log. It is loaded only in development, so the built console does not have it.
 const Transport = import.meta.env.DEV
   ? lazy(async () => ({ default: (await import("../views/Transport.tsx")).Transport }))
   : null;
 
-const CLASSES: readonly AgentClass[] = ["real", "hosted", "synthetic"];
-
-export function MissionControlPage({ subject, mode }: { subject?: string; mode: Mode }) {
+export function MissionControlPage({
+  name,
+  subject,
+  mode,
+}: {
+  /** The project's `<namespace>/<name>`. */
+  name: string;
+  subject?: string;
+  mode: Mode;
+}) {
   const player = usePlayer();
-  // What a reader has opened and closed, and how far down they have asked to see. It lasts while they are here.
-  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
-  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
-  const [shown, setShown] = useState(LANES);
-  // What has finished leaves its lane a little after it did, and a rate is over the last minute: both turn on
-  // the time as well as on the log, so they are read again every two seconds of it, whether or not Keel wrote.
-  const clock = useClock(0.5);
-  // A subject open beside the graph has its lane shown and open in it, however far down it comes.
-  const lanes = useSelected(
-    (world, { t, cards }) =>
-      lanesOf(
-        world,
-        t,
-        {
-          opened,
-          closed,
-          shown,
-          ...(subject === undefined ? {} : { pinned: subject }),
-        },
-        cards,
-      ),
-    [opened, closed, shown, subject, clock],
+  // A timer, a fork going quiet and a branch dissolving turn on the time as well as the log.
+  const clock = useClock(1);
+  // Where each fork and batch was put: kept while the reader is here, so nothing placed moves.
+  const kept = useRef(keptAfresh());
+  const canvas = useSelected((world, { t, cards }) => canvasOf(world, t, cards), [clock]);
+  const growth = useSelected(
+    (world, { t, cards }) => growthOf(world, t, name, kept.current, cards),
+    [clock, name],
   );
-  const trunk = useSelected((world, { t }) => trunkStatsOf(world, t), [clock]);
   const detail = useSelected(
     (world, { cards }) => (subject === undefined ? null : subjectDetailOf(world, subject, cards)),
     [subject],
   );
-  // An agent is drawn beside its change, and named in the subject's panel, once the reader has a name for it.
-  useHolderCards([
-    ...lanes.lanes.flatMap((lane) =>
-      lane.nodes.flatMap((node) => (node.kind === "change" ? [node.changeId] : [])),
-    ),
-    ...(detail?.changes.listed.map((change) => change.id) ?? []),
-  ]);
-  const toggle = useCallback((key: string, to: boolean): void => {
-    const [into, outOf] = to ? [setOpened, setClosed] : [setClosed, setOpened];
-    into((before) => new Set([...before, key]));
-    outOf((before) => new Set([...before].filter((each) => each !== key)));
-  }, []);
-  const more = useCallback((): void => setShown((before) => before + LANES), []);
-  const agents = CLASSES.filter((agentClass) => lanes.agents[agentClass] > 0).map(
-    (agentClass) => `${lanes.agents[agentClass].toLocaleString("en-US")} ${CLASS_WORD[agentClass]}`,
-  );
+  // A card is asked for each agent drawn, so it is named as its card names it.
+  useHolderCards(growth.nodes.flatMap((node) => (node.kind === "fork" ? [node.changeId] : [])));
   return (
     <div className="flex h-full flex-col">
       <h1 className="sr-only">Mission Control</h1>
-      <div className="flex shrink-0 flex-wrap items-center gap-x-6 border-b border-kumo-line bg-kumo-base pr-4">
-        <TrunkLine trunk={trunk} />
-        <p className="a-num ml-auto shrink-0 py-3 text-[13px] text-kumo-subtle" data-working>
-          {agents.length > 0 && (
-            <>
-              <span className="font-semibold text-kumo-strong">{agents.join(" · ")}</span>{" "}
-              {agents.length === 1 &&
-              lanes.agents.real + lanes.agents.hosted + lanes.agents.synthetic === 1
-                ? "agent"
-                : "agents"}{" "}
-              ·{" "}
-            </>
-          )}
-          <span className="font-semibold text-kumo-strong">
-            {lanes.changes.toLocaleString("en-US")}
-          </span>{" "}
-          {lanes.changes === 1 ? "change" : "changes"} open
-        </p>
-        {Transport !== null && !player.live && (
+      {Transport !== null && !player.live && (
+        <div className="shrink-0 border-b border-kumo-line bg-kumo-base px-4">
           <Suspense fallback={null}>
             <Transport />
           </Suspense>
-        )}
-      </div>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
-          <MissionGraph
-            lanes={lanes}
+          <MissionCanvas
+            canvas={canvas}
+            growth={growth}
+            now={player.t}
             mode={mode}
-            onToggle={toggle}
-            onMore={more}
-            {...(detail === null ? {} : { selected: detail.key })}
+            live={player.live}
+            loaded={player.loaded}
           />
         </div>
         {detail !== null && <SubjectPanel detail={detail} />}
         {subject !== undefined && detail === null && (
           <aside className="a-subject px-5 py-4" aria-label={`Subject ${subject}`}>
             <h2 className="a-mono break-all text-lg font-semibold text-kumo-strong">{subject}</h2>
-            <p className="mt-1 text-base text-kumo-subtle">
-              Keel has said nothing about a subject of this name so far. A subject is here once it
-              has been minted, or a change has relied on it.
-            </p>
+            <p className="mt-1 text-base text-kumo-subtle">No subject of this name.</p>
           </aside>
         )}
       </div>

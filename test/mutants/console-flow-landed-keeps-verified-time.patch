@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.landed
+# why: a batch trunk took keeps the time it was verified as the time it ended, not the time trunk advanced
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index 9da69291..18dc8756 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -241,7 +241,7 @@
+         this.promoting.delete(event.payload.groupId);
+         for (const batchId of group?.batches ?? []) {
+           const batch = this.#batch(batchId);
+-          if (batch !== undefined) batch.ended = { ...batch.ended, t, how: "landed" };
++          if (batch !== undefined) batch.ended = { t, ...batch.ended, how: "landed" };
+         }
+         this.commits.unshift({
+           height: event.payload.height ?? (this.commits[0]?.height ?? 0) + 1,

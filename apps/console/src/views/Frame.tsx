@@ -9,6 +9,7 @@ import {
   GavelIcon,
   GearIcon,
   GitDiffIcon,
+  FlowArrowIcon,
   GraphIcon,
   HandPalmIcon,
   type Icon,
@@ -33,6 +34,7 @@ export type TabId =
   | "escalations"
   | "decisions"
   | "mission-control"
+  | "pipeline"
   | "insights"
   | "settings";
 
@@ -59,6 +61,7 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
     to: { at: "escalations", filter: "open", shown: PAGE },
   },
   { id: "decisions", label: "Decisions", Icon: GavelIcon, to: { at: "decisions" } },
+  { id: "pipeline", label: "Pipeline", Icon: FlowArrowIcon, to: { at: "pipeline" } },
   {
     id: "mission-control",
     label: "Mission Control",
@@ -90,6 +93,8 @@ export function tabOf(route: Route): TabId | undefined {
       return "decisions";
     case "mission-control":
       return "mission-control";
+    case "pipeline":
+      return "pipeline";
     case "insights":
       return "insights";
     case "settings":

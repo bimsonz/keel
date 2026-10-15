@@ -61,15 +61,27 @@ const statOn = async (page: Page, label: string): Promise<string> =>
       .innerText(),
   );
 const pathOf = (page: Page): string => new URL(page.url()).pathname;
-/** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
-/** Waits for Mission Control's graph to be drawn, or for five seconds: the check after it says which. */
-const graphDrawn = async (shown: Page): Promise<void> => {
+/** A number in Insights' table of trunk's numbers, by its name. */
+const trunkStatOn = async (page: Page, label: string): Promise<string> =>
+  squash(
+    await page
+      .locator("table.a-stats tr", { has: page.locator("th", { hasText: label }) })
+      .locator("td")
+      .first()
+      .innerText(),
+  );
+/** Waits for Mission Control's canvas to be drawn, or for five seconds: the check after it says which. */
+const canvasDrawn = async (shown: Page): Promise<void> => {
   await shown
-    .locator(".a-fn")
+    .locator(".a-mc .react-flow")
     .first()
     .waitFor({ timeout: 5_000 })
     .catch(() => undefined);
 };
+/** Mission Control's frame, and the canvas drawn in it, counted. */
+const canvasOn = async (shown: Page): Promise<string> =>
+  `${await shown.locator(".a-mc").count()} | ${await shown.locator(".a-mc .react-flow").count()}`;
+/** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
 const shot = async (shown: Page, name: string): Promise<void> => {
   const folder = process.env["SHOTS"];
   if (folder !== undefined && folder !== "")
@@ -201,14 +213,18 @@ expectEqual(
   "true",
 );
 
-// Trunk's numbers ride above the live graph. Moving there does not load the page again: the fixture is still held where it was.
+// Mission Control draws its canvas. Moving there does not load the page again: the fixture is still held where it was.
 await tabs.filter({ hasText: "Mission Control" }).click();
 await page.getByText("Holding: a person is being asked").waitFor();
-expectEqual("people asked / landed, held", await stat("People asked / changes landed"), "1/0");
-expectEqual("advances, held", await stat("Advances"), "0");
+await canvasDrawn(page);
+expectEqual("mission control: its canvas, drawn", await canvasOn(page), "1 | 1");
 // Left alone, it stays held: the default is hold.
 await page.waitForTimeout(2_500);
-expectEqual("advances, still held after waiting", await stat("Advances"), "0");
+expectEqual(
+  "still held after waiting",
+  String(await page.getByText("Holding: a person is being asked").count()),
+  "1",
+);
 
 // From there to the list of what is waiting for a person, to the question, and back the way one came.
 await page.getByRole("link", { name: "Holding: a person is being asked" }).click();
@@ -248,10 +264,10 @@ await page
   .waitFor({ timeout: 10_000 });
 await page.getByText("Recorded as decision D-1").waitFor({ timeout: 10_000 });
 // The answer was given on one page and is read on another, with no page load between: what was ruled is still ruled.
-await tabs.filter({ hasText: "Mission Control" }).click();
+await tabs.filter({ hasText: "Insights" }).click();
 await page.waitForFunction(
   () =>
-    [...document.querySelectorAll("dl dt")].find((dt) => dt.textContent === "Advances")
+    [...document.querySelectorAll("table.a-stats th")].find((th) => th.textContent === "Advances")
       ?.nextElementSibling?.textContent === "2",
   undefined,
   {
@@ -262,8 +278,8 @@ await page.waitForFunction(
 await page
   .waitForFunction(
     () =>
-      [...document.querySelectorAll("dl dt")]
-        .find((dt) => dt.textContent === "People asked / changes landed")
+      [...document.querySelectorAll("table.a-stats th")]
+        .find((th) => th.textContent === "People asked / changes landed")
         ?.nextElementSibling?.textContent?.replaceAll(/\s+/g, "") === "1/2",
     undefined,
     { timeout: 10_000 },
@@ -271,10 +287,10 @@ await page
   .catch(() => undefined);
 expectEqual(
   "people asked / landed, after the ruling",
-  await stat("People asked / changes landed"),
+  await trunkStatOn(page, "People asked / changes landed"),
   "1/2",
 );
-expectEqual("trunk red", await stat("Trunk red"), "0");
+expectEqual("trunk red", await trunkStatOn(page, "Trunk red"), "0");
 expectEqual(
   "frame: nothing is left open",
   (await tabs.allInnerTexts()).map(squash).join(" | "),
@@ -1198,183 +1214,22 @@ expectEqual(
   "Public projects Keel did not list its projects: What answered at /v1 was not Keel. | 0",
 );
 
-// Mission Control on the swarm, with thirteen conflicts open at once: a proof nobody was asked about stays open, as
-// Keel counts a conflict, until a ruling resolves it. There is one lane to a subject and one column to
-// each kind of thing; what a person is being asked about comes first; and nothing is left out for good.
-const graph = at("/mission-control", "scenario=swarm&t=100&play=0");
-await page.goto(graph, { waitUntil: "networkidle" });
-await page.locator('.a-fn[data-kind="conflict"]').first().waitFor();
-const leftOf = (kind: string): Promise<number[]> =>
-  page
-    .locator(`.a-fn[data-kind="${kind}"]`)
-    .evaluateAll((nodes) => [
-      ...new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().left))),
-    ]);
+// Mission Control on the swarm draws its canvas, and the Changes tab counts the changes open.
+await page.goto(at("/mission-control", "scenario=swarm&t=100&play=0"), {
+  waitUntil: "networkidle",
+});
+await canvasDrawn(page);
+expectEqual("swarm: Mission Control draws its canvas", await canvasOn(page), "1 | 1");
 expectEqual(
-  "swarm: the columns, named",
-  (await page.locator(".a-mission-head span").allInnerTexts()).join(" | "),
-  "Agent | Change | Subject | Conflict | Probe | Outcome",
-);
-// Each kind of thing stands in one column, in every lane. What came of a conflict is in the last, whatever it was.
-expectEqual("swarm: every conflict in one column", String((await leftOf("conflict")).length), "1");
-expectEqual("swarm: every subject in one column", String((await leftOf("subject")).length), "1");
-expectEqual(
-  "swarm: a question and a guard share the column of what came of it",
-  String((await leftOf("escalation"))[0] === (await leftOf("guard"))[0]),
-  "true",
-);
-expectEqual(
-  "swarm: drawn at no less than 0.8 of life size",
-  String(Number(await page.locator(".a-mission").getAttribute("data-zoom")) >= 0.8),
-  "true",
-);
-// Every open conflict is drawn. None is folded away where it cannot be reached.
-expectEqual(
-  "swarm: conflicts drawn",
-  String(await page.locator('.a-fn[data-kind="conflict"]').count()),
-  "13",
-);
-// Keel glosses a subject first named with nothing said of it by its key: such a node says its key once, and a
-// subject glossed in words still says them.
-const subjectNode = (key: string) =>
-  page.locator('.a-fn[data-kind="subject"]', { hasText: key }).first();
-const timesSaid = async (key: string): Promise<string> =>
-  (await subjectNode(key).count()) === 0
-    ? "not drawn"
-    : String(squash(await subjectNode(key).innerText()).split(key).length - 1);
-expectEqual(
-  "swarm: a subject Keel glossed with its key says the key once; one glossed in words says them",
-  `${await timesSaid("authz.token-revocation")} | ${String(
-    squash(
-      await subjectNode("storage.gc.safety")
-        .innerText()
-        .catch(() => ""),
-    ).includes("What garbage collection may delete"),
-  )}`,
-  "1 | true",
-);
-expectEqual(
-  "swarm: the lane of what a person is being asked about comes first",
-  String(
-    squash(await page.locator('.a-fn[data-kind="subject"]').first().innerText()).includes(
-      "storage.gc.safety",
-    ),
-  ),
-  "true",
-);
-// The load generator's agents are counted, and called what they are. They are not a node with a line to everything.
-expectEqual(
-  "swarm: the agents, counted above the graph",
-  squash(await page.locator("[data-working]").innerText()),
-  "3 REAL · 800 SYNTHETIC agents · 736 changes open",
-);
-expectEqual(
-  "swarm: and the Changes tab counts the same changes as open",
+  "swarm: the Changes tab counts the changes open",
   squash(await tabs.filter({ hasText: "Changes" }).innerText()),
   "Changes 736 open",
 );
-expectEqual(
-  "swarm: none of them is called hosted",
-  String(await page.getByText("HOSTED").count()),
-  "0",
-);
-expectEqual(
-  "swarm: the question a person is being asked is drawn",
-  String(await page.locator('.a-fn[data-kind="escalation"]').count()),
-  "1",
-);
-expectEqual(
-  "swarm: the question says what stands until it is answered",
-  String(
-    await page
-      .locator('.a-fn[data-kind="escalation"]')
-      .getByText("Until answered: The change waits.")
-      .count(),
-  ),
-  "1",
-);
-// The names of the columns stay where they are while the lanes go by beneath them.
-const headAt = (): Promise<number> =>
-  page.locator(".a-mission-head").evaluate((head) => Math.round(head.getBoundingClientRect().top));
-const headBefore = await headAt();
-await page.locator(".a-mission").evaluate((scroller) => scroller.scrollTo({ top: 900 }));
-expectEqual(
-  "swarm: the lanes scroll",
-  String(await page.locator(".a-mission").evaluate((scroller) => scroller.scrollTop > 0)),
-  "true",
-);
-expectEqual("swarm: the columns' names stay put", String((await headAt()) === headBefore), "true");
-// A lane with nothing contested is one line, until it is opened. Opened, it draws its subject; closed again, it is one line.
-const quiet = page.locator('button.a-lane[data-open="false"]');
-const quietBefore = await quiet.count();
-const subjectsBefore = await page.locator('.a-fn[data-kind="subject"]').count();
-expectEqual("swarm: quiet lanes are one line each", String(quietBefore > 0), "true");
-const opening = (await quiet.first().getAttribute("data-lane")) ?? "";
-// What the row says is its name to whoever cannot see it: the subject, and how much is going on there.
-expectEqual(
-  "swarm: a quiet lane says what is on it",
-  String(/\d+ changes?/.test(squash(await quiet.first().innerText()))),
-  "true",
-);
-await quiet.first().click();
-await page.waitForFunction(
-  (before) => document.querySelectorAll('.a-fn[data-kind="subject"]').length === before + 1,
-  subjectsBefore,
-);
-expectEqual(
-  "swarm: a lane opens when asked",
-  `${await quiet.count()} closed, ${await page.locator('.a-fn[data-kind="subject"]').count()} subjects drawn`,
-  `${quietBefore - 1} closed, ${subjectsBefore + 1} subjects drawn`,
-);
-await page.getByRole("button", { name: `Close the lane of ${opening}` }).click();
-await page.waitForFunction(
-  (before) => document.querySelectorAll('.a-fn[data-kind="subject"]').length === before,
-  subjectsBefore,
-);
-expectEqual("swarm: and closes again", String(await quiet.count()), String(quietBefore));
-// The lanes not shown are said, with what is on them, and shown when asked for.
-const lanesBefore = await page.locator(".a-lane").count();
-await page.getByRole("button", { name: /^Show \d+ more subjects/ }).click();
-await page.waitForFunction(
-  (before) => document.querySelectorAll(".a-lane").length > before,
-  lanesBefore,
-);
-expectEqual(
-  "swarm: more lanes, when asked for",
-  String((await page.locator(".a-lane").count()) > lanesBefore),
-  "true",
-);
 
-// While the log plays, things arrive and leave. The graph is drawn at the size it was, where it was: nothing re-fits.
-await page.goto(at("/mission-control", "scenario=swarm&t=60&speed=4"), {
+// A subject opens at its own address, beside Mission Control's canvas; a conflict in it leads to the conflict's page.
+await page.goto(at("/subjects/storage.gc.safety", "scenario=swarm&t=100&play=0"), {
   waitUntil: "networkidle",
 });
-await page.locator('.a-fn[data-kind="subject"]').first().waitFor();
-const framed = (): Promise<string> =>
-  page.locator(".react-flow__viewport").evaluate((element) => getComputedStyle(element).transform);
-const [frameBefore, nodesBefore] = [
-  await framed(),
-  await page
-    .locator(".a-fn")
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? "").join()),
-];
-await page.waitForFunction(
-  (before) =>
-    [...document.querySelectorAll(".a-fn")]
-      .map((node) => node.getAttribute("href") ?? "")
-      .join() !== before,
-  nodesBefore,
-  { timeout: 20_000 },
-);
-expectEqual(
-  "swarm, playing: the graph is not re-framed when something arrives",
-  await framed(),
-  frameBefore,
-);
-
-// A subject opens beside the graph; its address can be shared; a conflict in it leads to the conflict's page.
-await page.goto(graph, { waitUntil: "networkidle" });
-await page.locator('.a-fn[data-kind="subject"]', { hasText: "storage.gc.safety" }).click();
 const panel = page.getByRole("complementary", { name: "Subject storage.gc.safety" });
 await panel.waitFor();
 expectEqual("subject: named in the address", pathOf(page), "/acme/demo/subjects/storage.gc.safety");
@@ -1388,22 +1243,9 @@ expectEqual(
   squash(await panel.locator("section").last().locator("header").innerText()),
   "Changes 33 open",
 );
-expectEqual(
-  "subject: marked on the graph",
-  String(await page.locator('.a-fn[data-selected="true"]').count()),
-  "1",
-);
-// It stands beside the graph, not over it: the subject it is about is still to be seen.
-expectEqual(
-  "subject: beside the graph, not over it",
-  String(
-    (await page
-      .locator('.a-fn[data-selected="true"]')
-      .evaluate((node) => node.getBoundingClientRect().right)) <=
-      (await panel.evaluate((aside) => aside.getBoundingClientRect().left)),
-  ),
-  "true",
-);
+// The canvas is a file of its own and is drawn a moment after the panel beside it: waited for, and read either way.
+await canvasDrawn(page);
+expectEqual("subject: beside Mission Control's canvas", await canvasOn(page), "1 | 1");
 await panel.getByRole("link", { name: /C-7/ }).click();
 await page.getByRole("heading", { name: "World matrix" }).waitFor();
 expectEqual(
@@ -1417,67 +1259,6 @@ expectEqual(
   "subject: Back returns to it, open as it was",
   pathOf(page),
   "/acme/demo/subjects/storage.gc.safety",
-);
-// A subject's address opens it from nowhere, dots and all.
-await page.goto(at("/subjects/storage.gc.safety", "scenario=swarm&t=100&play=0"), {
-  waitUntil: "networkidle",
-});
-await panel.waitFor();
-// The graph is a file of its own and is drawn a moment after the panel beside it: waited for, and read either way.
-await graphDrawn(page);
-expectEqual(
-  "subject: opened cold",
-  String(await page.locator('.a-fn[data-selected="true"]').count()),
-  "1",
-);
-
-// A subject whose lane comes after those first shown: opened from its address, its lane is shown all the same, and marked.
-await page.goto(graph, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: /^Show \d+ more subjects/ }).waitFor();
-const shownAtFirst = await page
-  .locator(".a-lane")
-  .evaluateAll((lanes) => lanes.map((lane) => lane.getAttribute("data-lane") ?? ""));
-await page.getByRole("button", { name: /^Show \d+ more subjects/ }).click();
-await page.waitForFunction(
-  (before) => document.querySelectorAll(".a-lane").length > before,
-  shownAtFirst.length,
-);
-const far =
-  (
-    await page
-      .locator(".a-lane")
-      .evaluateAll((lanes) => lanes.map((lane) => lane.getAttribute("data-lane") ?? ""))
-  ).find((key) => !shownAtFirst.includes(key)) ?? "";
-await page.goto(at(`/subjects/${far}`, "scenario=swarm&t=100&play=0"), {
-  waitUntil: "networkidle",
-});
-await page.getByRole("complementary", { name: `Subject ${far}` }).waitFor();
-await graphDrawn(page);
-expectEqual(
-  "subject: one far down the list has its lane shown when it is opened",
-  String(await page.locator('.a-fn[data-selected="true"]').count()),
-  "1",
-);
-// It is brought to the reader a few frames after it is drawn.
-await page
-  .waitForFunction(
-    () => {
-      const box = document.querySelector('.a-fn[data-selected="true"]')?.getBoundingClientRect();
-      return box !== undefined && box.top >= 0 && box.bottom <= window.innerHeight;
-    },
-    undefined,
-    { timeout: 5_000 },
-  )
-  .catch(() => undefined);
-expectEqual(
-  "subject: and is brought into view",
-  String(
-    await page.locator('.a-fn[data-selected="true"]').evaluate((node) => {
-      const box = node.getBoundingClientRect();
-      return box.top >= 0 && box.bottom <= window.innerHeight;
-    }),
-  ),
-  "true",
 );
 // A subject Keel has not heard of says so, where its panel would be.
 await page.goto(at("/subjects/no.such.subject", "scenario=swarm&t=100&play=0"), {
@@ -1494,91 +1275,6 @@ expectEqual(
   ),
   "1",
 );
-
-// A change stands in one lane and is counted there. In the lane of each other subject it touches it is shown
-// again, as a reference to it. In scenario 1 the first change comes back relying on a second subject, which Keel
-// mints at an agent's first word about it.
-await page.goto(at("/mission-control", "scenario=s1&t=8:30&play=0"), { waitUntil: "networkidle" });
-await page.locator('.a-fn[data-kind="subject"]').first().waitFor({ timeout: 20_000 });
-const reference = page.locator('.a-fn[data-kind="reference"]');
-expectEqual(
-  "graph: a change that relies on a second subject is shown in that subject's lane too, with what ties it there",
-  squash((await reference.allInnerTexts()).join(" / ")),
-  "Change #1 working relies on: is true in the lane of authz.permission-evaluation",
-);
-expectEqual(
-  "graph: and it stands inside the band of the subject it relies on",
-  String(
-    await page.evaluate(() => {
-      const band = document
-        .querySelector('.a-lane[data-lane="collab.revocation"]')
-        ?.getBoundingClientRect();
-      const box = document.querySelector('.a-fn[data-kind="reference"]')?.getBoundingClientRect();
-      return (
-        band !== undefined && box !== undefined && box.top >= band.top && box.bottom <= band.bottom
-      );
-    }),
-  ),
-  "true",
-);
-expectEqual(
-  "graph: the change itself is drawn once, with its agent beside it, and counted once",
-  `${await page.locator('.a-fn[data-kind="change"]').count()} change, ${await page.locator('.a-fn[data-kind="agent"]').count()} agent, ${squash(await page.locator("[data-working]").innerText())}`,
-  "1 change, 1 agent, 2 REAL agents · 1 change open",
-);
-expectEqual(
-  "graph: a subject's counts stay on one line when it has premises, a guard and a decision",
-  String(
-    await page
-      .locator('.a-fn[data-kind="subject"] [data-counts]')
-      .first()
-      .evaluate((row) => row.getBoundingClientRect().height <= 22),
-  ),
-  "true",
-);
-// Closed, that lane says that what it shows is another lane's change.
-await page
-  .locator('.a-lane[data-lane="collab.revocation"] .a-lane-toggle')
-  .click({ timeout: 5000 })
-  .catch(() => {});
-const closedLane = page.locator('button.a-lane[data-lane="collab.revocation"]');
-await closedLane.waitFor({ timeout: 5000 }).catch(() => {});
-expectEqual(
-  "graph: a closed lane counts no change as its own, and says one of another lane touches it",
-  squash((await closedLane.allInnerTexts()).join(" / ")).includes("0 changes · 1 from another lane")
-    ? "said"
-    : squash((await closedLane.allInnerTexts()).join(" / ")),
-  "said",
-);
-await closedLane.click({ timeout: 5000 }).catch(() => {});
-await reference
-  .first()
-  .click({ timeout: 5000 })
-  .catch(() => {});
-await page.waitForURL("**/acme/demo/changes/1**", { timeout: 5000 }).catch(() => {});
-expectEqual("graph: a reference opens the change's own page", pathOf(page), "/acme/demo/changes/1");
-
-// The graph's size is measured from the room there is, even where the page opened with nothing to draw.
-await page.setViewportSize({ width: 1400, height: 900 });
-await page.goto(at("/mission-control", "scenario=s1&t=20&speed=16"), { waitUntil: "networkidle" });
-await page.locator('.a-fn[data-kind="subject"]').first().waitFor({ timeout: 20_000 });
-expectEqual(
-  "graph: sized to a narrower window though it opened empty",
-  String(Number(await page.locator(".a-mission").getAttribute("data-zoom")) < 1),
-  "true",
-);
-await page.setViewportSize({ width: 1920, height: 1080 });
-
-// A change and a conflict open from the graph too.
-await page.goto(graph, { waitUntil: "networkidle" });
-// A change is named by Keel's own number for it.
-await page.locator('.a-fn[data-kind="change"]', { hasText: "#496" }).click();
-await page.getByRole("navigation", { name: "Change" }).waitFor();
-expectEqual("graph: a change opens its page", pathOf(page), "/acme/demo/changes/496");
-await page.goto(graph, { waitUntil: "networkidle" });
-await page.locator('.a-fn[data-kind="conflict"]', { hasText: "C-13" }).click();
-await page.getByRole("heading", { name: "World matrix" }).waitFor();
-expectEqual("graph: a conflict opens its page", pathOf(page), "/acme/demo/conflicts/C-13");
 
 // At scale a list shows a page at a time, and says how to see more.
 await page.goto(at("/changes", "scenario=swarm&t=100&play=0"), { waitUntil: "networkidle" });
@@ -1631,17 +1327,6 @@ expectEqual(
   `${await tabs.filter({ hasText: "Agents" }).count()} tabs | ${squash(await page.getByRole("heading", { level: 1 }).first().innerText())}`,
   "0 tabs | There is nothing at this address",
 );
-// Mission Control's agent node says the run its change is held under, where the agent named one.
-await page.goto(at("/mission-control", "scenario=s1&t=470&ruling=live&play=0"), {
-  waitUntil: "networkidle",
-});
-await graphDrawn(page);
-expectEqual(
-  "mission control: an agent beside its change says the run it named, and one that named none says none",
-  `${await page.getByText("run “collab-revocation”").count()} | ${await page.getByText(/run “/).count()}`,
-  "1 | 1",
-);
-
 // Insights: trunk's numbers with what each means, the review funnel, and the benchmark where a run was sealed.
 // A change a ruling went against is counted where it had got to, under that cause and no other.
 await page.goto(at("/insights/funnel", RULED), { waitUntil: "networkidle" });
@@ -2074,7 +1759,7 @@ await asDeployed(street, {
   hold: (path) => (path === "/v1/events" ? logHeld : Promise.resolve()),
 });
 const visitor = watch(await street.newPage(), "built, a visitor");
-// The scripts the page asks for: the code viewer and Mission Control's graph are files of their own, asked for by
+// The scripts the page asks for: the code viewer and Mission Control's canvas are files of their own, asked for by
 // the pages that draw them. The names are the build's, with a hash after each.
 const scripts: string[] = [];
 visitor.on("request", (request) => {
@@ -2200,23 +1885,17 @@ expectEqual(
 // Playback is for a fixture's log. The built console has none, and no way to move about in Keel's.
 scripts.length = 0;
 await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
-await visitor.locator("dl.a-trunk-line").waitFor();
-expectEqual(
-  "visitor: changes landed, and no count of people asked, which a visitor is not read",
-  await statOn(visitor, "People asked / changes landed"),
-  "—/0",
-);
-await shot(visitor, "visitor-mission-control");
-// A new document, so what it asks for is counted from nothing: the graph, and not the code viewer.
+// A new document, so what it asks for is counted from nothing: the canvas, and not the code viewer.
 await visitor
-  .locator(".react-flow")
+  .locator(".a-mc .react-flow")
   .first()
   .waitFor({ timeout: 8_000 })
   .catch(() => undefined);
+await shot(visitor, "visitor-mission-control");
 expectEqual(
-  "visitor: Mission Control asks for its graph, which is a file of its own, and for no code viewer",
-  `${heavy()} | ${await visitor.locator(".react-flow").count()} drawn`,
-  "MissionGraph | 1 drawn",
+  "visitor: Mission Control draws its canvas, which is a file of its own, and asks for no code viewer",
+  `${heavy()} | ${await canvasOn(visitor)}`,
+  "MissionCanvas | 1 | 1",
 );
 // The control is loaded apart from the page, a moment after it. So it is waited for, and must not come.
 expectEqual(
@@ -2229,6 +1908,14 @@ expectEqual(
       () => "none",
     ),
   "none",
+);
+// Trunk's numbers are in Insights: a visitor is told what landed, and no count of people asked.
+await visitor.goto(`${built}/ada/demo/insights`, { waitUntil: "domcontentloaded" });
+await visitor.locator("table.a-stats").waitFor();
+expectEqual(
+  "visitor: changes landed, and no count of people asked, which a visitor is not read",
+  await trunkStatOn(visitor, "People asked / changes landed"),
+  "—/0",
 );
 
 // Asking the built console for a fixture gets Keel, not the fixture. And no link in it carries the asking further.
@@ -2459,12 +2146,12 @@ const namedFromCard = (shown: Page, name: string): Promise<void> =>
     .first()
     .waitFor({ timeout: 10_000 })
     .catch(() => undefined);
-const agentsNamed = async (shown: Page, within = "main"): Promise<string> =>
+const agentsNamed = async (shown: Page): Promise<string> =>
   [
     ...new Set(
       (
         await shown
-          .locator(within)
+          .locator("main")
           .getByText(/^(an agent|Agent( [AB])?)$/)
           .allInnerTexts()
       ).map(squash),
@@ -2539,17 +2226,6 @@ expectEqual(
   "Agent A, Agent B | 0 classes",
 );
 await shot(visitor, "visitor-conflict");
-// Mission Control draws an agent beside its change once the reader has a name for it: for a visitor, its card's.
-await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
-await graphDrawn(visitor);
-await namedFromCard(visitor, "Agent A");
-await namedFromCard(visitor, "Agent B");
-expectEqual(
-  "visitor: Mission Control draws each agent beside its change under its card's name, with its run and no class",
-  `${await agentsNamed(visitor, ".a-fn")} | ${await visitor.getByText("run “collab-revocation”", { exact: true }).count()} run | ${await classesWritten(visitor)} classes`,
-  "Agent A, Agent B | 1 run | 0 classes",
-);
-await shot(visitor, "visitor-mission-control");
 await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("main").getByRole("heading").last().waitFor();
 const wayIn =
@@ -3794,9 +3470,9 @@ expectEqual(
 const logEnded = Date.parse(shut.events().at(-1)?.at ?? "");
 const later = watch(await lobby.newPage(), "member, as time passes");
 await later.clock.install({ time: new Date(logEnded + 1_000) });
-await later.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
-await later.locator("dl.a-trunk-line").waitFor({ timeout: 10_000 });
-const landedLately = async (): Promise<string> => statOn(later, "Landed per minute");
+await later.goto(`${built}/ada/demo/insights`, { waitUntil: "domcontentloaded" });
+await later.locator("table.a-stats").waitFor({ timeout: 10_000 });
+const landedLately = async (): Promise<string> => trunkStatOn(later, "Landed per minute");
 /** Reads the rate until it is `wanted`, or for three seconds: a rate that never moves is a failed check, by name. */
 const settlesAt = async (wanted: string): Promise<string> => {
   for (let tries = 0; tries < 30 && (await landedLately()) !== wanted; tries += 1)

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.bounds
+# why: the bounds stop at a node's left edge
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index a725af55..62be89d4 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -574,7 +574,7 @@ export function growthOf(
+   for (const node of nodes) {
+     x0 = Math.min(x0, node.x);
+     y0 = Math.min(y0, node.y);
+-    x1 = Math.max(x1, node.x + node.w);
++    x1 = Math.max(x1, node.x);
+     y1 = Math.max(y1, node.y + node.h);
+   }
+   return { nodes, edges, bounds: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };

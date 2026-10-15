@@ -44,6 +44,7 @@ import type {
   World as WorldId,
 } from "../domain/state.ts";
 import { citedIn } from "./decisions.ts";
+import { Flow } from "./flow.ts";
 
 /** A proposition as a claim, as Keel keys one: what it says, and not its gloss, its strength or its anchors. */
 export const claimOf = (proposition: Proposition): string =>
@@ -451,6 +452,8 @@ export class World {
   readonly guards = new Map<string, GuardEntry>();
   readonly verdicts = new Map<string, VerdictEntry>();
   readonly batches = new Map<string, BatchEntry>();
+  /** Where each change stands in Keel's flow and since when: the Pipeline is drawn from it. */
+  readonly flow = new Flow();
   /** Session id to agent id. */
   readonly sessions = new Map<string, string>();
   /** Each agent the log names as having written here or as holding a change, by its id. */
@@ -606,6 +609,7 @@ export class World {
   apply(event: AnyEvent, t: number): void {
     this.version += 1;
     this.#wrote(event);
+    this.flow.apply(event, t);
     const p = event.payload;
     switch (event.type) {
       case "AgentEnrolled": {

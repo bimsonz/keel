@@ -89,21 +89,6 @@ function statsOf(trunk: TrunkStats, hidden: boolean): Stat[] {
   ];
 }
 
-/** One line, above the live graph. */
-export function TrunkLine({ trunk }: { trunk: TrunkStats }) {
-  const hidden = usePublicOnly();
-  return (
-    <dl className="a-trunk-line" aria-label="Trunk">
-      {statsOf(trunk, hidden).map((stat) => (
-        <div key={stat.label}>
-          <dt>{stat.label}</dt>
-          <dd className="a-num">{stat.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 /** Each number with what it means. */
 export function TrunkTable({ trunk }: { trunk: TrunkStats }) {
   const hidden = usePublicOnly();

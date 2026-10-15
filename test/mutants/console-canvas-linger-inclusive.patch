@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/canvas.test.ts
+# kills: canvas.linger
+# why: a batch that ended off trunk is still drawn when LINGER_MS has passed
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index a78cc246..24396f09 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -229,7 +229,7 @@
+   if (how === "landed") return false;
+   if (how === "green" || how === "promoted")
+     return !batch.members.every((id) => changes.get(id)?.stage === "landed");
+-  return now - (batch.ended?.t ?? now) < LINGER_MS;
++  return now - (batch.ended?.t ?? now) <= LINGER_MS;
+ }
+ 
+ function factsOf(change: ChangeEntry): string[] {
