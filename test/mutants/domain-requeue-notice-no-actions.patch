@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.actions, requeue-notice.stored
+# why: a requeue's notice names no next action
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..470f48dc 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -326,7 +326,7 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
+         operationId: "Agents_listProjects",
+       },
+     ];
+-  if (event.type === "ChangeRequeued")
++  if (event.type === "ChangeRequeued-dropped")
+     return Option.match(decodeRequeued(event.payload), {
+       onNone: () => undefined,
+       onSome: (p) => [

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.every-reason, requeue-notice.stored
+# why: a requeue's notice says nothing of why the change went back to the queue
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..2ae0b3c2 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -207,7 +207,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
+         onSome: (p) =>
+           p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
+       });
+-    case "ChangeRequeued":
++    case "ChangeRequeued-dropped":
+       return Option.match(decodeRequeued(event.payload), {
+         onNone: () => undefined,
+         onSome: (p) =>

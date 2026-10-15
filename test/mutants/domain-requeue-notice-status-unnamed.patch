@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.actions
+# why: the status read does not name the change, so it reads nothing
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..75234202 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -335,7 +335,7 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
+           kind: "read",
+           title: "Read where the change stands",
+           operationId: "status",
+-          args: { changeId: p.changeId, wait: 30 },
++          args: { wait: 30 },
+         },
+       ],
+     });

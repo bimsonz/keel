@@ -1,0 +1,25 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.every-reason, requeue-notice.stored
+# why: an infrastructure failure reads as a clash between the batch's changes, and a clash as an infrastructure failure
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..52b49d78 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -130,7 +130,7 @@ const decodeRequeued = Schema.decodeUnknownOption(ChangeRequeued);
+  * alone (`runsAlone`), and only its own bounce asks for a rebase.
+  */
+ const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next: string }> = {
+-  "infra-failure": { because: "its batch failed on Keel's infrastructure", next: "Runs again" },
++  "infra-failure": { because: "the changes in its batch could not be merged together", next: "Runs again" },
+   bisection: {
+     because: "its batch failed and Keel is splitting it to find which change broke it",
+     next: "Runs again in a smaller batch",
+@@ -144,7 +144,7 @@ const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next:
+     next: "Runs again without that change",
+   },
+   textual: {
+-    because: "the changes in its batch could not be merged together",
++    because: "its batch failed on Keel's infrastructure",
+     next: "Runs alone next; if it does not merge onto trunk on its own, it bounces and asks for a rebase",
+   },
+   interaction: {

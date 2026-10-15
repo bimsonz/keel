@@ -1,4 +1,5 @@
 import { Effect, Option, Schema } from "effect";
+import { ChangeRequeued, type RequeueReason } from "../../domain/coordination/index.ts";
 import {
   AgentInvited,
   AgentInvitedToProject,
@@ -120,6 +121,38 @@ const decodePreview = Schema.decodeUnknownOption(
   Schema.Struct({ url: Schema.String, aliasUrl: Schema.optional(Schema.String) }),
 );
 
+const decodeRequeued = Schema.decodeUnknownOption(ChangeRequeued);
+
+/**
+ * Why a change went back to the front of its lane's queue, and what Keel does
+ * with it next, by the requeue's reason. A change that is queued takes no
+ * rebase or submit, so nothing here asks for one: after `textual` it runs
+ * alone (`runsAlone`), and only its own bounce asks for a rebase.
+ */
+const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next: string }> = {
+  "infra-failure": { because: "its batch failed on Keel's infrastructure", next: "Runs again" },
+  bisection: {
+    because: "its batch failed and Keel is splitting it to find which change broke it",
+    next: "Runs again in a smaller batch",
+  },
+  invalidated: {
+    because: "trunk moved while its batch was verified",
+    next: "Verified again on trunk's new head",
+  },
+  "co-member-failed": {
+    because: "another change in its batch failed and was bounced",
+    next: "Runs again without that change",
+  },
+  textual: {
+    because: "the changes in its batch could not be merged together",
+    next: "Runs alone next; if it does not merge onto trunk on its own, it bounces and asks for a rebase",
+  },
+  interaction: {
+    because: "its batch's changes passed apart but failed together",
+    next: "Runs alone next",
+  },
+};
+
 /** More than the notice's title says, chosen for the event when it is delivered. */
 export function detailOf(event: EventEnvelope): string | undefined {
   switch (event.type) {
@@ -173,6 +206,12 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onNone: () => undefined,
         onSome: (p) =>
           p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
+      });
+    case "ChangeRequeued":
+      return Option.match(decodeRequeued(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `Requeued from ${p.batchId}: ${REQUEUED[p.reason].because}. ${REQUEUED[p.reason].next}.`,
       });
     case "PreviewDeployed":
       return Option.match(decodePreview(event.payload), {
@@ -287,6 +326,19 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
         operationId: "Agents_listProjects",
       },
     ];
+  if (event.type === "ChangeRequeued")
+    return Option.match(decodeRequeued(event.payload), {
+      onNone: () => undefined,
+      onSome: (p) => [
+        { kind: "wait", title: REQUEUED[p.reason].next },
+        {
+          kind: "read",
+          title: "Read where the change stands",
+          operationId: "status",
+          args: { changeId: p.changeId, wait: 30 },
+        },
+      ],
+    });
   const conflictId = Option.getOrUndefined(decodeEscalation(event.payload))?.conflictId;
   if (conflictId === undefined) return undefined;
   switch (event.type) {

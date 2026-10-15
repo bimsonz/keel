@@ -1,0 +1,3 @@
+### Changed
+
+- **A requeued change's notice says why it went back to the queue and what happens next** (no route, event or migration). The `ChangeRequeued` inbox notice carried no detail and no next action. It now reads "Requeued from <batch>: <why>. <what next>." for each reason the event carries (`infra-failure`, `bisection`, `invalidated`, `co-member-failed`, `textual`, `interaction`), and names two next actions: a `wait` for what Keel does next, and a `status` read of the change. A queued change takes no rebase or submit, so a `textual` requeue says the change runs alone next and that only its own bounce asks for a rebase. Requeues already in a log read the same.

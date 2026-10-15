@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.old-log
+# why: a requeue committed before the plan was kept on it is told with no words
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..15c3a597 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -211,7 +211,9 @@ export function detailOf(event: EventEnvelope): string | undefined {
+       return Option.match(decodeRequeued(event.payload), {
+         onNone: () => undefined,
+         onSome: (p) =>
+-          `Requeued from ${p.batchId}: ${REQUEUED[p.reason].because}. ${REQUEUED[p.reason].next}.`,
++          p.planHash === undefined
++            ? undefined
++            : `Requeued from ${p.batchId}: ${REQUEUED[p.reason].because}. ${REQUEUED[p.reason].next}.`,
+       });
+     case "PreviewDeployed":
+       return Option.match(decodePreview(event.payload), {

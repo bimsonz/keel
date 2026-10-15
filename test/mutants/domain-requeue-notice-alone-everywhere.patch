@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.alone
+# why: a change split out of a bisected batch is told it runs alone, which the lane does not do
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..86003702 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -133,7 +133,7 @@ const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next:
+   "infra-failure": { because: "its batch failed on Keel's infrastructure", next: "Runs again" },
+   bisection: {
+     because: "its batch failed and Keel is splitting it to find which change broke it",
+-    next: "Runs again in a smaller batch",
++    next: "Runs alone in a smaller batch",
+   },
+   invalidated: {
+     because: "trunk moved while its batch was verified",

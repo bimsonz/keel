@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.every-reason, requeue-notice.stored
+# why: the notice does not say which batch the change came back from
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..380c4213 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -211,7 +211,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
+       return Option.match(decodeRequeued(event.payload), {
+         onNone: () => undefined,
+         onSome: (p) =>
+-          `Requeued from ${p.batchId}: ${REQUEUED[p.reason].because}. ${REQUEUED[p.reason].next}.`,
++          `Requeued from its batch: ${REQUEUED[p.reason].because}. ${REQUEUED[p.reason].next}.`,
+       });
+     case "PreviewDeployed":
+       return Option.match(decodePreview(event.payload), {

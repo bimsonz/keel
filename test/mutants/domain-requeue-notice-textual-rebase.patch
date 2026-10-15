@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts
+# kills: requeue-notice.actions
+# why: a textual requeue asks for a rebase, which a queued change refuses
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 9f82e820..fb06d131 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -330,7 +330,9 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
+     return Option.match(decodeRequeued(event.payload), {
+       onNone: () => undefined,
+       onSome: (p) => [
+-        { kind: "wait", title: REQUEUED[p.reason].next },
++        p.reason === "textual"
++          ? { kind: "call", title: "Rebase onto trunk", operationId: "rebase", args: { changeId: p.changeId } }
++          : { kind: "wait", title: REQUEUED[p.reason].next },
+         {
+           kind: "read",
+           title: "Read where the change stands",
